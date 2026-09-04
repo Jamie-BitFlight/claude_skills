@@ -83,6 +83,39 @@ class TestBacklogAddErrorContract:
         assert result.exit_code == 0, result.stderr
         assert json.loads(result.stdout) == {"title": "new item", "priority": "P1", "item_ref": "#123"}
 
+    def test_add_exits_nonzero_when_result_carries_an_error_without_raising(self, mocker: MockerFixture) -> None:
+        """``add_item`` returning a populated ``error`` key (not raising) still exits non-zero.
+
+        Tests: The #3182 fix's CLI half -- a GitHub issue-creation failure is
+        reported via ``result["error"]`` on an otherwise-normal return (item
+        stored locally, ``item_ref`` empty), not via a raised exception. This
+        is distinct from ``test_duplicate_item_rejection_...`` above, which
+        covers the raised-exception path.
+        How: Mock ``operations.add_item`` to return a mapping with a
+        populated ``error`` key and no exception.
+        Why: A caller parsing only the exit code must be able to detect this
+        failure mode without inspecting stdout.
+        """
+        mocker.patch(
+            "sam_schema.backlog.operations.add_item",
+            return_value={
+                "title": "new item",
+                "priority": "P1",
+                "item_ref": "",
+                "error": "Issue creation failed: boom",
+            },
+        )
+
+        result = runner.invoke(app, ["backlog", "add", "--title", "new item", "--priority", "P1"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout) == {
+            "title": "new item",
+            "priority": "P1",
+            "item_ref": "",
+            "error": "Issue creation failed: boom",
+        }
+
 
 class TestBacklogViewRefreshForwarding:
     """``backlog view`` forwards the ``--refresh`` flag to ``operations.view_item``."""

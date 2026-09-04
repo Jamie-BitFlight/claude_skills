@@ -151,19 +151,24 @@ Shared parameters:
 - `force`: optional; default false
 
 If the result contains `error` or non-empty `errors` (MCP), or the CLI exits non-zero, report the
-error and stop — except the GitHub-issue-creation-failure `error` case, which Step 5 handles
-without stopping because the item was still stored.
+error and stop — except the GitHub-issue-creation-failure `error` case (item stored, `reference`
+present — see Step 5), which does not stop the workflow.
 
 ## Step 5: Use `item_ref` from the response
 
 The `backlog_add` response contains `item_ref` — use that value directly for all downstream workflows and selector parameters.
 
-If the response also carries a non-empty `error` (MCP field, or the CLI JSON payload's `"error"` key), the backend
-issue could not be created even though the item itself was stored: `item_ref` will be `""` and `reference` is the
-only selector for this item until an issue is created for it. Report the error text to the user, use `reference`
-(not `item_ref`) in Step 6's confirmation and next-step commands, and do not treat this as the generic
+If the response also carries a non-empty `error` **and a non-empty `reference` (or `file_path`/`title`)**, the
+backend issue could not be created even though the item itself was stored: `item_ref` will be `""` and `reference`
+is the only selector for this item until an issue is created for it. Report the error text to the user, use
+`reference` (not `item_ref`) in Step 6's confirmation and next-step commands, and do not treat this as the generic
 "MCP tool result contains `error`" stop condition in Error handling below — the item exists and Step 6 still
 applies, just without an issue reference.
+
+If the response carries a non-empty `error` and `reference`/`file_path`/`title` are all absent, the item was
+**never stored** — this is a distinct, pre-existing failure mode (e.g. a duplicate or validation error raised
+before any write). Treat this as the generic "MCP tool result contains `error`" stop condition below; there is
+no item and no selector to fall back to.
 
 ## Step 6: Confirm write
 
@@ -191,12 +196,14 @@ Stop and report on:
 - duplicate detected and the user chose not to proceed
 - duplicate detected in `auto` mode
 - MCP tool result contains `error` or non-empty `errors` (excluding the GitHub-issue-creation-failure `error` case
-  handled in Step 5, which does not stop the workflow)
+  handled in Step 5 — item stored, `reference` present — which does not stop the workflow; an `error` with no
+  `reference`/`file_path`/`title` means the item was never stored and IS a stop condition)
 
 ## Completion criteria
 
 Creation is complete only when:
-- `backlog_add` returns with no non-empty `errors` (a populated `error` field with GitHub-issue-creation-failure
-  text is not itself a stop condition — see Step 5's failure branch — but any other non-empty `error`/`errors` is)
+- `backlog_add` returns with no non-empty `errors`, and any populated `error` field is the GitHub-issue-creation-failure
+  case from Step 5 (item stored, `reference` present) — any other non-empty `error`, or one with no `reference`/
+  `file_path`/`title`, means creation did not complete
 - `item_ref` is normalized to `#N`, or, if Step 5's failure branch applied, `reference` is used in its place
 - confirmation is shown to the user, using whichever selector (`item_ref` or `reference`) Step 5 resolved
