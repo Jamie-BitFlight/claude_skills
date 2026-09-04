@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 #
 # [tool.ty.environment]
-# extra-paths = ["."]
+# root = ["."]
 # ///
 """Validate Codex plugin installation and runtime behavior in isolation."""
 

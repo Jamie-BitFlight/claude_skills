@@ -1,4 +1,4 @@
-# FastMCP v3 Providers Reference
+# FastMCP Providers Reference
 
 How FastMCP sources components from different origins: local code, mounted servers, remote proxies, filesystems, and skills directories. [1]
 
@@ -140,6 +140,11 @@ Namespacing transform rules:
 | Link type | Live (dynamic) | One-time copy (static) |
 | Updates | Reflected immediately | Not reflected |
 | Use case | Modular runtime composition | Bundling finalized components |
+| Availability | v3 and v4 | **v3 only — removed in v4** |
+
+CONSTRAINT (v4): `import_server()` is removed entirely, not deprecated. `mount()` is the only
+option — its live-link semantics have no static-copy equivalent. See
+[./migration.md](./migration.md) if you relied on the snapshot behavior.
 
 ---
 

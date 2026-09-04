@@ -25,6 +25,7 @@ been added yet.
 | `prose-file-classification.md` | any `.md` — review-treatment decision tree for prose files |
 | `python-development.md` | Python files, `pyproject.toml`, `uv.lock` — PEP 723 scripts, no uv workspace, ty errors |
 | `review-and-correction-discipline.md` | SKILL.md/agents/commands/CLAUDE.md — structural vs content review gates |
+| `runtime-vs-design-time.md` | SKILL.md/references/agents/commands/CLAUDE.md/AGENTS.md — runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo |
 | `script-invocation.md` | scripts/, `.claude/hooks/` — shebang/execute-bit, run scripts directly |
 | `silent-failure-prevention.md` | Python/TS/JS — write operations must report what changed |
 | `skill-content-optimization.md` | SKILL.md, references/*.md — load skill-creator before editing skills |

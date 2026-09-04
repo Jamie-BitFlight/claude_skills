@@ -1,6 +1,6 @@
-# FastMCP v3 Migration Reference
+# FastMCP v3 → v4 Migration Reference
 
-Breaking changes and migration steps for upgrading to FastMCP v3 — covers v2 to v3 changes, migration from the bundled MCP SDK FastMCP, and migration from the low-level `mcp.server.Server` class. [1] [2] [3]
+Breaking changes and migration steps for upgrading to FastMCP v3 or v4 — covers v2 to v3 changes, v3 to v4 changes, migration from the bundled MCP SDK FastMCP, and migration from the low-level `mcp.server.Server` class. [1] [2] [3] [9] [10]
 
 ---
 
@@ -16,8 +16,13 @@ Pin your version constraint to avoid breaking on the next major:
 
 ```toml
 [project]
-dependencies = ["fastmcp>=3.0.0,<4"]
+dependencies = ["fastmcp>=4.0.0,<5"]
 ```
+
+FastMCP 4 rebuilds on MCP Python SDK v2 and introduces a sessionless protocol, but negotiates
+both protocol eras per connection — most FastMCP 3 servers run unchanged. See
+[FastMCP v3 to v4 — Breaking Changes](#fastmcp-v3-to-v4--breaking-changes-9-10) below for the changes
+that do apply. [9] [10]
 
 ---
 
@@ -245,9 +250,11 @@ git remote set-url origin https://github.com/PrefectHQ/fastmcp.git
 
 ---
 
-## v2 Deprecations (Still Work, Emit Warnings) [5]
+## v2 Deprecations — Removed Entirely in v4 [5] [10]
 
-Update these when convenient — they still work in v3 but will be removed in a future release.
+These were soft-deprecated (still worked, emitted warnings) in v3. FastMCP 4 removes every one of
+them — the old form now raises an error instead of a warning. Update before upgrading to v4, not
+"when convenient."
 
 ### mount() prefix → namespace
 
@@ -262,12 +269,17 @@ main.mount(subserver, namespace="api")
 ### import_server() → mount()
 
 ```python
-# Deprecated
+# Deprecated in v3, removed in v4
 main.import_server(subserver)
 
 # New
 main.mount(subserver)
 ```
+
+CONSTRAINT: `import_server()`'s one-time static-copy semantics have no v4 replacement — `mount()`
+is a live, dynamic link only. If your server relied on `import_server()` to snapshot a subserver's
+components at a point in time (so later changes to the subserver would NOT propagate), there is no
+direct v4 equivalent; mount the subserver and accept live updates, or copy components manually.
 
 ### Module Paths for Proxy and OpenAPI
 
@@ -309,6 +321,145 @@ from fastmcp.server import create_proxy
 
 proxy = create_proxy("http://example.com/mcp")
 ```
+
+---
+
+## FastMCP v3 to v4 — Breaking Changes [9] [10]
+
+### 1. `ToolAnnotations` Fields Are Now snake_case
+
+FastMCP 4 rebuilds on MCP Python SDK v2, which renamed every `ToolAnnotations` field from
+camelCase to snake_case. Any code that constructs `mcp.types.ToolAnnotations` directly must use
+the new names — this is not FastMCP-specific, it applies to any `mcp.types` model you build by
+hand. [10]
+
+```python
+# v3 (SDK v1) — camelCase
+ToolAnnotations(title="My Tool", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
+
+# v4 (SDK v2) — snake_case
+ToolAnnotations(
+    title="My Tool", read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=False
+)
+```
+
+The same SDK v2 rename affects other `mcp.types` fields and client-transport symbols in the wild —
+for example `Tool.inputSchema` → `Tool.input_schema`, and
+`mcp.client.streamable_http.streamablehttp_client` → `streamable_http_client`, whose constructor
+also changed from a `headers: dict` kwarg to `http_client: ... | None`.
+
+CONSTRAINT: that `http_client` parameter does **not** take an `httpx.AsyncClient`. SDK v2's streamable-HTTP
+transport (`mcp/client/streamable_http.py`) depends on and re-exports **`httpx2`** — a separate PyPI
+package (`httpx2`, by the `httpx`/Pydantic team, "the next generation HTTP client"), not a typo for
+`httpx` and not the same import as the `httpx` you already have for provider/auth code elsewhere in
+this skill. Passing an `httpx.AsyncClient` here type-checks as a plausible-looking bug (both classes
+have the same shape) but fails validation, since the parameter is typed `httpx2.AsyncClient | None`.
+
+```python
+# v3 (SDK v1)
+from mcp.client.streamable_http import streamablehttp_client
+
+streamablehttp_client(url=url, headers=headers)
+
+# v4 (SDK v2) — note httpx2, not httpx
+import httpx2
+from mcp.client.streamable_http import streamable_http_client
+
+streamable_http_client(url=url, http_client=httpx2.AsyncClient(headers=headers) if headers else None)
+```
+
+Declare `httpx2` as a direct dependency (`httpx2>=2.5.0`, matching the floor `mcp` itself pins) if you
+construct this client yourself rather than relying on it transitively through `mcp`/`fastmcp`.
+
+If you build MCP protocol objects by hand anywhere in a server or client, grep for every
+`mcp.types` construction and camelCase attribute access before upgrading — this is the single
+most common silent break, since a stale field name is usually accepted by the type checker only
+if you're passing `**kwargs`, and otherwise fails at call time, not import time.
+
+### 2. Background Tasks Require Explicit `TasksExtension` Registration
+
+RULE: a server exposing `@mcp.tool(task=True)` tools must register the tasks extension itself in
+v4. v3 registered it implicitly the moment a task-enabled tool was added; v4 does not.
+
+```python
+# v3 — implicit, no registration needed
+from fastmcp import FastMCP
+
+mcp = FastMCP("MyServer")
+
+
+@mcp.tool(task=True)
+async def slow_computation() -> str: ...
+
+
+# v4 — explicit registration required
+from fastmcp import FastMCP
+from fastmcp_tasks import TasksExtension
+
+mcp = FastMCP("MyServer")
+mcp.add_extension(TasksExtension())
+
+
+@mcp.tool(task=True)
+async def slow_computation() -> str: ...
+```
+
+CONSTRAINT: without `mcp.add_extension(TasksExtension())`, task-enabled tools fail at call time
+(not at import time), so this gap surfaces as a runtime error under load, not a startup failure.
+
+### 3. `ctx.sample()`, `ctx.sample_step()`, `ctx.list_roots()` Removed
+
+FastMCP 4's sessionless protocol has no live server-to-client callback channel, so these
+server-side `Context` methods are removed outright — not deprecated — across every protocol era.
+[10]
+
+```python
+# v3 — server pushes a sampling request down the live connection
+@mcp.tool
+async def summarize(ctx: Context, text: str) -> str:
+    result = await ctx.sample(f"Summarize: {text}")
+    return result.text
+
+
+# v4 — no server-initiated callback; either call an LLM directly...
+@mcp.tool
+async def summarize(text: str) -> str:
+    return await my_llm_client.complete(f"Summarize: {text}")
+
+
+# ...or, when you specifically need the caller's model, return an
+# InputRequiredResult and read the answer on the next round-trip instead
+# of blocking on a live callback.
+```
+
+CONSTRAINT: this also affects the client side — `sampling_handler` (see
+[./client-sdk.md](./client-sdk.md)) only fires when connecting to a pre-v4 server that still
+calls `ctx.sample()`. A server built against FastMCP 4 can never trigger it, so a v4 server and a
+`sampling_handler`-based client are not a meaningful pairing.
+
+### 4. `Client("server.py")` String Inference Deprecated
+
+Passing a bare string to infer stdio transport now emits a deprecation warning in v4; removal is
+planned for v5.
+
+```python
+# Deprecated — warns in v4
+client = Client("my_server.py")
+
+# Preferred
+from pathlib import Path
+
+client = Client(Path("my_server.py"))
+```
+
+---
+
+## Troubleshooting: FastMCP's Rich Logging Can Mask the Real Error
+
+Not a v3→v4 breaking change — it applies to any FastMCP version, but SDK v2's dependency churn is
+a common moment to hit it. See
+[./server-core.md#rich-traceback-logging-can-mask-the-real-error](./server-core.md#rich-traceback-logging-can-mask-the-real-error)
+for the mechanism and the fix.
 
 ---
 
@@ -552,3 +703,5 @@ Choose extras based on your LLM provider: `fastmcp-slim[client,openai]`, `fastmc
 6. [FastMCP From Mcp Sdk](https://gofastmcp.com/getting-started/upgrading/from-mcp-sdk)
 7. [FastMCP From Low Level Sdk](https://gofastmcp.com/getting-started/upgrading/from-low-level-sdk)
 8. [FastMCP Client Only Package](https://gofastmcp.com/clients/client-only-package.md) (accessed 2026-05-23)
+9. [FastMCP Upgrade Guide](https://gofastmcp.com/development/upgrade-guide) (accessed 2026-09-04)
+10. [FastMCP What's New in FastMCP 4](https://gofastmcp.com/getting-started/whats-new) (accessed 2026-09-04)

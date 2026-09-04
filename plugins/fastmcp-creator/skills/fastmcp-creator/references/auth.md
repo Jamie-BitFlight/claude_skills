@@ -1,4 +1,4 @@
-# FastMCP v3 Authentication and Authorization Reference
+# FastMCP Authentication and Authorization Reference
 
 How to authenticate requests to FastMCP HTTP servers and authorize access at the component level. [1]
 

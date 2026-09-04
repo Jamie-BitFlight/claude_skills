@@ -1,6 +1,6 @@
 ---
 name: fastmcp-creator
-description: Use when building, extending, or debugging FastMCP v3 Python MCP servers. Activates on FastMCP tool/resource/prompt creation, provider and transform implementation (CodeMode, Tool Search), auth setup (MultiAuth, PropelAuth, KeycloakProvider), client SDK usage, FastMCPApp and Generative UI server building, fastmcp-slim client-only installs, nginx reverse proxy deployment, Prefab Apps, OTEL observability, and testing. Grounded in local v3.3 docs — zero speculation.
+description: Use when building, extending, or debugging FastMCP v4 (or v3) Python MCP servers. Activates on FastMCP tool/resource/prompt creation, provider and transform implementation (CodeMode, Tool Search), auth setup (MultiAuth, PropelAuth, KeycloakProvider), client SDK usage, FastMCPApp and Generative UI server building, fastmcp-slim client-only installs, nginx reverse proxy deployment, Prefab Apps, OTEL observability, testing, and v3→v4 migration. Grounded in official FastMCP v4 docs plus locally-verified v3 gotchas — zero speculation.
 ---
 
 ## Current Environment
@@ -11,15 +11,15 @@ description: Use when building, extending, or debugging FastMCP v3 Python MCP se
 
 **Installed FastMCP version:**
 
-!`uv run python -c "import fastmcp; print(f'FastMCP {fastmcp.__version__}')" 2>/dev/null || echo "FastMCP not installed — run: uv add 'fastmcp>=3.0' before scaffolding"`
+!`uv run python -c "import fastmcp; print(f'FastMCP {fastmcp.__version__}')" 2>/dev/null || echo "FastMCP not installed — run: uv add 'fastmcp>=4.0' before scaffolding"`
 
 ---
 
 ## Trigger Matrix
 
-When user intent matches, load the reference file listed — do not rely on training data for v3 API facts.
+When user intent matches, load the reference file listed — do not rely on training data for v3/v4 API facts.
 
-| User intent | v3 feature | Reference file |
+| User intent | Feature | Reference file |
 |---|---|---|
 | Build a new FastMCP server | `FastMCP()`, `@mcp.tool`, `@mcp.resource` | [./references/server-core.md](./references/server-core.md) |
 | Compose multiple servers | `mount()`, namespace, providers | [./references/providers.md](./references/providers.md) |
@@ -39,7 +39,9 @@ When user intent matches, load the reference file listed — do not rely on trai
 | Deploy behind nginx reverse proxy | SSE config, TLS, subpath mounting | [./references/deployment.md](./references/deployment.md) |
 | Write tests for a FastMCP server | In-memory Client, pytest patterns | [./references/testing.md](./references/testing.md) |
 | Integrate with Anthropic/OpenAI/FastAPI | Integration patterns | [./references/integrations.md](./references/integrations.md) |
-| Migrate from FastMCP v2 | Breaking changes, syntax fixes | [./references/migration.md](./references/migration.md) |
+| Migrate from FastMCP v2 to v3 | Breaking changes, syntax fixes | [./references/migration.md](./references/migration.md) |
+| Migrate/upgrade a v3 server to v4 | `ToolAnnotations` snake_case, `TasksExtension`, sampling removal | [./references/migration.md](./references/migration.md) |
+| Debug a masked tool exception on stdio | Rich traceback logging trap | [./references/server-core.md](./references/server-core.md) |
 | Add web UI to a server | Apps HTML API, Prefab Apps | [./references/apps.md](./references/apps.md) |
 | Return interactive UI from tools | `@mcp.tool(app=True)`, `PrefabApp` | [./references/advanced.md](./references/advanced.md) |
 | Add request/response middleware | `Middleware`, built-in middleware | [./references/middleware.md](./references/middleware.md) |
@@ -135,8 +137,10 @@ main.mount(weather, namespace="weather")
 
 ```python
 from fastmcp import FastMCP
+from fastmcp_tasks import TasksExtension
 
 mcp = FastMCP("task-server")
+mcp.add_extension(TasksExtension())  # required in v4; implicit in v3 — see references/migration.md
 
 
 @mcp.tool(task=True)  # RULE: task=True, NOT task=TaskConfig(...)
@@ -151,7 +155,7 @@ async def long_running(data: str) -> str:
 
 ## v3 API Corrections
 
-CONSTRAINT: These v2 patterns are deprecated or removed. Generate only the v3 form.
+CONSTRAINT: These v2 patterns are deprecated or removed. Generate only the v3 form, then check [./references/migration.md](./references/migration.md) for a v3→v4 change to the same pattern — e.g. `task=True` also needs `TasksExtension` registration in v4.
 
 | v2 / wrong pattern | v3 correct pattern | Source | Why |
 |---|---|---|---|
@@ -207,11 +211,17 @@ The following features were added in FastMCP 3.3 and require `fastmcp>=3.3.0`:
 - **fastmcp-slim** — client-only distribution; install `fastmcp-slim[client]` for consumers who only need the FastMCP client without the full server framework; import namespace is identical (`from fastmcp import Client`)
 - **Storage backends** — persistent cache and OAuth state storage backends [6]
 
+### FastMCP 4.0 — Breaking-Change Release
+
+FastMCP 4.0 is not an additive gate like 3.1–3.3 above — it removes and renames APIs. See
+[./references/migration.md](./references/migration.md#fastmcp-v3-to-v4--breaking-changes-9-10) for what
+changed and what to generate instead.
+
 ---
 
 ## Reference Files
 
-All v3 reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/jlowin/fastmcp> (source code):
+All reference files sourced from <https://gofastmcp.com> (published docs) and <https://github.com/jlowin/fastmcp> (source code); v4-specific deltas are called out inline and centralized in [./references/migration.md](./references/migration.md):
 
 - [./references/server-core.md](./references/server-core.md) — `FastMCP()`, tools, resources, prompts, context, lifespan, `transforms=` kwarg
 - [./references/providers.md](./references/providers.md) — LocalProvider, FastMCPProvider, ProxyProvider, FileSystemProvider, SkillsProvider
@@ -224,7 +234,7 @@ All v3 reference files sourced from <https://gofastmcp.com> (published docs) and
 - [./references/deployment.md](./references/deployment.md) — stdio, HTTP, server config, Prefect Horizon, nginx reverse proxy, module mode, `FASTMCP_TRANSPORT`
 - [./references/testing.md](./references/testing.md) — in-memory Client, FastMCPTransport, pytest patterns, inline-snapshot
 - [./references/integrations.md](./references/integrations.md) — Anthropic, OpenAI, Gemini, Google GenAI, FastAPI, GitHub, Auth0, Azure, PropelAuth, Claude Code
-- [./references/migration.md](./references/migration.md) — v2 → v3 breaking changes, from MCP SDK
+- [./references/migration.md](./references/migration.md) — v2 → v3 and v3 → v4 breaking changes, from MCP SDK
 - [./references/observability.md](./references/observability.md) — OTEL instrumentation, automatic spans, OTLP exporters, environment variable configuration
 - [./references/real-world-patterns.md](./references/real-world-patterns.md) — ProxyProvider, mount(), SkillsProvider, showcase
 

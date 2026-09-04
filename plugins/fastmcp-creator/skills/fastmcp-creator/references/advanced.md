@@ -12,13 +12,20 @@ CONSTRAINT: Background tasks require the `tasks` optional extra. Install with:
 pip install "fastmcp[tasks]"
 ```
 
-RULE: Use `task=True` as the v3 pattern for background task support. `task=True` enables background execution — clients may request it or call the tool synchronously.
+RULE: Use `task=True` for background task support. `task=True` enables background execution — clients may request it or call the tool synchronously.
+
+RULE (v4 only): a server exposing any `task=True` tool must register the tasks extension itself —
+`mcp.add_extension(TasksExtension())`. FastMCP 3 registered it implicitly the moment a task-enabled
+tool existed; FastMCP 4 does not, and the gap surfaces as a runtime failure on first call, not a
+startup error. See [./migration.md](./migration.md) for the v3→v4 change.
 
 ```python
 import asyncio
 from fastmcp import FastMCP
+from fastmcp_tasks import TasksExtension
 
 mcp = FastMCP("MyServer")
+mcp.add_extension(TasksExtension())  # required in v4; implicit in v3
 
 
 @mcp.tool(task=True)
