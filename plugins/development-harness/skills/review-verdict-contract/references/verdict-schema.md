@@ -184,7 +184,7 @@ flowchart TD
     Q2 -->|"No — pure reference data,<br>changelogs, release notes"| T1["Tier 1 — Documentation Only<br>SKIP permitted for all perspectives"]
     Q2 -->|"Yes — guides behavior,<br>defines constraints, describes workflow"| Q3{"Primary executor or<br>audience is an AI / LLM / agent?"}
     Q3 -->|"No — human-facing<br>CONTRIBUTING.md, ADRs, runbooks"| T2["Tier 2 — Process Documentation<br>SKIP permitted with explicit skip_reason<br>stating why the change has no impact<br>in this reviewer's scope"]
-    Q3 -->|"Yes — agent files, SKILL.md,<br>CLAUDE.md, rules/*.md, prompts"| T3["Tier 3 — LLM Prompt Engineering Artifact<br>See §2.5 tier rules below"]
+    Q3 -->|"Yes — agent files, SKILL.md,<br>CLAUDE.md, .claude/rules/*.md, prompts"| T3["Tier 3 — LLM Prompt Engineering Artifact<br>See §2.5 tier rules below"]
 ```
 
 ### Tier 1 — Documentation Only

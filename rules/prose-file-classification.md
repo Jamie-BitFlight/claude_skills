@@ -23,7 +23,7 @@ Files like `CONTRIBUTING.md`, architecture decision records, runbooks, and `READ
 
 ## LLM Prompt Engineering Artifacts (AI-facing)
 
-Plugin agent files (`agents/*.md`), skill files (`skills/*/SKILL.md`, `skills/*/references/*.md`), `CLAUDE.md`, `.claude/rules/*.md`, and any file whose prose is read and executed by an LLM are **prompt engineering code**. The markdown content IS the executable: it controls how AI agents reason, what constraints they enforce, and what outputs they produce.
+Plugin agent files (`agents/*.md`), skill files (`skills/*/SKILL.md`, `skills/*/references/*.md`), `CLAUDE.md`, `rules/*.md`, and any file whose prose is read and executed by an LLM are **prompt engineering code**. The markdown content IS the executable: it controls how AI agents reason, what constraints they enforce, and what outputs they produce.
 
 **Consequences for review and quality gates:**
 
