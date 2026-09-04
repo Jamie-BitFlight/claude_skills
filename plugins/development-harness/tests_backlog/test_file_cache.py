@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import get_context
 from multiprocessing.synchronize import Barrier as ProcessBarrier
@@ -144,6 +146,117 @@ def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> N
         ("issues/12.yaml", "Issue snapshot"),
         ("plans/P12.yaml", "Plan snapshot"),
     ]
+
+
+def test_file_cache_work_item_snapshots_orphaned_temp_file_is_invisible_to_enumeration(tmp_path: Path) -> None:
+    """A ``_save_item_snapshot`` temp file must never match the snapshot glob.
+
+    Regression test: ``_save_item_snapshot``'s ``tempfile.mkstemp`` suffix
+    is ``.tmp``, not ``.tmp.yaml``, so a process killed between
+    ``mkstemp()`` and its ``finally`` cleanup (session interrupt, OOM,
+    crash) leaves an orphan that never matches ``_work_item_snapshots``'s
+    ``*.yaml`` glob -- invisible by construction, not by a filename
+    heuristic applied after the fact. An earlier fix gave the temp file
+    suffix ``.tmp.yaml`` instead (so it still matched the glob) and tried
+    to filter it back out by name; a 0-byte body then parsed to ``None``
+    and failed ``BacklogItem`` validation, which propagated out of the
+    whole enumeration uncaught, taking every other, perfectly good
+    snapshot offline with it.
+    """
+    # Given: a cache root whose items/issues directory holds only an orphaned temp file
+    cache = FileCache(tmp_path)
+    issues_dir = tmp_path / "items" / "issues"
+    issues_dir.mkdir(parents=True)
+    (issues_dir / ".1466.yaml.vosleo7o.tmp").touch()
+
+    # When: the provider enumerates its durable snapshots
+    snapshots = cache._work_item_snapshots()
+
+    # Then: the orphan never matches the *.yaml glob -- absent, not raised
+    assert snapshots == []
+
+
+def _touch_orphaned_temp_file(issues_dir: Path) -> None:
+    (issues_dir / ".12.yaml.abcd1234.tmp").touch()
+
+
+def _touch_zero_byte_yaml(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").touch()
+
+
+def _write_invalid_utf8_yaml(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").write_bytes(b'title: "\xff\xfe bad utf8"')
+
+
+def _make_directory_matching_glob(issues_dir: Path) -> None:
+    (issues_dir / "13.yaml").mkdir()
+
+
+def _make_symlink_escaping_cache_root(issues_dir: Path) -> None:
+    # The boundary _snapshot_path() enforces is root/"items", not root itself, so a
+    # target under root but outside root/"items" already escapes it -- and staying
+    # under root keeps this file inside pytest's per-test tmp_path sandbox, not the
+    # shared per-session temp root a level higher.
+    outside_target = issues_dir.parent.parent / "outside.yaml"
+    outside_target.write_text("title: escaped")
+    (issues_dir / "13.yaml").symlink_to(outside_target)
+
+
+@pytest.mark.parametrize(
+    ("corrupt_sibling", "reason"),
+    [
+        pytest.param(
+            _touch_orphaned_temp_file,
+            "an orphaned temp file never matches the *.yaml glob at all",
+            id="orphaned_temp_file",
+        ),
+        pytest.param(
+            _touch_zero_byte_yaml,
+            "a genuinely empty .yaml file parses to None and fails BacklogItem validation",
+            id="zero_byte_yaml",
+        ),
+        pytest.param(
+            _write_invalid_utf8_yaml,
+            "invalid UTF-8 bytes raise UnicodeDecodeError, a ValueError subclass",
+            id="invalid_utf8",
+        ),
+        pytest.param(
+            _make_directory_matching_glob,
+            "a directory matching the *.yaml glob raises OSError on open()",
+            id="unreadable_path",
+        ),
+        pytest.param(
+            _make_symlink_escaping_cache_root,
+            "a symlink escaping the cache root raises a bare ValueError from Path.relative_to",
+            marks=pytest.mark.skipif(
+                sys.platform == "win32", reason="symlink creation requires elevated privileges on Windows"
+            ),
+            id="symlink_escaping_root",
+        ),
+    ],
+)
+def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
+    tmp_path: Path, corrupt_sibling: Callable[[Path], None], reason: str
+) -> None:
+    """A corrupt/orphaned sibling file must not take the whole batch offline.
+
+    Regression test, one case per way a sibling file can fail: before this
+    PR's fixes, each of these independently propagated an uncaught
+    exception out of the whole enumeration, taking every other, perfectly
+    good snapshot offline with it. See ``reason`` above for why each case
+    is caught now.
+    """
+    # Given: one real, successfully-saved snapshot and one corrupt/orphaned sibling
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    issues_dir = tmp_path / "items" / "issues"
+    corrupt_sibling(issues_dir)
+
+    # When: the provider reloads its durable snapshots
+    snapshots = FileCache(tmp_path)._work_item_snapshots()
+
+    # Then: only the real item is returned -- the corrupt sibling is skipped, not raised
+    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
 
 
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:

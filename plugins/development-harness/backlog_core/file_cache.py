@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import tempfile
 import warnings
@@ -28,6 +29,8 @@ from .file_cache_state import (
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
 from .yaml_io import load_item, load_item_text, save_item
+
+_log = logging.getLogger(__name__)
 
 
 class LegacyMigrationError(ValueError):
@@ -431,13 +434,33 @@ class FileCache:
         self._save_item_snapshot(item, relative_path)
 
     def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
+        """Return every durable work-item snapshot beneath the cache root.
+
+        An orphaned :meth:`_save_item_snapshot` temp file never reaches this
+        method at all -- see that method's own comment on why. A snapshot
+        that still fails to load (bad YAML, invalid UTF-8, a symlink
+        escaping the cache root, or any other ``OSError``) is logged and
+        skipped rather than letting it take the whole batch offline,
+        mirroring the per-entry salvage policy
+        :meth:`_CacheStateStore._salvage_field` already applies to the
+        durable mutation queue. ``ValueError`` alone covers pydantic and
+        Unicode decode failures too, since both are its subclasses.
+
+        Returns:
+            Ordered ``(logical_key, item)`` pairs for every snapshot that
+            loaded successfully.
+        """
         item_root = self._root / "items"
         if not item_root.exists():
             return []
-        return [
-            (relative.as_posix(), self._load_item_snapshot(relative))
-            for relative in (path.relative_to(item_root) for path in sorted(item_root.rglob("*.yaml")))
-        ]
+        snapshots: list[tuple[str, BacklogItem]] = []
+        for path in sorted(item_root.rglob("*.yaml")):
+            relative = path.relative_to(item_root)
+            try:
+                snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
+            except (ValueError, YAMLError, OSError) as exc:
+                _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
+        return snapshots
 
     @staticmethod
     def _serialize_item(item: BacklogItem) -> str:
@@ -453,9 +476,13 @@ class FileCache:
         destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary: Path | None = None
         try:
-            fd, temporary_name = tempfile.mkstemp(
-                dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp.yaml"
-            )
+            # suffix=".tmp", not ".tmp.yaml": save_item() writes valid YAML to
+            # any path regardless of extension, and a plain ".tmp" name never
+            # matches _work_item_snapshots()'s "*.yaml" glob -- an orphan left
+            # behind by a process killed before the finally block below is
+            # then invisible to that enumeration by construction, with no
+            # filename heuristic needed to tell it apart from a real snapshot.
+            fd, temporary_name = tempfile.mkstemp(dir=destination.parent, prefix=f".{destination.name}.", suffix=".tmp")
             temporary = Path(temporary_name)
             os.close(fd)
             save_item(item.model_copy(deep=True), temporary)
