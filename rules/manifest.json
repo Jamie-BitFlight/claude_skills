@@ -1,10 +1,6 @@
 {
   "rules": [
     {
-      "file": "agent-output-contracts.md",
-      "match": "**/agents/*.md"
-    },
-    {
       "file": "astral-tool-overrides.md",
       "match": "*.py,pyproject.toml,uv.lock"
     },
@@ -15,10 +11,6 @@
     {
       "file": "citation-requirements.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
-    },
-    {
-      "file": "delegation-format.md",
-      "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
       "file": "exception-handling.md",
@@ -94,6 +86,10 @@
     },
     {
       "file": "commit-cadence-and-worktrees.md",
+      "match": "*"
+    },
+    {
+      "file": "delegation.md",
       "match": "*"
     },
     {
