@@ -8,10 +8,12 @@
  * the required delegation template structure, and exits code 2 with stderr feedback
  * if validation fails. Exits code 0 silently on pass or when skipped.
  *
- * Required template sections (from .claude/skills/delegate/SKILL.md):
+ * Required template sections (from plugins/agent-orchestration/skills/delegate/SKILL.md):
  *   1. Starts with "Your ROLE_TYPE is sub-agent."
  *   2. Contains DEFINITION OF SUCCESS section
- *   3. Does NOT prescribe HOW (no bare code blocks with implementation)
+ *   3. Contains a PHASE: line whose value is one of the nine phase names
+ *   4. Contains OBSERVATIONS: and CONTEXT: (specialist mode) or FILES: (generic mode)
+ *   5. Contains DELIVERY: section
  *
  * Resume calls are skipped — no new prompt is validated.
  *
@@ -21,6 +23,18 @@
  */
 
 const fs = require('node:fs');
+
+const PHASES = [
+  'read',
+  'gather',
+  'process',
+  'verify',
+  'write',
+  'validate',
+  'test',
+  'report',
+  'review',
+];
 
 /**
  * Returns true if the prompt is a skill pass-through — a routing prompt that
@@ -57,7 +71,7 @@ function hasSection(prompt, sectionName) {
 }
 
 /**
- * Validates a prompt against the 5 delegation template rules.
+ * Validates a prompt against the delegation template rules.
  * @param {string} prompt
  * @returns {{ valid: boolean, violations: string[] }}
  */
@@ -74,35 +88,26 @@ function validatePrompt(prompt) {
     violations.push('Rule 2: Missing DEFINITION OF SUCCESS section');
   }
 
-  // Rule 3: must NOT prescribe HOW — detect fenced code blocks that contain
-  // implementation-style content (line assignments, function/method calls on
-  // specific lines, etc.). A single inline code mention is acceptable; a fenced
-  // block with actual implementation lines is the anti-pattern.
-  //
-  // Heuristic: find ``` fenced blocks; if any block body contains 3+ lines
-  // that look like implementation code (assignments, function calls, imports),
-  // flag it as prescribing HOW.
-  const fencedBlockPattern = /```[^\n]*\n([\s\S]*?)```/g;
-  const implementationLinePattern =
-    /^\s*(const |let |var |import |export |function |class |return |if \(|for \(|\w+\s*=\s*|\w+\.\w+\()/m;
+  // Rule 3: must contain a PHASE: line with one of the nine phase names
+  const phaseMatch = /^PHASE:[ \t]*(\S+)[ \t]*$/m.exec(prompt);
+  if (!phaseMatch) {
+    violations.push(`Rule 3: Missing PHASE: line (one of ${PHASES.join('|')})`);
+  } else if (!PHASES.includes(phaseMatch[1])) {
+    violations.push(`Rule 3: PHASE value "${phaseMatch[1]}" is not one of ${PHASES.join('|')}`);
+  }
 
-  for (
-    let fenceMatch = fencedBlockPattern.exec(prompt);
-    fenceMatch !== null;
-    fenceMatch = fencedBlockPattern.exec(prompt)
-  ) {
-    const blockBody = fenceMatch[1] ?? '';
-    const lines = blockBody.split('\n').filter((l) => l.trim().length > 0);
-    const implLines = lines.filter((l) => implementationLinePattern.test(l));
-    // If more than half the non-empty lines look like implementation code,
-    // treat the block as prescribing HOW.
-    if (lines.length >= 3 && implLines.length >= Math.ceil(lines.length / 2)) {
-      violations.push(
-        'Rule 3: Prompt contains implementation code block (prescribes HOW). ' +
-          'Use OBSERVATIONS/CONTEXT constraints instead of code snippets.',
-      );
-      break; // one violation is enough
-    }
+  // Rule 4: specialist mode (OBSERVATIONS + CONTEXT) or generic mode (FILES)
+  const specialist = hasSection(prompt, 'OBSERVATIONS') && hasSection(prompt, 'CONTEXT');
+  const generic = hasSection(prompt, 'FILES');
+  if (!specialist && !generic) {
+    violations.push(
+      'Rule 4: Missing OBSERVATIONS + CONTEXT sections (specialist mode) or FILES section (generic mode)',
+    );
+  }
+
+  // Rule 5: must contain DELIVERY section
+  if (!hasSection(prompt, 'DELIVERY')) {
+    violations.push('Rule 5: Missing DELIVERY section');
   }
 
   return { valid: violations.length === 0, violations };
@@ -148,9 +153,7 @@ function main() {
 
   // Skip skill pass-through prompts — routing patterns where the prompt
   // primarily invokes a Skill() call. These get context from the skill itself,
-  // not the delegation prompt. Detected by: prompt body (after trimming
-  // whitespace lines) is dominated by Skill() invocations or is very short
-  // (under 5 non-empty lines) and contains a Skill() call.
+  // not the delegation prompt.
   if (isSkillPassthrough(prompt)) {
     process.exit(0);
   }
@@ -171,31 +174,37 @@ function main() {
       'Violations:',
       ...violations.map((v) => `  - ${v}`),
       '',
-      'Required template (.claude/skills/delegate/SKILL.md):',
+      'Required template (plugins/agent-orchestration/skills/delegate/SKILL.md, specialist mode):',
       '',
-      '  Your ROLE_TYPE is sub-agent.',
+      '  Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.',
       '',
-      '  [Task Identification - one sentence]',
+      '  PHASE: <one of the phase names>',
+      '  TASK: <one sentence>',
       '',
       '  OBSERVATIONS:',
-      '  - [Factual observations already in your context]',
-      '  - [Verbatim error messages if applicable]',
-      '  - [Environment or system state if relevant]',
+      '  - <facts already in your context: user statements, prior STATUS reports, verbatim errors, file:line if known>',
       '',
       '  DEFINITION OF SUCCESS:',
-      '  - [Specific measurable outcome]',
-      '  - [Acceptance criteria]',
+      '  - <measurable outcome>',
+      '  - <acceptance criteria>',
+      '  - <how it is verified — a command and its expected result, or the reviewer that will check>',
+      '',
+      '  DELIVERY:',
+      '  - Return STATUS as the first line. Write anything longer than a line to .tmp/scratch/reports/<YYYYMMDD>-<slug>.md and return the path.',
       '',
       '  CONTEXT:',
-      '  - Location: [Where to look]',
-      '  - Scope: [Boundaries]',
-      '  - Constraints: [Hard requirements vs Preferences]',
+      '  - Location: <where to look>',
+      '  - Scope: <boundaries>',
+      '  - Constraints: <user-mandated requirements; existing patterns to follow>',
+      '  - Commands: <the project\'s quality gates for validate/test, or "discover the ones this project defines">',
       '',
-      '  ECOSYSTEM CONTEXT:',
-      '  - [Session-specific facts the agent cannot find in CLAUDE.md or tool descriptions]',
+      '  ECOSYSTEM CONTEXT:  (omit the section if empty)',
+      '  - <session facts the agent cannot read anywhere: authenticated CLIs, a PR under review, another agent live on the same files>',
       '',
       '  YOUR TASK:',
-      '  1. ...',
+      "  <the phase's row from the table below, verbatim>",
+      '',
+      'Generic mode (general-purpose / Explore) replaces OBSERVATIONS + CONTEXT with a FILES: section.',
       '',
       'Fix the prompt and retry.',
       '--- End Validation ---',
