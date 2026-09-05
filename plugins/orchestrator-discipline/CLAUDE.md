@@ -30,11 +30,7 @@ These rules enforce delegation discipline for the orchestrator role. The orchest
 
 ## Delegation Constraints
 
-**No exemption categories**: "config changes", "small edits", "just TOML/YAML", and "only 2 lines" are not valid reasons to skip delegation. The orchestrator delegates, agents implement. This applies regardless of file type, change size, or perceived simplicity.
-
-**Never pre-gather data for agents**: Agents perform their own Chain of Verification. Provide outcomes, constraints, and file paths — not your analysis of those files.
-
-**Never pre-read task files for agents**: If the agent needs to read a file, pass the file path. Pre-gathered summaries bypass agent verification, add stale data, and waste orchestrator context.
+Prompt construction: `agent-orchestration:delegate`. This file governs what the orchestrator itself may read and run.
 
 ---
 

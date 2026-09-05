@@ -5,7 +5,7 @@
  * PreToolUse hook — blocks Agent invocations that route analysis/reasoning
  * tasks to the Explore subagent.
  *
- * Reason: .claude/CLAUDE.md <sub_agent_selection> documents that the Explore
+ * Reason: rules/delegation.md and agent-orchestration:delegate "Pick the agent" document that the Explore
  * agent is haiku-based with ~50% hallucination rate on ambiguous/reasoning
  * queries (validated 2026-02-02, 2/4 accuracy). It is permitted only for
  * exact file pattern or keyword search — never for reasoning, interpretation,
@@ -206,7 +206,7 @@ function main() {
       'keyword match is a false positive, rephrase the description and prompt',
       'to remove analysis verbs and retry.',
       '',
-      'Rule source: .claude/CLAUDE.md <sub_agent_selection>,',
+      'Rule source: rules/delegation.md; agent-orchestration:delegate "Pick the agent",',
       '             .claude/rules/model-selection.md',
       '--- End ---',
     ].join('\n')}\n`,
