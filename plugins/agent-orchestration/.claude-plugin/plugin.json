@@ -1,7 +1,7 @@
 {
   "name": "agent-orchestration",
-  "description": "This skill should be used when the model's ROLE_TYPE is orchestrator and needs to delegate tasks to specialist sub-agents. Provides scientific delegation framework ensuring world-building context (WHERE, WHAT, WHY) while preserving agent autonomy in implementation decisions (HOW). Use when planning task delegation, structuring sub-agent prompts, or coordinating multi-agent workflows.",
-  "version": "1.4.7",
+  "description": "Orchestrate sub-agents across harnesses: decompose work into phases, dispatch each phase with a specialist or generic prompt, adjudicate returned STATUS reports, and run fan-out, maker/checker, tournament, and loop-until-stop shapes with explicit caps. Use when delegating any implementation, investigation, fix, or review.",
+  "version": "2.0.0",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

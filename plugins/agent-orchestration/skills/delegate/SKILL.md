@@ -1,167 +1,153 @@
 ---
 name: delegate
-description: Decompose a request into phases, dispatch those phases to sub-agents in parallel, and adjudicate what comes back — with the WHERE-WHAT-WHY prompt template for each dispatch. Use when a request asks for implementation, investigation, or any multi-step work, before invoking a sub-agent, when preparing prompts for specialist agents, or when deciding whether to do work inline or delegate it. Provides the OBSERVATIONS-SUCCESS-CONTEXT format with authoring rules and a pre-send checklist. For the full step-by-step preparation worksheet, activate the `/agent-orchestration:how-to-delegate` skill.
-user-invocable: true
+description: Decompose substantive work into phases, dispatch each phase to a sub-agent, and adjudicate what comes back. Use whenever a request asks for implementation, investigation, a fix, a review, or any change to files — including small ones — and whenever you are about to read source or run a diagnostic yourself instead of handing it off. Also use when a report from a sub-agent needs judging, when a phase needs re-dispatching, or when a user names one instance of a pattern. Does not apply when your own prompt begins "Your ROLE_TYPE is sub-agent." — then follow references/sub-agent-contract.md instead.
 ---
 
-# Delegation
+# Delegate
 
-Delegation is the default execution mode for a substantive request, not an escalation reserved for large ones. An orchestrator that reads the files and runs the commands itself is the anti-pattern: context spent holding file contents and command output is context no longer available for judgment and adjudication.
+The orchestrator's context is the one window that lasts the whole session. Every file it reads and every command output it holds is judgment budget spent. Sub-agents get a fresh window per task, so the orchestrator routes, defines done, and judges; the agents read, run, and write.
 
-For the full step-by-step preparation worksheet, activate the `/agent-orchestration:how-to-delegate` skill. For the orchestration framework, anti-patterns, and parallel-dispatch mechanics, activate the `/agent-orchestration:agent-orchestration` skill.
+## Two roles
 
-```mermaid
-flowchart TD
-    Req(["Substantive request received"]) --> Dec["Decompose into phases"]
-    Dec --> Dis["Dispatch — one phase per prompt<br>independent phases concurrently"]
-    Dis --> Adj["Adjudicate returned reports"]
-    Adj --> Q{"Do the reports establish<br>the requested outcome<br>with evidence?"}
-    Q -->|"No — gap, conflict, or unsupported claim"| Re["Re-dispatch naming the gap<br>or split the phase further"]
-    Re --> Adj
-    Q -->|"Yes"| Done(["Report outcome"])
-```
+Every dispatch prompt opens with `Your ROLE_TYPE is sub-agent.` That line is an anti-recursion marker: a sub-agent that inherits this skill must not fan out further. If your prompt opened that way, stop here and follow [references/sub-agent-contract.md](references/sub-agent-contract.md). Otherwise you are the delegator and the rest of this file applies.
 
----
+## When this applies
 
-## 1. Decompose
+Any request that changes files, investigates a cause, gathers facts, or reviews work — regardless of size. "It's only two lines" is delegated. The one exception: a check scoped to a single file you edited yourself this turn.
 
-<decompose>
+Answer inline when the answer is already in your context and no file changes.
 
-Split the request into phases before any dispatch happens. The phases:
+## Decompose
+
+Split the request into phases. Keep only the phases that produce work; never pad.
 
 | Phase | Produces |
-| ----- | -------- |
+| --- | --- |
 | read | The material the work depends on, located and read |
-| gather | External facts — documentation, prior art, current system state |
+| gather | External facts: docs, prior art, current system state |
 | process | The analysis and the chosen approach |
-| verify | Confirmation that the approach holds against the actual code and environment |
+| verify | The approach checked against the real code and environment |
 | write | The change |
-| validate | Lint, type-check, and build results |
-| test | Test runs, and new tests covering the change |
-| report | What changed, and the evidence supporting it |
+| validate | Lint, type-check, build results |
+| test | Test runs, plus new tests covering the change |
+| report | What changed, with evidence |
 | review | Independent critique of the result |
 
-Drop any phase that produces no work for this request. Do not pad a decomposition with empty phases.
+Two shapes recur and have their own handling:
 
-Mechanical fan-out is delegated, never done inline: the same edit applied across many files, the same check run against many targets. "It is only a few files" is not a reason to keep it in the orchestrator.
+- **Bug fix** → [rules/fix-delegation-discipline.md](../../../../rules/fix-delegation-discipline.md): reproduce before changing.
+- **Same edit across many targets** → one `process` dispatch decides the change; N generic dispatches apply it; one `review` dispatch checks. See [parallel-work](../parallel-work/SKILL.md).
 
-</decompose>
+## Dispatch
 
-## 2. Dispatch
+- One phase per dispatch. A phase may fan out across N targets (N dispatches, same phase); it never blends with another phase.
+- Send independent dispatches together in one turn so they run concurrently. Serialize only where one consumes another's result, or two would write the same file without isolation.
+- Results from `read`/`gather`/`process` go to a file, not into your context. Pass the path to the next phase; do not forward the content.
 
-<dispatch>
+### Pick the agent
 
-- One phase, one prompt, one agent.
-- Send independent phases in a single message so they run concurrently.
-- Serialize only where one phase consumes another's result, or where two agents would write the same file.
-- Match the agent type to the phase rather than sending every phase to a generalist.
+Classify by what the task asks of the agent, not by its name:
 
-</dispatch>
+- **Specialist** — any agent whose description matches the phase's domain. Gets observations, success criteria, and context. Never gets implementation steps.
+- **Generic** — `general-purpose` (or the harness equivalent) and `Explore`. Gets a prescribed implementation: exact edit, exact files, exact verification. `Explore` only for exact-match search, never for anything it could interpret.
+- **Reviewer** — for the `review` phase, an agent different from the one that wrote, preferring a reviewer- or auditor-typed agent for the domain.
 
-## 3. Adjudicate
+When no specialist fits, dispatch generic with a prescribed task. Never ask one specialist to act as another.
 
-<adjudicate>
-
-Adjudication is what the orchestrator keeps for itself:
-
-- Judge the returned work instead of re-deriving it. Re-reading the files an agent already read spends the context that delegating them saved.
-- Treat every agent report as a claim, not a fact. Check that the stated evidence supports the conclusion, and require the command output rather than the assurance that a command passed.
-- Resolve conflicting reports by identifying which claim is falsifiable and dispatching a check for it — not by accepting the more confident report.
-- Decide what happens next: accept the result, re-dispatch with the gap named, or split the phase further.
-
-</adjudicate>
-
----
-
-## Template
-
-Construct each dispatch prompt from this template. Set `PHASE` to the phase this dispatch covers, then copy that phase's row from the Phase Task Table verbatim into `YOUR TASK`. Never blend rows from more than one phase into a single dispatch — a dispatch covers exactly one phase.
+### Prompt — specialist mode
 
 ```text
-Your ROLE_TYPE is sub-agent.
+Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.
 
-PHASE: [read | gather | process | verify | write | validate | test | report | review]
-
-[Task Identification - one sentence]
+PHASE: <one of the phase names>
+TASK: <one sentence>
 
 OBSERVATIONS:
-- [Factual observations already in your context]
-- [Verbatim error messages if applicable]
-- [Environment or system state if relevant]
+- <facts already in your context: user statements, prior STATUS reports, verbatim errors, file:line if known>
 
 DEFINITION OF SUCCESS:
-- [Specific measurable outcome]
-- [Acceptance criteria]
-- [Verification method]
+- <measurable outcome>
+- <acceptance criteria>
+- <how it is verified — a command and its expected result, or the reviewer that will check>
 
 DELIVERY:
-- [The channel that reaches the dispatcher, and where any longer artifact is written]
+- Return STATUS as the first line. Write anything longer than a line to .tmp/scratch/reports/<YYYYMMDD>-<slug>.md and return the path.
 
 CONTEXT:
-- Location: [Where to look]
-- Scope: [Boundaries]
-- Constraints: [Hard requirements vs Preferences]
-- Commands: [Exact commands this phase runs, or "discover the ones this project defines"]
+- Location: <where to look>
+- Scope: <boundaries>
+- Constraints: <user-mandated requirements; existing patterns to follow>
+- Commands: <the project's quality gates for validate/test, or "discover the ones this project defines">
 
-ECOSYSTEM CONTEXT:
-- [Session-specific facts the agent cannot find in project instructions or tool descriptions]
-- [Authenticated CLIs, non-obvious doc locations, task-specific access]
+ECOSYSTEM CONTEXT:  (omit the section if empty)
+- <session facts the agent cannot read anywhere: authenticated CLIs, a PR under review, another agent live on the same files>
 
 YOUR TASK:
-[Copy the row matching PHASE from the Phase Task Table below. Do not write a different task.]
+<the phase's row from the table below, verbatim>
 ```
 
-### Phase Task Table
+Phase rows for `YOUR TASK`:
 
-<phase_task_table>
+| Phase | Row |
+| --- | --- |
+| read | Locate and read the material this work depends on. Write exact paths and quoted content to the delivery file; do not summarize away detail a later phase needs. Edit nothing. |
+| gather | Collect the external facts named in CONTEXT. Record each with its source in the delivery file. Edit nothing. |
+| process | Analyze the material at the paths in OBSERVATIONS. Choose an approach; record it and why alternatives were ruled out. Edit nothing. |
+| verify | Check the chosen approach against the real code and environment in CONTEXT. Record where it holds and where it fails. Implement nothing. |
+| write | Make the change in DEFINITION OF SUCCESS. Touch only files within CONTEXT Scope. |
+| validate | Run the commands in CONTEXT Commands, or discover this project's lint/type/build gates and state which you ran. Report exact output, pass and fail. A silenced failure is a failure. |
+| test | Run the test invocation in CONTEXT Commands, or discover it and state which you ran. Add tests covering the change. Report exact output. |
+| report | State what changed and the evidence for it: files, commands, outputs. Make no claim the evidence does not support. |
+| review | Critique the result at the path in OBSERVATIONS against DEFINITION OF SUCCESS. Report gaps, contradictions, unsupported claims. Fix nothing. |
 
-| Phase | YOUR TASK |
-| ----- | -------- |
-| read | Locate and read the material this work depends on. Report exact file paths and quoted content — do not summarize away detail a later phase needs. Do not edit any file. |
-| gather | Collect the external facts named in CONTEXT — documentation, prior art, current system state. Report each fact with its source. Do not edit any file. |
-| process | Analyze the material the read and gather phases produced. Choose an approach. Report the approach and why alternatives were ruled out. Do not edit any file. |
-| verify | Check the chosen approach against the actual code and environment named in CONTEXT. Report where it holds and where it fails. Do not implement a fix. |
-| write | Make the change described in DEFINITION OF SUCCESS. Touch only the files named in CONTEXT. |
-| validate | Run the lint, type-check, and build commands named in CONTEXT Commands. Where none are named, discover the ones this project defines and report which you ran. Report exact command output, pass and fail alike. Do not silence a failure without stating the fix. |
-| test | Run the test suite named in CONTEXT Commands. Where none is named, discover the invocation this project defines and report which you ran. Add tests covering the change. Report exact command output. |
-| report | Summarize what changed and the evidence supporting it. Cite the specific files, commands, and outputs. State no claim the evidence does not support. |
-| review | Independently critique the result named in CONTEXT against DEFINITION OF SUCCESS. Report gaps, contradictions, or unsupported claims. Do not fix them. |
+Rules for filling it in:
 
-</phase_task_table>
+- OBSERVATIONS is pass-through: only what is already in your context. Reading, grepping, or running commands to fill it is pre-gathering; the agent does that with a fresh window.
+- State observations as facts ("exit code 1", "the error text is: …"). Where you hold a hypothesis, label it: `Hypothesis to verify: …`.
+- Constraints are outcomes and boundaries, never steps. Naming the project's own gate in Commands is a constraint, not a step.
+- Say nothing the agent inherits: repo conventions, toolchain, "explore freely", "use available skills". Those live in the project's agent instructions. Name a skill only when the agent must load it and would not on its own.
+- Paths: written as the agent will resolve them from its own working directory; relative inside the repo, and the symlink form (not the resolved target) for anything reached through a symlink.
 
-Authoring guidance (for the orchestrator filling in this template — do not include these annotations in the delivered prompt):
+### Prompt — generic mode
 
-- OBSERVATIONS: Pass-through only — data already in your context (user messages, prior agent reports, command outputs you already received). Include `file:line` references if already known. Include verbatim error messages, not paraphrased. Do NOT pre-gather data for the agent (for example, do not run `ruff check .` before delegating to a linting agent). Do NOT read, grep, or glob files to find context for the agent — the agent has full tool access and an empty context window; it does its own discovery. No interpretations ("I think"), no assumptions ("probably"). SOURCE: [agent-orchestration SKILL.md](./../agent-orchestration/SKILL.md) — Pre-Delegation Verification Checklist section.
-- DEFINITION OF SUCCESS: The "WHAT". Measurable outcomes the agent can verify. When the agent will produce more than roughly one line of output, instruct it to write results to a file and return only the path — this keeps orchestrator context lean. Example: `Write findings to .tmp/reports/NAME-YYYYMMDD.md. Return: STATUS: DONE + file path.` When directing agents to write to `.tmp/`, verify `.tmp/` is ignored by version control before committing.
-- DELIVERY: State the delivery channel explicitly. The channel that carries an agent's final response back to its dispatcher differs between harnesses. Name the channel this dispatch expects, and name the artifact fallback: the full result written to a file whose path the agent returns. A result that exists only in the agent's final response text may never be read. Do not assume the dispatcher receives anything the prompt did not ask the agent to send.
-- CONTEXT: The "WHERE" and "WHY". Location narrows scope; constraints bound the solution space. Commands is the one slot that carries literal invocations — the quality gates a `validate` or `test` dispatch has to run. Name them when this project defines them; write the discovery instruction when it does not, and never leave the slot blank on those two phases. Naming a project's own gate is not prescribing HOW: the gate is the acceptance bar, not the implementation.
+```text
+Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.
 
----
+PHASE: <write | validate | test | read>
+TASK: <the exact instruction — the edit to make, the pattern to find, the command to run>
 
-## Delegation Rules
+FILES:
+- <exact paths>
 
-Check before sending:
+DEFINITION OF SUCCESS:
+- <the verification command and its expected result>
 
-| Rule | Check |
-| ---- | ----- |
-| Formula | Delegation = Observations + Success Criteria + Resources - Assumptions - Micromanagement |
-| No HOW | Do NOT tell the agent _how_ to implement (for example, "Change line 42 to X") |
-| Constraints OK | DO tell the agent _constraints_ (for example, "Must use the httpx library") |
-| No Assumptions | Do NOT say "The issue is probably..." |
-| Full Scope | If a code smell is found, instruct the agent to audit the _entire pattern_, not a single instance |
-| Stated Delivery | Every prompt names how the result reaches the dispatcher |
+DELIVERY:
+- Return STATUS as the first line, with the verification output.
+```
 
----
+## Adjudicate
 
-## Quick Checklist
+Reports are claims. For each one:
 
-- [ ] Request was decomposed into phases before this dispatch was written
-- [ ] Independent phases are being sent concurrently, not one at a time
-- [ ] Starts with `Your ROLE_TYPE is sub-agent.`
-- [ ] YOUR TASK copies exactly one row from the Phase Task Table, matching the dispatch's PHASE
-- [ ] Contains only factual observations
-- [ ] No assumptions stated as facts
-- [ ] Defines WHAT and WHY, not HOW
-- [ ] Lists resources without prescribing tools, apart from the quality gates named in CONTEXT Commands
-- [ ] A `validate` or `test` dispatch names its commands in CONTEXT Commands or instructs the agent to discover them
-- [ ] Names the delivery channel and where any longer artifact is written
+- Check that the evidence supports the conclusion. "Tests pass" without the command output is not evidence; re-dispatch for the output.
+- Judge the returned work; do not re-derive it. Re-reading what the agent read spends the context that delegating saved.
+- Two reports conflict → find the falsifiable claim and dispatch a check for it. Confidence is not a tiebreaker.
+- `PARTIAL` → re-dispatch the remainder, naming exactly what is left.
+- `BLOCKED` on a missing input → supply it and re-dispatch. `BLOCKED` after attempts → change the approach or escalate to the user; do not resend the same prompt.
+
+Re-dispatch the same phase at most twice on the same gap. After that, stop and report `BLOCKED` to the user with the gap named.
+
+The `review` phase is not optional for any request that changed code. It goes to a reviewer, never to the writer.
+
+## Pattern expansion
+
+A user pointing at one instance of a smell, bug, or missing check is naming a pattern. Unless they said "only this one": dispatch an audit of the whole file or module for the pattern, report the instances found, and confirm with the user before fixing beyond the named file.
+
+## Pointers
+
+- [references/sub-agent-contract.md](references/sub-agent-contract.md) — what dispatched agents follow.
+- [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps.
+- [references/harness-notes/claude-code.md](references/harness-notes/claude-code.md) — Claude Code mechanics; open only when running there.
+- `orchestrator-discipline` plugin — what the orchestrator may read and run; enforced by hooks.
+- `process-siren` plugin — writing decision points as evaluable Mermaid diamonds.
