@@ -558,6 +558,44 @@ class TestParseIssueBodyUnknownHeading:
         assert "unknown__migration_steps" in result.sections
         assert "unknown__custom_analysis" in result.sections
 
+    def test_parse_unregistered_groomed_heading_does_not_collide_with_groomed_section(self) -> None:
+        """A bare '## Groomed' heading (no date parens) is an unregistered section, not GroomedData.
+
+        Regression test for the fix that replaced a loose
+        ``heading_name.startswith("Groomed")`` check with
+        ``parsing._GROOMED_DATE_RE`` (requires a ``(date)`` suffix). An
+        unregistered section stored under a
+        key like ``"GROOMED"`` round-trips through ``unknown_key_to_heading`` to
+        the display heading ``"Groomed"`` (title-cased, no parens) — identical
+        text to what the loose check matched, misrouting it into
+        ``_parse_groomed_section`` and producing a spurious ``GroomedData`` under
+        the ``"groomed"`` key alongside the correct ``unknown__groomed`` key.
+        """
+        # Arrange — a heading identical to the unregistered-key fallback text,
+        # with no date suffix, alongside a real canonical Groomed section.
+        body = (
+            "<!-- backlog-metadata:\n"
+            "priority: P1\n"
+            "type: Feature\n"
+            "status: open\n"
+            "added: 2026-01-01\n"
+            "-->\n\n"
+            "## Groomed\n\nUnrelated content that happens to share the fallback heading.\n\n"
+            "## Groomed (2026-01-01)\n\n### Priority\n\nHigh priority.\n"
+        )
+
+        # Act
+        result = parse_issue_body(body)
+
+        # Assert — the bare heading is stored as an unknown section, not folded
+        # into "groomed", and the real Groomed section still parses correctly.
+        assert "unknown__groomed" in result.sections
+        assert isinstance(result.sections["unknown__groomed"], Section)
+        groomed = result.sections["groomed"]
+        assert isinstance(groomed, GroomedData)
+        assert groomed.date == "2026-01-01"
+        assert groomed.subsections.get("Priority") == "High priority."
+
     def test_parse_issue_body_existing_carries_non_body_fields(self) -> None:
         """parse_issue_body with existing carries over title, issue, source, plan.
 

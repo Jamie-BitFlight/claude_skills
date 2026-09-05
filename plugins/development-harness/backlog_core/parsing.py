@@ -821,8 +821,16 @@ def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
 _H2_LEVEL = 2
 _H3_LEVEL = 3
 
-# Groomed heading: "## Groomed" with optional " (YYYY-MM-DD)" suffix.
-_GROOMED_DATE_RE = re.compile(r"^Groomed(?:\s*\((\d{4}-\d{2}-\d{2})\))?$", re.IGNORECASE)
+# Groomed heading: "Groomed (date)" only — the date group is REQUIRED, not
+# optional. A bare "Groomed" (no parens) is also what an unregistered section's
+# fallback heading collapses to via rendering.unknown_key_to_heading (e.g. a
+# section key "GROOMED" -> "Groomed", no date). Matching it here would route
+# that unrelated section into GroomedData and silently duplicate/overwrite the
+# real "Groomed (date)" section on round-trip. Canonical for both this
+# module's parse_md_body_sections (legacy .md-file parser) and
+# github_sync.parse_issue_body, which imports this same pattern instead of
+# keeping its own copy — a single definition, not two hand-synced ones.
+_GROOMED_DATE_RE = re.compile(r"^Groomed\s*\(([^)]*)\)$", re.IGNORECASE)
 
 # Entry-block wrapper markers. Must match entry_blocks.wrap_entry()'s
 # "<div><sub>{ts}</sub>\n\n{content}\n</div>" format (see find_entry_spans in
@@ -1239,9 +1247,10 @@ def parse_md_body_sections(body_text: str, added_date: str = "0000-00-00") -> di
     Splits the body on ``## `` top-level headings (respecting fenced code
     blocks), then converts each section to a typed model:
 
-    - ``## Groomed`` (with optional date suffix) → ``GroomedData``
-      ``### `` subsections become ``GroomedData.subsections`` keys; values
-      are stored verbatim so ``entry_blocks`` operations work unchanged.
+    - ``## Groomed (date)`` (parenthesized suffix required — see
+      ``_GROOMED_DATE_RE``) → ``GroomedData``. ``### `` subsections become
+      ``GroomedData.subsections`` keys; values are stored verbatim so
+      ``entry_blocks`` operations work unchanged.
     - All other sections → ``Section`` with a list of ``Entry`` objects.
       Sections with ``<div><sub>`` entry blocks are parsed into individual
       ``Entry`` instances.  Sections with plain text get a single synthetic
