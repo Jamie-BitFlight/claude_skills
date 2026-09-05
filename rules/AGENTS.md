@@ -33,7 +33,6 @@ been added yet.
 | `skill-substitution.md` | SKILL.md — load-time string substitution gotcha |
 | `uv-run-fallback.md` | scripts/, Python files, `.claude/hooks/` — uv run fallback when uv unavailable |
 | `yaml-toml-libraries.md` | Python files — `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
-| `agent-delegation.md` | any file (always-on) — path conventions and agent-selection for delegation |
 | `commit-cadence-and-worktrees.md` | any file (always-on) — small scoped commits, worktrees for concurrent writes |
 | `evidence-action-proportionality.md` | any file (always-on) — files changed must match evidence gathered |
 | `fact-verification-first.md` | any file (always-on) — WebSearch before planning around a named product/version |

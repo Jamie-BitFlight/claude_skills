@@ -93,10 +93,6 @@
       "match": "*.py"
     },
     {
-      "file": "agent-delegation.md",
-      "match": "*"
-    },
-    {
       "file": "commit-cadence-and-worktrees.md",
       "match": "*"
     },
