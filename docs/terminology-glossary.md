@@ -19,7 +19,7 @@ repository.
 
 Agent: a dispatch target for the `Agent` or `Task` tool, either built in or defined under
 `agents/*.md`. This differs from Agent Skills, the open skill format. Load
-`agent-orchestration:agent-orchestration` for repository dispatch conventions.
+`agent-orchestration:delegate` for repository dispatch conventions.
 
 Command: a Markdown file under `commands/` invoked as `/name`. A skill directory and command file
 sharing a name both produce `/name`; the skill wins. Load `plugin-creator:command-development`.

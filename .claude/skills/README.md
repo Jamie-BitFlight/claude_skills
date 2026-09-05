@@ -11,7 +11,6 @@ This directory contains skills that extend Claude's capabilities with specialize
 | [rt-ica](#rt-ica)                                               | Planning Tools     | Pre-planning checkpoint that blocks until prerequisites verified | Yes                   |
 | [scientific-method:scientific-thinking](#scientific-method-scientific-thinking) (plugin) | Workflow Tools     | Hypothesis-driven reasoning for complex problems                 | Yes                   |
 | [verify](#verify)                                               | Workflow Tools     | Self-assessment checklist before task completion                 | Yes                   |
-| [delegate](#delegate)                                           | Workflow Tools     | Quick delegation template for sub-agent prompts                  | Yes                   |
 | [claude-skills-overview-2026](#claude-skills-overview-2026)     | Reference          | Skills and Slash Command system documentation                    | Yes                   |
 | [hooks-guide](#hooks-guide)                                     | Reference          | Cross-platform hooks reference (Claude Code, Copilot, Cursor)    | Yes                   |
 | [claude-plugins-reference-2026](#claude-plugins-reference-2026) | Reference          | Plugins system documentation                                     | Yes                   |
@@ -206,34 +205,6 @@ When an agent loads this skill, it will:
 
 ---
 
-### delegate
-
-**What it does**: Provides a quick delegation template for constructing sub-agent prompts. Ensures proper structure with observations, success criteria, and context while preserving agent autonomy.
-
-**AI behavior when loaded**:
-
-- Analyzes task for WHERE, WHAT, WHY components
-- Constructs prompt using structured template
-- Enforces delegation rules (no micromanagement, no assumptions)
-- Validates prompt before sending
-
-**How to trigger**:
-
-- Explicitly: `@delegate` or `Skill(skill: "delegate")`
-- Automatically: When assigning work to a sub-agent, before invoking the Agent tool, or when preparing prompts for specialized agents
-
-**What to expect**:
-
-- Structured template with OBSERVATIONS, DEFINITION OF SUCCESS, CONTEXT, and AVAILABLE RESOURCES
-- Delegation rules checklist
-- Pre-flight validation of prompt quality
-
-**Delegation formula**: `Delegation = Observations + Success Criteria + Resources - Assumptions - Micromanagement`
-
-**Related skills**: For comprehensive 10-step delegation guidance, activate `/agent-orchestration:how-to-delegate`.
-
----
-
 ## Claude Code Reference Documentation
 
 These skills provide comprehensive reference documentation for Claude Code's capabilities system. Claude loads these automatically when you're working with the respective features.
@@ -424,7 +395,6 @@ Claude automatically activates skills based on your request. Skills have trigger
 - **rt-ica**: "planning", "prerequisites", "spec", "PRD", "ticket", "RFC", "architecture design", "multi-step task"
 - **scientific-method:scientific-thinking**: "debugging", "strange behavior", "root cause", "architecture design", "complex refactoring", "investigation"
 - **verify**: "is it done", "task complete", "before commit", "completion", "finished"
-- **delegate**: "sub-agent", "Agent tool", "delegation", "assign work"
 - **audit**: "review output", "hallucination", "suspicious", "probably", "likely", "verify claims"
 - **claude-skills-overview-2026**: "skill format", "SKILL.md", "skill frontmatter", "skill best practices"
 - **hooks-guide**: "hook", "PreToolUse", "PostToolUse", "hook events", "inline-agent hooks", "platform hooks"

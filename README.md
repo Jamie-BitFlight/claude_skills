@@ -100,7 +100,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 
 | Plugin | Install name | What It Does |
 | --- | --- | --- |
-| [agent-orchestration](./plugins/agent-orchestration) | `agent-orchestration` | Structures delegation prompts with world-building context (WHERE, WHAT, WHY) while preserving agent autonomy on implementation decisions. |
+| [agent-orchestration](./plugins/agent-orchestration) | `agent-orchestration` | Orchestrate sub-agents across harnesses: decompose work into phases, dispatch each with a specialist or generic prompt, adjudicate STATUS reports, and run fan-out, maker/checker, tournament, and loop-until-stop shapes with explicit caps (`delegate`, `parallel-work`). |
 | [verification-gate](./plugins/verification-gate) | `verification-gate` | Forces Claude to verify its hypothesis matches its target before executing writes or edits — blocks correct diagnoses from producing wrong implementations. |
 | [hallucination-detector](https://github.com/bitflight-devops/hallucination-detector) | `hallucination-detector` | Blocks task completion when Claude speculates or makes ungrounded claims, forcing evidence-first rewrites. Separate GitHub repo. |
 | [scientific-method](./plugins/scientific-method) | `scientific-method` | Structures hypothesis-driven debugging and investigation with experiment protocols and evidence-first methodology. |

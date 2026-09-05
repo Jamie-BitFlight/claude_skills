@@ -317,7 +317,7 @@ The orchestrator MUST account for these constraints when designing team workflow
 
 ## Related Skills
 
-- `/orchestrating-swarms` — Implementation-level reference with TeammateTool API, spawn backends, message formats, and complete code examples. Use when building team workflows.
+- `agent-orchestration:parallel-work` — portable fan-out shapes; Claude Code team mechanics in its `delegate/references/harness-notes/claude-code.md`.
 - `/summarizer:multi-source-synthesis` — Working example of team coordination in practice. The summarizer plugin uses teammates for parallel source summarization with cross-checking, then synthesis by the leader.
 
 **Source**: [Agent Teams Documentation](https://code.claude.com/docs/en/agent-teams.md) (accessed 2026-03-07)

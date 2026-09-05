@@ -296,6 +296,6 @@ flowchart TD
 
 ## Navigation
 
-- **Previous:** [Multi-Agent Orchestration](./multi-agent-orchestration.md)
+- **Previous:** [Asset Decision Tree](./asset-decision-tree.md)
 - **Next:** [Investigation Workflow](../../../plugins/scientific-method/shared/investigation-workflow.md)
 - **Back to:** [Index](./README.md)

@@ -255,7 +255,7 @@ The leader MUST still run the full synthesis workflow (Steps 1-6) on the collect
 3. Request shutdown for all teammates after synthesis is complete
 4. Cleanup the team
 
-SOURCE: Team coordination pattern from [orchestrating-swarms skill](https://code.claude.com/docs/en/agent-teams.md) (accessed 2026-02-06). Swarm pattern (self-organizing workers with shared task list) applied to multi-source summarization.
+SOURCE: Team coordination pattern from [Claude Code agent teams](https://code.claude.com/docs/en/agent-teams.md) (accessed 2026-02-06); see `agent-orchestration:parallel-work`. Swarm pattern (self-organizing workers with shared task list) applied to multi-source summarization.
 
 ## Output Rendering
 

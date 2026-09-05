@@ -61,7 +61,7 @@ When the research entry describes an external tool's pattern, map it to the clos
 | Research workflows | `.claude/agents/research-curator.md`, `.claude/skills/research-curator/SKILL.md` |
 | Backlog, issue management | `.claude/skills/backlog/SKILL.md` |
 | Agent creation, agent format | `.claude/agents/`, `plugin-creator/agent-creator/SKILL.md` |
-| Multi-agent swarms, parallel work | `.claude/skills/swarm-operations/SKILL.md`, `swarm-patterns/SKILL.md` |
+| Multi-agent fan-out, parallel work | `plugins/agent-orchestration/skills/parallel-work/SKILL.md` |
 | Code review, quality gates | `.claude/skills/complete-implementation/SKILL.md` |
 | Context management, memory | CLAUDE.md, `.claude/rules/` |
 | MCP tools, server integration | `.claude/skills/fastmcp-creator/SKILL.md` |

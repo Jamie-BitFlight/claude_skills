@@ -10,7 +10,7 @@ Visual documentation mapping repository assets (skills, agents, commands, hooks)
 | --------------------------------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
 | [Master Workflow](./master-workflow.md)                                                       | Complete 6-stage overview with all assets | Understanding the full system            |
 | [Asset Decision Tree](./asset-decision-tree.md)                                               | Skill vs Command vs Agent vs Hook         | Choosing the right extension type        |
-| [Multi-Agent Orchestration](./multi-agent-orchestration.md)                                   | Delegation and DONE/BLOCKED signaling     | Coordinating specialist agents           |
+| [Sub-agent Contract](../../../plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md) | Delegation and DONE/PARTIAL/BLOCKED signaling | Coordinating specialist agents |
 | [Simple Task Workflow](./simple-task-workflow.md)                                             | Minimal path for straightforward tasks    | Quick implementations                    |
 | [Investigation Workflow](../../../plugins/scientific-method/shared/investigation-workflow.md) | Hypothesis-driven scientific method       | Debugging, research, root cause analysis |
 | [RAG Retrieval Pattern](./rag-retrieval-pattern.md)                                           | Context augmentation flow                 | Knowledge retrieval tasks                |
@@ -77,20 +77,19 @@ classDef neutral fill:#e0e0e0,stroke:#757575,stroke-width:1px,color:#424242
 | subagent-generator       | Execution      | Create new agents                  |
 | logging                  | Output         | Consolidate work logs              |
 
-### Commands (11 total)
+### Commands
 
 | Command                                | Stage Coverage | Primary Purpose              |
 | -------------------------------------- | -------------- | ---------------------------- |
 | /am-i-complete                         | Verification   | Completion readiness check   |
 | /dh:verify-done                                | Verification   | Self-assessment checklist    |
 | /audit                                 | Verification   | Hallucination detection      |
-| /how-to-delegate                       | Planning       | Delegation guidance          |
+| /agent-orchestration:delegate          | Planning       | Decompose, dispatch, adjudicate |
 | /think                                 | Planning       | Step-back reasoning          |
 | /sessions                              | Input          | Session management           |
 | /step-back                             | Planning       | Broader perspective          |
 | /how-confident                         | Verification   | Confidence self-assessment   |
 | /dh:rt-ica                             | Planning       | Requirements assessment      |
-| /delegate                              | Planning       | Quick delegation template    |
 | /scientific-method:scientific-thinking | Planning       | Scientific method activation |
 
 ### Hooks (1 total)
@@ -116,7 +115,7 @@ Stage 2: CONTEXT GATHERING
 
 Stage 3: PLANNING
 ├── Coverage: ✅ COVERED
-├── Assets: rt-ica, delegate, /how-to-delegate, /think, scientific-method:scientific-thinking
+├── Assets: rt-ica, /agent-orchestration:delegate, /think, scientific-method:scientific-thinking
 └── Gaps: No complexity estimation
 
 Stage 4: EXECUTION
@@ -141,7 +140,7 @@ Stage 6: OUTPUT DELIVERY
 
 1. **New to the system?** Start with [Master Workflow](./master-workflow.md)
 2. **Building an extension?** Use [Asset Decision Tree](./asset-decision-tree.md)
-3. **Delegating work?** Follow [Multi-Agent Orchestration](./multi-agent-orchestration.md)
+3. **Delegating work?** Load `agent-orchestration:delegate`; dispatched agents follow the [Sub-agent Contract](../../../plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md)
 4. **Quick task?** Use [Simple Task Workflow](./simple-task-workflow.md)
 5. **Debugging/research?** Follow [Investigation Workflow](../../../plugins/scientific-method/shared/investigation-workflow.md)
 6. **Need context?** Use [RAG Retrieval Pattern](./rag-retrieval-pattern.md)
