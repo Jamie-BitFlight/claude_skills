@@ -27,8 +27,8 @@ with its own MCP servers (`backlog_core/`, `sam_schema/`), agents, and skills. I
 Backlog backend for this checkout: **GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`).
 This repo does not use Beads (`bd`) for task tracking. **Never run `bd init` or `bd setup` at the
 repo root.** If a Beads integration block reappears in this file, delete it — it does not describe
-this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for how
-backend selection and the `backlog_*`/`sam_*` MCP tools actually work.
+this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for the
+backend abstraction's Protocol architecture when extending or modifying `dh`'s backend code.
 
 ## Environment Setup (Required First)
 
@@ -94,6 +94,20 @@ This repo enforces **Conventional Commits** with `--strict --force-scope` (scope
 the `conventional-pre-commit` hook in `.pre-commit-config.yaml`.
 
 **NEVER use `--no-verify` or flags that bypass git hooks.** If a hook fails, fix the underlying issue.
+
+## Git Workflow: Commit, Push, and PR per Task
+
+Repo owner instruction, standing: commit completed work as each discrete task finishes, push the
+branch, and open a pull request for it. Do not wait for interactive approval before committing or
+pushing in this repository — this overrides Claude Code's own default "ask before committing"
+behavior here.
+
+- Follow `rules/commit-cadence-and-worktrees.md` for commit hygiene: small, file-scoped commits
+  via an explicit file list, never `git add -A`.
+- One PR per discrete task or unit of work, not one PR per session. Push the branch and run
+  `gh pr create` once a task's commit(s) land.
+- This does not extend to force-pushing, pushing directly to `main`, merging PRs, or bypassing
+  hooks (`--no-verify`) — those still need explicit approval every time.
 
 ## Working Tree Safety
 
