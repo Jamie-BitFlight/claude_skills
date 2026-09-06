@@ -72,7 +72,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 | Stage | Command | Purpose |
 |-------|---------|---------|
 | Starting complex task | `/dh:rt-ica <#N \| goal>` | Works backward from the goal through the prerequisite chain, classifying each as available/derivable/missing, and blocks planning until nothing is missing |
-| Delegating to sub-agent | `/delegate` | Enforces delegation framework |
+| Delegating to sub-agent | `/agent-orchestration:delegate` | Decompose, dispatch, adjudicate |
 | Reviewing agent output | `/hallucination-detector:hallucination-audit` | Checks hallucinations, unverified causality |
 | Claiming task complete | `/dh:verify-done` | Runs "Is It Done?" checklist |
 | Writing or improving a process | `/process-siren:improve-processes` | Evaluates process completeness, improves before Mermaid conversion |
@@ -135,7 +135,7 @@ flowchart TD
 
 ## Parallel Execution
 
-Load `agent-orchestration:agent-orchestration` for the dispatch decision (single `Agent()` vs `TeamCreate`, shared-file-mutation serialization) — see its "Parallel Dispatch — Teams as Standard Mechanism" section.
+Load `agent-orchestration:parallel-work` for fan-out shapes and isolation; teams are not the default.
 
 Close out agents you have finished with. When a teammate's work is done and you are no longer
 using it, send it a `shutdown_request` rather than leaving it resident. Subagents dispatched
@@ -184,7 +184,7 @@ Activate `/plugin-creator:skill-creator` when ANY condition matches:
 
 ## Agent Delegation Standards
 
-Follow Delegation Template in agent-orchestration:agent-orchestration skill when invoking Agent tool.
+Follow the prompt template in `agent-orchestration:delegate`; sub-agents follow its `sub-agent-contract.md`.
 
 ---
 
@@ -322,7 +322,7 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- Agent Output Contracts (explicit terminal output required — no silent exits): [Agent Output Contracts](../rules/agent-output-contracts.md)
+- Sub-agent Contract (STATUS first line, evidence, artifact path): [Sub-agent Contract](../plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md)
 
 ---
 

@@ -142,7 +142,6 @@ Nielsen 10 = 10 ready-made overlapping jobs. Near-zero partition design cost.
 
 ### C6 Verification / Done Gates — pre-partitioned, single-pass
 
-- `agent-orchestration/.../post-completion-validation-protocol.md` — 44 (11 commit types x4) — fit5
 - `scientific-method/skills/evidence-first-debugging` — 13 (5 rules + 8 checklist) — fit5
 - `development-harness/skills/verify-done` — 8 sections — fit4
 - `development-harness/skills/final-verification` — 5 dimensions — fit4
@@ -173,9 +172,7 @@ Each names its own categories → those categories ARE the worker boundaries.
 
 ### C9 Orchestration / Hallucination Detection
 
-- `agent-orchestration/.../hallucination-triggers.md` — 4 categories, ~35-40 rules — fit5
-- `agent-orchestration/skills/agent-orchestration/SKILL.md` — 6-8 gates — fit4
-- `agent-orchestration/skills/how-to-delegate` — 6 pre-flight + 10 step gates — fit4
+- `agent-orchestration/skills/delegate/SKILL.md` — dispatch rules + adjudication gates — fit4
 - `agentskill-kaizen/references/arl-qa-expert-panel.md` — R1-R10 — fit4
 - `scientific-method/agents/retrospective-analyst` — 3 artifacts x sub-sections — fit4
 

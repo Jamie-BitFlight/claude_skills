@@ -96,7 +96,7 @@ Start by tracing [X] through the codebase: find all call sites, read how [Y] is 
 
 "Finding" here means tracing — following call chains, reading usage patterns, consulting the module's documentation, its source on GitHub, its changelog, related RFCs or issues — not a grep for a keyword. The implementing agent does this with full task context, so it understands why it is looking and what to do with what it discovers. Research done in context of the implementation task produces higher-quality results than pre-filtered findings handed over from the orchestrator.
 
-Load `/agent-orchestration:agent-orchestration` for the full framework: delegation template, verification checklists, anti-patterns, and parallel dispatch patterns.
+Load `/agent-orchestration:delegate` for the dispatch template and adjudication rules, and `/agent-orchestration:parallel-work` for fan-out shapes.
 
 ### Delegation Routing Rules
 

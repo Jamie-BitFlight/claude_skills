@@ -30,11 +30,7 @@ These rules enforce delegation discipline for the orchestrator role. The orchest
 
 ## Delegation Constraints
 
-**No exemption categories**: "config changes", "small edits", "just TOML/YAML", and "only 2 lines" are not valid reasons to skip delegation. The orchestrator delegates, agents implement. This applies regardless of file type, change size, or perceived simplicity.
-
-**Never pre-gather data for agents**: Agents perform their own Chain of Verification. Provide outcomes, constraints, and file paths — not your analysis of those files.
-
-**Never pre-read task files for agents**: If the agent needs to read a file, pass the file path. Pre-gathered summaries bypass agent verification, add stale data, and waste orchestrator context.
+Prompt construction: `agent-orchestration:delegate`. This file governs what the orchestrator itself may read and run.
 
 ---
 
@@ -52,7 +48,7 @@ A validated failure mode where the orchestrator progressively reads more files, 
 ```mermaid
 flowchart TD
     Start([Orchestrator encounters task]) --> Q1{Need to understand current state?}
-    Q1 -->|Yes| Delegate1["Delegate to Explore agent:<br>'Run [command] and report summary'"]
+    Q1 -->|Yes| Delegate1["Delegate to general-purpose agent:<br>'Run [exact command] and report: [exact output shape]'"]
     Q1 -->|No| Delegate2[Delegate implementation to specialist agent]
     Delegate1 --> Receive[Receive agent summary]
     Receive --> Q2{Scope changed from original?}
@@ -109,7 +105,7 @@ flowchart TD
 
 ## Diagnostic Commands
 
-The orchestrator MUST NOT run diagnostic commands that produce large output directly into its context window. These commands should be delegated to an Explore agent or specialist.
+The orchestrator MUST NOT run diagnostic commands that produce large output directly into its context window. These commands should be delegated to a general-purpose agent or specialist.
 
 **Commands that must be delegated** (not run directly by the orchestrator):
 
@@ -119,14 +115,14 @@ The orchestrator MUST NOT run diagnostic commands that produce large output dire
 
 **Exception**: Post-edit verification of a single file you just modified. Scope the check to that file only — never the entire codebase.
 
-**Correct delegation pattern**:
+**Correct delegation pattern**: dispatch to a general-purpose agent with a prescribed instruction — exact command, exact output shape:
 
 ```text
-Delegate to Explore agent:
-"Run [diagnostic command] and report:
+Delegate to a general-purpose agent:
+"Run [exact diagnostic command] and report, in this exact shape:
  - Total count by diagnostic category
  - Affected file paths
- - Representative example of each category
+ - One representative example of each category
  3 sentences maximum."
 ```
 

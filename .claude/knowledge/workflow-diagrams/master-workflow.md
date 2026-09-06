@@ -24,7 +24,7 @@ flowchart TB
     subgraph PLANNING["3. PLANNING ✅"]
         P1["/dh:rt-ica skill"]
         P2["delegate skill"]
-        P3["/how-to-delegate"]
+        P3["/agent-orchestration:delegate"]
         P4["/think command"]
         P5["scientific-method:scientific-thinking skill"]
     end
@@ -160,7 +160,7 @@ flowchart TB
 
     subgraph DELEGATE["Delegation Design"]
         DEL1["delegate skill<br/>WHERE-WHAT-WHY template"]
-        DEL2["/how-to-delegate<br/>Full delegation guidance"]
+        DEL2["/agent-orchestration:delegate<br/>Decompose, dispatch, adjudicate"]
     end
 
     subgraph GAP["Gaps"]
@@ -180,7 +180,7 @@ flowchart TB
 | -------------------------------------- | ------- | ------------------------------------------- |
 | rt-ica                                 | Skill   | Block planning until prerequisites verified |
 | delegate                               | Skill   | Quick WHERE-WHAT-WHY template               |
-| /how-to-delegate                       | Command | Comprehensive delegation framework          |
+| /agent-orchestration:delegate          | Skill   | Decompose, dispatch, adjudicate             |
 | /think                                 | Command | Step-back broader perspective               |
 | scientific-method:scientific-thinking  | Skill   | Hypothesis-driven approach                  |
 | /step-back                             | Command | Wider view of task implications             |
@@ -366,12 +366,11 @@ flowchart TB
 │ /am-i-complete                         │       │         │          │           │      ●       │        │
 │ /dh:verify-done                                │       │         │          │           │      ●       │        │
 │ /audit                                 │       │         │          │           │      ●       │        │
-│ /how-to-delegate                       │       │         │    ●     │           │              │        │
+│ /agent-orchestration:delegate          │       │         │    ●     │           │              │        │
 │ /think                                 │       │         │    ●     │           │              │        │
 │ /step-back                             │       │         │    ●     │           │              │        │
 │ /how-confident                         │       │         │          │           │      ●       │        │
 │ /rt-ica                                │       │    ●    │    ●     │           │              │        │
-│ /delegate                              │       │         │    ●     │           │              │        │
 │ /scientific-method:scientific-thinking │       │         │    ●     │           │              │        │
 ├────────────────────────────────────────┼───────┼─────────┼──────────┼───────────┼──────────────┼────────┤
 │ HOOKS                                  │       │         │          │           │              │        │

@@ -121,8 +121,8 @@ RULE: NEVER read source code, config, or test files unless you will Edit/Write t
 Pass paths to agents — they perform their own verification.
 
 ANTI-PATTERN: "Let me understand the patterns to scope the delegation"
-CORRECT: Write the path into the delegation prompt. Then use /delegate (Skill tool,
-skill: "delegate") to enforce the reproduction-first delegation framework. Delegate first.
+CORRECT: Write the path into the delegation prompt. Then use /agent-orchestration:delegate (Skill tool,
+skill: "agent-orchestration:delegate") to enforce the delegation framework. Delegate first.
 </orchestrator-read-warning>`,
     },
   };

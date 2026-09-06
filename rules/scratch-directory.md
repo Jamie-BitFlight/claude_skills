@@ -20,7 +20,7 @@ Add subdirectories freely. Nothing in `.tmp/` is committed, linted, or quality-c
 ```text
 DEFINITION OF SUCCESS:
 Write findings to .tmp/scratch/reports/YYYYMMDD-<slug>.md
-Return: STATUS: DONE + path to the file
+Return: STATUS: DONE (or PARTIAL) + path to the file
 ```
 
 The returned path is for the requesting agent to read directly. Do not invent an ad hoc handoff by

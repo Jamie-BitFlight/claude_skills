@@ -160,7 +160,7 @@ If you have many skills, embed pointers in CLAUDE.md as a safeguard:
 ```markdown
 ## Skills Available
 - For debugging: use `/scientific-method:scientific-thinking` skill
-- For delegation: use `/delegate` skill
+- For delegation: use `/agent-orchestration:delegate` skill
 ```
 
 This ensures Claude can find skills even if truncated from `<available_skills>`.
@@ -345,7 +345,7 @@ Agent teams coordinate multiple independent Claude Code instances with inter-age
 
 Use agent teams when 3+ workers need to share findings, challenge each other, and coordinate independently. Use subagents when workers report back without needing cross-communication.
 
-For complete agent teams reference including architecture, display modes, lifecycle management, use case patterns, and quality gate hooks (`TeammateIdle`, `TaskCompleted`), see `resources/agent-teams.md`. For implementation-level API details (TeammateTool operations, message formats, spawn backends), activate the `/orchestrating-swarms` skill.
+For complete agent teams reference including architecture, display modes, lifecycle management, use case patterns, and quality gate hooks (`TeammateIdle`, `TaskCompleted`), see `resources/agent-teams.md`.
 
 **Source**: [Agent Teams Documentation](https://code.claude.com/docs/en/agent-teams.md) (accessed 2026-02-06)
 

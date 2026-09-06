@@ -322,6 +322,8 @@ flowchart TD
 
 - Using the word `end` in all lowercase as a node name will break the flowchart. Capitalize at least one letter (e.g., `End`, `END`) or use the workaround from GitHub issue #1444.
 - Using `o` or `x` as the first letter of a connecting node (e.g., `A---oB`) will create a circle edge or cross edge respectively. Add a space before the letter or capitalize it (e.g., `dev--- ops`, `dev---Ops`).
+- `\n` does not render as a line break inside a node label — Mermaid treats it as literal text. Use `<br>` instead: `id["Line one<br>Line two"]`.
+- A bare colon inside a quoted node label string can break rendering (Mermaid's parser can misread it as label/attribute syntax). Use `=` for assignments inside labels instead: `id["subagent_type='plugin:agent-name'"]` rather than `id["subagent_type: plugin:agent-name"]`.
 
 ## See Also
 

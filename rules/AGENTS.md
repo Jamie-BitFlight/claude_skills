@@ -10,11 +10,11 @@ been added yet.
 
 | File | Loads when editing... |
 |---|---|
-| `agent-output-contracts.md` | agent/command/reference files — every agent must emit explicit terminal output |
+| `agent-output-contracts.md` | agent-definition files — prohibited silent-output instructions and enforcement checklist |
 | `astral-tool-overrides.md` | Python files, `pyproject.toml`, `uv.lock` — this repo's uv/ty/ruff policy overrides |
 | `ci-workflows.md` | `.github/workflows/*.yml` — CI workflow modification protocol |
 | `citation-requirements.md` | SKILL.md/agents/commands/CLAUDE.md — factual claims need a cited source |
-| `delegation-format.md` | SKILL.md/agents/commands/references — canonical delegation-instruction format |
+| `delegation-format.md` | SKILL.md/agents/commands/references — wrong delegation-instruction formats to avoid in prose |
 | `exception-handling.md` | Python/TS/JS — narrow exception catches only, no broad `except Exception` |
 | `frontmatter-requirements.md` | SKILL.md/agents/commands — required frontmatter fields |
 | `language-conventions.md` | scripts/, `.claude/hooks/`, Python files — language choice, `.cjs`/`.mjs` Node convention |
@@ -33,8 +33,8 @@ been added yet.
 | `skill-substitution.md` | SKILL.md — load-time string substitution gotcha |
 | `uv-run-fallback.md` | scripts/, Python files, `.claude/hooks/` — uv run fallback when uv unavailable |
 | `yaml-toml-libraries.md` | Python files — `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
-| `agent-delegation.md` | any file (always-on) — path conventions and agent-selection for delegation |
 | `commit-cadence-and-worktrees.md` | any file (always-on) — small scoped commits, worktrees for concurrent writes |
+| `delegation.md` | any file (always-on) — substantive work is delegated; pointer to `agent-orchestration:delegate` and the sub-agent contract |
 | `evidence-action-proportionality.md` | any file (always-on) — files changed must match evidence gathered |
 | `fact-verification-first.md` | any file (always-on) — WebSearch before planning around a named product/version |
 | `falsification-requirement.md` | any file (always-on) — every hypothesis test needs a falsification check |

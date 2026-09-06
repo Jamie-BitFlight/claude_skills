@@ -51,8 +51,8 @@ This skill auto-loads via the plugin's hooks and rules. Manual activation is use
 ```mermaid
 flowchart TD
     Start([Task arrives]) --> Q1{Does orchestrator need<br>current codebase state?}
-    Q1 -->|Yes| Explore["Delegate to Explore agent<br>with diagnostic command"]
-    Q1 -->|No| Direct[Delegate implementation<br>to specialist agent]
+    Q1 -->|Yes| Explore["Delegate a read/validate dispatch<br>(generic agent) with the command"]
+    Q1 -->|No| Direct["Delegate implementation<br>to specialist agent<br>per agent-orchestration:delegate"]
     Explore --> Summary[Receive summary<br>from agent]
     Summary --> Q2{Scope changed?}
     Q2 -->|Yes| User[Present to user<br>for routing decision]

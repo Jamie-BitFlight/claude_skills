@@ -147,7 +147,7 @@ flowchart TD
         E1["/am-i-complete → Check completion"]
         E2["/think → Step-back reasoning"]
         E3["/sessions → Session management"]
-        E4["/how-to-delegate → Delegation guidance"]
+        E4["/agent-orchestration:delegate → Decompose, dispatch, adjudicate"]
     end
 
     YES --> EXAMPLES
@@ -318,5 +318,5 @@ flowchart LR
 ## Navigation
 
 - **Previous:** [Master Workflow](./master-workflow.md)
-- **Next:** [Multi-Agent Orchestration](./multi-agent-orchestration.md)
+- **Next:** [Simple Task Workflow](./simple-task-workflow.md)
 - **Back to:** [Index](./README.md)

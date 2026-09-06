@@ -5,11 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { loadRulesByNames } from '../../rules/context-loader.mjs';
 
-const DELEGATION_RULES = [
-  'agent-delegation.md',
-  'fix-delegation-discipline.md',
-  'model-selection.md',
-];
+const DELEGATION_RULES = ['delegation.md', 'fix-delegation-discipline.md', 'model-selection.md'];
 
 function readStdin() {
   try {
@@ -25,6 +21,10 @@ function main() {
   try {
     input = JSON.parse(raw);
   } catch {
+    process.exit(0);
+  }
+
+  if (typeof input !== 'object' || input === null) {
     process.exit(0);
   }
 
