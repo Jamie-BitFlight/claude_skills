@@ -19,6 +19,30 @@ distributable packages — never build, bundle, publish, or add a `pyproject.tom
 Doing so creates two dependency sources of truth (the script's own inline deps vs. a new
 package's) that silently diverge — a split-brain, not a cleanup.
 
+### Splitting a PEP 723 script
+
+A PEP 723 script may import its own modules; the inline block governs its PyPI dependencies, not
+its file count. Split a script that passes ~500 lines, per the File Size Policy in
+[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md). Verified
+2026-09-06 by running a two-file PEP 723 script from an unrelated working directory, and by
+`sam_schema/cli.py`, which has shipped this way.
+
+Imports resolve two ways:
+
+- **A sibling module in the script's own directory** imports by name with no setup. `uv run` puts
+  the script's directory first on `sys.path` whatever the working directory.
+- **A script inside a package, importing that package by name**, needs the package's parent on the
+  path first:
+
+  ```python
+  sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+  ```
+
+  `sam_schema/cli.py` does exactly this before `from sam_schema import artifacts, backlog, …`.
+
+Only the entry script carries the shebang and the `# /// script` block; the modules it imports are
+plain `.py` files.
+
 ### Invariant
 
 ```bash

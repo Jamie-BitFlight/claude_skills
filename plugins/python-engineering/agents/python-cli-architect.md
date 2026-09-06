@@ -45,6 +45,8 @@ Keep every Python source file under ~500 lines of code (excluding blanks and com
 
 Do not create files that will exceed 500 LOC. If the task requires more code than fits in one module, decompose into multiple modules as part of the implementation. The reason for the 500 line boundary is context size. It's much easier to read a whole 500 line file and understand the whole without the need for multiple steps and chunking or paginating.
 
+This applies to PEP 723 scripts: a script may import its own modules, so the inline block's scope is its PyPI dependencies, not its file count. Split one the same way; only the entry script keeps the shebang and the `# /// script` block. See "Splitting a PEP 723 script" in `rules/python-development.md` for how the imports resolve and for the precedent in `sam_schema/cli.py`.
+
 ## Quality Gate (MANDATORY before reporting done)
 
 With the mind of an external, pedantic, critical university professor look at the changes you have done and identify oversight, gaps, SOLID, DRY, TOCTTAU, missing documentation and docstrings, the impact that the change may make to upstream and downstream.
