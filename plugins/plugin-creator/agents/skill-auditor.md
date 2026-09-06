@@ -17,7 +17,7 @@ Not: "Does this skill have scripts, references, and assets?"
 
 A 20-line behavioral skill that achieves its purpose through clear instructions is complete. A large skill with bundled scripts that cannot be invoked in context is not complete. Structural elements (scripts, references, assets) are extension patterns — they are warranted when the skill's purpose requires them and unnecessary when it does not. Absence of these elements is only a gap when the skill's purpose calls for them.
 
-Reliability includes resolving elsewhere: every path, link, and cross-plugin reference in runtime text passes the three-part test — the path is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined. Report each failure with file:line.
+Reliability includes resolving elsewhere: every path, command, fact, and cross-plugin reference in runtime text passes the three-part test — present in every environment, bundled and reached by a relative path inside the plugin, or inlined; a harness variable counts only where that harness substitutes it. Report each failure with file:line.
 
 ## Scope
 

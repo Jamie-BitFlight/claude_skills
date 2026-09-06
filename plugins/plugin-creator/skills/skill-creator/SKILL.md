@@ -78,15 +78,13 @@ Add automated doc updater when skill wraps external docs (API specs, frameworks,
 
 ### Reference only what ships with the skill
 
-Before writing any path, command, or cross-plugin reference into a skill, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
+Confirm each path, command, fact, or cross-plugin reference is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
 
 ### Concise is Key
 
 The context window is a public good. Skills share the context window with everything else Claude needs: system prompt, conversation history, other Skills' metadata, and the actual user request.
 
 **Default assumption: Claude is already very smart.** Only add context Claude doesn't already have. Challenge each piece of information: "Does Claude really need this explanation?" and "Does this paragraph justify its token cost?"
-
-Prefer concise examples over verbose explanations.
 
 For token budget limits, truncation behavior, and fallback strategy, activate the `/plugin-creator:claude-skills-overview-2026` skill — it is the authoritative source for this section.
 

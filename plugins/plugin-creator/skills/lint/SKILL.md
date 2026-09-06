@@ -35,4 +35,8 @@ illustration rather than an instruction; angle-bracket placeholders are exempt f
 reason. Move an illustrative real path into a fence, and write a generic one as
 `<plugin>/skills/<name>/SKILL.md`.
 
-Each finding is measured against the three-part test: present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
+The test behind each finding: a path, command, fact, or cross-plugin reference is present in
+every environment, bundled and reached by a relative path inside the plugin, or inlined;
+otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness
+substitutes it. The scanner never reports a path built on `${CLAUDE_PLUGIN_ROOT}` or
+`${CLAUDE_SKILL_DIR}`, so check those by hand against the same test.
