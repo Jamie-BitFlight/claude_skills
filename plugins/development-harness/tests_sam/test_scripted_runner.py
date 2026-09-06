@@ -14,9 +14,13 @@ report section it belongs to. That is what lets a regression here name the step 
 of reporting an exit status. ``report()`` still returns a non-zero status when any observation is
 unsatisfied, so a human running the script by hand gets a verdict rather than a listing.
 
-Three tests read the script rather than run it: one holds it to the canonical PEP 723 shebang, one
-proves it never imports the package it drives, and one proves it names no construct that would tie
-it to POSIX. A handful more hold the preconditions the run refuses to start without — the toolchain,
+Some tests read the runner rather than run it, and each reads every file it is built from — the
+entry script and every module of ``tests_sam/scripted_runner_lib/`` — because that set comes from
+:func:`~tests_sam.scripted_runner.source_paths` rather than a list kept here. They hold the entry
+script to the canonical PEP 723 shebang and its modules to carrying neither shebang nor metadata
+block, prove that nothing in the runner imports the package it drives, prove that nothing in it
+names a construct that would tie it to POSIX, and prove that the set they read is every module the
+runner imports. A handful more hold the preconditions the run refuses to start without — the toolchain,
 the CLI, the base commit, the fixture files and the state root that keeps a hand run off any real
 ledger. The rest drive the loop once, in a session-scoped fixture, and assert the recorded
 observations one by one. Three more hold every command and flag the loop actually issued against
@@ -26,6 +30,8 @@ depending on a surface the specification does not name.
 
 from __future__ import annotations
 
+import ast
+import importlib.util
 import os
 import re
 from pathlib import Path
@@ -59,10 +65,25 @@ PLATFORM_BOUND_CONSTRUCTS: dict[str, re.Pattern[str]] = {
 }
 """Constructs that would tie the runner to POSIX, each named the way its failure would read.
 
-The shebang line is exempt: it is inert on Windows, where the script is run through ``uv run``, and
-``rules/script-invocation.md`` requires it verbatim. Every pattern below is checked against the rest
-of the source.
+The entry script's shebang line is exempt: it is inert on Windows, where the script is run through
+``uv run``, and ``rules/script-invocation.md`` requires it verbatim. Every pattern below is checked
+against the rest of that file and against the whole of every module, none of which carries one.
 """
+
+RUNNER_SOURCES: tuple[Path, ...] = scripted_runner.source_paths()
+"""Every file the runner is built from, derived from the runner itself rather than listed here."""
+
+SOURCE_IDS: tuple[str, ...] = tuple(path.name for path in RUNNER_SOURCES)
+"""Readable parametrisation ids for :data:`RUNNER_SOURCES`."""
+
+RUNNER_MODULES: tuple[Path, ...] = tuple(path for path in RUNNER_SOURCES if path != scripted_runner.SOURCE_PATH)
+"""Every file of the runner but the entry script, which is the only one ``uv`` is ever pointed at."""
+
+MODULE_IDS: tuple[str, ...] = tuple(path.name for path in RUNNER_MODULES)
+"""Readable parametrisation ids for :data:`RUNNER_MODULES`."""
+
+PACKAGE_ROOT: str = scripted_runner.__name__.partition(".")[0]
+"""The package the runner's own modules live in; an import of anything else is not one of its own."""
 
 FIRST_WAVE = "first"
 SECOND_WAVE = "second"
@@ -150,8 +171,38 @@ def assert_satisfied(observation: Observation) -> None:
 # ---------------------------------------------------------------------------
 
 
+def first_party_module_paths(source_path: Path) -> set[Path]:
+    """Return the file of every module inside :data:`PACKAGE_ROOT` that one source imports.
+
+    Args:
+        source_path: The file whose import statements are read.
+
+    Returns:
+        The resolved file of each imported module; a name that resolves to no module is left out,
+        because ``from x import Name`` names an attribute as readily as a submodule.
+    """
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(source_path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            names.add(node.module)
+            names.update(f"{node.module}.{alias.name}" for alias in node.names)
+    paths: set[Path] = set()
+    for name in sorted(names):
+        if name.partition(".")[0] != PACKAGE_ROOT:
+            continue
+        try:
+            spec = importlib.util.find_spec(name)
+        except ModuleNotFoundError:
+            continue
+        if spec is not None and spec.origin is not None:
+            paths.add(Path(spec.origin).resolve())
+    return paths
+
+
 def test_the_runner_is_a_pep723_script_runnable_by_hand() -> None:
-    """The runner carries the canonical shebang, a PEP 723 block, and the executable bit."""
+    """The entry script carries the canonical shebang, a PEP 723 block, and the executable bit."""
     source = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8")
 
     assert source.startswith(f"{CANONICAL_SHEBANG}\n"), "the runner does not carry the canonical PEP 723 shebang"
@@ -160,23 +211,50 @@ def test_the_runner_is_a_pep723_script_runnable_by_hand() -> None:
         assert os.access(scripted_runner.SOURCE_PATH, os.X_OK), f"{scripted_runner.SOURCE_PATH} is not executable"
 
 
-def test_the_runner_never_imports_the_package_it_drives() -> None:
-    """The proof is that the CLI is enough, so the runner may not reach the package behind it."""
-    source = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8")
+@pytest.mark.parametrize("module_path", RUNNER_MODULES, ids=MODULE_IDS)
+def test_only_the_entry_script_carries_the_shebang_and_the_metadata_block(module_path: Path) -> None:
+    """``rules/python-development.md``: the modules a split PEP 723 script imports are plain files."""
+    source = module_path.read_text(encoding="utf-8")
 
-    found = DRIVEN_PACKAGE_IMPORT.findall(source)
+    assert not source.startswith("#!"), f"{module_path.name} carries a shebang, but only the entry script is run"
+    assert "# /// script" not in source, f"{module_path.name} declares a second source of truth for dependencies"
 
-    assert not found, f"the runner imports the package it is meant to drive as a subprocess: {found}"
+
+def test_the_source_set_the_artefact_tests_read_starts_at_the_entry_script_and_holds_its_modules() -> None:
+    """Every scan below is worth its name only if the set it reads is the whole runner."""
+    assert RUNNER_SOURCES[0] == scripted_runner.SOURCE_PATH, "the entry script is not the first source read"
+    assert RUNNER_MODULES, "the runner's library package holds no module, so the scans read one file"
 
 
-def test_the_runner_names_no_construct_that_would_tie_it_to_posix() -> None:
+def test_the_source_set_the_artefact_tests_read_is_every_module_the_runner_imports() -> None:
+    """A module added outside the library package must not fall out of the scans above."""
+    imported: set[Path] = set().union(*(first_party_module_paths(path) for path in RUNNER_SOURCES))
+
+    unscanned = sorted(str(path) for path in imported - set(RUNNER_SOURCES))
+
+    assert not unscanned, f"the runner imports modules the artefact tests never read: {unscanned}"
+
+
+@pytest.mark.parametrize("source_path", RUNNER_SOURCES, ids=SOURCE_IDS)
+def test_no_source_of_the_runner_imports_the_package_it_drives(source_path: Path) -> None:
+    """The proof is that the CLI is enough, so nothing in the runner may reach the package behind it."""
+    found = DRIVEN_PACKAGE_IMPORT.findall(source_path.read_text(encoding="utf-8"))
+
+    assert not found, f"{source_path.name} imports the package the runner drives as a subprocess: {found}"
+
+
+@pytest.mark.parametrize("source_path", RUNNER_SOURCES, ids=SOURCE_IDS)
+def test_no_source_of_the_runner_names_a_construct_that_would_tie_it_to_posix(source_path: Path) -> None:
     """The runner must run on Windows, so nothing below the shebang may assume a POSIX host."""
-    shebang, _, body = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8").partition("\n")
+    shebang, newline, body = source_path.read_text(encoding="utf-8").partition("\n")
+    entry_script = source_path == scripted_runner.SOURCE_PATH
+    scanned = body if entry_script else f"{shebang}{newline}{body}"
 
-    found = sorted(reason for reason, pattern in PLATFORM_BOUND_CONSTRUCTS.items() if pattern.search(body))
+    found = sorted(reason for reason, pattern in PLATFORM_BOUND_CONSTRUCTS.items() if pattern.search(scanned))
 
-    assert shebang == CANONICAL_SHEBANG, "the exempted first line is not the shebang"
-    assert not found, f"the runner will not run on Windows: {found}"
+    if entry_script:
+        assert shebang == CANONICAL_SHEBANG, "the exempted first line is not the shebang"
+    assert not found, f"{source_path.name} will not run on Windows: {found}"
 
 
 def test_the_loop_plan_fixture_the_runner_reads_is_on_disk() -> None:
