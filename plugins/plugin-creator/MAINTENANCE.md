@@ -27,6 +27,17 @@ plugin — a skill bundles `scripts/`, and shared docs live at `${CLAUDE_PLUGIN_
 flagging a bare `scripts/helper.py` reported portable code as broken. Removing them cut
 plugin-creator's own count from 66 to 38 with no loss of real findings.
 
+## Tracked follow-ups
+
+Two temporary states in this plugin are tracked as backlog items rather than as notes here, so
+they surface on a queue instead of waiting to be re-read:
+
+- **#3429** — the ten SKILL.md pointers use a backticked `${CLAUDE_PLUGIN_ROOT}` path instead of
+  a markdown link. That is a workaround for a skilllint LK001 false positive on relative
+  invocation, and the item carries the verification command and the revert steps.
+- **#3430** — six agents state the portability test inline because substitution in agent bodies
+  is undocumented and unverified. The item carries the canary test that would settle it.
+
 ## Open: local-path SOURCE citations
 
 Most of plugin-creator's remaining escapes are `SOURCE:` lines citing a local path
