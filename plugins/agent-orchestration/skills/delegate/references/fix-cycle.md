@@ -21,5 +21,5 @@ runs before and after the change.
 4. Re-run the same reproduction; confirm it now passes.
 5. Run the project's regression gate; confirm nothing else broke.
 
-If the reproduction won't fail, or still fails after a reasonable retry, report `BLOCKED` with
+If the reproduction won't fail, or still fails after two attempts, report `BLOCKED` with
 the command and its output rather than guessing further.

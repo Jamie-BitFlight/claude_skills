@@ -56,11 +56,11 @@ Classify by what the task asks of the agent, not by its name:
 
 When no specialist fits, dispatch generic with a prescribed task.
 
+Both prompts open with the same two lines — copy them verbatim onto the first line of whichever template follows: `Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.`
+
 ### Prompt — specialist mode
 
 ```text
-Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.
-
 PHASE: <one of the phase names>
 TASK: <one sentence>
 
@@ -73,7 +73,7 @@ DEFINITION OF SUCCESS:
 - <how it is verified — a command and its expected result, or the reviewer that will check>
 
 DELIVERY:
-- Return STATUS as the first line. Write anything longer than a line to .tmp/scratch/reports/<YYYYMMDD>-<slug>.md and return the path.
+- Write anything longer than a line to .tmp/scratch/reports/<YYYYMMDD>-<slug>.md and return the path.
 
 CONTEXT:
 - Location: <where to look>
@@ -114,8 +114,6 @@ Rules for filling it in:
 ### Prompt — generic mode
 
 ```text
-Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at <absolute path to references/sub-agent-contract.md>.
-
 PHASE: <write | validate | test | read>
 TASK: <the exact instruction — the edit to make, the pattern to find, the command to run>
 
@@ -126,7 +124,7 @@ DEFINITION OF SUCCESS:
 - <the verification command and its expected result>
 
 DELIVERY:
-- Return STATUS as the first line, with the verification output.
+- Include the verification output in your report.
 ```
 
 ## Adjudicate
@@ -151,7 +149,6 @@ A user pointing at one instance of a smell, bug, or missing check is naming a pa
 
 - [references/sub-agent-contract.md](references/sub-agent-contract.md) — what dispatched agents follow.
 - [references/fix-cycle.md](references/fix-cycle.md) — the reproduce-first cycle for bug-fix dispatches.
-- [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps.
-- [references/harness-notes/claude-code.md](references/harness-notes/claude-code.md) — Claude Code mechanics; open only when running there.
+- [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps; also points to Claude Code harness mechanics.
 - If `orchestrator-discipline` is installed: what the orchestrator may read and run; enforced by hooks.
 - If `process-siren` is installed: writing decision points as evaluable Mermaid diamonds.
