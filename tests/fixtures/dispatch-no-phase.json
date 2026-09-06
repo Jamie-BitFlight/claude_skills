@@ -1,9 +1,0 @@
-{
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Agent",
-  "tool_input": {
-    "subagent_type": "python-engineering:python-cli-architect",
-    "description": "Fix run_bounded timeout",
-    "prompt": "Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at /repo/plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md.\n\nTASK: Make scripts/run_bounded.py terminate the whole process group when the timeout expires.\n\nOBSERVATIONS:\n- User statement: \"run_bounded leaves child processes running after timeout\"\n\nDEFINITION OF SUCCESS:\n- After timeout, no descendant of the launched command is alive\n- Verified by: uv run pytest tests/test_run_bounded.py -q exits 0\n\nDELIVERY:\n- Return STATUS as the first line.\n\nCONTEXT:\n- Location: scripts/run_bounded.py\n- Scope: only that file\n- Constraints: POSIX process-group signals\n- Commands: uv run pytest tests/test_run_bounded.py -q\n"
-  }
-}

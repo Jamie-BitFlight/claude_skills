@@ -1,9 +1,0 @@
-{
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Agent",
-  "tool_input": {
-    "subagent_type": "general-purpose",
-    "description": "Run ruff on scripts",
-    "prompt": "Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at /repo/plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md.\n\nPHASE: validate\nTASK: Run `uv run ruff check scripts/` and report the exact output.\n\nDEFINITION OF SUCCESS:\n- `uv run ruff check scripts/` exits 0 with output \"All checks passed!\"\n\nDELIVERY:\n- Return STATUS as the first line, with the verification output.\n"
-  }
-}

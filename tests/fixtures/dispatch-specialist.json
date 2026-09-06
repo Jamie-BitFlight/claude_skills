@@ -1,9 +1,0 @@
-{
-  "hook_event_name": "PreToolUse",
-  "tool_name": "Agent",
-  "tool_input": {
-    "subagent_type": "python-engineering:python-cli-architect",
-    "description": "Fix run_bounded timeout",
-    "prompt": "Your ROLE_TYPE is sub-agent. Follow the sub-agent contract at /repo/plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md.\n\nPHASE: write\nTASK: Make scripts/run_bounded.py terminate the whole process group when the timeout expires.\n\nOBSERVATIONS:\n- User statement: \"run_bounded leaves child processes running after timeout\"\n- Prior STATUS report: STATUS: DONE — reproduction at .tmp/scratch/reports/20260905-run-bounded-repro.md shows orphaned sleep after exit code 124\n- The error text is: \"TimeoutExpired: Command '['sh', '-c', 'sleep 30 & wait']' timed out after 1 seconds\"\n\nDEFINITION OF SUCCESS:\n- After timeout, no descendant of the launched command is alive\n- Verified by: uv run pytest tests/test_run_bounded.py -q exits 0\n\nDELIVERY:\n- Return STATUS as the first line. Write anything longer than a line to .tmp/scratch/reports/20260905-run-bounded-fix.md and return the path.\n\nCONTEXT:\n- Location: scripts/run_bounded.py, tests/test_run_bounded.py\n- Scope: only those two files\n- Constraints: POSIX process-group signals; Windows path uses taskkill /T /F\n- Commands: uv run pytest tests/test_run_bounded.py -q\n\nYOUR TASK:\nMake the change in DEFINITION OF SUCCESS. Touch only files within CONTEXT Scope.\n"
-  }
-}
