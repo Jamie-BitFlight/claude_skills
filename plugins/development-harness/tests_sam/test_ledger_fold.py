@@ -410,14 +410,13 @@ def test_from_milestone_replace_clears_only_its_own_tables(tmp_path: Path) -> No
 
 
 def test_replacing_a_milestone_plan_under_a_new_id_folds(tmp_path: Path) -> None:
-    """A replace whose ``exists`` check matched on milestone empties another plan's rows than it writes.
+    """A replace that matched on milestone renames the row it matched to the incoming id.
 
     ``existing_plan`` matches a plan with this id, or an unarchived plan with this milestone. When
-    the second matches, ``clear_plan`` empties that plan's rows while ``write_plan_row`` updates the
-    incoming id -- which is why ``plan.replaced`` carries ``replaced`` as well as the row. The
-    ledger it leaves is odd, and this test asserts only that the fold reproduces it: the update
-    matches no row, so ``plans`` keeps the plan it emptied and the new tasks point at a plan id that
-    holds none. That is a defect in ``write_plan_row``, recorded here rather than fixed.
+    the second matches, the incoming id differs from the one whose rows are emptied, which is why
+    ``plan.replaced`` carries ``replaced`` as well as the row. One plan must survive, under the
+    incoming id, holding the incoming tasks: an update keyed on the incoming id would match no row
+    and leave the emptied plan behind with the new tasks pointing at nothing.
     """
     conn = ledger(tmp_path)
     first = from_milestone(conn, tmp_path)
@@ -434,8 +433,10 @@ def test_replacing_a_milestone_plan_under_a_new_id_folds(tmp_path: Path) -> None
     assert replaced["plan"] == "Pelsewhere"
     assert replaced["payload"]["replaced"] == first
     held = assert_rebuilt(conn)
-    assert [row["plan_id"] for row in held["plans"]] == [first]
+    assert [row["plan_id"] for row in held["plans"]] == ["Pelsewhere"]
     assert {row["plan"] for row in held["tasks"]} == {"Pelsewhere"}
+    assert held["tasks"], "the replacement's tasks must belong to the surviving plan"
+    assert all(row["integration_branch"] == "integration/41" for row in held["plans"])
 
 
 def test_state_force_on_an_accepted_task_folds(tmp_path: Path) -> None:
