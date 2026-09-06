@@ -23,8 +23,15 @@ subprocess, making the hook backend-agnostic (hooks must not write directly to Y
 Context File Mechanism:
 - The /start-task command writes task context to ~/.dh/projects/{slug}/context/active-task-{session_id}.json
 - PostToolUse hooks read from this file to know which task is active
-- SubagentStop extracts the sub-agent's session_id from agent_transcript_path, then looks up
-  active-task-{session_id}.json directly (targeted lookup, not glob-all)
+- SubagentStop extracts a session_id from agent_transcript_path, then looks up
+  active-task-{session_id}.json directly
+
+KNOWN DEFECT in that correlation: a sub-agent's transcript carries its PARENT session's id, not
+its own, so every sub-agent of one plan resolves to the same record. A wave running N tasks in
+parallel writes N registrations to one path and only the last survives, and a stopping agent can
+therefore be attributed to another agent's task. The per-sub-agent identifier the harness does
+supply is not read here. Task state written by this hook during parallel dispatch is unreliable
+until the record is keyed by something unique to the task.
 
 Usage:
     Called automatically via hooks configuration.
@@ -947,6 +954,14 @@ def _local_active_task_file(session_id: str) -> Path | None:
 
     Returns None — meaning "ask the CLI instead" — when the configured backend is
     anything else, because those keep the record where this process cannot see it.
+
+    **The key this builds is known to be non-unique and is scheduled to change.** Every
+    sub-agent of one parent session carries that parent's session id, so a plan running
+    N tasks in parallel writes N records to one path and only the last survives. This
+    function makes that lookup cheaper; it does not make it correct, and a caller must
+    not read a hit here as proof that the record belongs to the agent that just stopped.
+    The saving is in avoiding a subprocess, which survives whatever the key becomes —
+    only the filename below changes.
 
     Args:
         session_id: Sub-agent session identifier.
