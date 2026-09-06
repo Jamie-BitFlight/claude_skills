@@ -63,9 +63,25 @@ def test_plan_and_active_task_update_use_configured_content(tmp_path: Path) -> N
     assert _invoke("plan", "read", "--address", plan_id)["plan"]["goal"] == "Persist through configured content"
     assert _invoke("plan", "update", "--plan-address", plan_id, "--goal", "Updated goal")["updated"] is True
 
-    _invoke("active-task", "set", "--address", f"{plan_id}/T1", "--plan-dir", str(ignored_directory))
+    _invoke(
+        "active-task",
+        "set",
+        "--address",
+        f"{plan_id}/T1",
+        "--plan-dir",
+        str(ignored_directory),
+        "--session-id",
+        "test-session-content-route",
+    )
     assert (
-        _invoke("active-task", "update", "--set-fields-json", '{"title":"Updated through active task"}')["updated"]
+        _invoke(
+            "active-task",
+            "update",
+            "--set-fields-json",
+            '{"title":"Updated through active task"}',
+            "--session-id",
+            "test-session-content-route",
+        )["updated"]
         is True
     )
 
