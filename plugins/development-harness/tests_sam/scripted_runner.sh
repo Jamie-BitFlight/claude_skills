@@ -141,6 +141,12 @@ prepare_workspace() {
     mkdir -p "$WORK_DIR/state" "$WORK_DIR/worktrees"
     DH_STATE_HOME=$WORK_DIR/state
     export DH_STATE_HOME
+    # `export --to content` writes through the configured backlog backend. Point it at SQLite,
+    # whose database sits under DH_STATE_HOME, so this script reaches no network and no shared
+    # store. Without this the default is GitHub, which needs credentials this script has no
+    # business holding.
+    BACKLOG_BACKEND=sqlite
+    export BACKLOG_BACKEND
     if [ -z "${DH_PROJECT_ROOT:-}" ] && repository=$(nearest_repository "$SCRIPT_DIR"); then
         DH_PROJECT_ROOT=$repository
         export DH_PROJECT_ROOT
@@ -240,6 +246,16 @@ append_report_section() {
     expect_contains "update appends $3 to $1" '"task.section"' "$SAM_OUT"
 }
 
+export_plan() {
+    # work-loop.md "Export": project the plan at each wave end. $1 says which wave, for the
+    # failure message. A second export with no new events must report the `unchanged` no-op,
+    # which is what proves the projection hash, not the event count, decides.
+    sam export --plan-address "$PLAN"
+    expect_absent "the $1 export writes rather than reporting unchanged" 'unchanged' "$SAM_OUT"
+    sam export --plan-address "$PLAN"
+    expect_contains "a second export after the $1 wave changes nothing" 'unchanged' "$SAM_OUT"
+}
+
 # ---------------------------------------------------------------------------
 # The loop
 # ---------------------------------------------------------------------------
@@ -258,6 +274,7 @@ first_wave() {
         settle_task "$task" "$ATTEMPT"
         accept_task "$task" 'every criterion met'
     done
+    export_plan 'first'
 }
 
 second_wave() {
@@ -282,6 +299,7 @@ send_back() {
     runner_attempt T3 2 "$SEND_BACK_MARKER"
     settle_task T3 2
     accept_task T3 'the empty manifest now renders'
+    export_plan 'send-back'
 }
 
 main() {
