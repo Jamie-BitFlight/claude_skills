@@ -2065,16 +2065,13 @@ def test_last_assistant_message_is_used_without_reading_the_transcript(tmp_path:
     mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
 
 
-def test_an_echoed_template_does_not_outrank_the_real_verdict() -> None:
-    """The template line agents/task-worker.md prints must not beat the worker's own status.
+def test_the_template_placeholder_is_not_a_verdict() -> None:
+    """``STATUS: COMPLETE|PARTIAL|FAILED`` is the printed format, not a report.
 
-    That file documents the report format as a literal ``STATUS: COMPLETE|PARTIAL|FAILED``
-    line. A worker that shows the format before filling it in emits two lines starting with
-    STATUS:, and the token pattern captures COMPLETE out of the alternation. Taking the
-    first match therefore reads a completion out of a template and marks the task done.
-
-    Only a line-initial STATUS is matched at all, so a quoted status inside a sentence is
-    already ignored; this is the case that is genuinely ambiguous.
+    agents/task-worker.md documents the report shape with that literal alternation. A
+    worker that shows the format before filling it in emits it as a line-initial STATUS,
+    and a token pattern that does not require the token to end the line captures COMPLETE
+    out of it — reading a completion out of a placeholder.
     """
     report = (
         "## Completion Report\n\n"
@@ -2085,6 +2082,30 @@ def test_an_echoed_template_does_not_outrank_the_real_verdict() -> None:
     )
 
     assert _hook_mod._parse_status_line(report) == "PARTIAL"
+
+
+def test_a_later_status_line_does_not_override_the_verdict() -> None:
+    """The first well-formed STATUS line is the verdict, per the subagent contract.
+
+    skills/subagent-contract/SKILL.md: "Begin your response with STATUS: DONE or
+    STATUS: BLOCKED as its own first line. Consumers branch on that line in that position."
+    The task-worker template's last field is NOTES, which is free text for discoveries and
+    out-of-scope work. Preferring a later match would let a note silently outrank the
+    worker's own report.
+    """
+    report = (
+        "STATUS: PARTIAL\n"
+        "BLOCKER: 2 of 5 criteria unmet.\n"
+        "NOTES: the integration checker finished its own task first.\n"
+        "STATUS: DONE\n"
+    )
+
+    assert _hook_mod._parse_status_line(report) == "PARTIAL"
+
+
+def test_prose_mentioning_a_status_is_not_a_verdict() -> None:
+    """A STATUS token embedded in a sentence is not a report line."""
+    assert _hook_mod._parse_status_line("STATUS: DONE was reported by the sibling task.") is None
 
 
 def test_local_backend_with_no_active_task_spawns_no_subprocess(mocker: MockerFixture, tmp_path: Path) -> None:

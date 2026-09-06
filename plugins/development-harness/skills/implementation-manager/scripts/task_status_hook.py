@@ -82,12 +82,17 @@ _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
 _PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
 
-# A worker's self-reported status, per subagent-contract. Matched against EVERY line of
-# the final message, not only the first: agents/task-worker.md prescribes the completion
-# report inside a ```text fence, so a worker following its own template emits a fence
-# marker as line one. Leading markdown — fence, bold, bullet, blockquote — is tolerated,
-# and the token may carry underscores (GAPS_FOUND).
-_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*STATUS:\s*\**\s*([A-Za-z][A-Za-z_]*)", re.IGNORECASE)
+# A worker's self-reported status, per subagent-contract. Every line is scanned rather
+# than only the first, because agents/task-worker.md prescribes the completion report
+# inside a ```text fence, so a worker following its own template emits a fence marker as
+# line one. Leading markdown — fence, bold, bullet, blockquote — is tolerated, and the
+# token may carry underscores (GAPS_FOUND).
+#
+# The token must END the line. That rejects two lookalikes that are not verdicts: the
+# literal template placeholder `STATUS: COMPLETE|PARTIAL|FAILED` that task-worker.md
+# prints, and prose such as `STATUS: DONE was reported by the sibling task`. Without the
+# anchor the pattern captures a token out of both.
+_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*STATUS:\s*\**\s*([A-Za-z][A-Za-z_]*)\s*\**\s*$", re.IGNORECASE)
 
 # Tokens meaning the worker finished. ponytail: accepts all three spellings in use across
 # the plugin; narrow to one token once the status vocabulary is unified.
@@ -755,22 +760,26 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
 def _parse_status_line(final_text: str) -> str | None:
     """Return the upper-cased STATUS token from *final_text*, or None if it carries none.
 
-    Scans every line and keeps the LAST match. A completion report often quotes or
-    summarises other STATUS lines — a worker describing what it found, or echoing a
-    sibling's result — and the worker's own verdict is the one it ends on.
+    Takes the FIRST match, because ``skills/subagent-contract/SKILL.md`` places the verdict
+    on the report's opening line and says consumers branch on it "in that position". A later
+    ``STATUS:`` line is therefore not a verdict — the ``NOTES:`` field of the
+    ``agents/task-worker.md`` template is free text and comes last, so preferring the final
+    match would let a note override the worker's own report.
+
+    Every line is scanned rather than only line one because that same template wraps the
+    report in a fence, which occupies the first line.
 
     Args:
         final_text: The worker's final message.
 
     Returns:
-        The token in upper case, or None when no line carries a STATUS: prefix.
+        The token in upper case, or None when no line is a well-formed STATUS report line.
     """
-    token: str | None = None
     for line in final_text.strip().splitlines():
         match = _STATUS_LINE_RE.match(line)
         if match:
-            token = match.group(1).upper()
-    return token
+            return match.group(1).upper()
+    return None
 
 
 def _resolve_final_message(hook_input: dict[str, Any]) -> tuple[str | None, str | None]:
