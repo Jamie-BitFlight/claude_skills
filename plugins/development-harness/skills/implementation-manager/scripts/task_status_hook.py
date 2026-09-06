@@ -752,6 +752,53 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     return None
 
 
+def _parse_status_line(final_text: str) -> str | None:
+    """Return the upper-cased STATUS token from *final_text*, or None if it carries none.
+
+    Scans every line and keeps the LAST match. A completion report often quotes or
+    summarises other STATUS lines — a worker describing what it found, or echoing a
+    sibling's result — and the worker's own verdict is the one it ends on.
+
+    Args:
+        final_text: The worker's final message.
+
+    Returns:
+        The token in upper case, or None when no line carries a STATUS: prefix.
+    """
+    token: str | None = None
+    for line in final_text.strip().splitlines():
+        match = _STATUS_LINE_RE.match(line)
+        if match:
+            token = match.group(1).upper()
+    return token
+
+
+def _resolve_final_message(hook_input: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Resolve the sub-agent's final message and its STATUS token.
+
+    Prefers ``last_assistant_message`` from the hook payload. Claude Code's hook
+    documentation is explicit that hooks needing the final assistant text "should use
+    last_assistant_message on Stop and SubagentStop instead of reading the transcript",
+    and Codex supplies the same field. Reading it costs one dictionary lookup where
+    scanning the transcript costs a full file read on every sub-agent stop.
+
+    Falls back to the transcript when the field is absent, which covers harnesses that
+    do not supply it and older releases that predate it.
+
+    Args:
+        hook_input: Parsed SubagentStop hook input.
+
+    Returns:
+        Tuple of ``(status_token, final_text)``. ``final_text`` is None only when the
+        message could not be obtained at all, which callers treat as evidence of nothing.
+    """
+    payload_message = hook_input.get("last_assistant_message")
+    if isinstance(payload_message, str) and payload_message.strip():
+        return _parse_status_line(payload_message), payload_message
+
+    return _extract_status_from_transcript(Path(hook_input.get("agent_transcript_path", "")))
+
+
 def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, str | None]:
     """Extract the sub-agent's self-reported status from its final assistant message.
 
@@ -799,11 +846,7 @@ def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, 
     if not final_text or not final_text.strip():
         return None, None
 
-    for line in final_text.strip().splitlines():
-        match = _STATUS_LINE_RE.match(line)
-        if match:
-            return match.group(1).upper(), final_text
-    return None, final_text
+    return _parse_status_line(final_text), final_text
 
 
 def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
@@ -1180,8 +1223,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     # state — start-task lets a worker mark itself complete before stopping, so a task
     # already reading COMPLETE proves nothing about what the worker actually reported.
     # This check therefore runs before any COMPLETE short-circuit.
-    transcript_path_raw = hook_input.get("agent_transcript_path", "")
-    status_token, final_text = _extract_status_from_transcript(Path(transcript_path_raw))
+    status_token, final_text = _resolve_final_message(hook_input)
     already_complete = current_task.status == SamTaskStatus.COMPLETE
 
     if status_token not in _COMPLETE_STATUS_TOKENS:

@@ -2027,6 +2027,66 @@ def test_unregistered_status_token_leaves_task_state_unchanged(status_token: str
     mock_update.assert_not_called()
 
 
+def test_last_assistant_message_is_used_without_reading_the_transcript(tmp_path: Path) -> None:
+    """The payload's final message wins over the transcript, and the file is never opened.
+
+    Claude Code's hook docs direct hooks needing the final assistant text to use
+    ``last_assistant_message`` "instead of reading the transcript", and Codex supplies the
+    same field. Scanning a transcript to recover a string already on stdin costs a full
+    file read on every sub-agent stop.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        # Deliberately unreadable: if the hook falls back to it, the payload was ignored.
+        "agent_transcript_path": str(tmp_path / "never-written.jsonl"),
+        "last_assistant_message": "STATUS: PARTIAL\nBLOCKER: 2 of 5 criteria unmet.",
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_extract_status_from_transcript") as mock_transcript,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit),
+    ):
+        handle_subagent_stop(hook_input)
+
+    mock_transcript.assert_not_called()
+    mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
+
+
+def test_an_echoed_template_does_not_outrank_the_real_verdict() -> None:
+    """The template line agents/task-worker.md prints must not beat the worker's own status.
+
+    That file documents the report format as a literal ``STATUS: COMPLETE|PARTIAL|FAILED``
+    line. A worker that shows the format before filling it in emits two lines starting with
+    STATUS:, and the token pattern captures COMPLETE out of the alternation. Taking the
+    first match therefore reads a completion out of a template and marks the task done.
+
+    Only a line-initial STATUS is matched at all, so a quoted status inside a sentence is
+    already ignored; this is the case that is genuinely ambiguous.
+    """
+    report = (
+        "## Completion Report\n\n"
+        "Reporting in the documented format:\n\n"
+        "STATUS: COMPLETE|PARTIAL|FAILED\n\n"
+        "STATUS: PARTIAL\n"
+        "BLOCKER: 2 of 5 criteria unmet.\n"
+    )
+
+    assert _hook_mod._parse_status_line(report) == "PARTIAL"
+
+
 def test_local_backend_with_no_active_task_spawns_no_subprocess(mocker: MockerFixture, tmp_path: Path) -> None:
     """The no-active-task path costs no subprocess under the default local backend.
 
