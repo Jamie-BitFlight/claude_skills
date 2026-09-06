@@ -880,7 +880,12 @@ def test_handle_subagent_stop_marks_blocked_when_no_status_line_found(tmp_path: 
 
 
 def test_handle_subagent_stop_marks_blocked_when_transcript_unreadable(tmp_path: Path) -> None:
-    """A missing/unreadable transcript must fail closed to BLOCKED, never COMPLETE."""
+    """A missing transcript against a non-COMPLETE task blocks — nothing evidenced success.
+
+    The task is IN_PROGRESS here, so there is no existing COMPLETE to protect. The
+    inverse case, where an unreadable transcript must leave an existing COMPLETE alone,
+    is ``test_unreadable_transcript_leaves_self_marked_complete_alone``.
+    """
     plan_id = "Pf4281187"
     hook_input: dict[str, Any] = {
         "cwd": str(tmp_path),
@@ -1895,4 +1900,163 @@ def test_self_marked_complete_specialist_reporting_partial_is_reverted(tmp_path:
 
     assert exc_info.value.code == 0
     mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+def test_self_marked_complete_omitting_the_status_line_is_reverted(tmp_path: Path) -> None:
+    """A readable final message with no STATUS: line blocks a self-marked COMPLETE.
+
+    Omitting the STATUS line is a contract violation by the worker and the most common
+    one. The hook read the transcript and saw what the worker said, so it has positive
+    evidence the worker did not report completion — distinct from not being able to read
+    the transcript at all, which is the next test.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    transcript = _transcript_with_status(tmp_path, "Here's a summary of what I did.\nUpdated five files.")
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("label", "final_text"),
+    [
+        ("fenced per task-worker.md", "```text\nSTATUS: PARTIAL\nBLOCKER: 2 of 5 unmet.\n```"),
+        ("lead sentence first", "Here is the completion report.\n\nSTATUS: PARTIAL\nBLOCKER: unmet."),
+        ("bold markdown", "**STATUS: PARTIAL**\nBLOCKER: unmet."),
+        ("heading first", "## Completion Report\n\nSTATUS: PARTIAL\nBLOCKER: unmet."),
+    ],
+)
+def test_status_line_is_found_below_the_first_line(label: str, final_text: str, tmp_path: Path) -> None:
+    """The STATUS line is matched anywhere in the final message, not only on line one.
+
+    agents/task-worker.md prescribes the completion report inside a ```text fence, so a
+    worker following its own documented template puts the fence marker on line one. Reading
+    only the first line scored every such report as "no STATUS line" — which both blocked
+    honest DONE reports and let a self-marked COMPLETE survive a fenced PARTIAL.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    transcript = _transcript_with_status(tmp_path, final_text)
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit),
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert mock_state.call_args is not None, f"{label}: PARTIAL was not detected, task left COMPLETE"
+    mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
+
+
+@pytest.mark.parametrize("status_token", ["VERIFIED", "GAPS_FOUND", "CONNECTED", "READY", "DRAFTING"])
+def test_unregistered_status_token_leaves_task_state_unchanged(status_token: str, tmp_path: Path) -> None:
+    """A token outside both vocabularies is not evidence of failure and must not block.
+
+    The SubagentStop matcher no longer filters to task-worker, so shipped specialists —
+    feature-verifier, integration-checker, plan-validator — now reach this hook reporting
+    their own vocabularies. Blocking on an unrecognised word would turn their correct work
+    into BLOCKED.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    in_progress = MagicMock(spec=Task)
+    in_progress.status = TaskStatus.IN_PROGRESS
+
+    transcript = _transcript_with_status(tmp_path, f"STATUS: {status_token}\nAll checks ran.")
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", "P1a2b3c4", "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=in_progress, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_not_called()
+    mock_update.assert_not_called()
+
+
+def test_unreadable_transcript_leaves_self_marked_complete_alone(tmp_path: Path) -> None:
+    """A transcript the hook cannot read never un-completes finished work.
+
+    The hook has no evidence about the worker either way, and reverting a COMPLETE
+    requires positive evidence just as writing one does. An infrastructure read failure
+    must not stall the wave by blocking a task that finished.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(tmp_path / "never-written.jsonl"),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        # No mock on _extract_status_from_transcript — the real function must return
+        # (None, None) for a path that was never written.
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_not_called()
     mock_update.assert_not_called()
