@@ -29,7 +29,7 @@ The AI writing an instruction file and the AI reading it share the same training
 
 ## What to keep external
 
-Before replacing prose with a path, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined. An external target must ship with the artifact to resolve for an installed consumer.
+Before replacing prose with a path, confirm the path is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
 
 
 **Discoverable data** — version numbers, hex codes, release tags, file listings, schema fields, or command `--help` outputs. If a command or lookup can produce it, don't store it. It will be wrong within days. Instead, verify that it is discoverable, and replace the prose with an instruction on **where** to discover the data and **when** to reach for which tool (e.g.,

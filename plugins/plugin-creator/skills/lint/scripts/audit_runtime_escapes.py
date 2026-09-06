@@ -29,9 +29,10 @@ Three exemptions, and they are the spec rather than conveniences:
 2. **Angle-bracket placeholders are exempt.** A token containing ``<`` or ``>``
    (``<plugin>/skills/<name>/SKILL.md``) names a shape, not a location. Generic examples
    belong in this form; an illustrative real path belongs in a fenced block instead.
-3. **Load-time substitutions are portable.** ``${CLAUDE_PLUGIN_ROOT}`` and
-   ``${CLAUDE_SKILL_DIR}`` resolve in any environment, so paths built on them are never
-   reported.
+3. **Variable-built paths are skipped, not verified.** A path on ``${CLAUDE_PLUGIN_ROOT}`` or
+   ``${CLAUDE_SKILL_DIR}`` is never reported. Claude Code substitutes both in a ``SKILL.md``
+   body; whether any other harness does is unestablished, so this exemption under-reports.
+   Tracked as issue #3445.
 
 Cross-plugin references are matched against an allowlist read from the ``plugins/`` directory,
 so label values (``state:verified``) and placeholders (``plugin:skill-name``) stay out of the
@@ -69,13 +70,13 @@ _DESIGN_TIME_DIRS = frozenset({"maintenance", "evals"})
 # escape wherever it appears.
 #
 # `scripts/` and `docs/` are deliberately absent. Both are valid *inside* a plugin — a skill
-# bundles `scripts/`, and Technique 1 places shared docs at `${CLAUDE_PLUGIN_ROOT}/docs/` — so a
+# bundles `scripts/`, and Technique 1 places shared docs at the plugin root `docs/` — so a
 # bare `scripts/helper.py` in prose usually means the artifact's own, and flagging it reports
 # portable code as broken. A genuinely repo-rooted one is caught by the markdown-link and
 # `plugins/<other>/` checks instead.
 _REPO_ROOT_DIRS = ("rules", "tests", "tests_backlog", "examples", "research")
 
-# Load-time substitutions resolve anywhere, so a path built on one is portable.
+# Variable-built paths are skipped, not verified — docstring exemption 3, issue #3445.
 _PORTABLE_PREFIXES = ("${CLAUDE_PLUGIN_ROOT}", "${CLAUDE_SKILL_DIR}", "$CLAUDE_PLUGIN_ROOT", "$CLAUDE_SKILL_DIR")
 
 # Markdown link target, e.g. [text](./references/foo.md).
@@ -284,9 +285,9 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
     unguarded_skills = [e for e in escapes if e.kind == "cross-plugin-skill" and not e.guarded]
 
     out: list[str] = [
-        "# development-harness runtime escapes",
+        f"# {plugin_dir.name} runtime escapes",
         "",
-        f"Generated: {datetime.now(UTC).date().isoformat()} by `scripts/audit_dh_runtime_escapes.py`.",
+        f"Generated: {datetime.now(UTC).date().isoformat()} by `audit_runtime_escapes.py`.",
         (
             f"Scanned: `{plugin_dir.name}/{{{','.join(_RUNTIME_ROOTS)}}}/**/*.md`, "
             "excluding design-time artifacts and fenced code blocks."
@@ -341,8 +342,8 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
         "- Fenced code blocks are skipped, so illustrative paths inside examples are not counted.",
         "- A relative link is reported when it carries three or more leading `../` segments, the",
         "  depth at which a skill reference leaves `skills/`. Shallower climbs stay inside the plugin.",
-        "- Same-plugin (`dh:`) references and `${CLAUDE_PLUGIN_ROOT}`-rooted paths are portable and",
-        "  are never reported.",
+        "- Same-plugin (`dh:`) references are never reported. Paths built on `${CLAUDE_PLUGIN_ROOT}` or",
+        "  `${CLAUDE_SKILL_DIR}` are skipped, not verified (exemption 3, issue #3445).",
         "",
     ]
     return "\n".join(out)
