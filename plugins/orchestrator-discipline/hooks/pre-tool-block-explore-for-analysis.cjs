@@ -9,7 +9,7 @@
  * agent is haiku-based with ~50% hallucination rate on ambiguous/reasoning
  * queries (validated 2026-02-02, 2/4 accuracy). It is permitted only for
  * exact file pattern or keyword search — never for reasoning, interpretation,
- * or analysis. .claude/rules/model-selection.md routes "Analyze architecture,
+ * or analysis. rules/model-selection.md routes "Analyze architecture,
  * plan approaches, reason about trade-offs, design systems" to opus.
  *
  * This hook reads the JSON event from stdin, inspects tool_input for
@@ -187,7 +187,7 @@ function main() {
       'only for exact file pattern or keyword search — never for reasoning,',
       'interpretation, or analysis.',
       '',
-      'Reroute to a reasoning-class agent. Per .claude/rules/model-selection.md:',
+      'Reroute to a reasoning-class agent. Per rules/model-selection.md:',
       '',
       '  - Architecture analysis, trade-off reasoning, system design → opus',
       '    (general-purpose with model: "opus", or specialist opus agents)',
@@ -207,7 +207,7 @@ function main() {
       'to remove analysis verbs and retry.',
       '',
       'Rule source: rules/delegation.md; agent-orchestration:delegate "Pick the agent",',
-      '             .claude/rules/model-selection.md',
+      '             rules/model-selection.md',
       '--- End ---',
     ].join('\n')}\n`,
   );

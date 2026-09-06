@@ -9,7 +9,7 @@ The orchestrator's context is the one window that lasts the whole session. Every
 
 ## Two roles
 
-Every dispatch prompt opens with `Your ROLE_TYPE is sub-agent.` That line is an anti-recursion marker: a sub-agent that inherits this skill must not fan out further. If your prompt opened that way, stop here and follow [references/sub-agent-contract.md](references/sub-agent-contract.md). Otherwise you are the delegator and the rest of this file applies.
+Every dispatch prompt opens with `Your ROLE_TYPE is sub-agent.` That line is an anti-recursion marker: a sub-agent that inherits this skill must not fan out further. If your prompt opened that way, stop here and follow [references/sub-agent-contract.md](./references/sub-agent-contract.md). Otherwise you are the delegator and the rest of this file applies.
 
 ## When this applies
 
@@ -35,9 +35,9 @@ Split the request into phases. Keep only the phases that produce work; never pad
 | report | What changed, with evidence |
 | review | Independent critique of the result |
 
-Two shapes recur and have their own handling:
+Some shapes recur and have their own handling:
 
-- **Bug fix** → [references/fix-cycle.md](references/fix-cycle.md): reproduce before changing.
+- **Bug fix** → [references/fix-cycle.md](./references/fix-cycle.md): reproduce before changing.
 - **Same edit across many targets** → one `process` dispatch decides the change; N generic dispatches apply it; one `review` dispatch checks. See [parallel-work](../parallel-work/SKILL.md).
 
 ## Dispatch
@@ -147,8 +147,8 @@ A user pointing at one instance of a smell, bug, or missing check is naming a pa
 
 ## Pointers
 
-- [references/sub-agent-contract.md](references/sub-agent-contract.md) — what dispatched agents follow.
-- [references/fix-cycle.md](references/fix-cycle.md) — the reproduce-first cycle for bug-fix dispatches.
+- [references/sub-agent-contract.md](./references/sub-agent-contract.md) — what dispatched agents follow.
+- [references/fix-cycle.md](./references/fix-cycle.md) — the reproduce-first cycle for bug-fix dispatches.
 - [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps; also points to Claude Code harness mechanics.
 - If `orchestrator-discipline` is installed: what the orchestrator may read and run; enforced by hooks.
 - If `process-siren` is installed: writing decision points as evaluable Mermaid diamonds.

@@ -24,6 +24,10 @@ function main() {
     process.exit(0);
   }
 
+  if (typeof input !== 'object' || input === null) {
+    process.exit(0);
+  }
+
   let content = '';
   try {
     content = loadRulesByNames(DELEGATION_RULES, input.session_id);

@@ -1,6 +1,6 @@
 # agent-orchestration
 
-Two skills and one contract for orchestrating sub-agents, portable across harnesses that support plugins, skills, and agents.
+A small set of skills and a contract for orchestrating sub-agents, portable across harnesses that support plugins, skills, and agents.
 
 | Piece | Purpose |
 | --- | --- |
