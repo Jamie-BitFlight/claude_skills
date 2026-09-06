@@ -17,7 +17,6 @@ Open this when running in Claude Code. Nothing here changes the rules in `delega
 
 ## Enforcement hooks
 
-- `validate-delegation.cjs` (PreToolUse on `Agent`) rejects a dispatch prompt missing the ROLE_TYPE opener, `PHASE:`, or `DEFINITION OF SUCCESS:`.
 - `pre-tool-block-explore-for-analysis.cjs` (orchestrator-discipline) rejects `Explore` dispatches whose prompt contains reasoning verbs.
 - Recommended addition — `SubagentStop`: fail the stop if the sub-agent's final message does not begin with `STATUS: DONE|PARTIAL|BLOCKED`. This turns the contract's report rule from prose into a gate.
 

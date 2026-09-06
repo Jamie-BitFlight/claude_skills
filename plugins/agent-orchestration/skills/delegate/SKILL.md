@@ -102,6 +102,7 @@ Phase rows for `YOUR TASK`:
 
 Rules for filling it in:
 
+- A section you cannot fill from what is already in your context is omitted, not invented. Empty OBSERVATIONS or ECOSYSTEM CONTEXT is a valid state; a guess is not.
 - OBSERVATIONS is pass-through: only what is already in your context. Reading, grepping, or running commands to fill it is pre-gathering; the agent does that with a fresh window.
 - State observations as facts ("exit code 1", "the error text is: …"). Where you hold a hypothesis, label it: `Hypothesis to verify: …`.
 - Constraints are outcomes and boundaries, never steps. Naming the project's own gate in Commands is a constraint, not a step.
