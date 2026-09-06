@@ -1,0 +1,2 @@
+- Parse the one-entry manifest and count the entries.
+- Parse the many-entry manifest and count the entries.

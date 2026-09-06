@@ -1,0 +1,2 @@
+- A parsed manifest renders one report row per entry.
+- An empty manifest renders an empty report rather than raising.
