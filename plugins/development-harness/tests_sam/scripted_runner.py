@@ -36,11 +36,10 @@ It writes nothing outside a work directory: ``DH_STATE_HOME`` points into one an
 no shared store and no credentials. Pass ``--work-dir`` to keep that directory for inspection and
 ``--plugin-root`` to run against a plugin checkout other than this script's own.
 
-Keep this one file. A PEP 723 script carries its dependencies inline and so must be standalone to
-stay runnable by hand, and three of its tests prove their claims by reading this source: that it
-imports neither ``dh_core`` nor ``sam_schema``, that it builds no shell command, and that it
-carries the canonical shebang. Moving the driver into a sibling module would take that surface out
-of the file under proof.
+Three of this file's tests prove their claims by reading this source: that it imports neither
+``dh_core`` nor ``sam_schema``, that it builds no shell command, and that it carries the canonical
+shebang. Splitting the driver into a sibling module is fine, but those tests must then read the
+whole package, or they will pass while proving nothing.
 """
 
 from __future__ import annotations
