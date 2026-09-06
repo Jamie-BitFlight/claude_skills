@@ -284,7 +284,9 @@ Prose that asserts how a tool, harness, spec, or API behaves is read as truth by
 - **Don't**: render an unchecked claim in the same declarative voice as a verified one
 - **Why**: absence of evidence reads identically to evidence of absence once it is written down
 
-Cap the loop at three passes. If corrections remain, ship the draft with the residual disagreements stated in it rather than resolving them yourself.
+Run the loop until a pass returns no corrections. Never cap it by count and ship what remains: deciding which disagreements are "residual" hands adjudication back to the author the loop exists to check.
+
+**Treat sustained churn as a finding about the text, not a cost to bear.** When several passes keep returning corrections — especially ones that change structure rather than wording — the text may be unclear, untestable, or aimed at the wrong objective, and more passes will not fix that. At that point send a fresh agent the text and the project's goals, and ask it to state what the text is *for*, whether it achieves that, and what forms would serve the objective better. Give it no history and no drafts. Prose churning against a matrix of facts often wants to be structured data with a test; a section that will not settle is often two objectives wearing one heading. Fix the objective, then resume the loop on whatever replaces it.
 
 **Carry the warrant with the claim.** A fact repeated without its source arrives at the next file looking stronger than it is: a canary test becomes "vendor docs", a community gist becomes "the harness supports it". Write how it was established next to what it says — vendor-documented, tested here on a date, or unverified — every time the claim moves. A claim whose warrant you cannot state is one you must re-establish, not repeat.
 
