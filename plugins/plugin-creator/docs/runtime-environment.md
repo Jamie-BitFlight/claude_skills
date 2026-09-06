@@ -27,24 +27,27 @@ If none hold, inline it, move it into your plugin's `references/`, or delete it.
 
 ## Harness substitutions
 
-Part 2 says *relative path* because that is what every harness understands. The Agent Skills
-specification, under "File references", says only: "When referencing other files in your skill,
-use relative paths from the skill root." It defines no substitution variables at all.
+Part 2 says *relative path* because that is the only form the specification defines. The Agent
+Skills specification, under "File references", says: "When referencing other files in your
+skill, use relative paths from the skill root." It defines no substitution variables.
 
-Variables are a per-harness convenience, so a path built on one resolves for some readers and
-is passed through as a literal string by the rest:
+A substitution variable is therefore a bet on which harness reads your skill. Each one below is
+that harness's own extension, not a shared convention:
 
-| Harness | Variable | Where it substitutes |
-|---|---|---|
-| Claude Code | `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` | the skill's markdown body and `allowed-tools` only — never `references/` |
-| Kimi Code | `${KIMI_SKILL_DIR}` | skill body |
-| Pi | `{baseDir}` | skill body |
-| Agent Plugins | `${PLUGIN_ROOT}` | `mcp.json` args, env and cwd only |
-| Codex, Cursor, OpenCode | none documented | — |
+| Harness | Variable | Where it substitutes | Confirmed |
+|---|---|---|---|
+| Claude Code | `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` | the skill's markdown body and `allowed-tools` only — never `references/` | vendor docs |
+| Kimi Code | `${KIMI_SKILL_DIR}` | skill body | reported, unconfirmed |
+| Pi | `{baseDir}` | skill body | reported, unconfirmed |
+| Agent Plugins | `${PLUGIN_ROOT}` | `mcp.json` args, env and cwd only | reported, unconfirmed |
 
-A literal `${CLAUDE_PLUGIN_ROOT}/docs/x.md` in a file the reader does not substitute is a
-broken path, and nothing reports it. Reach for a variable only when the harness is known, and
-prefer a relative path when it is not.
+Harnesses absent from this table are absent because nobody has looked, not because they were
+checked and found to substitute nothing. Treat a blank as unknown.
+
+What a harness that does not substitute a variable *does* with the literal string is also
+unknown — it may pass it through, drop it, or error, and no source consulted says which.
+That uncertainty is the argument: a relative path needs no such knowledge. Reach for a variable
+only when you know the harness reads it, and take a relative path otherwise.
 
 ## Four failures
 
