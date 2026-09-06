@@ -955,13 +955,9 @@ def _local_active_task_file(session_id: str) -> Path | None:
     Returns None — meaning "ask the CLI instead" — when the configured backend is
     anything else, because those keep the record where this process cannot see it.
 
-    **The key this builds is known to be non-unique and is scheduled to change.** Every
-    sub-agent of one parent session carries that parent's session id, so a plan running
-    N tasks in parallel writes N records to one path and only the last survives. This
-    function makes that lookup cheaper; it does not make it correct, and a caller must
-    not read a hit here as proof that the record belongs to the agent that just stopped.
-    The saving is in avoiding a subprocess, which survives whatever the key becomes —
-    only the filename below changes.
+    The key is not unique. Every sub-agent of one parent session carries that parent's
+    session id, so several agents share one record and only the last write survives. A
+    hit here does not prove the record belongs to the agent that just stopped.
 
     Args:
         session_id: Sub-agent session identifier.
