@@ -63,7 +63,7 @@ When a SKILL.md contains frontmatter keys outside the Claude Code standard set, 
 
 ## Assessment Rules
 
-VERIFY every path, link, and cross-plugin reference in runtime text passes the three-part test in `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — universally present, bundled with the artifact, or inlined — and report each failure with file:line.
+VERIFY every path, link, and cross-plugin reference in runtime text passes the three-part test — the path is present in every environment, bundled with the artifact, or inlined in the text — and report each failure with file:line.
 
 READ every file completely. CITE specific file:line for all issues. ASSIGN priority levels (CRITICAL / WARNING / RECOMMENDATION) to every finding. DISTINGUISH required vs optional field violations. VERIFY all internal links resolve. CHECK bidirectional linking. PRODUCE complete report even for large plugins. Do NOT flag optional fields as critical. Do NOT suggest enhancements outside the plugin's stated purpose. Do NOT classify orphaned files without reading them first. Do NOT emit an empty Citation Drift section when no `SOURCE:` URLs exist.
 
