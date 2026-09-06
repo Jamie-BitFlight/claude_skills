@@ -44,10 +44,24 @@ that harness's own extension, not a shared convention:
 Harnesses absent from this table are absent because nobody has looked, not because they were
 checked and found to substitute nothing. Treat a blank as unknown.
 
-What a harness that does not substitute a variable *does* with the literal string is also
-unknown — it may pass it through, drop it, or error, and no source consulted says which.
-That uncertainty is the argument: a relative path needs no such knowledge. Reach for a variable
-only when you know the harness reads it, and take a relative path otherwise.
+### Installing cleanly is not the same as resolving
+
+Several harnesses take a Claude Code plugin as-is — marketplace, install, skills, directory
+shape. That compatibility is real, and it is what makes the next part easy to miss: the
+structure ports, the variables do not.
+
+Codex does not interpolate `${CLAUDE_PLUGIN_ROOT}` in a plugin's `.mcp.json`. It passes the
+literal string to the spawned process, which fails with
+`ENOENT: Could not change directory to "${CLAUDE_PLUGIN_ROOT}"`, and `codex mcp list` shows the
+placeholder unexpanded. Open as `openai/codex` issue 19582, reproduced independently on two
+plugins across two releases.
+
+That is the shape of the failure to expect: the plugin installs, reports no error, and breaks
+on a path at the moment something needs it. Whether the same harnesses substitute inside a
+`SKILL.md` body has not been established either way.
+
+Reach for a variable only when you know the harness reads it in the place you are writing it.
+Take a relative path otherwise — it needs no such knowledge.
 
 ## Four failures
 
