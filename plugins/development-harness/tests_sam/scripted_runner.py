@@ -35,6 +35,12 @@ It writes nothing outside a work directory: ``DH_STATE_HOME`` points into one an
 ``BACKLOG_BACKEND`` is ``sqlite``, so the ledger it builds is its own and it reaches no network,
 no shared store and no credentials. Pass ``--work-dir`` to keep that directory for inspection and
 ``--plugin-root`` to run against a plugin checkout other than this script's own.
+
+Keep this one file. A PEP 723 script carries its dependencies inline and so must be standalone to
+stay runnable by hand, and three of its tests prove their claims by reading this source: that it
+imports neither ``dh_core`` nor ``sam_schema``, that it builds no shell command, and that it
+carries the canonical shebang. Moving the driver into a sibling module would take that surface out
+of the file under proof.
 """
 
 from __future__ import annotations
@@ -127,6 +133,10 @@ class ToolchainMissingError(ScriptedRunnerError):
 
 class FixtureMissingError(ScriptedRunnerError):
     """A loop-plan fixture file the loop reads is absent."""
+
+
+class CommandTimeoutError(ScriptedRunnerError):
+    """A command did not finish inside the time the run allows it."""
 
 
 # ---------------------------------------------------------------------------
@@ -528,21 +538,28 @@ class LedgerCli:
 
         Raises:
             LedgerCommandError: When the command exits non-zero, which is unexpected on this path.
+            CommandTimeoutError: When the command does not finish inside the run's per-command limit.
         """
         argv = [str(self.toolchain.uv), "run", str(self.toolchain.cli_path), "plan", command]
         for item in arguments:
             argv.append(item.name)
             if item.value is not None:
                 argv.append(item.value)
-        completed = subprocess.run(
-            argv,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            env=self.environment,
-            timeout=self.timeout_seconds,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                argv,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                env=self.environment,
+                timeout=self.timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as expired:
+            flags = " ".join(item.name for item in arguments)
+            raise CommandTimeoutError(
+                f"sam plan {command} {flags} did not finish within {self.timeout_seconds} seconds"
+            ) from expired
         result = CommandResult(
             call=CommandCall(
                 command=command, flags=tuple(item.name for item in arguments), address=address_of(arguments)
@@ -612,15 +629,21 @@ def base_commit(git: Path, plugin_root: Path, timeout_seconds: int) -> str:
 
     Raises:
         ScriptedRunnerError: When the checkout has no commit to name.
+        CommandTimeoutError: When the read does not finish inside the run's per-command limit.
     """
-    completed = subprocess.run(
-        [str(git), "-C", str(plugin_root), "rev-parse", "HEAD"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=timeout_seconds,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            [str(git), "-C", str(plugin_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as expired:
+        raise CommandTimeoutError(
+            f"reading HEAD of {plugin_root} did not finish within {timeout_seconds} seconds"
+        ) from expired
     sha = completed.stdout.strip()
     if completed.returncode != 0 or not sha:
         raise ScriptedRunnerError(
@@ -1222,6 +1245,7 @@ def run_loop(
     Raises:
         LedgerCommandError: When any ``sam plan`` command exits non-zero. Behavioural mismatches
             become unsatisfied observations instead, so the caller can name the step that broke.
+        CommandTimeoutError: When one command does not finish inside ``timeout_seconds``.
     """
     preparation = prepare_workspace(
         work_dir, plugin_root=plugin_root, project_root=project_root, timeout_seconds=timeout_seconds

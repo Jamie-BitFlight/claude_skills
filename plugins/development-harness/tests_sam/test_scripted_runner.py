@@ -11,31 +11,30 @@ The runner does not assert; it *records*. Every behaviour the loop is supposed t
 down as an :class:`~tests_sam.scripted_runner.Observation` carrying what was expected and what was
 observed, keyed by a :class:`~tests_sam.scripted_runner.Check` and by the task, attempt, wave or
 report section it belongs to. That is what lets a regression here name the step that broke instead
-of reporting an exit status. ``main()`` still exits non-zero when any observation is unsatisfied,
-so a human running the script by hand gets the same verdict the shell script used to give.
+of reporting an exit status. ``report()`` still returns a non-zero status when any observation is
+unsatisfied, so a human running the script by hand gets a verdict rather than a listing.
 
 Three tests read the script rather than run it: one holds it to the canonical PEP 723 shebang, one
-proves it never imports the package it drives, and one proves it builds no POSIX shell command. The
-rest drive the loop once, in a session-scoped fixture, and assert the recorded observations one by
-one. Two more hold every command and flag the loop actually issued against
-``dh_core.ledger_spec.COMMANDS``, so the proof cannot quietly start depending on a surface the
-specification does not name.
+proves it never imports the package it drives, and one proves it names no construct that would tie
+it to POSIX. A handful more hold the preconditions the run refuses to start without — the toolchain,
+the CLI, the base commit, the fixture files and the state root that keeps a hand run off any real
+ledger. The rest drive the loop once, in a session-scoped fixture, and assert the recorded
+observations one by one. Three more hold every command and flag the loop actually issued against
+``dh_core.ledger_spec.COMMANDS`` and ``RETIRED_COMMANDS``, so the proof cannot quietly start
+depending on a surface the specification does not name.
 """
 
 from __future__ import annotations
 
 import os
 import re
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 from dh_core import ledger_spec
 
 from tests_sam import scripted_runner
-from tests_sam.scripted_runner import Check, LoopRecord, Observation
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from tests_sam.scripted_runner import Check, LoopRecord, Observation, Preparation
 
 pytestmark = pytest.mark.xdist_group("scripted-runner")
 """Every test here shares one run of the loop, so they must share one xdist worker."""
@@ -45,6 +44,25 @@ CANONICAL_SHEBANG = "#!/usr/bin/env -S uv run --quiet --script"
 
 DRIVEN_PACKAGE_IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:dh_core|sam_schema)\b", re.MULTILINE)
 """An import of the very package the runner exists to drive from the outside."""
+
+PLATFORM_BOUND_CONSTRUCTS: dict[str, re.Pattern[str]] = {
+    "a shell parses its command line": re.compile(r"shell\s*=\s*True"),
+    "a command runs through os.system": re.compile(r"\bos\.system\("),
+    "a command runs through a shell helper": re.compile(r"\bsubprocess\.get(?:status)?output\("),
+    "a POSIX interpreter or absolute path is named": re.compile(
+        r"""["']/(?:bin|usr|tmp|etc|var)/|["'](?:sh|bash)["']"""
+    ),
+    "a POSIX-only child hook is passed": re.compile(r"\bpreexec_fn\b|\bos\.setsid\b|\bos\.fork\b"),
+    "a POSIX signal or process group is used": re.compile(r"\bsignal\.SIG|\bos\.kill(?:pg)?\("),
+    "correctness rests on a permission bit": re.compile(r"\.chmod\(|\bos\.access\("),
+    "a path is built by hand rather than by pathlib": re.compile(r"\bos\.path\.join\("),
+}
+"""Constructs that would tie the runner to POSIX, each named the way its failure would read.
+
+The shebang line is exempt: it is inert on Windows, where the script is run through ``uv run``, and
+``rules/script-invocation.md`` requires it verbatim. Every pattern below is checked against the rest
+of the source.
+"""
 
 FIRST_WAVE = "first"
 SECOND_WAVE = "second"
@@ -105,6 +123,16 @@ def loop_record(tmp_path_factory: pytest.TempPathFactory) -> LoopRecord:
     return scripted_runner.run_loop(work_dir)
 
 
+@pytest.fixture
+def preparation(tmp_path: Path) -> Preparation:
+    """Resolve the toolchain and lay out a state root under one test's own directory.
+
+    Returns:
+        What the runner resolves before it issues a single command.
+    """
+    return scripted_runner.prepare_workspace(tmp_path)
+
+
 def assert_satisfied(observation: Observation) -> None:
     """Fail with the observation's own wording when it is unsatisfied.
 
@@ -141,11 +169,102 @@ def test_the_runner_never_imports_the_package_it_drives() -> None:
     assert not found, f"the runner imports the package it is meant to drive as a subprocess: {found}"
 
 
-def test_the_runner_builds_no_posix_shell_command() -> None:
-    """The runner must run on Windows, so no invocation may go through a shell."""
-    source = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8")
+def test_the_runner_names_no_construct_that_would_tie_it_to_posix() -> None:
+    """The runner must run on Windows, so nothing below the shebang may assume a POSIX host."""
+    shebang, _, body = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8").partition("\n")
 
-    assert "shell=True" not in source, "the runner asks a shell to parse a command line"
+    found = sorted(reason for reason, pattern in PLATFORM_BOUND_CONSTRUCTS.items() if pattern.search(body))
+
+    assert shebang == CANONICAL_SHEBANG, "the exempted first line is not the shebang"
+    assert not found, f"the runner will not run on Windows: {found}"
+
+
+def test_the_loop_plan_fixture_the_runner_reads_is_on_disk() -> None:
+    """The artefact is the script and the plan it drives; neither is a proof without the other."""
+    assert scripted_runner.FIXTURE_DIRECTORY.is_dir(), f"no loop-plan fixture at {scripted_runner.FIXTURE_DIRECTORY}"
+    assert (scripted_runner.FIXTURE_DIRECTORY / "responses" / "T3" / "attempt-2.md").is_file(), (
+        "the fixture holds no send-back response, so the loop's distinctive step cannot run"
+    )
+
+
+def test_a_missing_fixture_stops_the_run_rather_than_reading_as_empty_text() -> None:
+    """An absent field file must not reach the ledger as an empty acceptance criterion."""
+    fixtures = scripted_runner.Fixtures(scripted_runner.FIXTURE_DIRECTORY / "no-such-plan")
+
+    with pytest.raises(scripted_runner.FixtureMissingError) as raised:
+        fixtures.read("tasks", "T1", "title.txt")
+
+    assert "tasks/T1/title.txt" in str(raised.value)
+
+
+# ---------------------------------------------------------------------------
+# What the run refuses to start without
+# ---------------------------------------------------------------------------
+
+
+def test_a_program_the_run_needs_is_named_when_path_does_not_hold_it() -> None:
+    """``uv`` resolves the CLI's dependencies and ``git`` names the base commit; neither is optional."""
+    with pytest.raises(scripted_runner.ToolchainMissingError) as raised:
+        scripted_runner.resolve_program("dh-no-such-program", "the plan needs a base commit for --base-sha")
+
+    assert "dh-no-such-program" in str(raised.value)
+    assert "--base-sha" in str(raised.value)
+
+
+def test_a_checkout_without_the_cli_stops_the_run(tmp_path: Path) -> None:
+    """The runner drives ``sam_schema/cli.py``, so a checkout lacking it has nothing to prove."""
+    with pytest.raises(scripted_runner.ScriptedRunnerError) as raised:
+        scripted_runner.prepare_workspace(tmp_path / "work", plugin_root=tmp_path / "not-a-plugin")
+
+    assert "cli.py" in str(raised.value)
+
+
+def test_the_run_records_the_checkouts_head_as_the_plans_base_sha(preparation: Preparation) -> None:
+    """``create --base-sha`` records the commit a judge diffs a report against."""
+    assert re.fullmatch(r"[0-9a-f]{40}", preparation.toolchain.base_sha), (
+        f"the run resolved no base commit: {preparation.toolchain.base_sha!r}"
+    )
+
+
+def test_the_run_reaches_no_network_no_shared_store_and_no_credentials(
+    preparation: Preparation, tmp_path: Path
+) -> None:
+    """The state root is the run's own and the backlog backend is local, so a hand run stays offline."""
+    environment = preparation.workspace.environment
+
+    assert environment["BACKLOG_BACKEND"] == "sqlite", "export would write through the default GitHub backend"
+    assert environment["DH_STATE_HOME"] == str(preparation.workspace.state_home)
+    assert preparation.workspace.state_home.is_relative_to(tmp_path)
+    assert (Path(environment["DH_PROJECT_ROOT"]) / ".git").exists(), "DH_PROJECT_ROOT names no repository"
+
+
+def test_a_non_zero_exit_carries_the_command_its_status_and_both_streams() -> None:
+    """Every refusal and no-op code is unexpected on this path, so a non-zero exit stops the run loudly."""
+    result = scripted_runner.CommandResult(
+        call=scripted_runner.CommandCall(command="accept", flags=("--address", "--note"), address="P0/T1"),
+        exit_code=3,
+        stdout="what it printed",
+        stderr="why it refused",
+    )
+
+    message = str(scripted_runner.LedgerCommandError(result))
+
+    assert "accept" in message
+    assert "--address" in message
+    assert "3" in message
+    assert "what it printed" in message
+    assert "why it refused" in message
+
+
+def test_a_command_that_does_not_finish_stops_the_run_by_name(preparation: Preparation) -> None:
+    """A hung command reaches the same surface as every other failure, not a traceback."""
+    cli = scripted_runner.LedgerCli(preparation.toolchain, preparation.workspace.environment, timeout_seconds=0)
+
+    with pytest.raises(scripted_runner.CommandTimeoutError) as raised:
+        cli.run("status", (scripted_runner.Argument(name="--plan-address", value="P0"),))
+
+    assert "status" in str(raised.value)
+    assert "--plan-address" in str(raised.value)
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +449,32 @@ def test_the_loop_records_no_unsatisfied_observation(loop_record: LoopRecord) ->
     failures = [f"{item.check.value}({item.label}): {item.expectation}" for item in loop_record.failures]
 
     assert not failures, f"the loop recorded unsatisfied observations: {failures}"
+
+
+def test_a_clean_run_ends_by_naming_the_plan_that_reached_progress_done(
+    loop_record: LoopRecord, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The one line a hand run prints on success names the plan, so the ledger can be inspected after."""
+    status = scripted_runner.report(loop_record)
+
+    assert status == 0
+    assert capsys.readouterr().out.strip() == f"scripted-runner: plan {loop_record.plan} reached progress done"
+
+
+def test_an_unsatisfied_observation_fails_the_run_and_names_the_step_that_broke(
+    loop_record: LoopRecord, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Recording rather than asserting is only worth it if the verdict still names the broken step."""
+    broken = loop_record.observations[0].model_copy(update={"satisfied": False})
+    record = loop_record.model_copy(update={"observations": (broken, *loop_record.observations[1:])})
+
+    status = scripted_runner.report(record)
+
+    assert status == 1
+    captured = capsys.readouterr()
+    assert broken.check.value in captured.err
+    assert broken.expectation in captured.err
+    assert "reached progress done" not in captured.out
 
 
 # ---------------------------------------------------------------------------
