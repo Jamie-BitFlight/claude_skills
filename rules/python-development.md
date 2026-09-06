@@ -43,6 +43,12 @@ Imports resolve two ways:
 Only the entry script carries the shebang and the `# /// script` block; the modules it imports are
 plain `.py` files.
 
+`ty` will not resolve those imports yet: it treats a file with inline metadata as a standalone
+script, so `pyproject.toml` does not apply to it. Set `root` inside the script's own block, not
+`extra-paths` — `root` replaces ty's root detection rather than adding to it, so include `"."` or
+the script's declared dependencies stop resolving too. `tests_sam/scripted_runner.py` carries
+`root = [".", ".."]`. Load `python-engineering:ty` before changing this; it holds the full rule.
+
 ### Invariant
 
 ```bash
@@ -66,8 +72,11 @@ resolution. Load `python-engineering:python3-typing` for the boundary-validation
 
 ### `unresolved-import` errors
 
-When `ty` reports `unresolved-import` for a module that genuinely exists on disk, the module's
-directory is almost always missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`.
+A PEP 723 script importing its own modules is the exception, and is fixed by `root` inside the
+script's block — see "Splitting a PEP 723 script" above, and `python-engineering:ty`. Everywhere
+else: when `ty` reports `unresolved-import` for a module that genuinely exists on disk, the
+module's directory is almost always missing from `[tool.ty.environment] extra-paths` in
+`pyproject.toml`.
 Add the directory there, then re-verify with `uv run ty check <path>` before investigating the
 importing code itself. A root-level `ty.toml`, if one exists, takes precedence over
 `pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths` addition doesn't
