@@ -28,21 +28,15 @@ Use markdown links with relative paths starting with `./`. **Reason**: Enables C
 - From references/file.md → same dir: `[text](./filename.md)`
 - From references/file.md → subdir: `[text](./subdir/filename.md)`
 
-Use a markdown link for any real relative path; a bare backticked path (`modern-modules/httpx.md`) and an absolute path (`/home/user/...`) both fail. External file: full URL with access date. The one path form that takes backticks instead is the substituted form below.
+Use a markdown link for any real relative path; a bare backticked path (`modern-modules/httpx.md`) and an absolute path (`/home/user/...`) both fail. External file: full URL with access date.
 
 **Exception — `.claude/` and `rules/`:** these files are injected as raw text at the agent's cwd (repo root), never browsed via GitHub/editor click-through. Links there are repo-root-relative, no `./` prefix. Do not "fix" them back to file-relative.
 
-**Exception — substituted paths in a `SKILL.md` body:** `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` substitute at load time throughout the rendered body, link targets included, so they resolve in any environment a plugin is installed into.
-
-Write these as a **backticked path**, not a markdown link:
+**Exception — substituted paths in a `SKILL.md` body:** `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` substitute at load time, so write them as a backticked path, not a markdown link:
 
 ```markdown
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — contains <what>; read before <when>.
+`${CLAUDE_PLUGIN_ROOT}/docs/<doc>.md` — contains <what>; read before <when>.
 ```
-
-The backtick is a workaround for a `skilllint` bug, not a property of the syntax. `skilllint` does expand both variables, but when invoked with a **relative** path it resolves the plugin root relatively too and joins that onto the skill directory, producing `…/skills/<name>/plugins/<plugin>/…` and a false LK001. Pre-commit passes relative paths, so the link form cannot be committed until that is fixed upstream. Tracked as issue #3429, which carries the verification command and the revert steps — revert there, not from this file.
-
-Keep the annotation contract — what the file contains, when to read it — that a link would have carried.
 
 Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths in markdown links. See `skill-substitution.md`.
 
