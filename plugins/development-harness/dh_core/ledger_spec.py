@@ -164,7 +164,12 @@ COLUMNS: list[Column] = [
         integration_branch="text|null",
         base_sha="text|null",
     ),
-    *_cols("plans", Provenance.EVENT, ["plan.created", "plan.fields", "plan.replaced"], quality_gates="json"),
+    *_cols(
+        "plans",
+        Provenance.EVENT,
+        ["plan.created", "plan.fields", "plan.replaced"],
+        quality_gates="json: the shell commands run before a milestone item merges",
+    ),
     *_cols("plans", Provenance.EVENT, ["plan.archived"], archived="datetime|null"),
     Column(
         table="plans",
@@ -445,10 +450,11 @@ REASONS: list[Reason] = [
         condition="attempt_open is 1 and the command's exception (returned, stale, --force) does not hold",
     ),
     Reason(code="not-ready", kind=ReasonKind.REFUSAL, condition="tasks.ready is false"),
+    Reason(code="stale-attempt", kind=ReasonKind.REFUSAL, condition="--attempt differs from tasks.attempts"),
     Reason(
-        code="stale-attempt",
+        code="attempt-closed",
         kind=ReasonKind.REFUSAL,
-        condition="--attempt differs from tasks.attempts, or attempt_open is 0",
+        condition="--attempt equals tasks.attempts and attempt_open is 0",
     ),
     Reason(
         code="attempt-required",
@@ -569,6 +575,7 @@ COMMANDS: list[Command] = [
             Flag(name="--slug", required=True, value="slug"),
             Flag(name="--goal", required=True, value="text"),
             Flag(name="--owner-reference", value="work item"),
+            Flag(name="--base-sha", value="the commit a judge diffs a report against"),
             Flag(name="--quality-gate", value="command, repeatable"),
         ],
         summary="plan.created; tasks may follow with append-task",
@@ -637,6 +644,7 @@ COMMANDS: list[Command] = [
             Flag(name="--task-id", value="T"),
             ATTEMPT,
             Flag(name="--append-section", value="name"),
+            Flag(name="--section-content", value="the section body"),
             Flag(name="--set", value="field=value, repeatable"),
         ],
         renews=True,
@@ -834,7 +842,10 @@ TRANSITIONS: list[Transition] = [
     Transition(
         command="read",
         from_status=Status.IN_PROGRESS,
-        checks=[Check(reason="stale-attempt", unless="--attempt absent")],
+        checks=[
+            Check(reason="stale-attempt", unless="--attempt absent"),
+            Check(reason="attempt-closed", unless="--attempt absent"),
+        ],
         effects=_renew_effects(),
         events=["lease.renewed"],
         note="without --attempt: reads, renews nothing, appends nothing",
@@ -853,7 +864,11 @@ TRANSITIONS: list[Transition] = [
     Transition(
         command="update",
         from_status=Status.IN_PROGRESS,
-        checks=[Check(reason="stale-attempt", unless="--attempt absent"), Check(reason="attempt-required")],
+        checks=[
+            Check(reason="stale-attempt", unless="--attempt absent"),
+            Check(reason="attempt-closed", unless="--attempt absent"),
+            Check(reason="attempt-required"),
+        ],
         effects=[
             Effect(column="sections", value="one row (name, attempts, content) per --append-section"),
             Effect(column="task model fields", value="per --set"),
@@ -880,6 +895,7 @@ TRANSITIONS: list[Transition] = [
         from_status=Status.IN_PROGRESS,
         checks=[
             Check(reason="stale-attempt", unless="--path given"),
+            Check(reason="attempt-closed", unless="--path given"),
             Check(reason="unmatched-path", unless="--attempt given"),
         ],
         effects=_renew_effects(),
@@ -902,7 +918,11 @@ TRANSITIONS: list[Transition] = [
     Transition(
         command="finish",
         from_status=Status.IN_PROGRESS,
-        checks=[Check(reason="stale-attempt"), Check(reason="report-missing", unless="--result is not complete")],
+        checks=[
+            Check(reason="stale-attempt"),
+            Check(reason="attempt-closed"),
+            Check(reason="report-missing", unless="--result is not complete"),
+        ],
         effects=[
             Effect(column="attempt_open", value="0"),
             Effect(column="result", value="--result"),
@@ -990,10 +1010,16 @@ TRANSITIONS: list[Transition] = [
                 Check(reason="task-accepted", unless="--force"),
                 Check(reason="leased", unless="--force, or returned, or stale, or attempt_open is 0"),
                 Check(reason="dependents-started", unless="--force"),
-                Check(reason="attempts-exhausted", unless="--more-attempts"),
+                Check(reason="attempts-exhausted", unless="--more-attempts, or --force"),
             ],
             effects=[
-                Effect(column="attempts_allowed", value="attempts_allowed + loop.max_attempts when --more-attempts"),
+                Effect(
+                    column="attempts_allowed",
+                    value=(
+                        "attempts_allowed + loop.max_attempts when --more-attempts; plus 1 when result is "
+                        "needs-input, so putting a question to the user does not spend an attempt"
+                    ),
+                ),
                 *_clear_attempt_effects(),
                 Effect(column="accepted", value="0"),
                 Effect(column="response", value="--response or null"),
@@ -1022,11 +1048,14 @@ TRANSITIONS: list[Transition] = [
                 Effect(column="accepted", value="0 when --force"),
                 Effect(column="completed", value="now when --new-status is complete"),
                 CASCADE,
-                REVERSAL,
             ],
             events=["task.state"],
             to_status="--new-status",
-            note="CASCADE applies when entering failed; REVERSAL when leaving failed",
+            note=(
+                "CASCADE applies when entering failed. Leaving failed by state keeps the cascade: the "
+                "dependents stay skipped because the work was abandoned rather than redone. Only reclaim, "
+                "which returns the task to not-started, reverses it."
+            ),
         )
         for s in OPEN_STATUSES
     ],
@@ -1077,7 +1106,7 @@ TRANSITIONS: list[Transition] = [
         effects=[
             Effect(
                 column="plans, tasks, sections",
-                value="rows from the source; attempt_open 0; attempts and accepted from the source, else 0 and (status is complete); sections tagged 0",
+                value="rows from the source; attempt_open 0; attempts and accepted from the source, else 0 and 0, so an imported complete task still faces the judge; sections tagged 0",
             ),
             Effect(column="export_cursors", value="target content, revision and projection_hash of the source"),
         ],
