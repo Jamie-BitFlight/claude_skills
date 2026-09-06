@@ -45,7 +45,7 @@ flowchart TD
 **How to spawn agents:**
 
 - **Agent tool** (`subagent_type=...`) — for focused, isolated work where only the result matters
-- **TeamCreate** — for multi-agent coordination where agents need to communicate (see `agent-orchestration:parallel-work` "Persistent teams")
+- **Named teammate** (`Agent(name=...)`) — for multi-agent coordination where agents need to communicate (see `agent-orchestration:parallel-work` "Persistent teams")
 
 **Why delegation matters:**
 
@@ -814,7 +814,7 @@ VERDICT: [COMPLETE / NOT COMPLETE - reason]
 
 ## Quick Reference: Agent Delegation
 
-Use concurrent **Agent** calls for parallel work (`agent-orchestration:parallel-work`); reach for **TeamCreate** only when agents must exchange messages mid-task.
+Use concurrent **Agent** calls for parallel work (`agent-orchestration:parallel-work`); reach for a **named teammate** (`Agent(name=...)`) only when agents must exchange messages mid-task.
 
 | Phase    | Agent Type                  | Purpose                                                                       |
 | -------- | --------------------------- | ----------------------------------------------------------------------------- |
