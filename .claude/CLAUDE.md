@@ -288,6 +288,8 @@ Cap the loop at three passes. If corrections remain, ship the draft with the res
 
 **Carry the warrant with the claim.** A fact repeated without its source arrives at the next file looking stronger than it is: a canary test becomes "vendor docs", a community gist becomes "the harness supports it". Write how it was established next to what it says — vendor-documented, tested here on a date, or unverified — every time the claim moves. A claim whose warrant you cannot state is one you must re-establish, not repeat.
 
+**Weight absence claims hardest.** Positive claims verify themselves — you find the thing, and finding it is the evidence. A negative has no terminating act: you stop looking, and stopping feels identical to finding. So every sentence asserting an absence must name the search that would have found it, and that search must be capable of finding it. Write `looked in X, did not find it` rather than `it is not there`. An empty grep, a 404, a missing JSON key, and a page read in part are facts about your search, not about the world; a code-search index that returns nothing for a term present in the file proves the index incomplete, not the term absent. This is where claims fail most: a review of one session's errors found nearly every wrong claim was a negative, and nearly every positive claim held.
+
 ---
 
 ## Read the Decisions Before Changing the Design
