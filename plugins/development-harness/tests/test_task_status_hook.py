@@ -1,13 +1,13 @@
-"""Tests for task_status_hook.py — MCP write helpers and refactored handlers.
+"""Tests for task_status_hook.py — SAM CLI write helpers and hook handlers.
 
 Covers:
-- _call_sam_task_state: routes state writes through MCP subprocess
-- _call_sam_task_update: routes field writes through MCP subprocess
+- _call_sam_task_state: routes state writes through the SAM CLI subprocess
+- _call_sam_task_update: routes field writes through the SAM CLI subprocess
 - Both helpers fall back gracefully (return False) on subprocess failure
 - read_task_context / _call_sam_active_task_get / _read_context_file: read the plan
   address directly from the "plan" field (no path-parsing indirection)
-- handle_subagent_stop: calls MCP helpers instead of direct YAML writes
-- handle_activity_update: calls MCP helpers instead of direct YAML writes
+- handle_subagent_stop: calls SAM CLI helpers instead of direct YAML writes
+- handle_activity_update: calls SAM CLI helpers instead of direct YAML writes
 """
 
 from __future__ import annotations
@@ -598,7 +598,7 @@ def test_call_sam_task_update_returns_false_on_malformed_json() -> None:
 
 
 # ---------------------------------------------------------------------------
-# handle_activity_update — MCP call path
+# handle_activity_update — SAM CLI call path
 # ---------------------------------------------------------------------------
 
 
@@ -657,13 +657,13 @@ def test_handle_activity_update_skips_when_no_plan_addr(tmp_path: Path, monkeypa
         # Act
         handle_activity_update(hook_input)
 
-    # Assert — exited cleanly without calling MCP update
+    # Assert — exited cleanly without calling the SAM CLI update
     assert exc_info.value.code == 0
     mock_update.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# handle_subagent_stop — MCP write path
+# handle_subagent_stop — SAM CLI write path
 # ---------------------------------------------------------------------------
 
 
@@ -682,6 +682,7 @@ def test_handle_subagent_stop_calls_state_and_update(tmp_path: Path, monkeypatch
     with (
         patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
         patch.object(_hook_mod, "_call_sam_task_read", return_value=mock_task, create=True),
+        patch.object(_hook_mod, "_extract_status_from_transcript", return_value=("DONE", "STATUS: DONE\n")),
         patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
         patch.object(_hook_mod, "_call_sam_task_update", return_value=True) as mock_update,
         patch.object(_hook_mod, "_cleanup_active_task_context"),
@@ -699,7 +700,7 @@ def test_handle_subagent_stop_calls_state_and_update(tmp_path: Path, monkeypatch
 
 
 def test_handle_subagent_stop_exits_cleanly_when_state_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """handle_subagent_stop exits 0 (not 2) when MCP state call fails."""
+    """handle_subagent_stop exits 0 (not 2) when the SAM CLI state call fails."""
     # Arrange — plan_id is a str plan address (post-refactor shape)
     plan_id = "Pf4281187"
 
@@ -713,6 +714,7 @@ def test_handle_subagent_stop_exits_cleanly_when_state_fails(tmp_path: Path, mon
     with (
         patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
         patch.object(_hook_mod, "_call_sam_task_read", return_value=mock_task, create=True),
+        patch.object(_hook_mod, "_extract_status_from_transcript", return_value=("DONE", "STATUS: DONE\n")),
         patch.object(_hook_mod, "_call_sam_task_state", return_value=False),
         patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
         patch.object(_hook_mod, "_cleanup_active_task_context"),
@@ -727,21 +729,273 @@ def test_handle_subagent_stop_exits_cleanly_when_state_fails(tmp_path: Path, mon
     mock_update.assert_not_called()
 
 
+# ---------------------------------------------------------------------------
+# handle_subagent_stop — status-gated completion
+#
+# Only a recognized complete token reaches COMPLETE; everything else —
+# including no signal at all — becomes BLOCKED.
+# ---------------------------------------------------------------------------
+
+
+def _in_progress_task() -> MagicMock:
+    from sam_schema.core.models import Task, TaskStatus
+
+    mock_task = MagicMock(spec=Task)
+    mock_task.status = TaskStatus.IN_PROGRESS
+    return mock_task
+
+
+@pytest.mark.parametrize("status_text", ["STATUS: PARTIAL\n3 of 5 criteria done.", "STATUS: BLOCKED\nmissing creds."])
+def test_handle_subagent_stop_marks_blocked_on_non_complete_status(status_text: str, tmp_path: Path) -> None:
+    """A worker reporting PARTIAL or BLOCKED must not be marked COMPLETE."""
+    plan_id = "Pf4281187"
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+    token = status_text.split()[1].rstrip(".,;:")
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=_in_progress_task(), create=True),
+        patch.object(_hook_mod, "_extract_status_from_transcript", return_value=(token, status_text)),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T1", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+@pytest.mark.parametrize("status_token", ["PARTIAL", "BLOCKED"])
+def test_handle_subagent_stop_reverts_self_marked_complete_on_non_complete_status(
+    status_token: str, tmp_path: Path
+) -> None:
+    """A worker that marks itself COMPLETE then reports PARTIAL/BLOCKED is reverted to blocked.
+
+    start-task marks the task complete via the SAM CLI before the worker stops, so the
+    task already reads COMPLETE by the time this hook runs. The worker's report, not the
+    state it wrote about itself, decides the outcome.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "Pf4281187"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(
+            _hook_mod,
+            "_extract_status_from_transcript",
+            return_value=(status_token, f"STATUS: {status_token}\n2 of 5 criteria met."),
+        ),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T1", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+def test_handle_subagent_stop_leaves_self_marked_complete_alone_on_done(tmp_path: Path) -> None:
+    """A worker that marks itself COMPLETE and reports DONE needs no further write."""
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "Pf4281187"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_extract_status_from_transcript", return_value=("DONE", "STATUS: DONE\n")),
+        patch.object(_hook_mod, "_call_sam_task_state") as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_not_called()
+    mock_update.assert_not_called()
+
+
+def test_handle_subagent_stop_failed_state_still_cascades_regardless_of_report(tmp_path: Path) -> None:
+    """An explicit state=failed is terminal and wins over whatever the transcript says."""
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "Pf4281187"
+    failed_task = MagicMock(spec=Task)
+    failed_task.status = TaskStatus.FAILED
+
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=failed_task, create=True),
+        patch.object(_hook_mod, "_extract_status_from_transcript", return_value=("DONE", "STATUS: DONE\n")),
+        patch.object(_hook_mod, "_cascade_failed_task") as mock_cascade,
+        patch.object(_hook_mod, "_call_sam_task_state") as mock_state,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+    ):
+        handle_subagent_stop(hook_input)
+
+    mock_cascade.assert_called_once()
+    mock_state.assert_not_called()
+
+
+def test_handle_subagent_stop_marks_blocked_when_no_status_line_found(tmp_path: Path) -> None:
+    """A worker whose final message has no STATUS: line is treated as not-complete, not COMPLETE."""
+    plan_id = "Pf4281187"
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=_in_progress_task(), create=True),
+        patch.object(
+            _hook_mod, "_extract_status_from_transcript", return_value=(None, "Here's a summary of what I did.")
+        ),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T1", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+def test_handle_subagent_stop_marks_blocked_when_transcript_unreadable(tmp_path: Path) -> None:
+    """A missing/unreadable transcript must fail closed to BLOCKED, never COMPLETE."""
+    plan_id = "Pf4281187"
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(tmp_path / "does-not-exist.jsonl"),
+    }
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=_in_progress_task(), create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        # No mock on _extract_status_from_transcript — exercise the real function
+        # against a transcript path that does not exist.
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T1", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
+
+
+@pytest.mark.parametrize("status_token", ["DONE", "COMPLETE", "COMPLETED"])
+def test_handle_subagent_stop_accepts_every_current_complete_spelling(status_token: str, tmp_path: Path) -> None:
+    """Every complete spelling in live use across the plugin still reaches COMPLETE."""
+    plan_id = "Pf4281187"
+    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
+
+    with (
+        patch.object(_hook_mod, "_resolve_active_task_context", return_value=(None, plan_id, "T1", None, None)),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=_in_progress_task(), create=True),
+        patch.object(
+            _hook_mod, "_extract_status_from_transcript", return_value=(status_token, f"STATUS: {status_token}")
+        ),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update", return_value=True) as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+    ):
+        handle_subagent_stop(hook_input)
+
+    mock_state.assert_called_once_with(plan_id, "T1", "complete")
+    mock_update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _extract_status_from_transcript
+# ---------------------------------------------------------------------------
+
+
+def _write_transcript(tmp_path: Path, records: list[dict[str, Any]]) -> Path:
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+    return transcript
+
+
+def _assistant_record(text: str) -> dict[str, Any]:
+    return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
+
+
+def test_extract_status_from_transcript_reads_last_assistant_message(tmp_path: Path) -> None:
+    """Uses the LAST assistant text block, not the first, so mid-run status updates are ignored."""
+    transcript = _write_transcript(
+        tmp_path,
+        [
+            _assistant_record("STATUS: BLOCKED\nstill working, this is a progress note"),
+            {"type": "user", "message": {"content": [{"type": "text", "text": "STATUS: DONE (echoed input, ignore)"}]}},
+            _assistant_record("STATUS: DONE\nall acceptance criteria satisfied"),
+        ],
+    )
+
+    status_token, final_text = _hook_mod._extract_status_from_transcript(transcript)
+
+    assert status_token == "DONE"
+    assert final_text is not None
+    assert "all acceptance criteria satisfied" in final_text
+
+
+def test_extract_status_from_transcript_missing_file_returns_none() -> None:
+    status_token, final_text = _hook_mod._extract_status_from_transcript(Path("/nonexistent/transcript.jsonl"))
+    assert status_token is None
+    assert final_text is None
+
+
+def test_extract_status_from_transcript_no_status_line_returns_none_token(tmp_path: Path) -> None:
+    transcript = _write_transcript(tmp_path, [_assistant_record("Just a plain summary, no status line.")])
+
+    status_token, final_text = _hook_mod._extract_status_from_transcript(transcript)
+
+    assert status_token is None
+    assert final_text == "Just a plain summary, no status line."
+
+
+def test_extract_status_from_transcript_case_insensitive(tmp_path: Path) -> None:
+    transcript = _write_transcript(tmp_path, [_assistant_record("status: done\nlowercase variant")])
+
+    status_token, _ = _hook_mod._extract_status_from_transcript(transcript)
+
+    assert status_token == "DONE"
+
+
 # ===========================================================================
-# REFACTOR TARGET TESTS — RED on current code, GREEN after plan_id refactor
+# _resolve_active_task_context / handle_subagent_stop — plan addressing
 #
-# Target behavior:
-#   - _resolve_active_task_context returns (session_id, plan_id: str, task_id, ...)
-#     NOT (session_id, task_file_path: Path, task_id, ...)
-#   - handle_subagent_stop calls _call_sam_task_read(plan_id, task_id) via MCP
-#   - handle_subagent_stop NEVER calls sam_get_task (filesystem read)
-#
-# All new tests use pytest-mock (mocker: MockerFixture) exclusively.
+# plan_id is a plain str plan address end-to-end (e.g. "Pf4281187"), never a
+# filesystem Path — task reads go through _call_sam_task_read via the SAM
+# CLI, not a direct file read. sam_get_task (that removed file-read path) no
+# longer exists on the module; tests below patch it with create=True purely
+# to assert it is never touched.
 # ===========================================================================
 
 
 # ---------------------------------------------------------------------------
-# _call_sam_task_read — new MCP read helper (does not exist yet on current code)
+# _call_sam_task_read — SAM CLI task-read helper
 # ---------------------------------------------------------------------------
 
 
@@ -805,7 +1059,6 @@ def test_call_sam_task_read_returns_none_when_uv_missing(mocker: MockerFixture) 
     """_call_sam_task_read returns None gracefully when uv is not on PATH.
 
     Mirrors the graceful-failure pattern of _call_sam_task_state.
-    RED: function does not exist on current code.
     """
     mocker.patch("shutil.which", return_value=None)
 
@@ -818,10 +1071,7 @@ def test_call_sam_task_read_returns_none_when_uv_missing(mocker: MockerFixture) 
 
 
 def test_call_sam_task_read_returns_none_on_subprocess_failure(mocker: MockerFixture) -> None:
-    """_call_sam_task_read returns None when the subprocess exits non-zero.
-
-    RED: function does not exist on current code.
-    """
+    """_call_sam_task_read returns None when the subprocess exits non-zero."""
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
     mocker.patch(
@@ -838,10 +1088,7 @@ def test_call_sam_task_read_returns_none_on_subprocess_failure(mocker: MockerFix
 
 
 def test_call_sam_task_read_returns_none_on_timeout(mocker: MockerFixture) -> None:
-    """_call_sam_task_read returns None when the subprocess times out.
-
-    RED: function does not exist on current code.
-    """
+    """_call_sam_task_read returns None when the subprocess times out."""
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
     mocker.patch("subprocess.Popen", return_value=_popen_timeout())
@@ -857,8 +1104,7 @@ def test_call_sam_task_read_returns_none_on_timeout(mocker: MockerFixture) -> No
 
 
 # ---------------------------------------------------------------------------
-# handle_subagent_stop — MCP read path assertions (RED on current code)
-# The critical behavioral assertions of the refactor.
+# handle_subagent_stop — SAM CLI read-path assertions
 # ---------------------------------------------------------------------------
 
 
@@ -870,21 +1116,10 @@ def test_handle_subagent_stop_calls_mcp_read_not_sam_get_task_on_happy_path(mock
       1. _call_sam_task_read IS called with a plain str plan_id, not a Path.
       2. sam_get_task is NEVER called.
       3. plan_id arg is type str (not Path).
-
-    RED on current code:
-      - _call_sam_task_read does not exist on the module.
-      - Current code receives Path from _resolve_active_task_context and crashes at
-        task_file_path.is_absolute() with AttributeError: 'str' has no attribute 'is_absolute'
-        because the refactored shape (str plan_id) is incompatible with current code.
-      - Even if that were fixed, sam_get_task would be called instead of _call_sam_task_read.
-
-    GREEN after refactor:
-      - _call_sam_task_read exists and is called with (plan_id_str, task_id).
-      - sam_get_task is never invoked.
     """
     from sam_schema.core.models import Task, TaskStatus
 
-    # Arrange — resolved context carries plan_id as a plain string (post-refactor shape)
+    # Arrange — resolved context carries plan_id as a plain string
     plan_id = "Pf4281187"
     task_id = "T1"
     session_id = "sess-refactor-001"
@@ -894,28 +1129,25 @@ def test_handle_subagent_stop_calls_mcp_read_not_sam_get_task_on_happy_path(mock
 
     hook_input: dict[str, Any] = {"cwd": "/workspace", "hook_event_name": "SubagentStop", "agent_transcript_path": ""}
 
-    # _resolve_active_task_context returns str plan_id (refactored shape)
     mocker.patch.object(
         _hook_mod, "_resolve_active_task_context", return_value=(session_id, plan_id, task_id, None, None)
     )
 
-    # _call_sam_task_read replaces _fetch_task_for_stop_hook in refactored code.
-    # create=True is required because the function does not exist on current code.
+    # _call_sam_task_read replaces the old filesystem-based _fetch_task_for_stop_hook read.
     mock_read = mocker.patch.object(_hook_mod, "_call_sam_task_read", create=True, return_value=mock_task)
 
-    # sam_get_task must NEVER be called after refactor
+    # sam_get_task (the old filesystem-read path) no longer exists — assert it's never touched.
     mock_get = mocker.patch.object(_hook_mod, "sam_get_task", create=True)
 
+    mocker.patch.object(_hook_mod, "_extract_status_from_transcript", return_value=("DONE", "STATUS: DONE\n"))
     mocker.patch.object(_hook_mod, "_call_sam_task_state", return_value=True)
     mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
     mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
 
-    # Act — RED: current code raises AttributeError at task_file_path.is_absolute()
-    #           because str has no is_absolute. The refactor removes that line.
-    # GREEN: runs to completion without raising.
+    # Act
     handle_subagent_stop(hook_input)
 
-    # Assert 1: _call_sam_task_read was called (RED: never called on current code)
+    # Assert 1: _call_sam_task_read was called
     mock_read.assert_called_once()
     read_args = mock_read.call_args[0]
 
@@ -924,23 +1156,17 @@ def test_handle_subagent_stop_calls_mcp_read_not_sam_get_task_on_happy_path(mock
     assert read_args[0] == plan_id, f"Expected plan_id '{plan_id}', got '{read_args[0]}'"
     assert read_args[1] == task_id
 
-    # Assert 3: sam_get_task was NOT called (RED: called on current code)
+    # Assert 3: sam_get_task was NOT called
     mock_get.assert_not_called()
 
 
 def test_handle_subagent_stop_cascades_via_mcp_when_task_already_failed(mocker: MockerFixture) -> None:
-    """handle_subagent_stop cascades via MCP when task is already FAILED.
+    """handle_subagent_stop reads the task via the SAM CLI when it is already FAILED.
 
     Asserts:
       1. _call_sam_task_read IS called (to discover FAILED status).
       2. sam_get_task is NEVER called.
       3. _cascade_failed_task is called, which routes through _call_sam_task_state.
-
-    RED on current code:
-      - _call_sam_task_read does not exist.
-      - Current code raises AttributeError at task_file_path.is_absolute() before
-        ever reaching the FAILED branch.
-      - Even if patched past that, sam_get_task would be called instead.
     """
     from sam_schema.core.models import Task, TaskStatus
 
@@ -963,7 +1189,7 @@ def test_handle_subagent_stop_cascades_via_mcp_when_task_already_failed(mocker: 
     mocker.patch.object(_hook_mod, "_cascade_failed_task")
     mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
 
-    # Act — RED: AttributeError on current code; GREEN: runs to completion
+    # Act
     handle_subagent_stop(hook_input)
 
     # Assert: _call_sam_task_read was called with str plan_id
@@ -984,12 +1210,6 @@ def test_handle_subagent_stop_skips_state_write_when_task_already_complete(mocke
       1. _call_sam_task_read IS called to check current status.
       2. sam_get_task is NEVER called.
       3. _call_sam_task_state is NOT called (no unnecessary state write).
-
-    RED on current code:
-      - _call_sam_task_read does not exist.
-      - Current code raises AttributeError at task_file_path.is_absolute() because
-        the refactored tuple shape passes str where Path is expected.
-      - Even if past that, sam_get_task would be called instead of _call_sam_task_read.
     """
     from sam_schema.core.models import Task, TaskStatus
 
@@ -1011,8 +1231,7 @@ def test_handle_subagent_stop_skips_state_write_when_task_already_complete(mocke
     mock_state = mocker.patch.object(_hook_mod, "_call_sam_task_state")
     mocker.patch.object(_hook_mod, "_cleanup_active_task_context")
 
-    # Act — RED: AttributeError crashes before sys.exit(0) on current code
-    #           GREEN: exits cleanly via sys.exit(0) after status check
+    # Act
     with pytest.raises(SystemExit) as exc_info:
         handle_subagent_stop(hook_input)
 
@@ -1034,7 +1253,7 @@ def test_handle_subagent_stop_skips_state_write_when_task_already_complete(mocke
 
 
 # ---------------------------------------------------------------------------
-# _resolve_active_task_context — returns str plan_id not Path (RED on current code)
+# _resolve_active_task_context — returns str plan_id, never a Path
 # ---------------------------------------------------------------------------
 
 
@@ -1044,7 +1263,7 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     _call_sam_active_task_get reads the ActiveTaskContext.plan field directly —
     no path parsing or extraction involved.
     """
-    # Arrange — transcript with session_id so MCP primary path is taken
+    # Arrange — transcript with session_id so the SAM CLI primary path is taken
     transcript = tmp_path / "agent-session.jsonl"
     transcript.write_text(json.dumps({"sessionId": "sess-abc123", "type": "user"}) + "\n")
 
@@ -1070,8 +1289,7 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     assert result is not None, "_resolve_active_task_context returned None unexpectedly"
     _session_id, plan_id, task_id, _parent_issue, _context_file = result
 
-    # RED on current code: Path("Pf4281187") is a Path, so isinstance(plan_id, Path) is True
-    # GREEN after refactor: plan_id is a plain str
+    # plan_id must be a plain str, never a filesystem Path (that abstraction was removed).
     assert isinstance(plan_id, str), f"plan_id must be str after refactor, got {type(plan_id)}: {plan_id!r}"
     assert not isinstance(plan_id, Path), "plan_id must NOT be a Path after refactor — filesystem abstraction removed"
     assert plan_id == "Pf4281187"
@@ -1089,7 +1307,7 @@ def test_handle_subagent_stop_emits_stderr_when_mcp_read_returns_none(
     """handle_subagent_stop prints a diagnostic to stderr when _call_sam_task_read returns None.
 
     Verifies the silent failure case is now visible: before this fix the hook exited 0
-    without any message when the MCP read failed.
+    without any message when the SAM CLI read failed.
     """
     # Arrange
     plan_id = "Pf4281187"
@@ -1207,7 +1425,7 @@ def test_call_sam_active_task_clear_passes_sam_active_task_target(mocker: Mocker
 
 
 # ---------------------------------------------------------------------------
-# Change 2 — _cleanup_active_task_context suppresses FileNotFoundError only
+# _cleanup_active_task_context suppresses FileNotFoundError only
 # ---------------------------------------------------------------------------
 
 
@@ -1219,7 +1437,7 @@ def test_cleanup_active_task_context_propagates_permission_error(mocker: MockerF
     a FileNotFoundError, so it must propagate — a filesystem access problem is a real
     failure that must be observable, not silently discarded.
     """
-    # Arrange — session_id=None forces the fallback filesystem path (skips MCP clear)
+    # Arrange — session_id=None forces the fallback filesystem path (skips the SAM CLI clear)
     fallback_file = tmp_path / "active-task-sess.json"
     fallback_file.write_text("{}")
     mocker.patch.object(Path, "unlink", side_effect=PermissionError("read-only filesystem"))
@@ -1277,7 +1495,7 @@ def test_read_task_context_reads_plan_field_for_local_backend_shape(
 
 
 # ---------------------------------------------------------------------------
-# Change 3 — read_task_context logs to stderr on malformed JSON
+# read_task_context logs to stderr on malformed JSON
 # ---------------------------------------------------------------------------
 
 
@@ -1359,9 +1577,9 @@ def test_hook_source_contains_no_fastmcp_invocation() -> None:
 
 
 # ---------------------------------------------------------------------------
-# PR #3306 review response — timeout ordering + process-group cleanup
+# Timeout ordering and process-group cleanup
 #
-# Two compounding defects fixed here:
+# Two compounding defects this section guards against:
 #   1. Every _call_sam_cli-family timeout default (15s, or 10s for the
 #      active-task helpers) is not safely below the outer 10s PostToolUse hook
 #      deadline Claude Code itself enforces — the external SIGKILL can beat
@@ -1405,9 +1623,9 @@ def test_call_sam_cli_delegates_timeout_cleanup_to_terminate_process_tree(mocker
     scripts/run_bounded.py's terminate_process_tree, already used the same way by
     scripts/validate_codex_plugin_isolated.py.
 
-    Kept safe against the still-unfixed hand-rolled cleanup by stubbing os.getpgid/os.killpg
-    too, so this test cannot SIGKILL a real, unrelated process group on the test machine
-    while it is RED.
+    os.getpgid/os.killpg are stubbed here too because terminate_process_tree itself calls
+    them for real — without the stub this test would SIGKILL a real process group on the
+    test machine.
     """
     proc = _popen_timeout(pid=4242)
 
@@ -1446,12 +1664,12 @@ def test_call_sam_cli_uses_posix_session_flag(mocker: MockerFixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# PR #3306 review response, round 3 — handle_activity_update shares a single
-# wall-clock deadline across its two sequential _call_sam_cli-backed calls
+# handle_activity_update shares a single wall-clock deadline across its two
+# sequential _call_sam_cli-backed calls
 #
 # _call_sam_task_read then _call_sam_task_update are each individually kept
-# below the outer 10s PostToolUse hook deadline, but nothing today stops their
-# SUM from exceeding it: worst case ~8s + ~8s = ~16s, well past the 10s
+# below the outer 10s PostToolUse hook deadline, but nothing stops their SUM
+# from exceeding it: worst case ~8s + ~8s = ~16s, well past the 10s
 # external SIGKILL Claude Code enforces on the whole hook process. The fix
 # computes a shared remaining-budget deadline once (time.monotonic()) and
 # passes the REMAINING time to each call, skipping the update call outright
@@ -1549,13 +1767,132 @@ def test_handle_activity_update_skips_update_when_budget_exhausted(
 
 
 def test_terminate_process_tree_resolves_from_inside_the_plugin_package() -> None:
-    """Regression test for a review finding on PR #3306.
+    """terminate_process_tree must resolve from inside the plugin package, not repo-root scripts/.
 
-    _call_sam_cli's terminate_process_tree import previously reached into a
-    repo-root-only scripts/ directory that a marketplace install never ships
-    (only plugins/development-harness itself is distributed). Assert the
-    imported function's own source file lives inside the plugin directory,
-    not the sibling repo-root scripts/ directory.
+    A marketplace install ships only plugins/development-harness — a sibling
+    repo-root scripts/ import would silently break there. Assert the imported
+    function's own source file lives inside the plugin directory.
     """
     source_file = Path(_hook_mod.terminate_process_tree.__code__.co_filename).resolve()
     assert _plugin_dir.resolve() in source_file.parents
+
+
+# ---------------------------------------------------------------------------
+# SubagentStop coverage — the hook must fire for any agent that claimed a task
+# ---------------------------------------------------------------------------
+
+
+def test_subagent_stop_hook_is_not_restricted_to_task_worker() -> None:
+    """SubagentStop must not filter by agent name.
+
+    execution/SKILL.md dispatches a named specialist whenever one matches the task and
+    only falls back to dh:task-worker otherwise. A name-based matcher therefore decides
+    task-state tracking by which specialist got picked, and a specialist's task is never
+    marked at all. The hook gates on whether an active SAM task resolves, so it is safe
+    to run for every sub-agent.
+    """
+    hooks_config = json.loads((_plugin_dir / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+
+    subagent_stop = hooks_config["hooks"]["SubagentStop"]
+    assert subagent_stop, "SubagentStop must have at least one hook entry"
+
+    for entry in subagent_stop:
+        matcher = entry.get("matcher")
+        assert matcher is None, (
+            f"SubagentStop must not filter by agent name (found matcher={matcher!r}). "
+            "Coverage must depend on whether a SAM task was claimed, not on the agent's name."
+        )
+        commands = [h.get("command", "") for h in entry.get("hooks", [])]
+        assert any("task_status_hook.py" in c for c in commands), "SubagentStop must invoke task_status_hook.py"
+
+
+def _transcript_with_status(tmp_path: Path, status_line: str, session_id: str = "sess-specialist-1") -> Path:
+    """Write a transcript in the real JSONL shape the hook parses.
+
+    Mirrors an actual sub-agent transcript: a sessionId-bearing first record, a user
+    prompt, tool traffic, then the final assistant message carrying the STATUS line.
+    """
+    records: list[dict[str, Any]] = [
+        {"type": "user", "sessionId": session_id, "message": {"content": [{"type": "text", "text": "P1a2b3c4/T7"}]}},
+        {
+            "type": "assistant",
+            "sessionId": session_id,
+            "message": {"content": [{"type": "text", "text": "Working on it."}]},
+        },
+        {"type": "user", "sessionId": session_id, "message": {"content": [{"type": "tool_result", "text": "ok"}]}},
+        {"type": "assistant", "sessionId": session_id, "message": {"content": [{"type": "text", "text": status_line}]}},
+    ]
+    transcript = tmp_path / f"{session_id}.jsonl"
+    transcript.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+    return transcript
+
+
+def test_specialist_agent_stopping_with_done_marks_task_complete(tmp_path: Path) -> None:
+    """A non-task-worker specialist that claims a task and reports DONE gets it marked complete.
+
+    Drives a real transcript file rather than a mocked status, so the JSONL parsing path
+    is exercised end to end.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    in_progress = MagicMock(spec=Task)
+    in_progress.status = TaskStatus.IN_PROGRESS
+
+    transcript = _transcript_with_status(tmp_path, "STATUS: DONE\nAll acceptance criteria met.")
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=in_progress, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update", return_value=True) as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+    ):
+        handle_subagent_stop(hook_input)
+
+    mock_state.assert_called_once_with(plan_id, "T7", "complete")
+    mock_update.assert_called_once()
+
+
+def test_self_marked_complete_specialist_reporting_partial_is_reverted(tmp_path: Path) -> None:
+    """The happy-path state the system actually produces: task already COMPLETE via start-task.
+
+    start-task marks the task complete before the worker stops, so COMPLETE — not
+    IN_PROGRESS — is the state this hook normally observes. A PARTIAL report against that
+    state must still revert to blocked.
+    """
+    from sam_schema.core.models import Task, TaskStatus
+
+    plan_id = "P1a2b3c4"
+    self_marked = MagicMock(spec=Task)
+    self_marked.status = TaskStatus.COMPLETE
+
+    transcript = _transcript_with_status(tmp_path, "STATUS: PARTIAL\nBLOCKER: 2 of 5 criteria unmet.")
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    with (
+        patch.object(
+            _hook_mod, "_resolve_active_task_context", return_value=("sess-specialist-1", plan_id, "T7", None, None)
+        ),
+        patch.object(_hook_mod, "_call_sam_task_read", return_value=self_marked, create=True),
+        patch.object(_hook_mod, "_call_sam_task_state", return_value=True) as mock_state,
+        patch.object(_hook_mod, "_call_sam_task_update") as mock_update,
+        patch.object(_hook_mod, "_cleanup_active_task_context"),
+        pytest.raises(SystemExit) as exc_info,
+    ):
+        handle_subagent_stop(hook_input)
+
+    assert exc_info.value.code == 0
+    mock_state.assert_called_once_with(plan_id, "T7", _hook_mod.SamTaskStatus.BLOCKED)
+    mock_update.assert_not_called()
