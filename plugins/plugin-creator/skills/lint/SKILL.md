@@ -35,5 +35,4 @@ illustration rather than an instruction; angle-bracket placeholders are exempt f
 reason. Move an illustrative real path into a fence, and write a generic one as
 `<plugin>/skills/<name>/SKILL.md`.
 
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the
-three-part test each finding is measured against.
+Each finding is measured against the three-part test: present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.

@@ -78,7 +78,7 @@ Add automated doc updater when skill wraps external docs (API specs, frameworks,
 
 ### Reference only what ships with the skill
 
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before writing any path, command, or cross-plugin reference into a skill.
+Before writing any path, command, or cross-plugin reference into a skill, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 
 ### Concise is Key
 
