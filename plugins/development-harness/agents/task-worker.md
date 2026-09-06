@@ -76,9 +76,11 @@ COMMITS: {list of commit hashes or messages}
 NOTES: {design decisions, discoveries, out-of-scope work identified}
 ```
 
-Use STATUS: PARTIAL when some acceptance criteria are met and at least one is blocked. Use STATUS: FAILED only when no meaningful progress was made.
+Use STATUS: PARTIAL when some acceptance criteria are met and at least one is blocked.
 
-When operating as part of a coordinated group, send this completion status back to the group's lead agent.
+Reporting FAILED in this text does not fail the task. Only an explicit
+`sam_task(action='state', status='failed')` marks the task FAILED and cascades skips to its
+dependents. Text alone leaves the task blocked for a human or dispatcher to route.
 
 ## Cross-References
 
