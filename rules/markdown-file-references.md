@@ -40,7 +40,9 @@ Write these as a **backticked path**, not a markdown link:
 `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — contains <what>; read before <when>.
 ```
 
-`skilllint` resolves link targets against the filesystem and cannot expand the variable, so the markdown-link form fails LK001 as a broken link while the backticked form passes and still resolves for the agent. Keep the annotation contract — what the file contains, when to read it — that a link would have carried.
+The backtick is a workaround for a `skilllint` bug, not a property of the syntax. `skilllint` does expand both variables (`rules/lk_series.py`, `_STATICALLY_RESOLVABLE_CLAUDE_VARS`), but when it is invoked with a **relative** path it resolves the plugin root to a relative path too and then joins that onto the skill directory, producing `…/skills/<name>/plugins/<plugin>/…` and a false LK001. The same check passes when invoked with an absolute path. Pre-commit passes relative paths, so the link form cannot be committed until that is fixed upstream; revert to the markdown-link form once it is.
+
+Keep the annotation contract — what the file contains, when to read it — that a link would have carried.
 
 Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths in markdown links. See `skill-substitution.md`.
 
