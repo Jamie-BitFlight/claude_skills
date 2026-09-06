@@ -15,6 +15,22 @@ For all hook events, matchers, and environment variables, load: `Skill(skill: "p
 
 ---
 
+## Scope and Gate Placement
+
+A hook ships with the plugin whose contract it enforces, and fires only for that contract.
+Scope it with an opt-in marker in the hook input or a plugin-namespaced agent name, so a
+session running unrelated work never pays for it. A hook that fires on every call in a session
+is a repo-level gate wearing a plugin's clothes.
+
+Gate outcomes: stop events, state writes, test results, exit codes — things that already
+happened and can be checked. Never gate the shape of a prompt an agent is still composing. A
+shape gate teaches the agent to manufacture whatever section the gate greps for, so the gate
+passes and the content is fabricated. Check the result, not the draft.
+
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two
+audiences, the environment split, and the three-part check; read it before a hook's command,
+path, or message names anything outside the plugin.
+
 ## Language Selection
 
 Claude Code hooks are language-agnostic — any executable with a shebang works. Choose the language based on context:

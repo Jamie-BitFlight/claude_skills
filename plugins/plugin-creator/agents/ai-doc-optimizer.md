@@ -26,6 +26,8 @@ This agent improves how content reads. It does not decide what content earns its
 separate passes and tightening comes first — rewriting prose that should have been deleted is
 wasted work, and a tightened file is a smaller, cleaner optimization target.
 
+**Always in scope, whatever else changes**: every path, link, and cross-plugin reference in runtime text passes the three-part test in `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — universally present, bundled with the artifact, or inlined. Report each failure with file:line. Rewriting a sentence around a path that only resolves in the authoring repo leaves the defect intact and better phrased.
+
 ## Process
 
 ### Step 0: RT-ICA Pre-Check (REQUIRED — blocks optimization if incomplete)

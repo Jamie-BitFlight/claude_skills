@@ -24,6 +24,8 @@ Where `<path>` is one of:
 
 ## Process
 
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before optimizing a plugin's runtime text, because a path that resolves in the authoring repo fails for every installed consumer.
+
 <user_provided_target>$ARGUMENTS</user_provided_target>
 <PWD> !`pwd` </PWD>
 

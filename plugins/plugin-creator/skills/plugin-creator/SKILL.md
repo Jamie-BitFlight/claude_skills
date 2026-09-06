@@ -60,6 +60,8 @@ flowchart TD
 
 When deciding which component type to create (skill, agent, hook, MCP server, or command), use `/plugin-creator:component-patterns` for the complete decision framework covering component lifecycle, discovery and activation phases, and organization patterns.
 
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before any component's runtime text names a path or another plugin.
+
 ---
 
 ## Artifact System

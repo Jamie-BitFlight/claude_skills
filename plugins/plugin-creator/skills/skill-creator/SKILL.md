@@ -76,6 +76,10 @@ Add automated doc updater when skill wraps external docs (API specs, frameworks,
 
 ## Core Principles
 
+### Reference only what ships with the skill
+
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before writing any path, command, or cross-plugin reference into a skill.
+
 ### Concise is Key
 
 The context window is a public good. Skills share the context window with everything else Claude needs: system prompt, conversation history, other Skills' metadata, and the actual user request.
