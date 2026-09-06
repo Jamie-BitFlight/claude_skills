@@ -273,6 +273,36 @@ For backlog MCP tool reference (tool names, return format, DH state location, sy
 
 ---
 
+## Claim-Check Prose Before It Lands
+
+Prose that asserts how a tool, harness, spec, or API behaves is read as truth by every agent that loads the file. You cannot check it yourself: a claim you believe reads the same to you whether or not it is true.
+
+**Trigger**: Writing or editing any file that states external behaviour — a rule, a skill, a doc, a backlog item, a report.
+**Action**: Draft to `.tmp/scratch/`, not to the target file. Batch the drafts, then dispatch one fresh-context agent per draft, in parallel, in a single message. Give each agent the draft and the sources — never your reasoning for the claims. Ask for a list of corrections, not a verdict. Apply the corrections, re-dispatch, and repeat until a pass returns none. Then write the target file.
+
+- **Do**: mark each claim with how it was confirmed — vendor docs, reproduced locally, reported and unconfirmed
+- **Don't**: render an unchecked claim in the same declarative voice as a verified one
+- **Why**: absence of evidence reads identically to evidence of absence once it is written down
+
+Cap the loop at three passes. If corrections remain, ship the draft with the residual disagreements stated in it rather than resolving them yourself.
+
+**Carry the warrant with the claim.** A fact repeated without its source arrives at the next file looking stronger than it is: a canary test becomes "vendor docs", a community gist becomes "the harness supports it". Write how it was established next to what it says — vendor-documented, tested here on a date, or unverified — every time the claim moves. A claim whose warrant you cannot state is one you must re-establish, not repeat.
+
+---
+
+## Read the Decisions Before Changing the Design
+
+An accepted ADR or a `*-contract` skill outranks the code and the tests. Tests record what the previous change implemented; they cannot tell you the design was wrong, because they were written after it was decided. A green suite means nothing regressed, never that the change is correct.
+
+**Trigger**: Changing behaviour in a subsystem — a key, a protocol, a state transition, a parsed format.
+**Action**: Read `plugins/*/docs/adrs/`, `.claude/decisions/`, and any `*-contract` skill governing it, before writing code. Search for a superseding ADR: a decision may already have been reversed. When a test fails after your change, ask whether the contract objects before editing the test — a failing test is a question, not a verdict.
+
+- **Do**: cite the ADR that settles a design question, and say when your change reverses one
+- **Don't**: re-derive a decision the repo already made, or edit a test until it accepts your change
+- **Why**: two designs were re-derived from scratch this way, and one shipped a contract violation that the full suite passed
+
+---
+
 ## No Derived Data in Documentation
 
 Do not embed counts, totals, or other values derived from a list or table defined elsewhere. These values drift silently when the source changes, creating stale documentation that misleads agents and humans. This is the documentation equivalent of magic numbers in code.
