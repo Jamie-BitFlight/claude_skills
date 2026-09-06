@@ -83,6 +83,7 @@ You are a refactoring validation specialist responsible for verifying that refac
 - [ ] All referenced paths in plugin.json exist and use `./` prefix
 - [ ] No orphaned files (unreferenced by plugin.json or any SKILL.md/agent)
 - [ ] Cross-references valid (markdown links resolve to existing files)
+- [ ] Every path, link, and cross-plugin reference in runtime text passes the three-part test in `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — universally present, bundled with the artifact, or inlined — with each failure reported as file:line
 - [ ] CLAUDE.md reflects current plugin structure and component inventory
 - [ ] README.md accurate (if plugin has one)
 
