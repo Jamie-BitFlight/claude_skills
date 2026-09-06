@@ -1,0 +1,2 @@
+- The parser accepts a manifest holding one entry.
+- The parser accepts a manifest holding many entries.

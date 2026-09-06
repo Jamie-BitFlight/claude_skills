@@ -1,0 +1,2 @@
+- Render a two-entry manifest and count the rows.
+- Render an empty manifest and read the exit status.

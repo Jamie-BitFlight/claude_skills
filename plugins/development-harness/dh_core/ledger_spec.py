@@ -17,6 +17,14 @@ the contract the conformance tests drive it through.
 The runner key is the attempt number. ``dispatch`` increments ``attempts`` and prints it; the
 runner passes ``--address P/T --attempt N`` on every command; a command from a superseded attempt
 is refused with ``stale-attempt``. No session id or agent id appears anywhere in this module.
+
+Every materialised table is a fold over the log: ``dh_core.ledger.store.rebuild`` empties them and
+replays ``events`` into them, and ``tests_sam/test_ledger_fold.py`` drives a plan through the
+commands and asserts the rebuilt tables equal the ones the transitions wrote, row for row and
+column for column. That holds only while the payloads carry what their columns need, so the
+``EVENTS`` payloads below are read as an obligation: an event kind named in a column's ``set_by``
+either carries that column's value in its payload, or the value is one of :data:`INSTANT_COLUMNS`
+and comes from :data:`EVENT_INSTANT`, or the transition writes a constant the fold can restate.
 """
 
 from __future__ import annotations
@@ -170,7 +178,7 @@ COLUMNS: list[Column] = [
         ["plan.created", "plan.fields", "plan.replaced"],
         quality_gates="json: the shell commands run before a milestone item merges",
     ),
-    *_cols("plans", Provenance.EVENT, ["plan.archived"], archived="datetime|null"),
+    *_cols("plans", Provenance.EVENT, ["plan.created", "plan.replaced", "plan.archived"], archived="datetime|null"),
     Column(
         table="plans",
         name="progress",
@@ -205,21 +213,21 @@ COLUMNS: list[Column] = [
         name="started",
         type="datetime|null",
         provenance=Provenance.EVENT,
-        set_by=["task.dispatched", "task.imported"],
+        set_by=["task.dispatched", "task.imported", "task.added"],
     ),
     Column(
         table="tasks",
         name="completed",
         type="datetime|null",
         provenance=Provenance.EVENT,
-        set_by=["task.finished", "task.state", "task.dispatched", "task.reclaimed", "task.imported"],
+        set_by=["task.finished", "task.state", "task.dispatched", "task.reclaimed", "task.imported", "task.added"],
     ),
     Column(
         table="tasks",
         name="last_activity",
         type="datetime|null",
         provenance=Provenance.EVENT,
-        set_by=["lease.renewed", "task.dispatched", "task.imported"],
+        set_by=["lease.renewed", "task.dispatched", "task.imported", "task.added"],
     ),
     # tasks: ledger columns
     *_cols("tasks", Provenance.EVENT, ["task.added", "task.imported"], plan="text", conflict_group="text|null"),
@@ -364,16 +372,60 @@ class EventKind(BaseModel):
     """Commands that append this kind."""
 
 
+EVENT_INSTANT: str = "events.at"
+"""Where an instant a fold writes comes from: the ``at`` column of the event that set it.
+
+No payload carries a timestamp. The transition samples one instant inside its transaction and
+gives it to every event it appends, so ``events.at`` *is* the moment the transition acted, and a
+fold reads :data:`INSTANT_COLUMNS` from it rather than from a payload field. The alternative --
+a timestamp on every payload that sets one -- would record the same instant several times and
+admit two of them disagreeing.
+"""
+
+INSTANT_COLUMNS: tuple[str, ...] = ("started", "last_activity", "first_renewed", "expires", "completed", "archived")
+"""The columns whose value a fold takes from :data:`EVENT_INSTANT` rather than from a payload.
+
+``expires`` is the one that is not the instant itself: it is that instant plus the row's
+``ttl_seconds``, as the ``dispatch`` and renew effects write it. ``started``, ``last_activity`` and
+``completed`` also arrive inside the ``task.added`` and ``task.imported`` payloads, which carry the
+whole ``Task`` dump; there the payload is the source and the event's own instant is not consulted.
+"""
+
+
 EVENTS: list[EventKind] = [
     EventKind(
         kind="plan.created",
         payload=[*PLAN_MODEL_FIELDS, "milestone", "integration_branch", "base_sha", "quality_gates"],
         written_by=["create", "from-milestone", "import"],
     ),
-    EventKind(kind="plan.replaced", payload=["source", "revision"], written_by=["import", "from-milestone"]),
+    EventKind(
+        kind="plan.replaced",
+        payload=[
+            *PLAN_MODEL_FIELDS,
+            "milestone",
+            "integration_branch",
+            "base_sha",
+            "quality_gates",
+            "source",
+            "revision",
+            "replaced",
+            "clears",
+        ],
+        written_by=["import", "from-milestone"],
+    ),
+    # ``plan.replaced`` carries the whole plan row, as ``plan.created`` does, because
+    # ``COLUMNS`` names it in the ``set_by`` of every ``plans`` column: a replace that logged only
+    # its provenance would leave the fold holding the plan it overwrote. ``replaced`` is the id of
+    # the plan whose rows it emptied, which is the incoming id except when the ``exists`` check
+    # matched on milestone instead, and ``clears`` is the tables it emptied -- ``import`` and
+    # ``from-milestone`` write this one kind and empty different tables.
     EventKind(kind="plan.fields", payload=["changed"], written_by=["update", "finalize"]),
     EventKind(kind="plan.archived", payload=["reason"], written_by=["archive"]),
-    EventKind(kind="plan.imported", payload=["source", "revision", "projection_hash"], written_by=["import"]),
+    EventKind(
+        kind="plan.imported",
+        payload=["source", "revision", "projection_hash", "target", "last_seq"],
+        written_by=["import"],
+    ),
     EventKind(
         kind="plan.exported",
         payload=["target", "last_seq", "revision", "projection_hash", "divergences"],
@@ -381,7 +433,7 @@ EVENTS: list[EventKind] = [
     ),
     EventKind(
         kind="task.added",
-        payload=[*TASK_MODEL_FIELDS, "conflict_group"],
+        payload=[*TASK_MODEL_FIELDS, "conflict_group", "attempts_allowed"],
         written_by=["create", "append-task", "from-milestone"],
     ),
     EventKind(
@@ -407,7 +459,15 @@ EVENTS: list[EventKind] = [
     EventKind(
         kind="task.reclaimed", payload=["from_status", "reason", "response", "attempts_allowed"], written_by=["reclaim"]
     ),
-    EventKind(kind="task.state", payload=["status", "reason"], written_by=["state", "finish", "reclaim", "accept"]),
+    EventKind(
+        kind="task.state",
+        payload=["status", "reason", "accepted", "attempt_open"],
+        written_by=["state", "finish", "reclaim", "accept"],
+    ),
+    # ``accepted`` and ``attempt_open`` are the values the row holds once the transition is done.
+    # ``state --force`` clears acceptance and every ``state`` closes the attempt, but the same kind
+    # is appended by the cascade and its reversal, which move a dependent's status and leave both
+    # columns alone -- so the fold reads the value rather than inferring it from the command.
 ]
 
 
