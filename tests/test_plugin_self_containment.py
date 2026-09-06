@@ -37,6 +37,7 @@ def find_self_containment_violations(plugin_dir: Path) -> list[tuple[Path, int, 
         One `(file, line_number, link_target, resolved_path)` tuple per offending link.
     """
     violations: list[tuple[Path, int, str, Path]] = []
+    resolved_root = plugin_dir.resolve()
     for md_file in plugin_dir.rglob("*.md"):
         content = md_file.read_text(encoding="utf-8")
         for match in _LINK_PATTERN.finditer(content):
@@ -45,7 +46,7 @@ def find_self_containment_violations(plugin_dir: Path) -> list[tuple[Path, int, 
                 continue
             resolved = (md_file.parent / target.split("#", 1)[0]).resolve()
             try:
-                resolved.relative_to(plugin_dir.resolve())
+                resolved.relative_to(resolved_root)
             except ValueError:
                 line_number = content.count("\n", 0, match.start()) + 1
                 violations.append((md_file, line_number, target, resolved))
