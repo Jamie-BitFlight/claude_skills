@@ -61,6 +61,7 @@ if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
 
 import dh_paths as _dh_paths
+from dh_config import DHConfig
 
 _HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
 _HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
@@ -883,6 +884,36 @@ def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | 
     return context_file
 
 
+def _local_active_task_file(session_id: str) -> Path | None:
+    """Return the local-backend active-task record for *session_id*, or None.
+
+    The default ``local`` context backend stores each record at
+    ``context_dir()/active-task-{session_id}.json``, so this hook can stat the exact
+    file the SAM CLI would read. That matters for cost: this hook runs on every
+    sub-agent stop in every plugin, and the ``active-task get`` subprocess costs
+    ~1.3s of the ~1.75s total whether or not a task exists.
+
+    Returns None — meaning "ask the CLI instead" — when the configured backend is
+    anything else, because those keep the record where this process cannot see it.
+
+    Args:
+        session_id: Sub-agent session identifier.
+
+    Returns:
+        Path to the record for a local backend, or None to fall back to the CLI.
+    """
+    if DHConfig().get_backend(subsystem="context") != "local":
+        return None
+
+    try:
+        context_dir = _dh_paths.context_dir()
+    except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError):
+        # No resolvable project root — fall back to the CLI, as _resolve_context_file_from_transcript does.
+        return None
+
+    return context_dir / f"active-task-{session_id}.json"
+
+
 def _resolve_active_task_context(
     hook_input: dict[str, Any],
 ) -> tuple[str | None, str | None, str | None, str | int | None, Path | None] | None:
@@ -915,9 +946,17 @@ def _resolve_active_task_context(
     parent_issue_number: str | int | None = None
     context_file: Path | None = None
 
-    # Step 1: SAM CLI lookup via active-task get
+    # Step 1: the active-task record.
     if sub_agent_session_id:
-        plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
+        local_record = _local_active_task_file(sub_agent_session_id)
+        if local_record is None:
+            # Backend stores the record somewhere this process cannot stat — ask the CLI.
+            plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
+        elif local_record.exists():
+            context_file = local_record
+            plan_id, task_id, parent_issue_number = _read_context_file(local_record)
+        # Local backend with no record: no active task. Steps 2 and 3 still run, and
+        # both read files, so the no-active-task path spawns no subprocess at all.
 
     # Step 2: Filesystem context file written by /start-task
     if plan_id is None or task_id is None:

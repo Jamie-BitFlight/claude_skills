@@ -1286,6 +1286,9 @@ def test_resolve_active_task_context_returns_str_plan_id_from_mcp(mocker: Mocker
     mocker.patch("shutil.which", return_value="/usr/bin/uv")
     mocker.patch.object(Path, "exists", return_value=True)
     mocker.patch("subprocess.Popen", return_value=_popen_from_completed(mcp_response))
+    # None means "this backend keeps the record where the hook cannot stat it", which
+    # is what routes resolution through the CLI — the path this test covers.
+    mocker.patch.object(_hook_mod, "_local_active_task_file", return_value=None)
 
     # Act — let _resolve_active_task_context → _call_sam_active_task_get run naturally
     result = _hook_mod._resolve_active_task_context(hook_input)
@@ -2022,6 +2025,54 @@ def test_unregistered_status_token_leaves_task_state_unchanged(status_token: str
     assert exc_info.value.code == 0
     mock_state.assert_not_called()
     mock_update.assert_not_called()
+
+
+def test_local_backend_with_no_active_task_spawns_no_subprocess(mocker: MockerFixture, tmp_path: Path) -> None:
+    """The no-active-task path costs no subprocess under the default local backend.
+
+    This hook fires on every sub-agent stop in every plugin, and most of those agents
+    hold no SAM task. The ``active-task get`` subprocess was ~1.3s of the ~1.75s total
+    on that path, so the record is stat-ed directly instead.
+    """
+    transcript = tmp_path / "agent-session.jsonl"
+    transcript.write_text(json.dumps({"sessionId": "sess-no-task", "type": "user"}) + "\n")
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+
+    # Local backend, and the record for this session was never written.
+    mocker.patch.object(_hook_mod, "_local_active_task_file", return_value=tmp_path / "active-task-sess-no-task.json")
+    popen = mocker.patch("subprocess.Popen")
+
+    assert _hook_mod._resolve_active_task_context(hook_input) is None
+    popen.assert_not_called()
+
+
+def test_local_backend_reads_the_active_task_record_without_a_subprocess(mocker: MockerFixture, tmp_path: Path) -> None:
+    """An existing local record resolves the task by file read, not by CLI call."""
+    transcript = tmp_path / "agent-session.jsonl"
+    transcript.write_text(json.dumps({"sessionId": "sess-has-task", "type": "user"}) + "\n")
+    record = tmp_path / "active-task-sess-has-task.json"
+    record.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T1", "parent_issue_number": 42}))
+
+    hook_input: dict[str, Any] = {
+        "cwd": str(tmp_path),
+        "hook_event_name": "SubagentStop",
+        "agent_transcript_path": str(transcript),
+    }
+    mocker.patch.object(_hook_mod, "_local_active_task_file", return_value=record)
+    popen = mocker.patch("subprocess.Popen")
+
+    result = _hook_mod._resolve_active_task_context(hook_input)
+
+    assert result is not None
+    _session_id, plan_id, task_id, _parent_issue, context_file = result
+    assert plan_id == "Pf4281187"
+    assert task_id == "T1"
+    assert context_file == record
+    popen.assert_not_called()
 
 
 def test_unreadable_transcript_leaves_self_marked_complete_alone(tmp_path: Path) -> None:
