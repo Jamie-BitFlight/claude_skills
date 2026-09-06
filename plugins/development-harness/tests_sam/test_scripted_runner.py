@@ -48,6 +48,9 @@ pytestmark = pytest.mark.xdist_group("scripted-runner")
 CANONICAL_SHEBANG = "#!/usr/bin/env -S uv run --quiet --script"
 """``rules/script-invocation.md``: the only shebang a PEP 723 script in this repository carries."""
 
+PEP723_BLOCK = re.compile(r"^# /// script$", re.MULTILINE)
+"""PEP 723's metadata block opener: a comment line of its own, not a mention of one in prose."""
+
 DRIVEN_PACKAGE_IMPORT = re.compile(r"^\s*(?:from|import)\s+(?:dh_core|sam_schema)\b", re.MULTILINE)
 """An import of the very package the runner exists to drive from the outside."""
 
@@ -206,7 +209,7 @@ def test_the_runner_is_a_pep723_script_runnable_by_hand() -> None:
     source = scripted_runner.SOURCE_PATH.read_text(encoding="utf-8")
 
     assert source.startswith(f"{CANONICAL_SHEBANG}\n"), "the runner does not carry the canonical PEP 723 shebang"
-    assert "# /// script" in source, "the runner declares no PEP 723 metadata block"
+    assert PEP723_BLOCK.search(source), "the runner declares no PEP 723 metadata block"
     if os.name == "posix":
         assert os.access(scripted_runner.SOURCE_PATH, os.X_OK), f"{scripted_runner.SOURCE_PATH} is not executable"
 
@@ -217,7 +220,9 @@ def test_only_the_entry_script_carries_the_shebang_and_the_metadata_block(module
     source = module_path.read_text(encoding="utf-8")
 
     assert not source.startswith("#!"), f"{module_path.name} carries a shebang, but only the entry script is run"
-    assert "# /// script" not in source, f"{module_path.name} declares a second source of truth for dependencies"
+    assert not PEP723_BLOCK.search(source), (
+        f"{module_path.name} declares a second source of truth for the runner's dependencies"
+    )
 
 
 def test_the_source_set_the_artefact_tests_read_starts_at_the_entry_script_and_holds_its_modules() -> None:
