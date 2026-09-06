@@ -32,7 +32,7 @@ Use a markdown link for any real relative path; a bare backticked path (`modern-
 
 **Exception — `.claude/` and `rules/`:** these files are injected as raw text at the agent's cwd (repo root), never browsed via GitHub/editor click-through. Links there are repo-root-relative, no `./` prefix. Do not "fix" them back to file-relative.
 
-**Exception — substituted paths in a `SKILL.md` body:** `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` substitute at load time, so write them as a backticked path, not a markdown link:
+**Exception — substituted paths in a `SKILL.md` body (Claude Code only):** `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` substitute at load time in the skill's markdown body and `allowed-tools`, so write them as a backticked path, not a markdown link. Other harnesses pass the string through literally, so a skill meant to be portable takes a relative path instead:
 
 ```markdown
 `${CLAUDE_PLUGIN_ROOT}/docs/<doc>.md` — contains <what>; read before <when>.

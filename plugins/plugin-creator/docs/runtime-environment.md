@@ -20,11 +20,31 @@ Before writing any path, command, or fact into runtime text, confirm one of thes
 
 1. It is present in every environment — a stdlib module, a POSIX command, a tool your
    frontmatter declares.
-2. It is one of your own bundled files, reached by a relative path inside your plugin, or built
-   on `${CLAUDE_PLUGIN_ROOT}`.
+2. It is one of your own bundled files, reached by a relative path from the skill root.
 3. It is inlined right there, needing no lookup.
 
 If none hold, inline it, move it into your plugin's `references/`, or delete it.
+
+## Harness substitutions
+
+Part 2 says *relative path* because that is what every harness understands. The Agent Skills
+specification, under "File references", says only: "When referencing other files in your skill,
+use relative paths from the skill root." It defines no substitution variables at all.
+
+Variables are a per-harness convenience, so a path built on one resolves for some readers and
+is passed through as a literal string by the rest:
+
+| Harness | Variable | Where it substitutes |
+|---|---|---|
+| Claude Code | `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}` | the skill's markdown body and `allowed-tools` only — never `references/` |
+| Kimi Code | `${KIMI_SKILL_DIR}` | skill body |
+| Pi | `{baseDir}` | skill body |
+| Agent Plugins | `${PLUGIN_ROOT}` | `mcp.json` args, env and cwd only |
+| Codex, Cursor, OpenCode | none documented | — |
+
+A literal `${CLAUDE_PLUGIN_ROOT}/docs/x.md` in a file the reader does not substitute is a
+broken path, and nothing reports it. Reach for a variable only when the harness is known, and
+prefer a relative path when it is not.
 
 ## Four failures
 
