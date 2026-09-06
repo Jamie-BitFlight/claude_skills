@@ -15,3 +15,25 @@ Run `uvx skilllint@latest check <path>` via Bash, using the exact literal path i
 Read the findings straight from the command output. Each one carries its error code, severity, the
 field or path it applies to, and the suggested fix. Report those to the user and act on them; do
 not look up a code anywhere else. Re-run with `--fix` to apply the auto-fixable ones.
+
+## Runtime escapes
+
+When <provided_path/> is a plugin directory, also run:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/skills/lint/scripts/audit_runtime_escapes.py" --plugin-dir <path>
+```
+
+It reports every path, markdown link, and cross-plugin reference in the plugin's runtime files
+that resolves only in the authoring repo, with file:line for each. Exit 0 means clean; exit 1
+means findings. Pass `--all` instead of `--plugin-dir` to sweep every plugin and get one count
+each.
+
+A finding is real when the text tells the runtime agent to act on something an installed
+consumer does not have. Fenced blocks are exempt, because an anti-pattern shown in a fence is an
+illustration rather than an instruction; angle-bracket placeholders are exempt for the same
+reason. Move an illustrative real path into a fence, and write a generic one as
+`<plugin>/skills/<name>/SKILL.md`.
+
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the
+three-part test each finding is measured against.

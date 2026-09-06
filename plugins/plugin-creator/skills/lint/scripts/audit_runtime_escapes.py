@@ -1,31 +1,50 @@
 #!/usr/bin/env python3
-"""Report runtime text in development-harness that will not resolve for an installed consumer.
+"""Report plugin runtime text that will not resolve for an installed consumer.
 
-The plugin is distributed. Its runtime text is read by an agent whose working directory is the
-consuming repo, which never has this repo's tree. A path into that tree resolves here and
-nowhere else.
+A plugin is distributed. Its runtime text is read by an agent whose working directory is the
+consuming repo, which never had the authoring repo checked out. A path into that tree resolves
+for the author and for nobody else, so the failure reaches real users and never reaches anyone
+testing from the authoring checkout.
 
 Runtime text is what loads with the artifact: ``SKILL.md`` bodies, agent bodies, and
-``references/**``. Design-time siblings that travel inside the package but do not load
-(``SKILL-GOALS.md``, ``MAINTENANCE.md``, ``BENCHMARKS.md``, ``maintenance/**``, ``evals/**``)
-are excluded from scanning, and a runtime link pointing *at* one of them is itself reported.
+``references/**``. Design-time siblings travel inside the package but never load
+(``SKILL-GOALS.md``, ``MAINTENANCE.md``, ``BENCHMARKS.md``, ``maintenance/**``, ``evals/**``);
+they are skipped, and a runtime link pointing *at* one of them is itself reported.
 
-Four escape classes are reported:
+Four escape classes:
 
 * ``repo-path`` — a path into the authoring repo's tree (``scripts/…``, ``rules/…``,
   ``tests/…``, ``docs/…``) that an installed consumer does not have.
-* ``cross-plugin-path`` — a filesystem path into a sibling plugin (``plugins/<other>/…``).
-* ``cross-plugin-skill`` — a ``<plugin>:<skill>`` activation reference to another plugin.
-  Reported with a heuristic guard flag; see ``_GUARD_WORDS``.
+* ``cross-plugin-path`` — a filesystem path into a sibling plugin.
+* ``cross-plugin-skill`` — a ``<plugin>:<skill>`` activation of another plugin, reported with
+  a same-line guard heuristic (see ``_GUARD_WORDS``) that triages but does not decide.
 * ``design-time-link`` — a runtime link into a design-time artifact that never loads.
 
-``${CLAUDE_PLUGIN_ROOT}`` and ``${CLAUDE_SKILL_DIR}`` substitute at load time, so paths built
-on them resolve in any environment and are not reported.
+Three exemptions, and they are the spec rather than conveniences:
+
+1. **Fenced blocks are never a finding.** The rule governs what the runtime agent is told to
+   do. A fenced block shown as an anti-pattern is an illustration, not an instruction, so a
+   document may quote every failure verbatim and still pass. Inline code spans and table cells
+   are NOT exempt — real paths live in both, and exempting them would blind the check.
+2. **Angle-bracket placeholders are exempt.** A token containing ``<`` or ``>``
+   (``<plugin>/skills/<name>/SKILL.md``) names a shape, not a location. Generic examples
+   belong in this form; an illustrative real path belongs in a fenced block instead.
+3. **Load-time substitutions are portable.** ``${CLAUDE_PLUGIN_ROOT}`` and
+   ``${CLAUDE_SKILL_DIR}`` resolve in any environment, so paths built on them are never
+   reported.
+
+Cross-plugin references are matched against an allowlist read from the ``plugins/`` directory,
+so label values (``state:verified``) and placeholders (``plugin:skill-name``) stay out of the
+results without maintaining a denylist of things that merely look like references.
+
+Usage:
+    audit_runtime_escapes.py --plugin-dir plugins/<name> [--out REPORT.md]
+    audit_runtime_escapes.py --all [--out REPORT.md]
 
 Exit codes:
-    0: no escapes found (the state at which this becomes a drift test)
+    0: no escapes found
     1: escapes found
-    2: the plugin directory does not exist
+    2: the requested directory does not exist
 """
 
 from __future__ import annotations
@@ -46,8 +65,15 @@ _RUNTIME_ROOTS = ("skills", "agents")
 _DESIGN_TIME_NAMES = frozenset({"SKILL-GOALS.md", "MAINTENANCE.md", "BENCHMARKS.md"})
 _DESIGN_TIME_DIRS = frozenset({"maintenance", "evals"})
 
-# Repo-root directories that exist only in the authoring checkout.
-_REPO_ROOT_DIRS = ("scripts", "rules", "tests", "tests_backlog", "docs", "examples", "research")
+# Directory names that exist only in the authoring checkout, so a bare path into one is an
+# escape wherever it appears.
+#
+# `scripts/` and `docs/` are deliberately absent. Both are valid *inside* a plugin — a skill
+# bundles `scripts/`, and Technique 1 places shared docs at `${CLAUDE_PLUGIN_ROOT}/docs/` — so a
+# bare `scripts/helper.py` in prose usually means the artifact's own, and flagging it reports
+# portable code as broken. A genuinely repo-rooted one is caught by the markdown-link and
+# `plugins/<other>/` checks instead.
+_REPO_ROOT_DIRS = ("rules", "tests", "tests_backlog", "examples", "research")
 
 # Load-time substitutions resolve anywhere, so a path built on one is portable.
 _PORTABLE_PREFIXES = ("${CLAUDE_PLUGIN_ROOT}", "${CLAUDE_SKILL_DIR}", "$CLAUDE_PLUGIN_ROOT", "$CLAUDE_SKILL_DIR")
@@ -73,6 +99,22 @@ _GUARD_WORDS = ("if ", "when ", "available", "installed", "optional", "present",
 # Leading `../` segments at which a relative link leaves the plugin. A reference inside
 # skills/<name>/references/ needs three to climb past the plugin root.
 _PLUGIN_ESCAPE_DEPTH = 3
+
+
+def _is_placeholder(token: str) -> bool:
+    """Return True when a token names a shape rather than a location.
+
+    Angle brackets mark a generic example (``<plugin>/skills/<name>/SKILL.md``). Nothing
+    resolves it, so nothing can break. An illustrative *real* path belongs in a fenced
+    block instead, where it reads as an example rather than an instruction.
+
+    Args:
+        token: The matched path or reference text.
+
+    Returns:
+        True when the token contains an angle-bracket placeholder.
+    """
+    return "<" in token or ">" in token
 
 
 @dataclass(frozen=True)
@@ -151,7 +193,9 @@ def sibling_plugin_names(plugin_dir: Path) -> frozenset[str]:
     )
 
 
-def _scan_line(rel_path: str, line_no: int, line: str, sibling_plugins: frozenset[str]) -> list[Escape]:
+def _scan_line(
+    rel_path: str, line_no: int, line: str, sibling_plugins: frozenset[str], own_plugin: str
+) -> list[Escape]:
     """Collect every escape appearing on one line of runtime text.
 
     Args:
@@ -159,6 +203,7 @@ def _scan_line(rel_path: str, line_no: int, line: str, sibling_plugins: frozense
         line_no: 1-based line number.
         line: The raw source line.
         sibling_plugins: Directory names of real sibling plugins.
+        own_plugin: Directory name of the plugin being scanned; paths into it are internal.
 
     Returns:
         Every escape found on this line, in detection order.
@@ -167,6 +212,8 @@ def _scan_line(rel_path: str, line_no: int, line: str, sibling_plugins: frozense
     stripped = line.strip()
 
     for target in _MD_LINK_RE.findall(line):
+        if _is_placeholder(target):
+            continue
         if _points_at_design_time(target):
             found.append(Escape(rel_path, line_no, "design-time-link", target, stripped))
         elif _escapes_plugin(target):
@@ -175,12 +222,12 @@ def _scan_line(rel_path: str, line_no: int, line: str, sibling_plugins: frozense
     found.extend(
         Escape(rel_path, line_no, "cross-plugin-path", match.group(0), stripped)
         for match in _CROSS_PLUGIN_PATH_RE.finditer(line)
-        if match.group(1) != "development-harness"
+        if match.group(1) != own_plugin and not _is_placeholder(match.group(0))
     )
 
     for match in _REPO_PATH_RE.finditer(line):
         token = match.group(0)
-        if token.startswith(_PORTABLE_PREFIXES) or f"/{token}" in line:
+        if token.startswith(_PORTABLE_PREFIXES) or _is_placeholder(token) or f"/{token}" in line:
             continue
         found.append(Escape(rel_path, line_no, "repo-path", token, stripped))
 
@@ -204,6 +251,7 @@ def collect_escapes(plugin_dir: Path) -> list[Escape]:
     """
     escapes: list[Escape] = []
     sibling_plugins = sibling_plugin_names(plugin_dir)
+    own_plugin = plugin_dir.resolve().name
     for root in _RUNTIME_ROOTS:
         for path in sorted((plugin_dir / root).rglob("*.md")):
             if _is_design_time(path):
@@ -217,7 +265,7 @@ def collect_escapes(plugin_dir: Path) -> list[Escape]:
                     continue
                 if in_fence:
                     continue
-                escapes.extend(_scan_line(rel_path, line_no, line, sibling_plugins))
+                escapes.extend(_scan_line(rel_path, line_no, line, sibling_plugins, own_plugin))
     return escapes
 
 
@@ -300,38 +348,79 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
     return "\n".join(out)
 
 
-def main() -> int:
-    """Scan the plugin and write the escape report.
+def render_sweep(counts: dict[str, int]) -> str:
+    """Render the cross-plugin summary table.
+
+    Args:
+        counts: Plugin directory name to escape count.
 
     Returns:
-        0 when no escapes are found, 1 when any are, 2 when the plugin directory is missing.
+        The sweep summary as markdown.
+    """
+    total = sum(counts.values())
+    clean = [name for name, count in counts.items() if count == 0]
+    out = [
+        "# Runtime escapes across all plugins",
+        "",
+        f"Generated: {datetime.now(UTC).date().isoformat()} by `audit_runtime_escapes.py --all`.",
+        "",
+        "| Plugin | Escapes |",
+        "|---|---|",
+    ]
+    out += [f"| `{name}` | {count} |" for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+    out += [
+        f"| **total** | **{total}** |",
+        "",
+        f"Clean plugins ({len(clean)} of {len(counts)}): "
+        + (", ".join(f"`{name}`" for name in sorted(clean)) if clean else "none"),
+        "",
+    ]
+    return "\n".join(out)
+
+
+def main() -> int:
+    """Scan one plugin or every plugin and report escapes.
+
+    Returns:
+        0 when no escapes are found, 1 when any are, 2 when the requested directory is missing.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--plugin-dir", type=Path, default=None, help="Plugin directory to scan")
     parser.add_argument(
-        "--plugin-dir",
-        type=Path,
-        default=Path("plugins/development-harness"),
-        help="Plugin directory to scan (default: plugins/development-harness)",
+        "--all", action="store_true", help="Sweep every plugin under plugins/ and report a count per plugin"
     )
     parser.add_argument("--out", type=Path, default=None, help="Write the markdown report to this path")
     args = parser.parse_args()
 
-    plugin_dir: Path = args.plugin_dir
-    if not plugin_dir.is_dir():
-        print(f"error: plugin directory not found: {plugin_dir}", file=sys.stderr)
-        return 2
-
-    escapes = collect_escapes(plugin_dir)
-    report = render_report(escapes, plugin_dir)
+    if args.all:
+        plugins_root = Path("plugins")
+        if not plugins_root.is_dir():
+            print(f"error: plugins directory not found: {plugins_root}", file=sys.stderr)
+            return 2
+        counts = {
+            child.name: len(collect_escapes(child))
+            for child in sorted(plugins_root.iterdir())
+            if child.is_dir() and any((child / root).is_dir() for root in _RUNTIME_ROOTS)
+        }
+        report = render_sweep(counts)
+        total = sum(counts.values())
+    else:
+        plugin_dir: Path = args.plugin_dir or Path("plugins/development-harness")
+        if not plugin_dir.is_dir():
+            print(f"error: plugin directory not found: {plugin_dir}", file=sys.stderr)
+            return 2
+        escapes = collect_escapes(plugin_dir)
+        report = render_report(escapes, plugin_dir)
+        total = len(escapes)
 
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(report, encoding="utf-8")
-        print(f"wrote {args.out} ({len(escapes)} escapes)")
+        print(f"wrote {args.out} ({total} escapes)")
     else:
         print(report)
 
-    return 1 if escapes else 0
+    return 1 if total else 0
 
 
 if __name__ == "__main__":

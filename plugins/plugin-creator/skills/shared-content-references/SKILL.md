@@ -66,7 +66,15 @@ For <topic>, activate the /plugin-name:index-skill-name skill.
 
 Moving or renaming a shared doc becomes a one-file edit inside the index skill.
 
+Shared content lives inside the plugin that ships it. A doc in the surrounding repo is not
+shared content — an installed consumer never has that tree, so the reference resolves for the
+author alone.
+
 ## 5. Reference Files
+
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two
+audiences, the environment split, and the three-part check; read it before pointing any
+reference outside the plugin that ships it.
 
 Load [annotation-format.md](./references/annotation-format.md) before writing any reference
 link created by Technique 1 or 2 — defines what every reference must state and why.

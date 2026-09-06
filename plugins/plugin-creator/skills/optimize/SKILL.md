@@ -29,6 +29,9 @@ The AI writing an instruction file and the AI reading it share the same training
 
 ## What to keep external
 
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before replacing prose with a path, because an external target must ship with the artifact to resolve for an installed consumer.
+
+
 **Discoverable data** — version numbers, hex codes, release tags, file listings, schema fields, or command `--help` outputs. If a command or lookup can produce it, don't store it. It will be wrong within days. Instead, verify that it is discoverable, and replace the prose with an instruction on **where** to discover the data and **when** to reach for which tool (e.g.,
 "When doing A, B, or C then first read these references here: <path>").
 For CLI tools, instruct the AI to discover arguments at runtime: "[ ] Run the command with `--help` and read CLI arguments before using it in a task."

@@ -31,6 +31,8 @@ Arguments: `<invocation_args/>`
 
 Load these skills at session start before executing any phase. Full skill descriptions and what each provides: `references/domain-knowledge-prerequisites.md`.
 
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before any phase writes a path or a cross-plugin reference into runtime text.
+
 Required — load at session start:
 
 1. `Skill(skill="plugin-creator:claude-plugins-reference-2026")` — plugin.json schema, component types, environment variables, installation scopes, path rules
