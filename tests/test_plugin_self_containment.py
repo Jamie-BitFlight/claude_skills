@@ -6,6 +6,12 @@ relative markdown link that walks upward past the plugin root — e.g.
 `[x](../../../../rules/foo.md)` — silently 404s for that installer even though it resolves fine
 inside this monorepo. `plugins/agent-orchestration` had exactly this defect (fixed alongside this
 test); this guard keeps it from recurring there.
+
+A second guard catches leakage that isn't a markdown link at all: a runtime file (anything but
+`MAINTENANCE.md`/`SKILL-GOALS.md`, which are design-time and never load at runtime) naming this
+monorepo's own authoring-time locations by their repo-relative name (`rules/`, `.claude/hooks/`,
+`docs/`) or by an absolute path under a user-specific filesystem root (`/Users/...`, `/home/...`).
+Neither exists in an installed consumer's tree.
 """
 
 from __future__ import annotations
@@ -15,6 +21,10 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+_URL_PATTERN = re.compile(r"https?://\S+")
+_ABS_PATH_PATTERN = re.compile(r"(?<![\w/{])/(?:Users|home|root)/[\w./-]*")
+_AUTHORING_DIR_TOKENS = ("rules/", ".claude/hooks/", "docs/")
+_DESIGN_TIME_FILENAMES = {"MAINTENANCE.md", "SKILL-GOALS.md"}
 
 
 def find_self_containment_violations(plugin_dir: Path) -> list[tuple[Path, int, str, Path]]:
@@ -50,4 +60,41 @@ def test_agent_orchestration_has_no_links_outside_plugin() -> None:
     assert not violations, "\n".join(
         f"{path.relative_to(_REPO_ROOT)}:{line}: [{target}] resolves outside the plugin, to {resolved}"
         for path, line, target, resolved in violations
+    )
+
+
+def find_authoring_repo_leakage(plugin_dir: Path) -> list[tuple[Path, int, str, str]]:
+    """Find runtime-file mentions of this monorepo's own authoring-time locations.
+
+    Args:
+        plugin_dir: Root directory of the plugin to scan.
+
+    Returns:
+        One `(file, line_number, matched_text, kind)` tuple per offending mention. Design-time
+        files (`MAINTENANCE.md`, `SKILL-GOALS.md`) are exempt.
+    """
+    violations: list[tuple[Path, int, str, str]] = []
+    for md_file in plugin_dir.rglob("*.md"):
+        if md_file.name in _DESIGN_TIME_FILENAMES:
+            continue
+        for line_number, line in enumerate(md_file.read_text(encoding="utf-8").splitlines(), start=1):
+            stripped = _URL_PATTERN.sub("", line)
+            abs_match = _ABS_PATH_PATTERN.search(stripped)
+            if abs_match:
+                violations.append((md_file, line_number, abs_match.group(0), "absolute-path"))
+                continue
+            for token in _AUTHORING_DIR_TOKENS:
+                if token in stripped:
+                    violations.append((md_file, line_number, token, "authoring-repo-relative-path"))
+                    break
+    return violations
+
+
+def test_agent_orchestration_has_no_authoring_repo_leakage() -> None:
+    """No runtime file under `plugins/agent-orchestration/` names this repo's own tree."""
+    plugin_dir = _REPO_ROOT / "plugins" / "agent-orchestration"
+    violations = find_authoring_repo_leakage(plugin_dir)
+
+    assert not violations, "\n".join(
+        f"{path.relative_to(_REPO_ROOT)}:{line}: {kind} — {text!r}" for path, line, text, kind in violations
     )

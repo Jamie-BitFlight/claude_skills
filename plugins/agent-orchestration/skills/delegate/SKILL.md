@@ -153,5 +153,5 @@ A user pointing at one instance of a smell, bug, or missing check is naming a pa
 - [references/fix-cycle.md](references/fix-cycle.md) — the reproduce-first cycle for bug-fix dispatches.
 - [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps.
 - [references/harness-notes/claude-code.md](references/harness-notes/claude-code.md) — Claude Code mechanics; open only when running there.
-- `orchestrator-discipline` plugin — what the orchestrator may read and run; enforced by hooks.
-- `process-siren` plugin — writing decision points as evaluable Mermaid diamonds.
+- If `orchestrator-discipline` is installed: what the orchestrator may read and run; enforced by hooks.
+- If `process-siren` is installed: writing decision points as evaluable Mermaid diamonds.

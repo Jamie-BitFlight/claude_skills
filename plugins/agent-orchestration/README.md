@@ -9,6 +9,6 @@ Two skills and one contract for orchestrating sub-agents, portable across harnes
 | `parallel-work` | Fan-out/fan-in, mechanical fan-out, maker/checker, generate-and-filter, tournament, hypothesis fan-out, loop-until-stop with caps. |
 | `delegate/references/harness-notes/claude-code.md` | Claude Code mechanics only. Add siblings per harness. |
 
-Pairs with `orchestrator-discipline` (what the orchestrator may read and run) and `process-siren` (decision points as evaluable Mermaid).
+If installed, pairs with `orchestrator-discipline` (what the orchestrator may read and run) and `process-siren` (decision points as evaluable Mermaid). Neither is required.
 
 Install: `/plugin install agent-orchestration@jamie-bitflight-skills`

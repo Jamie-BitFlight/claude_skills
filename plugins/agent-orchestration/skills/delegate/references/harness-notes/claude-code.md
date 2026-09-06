@@ -13,11 +13,11 @@ Open this when running in Claude Code. Nothing here changes the rules in `delega
 ## Isolation
 
 - `isolation: worktree` on an `Agent` call gives that sub-agent its own git worktree. Use it for every `write` dispatch in a fan-out. Relative paths in the prompt then resolve inside that worktree, which is what you want.
-- Completion notifications arrive automatically. Do not poll a running agent's output or read its transcript; `orchestrator-discipline` documents why.
+- Completion notifications arrive automatically. Do not poll a running agent's output or read its transcript. If `orchestrator-discipline` is installed, it documents why.
 
 ## Enforcement hooks
 
-- `pre-tool-block-explore-for-analysis.cjs` (orchestrator-discipline) rejects `Explore` dispatches whose prompt contains reasoning verbs.
+- If `orchestrator-discipline` is installed, its `pre-tool-block-explore-for-analysis.cjs` hook rejects `Explore` dispatches whose prompt contains reasoning verbs.
 
 ## Long pipelines → dynamic workflows
 
