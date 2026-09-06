@@ -10,32 +10,17 @@ flowchart TD
     Q1 -->|Analyze architecture,<br>plan approaches,<br>reason about trade-offs,<br>design systems| Opus[opus<br>Deep reasoning<br>Complex judgment]
 ```
 
-**Examples:**
+What an existing agent uses is its own `model:` frontmatter — read the agent file rather than a list here.
 
-| Agent | Model | Why |
-|---|---|---|
-| plan-validator | haiku | Cross-checks ACs vs tasks, DAG validity, Impact Radius coverage |
-| t0-baseline-capture | haiku | Runs commands, records output |
-| tn-verification-gate | haiku | Runs commands, compares against baseline |
-| doc-drift-auditor | haiku | Cross-references docs vs code |
-| codebase-analyzer | haiku | Reads files, maps patterns |
-| context-gathering | haiku | Reads files, builds manifest |
-| python-cli-architect | sonnet | Writes code, edits files |
-| python-pytest-architect | sonnet | Writes tests |
-| code-reviewer | sonnet | Reviews code (structured process) |
-| context-refinement | sonnet | Updates files with discoveries |
-| swarm-task-planner | opus | Designs task decomposition |
-| python-cli-design-spec | opus | Designs architecture |
-| feature-verifier | opus | Analyzes whether goals were met |
-| feature-researcher | opus | Analyzes problem space |
+**The branch most often mis-called is the first**: work that looks like checking but requires judgment about what it finds. `plan-validator`, `code-reviewer` and `feature-verifier` all read as checkers and none is haiku — a cheaper model asserts a gap without verifying it.
 
-**If an agent does both checking AND analysis**: split it into two agents — a haiku checker and an opus analyzer. Do not run opus on work that haiku can handle.
+**If an agent does both checking AND analysis**: split it into two agents — a haiku checker and an opus analyzer.
 
 ---
 
 ## Effort Tier Guidance
 
-Assign `--effort` based on the cognitive requirement of the task, not the agent name. Use alongside `--model` selection — the two are orthogonal. A haiku agent doing a boilerplate task should use `low`; a sonnet agent designing a subsystem should use `high`.
+Orthogonal to `--model`: a haiku agent doing a boilerplate task should use `low`; a sonnet agent designing a subsystem should use `high`.
 
 | Effort | Task type |
 |---|---|
@@ -46,4 +31,4 @@ Assign `--effort` based on the cognitive requirement of the task, not the agent 
 
 **Default (omit `--effort`)**: inherits model default.
 
-**How to pass**: `spawn.py ... spawn --effort {level}` or `dispatch_spawn(effort="{level}")`. The spawned `claude` process receives `CLAUDE_CODE_EFFORT_LEVEL={level}` in its environment.
+**How to pass**: `spawn.py ... spawn --effort {level}` or `dispatch_spawn(effort="{level}")`.
