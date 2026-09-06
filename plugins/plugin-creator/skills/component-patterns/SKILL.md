@@ -200,7 +200,7 @@ SOURCE: Cross-component patterns adapted from `../claude-plugins-official/plugin
 
 ## Best Practices
 
-- **Reference only what ships** — `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before writing any path or cross-plugin reference into runtime text.
+- **Reference only what ships** — every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 - **Start simple** — use flat structures, reorganize when growth demands it
 - **Consistent naming** — match file names to component purpose using full descriptive words
 - **Minimize nesting** — deep directory structures slow discovery and increase configuration burden

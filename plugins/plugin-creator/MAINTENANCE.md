@@ -8,19 +8,37 @@ Two distributed plugins were found shipping paths that only resolve in the autho
 agent-orchestration had links climbing to `../../../../rules/` and described a repo-level hook as
 if consumers had it, and development-harness carried 37 such references. The rule forbidding this
 lives in the repo's own `rules/` directory, which is design-time — no installed plugin can read
-it, so plugin-creator could not pass it on to the plugins it builds. The rule now lives inside
-this plugin at `docs/runtime-environment.md`, and the skills and agents that write or review
-runtime text point at it.
+it, so plugin-creator could not pass it on to the plugins it builds.
+
+The rule is now stated inline in the ten skills and six agents that write or review runtime text.
+It was briefly a `docs/runtime-environment.md` those skills pointed at; that document was deleted
+the same day. Two reasons, both of which the document itself supplied. Its own check says content
+needing no lookup should be inlined, and one sentence in sixteen files is that answer. And the
+pointer to it was written as `${CLAUDE_PLUGIN_ROOT}/docs/…`, so the plugin was betting on a
+harness substitution in order to deliver the advice not to — a substitution Codex, OpenCode,
+Crush and Cursor do not perform.
 
 `skills/lint/scripts/audit_runtime_escapes.py` makes the rule mechanical. It became the durable
 artifact of that work: it started as a development-harness-specific scanner, and was generalised
 here so one implementation serves every plugin rather than each re-stating the rule.
 
 Two scanner exemptions are deliberate and were decided rather than discovered. Fenced blocks are
-never findings, so a document can show an anti-pattern verbatim and still pass — without that,
-`docs/runtime-environment.md` could not contain its own worked examples. Angle-bracket
+never findings, so a document can show an anti-pattern verbatim and still pass. Angle-bracket
 placeholders are exempt because they name a shape that nothing resolves. Inline code spans and
 table cells are not exempt, because real paths live in both.
+
+## Substitution does not reach `references/`
+
+`${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` are not substituted inside `references/*.md`,
+only in the `SKILL.md` body. Canary-tested in this repo on 2026-08-06, run twice, once with the
+plugin fully reloaded. Anthropic's documentation does not address the case either way, so this is
+tested-here rather than documented, and it is worth re-running against a current build before
+anything new depends on it.
+
+This plugin writes `references/` files, which is what depends on it. Re-check by putting
+`${CLAUDE_SKILL_DIR}` in both a skill body and one of its `references/*.md`, invoking the skill,
+reading the reference file, and comparing the raw tool output — an expanded path in one and a
+literal token in the other.
 
 The scanner's `_REPO_ROOT_DIRS` deliberately omits `scripts` and `docs`. Both are valid inside a
 plugin — a skill bundles `scripts/`, and shared docs live at `${CLAUDE_PLUGIN_ROOT}/docs/` — so

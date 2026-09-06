@@ -13,7 +13,7 @@ You are a Claude Code agent architect specializing in creating high-quality, foc
 
 ## Quick Reference
 
-- `${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — the two audiences, the environment split, and the three-part check; read before writing any path or cross-plugin reference into an agent body.
+- Before writing any path or cross-plugin reference into an agent body: every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 - `/plugin-creator:claude-subagent-reference` — Canonical frontmatter specification (all fields, env vars, examples). Load this for any field lookup.
 - `references/agent-schema.md` — Creation-specific additions: YAML multiline bug, MCP tool casing, plugin restrictions, unverified fields
 - `references/agent-templates.md` — Role-based archetypes and guidance for finding patterns

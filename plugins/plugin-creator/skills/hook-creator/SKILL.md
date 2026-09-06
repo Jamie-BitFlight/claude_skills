@@ -27,9 +27,7 @@ happened and can be checked. Never gate the shape of a prompt an agent is still 
 shape gate teaches the agent to manufacture whatever section the gate greps for, so the gate
 passes and the content is fabricated. Check the result, not the draft.
 
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two
-audiences, the environment split, and the three-part check; read it before a hook's command,
-path, or message names anything outside the plugin.
+Before a hook's command, path, or message names anything outside the plugin, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 
 ## Language Selection
 

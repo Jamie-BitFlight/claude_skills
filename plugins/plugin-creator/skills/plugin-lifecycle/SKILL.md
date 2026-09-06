@@ -31,7 +31,7 @@ Arguments: `<invocation_args/>`
 
 Load these skills at session start before executing any phase. Full skill descriptions and what each provides: `references/domain-knowledge-prerequisites.md`.
 
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two audiences, the environment split, and the three-part check; read it before any phase writes a path or a cross-plugin reference into runtime text.
+Before any phase writes a path or a cross-plugin reference into runtime text, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 
 Required — load at session start:
 

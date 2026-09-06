@@ -72,9 +72,7 @@ author alone.
 
 ## 5. Reference Files
 
-`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` contains the two
-audiences, the environment split, and the three-part check; read it before pointing any
-reference outside the plugin that ships it.
+Before pointing any reference outside the plugin that ships it, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
 
 Load [annotation-format.md](./references/annotation-format.md) before writing any reference
 link created by Technique 1 or 2 — defines what every reference must state and why.
