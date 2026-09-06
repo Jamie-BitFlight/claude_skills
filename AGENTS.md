@@ -371,6 +371,9 @@ deletion, read `docs/branch-transfer-preflight.md`.
 | Session hooks | `.claude/hooks/` |
 | Backlog backend config | `.dh/config.yaml` |
 | development-harness agent guide | `plugins/development-harness/AGENTS.md` |
+| Harness capability matrix and its per-harness measurements | `plugins/development-harness/CLAIMS-REGISTER.md`, `plugins/development-harness/docs/work-ledger/measurements/` |
+| Work-ledger state machine (commands, reason codes, transitions) | `plugins/development-harness/dh_core/ledger_spec.py` |
+| Work-ledger orchestrator and runner contracts | `plugins/development-harness/docs/work-ledger/work-loop.md`, `runner-contract.md` |
 | CI pipeline | `.github/workflows/code-quality.yml` — see [CI Workflow Modification Protocol](rules/ci-workflows.md) before changing it |
 | Sub-agent report contract (STATUS first line, evidence, artifact path) | [plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md](plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md) |
 
