@@ -29,14 +29,18 @@ from sam_schema.core.context_config import ContextConfig, create_context_backend
 
 __all__ = ["DEFAULT_SESSION_ID", "app"]
 
-#: Sentinel session key used when --session-id is omitted. Mirrors the MCP
-#: server convention in sam_schema/server.py so both transports resolve the
-#: same session-scoped context.
-DEFAULT_SESSION_ID = "_default"
+#: Reserved sentinel key — never a valid --session-id value. See
+#: dh_core.operations.require_session_id, which both this CLI and the MCP
+#: server call before any active-task get/set/update/clear.
+DEFAULT_SESSION_ID = operations.DEFAULT_SESSION_ID
 
 app = typer.Typer(help="Session-scoped active task context.", no_args_is_help=True, rich_markup_mode=None)
 
-_SESSION_OPTION = typer.Option("--session-id", help="Session identifier (default: '_default')")
+_SESSION_OPTION = typer.Option(
+    "--session-id",
+    help="Caller-specific session identifier. Required — omitting it, or passing "
+    f"the reserved {DEFAULT_SESSION_ID!r} sentinel, is a hard error.",
+)
 
 
 def _context_backend() -> ContextBackend:
@@ -79,7 +83,11 @@ def _plan_backend() -> ContentTaskProvider:
 @app.command(name="get")
 def active_task_get(session_id: Annotated[str | None, _SESSION_OPTION] = None) -> None:
     """Show the active task context for a session."""
-    result = operations.get_active_task(_context_backend(), session_id or DEFAULT_SESSION_ID)
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        err(str(exc))
+    result = operations.get_active_task(_context_backend(), resolved_session)
     # Preserve explicit `active_task: null` when no context is set.
     output_json(result, exclude_none=False)
 
@@ -111,9 +119,13 @@ def active_task_set(
     resolved_parent: str | int | None = parent_issue_number
     if parent_issue_number is not None and parent_issue_number.isdigit():
         resolved_parent = int(parent_issue_number)
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        err(str(exc))
     result = operations.set_active_task(
         _context_backend(),
-        session_id or DEFAULT_SESSION_ID,
+        resolved_session,
         plan_ref,
         task_id,
         str(plan_dir) if plan_dir is not None else "plan",
@@ -132,7 +144,10 @@ def active_task_update(
     session_id: Annotated[str | None, _SESSION_OPTION] = None,
 ) -> None:
     """Update fields or append a section on the active task."""
-    resolved_session = session_id or DEFAULT_SESSION_ID
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        err(str(exc))
     ctx_backend = _context_backend()
     active = ctx_backend.get_active_task(resolved_session)
     if active is None:
@@ -159,5 +174,9 @@ def active_task_update(
 @app.command(name="clear")
 def active_task_clear(session_id: Annotated[str | None, _SESSION_OPTION] = None) -> None:
     """Clear the active task context for a session."""
-    result = operations.clear_active_task(_context_backend(), session_id or DEFAULT_SESSION_ID)
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        err(str(exc))
+    result = operations.clear_active_task(_context_backend(), resolved_session)
     output_json(result)

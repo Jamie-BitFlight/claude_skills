@@ -66,10 +66,6 @@ from sam_schema.core.models import (
 
 _log = logging.getLogger(__name__)
 
-# Sentinel session key used when session_id is omitted from sam_active_task calls.
-# Single-agent scenarios do not require explicit session isolation.
-_DEFAULT_SESSION_ID = "_default"
-
 # Stem parsing thresholds used in _build_task_assignment.
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
 _STEM_MIN_PARTS_FOR_SLUG: int = 3
@@ -564,8 +560,9 @@ def sam_active_task(
         str | None,
         Field(
             description=(
-                "Session identifier for scoping the active task context. "
-                "When None, uses the '_default' sentinel for single-agent scenarios."
+                "Caller-specific session identifier for scoping the active task "
+                "context. Required — omitting it, or passing the empty string, "
+                "is a hard error. Never pass the reserved '_default' sentinel."
             )
         ),
     ] = None,
@@ -573,8 +570,7 @@ def sam_active_task(
     """Session-scoped active task context management.
 
     Parks a task address in session-scoped storage so subsequent operations
-    can omit the plan/task parameters. Useful in single-agent workflows where
-    repeatedly passing the same address is noise.
+    can omit the plan/task parameters.
 
     Actions:
 
@@ -585,17 +581,20 @@ def sam_active_task(
 
     Args:
         config: Discriminated union selecting the action and its parameters.
-        session_id: Claude Code session identifier. When ``None``, uses the
-            ``"_default"`` sentinel (suitable for single-agent scenarios that
-            do not need explicit session isolation).
+        session_id: Caller-specific session identifier. Required.
 
     Returns:
         Action-specific Pydantic model. See individual action descriptions.
 
     Raises:
-        ToolError: When ``action="update"`` and no active task has been set.
+        ToolError: When ``session_id`` is missing, empty, or the reserved
+            ``"_default"`` sentinel. Also when ``action="update"`` and no
+            active task has been set.
     """
-    resolved_session = session_id if session_id is not None else _DEFAULT_SESSION_ID
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        raise ToolError(str(exc)) from exc
     ctx_backend = get_context_config().backend
 
     match config.action:
