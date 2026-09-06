@@ -13,7 +13,8 @@ You are a Claude Code agent architect specializing in creating high-quality, foc
 
 ## Quick Reference
 
-- Before writing any path or cross-plugin reference into an agent body: every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
+Confirm each path, command, fact, or cross-plugin reference in an agent body is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
+
 - `/plugin-creator:claude-subagent-reference` — Canonical frontmatter specification (all fields, env vars, examples). Load this for any field lookup.
 - `references/agent-schema.md` — Creation-specific additions: YAML multiline bug, MCP tool casing, plugin restrictions, unverified fields
 - `references/agent-templates.md` — Role-based archetypes and guidance for finding patterns

@@ -40,14 +40,15 @@ flowchart TD
 ## 3. Technique 1 — Plugin-Root Shared Doc
 
 ```markdown
-[<doc name>](${CLAUDE_PLUGIN_ROOT}/docs/<doc>.md) — contains <what>; read before <when>.
+[<doc name>](../../docs/<doc>.md) — contains <what>; read before <when>.
 ```
 
-`${CLAUDE_PLUGIN_ROOT}` resolves in plain `SKILL.md` prose and markdown link targets, not only
-`` !`bash` `` injection lines — confirmed by canary test, 2026-08-06. Use this as the primary
-form for a doc consumed across 2+ skill directories. Load
-[verification.md](./references/verification.md) before relying on this in a new, unverified
-runtime.
+From `skills/<name>/SKILL.md` the relative link stays inside the plugin and needs no harness
+support, so it is the primary form for a doc consumed across 2+ skill directories. Claude Code
+also substitutes `${CLAUDE_PLUGIN_ROOT}` in plain `SKILL.md` prose and markdown link targets;
+write that form only in a plugin that targets Claude Code alone. Load
+[verification.md](./references/verification.md) before relying on either form in a new,
+unverified runtime.
 
 ## 4. Technique 2 — The Index-Skill Pattern
 
@@ -72,7 +73,9 @@ author alone.
 
 ## 5. Reference Files
 
-Before pointing any reference outside the plugin that ships it, every path, link, or cross-plugin reference in runtime text is present in every environment, bundled and reached by a relative path that stays inside the plugin, or inlined.
+Confirm each shared reference is present in every environment, bundled and reached by a
+relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A
+harness variable counts only where that harness substitutes it.
 
 Load [annotation-format.md](./references/annotation-format.md) before writing any reference
 link created by Technique 1 or 2 — defines what every reference must state and why.

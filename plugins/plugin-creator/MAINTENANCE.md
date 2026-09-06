@@ -10,51 +10,55 @@ if consumers had it, and development-harness carried 37 such references. The rul
 lives in the repo's own `rules/` directory, which is design-time — no installed plugin can read
 it, so plugin-creator could not pass it on to the plugins it builds.
 
-The rule is now stated inline in the ten skills and six agents that write or review runtime text.
-It was briefly a `docs/runtime-environment.md` those skills pointed at; that document was deleted
-the same day. Two reasons, both of which the document itself supplied. Its own check says content
-needing no lookup should be inlined, and one sentence in sixteen files is that answer. And the
-pointer to it was written as `${CLAUDE_PLUGIN_ROOT}/docs/…`, so the plugin was betting on a
-harness substitution in order to deliver the advice not to — a substitution Codex, OpenCode,
-Crush and Cursor do not perform.
+The rule is stated inline in every skill and agent that writes or reviews runtime text; grep the
+shared predicate `bundled and reached by a relative path inside the plugin` to find each copy,
+and change all of them together. Do not reintroduce a shared doc for it: the one that briefly
+existed was reached by a `${CLAUDE_PLUGIN_ROOT}/docs/…` pointer, so the plugin depended on a
+harness substitution in order to deliver the advice not to. Which harnesses substitute that
+variable, and how well that is established, is recorded in `CLAIMS-REGISTER.md`.
 
 `skills/lint/scripts/audit_runtime_escapes.py` makes the rule mechanical. It became the durable
 artifact of that work: it started as a development-harness-specific scanner, and was generalised
 here so one implementation serves every plugin rather than each re-stating the rule.
 
 Two scanner exemptions are deliberate and were decided rather than discovered. Fenced blocks are
-never findings, so a document can show an anti-pattern verbatim and still pass. Angle-bracket
-placeholders are exempt because they name a shape that nothing resolves. Inline code spans and
-table cells are not exempt, because real paths live in both.
+never findings, because a fenced block is an illustration rather than an instruction, so a
+document can show an anti-pattern verbatim and still pass. Angle-bracket placeholders are exempt
+because they name a shape that nothing resolves. Inline code spans and table cells are not
+exempt, because real paths live in both.
 
-## Substitution does not reach `references/`
+## Claims this plugin depends on
 
-`${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` are not substituted inside `references/*.md`,
-only in the `SKILL.md` body. Canary-tested in this repo on 2026-08-06, run twice, once with the
-plugin fully reloaded. Anthropic's documentation does not address the case either way, so this is
-tested-here rather than documented, and it is worth re-running against a current build before
-anything new depends on it.
-
-This plugin writes `references/` files, which is what depends on it. Re-check by putting
-`${CLAUDE_SKILL_DIR}` in both a skill body and one of its `references/*.md`, invoking the skill,
-reading the reference file, and comparing the raw tool output — an expanded path in one and a
-literal token in the other.
+Warrants — source, date, and the re-check that would overturn each — live in
+`CLAIMS-REGISTER.md` beside this file, not here and never in runtime text. The claim this
+plugin's own structure rests on: `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` are
+substituted in a `SKILL.md` body and not inside `references/*.md`. That is why no `references/`
+file here carries a variable-built path. Re-check it per the register before anything new
+depends on it.
 
 The scanner's `_REPO_ROOT_DIRS` deliberately omits `scripts` and `docs`. Both are valid inside a
-plugin — a skill bundles `scripts/`, and shared docs live at `${CLAUDE_PLUGIN_ROOT}/docs/` — so
-flagging a bare `scripts/helper.py` reported portable code as broken. Removing them cut
+plugin — a skill bundles `scripts/`, and a plugin may bundle shared docs at its root `docs/` —
+so flagging a bare `scripts/helper.py` reported portable code as broken. Removing them cut
 plugin-creator's own count from 66 to 38 with no loss of real findings.
 
 ## Tracked follow-ups
 
-Two temporary states in this plugin are tracked as backlog items rather than as notes here, so
-they surface on a queue instead of waiting to be re-read:
+Open states touching this plugin are tracked as backlog items rather than as notes here, so they
+surface on a queue instead of waiting to be re-read. Each item's text predates the deletion of the
+shared doc, so read it against the current tree:
 
-- **#3429** — the ten SKILL.md pointers use a backticked `${CLAUDE_PLUGIN_ROOT}` path instead of
-  a markdown link. That is a workaround for a skilllint LK001 false positive on relative
-  invocation, and the item carries the verification command and the revert steps.
-- **#3430** — six agents state the portability test inline because substitution in agent bodies
-  is undocumented and unverified. The item carries the canary test that would settle it.
+- **#3429** — filed when ten SKILL.md pointers used a backticked `${CLAUDE_PLUGIN_ROOT}` path to
+  work around a skilllint LK001 false positive on relative invocation. Those pointers are gone,
+  so the item's revert steps have no target; the LK001 defect it documents is still real. Re-scope
+  it to the skilllint bug or close it.
+- **#3430** — asks whether agent bodies substitute `${CLAUDE_PLUGIN_ROOT}`. Its resolution branch
+  would point the agents at the deleted doc; the rule is now inlined everywhere by decision, so
+  the canary still answers `rules/skill-substitution.md`'s open question but changes nothing here.
+- **#3445** — the scanner skips every variable-built path (`_PORTABLE_PREFIXES`) on a premise it
+  cannot check. Emptying that tuple leaves plugin-creator's count at 38 (measured 2026-09-06):
+  the deleted pointers were backticked prose, not links, and `docs` is outside `_REPO_ROOT_DIRS`,
+  so the scanner has no detector for that class at all. The fix is a detector, not removing the
+  exemption.
 
 ## Open: local-path SOURCE citations
 
