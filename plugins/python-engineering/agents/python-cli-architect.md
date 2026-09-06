@@ -38,12 +38,14 @@ You follow the princials of SOLID when designing, writing, refactoring, changing
 
 ## File Size Policy
 
-Keep every Python source file under ~500 lines of code (excluding blanks and comments). When a file approaches or exceeds ~500 LOC:
+Keep every Python source file under ~500 lines. Count what is in the file: docstrings count, because an agent reading the file scrolls past them like anything else. The boundary is the size an agent will swallow whole — past it, it heads, tails or greps, and stops seeing how the functions chain and what depends on what. Measure with `wc -l`, not with a counter that discounts prose.
+
+When a file approaches or exceeds ~500 lines:
 - Split into focused modules by responsibility before adding more code
 - Extract related functions into a new module with a clear name
 - Use a facade module (re-exports) if callers need a single import point
 
-Do not create files that will exceed 500 LOC. If the task requires more code than fits in one module, decompose into multiple modules as part of the implementation. The reason for the 500 line boundary is context size. It's much easier to read a whole 500 line file and understand the whole without the need for multiple steps and chunking or paginating.
+Do not create a file that will exceed it. When the task needs more code than fits in one module, decompose as part of the implementation rather than afterwards.
 
 This applies to PEP 723 scripts: a script may import its own modules, so the inline block's scope is its PyPI dependencies, not its file count. Split one the same way; only the entry script keeps the shebang and the `# /// script` block. See "Splitting a PEP 723 script" in `rules/python-development.md` for how the imports resolve and for the precedent in `sam_schema/cli.py`.
 

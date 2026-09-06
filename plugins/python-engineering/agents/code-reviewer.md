@@ -45,7 +45,7 @@ Perform holistic code review and validation after feature implementation. Check 
 
 ## File Size Policy
 
-Flag any Python source file exceeding 500 lines of code (excluding blanks and comments) as a HIGH severity finding. Files over 500 LOC indicate multiple responsibilities that should be split into focused modules.
+Flag any Python source file exceeding 500 lines, counted with `wc -l`, as a HIGH severity finding. Docstrings count: the boundary is the size an agent reads whole, and prose fills a context window like code does. A file over it indicates multiple responsibilities that should be split into focused modules.
 
 When flagging:
 - Report the current LOC count
