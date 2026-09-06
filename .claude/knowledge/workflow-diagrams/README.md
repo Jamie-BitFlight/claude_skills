@@ -44,12 +44,12 @@ classDef neutral fill:#e0e0e0,stroke:#757575,stroke-width:1px,color:#424242
 
 ## Repository Asset Summary
 
-### Skills (12 total)
+### Skills
 
 | Skill                                 | Stage Coverage      | Primary Purpose                      |
 | ------------------------------------- | ------------------- | ------------------------------------ |
 | rt-ica                                | Input, Planning     | Pre-planning requirements checkpoint |
-| delegate                              | Planning            | Sub-agent prompt template            |
+| agent-orchestration:delegate          | Planning            | Sub-agent prompt template            |
 | verify                                | Verification        | Pre-completion self-assessment       |
 | audit                                 | Verification        | Hallucination detection              |
 | scientific-method:scientific-thinking | Planning, Execution | Hypothesis-driven reasoning          |
