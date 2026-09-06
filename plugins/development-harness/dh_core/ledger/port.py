@@ -366,19 +366,26 @@ def clear_plan(conn: sqlite3.Connection, plan: str, *, tables: Sequence[str]) ->
         conn.execute(" ".join(words), {"plan": plan})
 
 
-def write_plan_row(conn: sqlite3.Connection, row: Mapping[str, Any], *, replacing: bool) -> None:
-    """Insert or replace one ``plans`` row.
+def write_plan_row(conn: sqlite3.Connection, row: Mapping[str, Any], *, replacing: str | None) -> None:
+    """Insert one ``plans`` row, or overwrite the row a replace matched.
 
     Args:
         conn: An open ledger connection, inside the caller's transaction.
         row: A full ``plans`` row.
-        replacing: Whether a row with this id already exists.
+        replacing: The id of the plan the ``exists`` check matched, or None to insert. The
+            ``exists`` check matches a plan with this id or an unarchived plan with this
+            milestone, so the matched id is not always the incoming one. The update is therefore
+            keyed on the matched id and assigns ``plan_id`` too, renaming the row it overwrites.
+            Keying it on the incoming id instead would match nothing whenever the two differ,
+            leaving the emptied plan behind and the incoming tasks pointing at no row at all.
     """
-    if not replacing:
+    if replacing is None:
         conn.execute(transitions.PLAN_INSERT_SQL, dict(row))
         return
-    assignments = ", ".join(f"{name} = :{name}" for name in transitions.PLAN_COLUMNS if name != "plan_id")
-    conn.execute(transitions.update_statement("plans", assignments, "plan_id = :plan_id"), dict(row))
+    assignments = ", ".join(f"{name} = :{name}" for name in transitions.PLAN_COLUMNS)
+    parameters = dict(row)
+    parameters["replaced_plan_id"] = replacing
+    conn.execute(transitions.update_statement("plans", assignments, "plan_id = :replaced_plan_id"), parameters)
 
 
 def imported_task_row(task: TaskSource, *, plan: str) -> dict[str, Any]:
@@ -426,7 +433,7 @@ def import_plan(
         row = plan_row(source)
         if existing is not None:
             clear_plan(conn, str(existing["plan_id"]), tables=IMPORT_CLEARS)
-        write_plan_row(conn, row, replacing=existing is not None)
+        write_plan_row(conn, row, replacing=None if existing is None else str(existing["plan_id"]))
         if existing is None:
             transitions.append(
                 conn, kind="plan.created", plan=source.plan_id, task=None, payload=created_payload(row), at=moment
@@ -814,6 +821,11 @@ class ContentProjectionStore:
         Args:
             plan: The plan id.
 
+        A record that is not the JSON document :func:`projection` writes is one this ledger did
+        not write — ``sam_schema.core.backends.content.parse_plan_content`` also accepts legacy
+        provider YAML, so such a record is a plan the content path holds rather than a corrupt
+        one. It reads as None, the same as an absent record, rather than raising out of ``export``.
+
         Returns:
             The decoded projection, or None when the backend holds no record or holds one this
             ledger did not write.
@@ -822,7 +834,10 @@ class ContentProjectionStore:
             record = self.provider.get_content(self.reference(plan))
         except ContentNotFoundError:
             return None
-        decoded = json.loads(record.content)
+        try:
+            decoded = json.loads(record.content)
+        except json.JSONDecodeError:
+            return None
         return decoded if isinstance(decoded, dict) else None
 
     def write(self, plan: str, content: Mapping[str, Any], *, expected_revision: str = "") -> str:
@@ -928,6 +943,10 @@ def export_plan(
     then overwritten, because the ``export`` transition's only check is ``unchanged`` and
     ``ledger_spec.REASONS`` has no code for a store that moved.
 
+    The cursor's ``last_seq`` is the log head as it stood when the projection was built, not as it
+    stands when the cursor is written: a transition that lands between the two is not in the
+    document, so recording the later head would claim the projection reflects an event it does not.
+
     Args:
         conn: An open ledger connection.
         plan: The plan id.
@@ -938,6 +957,7 @@ def export_plan(
         A result naming the revision and any divergence, or an ``unchanged`` no-op.
     """
     content = projection(conn, plan)
+    reflected_seq = store.last_seq(conn, plan)
     digest = projection_hash(content)
     cursor = read_cursor(conn, plan, target)
     if cursor is not None and str(cursor["projection_hash"] or "") == digest:
@@ -949,8 +969,7 @@ def export_plan(
     revision = projection_store.write(plan, content, expected_revision=expected)
     with store.transaction(conn):
         moment = store.now()
-        seq = store.last_seq(conn, plan)
-        write_cursor(conn, plan=plan, target=target, last_seq=seq, revision=revision, projection_hash=digest)
+        write_cursor(conn, plan=plan, target=target, last_seq=reflected_seq, revision=revision, projection_hash=digest)
         transitions.append(
             conn,
             kind="plan.exported",
@@ -958,7 +977,7 @@ def export_plan(
             task=None,
             payload={
                 "target": target,
-                "last_seq": seq,
+                "last_seq": reflected_seq,
                 "revision": revision,
                 "projection_hash": digest,
                 "divergences": diverged,
@@ -1112,7 +1131,7 @@ def from_milestone(
         row = plan_row(source)
         if existing is not None:
             clear_plan(conn, str(existing["plan_id"]), tables=MILESTONE_CLEARS)
-        write_plan_row(conn, row, replacing=existing is not None)
+        write_plan_row(conn, row, replacing=None if existing is None else str(existing["plan_id"]))
         kind = "plan.replaced" if existing is not None else "plan.created"
         payload = (
             replaced_payload(row, source=source, replaced=str(existing["plan_id"]), clears=MILESTONE_CLEARS)

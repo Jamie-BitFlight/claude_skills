@@ -28,8 +28,8 @@ Which store a command uses, in order:
 --goal G`` still writes a content record and still prints ``plan_id``, which is what the plugin's
 skills call today and what ``tests_sam/test_cli_provider_addresses.py``'s
 ``test_create_persists_opaque_owner_reference`` reads back. A caller that means the ledger says so
-with a ledger-only flag — ``--base-sha`` or ``--quality-gate`` — as ``tests_sam/scripted_runner.sh``'s
-``build_plan`` does; every later command in that loop then names the plan, so rule 4 keeps it on
+with a ledger-only flag — ``--base-sha`` or ``--quality-gate`` — as ``tests_sam/scripted_runner.py``'s
+``LoopDriver.build_plan`` does; every later command in that loop then names the plan, so rule 4 keeps it on
 the ledger. A misrouted write is the one routing mistake asking again does not undo, which is why
 ``create`` is the command that keeps its old default rather than taking the new one.
 
@@ -81,6 +81,7 @@ from backlog_core.backend_protocol import get_config, require_github_extras
 from backlog_core.backend_types import ContentProvider
 from backlog_core.models import (
     BacklogError,
+    ContentProviderError,
     GitHubUnavailableError,
     Output,
     UnsupportedBackendCapabilityError,
@@ -143,8 +144,13 @@ MILESTONE_ERRORS: tuple[type[Exception], ...] = (
 )
 """What the GitHub read behind ``from-milestone`` raises when it cannot answer."""
 
-LEDGER_ERRORS: tuple[type[Exception], ...] = (LookupError, ValueError)
+LEDGER_ERRORS: tuple[type[Exception], ...] = (LookupError, ValueError, ContentProviderError)
 """What a ledger call raises for an address that names nothing, or an argument it rejects.
+
+``ContentProviderError`` is here for ``export``: the projection store is the configured backend's
+content capability, so a backend without one, or a record the target refuses to write, surfaces as
+that error rather than as a refusal. Without it the CLI answers a configuration problem with a
+traceback instead of the message-and-exit every other failure here gets.
 
 A refusal is not one of these: it carries a ``ledger_spec.REASONS`` code and is caught separately,
 because its code is the whole message and the exit is the surface's contract rather than an error
@@ -1362,7 +1368,10 @@ def import_plan(
     """Write plans read from a content record or a legacy file into the ledger."""
     kind = source or flag_values("import", "--from")[0]
     plans = import_sources(kind, plan_address, all_plans=all_plans)
-    with _ledger() as conn:
+    with _ledger() as conn, ledger.transaction(conn):
+        # One transaction across every plan: `import_plan` opens its own, and `store.transaction`
+        # joins an open one rather than nesting, so a refusal on the fifth plan of `--all` rolls
+        # back the four before it instead of leaving a half-imported ledger behind.
         results = [ledger.import_plan(conn, plan, replace=replace) for plan in plans]
     _emit(results)
 

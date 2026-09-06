@@ -24,7 +24,8 @@ The modules behind the surface, and what each owns:
 ``store``
     The database. Where it lives, opening it, the schema generated from ``ledger_spec.COLUMNS``,
     the append-only ``events`` table, and the conventions the rest of the package shares — naive
-    UTC at second precision, rows as dictionaries, ``Refusal``.
+    UTC at second precision, rows as dictionaries, ``Refusal``, and ``transaction``, which a caller
+    wraps around several commands so they commit or roll back together.
 
 ``derive``
     The derived columns, each from its ``rule``. ``READY_PREDICATE`` is the one implementation of
@@ -68,7 +69,7 @@ from dh_core.ledger.port import (
     projection_hash,
 )
 from dh_core.ledger.queries import Finding, FindingCode, PlanStatus, list_plans, ready, status, validate
-from dh_core.ledger.store import Refusal, database_path, open_ledger
+from dh_core.ledger.store import Refusal, database_path, open_ledger, transaction
 from dh_core.ledger.transitions import (
     PLAN_FIELD_COLUMNS,
     TASK_FIELD_COLUMNS,
@@ -136,6 +137,7 @@ __all__ = [
     "stale",
     "state",
     "status",
+    "transaction",
     "update",
     "validate",
 ]

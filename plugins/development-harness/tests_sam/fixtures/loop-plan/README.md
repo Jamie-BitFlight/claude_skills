@@ -1,7 +1,7 @@
 # The loop-plan fixture
 
-The plan `scripted_runner.sh` drives, as files a POSIX shell can `cat` into `sam plan` flags.
-Nothing here is read by Python: the script passes each file's contents as a flag value.
+The plan `scripted_runner.py` drives, as one file per `sam plan` flag value. Nothing here is
+parsed: the runner reads each file's text and passes it through as a flag value.
 
 - `slug.txt`, `goal.txt` — the `create --slug` and `create --goal` values.
 - `tasks/<T>/title.txt` — the `append-task --task-title` value.

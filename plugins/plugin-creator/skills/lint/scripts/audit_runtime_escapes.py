@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Report plugin runtime text that will not resolve for an installed consumer.
 
 A plugin is distributed. Its runtime text is read by an agent whose working directory is the
@@ -329,7 +333,7 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
             out += ["", f"### `{current}`", ""]
         guard = "" if escape.kind != "cross-plugin-skill" else (" [guarded]" if escape.guarded else " [unguarded]")
         out.append(f"- **L{escape.line_no}** `{escape.kind}`{guard} — `{escape.token}`")
-        out.append(f"  > {escape.line[:200]}")
+        out.append(f"  > {escape.line}")
 
     out += [
         "",

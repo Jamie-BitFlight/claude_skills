@@ -119,9 +119,11 @@ pull request that merged it, and ADR-1770-1 carries its `Superseded by` line.
    previous schema version opens and folds; every M3 fixture round-trips through import field
    for field; `export` prints `unchanged` after a wave that only renewed.
 4. `tests_sam/fixtures/loop-plan/` (three tasks, two parallel, one whose first attempt leaves a
-   criterion unmet, `lease.ttl_seconds` 60) and `tests_sam/scripted_runner.sh`, a shell script
+   criterion unmet, `lease.ttl_seconds` 60) and `tests_sam/scripted_runner.py`, a PEP 723 script
    that drives dispatch, read, renew, both report sections, finish, settle, accept, then one
-   send-back, re-dispatch, finish and accept, as a CI job.
+   send-back, re-dispatch, finish and accept, as a CI job. It records each expected behaviour as
+   an observation rather than asserting inline, so `tests_sam/test_scripted_runner.py` names the
+   step that broke and a hand run still exits non-zero on the first unsatisfied one.
 
 Done when the conformance and closure tests are green, the race test's red run is recorded in
 the pull request, `sam plan --help` lists every `ledger_spec.COMMANDS` entry, and the scripted
@@ -221,7 +223,7 @@ the red run against an exporter without the divergence re-read recorded in the p
 7. `dh_paths.py`'s docstring drops the two Cursor claims `CLAIMS-REGISTER.md` marks reported.
 
 Done when a fresh-context agent given `work-loop.md`, `runner-contract.md`, `sam plan --help`
-and step 4's sentence drives the `scripted_runner.sh` path through one send-back to acceptance,
+and step 4's sentence drives the `scripted_runner.py` path through one send-back to acceptance,
 reading nothing under `sam_schema/`, `dh_core/`, `backlog_core/` or `skills/`.
 
 ## What retires

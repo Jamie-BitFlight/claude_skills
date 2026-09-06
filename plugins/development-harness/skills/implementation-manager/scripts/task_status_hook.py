@@ -384,15 +384,18 @@ def _call_sam_active_task_get(session_id: str, timeout: float = 8) -> tuple[str 
     or no active task is stored for the session.
 
     Args:
-        session_id: Sub-agent session identifier. Empty string is normalised to
-            ``"_default"`` sentinel.
+        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
+            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
+            answered here rather than spent on a subprocess that can only fail.
         timeout: Subprocess timeout in seconds.
 
     Returns:
         Tuple of ``(plan_address, task_id, parent_issue_number)``.
-        All ``None`` when the call fails or active task is not set.
+        All ``None`` when the id is empty, the call fails, or active task is not set.
     """
-    resolved = session_id or "_default"
+    resolved = session_id
+    if not resolved:
+        return None, None, None
     stdout = _call_sam_cli(["active-task", "get", "--session-id", resolved], timeout=timeout)
     if stdout is None:
         return None, None, None
@@ -427,14 +430,17 @@ def _call_sam_active_task_clear(session_id: str, timeout: float = 8) -> bool:
     Best-effort cleanup after SubagentStop completes. Never raises.
 
     Args:
-        session_id: Sub-agent session identifier. Empty string is normalised to
-            ``"_default"`` sentinel.
+        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
+            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
+            answered here rather than spent on a subprocess that can only fail.
         timeout: Subprocess timeout in seconds.
 
     Returns:
         ``True`` if the active task was successfully cleared, ``False`` otherwise.
     """
-    resolved = session_id or "_default"
+    resolved = session_id
+    if not resolved:
+        return False
     stdout = _call_sam_cli(["active-task", "clear", "--session-id", resolved], timeout=timeout)
     return stdout is not None
 
@@ -819,8 +825,9 @@ def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, 
     """Extract the sub-agent's self-reported status from its final assistant message.
 
     Scans the whole transcript for the LAST ``type: "assistant"`` record with
-    text content, then checks whether the first line of that text matches a
-    ``STATUS: <TOKEN>`` line per subagent-contract.
+    text content, then hands that text to :func:`_parse_status_line`, which reads
+    the first well-formed ``STATUS: <TOKEN>`` line anywhere in it per
+    subagent-contract — not only line one, which the fenced report template occupies.
 
     Args:
         transcript_path: Path to the sub-agent's JSONL transcript file.
@@ -1105,7 +1112,7 @@ def _block_task_on_report(
         cause = "final message has no 'STATUS:' first line"
     else:
         cause = "produced no final message"
-    first_line = final_text.strip().splitlines()[0][:200] if final_text else "(no final message found)"
+    first_line = final_text.strip().splitlines()[0] if final_text else "(no final message found)"
     print(f"[hook] SubagentStop: {task_id} {cause} ({first_line!r}) — marking blocked instead", file=sys.stderr)
     if not _call_sam_task_state(plan_addr, task_id, SamTaskStatus.BLOCKED):
         print(f"[hook] SubagentStop: failed to mark {task_id} blocked via the SAM CLI", file=sys.stderr)

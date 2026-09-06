@@ -14,10 +14,9 @@ third-party report, unconfirmed by the vendor.
 
 ## Harness capability matrix (read 2026-09-06)
 
-One measurement file per harness holds the answer to each column with its file, line or heading.
-The files are drafted at `.tmp/scratch/dh-task-tracking/harness-*.md` and move under
-`docs/work-ledger/measurements/` when Slice 0 of the plan closes. This table summarises them;
-the files are the warrant.
+One measurement file per harness, under `docs/work-ledger/measurements/`, holds the answer to
+each column with its file, line or heading. This table summarises them; the files are the
+warrant.
 
 | harness | shell tool | after-tool hook carries the shell command text | hook carries a working directory | hooks fire inside a sub-agent | sub-agent worktree | `SKILL.md` | MCP | a plugin can ship the hook | confidence |
 |---|---|---|---|---|---|---|---|---|---|
@@ -27,19 +26,27 @@ the files are the warrant.
 | Cursor | `Shell` | yes, `afterShellExecution.command`, and `afterFileEdit.file_path` | on the shell events only; looked for a `cwd` on `afterFileEdit` and did not find one | reported | yes, `isolation: worktree` in agent frontmatter | yes | yes | yes, `hooks/hooks.json` | snippet and repo, `cursor/plugins` and `cursor/plugin-template`; hooks-inside-a-sub-agent is reported |
 | Hermes | `terminal` | yes, `args` and `tool_input` on `post_tool_call` | yes, `cwd`, the Hermes process's directory | yes, carrying the child's `session_id`; `task_id` sits under `extra` | yes, `delegation.worktree_isolation` in `config.yaml`, default off, git and local terminal only | yes | yes | no: a plugin ships Python hooks, and shell hooks come from config | source, `NousResearch/hermes-agent` `main` `7166071f` |
 | pi | `bash` | yes, `input.command` on `tool_result` | no field on the event; the directory comes from the extension context | no: the sub-agent example runs a child process, and the parent's in-process handlers never see the child's tool calls | none found; the example takes a directory | yes | no native MCP, extension only | no: a TypeScript extension shipped in a pi package | source, `earendil-works/pi` HEAD `9767ba27` |
+| Kilo Code | `bash` | yes, `args.command` on `tool.execute.after` | no field on the event; `PluginInput.directory`/`worktree` supply it | yes, carrying the child's `sessionID`, which is the only distinguishing key | none on the `task` tool; the VS Code `agent_manager` tool has a `worktree` mode | yes | yes | not from a skill collection: a hook is a TypeScript plugin from npm, the config `plugin` array, or `.kilo/plugin/*.ts` | source, `Kilo-Org/kilocode` HEAD `78d8d2a3`, v7.5.15 |
 | Kimi | `Bash` | yes, `tool_input.command` | yes, `cwd`, the bootstrap directory | yes; the sub-agent's tool and stop payloads carry no agent field, and the parent's `SubagentStart`/`SubagentStop` carry `agent_name`, a profile name rather than an instance id | none found | yes | yes | yes, manifest `hooks` in `kimi.plugin.json` or `[[hooks]]` in `config.toml` | source, `MoonshotAI/kimi-code` `main` `af81bb9`, v0.41.0 |
 
 Re-check, per harness: run the questions in that file's headings against the harness's default
 branch and update the commit or version in this row.
 
+**Kilo CLI is a fork of OpenCode** (`README.md` line 171, read 2026-09-06), so its runtime package
+is literally `packages/opencode/` and its row tracks OpenCode's rather than any Cline-family
+harness's. The Roo-Code-derived VS Code extension is the separate `kilocode-legacy` repository,
+end-of-life 2026-07-31.
+
 Consequences the design draws, each a claim in its own right:
 
-- **A runner needs only a shell tool.** Every row has one. Confidence: source on six rows;
-  Cursor's tool name by snippet. Re-check: the shell column.
+- **A runner needs only a shell tool.** Every row has one. Confidence: source on every row but
+  Cursor, whose tool name is by snippet. Re-check: the shell column.
 - **The shell command text reaches an after-tool hook on every harness.** So a hook can renew a
   lease by reading `--address` and `--attempt` out of a sam command it sees, with no identifier
-  of its own. Confidence: source on six rows; Cursor by snippet. Re-check: the command-text
-  column.
+  of its own. Confidence: source on every row but Cursor, by snippet. Re-check: the command-text
+  column. On Kilo, `tool.execute.after` does not fire when a tool call raises, so a hook there
+  pairs it with `tool.execute.before`; a non-zero exit, a timeout and an abort all still reach
+  it.
 - **The design reads no per-sub-agent variable from the shell environment.** Codex exports
   `CODEX_THREAD_ID`, Hermes `HERMES_SESSION_ID` and, for kanban workers only,
   `HERMES_KANBAN_TASK`; pi exports `PI_SESSION_ID`. None names a ledger task, and the design
@@ -47,9 +54,11 @@ Consequences the design draws, each a claim in its own right:
   reported for Cursor. For Claude Code: looked in the three cached documentation pages, found no
   statement either way, so this is unmeasured there and M1 of the plan measures it.
   Re-check: section 6 of each measurement file.
-- **A plugin can ship the renewing hook on four harnesses only:** Claude Code, Codex, Cursor and
-  Kimi. On Hermes a shell hook comes from user config, on OpenCode a plugin is JavaScript loaded
-  from plugin directories rather than skill paths, and on pi it is a TypeScript extension.
+- **The hook this repository ships reaches four harnesses:** Claude Code, Codex, Cursor and
+  Kimi, each of which loads hooks from a plugin manifest this marketplace already publishes. On
+  Hermes a shell hook comes from user config; on OpenCode and Kilo Code it is a JavaScript or
+  TypeScript plugin loaded from plugin directories rather than skill paths; on pi it is a
+  TypeScript extension. Those four need a separate install, not a different design.
   Confidence: source, except Cursor by repo. Re-check: the last column.
 - **On pi a hook cannot observe a sub-agent at all**, because the sub-agent is a child process
   and the parent's handlers do not see its tool calls. Confidence: source. Re-check:
@@ -61,6 +70,7 @@ Consequences the design draws, each a claim in its own right:
   the worktree column. Cursor's write event carries no working directory, so there the path hook
   reads `file_path` alone.
 - **MCP is not in the shared layer**, since pi has no native MCP. The CLI over a shell is.
+  Every other harness measured, Kilo Code included, registers MCP servers from project config.
   Confidence: source. Re-check: `earendil-works/pi` README.
 - **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Codex, Kimi
   and Hermes substitute their own variables in a skill body, and Codex additionally substitutes
@@ -75,7 +85,7 @@ Consequences the design draws, each a claim in its own right:
 - **`lease.ttl_seconds` defaults to 1800 and must exceed the longest gap between a runner's sam
   commands.** Unmeasured: the gap is what M0 of the plan reads out of past `implement-feature`
   transcripts, and the default is a guess until then. Confidence: none. Re-check: M0's
-  measurement file, then the longest observed gap in a `scripted_runner.sh` CI run.
+  measurement file, then the longest observed gap in a `scripted_runner.py` CI run.
 
 ## `dh_paths.py` claims
 

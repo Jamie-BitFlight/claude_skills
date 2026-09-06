@@ -45,6 +45,16 @@ Before validating an MCP server (protocol, Codex, or Claude plugin integration),
 
 ## Code Conventions
 
+**Cross-platform native**: write scripts in Python, never POSIX shell or PowerShell. Bash is for
+simple CI/CD wrappers only — see [rules/language-conventions.md](./rules/language-conventions.md).
+
+**Cross-harness**: first-class support for Claude Code, Codex, Hermes, OpenCode and Cursor;
+best-effort for pi, Kimi Code and Kilo Code. Before planning any change to an agent, skill, hook
+or plugin system, dispatch subagents to read those harnesses' own documentation and this
+repository's measurements of them, starting from
+[plugins/development-harness/CLAIMS-REGISTER.md](./plugins/development-harness/CLAIMS-REGISTER.md);
+add what you establish back to it.
+
 ### Python
 
 - **Always** include `from __future__ import annotations` as first import

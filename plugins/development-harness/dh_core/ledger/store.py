@@ -1051,24 +1051,23 @@ def fold_plan_created(tables: Folded, event: Mapping[str, Any]) -> None:
 
 
 def fold_plan_replaced(tables: Folded, event: Mapping[str, Any]) -> None:
-    """Empty the tables a replace emptied and write the plan row it wrote.
+    """Empty the tables a replace emptied, and rewrite the plan row it matched.
 
-    ``replaced`` names the plan whose rows went, which is the incoming id except when the
-    ``exists`` check matched on milestone instead. The row itself is written by an UPDATE keyed on
-    the incoming id, so a replace that matched a differently-identified plan changes nothing —
-    which is what the fold does when that id holds no row.
+    ``replaced`` names the plan the ``exists`` check matched, which is the incoming id except when
+    the check matched on milestone instead. The row it matched is overwritten and renamed to the
+    incoming id, so exactly one row survives and the tasks written alongside it have a plan to
+    belong to.
     """
     payload = event["payload"]
+    replaced = str(payload.get("replaced") or event["plan"])
     for table in payload.get("clears") or ():
-        clear_rows(tables, str(table), str(payload.get("replaced") or event["plan"]))
-    key = (str(event["plan"]),)
-    if key not in tables["plans"]:
-        return
+        clear_rows(tables, str(table), replaced)
     row = blank_row("plans")
     row.update(carried("plans", payload))
     row["plan_id"] = str(event["plan"])
     row["archived"] = None
-    tables["plans"][key] = row
+    tables["plans"].pop((replaced,), None)
+    tables["plans"][str(event["plan"]),] = row
 
 
 def fold_plan_fields(tables: Folded, event: Mapping[str, Any]) -> None:
@@ -1322,14 +1321,16 @@ def rebuild(conn: sqlite3.Connection) -> None:
 
     The rows go and the columns stay: the tables are emptied rather than dropped, so a column an
     older schema left behind — which :func:`ensure_schema` keeps on purpose — is still there
-    afterwards. The whole rebuild is one transaction, so a reader either sees the tables the
-    transitions wrote or the tables the fold wrote, never half of each.
+    afterwards. The whole rebuild is one transaction, the log read included, so a writer that
+    appends between the read and the write cannot have its events dropped from the materialised
+    tables, and a reader either sees the tables the transitions wrote or the tables the fold
+    wrote, never half of each.
 
     Args:
         conn: An open ledger connection.
     """
-    folded = fold_events(all_events(conn))
     with transaction(conn):
+        folded = fold_events(all_events(conn))
         for table in TABLES:
             words = ["DELETE FROM", table]
             conn.execute(" ".join(words))
