@@ -2,7 +2,7 @@
 name: code-reviewer
 description: "SAM Stage 6 independent code reviewer. Reviews any language or stack against a SAM task's acceptance criteria. Detects the stack from files, loads the matching dh:code-review-{stack} skill, checks universal quality dimensions (security, correctness, tests, API contracts, naming, error handling, performance), produces a structured PASS/FAIL/NEEDS-WORK verdict, and registers the report as a code-review artifact via MCP. Use when a task reaches S6 Forensic Review or when an independent review of implementation quality is required. Trigger phrases: 'review this implementation', 'run code review', 'S6 review', 'forensic review', 'check implementation against acceptance criteria'."
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:file-classification
