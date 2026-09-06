@@ -18,11 +18,10 @@ Open this when running in Claude Code. Nothing here changes the rules in `delega
 ## Enforcement hooks
 
 - `pre-tool-block-explore-for-analysis.cjs` (orchestrator-discipline) rejects `Explore` dispatches whose prompt contains reasoning verbs.
-- Recommended addition — `SubagentStop`: fail the stop if the sub-agent's final message does not begin with `STATUS: DONE|PARTIAL|BLOCKED`. This turns the contract's report rule from prose into a gate.
 
 ## Long pipelines → dynamic workflows
 
-With plain sub-agents every result lands in the orchestrator's window. When a request needs many phases, wide fan-out, adversarial verification, or loops over an unknown count, ask Claude Code for a **workflow** (or use the `ultracode` trigger). A dynamic workflow is a generated script that holds the loop, the branching, and the intermediate results, so only the final answer reaches your context. Its patterns — classify-and-act, fan-out-and-synthesize, adversarial verification, generate-and-filter, tournament, loop-until-done — are the shapes in `parallel-work`. Give it a token budget in the prompt ("use 20k tokens") for bounded runs. Saved workflows live in `~/.claude/workflows` or inside a skill.
+With plain sub-agents every result lands in the orchestrator's window. When a request needs many phases, wide fan-out, adversarial verification, or loops over an unknown count, ask Claude Code for a **workflow** (or use the `ultracode` trigger). A dynamic workflow is a generated script that holds the loop, the branching, and the intermediate results, so only the final answer reaches your context. Its patterns are the shapes documented in [parallel-work](../../../parallel-work/SKILL.md)'s section headers. Give it a token budget in the prompt ("use 20k tokens") for bounded runs. Saved workflows live in `~/.claude/workflows` or inside a skill.
 
 Reference: <https://code.claude.com/docs/en/workflows>
 

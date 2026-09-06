@@ -13,7 +13,9 @@ Every dispatch prompt opens with `Your ROLE_TYPE is sub-agent.` That line is an 
 
 ## When this applies
 
-Any request that changes files, investigates a cause, gathers facts, or reviews work — regardless of size. "It's only two lines" is delegated. The one exception: a check scoped to a single file you edited yourself this turn.
+Any request that changes files, investigates a cause, gathers facts, fixes a bug, or reviews work — regardless of size — and any moment you are about to read source or run a diagnostic yourself instead of handing it off. "It's only two lines" is delegated. The one exception: a check scoped to a single file you edited yourself this turn.
+
+Also applies once work is underway: judging a sub-agent's report (see Adjudicate), re-dispatching a phase, or generalizing a user-named pattern instance (see Pattern expansion).
 
 Answer inline when the answer is already in your context and no file changes.
 
@@ -49,10 +51,10 @@ Two shapes recur and have their own handling:
 Classify by what the task asks of the agent, not by its name:
 
 - **Specialist** — any agent whose description matches the phase's domain. Gets observations, success criteria, and context. Never gets implementation steps.
-- **Generic** — `general-purpose` (or the harness equivalent) and `Explore`. Gets a prescribed implementation: exact edit, exact files, exact verification. `Explore` only for exact-match search, never for anything it could interpret.
+- **Generic** — `general-purpose` (or the harness equivalent) and `Explore`. Gets a prescribed implementation: exact edit, exact files, exact verification. `Explore` only for exact-match search.
 - **Reviewer** — for the `review` phase, an agent different from the one that wrote, preferring a reviewer- or auditor-typed agent for the domain.
 
-When no specialist fits, dispatch generic with a prescribed task. Never ask one specialist to act as another.
+When no specialist fits, dispatch generic with a prescribed task.
 
 ### Prompt — specialist mode
 
@@ -139,7 +141,7 @@ Reports are claims. For each one:
 
 Re-dispatch the same phase at most twice on the same gap. After that, stop and report `BLOCKED` to the user with the gap named.
 
-The `review` phase is not optional for any request that changed code. It goes to a reviewer, never to the writer.
+Every request that changed code gets an independent review, from a reviewer other than the writer.
 
 ## Pattern expansion
 
