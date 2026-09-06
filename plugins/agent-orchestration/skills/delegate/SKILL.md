@@ -37,7 +37,7 @@ Split the request into phases. Keep only the phases that produce work; never pad
 
 Two shapes recur and have their own handling:
 
-- **Bug fix** → [rules/fix-delegation-discipline.md](../../../../rules/fix-delegation-discipline.md): reproduce before changing.
+- **Bug fix** → [references/fix-cycle.md](references/fix-cycle.md): reproduce before changing.
 - **Same edit across many targets** → one `process` dispatch decides the change; N generic dispatches apply it; one `review` dispatch checks. See [parallel-work](../parallel-work/SKILL.md).
 
 ## Dispatch
@@ -150,6 +150,7 @@ A user pointing at one instance of a smell, bug, or missing check is naming a pa
 ## Pointers
 
 - [references/sub-agent-contract.md](references/sub-agent-contract.md) — what dispatched agents follow.
+- [references/fix-cycle.md](references/fix-cycle.md) — the reproduce-first cycle for bug-fix dispatches.
 - [parallel-work](../parallel-work/SKILL.md) — fan-out, fan-in, maker/checker, tournaments, loops with caps.
 - [references/harness-notes/claude-code.md](references/harness-notes/claude-code.md) — Claude Code mechanics; open only when running there.
 - `orchestrator-discipline` plugin — what the orchestrator may read and run; enforced by hooks.

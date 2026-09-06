@@ -11,7 +11,7 @@ Parallelism buys fresh context per unit and speed. It costs coordination: a fan-
 
 - The units are independent: none needs another's result to start.
 - You know what the units are. Unknown cause → one investigation dispatch first.
-- Writes are isolated: each unit writes different files, or each runs in its own worktree (see [rules/commit-cadence-and-worktrees.md](../../../../rules/commit-cadence-and-worktrees.md)).
+- Writes are isolated: each unit writes different files, or each unit runs in its own worktree and commits only the files that unit touched (mechanics: [delegate/references/harness-notes/claude-code.md](../delegate/references/harness-notes/claude-code.md)'s Isolation section).
 
 Missing any one → serialize, or investigate first.
 
