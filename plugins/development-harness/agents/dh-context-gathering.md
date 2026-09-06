@@ -1,7 +1,7 @@
 ---
 name: dh-context-gathering
 description: Use when creating a new task OR when starting/switching to a task that lacks a context manifest. Provide the plan address (e.g. P{N}) so the agent can read it via sam_plan and write the context manifest back through the SAM update operation — never a file path, and never a direct file edit. Skip if the plan's context field already contains a "Context Manifest" section.
-tools: Read, Grep, Glob, Bash, Write, Skill, SendMessage, mcp__plugin_dh_sam
+tools: Read, Grep, Glob, Bash, Write, Skill, mcp__plugin_dh_sam
 model: haiku
 color: cyan
 skills:

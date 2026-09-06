@@ -45,8 +45,6 @@ Three tables in this repository share a similar two- or three-column shape but s
 
 ## Source
 
-SOURCE: [research/skill-generation-tools/agent-skills.md](../../../../../research/skill-generation-tools/agent-skills.md) lines 116-131 — quote: "Anti-rationalization. Every skill includes a table of common excuses agents use to skip steps (e.g., 'I'll add tests later') with documented counter-arguments." (accessed 2026-07-10)
+SOURCE: <https://github.com/addyosmani/agent-skills/blob/main/README.md> (accessed 2026-07-10) — primary URL for the upstream Consistent Skill Anatomy pattern, which states: "Anti-rationalization. Every skill includes a table of common excuses agents use to skip steps (e.g., 'I'll add tests later') with documented counter-arguments."
 
-SOURCE: <https://github.com/addyosmani/agent-skills/blob/main/README.md> (accessed 2026-07-10) — primary URL for the upstream Consistent Skill Anatomy pattern.
-
-SOURCE: [plugins/development-harness/skills/verify-done/SKILL.md](../../../../../plugins/development-harness/skills/verify-done/SKILL.md) lines 169-182 — precedent for the `Rationalization | Response` column vocabulary.
+The `Rationalization | Response` column vocabulary follows an existing in-repo precedent; that provenance is recorded in this plugin's `MAINTENANCE.md`, since it resolves only in the authoring repo.

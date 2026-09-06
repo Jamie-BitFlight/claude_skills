@@ -273,6 +273,52 @@ For backlog MCP tool reference (tool names, return format, DH state location, sy
 
 ---
 
+## Claim-Check Prose Before It Lands
+
+Prose that asserts how a tool, harness, spec, or API behaves is read as truth by every agent that loads the file. You cannot check it yourself: a claim you believe reads the same to you whether or not it is true.
+
+**Trigger**: Writing or editing any file that states external behaviour — a rule, a skill, a doc, a backlog item, a report.
+**Action**: Draft to `.tmp/scratch/`, not to the target file. Batch the drafts, then dispatch one fresh-context agent per draft, in parallel, in a single message. Give each agent the draft and the sources — never your reasoning for the claims. Ask for a list of corrections, not a verdict. Apply the corrections, re-dispatch, and repeat until a pass returns none. Then write the target file.
+
+- **Do**: mark each claim with how it was confirmed — vendor docs, reproduced locally, reported and unconfirmed
+- **Don't**: render an unchecked claim in the same declarative voice as a verified one
+- **Why**: absence of evidence reads identically to evidence of absence once it is written down
+
+Run the loop until a pass returns no corrections. Never cap it by count and ship what remains: deciding which disagreements are "residual" hands adjudication back to the author the loop exists to check.
+
+**A structural edit expires every claim scoped to the old structure.** Adding a category, column, mechanism, row or enum variant does not merely extend a document — it re-opens every sentence that quantified over the previous set. Those sentences are unchanged, so they never appear in the diff, and they were true when written. Truth is not inherited across a restructure.
+
+After any structural change, scan for closed-set language — *only*, *both*, *neither*, *either*, *the other*, *three ways*, *all of which*, *nothing else* — and re-derive each against the new structure. That phrasing is where structure gets encoded into prose, and it is the one part a reviewer reading changed lines cannot catch. The same applies to code: a third enum variant re-opens every branch that was exhaustive over two, and only a language with exhaustiveness checking will tell you. Prose has no compiler, so the trigger is the structural edit, not the sentence.
+
+**Treat sustained churn as a finding about the text, not a cost to bear.** When several passes keep returning corrections — especially ones that change structure rather than wording — the text may be unclear, untestable, or aimed at the wrong objective, and more passes will not fix that. At that point send a fresh agent the text and the project's goals, and ask it to state what the text is *for*, whether it achieves that, and what forms would serve the objective better. Give it no history and no drafts. Prose churning against a matrix of facts often wants to be structured data with a test; a section that will not settle is often two objectives wearing one heading. Fix the objective, then resume the loop on whatever replaces it.
+
+**Keep the warrant, but not in the runtime prose.** A fact repeated without its source arrives at the next file looking stronger than it is: a canary test becomes "vendor docs", a community gist becomes "the harness supports it". So every claim needs its warrant recorded — how it was established, from what source, on what date, and what a re-check would run.
+
+That record does not belong beside the instruction. Warrants, dates, searches and confidence levels are design-time material, and a document that carries them inline becomes a research entry wearing a rule's heading — the instruction stops growing while the evidence around it triples. Put them in a `CLAIMS-REGISTER.md` scoped to the domain that owns the claims: in the skill's own directory when they are one skill's, at the plugin root when they span it, in `docs/` when they are repo-wide. Runtime prose states the instruction and nothing about how it was established.
+
+In a skill that means a sibling file beside `SKILL.md`, never a section inside it and never in `references/`. Both of those are loaded at runtime — `SKILL.md` on every activation — so putting the register there charges every run for material only a maintainer reads. Nothing in the runtime prose should link it.
+
+A claim whose warrant you cannot state is one to re-establish, not repeat. A register entry with no re-check command is a note, not a warrant.
+
+**Date every claim about an external system.** A README, a changelog, a discussion thread, an issue title, or a recollection is a claim about the past. Only the current source or current docs, read now, is a claim about the present. Name the source and its date or version, and write "was true as of X" rather than "is". Pi's `{baseDir}` is the clean case: the README was accurate when written, the changelog records the removal, and only the source at HEAD says what is true today.
+
+**Weight absence claims hardest.** Positive claims verify themselves — you find the thing, and finding it is the evidence. A negative has no terminating act: you stop looking, and stopping feels identical to finding. So every sentence asserting an absence must name the search that would have found it, and that search must be capable of finding it. Write `looked in X, did not find it` rather than `it is not there`. An empty grep, a 404, a missing JSON key, and a page read in part are facts about your search, not about the world; a code-search index that returns nothing for a term present in the file proves the index incomplete, not the term absent. This is where claims fail most: a review of one session's errors found nearly every wrong claim was a negative, and nearly every positive claim held.
+
+---
+
+## Read the Decisions Before Changing the Design
+
+An accepted ADR or a `*-contract` skill outranks the code and the tests. Tests record what the previous change implemented; they cannot tell you the design was wrong, because they were written after it was decided. A green suite means nothing regressed, never that the change is correct.
+
+**Trigger**: Changing behaviour in a subsystem — a key, a protocol, a state transition, a parsed format.
+**Action**: Read `plugins/*/docs/adrs/`, `.claude/decisions/`, and any `*-contract` skill governing it, before writing code. Search for a superseding ADR: a decision may already have been reversed. When a test fails after your change, ask whether the contract objects before editing the test — a failing test is a question, not a verdict.
+
+- **Do**: cite the ADR that settles a design question, and say when your change reverses one
+- **Don't**: re-derive a decision the repo already made, or edit a test until it accepts your change
+- **Why**: two designs were re-derived from scratch this way, and one shipped a contract violation that the full suite passed
+
+---
+
 ## No Derived Data in Documentation
 
 Do not embed counts, totals, or other values derived from a list or table defined elsewhere. These values drift silently when the source changes, creating stale documentation that misleads agents and humans. This is the documentation equivalent of magic numbers in code.

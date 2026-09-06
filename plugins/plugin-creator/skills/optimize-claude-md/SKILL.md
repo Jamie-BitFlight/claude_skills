@@ -24,6 +24,8 @@ Where `<path>` is one of:
 
 ## Process
 
+When optimizing a plugin's runtime text, confirm each path, command, fact, or cross-plugin reference is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
+
 <user_provided_target>$ARGUMENTS</user_provided_target>
 <PWD> !`pwd` </PWD>
 

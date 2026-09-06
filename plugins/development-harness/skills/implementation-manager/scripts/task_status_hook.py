@@ -13,7 +13,8 @@
 """Task Status Hook - Update task status and timestamps automatically.
 
 This hook script handles multiple hook events:
-- SubagentStop: Parse prompt for task info, set status to COMPLETE, add Completed timestamp
+- SubagentStop: Parse prompt for task info; set status to COMPLETE with a Completed timestamp
+  if the worker's final message reports a complete STATUS, otherwise set status to BLOCKED.
 - PostToolUse (Write|Edit|Bash): Update LastActivity timestamp using context file
 
 All task state WRITES route through the SAM CLI (scripts/run_sam_cli.py) as a single
@@ -22,8 +23,15 @@ subprocess, making the hook backend-agnostic (hooks must not write directly to Y
 Context File Mechanism:
 - The /start-task command writes task context to ~/.dh/projects/{slug}/context/active-task-{session_id}.json
 - PostToolUse hooks read from this file to know which task is active
-- SubagentStop extracts the sub-agent's session_id from agent_transcript_path, then looks up
-  active-task-{session_id}.json directly (targeted lookup, not glob-all)
+- SubagentStop extracts a session_id from agent_transcript_path, then looks up
+  active-task-{session_id}.json directly
+
+KNOWN DEFECT in that correlation: a sub-agent's transcript carries its PARENT session's id, not
+its own, so every sub-agent of one plan resolves to the same record. A wave running N tasks in
+parallel writes N registrations to one path and only the last survives, and a stopping agent can
+therefore be attributed to another agent's task. The per-sub-agent identifier the harness does
+supply is not read here. Task state written by this hook during parallel dispatch is unreliable
+until the record is keyed by something unique to the task.
 
 Usage:
     Called automatically via hooks configuration.
@@ -60,6 +68,7 @@ if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
 
 import dh_paths as _dh_paths
+from dh_config import DHConfig
 
 _HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
 _HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
@@ -79,6 +88,28 @@ _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 # Named group ``plan`` captures whichever form is present.
 # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
 _PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
+
+# A worker's self-reported status, per subagent-contract. Every line is scanned rather
+# than only the first, because agents/task-worker.md prescribes the completion report
+# inside a ```text fence, so a worker following its own template emits a fence marker as
+# line one. Leading markdown — fence, bold, bullet, blockquote — is tolerated, and the
+# token may carry underscores (GAPS_FOUND).
+#
+# The token must END the line. That rejects two lookalikes that are not verdicts: the
+# literal template placeholder `STATUS: COMPLETE|PARTIAL|FAILED` that task-worker.md
+# prints, and prose such as `STATUS: DONE was reported by the sibling task`. Without the
+# anchor the pattern captures a token out of both.
+_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*STATUS:\s*\**\s*([A-Za-z][A-Za-z_]*)\s*\**\s*$", re.IGNORECASE)
+
+# Tokens meaning the worker finished. ponytail: accepts all three spellings in use across
+# the plugin; narrow to one token once the status vocabulary is unified.
+_COMPLETE_STATUS_TOKENS = frozenset({"DONE", "COMPLETE", "COMPLETED"})
+
+# Tokens that positively report NOT finishing. Only these block a task. A token outside
+# both sets is a vocabulary this hook does not know — several shipped specialists report
+# VERIFIED, CONNECTED, READY — and an unknown word is not evidence of failure, so it
+# leaves task state alone rather than blocking correct work.
+_INCOMPLETE_STATUS_TOKENS = frozenset({"PARTIAL", "FAILED", "BLOCKED", "INCOMPLETE"})
 
 
 class HookProfile(enum.StrEnum):
@@ -353,15 +384,18 @@ def _call_sam_active_task_get(session_id: str, timeout: float = 8) -> tuple[str 
     or no active task is stored for the session.
 
     Args:
-        session_id: Sub-agent session identifier. Empty string is normalised to
-            ``"_default"`` sentinel.
+        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
+            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
+            answered here rather than spent on a subprocess that can only fail.
         timeout: Subprocess timeout in seconds.
 
     Returns:
         Tuple of ``(plan_address, task_id, parent_issue_number)``.
-        All ``None`` when the call fails or active task is not set.
+        All ``None`` when the id is empty, the call fails, or active task is not set.
     """
-    resolved = session_id or "_default"
+    resolved = session_id
+    if not resolved:
+        return None, None, None
     stdout = _call_sam_cli(["active-task", "get", "--session-id", resolved], timeout=timeout)
     if stdout is None:
         return None, None, None
@@ -396,14 +430,17 @@ def _call_sam_active_task_clear(session_id: str, timeout: float = 8) -> bool:
     Best-effort cleanup after SubagentStop completes. Never raises.
 
     Args:
-        session_id: Sub-agent session identifier. Empty string is normalised to
-            ``"_default"`` sentinel.
+        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
+            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
+            answered here rather than spent on a subprocess that can only fail.
         timeout: Subprocess timeout in seconds.
 
     Returns:
         ``True`` if the active task was successfully cleared, ``False`` otherwise.
     """
-    resolved = session_id or "_default"
+    resolved = session_id
+    if not resolved:
+        return False
     stdout = _call_sam_cli(["active-task", "clear", "--session-id", resolved], timeout=timeout)
     return stdout is not None
 
@@ -598,12 +635,32 @@ def _cleanup_active_task_context(session_id: str | None, fallback_context_file: 
 
 
 def get_iso_timestamp() -> str:
-    """Get current UTC timestamp in ISO format.
+    """Return the current UTC time as an ISO-8601 string, truncated to whole seconds.
 
     Returns:
-        ISO formatted timestamp string.
+        ISO-8601 timestamp string (UTC, no microseconds).
     """
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _first_text_block(content: object) -> str | None:
+    """Return the first non-empty ``type: "text"`` block's text from a message content list.
+
+    Args:
+        content: The ``message.content`` value from a parsed JSONL transcript record.
+
+    Returns:
+        The first non-empty text string found, or None if ``content`` is not a
+        list or contains no text block.
+    """
+    if not isinstance(content, list):
+        return None
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text = item.get("text", "")
+            if text:
+                return text
+    return None
 
 
 def _extract_text_from_user_record(record: dict[str, Any]) -> str | None:
@@ -621,15 +678,7 @@ def _extract_text_from_user_record(record: dict[str, Any]) -> str | None:
     message = record.get("message", {})
     if not isinstance(message, dict):
         return None
-    content = message.get("content", [])
-    if not isinstance(content, list):
-        return None
-    for item in content:
-        if isinstance(item, dict) and item.get("type") == "text":
-            text = item.get("text", "")
-            if text:
-                return text
-    return None
+    return _first_text_block(message.get("content", []))
 
 
 def _extract_prompt_from_transcript(transcript_path: Path) -> str | None:
@@ -721,6 +770,108 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     return None
 
 
+def _parse_status_line(final_text: str) -> str | None:
+    """Return the upper-cased STATUS token from *final_text*, or None if it carries none.
+
+    Takes the FIRST match, because ``skills/subagent-contract/SKILL.md`` places the verdict
+    on the report's opening line and says consumers branch on it "in that position". A later
+    ``STATUS:`` line is therefore not a verdict — the ``NOTES:`` field of the
+    ``agents/task-worker.md`` template is free text and comes last, so preferring the final
+    match would let a note override the worker's own report.
+
+    Every line is scanned rather than only line one because that same template wraps the
+    report in a fence, which occupies the first line.
+
+    Args:
+        final_text: The worker's final message.
+
+    Returns:
+        The token in upper case, or None when no line is a well-formed STATUS report line.
+    """
+    for line in final_text.strip().splitlines():
+        match = _STATUS_LINE_RE.match(line)
+        if match:
+            return match.group(1).upper()
+    return None
+
+
+def _resolve_final_message(hook_input: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Resolve the sub-agent's final message and its STATUS token.
+
+    Prefers ``last_assistant_message`` from the hook payload. Claude Code's hook
+    documentation is explicit that hooks needing the final assistant text "should use
+    last_assistant_message on Stop and SubagentStop instead of reading the transcript",
+    and Codex supplies the same field. Reading it costs one dictionary lookup where
+    scanning the transcript costs a full file read on every sub-agent stop.
+
+    Falls back to the transcript when the field is absent, which covers harnesses that
+    do not supply it and older releases that predate it.
+
+    Args:
+        hook_input: Parsed SubagentStop hook input.
+
+    Returns:
+        Tuple of ``(status_token, final_text)``. ``final_text`` is None only when the
+        message could not be obtained at all, which callers treat as evidence of nothing.
+    """
+    payload_message = hook_input.get("last_assistant_message")
+    if isinstance(payload_message, str) and payload_message.strip():
+        return _parse_status_line(payload_message), payload_message
+
+    return _extract_status_from_transcript(Path(hook_input.get("agent_transcript_path", "")))
+
+
+def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, str | None]:
+    """Extract the sub-agent's self-reported status from its final assistant message.
+
+    Scans the whole transcript for the LAST ``type: "assistant"`` record with
+    text content, then hands that text to :func:`_parse_status_line`, which reads
+    the first well-formed ``STATUS: <TOKEN>`` line anywhere in it per
+    subagent-contract — not only line one, which the fenced report template occupies.
+
+    Args:
+        transcript_path: Path to the sub-agent's JSONL transcript file.
+
+    Returns:
+        Tuple of ``(status_token, final_text)``. ``status_token`` is the
+        upper-cased token (e.g. ``"DONE"``, ``"PARTIAL"``) or ``None`` if the
+        final message has no recognizable ``STATUS:`` line. ``final_text`` is
+        the full text of that message, or ``None`` if the transcript is
+        missing, unreadable, or has no assistant text content at all.
+    """
+    if not transcript_path.exists():
+        print(f"[hook] transcript not found: {transcript_path}", file=sys.stderr)
+        return None, None
+
+    final_text: str | None = None
+    try:
+        with transcript_path.open(encoding="utf-8") as fh:
+            for raw_line in fh:
+                stripped_line = raw_line.strip()
+                if not stripped_line:
+                    continue
+                try:
+                    record: dict[str, Any] = json.loads(stripped_line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict) or record.get("type") != "assistant":
+                    continue
+                message = record.get("message", {})
+                if not isinstance(message, dict):
+                    continue
+                text = _first_text_block(message.get("content", []))
+                if text:
+                    final_text = text
+    except OSError as e:
+        print(f"[hook] could not read transcript for status extraction {transcript_path}: {e}", file=sys.stderr)
+        return None, None
+
+    if not final_text or not final_text.strip():
+        return None, None
+
+    return _parse_status_line(final_text), final_text
+
+
 def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
     """Read plan address, task_id, and parent_issue_number from a context file.
 
@@ -799,6 +950,40 @@ def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | 
     return context_file
 
 
+def _local_active_task_file(session_id: str) -> Path | None:
+    """Return the local-backend active-task record for *session_id*, or None.
+
+    The default ``local`` context backend stores each record at
+    ``context_dir()/active-task-{session_id}.json``, so this hook can stat the exact
+    file the SAM CLI would read. That matters for cost: this hook runs on every
+    sub-agent stop in every plugin, and the ``active-task get`` subprocess costs
+    ~1.3s of the ~1.75s total whether or not a task exists.
+
+    Returns None — meaning "ask the CLI instead" — when the configured backend is
+    anything else, because those keep the record where this process cannot see it.
+
+    The key is not unique. Every sub-agent of one parent session carries that parent's
+    session id, so several agents share one record and only the last write survives. A
+    hit here does not prove the record belongs to the agent that just stopped.
+
+    Args:
+        session_id: Sub-agent session identifier.
+
+    Returns:
+        Path to the record for a local backend, or None to fall back to the CLI.
+    """
+    if DHConfig().get_backend(subsystem="context") != "local":
+        return None
+
+    try:
+        context_dir = _dh_paths.context_dir()
+    except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError):
+        # No resolvable project root — fall back to the CLI, as _resolve_context_file_from_transcript does.
+        return None
+
+    return context_dir / f"active-task-{session_id}.json"
+
+
 def _resolve_active_task_context(
     hook_input: dict[str, Any],
 ) -> tuple[str | None, str | None, str | None, str | int | None, Path | None] | None:
@@ -831,9 +1016,17 @@ def _resolve_active_task_context(
     parent_issue_number: str | int | None = None
     context_file: Path | None = None
 
-    # Step 1: SAM CLI lookup via active-task get
+    # Step 1: the active-task record.
     if sub_agent_session_id:
-        plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
+        local_record = _local_active_task_file(sub_agent_session_id)
+        if local_record is None:
+            # Backend stores the record somewhere this process cannot stat — ask the CLI.
+            plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
+        elif local_record.exists():
+            context_file = local_record
+            plan_id, task_id, parent_issue_number = _read_context_file(local_record)
+        # Local backend with no record: no active task. Steps 2 and 3 still run, and
+        # both read files, so the no-active-task path spawns no subprocess at all.
 
     # Step 2: Filesystem context file written by /start-task
     if plan_id is None or task_id is None:
@@ -889,8 +1082,98 @@ def _cascade_failed_task(
     sys.exit(0)
 
 
+def _block_task_on_report(
+    plan_addr: str,
+    task_id: str,
+    status_token: str | None,
+    final_text: str | None,
+    sub_agent_session_id: str | None,
+    context_file: Path | None,
+) -> None:
+    """Mark a task BLOCKED because its worker did not report completion.
+
+    Echoes the worker's own first line to stderr so the reported token and reason
+    survive into the hook log. Names the specific contract failure: a non-complete
+    token, a final message with no ``STATUS:`` line, or no final message at all.
+    Terminal — calls sys.exit(0).
+
+    Args:
+        plan_addr: Plan address (e.g. ``"Pf4281187"``).
+        task_id: Task ID within the plan.
+        status_token: The token parsed from the worker's STATUS line, or None if
+            the final message carried no recognizable STATUS line.
+        final_text: The worker's final message, or None if unavailable.
+        sub_agent_session_id: Agent session ID for context cleanup.
+        context_file: Context file path for cleanup.
+    """
+    if status_token is not None:
+        cause = f"reported STATUS: {status_token}"
+    elif final_text is not None:
+        cause = "final message has no 'STATUS:' first line"
+    else:
+        cause = "produced no final message"
+    first_line = final_text.strip().splitlines()[0] if final_text else "(no final message found)"
+    print(f"[hook] SubagentStop: {task_id} {cause} ({first_line!r}) — marking blocked instead", file=sys.stderr)
+    if not _call_sam_task_state(plan_addr, task_id, SamTaskStatus.BLOCKED):
+        print(f"[hook] SubagentStop: failed to mark {task_id} blocked via the SAM CLI", file=sys.stderr)
+    _cleanup_active_task_context(sub_agent_session_id, context_file)
+    sys.exit(0)
+
+
+def _resolve_non_complete_report(
+    plan_addr: str,
+    task_id: str,
+    status_token: str | None,
+    final_text: str | None,
+    already_complete: bool,
+    sub_agent_session_id: str | None,
+    context_file: Path | None,
+) -> None:
+    """Decide what a non-completion report does to task state. Terminal — calls sys.exit(0).
+
+    Three outcomes, because the reasons a report is not a completion are not equivalent:
+
+    - **Unreadable transcript, task already COMPLETE** — leave it. Writing COMPLETE and
+      reverting one both need positive evidence, and a failed read is evidence of nothing.
+      Un-completing finished work here would stall the whole wave.
+    - **A token in neither vocabulary** — leave state alone. Shipped specialists report
+      VERIFIED, CONNECTED, GAPS_FOUND, READY and DRAFTING; since the SubagentStop matcher
+      no longer filters non-task-worker agents out, blocking on an unrecognised word would
+      turn their correct work into BLOCKED.
+    - **Everything else** — block. A known non-completion token, or a readable final message
+      with no STATUS line at all, both positively evidence that the worker did not finish.
+
+    Args:
+        plan_addr: Plan address (e.g. ``"Pf4281187"``).
+        task_id: Task ID within the plan.
+        status_token: Token parsed from the worker's STATUS line, or None if there was none.
+        final_text: The worker's final message, or None if the transcript was unreadable.
+        already_complete: Whether the task already reads COMPLETE.
+        sub_agent_session_id: Agent session ID for context cleanup.
+        context_file: Context file path for cleanup.
+    """
+    if final_text is None and already_complete:
+        print(
+            f"[hook] SubagentStop: no final message readable for {task_id}; leaving existing COMPLETE unchanged",
+            file=sys.stderr,
+        )
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
+
+    if status_token is not None and status_token not in _INCOMPLETE_STATUS_TOKENS:
+        print(
+            f"[hook] SubagentStop: {task_id} reported STATUS: {status_token}, which is neither a "
+            "completion nor a failure token — task state unchanged",
+            file=sys.stderr,
+        )
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
+
+    _block_task_on_report(plan_addr, task_id, status_token, final_text, sub_agent_session_id, context_file)
+
+
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
-    """Handle SubagentStop event - mark task COMPLETE with timestamp.
+    """Handle SubagentStop event - mark task COMPLETE or BLOCKED based on the worker's report.
 
     Discovers the active task via the SAM CLI's ``active-task get`` subcommand
     (primary) or the ``active-task-{session_id}.json`` context file (fallback).
@@ -903,6 +1186,24 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     2. Call the SAM CLI's ``active-task get`` subcommand (primary path).
     3. Fall back to ``active-task-{session_id}.json`` on disk if that call fails.
     4. After status update, call ``active-task clear`` or delete the file.
+
+    Before writing COMPLETE, reads the worker's own final message via
+    ``_extract_status_from_transcript`` and checks its ``STATUS:`` line against
+    ``_COMPLETE_STATUS_TOKENS``. Anything else — a non-complete token, an
+    unrecognized one, or a final message with no STATUS line — marks the task
+    BLOCKED instead.
+
+    Evidence is asymmetric, and the two failure kinds are not the same:
+
+    - **The worker's report** decides the state. A readable final message that
+      does not report completion blocks the task, including one that omits the
+      ``STATUS:`` line entirely — that is a contract violation by the worker,
+      and the most common one.
+    - **A transcript the hook could not read** decides nothing. Writing COMPLETE
+      and reverting a COMPLETE both require positive evidence, so a missing,
+      unreadable, or empty transcript leaves an existing COMPLETE untouched
+      rather than un-completing finished work and stalling the wave. With no
+      existing COMPLETE it still blocks, because nothing has evidenced success.
 
     All status and field writes route through the SAM CLI as a single
     subprocess, making the hook backend-agnostic.
@@ -937,16 +1238,32 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         _cleanup_active_task_context(sub_agent_session_id, context_file)
         sys.exit(0)
 
-    if current_task.status == SamTaskStatus.COMPLETE:
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
     if current_task.status == SamTaskStatus.FAILED:
-        # Agent explicitly set task to FAILED before stopping.
-        # Cascade skip signals to all downstream dependents via the SAM CLI.
+        # Agent explicitly set task to FAILED before stopping. That is a deliberate
+        # self-report of a terminal state, more specific than anything the transcript
+        # says, so it wins. Cascade skip signals to all downstream dependents.
         # _cascade_failed_task is terminal (calls sys.exit(0)); return guards mocked callers.
         _cascade_failed_task(plan_addr, task_id, sub_agent_session_id, context_file)
         return
+
+    # The worker's final message is the authority on whether it finished, NOT the task
+    # state — start-task lets a worker mark itself complete before stopping, so a task
+    # already reading COMPLETE proves nothing about what the worker actually reported.
+    # This check therefore runs before any COMPLETE short-circuit.
+    status_token, final_text = _resolve_final_message(hook_input)
+    already_complete = current_task.status == SamTaskStatus.COMPLETE
+
+    if status_token not in _COMPLETE_STATUS_TOKENS:
+        # _resolve_non_complete_report is terminal (calls sys.exit(0)); return guards mocked callers.
+        _resolve_non_complete_report(
+            plan_addr, task_id, status_token, final_text, already_complete, sub_agent_session_id, context_file
+        )
+        return
+
+    # Worker reported completion and already marked itself complete — nothing to write.
+    if already_complete:
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
 
     if profile == HookProfile.STRICT:
         for warning in run_strict_pre_completion_checks(current_task, task_id):
