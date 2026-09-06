@@ -1123,6 +1123,51 @@ def update_task_fields(
     return UpdateTaskResult(updated=True, address=f"{plan}/{task}")
 
 
+#: Reserved key the active-task store used to receive on a missing or empty
+#: session id. No caller may pass this value or omit the id entirely — see
+#: :func:`require_session_id`. Kept as a named constant because the local
+#: backend's on-disk filename and existing records still use this literal.
+DEFAULT_SESSION_ID = "_default"
+
+
+class MissingSessionIdError(ValueError):
+    """Raised when an active-task operation is attempted without a real session id."""
+
+
+def require_session_id(session_id: str | None) -> str:
+    """Reject a missing, empty, or sentinel session id for an active-task operation.
+
+    The active-task record correlates a caller to the task it is working on.
+    A blank or omitted identifier and the reserved ``"_default"`` sentinel all
+    resolve to the same unowned bucket, where one caller's read, write, or
+    clear can land on a different caller's task — the mechanism observed
+    producing misattributed and overwritten task state. The CLI and the MCP
+    server both call this before any active-task get/set/update/clear, so
+    the rule is enforced once rather than duplicated across the two
+    frontends.
+
+    Args:
+        session_id: The caller-supplied session identifier, or None.
+
+    Returns:
+        The validated, non-empty, non-sentinel session id.
+
+    Raises:
+        MissingSessionIdError: When session_id is None, empty, or equal to
+            :data:`DEFAULT_SESSION_ID`.
+    """
+    if not session_id or session_id == DEFAULT_SESSION_ID:
+        msg = (
+            "A session id is required for active-task operations. Pass a real, "
+            "caller-specific identifier — never omit it and never pass the "
+            f"reserved {DEFAULT_SESSION_ID!r} sentinel. An operation without one "
+            "cannot be told apart from a different caller's, and that shared "
+            "bucket has already produced task state attributed to the wrong caller."
+        )
+        raise MissingSessionIdError(msg)
+    return session_id
+
+
 def get_active_task(ctx_backend: ContextBackend, session_id: str) -> ActiveTaskGetResult:
     """Retrieve the active task context for a session.
 
