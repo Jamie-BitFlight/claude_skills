@@ -1,5 +1,9 @@
 # agent-orchestration
 
+<p align="center">
+  <img src="./assets/hero.png" alt="Agent Orchestration" width="800" />
+</p>
+
 A small set of skills and a contract for orchestrating sub-agents, portable across harnesses that support plugins, skills, and agents.
 
 | Piece | Purpose |
