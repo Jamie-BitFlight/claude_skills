@@ -28,11 +28,21 @@ Use markdown links with relative paths starting with `./`. **Reason**: Enables C
 - From references/file.md → same dir: `[text](./filename.md)`
 - From references/file.md → subdir: `[text](./subdir/filename.md)`
 
-Never backtick-only (`modern-modules/httpx.md`) or absolute paths (`/home/user/...`). External file: full URL with access date.
+Use a markdown link for any real relative path; a bare backticked path (`modern-modules/httpx.md`) and an absolute path (`/home/user/...`) both fail. External file: full URL with access date. The one path form that takes backticks instead is the substituted form below.
 
 **Exception — `.claude/` and `rules/`:** these files are injected as raw text at the agent's cwd (repo root), never browsed via GitHub/editor click-through. Links there are repo-root-relative, no `./` prefix. Do not "fix" them back to file-relative.
 
-**Exception — `SKILL.md` link targets:** `${CLAUDE_PLUGIN_ROOT}`/`${CLAUDE_SKILL_DIR}` substitute at load time inside the `SKILL.md` body, link targets included — not a broken link. Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths. See `skill-substitution.md`.
+**Exception — substituted paths in a `SKILL.md` body:** `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_SKILL_DIR}` substitute at load time throughout the rendered body, link targets included, so they resolve in any environment a plugin is installed into.
+
+Write these as a **backticked path**, not a markdown link:
+
+```markdown
+`${CLAUDE_PLUGIN_ROOT}/docs/runtime-environment.md` — contains <what>; read before <when>.
+```
+
+`skilllint` resolves link targets against the filesystem and cannot expand the variable, so the markdown-link form fails LK001 as a broken link while the backticked form passes and still resolves for the agent. Keep the annotation contract — what the file contains, when to read it — that a link would have carried.
+
+Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths in markdown links. See `skill-substitution.md`.
 
 ## Skill Activation References
 
