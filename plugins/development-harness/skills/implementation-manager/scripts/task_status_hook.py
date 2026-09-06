@@ -81,13 +81,22 @@ _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
 _PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
 
-# A worker's self-reported status, per subagent-contract: first line of its final message.
-_STATUS_LINE_RE = re.compile(r"^\s*STATUS:\s*([A-Za-z]+)", re.IGNORECASE)
+# A worker's self-reported status, per subagent-contract. Matched against EVERY line of
+# the final message, not only the first: agents/task-worker.md prescribes the completion
+# report inside a ```text fence, so a worker following its own template emits a fence
+# marker as line one. Leading markdown — fence, bold, bullet, blockquote — is tolerated,
+# and the token may carry underscores (GAPS_FOUND).
+_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*STATUS:\s*\**\s*([A-Za-z][A-Za-z_]*)", re.IGNORECASE)
 
-# Tokens meaning the worker finished. Anything else — including no STATUS line — is
-# not-complete. ponytail: accepts all three spellings in use across the plugin; narrow
-# to one token once the status vocabulary is unified.
+# Tokens meaning the worker finished. ponytail: accepts all three spellings in use across
+# the plugin; narrow to one token once the status vocabulary is unified.
 _COMPLETE_STATUS_TOKENS = frozenset({"DONE", "COMPLETE", "COMPLETED"})
+
+# Tokens that positively report NOT finishing. Only these block a task. A token outside
+# both sets is a vocabulary this hook does not know — several shipped specialists report
+# VERIFIED, CONNECTED, READY — and an unknown word is not evidence of failure, so it
+# leaves task state alone rather than blocking correct work.
+_INCOMPLETE_STATUS_TOKENS = frozenset({"PARTIAL", "FAILED", "BLOCKED", "INCOMPLETE"})
 
 
 class HookProfile(enum.StrEnum):
@@ -789,9 +798,11 @@ def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, 
     if not final_text or not final_text.strip():
         return None, None
 
-    match = _STATUS_LINE_RE.match(final_text.strip().splitlines()[0])
-    status_token = match.group(1).upper() if match else None
-    return status_token, final_text
+    for line in final_text.strip().splitlines():
+        match = _STATUS_LINE_RE.match(line)
+        if match:
+            return match.group(1).upper(), final_text
+    return None, final_text
 
 
 def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
@@ -963,29 +974,93 @@ def _cascade_failed_task(
 
 
 def _block_task_on_report(
-    plan_addr: str, task_id: str, final_text: str | None, sub_agent_session_id: str | None, context_file: Path | None
+    plan_addr: str,
+    task_id: str,
+    status_token: str | None,
+    final_text: str | None,
+    sub_agent_session_id: str | None,
+    context_file: Path | None,
 ) -> None:
     """Mark a task BLOCKED because its worker did not report completion.
 
     Echoes the worker's own first line to stderr so the reported token and reason
-    survive into the hook log. Terminal — calls sys.exit(0).
+    survive into the hook log. Names the specific contract failure: a non-complete
+    token, a final message with no ``STATUS:`` line, or no final message at all.
+    Terminal — calls sys.exit(0).
 
     Args:
         plan_addr: Plan address (e.g. ``"Pf4281187"``).
         task_id: Task ID within the plan.
+        status_token: The token parsed from the worker's STATUS line, or None if
+            the final message carried no recognizable STATUS line.
         final_text: The worker's final message, or None if unavailable.
         sub_agent_session_id: Agent session ID for context cleanup.
         context_file: Context file path for cleanup.
     """
+    if status_token is not None:
+        cause = f"reported STATUS: {status_token}"
+    elif final_text is not None:
+        cause = "final message has no 'STATUS:' first line"
+    else:
+        cause = "produced no final message"
     first_line = final_text.strip().splitlines()[0][:200] if final_text else "(no final message found)"
-    print(
-        f"[hook] SubagentStop: {task_id} did not report completion ({first_line!r}) — marking blocked instead",
-        file=sys.stderr,
-    )
+    print(f"[hook] SubagentStop: {task_id} {cause} ({first_line!r}) — marking blocked instead", file=sys.stderr)
     if not _call_sam_task_state(plan_addr, task_id, SamTaskStatus.BLOCKED):
         print(f"[hook] SubagentStop: failed to mark {task_id} blocked via the SAM CLI", file=sys.stderr)
     _cleanup_active_task_context(sub_agent_session_id, context_file)
     sys.exit(0)
+
+
+def _resolve_non_complete_report(
+    plan_addr: str,
+    task_id: str,
+    status_token: str | None,
+    final_text: str | None,
+    already_complete: bool,
+    sub_agent_session_id: str | None,
+    context_file: Path | None,
+) -> None:
+    """Decide what a non-completion report does to task state. Terminal — calls sys.exit(0).
+
+    Three outcomes, because the reasons a report is not a completion are not equivalent:
+
+    - **Unreadable transcript, task already COMPLETE** — leave it. Writing COMPLETE and
+      reverting one both need positive evidence, and a failed read is evidence of nothing.
+      Un-completing finished work here would stall the whole wave.
+    - **A token in neither vocabulary** — leave state alone. Shipped specialists report
+      VERIFIED, CONNECTED, GAPS_FOUND, READY and DRAFTING; since the SubagentStop matcher
+      no longer filters non-task-worker agents out, blocking on an unrecognised word would
+      turn their correct work into BLOCKED.
+    - **Everything else** — block. A known non-completion token, or a readable final message
+      with no STATUS line at all, both positively evidence that the worker did not finish.
+
+    Args:
+        plan_addr: Plan address (e.g. ``"Pf4281187"``).
+        task_id: Task ID within the plan.
+        status_token: Token parsed from the worker's STATUS line, or None if there was none.
+        final_text: The worker's final message, or None if the transcript was unreadable.
+        already_complete: Whether the task already reads COMPLETE.
+        sub_agent_session_id: Agent session ID for context cleanup.
+        context_file: Context file path for cleanup.
+    """
+    if final_text is None and already_complete:
+        print(
+            f"[hook] SubagentStop: no final message readable for {task_id}; leaving existing COMPLETE unchanged",
+            file=sys.stderr,
+        )
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
+
+    if status_token is not None and status_token not in _INCOMPLETE_STATUS_TOKENS:
+        print(
+            f"[hook] SubagentStop: {task_id} reported STATUS: {status_token}, which is neither a "
+            "completion nor a failure token — task state unchanged",
+            file=sys.stderr,
+        )
+        _cleanup_active_task_context(sub_agent_session_id, context_file)
+        sys.exit(0)
+
+    _block_task_on_report(plan_addr, task_id, status_token, final_text, sub_agent_session_id, context_file)
 
 
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
@@ -1006,9 +1081,20 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     Before writing COMPLETE, reads the worker's own final message via
     ``_extract_status_from_transcript`` and checks its ``STATUS:`` line against
     ``_COMPLETE_STATUS_TOKENS``. Anything else — a non-complete token, an
-    unrecognized one, or no STATUS line at all — marks the task BLOCKED instead.
-    This fails closed: an unreadable or missing transcript is treated the same
-    as a non-complete report, never as an implicit success.
+    unrecognized one, or a final message with no STATUS line — marks the task
+    BLOCKED instead.
+
+    Evidence is asymmetric, and the two failure kinds are not the same:
+
+    - **The worker's report** decides the state. A readable final message that
+      does not report completion blocks the task, including one that omits the
+      ``STATUS:`` line entirely — that is a contract violation by the worker,
+      and the most common one.
+    - **A transcript the hook could not read** decides nothing. Writing COMPLETE
+      and reverting a COMPLETE both require positive evidence, so a missing,
+      unreadable, or empty transcript leaves an existing COMPLETE untouched
+      rather than un-completing finished work and stalling the wave. With no
+      existing COMPLETE it still blocks, because nothing has evidenced success.
 
     All status and field writes route through the SAM CLI as a single
     subprocess, making the hook backend-agnostic.
@@ -1060,20 +1146,10 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
     already_complete = current_task.status == SamTaskStatus.COMPLETE
 
     if status_token not in _COMPLETE_STATUS_TOKENS:
-        # Writing COMPLETE and reverting a COMPLETE both require positive evidence.
-        # A missing status line is not evidence the worker failed, so an existing
-        # COMPLETE stands — otherwise an unreadable transcript would un-complete
-        # finished work and stall the wave.
-        if status_token is None and already_complete:
-            print(
-                f"[hook] SubagentStop: no status reported for {task_id}; leaving existing COMPLETE unchanged",
-                file=sys.stderr,
-            )
-            _cleanup_active_task_context(sub_agent_session_id, context_file)
-            sys.exit(0)
-
-        # _block_task_on_report is terminal (calls sys.exit(0)); return guards mocked callers.
-        _block_task_on_report(plan_addr, task_id, final_text, sub_agent_session_id, context_file)
+        # _resolve_non_complete_report is terminal (calls sys.exit(0)); return guards mocked callers.
+        _resolve_non_complete_report(
+            plan_addr, task_id, status_token, final_text, already_complete, sub_agent_session_id, context_file
+        )
         return
 
     # Worker reported completion and already marked itself complete — nothing to write.
