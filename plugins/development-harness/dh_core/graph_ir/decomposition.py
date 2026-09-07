@@ -1,8 +1,9 @@
 """The decomposition input: what layer 3 consumes to produce a layer-2 work graph.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "Layer 3 ... takes the grooming and
-architecture output -- research, fact checks, dependencies, documentation, concerns -- and
-decomposes it into a layer-2 graph." Each of those nouns becomes a :class:`DecompositionItem`
+``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "What the model must carry":
+decomposition takes the grooming and design output -- research, fact checks, dependencies,
+documentation, concerns -- into work with its concurrency and ordering stated. Each of those nouns
+becomes a :class:`DecompositionItem`
 of the matching :class:`DecompositionSourceKind`, so a :class:`~dh_core.graph_ir.work_layer.WorkNode`
 can name the item it traces back to and a check can ask the traceability question in both
 directions: :meth:`DecompositionInput.untraced_planned_nodes` (a work node tracing to nothing here)

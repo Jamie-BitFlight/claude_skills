@@ -9,8 +9,10 @@ unmerged branch is `Proposed`, was never reviewed or merged, and may be withdraw
 rather than superseded. Its decision rested on choosing which of three graphs to model; that
 choice does not exist. Its defects, measurements, and its rejection of a representation compiled
 above unchanged models are carried forward below, in "Carried forward from the withdrawn draft".
-**Related:** Governed by [ASSESSOR-CONTRACT.md](../graph-ir/ASSESSOR-CONTRACT.md), which this ADR
-requires be rewritten — its "The layers" and "How they relate" sections state the superseded model.
+**Related:** Governed by [ARCHITECTURE.md](../../ARCHITECTURE.md)'s "The work graph" section, which
+now states the model this ADR decides — superseding `docs/graph-ir/ASSESSOR-CONTRACT.md`'s "The
+layers" and "How they relate" sections, since deleted (see
+[docs/graph-ir/findings/AMENDMENTS.md](../graph-ir/findings/AMENDMENTS.md)).
 
 ## Context
 

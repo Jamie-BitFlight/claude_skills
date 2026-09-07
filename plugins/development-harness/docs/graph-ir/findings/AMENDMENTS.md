@@ -148,3 +148,40 @@ a target, and this is the structure itself. A rename is pending and no target na
 **Re-read rather than trusting the frame:** `plugins/development-harness/docs/graph-ir/ASSESSOR-CONTRACT.md`
 for the model, and `plugins/development-harness/ARCHITECTURE.md` for the workflow the model
 describes, including which closure checks are specified.
+
+## A-5 — `ASSESSOR-CONTRACT.md`, the authority these findings cite, has been deleted
+
+**Date:** 2026-09-07
+**Cause:** `ASSESSOR-CONTRACT.md` was an ephemeral brief written for a one-off subagent exercise
+that was wrongly committed and then acquired dependents. It has been deleted outright, not
+superseded by a successor document at the same path.
+
+Every citation of `ASSESSOR-CONTRACT.md` in this directory — including A-4's own closing pointer
+above, and every "Authority" line and inline quote throughout `predicates.md`, `fidelity.md`,
+`completeness.md` and `data-flow-gaps.md` — now names a file that does not exist. The findings
+themselves stand; what no longer resolves is the path cited as where to re-read their authority.
+
+**Where its architecture content went.** The document's description of the model — one graph,
+described as types and executed as instances; what belongs to a node and an edge; edge types; the
+node record; provenance; the decomposition-exit gate and its tiers; falsified predicates; the
+severity rule; projections; mechanical checks — now lives in
+`plugins/development-harness/ARCHITECTURE.md` under the "The work graph" heading, in the
+subsections named there. A citation of `ASSESSOR-CONTRACT.md` for any of that content should be
+read as citing the matching subsection of "The work graph" instead.
+
+**What was dropped rather than moved.** Two kinds of content had no destination:
+
+- The document's own audit-process instructions for a verifier — how to trace, how to weigh a
+  finding holistically, how to validate a report, and the marker table a findings file was to
+  carry (`Found-by`, `Previously-known`, and the like). This was scaffolding for the one-off
+  exercise the document was written for, not a statement about the system under assessment, and
+  ARCHITECTURE.md carries no equivalent of it.
+- The document's own bullet list of falsified predicates. It was a second encoding of
+  `Predicate` and `PREDICATES` in `dh_core/graph_ir/findings.py`, kept in sync by hand against the
+  enum; `tests_sam/test_decomposition_gate.py` used to assert the two matched, which is the closure
+  A-1 above concerns. That test and its parsing helper are deleted along with the list itself:
+  `dh_core/graph_ir/findings.py` is now the only place the predicates are named.
+
+**Re-read rather than trusting a citation in prose:** `plugins/development-harness/ARCHITECTURE.md`,
+"The work graph" heading, for the current model; `dh_core/graph_ir/findings.py` for the predicates
+a check may report.

@@ -1,17 +1,20 @@
 """Layer 1 -- task lifecycle: nodes are statuses, edges are the commands that move between them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "One uniform machine, instantiated per
-task, tracking where each task's progress is. ``dh_core/ledger_spec.py:TRANSITIONS`` is this
-layer." This module gives that machine a graph shape distinct from :mod:`dh_core.graph_ir.model`
-(layer 3): a :class:`LedgerNode` is a bare status, not a process step, and it carries no actor.
+One uniform machine, instantiated per task, tracks where each task's progress is:
+``dh_core/ledger_spec.py:TRANSITIONS`` is that machine. This module gives it a graph shape distinct
+from :mod:`dh_core.graph_ir.model` (layer 3): a :class:`LedgerNode` is a bare status, not a process
+step, and it carries no actor.
 
-The contract's projection relationship is the reason this module exists rather than reusing layer
-3's richer :class:`~dh_core.graph_ir.model.Node`: "Layer 1 is a projection of layer 3 onto a single
-task ... Discarding the actor is exactly how authority is lost." :attr:`LedgerEdge.projects_from`
-is where that discarded actor is meant to be found -- naming the layer-3 node the transition
-projects, so a check can ask which transitions have no such origin
-(:meth:`LedgerGraph.edges_without_workflow_origin`) and, once joined with the layer-3 graph
-(:mod:`dh_core.graph_ir.system`), which name one that does not exist.
+This module's premise -- a separate layer-1 graph, projected from layer 3 -- is superseded design.
+Per ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "What belongs to a node":
+"Execution state -- the lifecycle a node runs through while working -- is a property of the node,
+not a graph of its own. `dh_core/ledger_spec.py`'s transitions are that lifecycle, and a status is
+not a thing on the path from grooming to closure." ``docs/graph-ir/findings/AMENDMENTS.md`` (entry
+A-4) records this explicitly: no projection derives the ledger's transitions from a work graph, and
+a criterion asking for one is ill-posed. :attr:`LedgerEdge.projects_from` and
+:meth:`LedgerGraph.edges_without_workflow_origin`, joined with the layer-3 graph
+(:mod:`dh_core.graph_ir.system`), implement the now-superseded projection relationship; this module
+has not yet been migrated to the one-graph shape.
 """
 
 from __future__ import annotations

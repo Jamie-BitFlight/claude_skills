@@ -1,9 +1,10 @@
 """The system: the layers bound together, and the checks that only make sense across them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "The system is several graphs. Each is
-describable on its own; the system is only drawn when all of them exist together. A representation
-that carries one of them and calls itself the model of the system is the flattening this contract
-exists to prevent." :class:`LayeredGraph` is that "all of them exist together" object: it holds a
+This module implements a three-layer split -- a task-lifecycle layer, a work-graph layer, and a
+workflow layer, joined by cross-layer references -- that is superseded design:
+``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+types and executed as instances, with no separate layer graphs to join. This module has not yet
+been migrated to that shape. :class:`LayeredGraph` is the "all of them exist together" object: it holds a
 :class:`~dh_core.graph_ir.ledger_layer.LedgerGraph`, a :class:`~dh_core.graph_ir.work_layer.WorkGraph`,
 a :class:`~dh_core.graph_ir.model.Graph` (workflow, layer 3), and the
 :class:`~dh_core.graph_ir.decomposition.DecompositionInput` layer 3 consumed -- and nothing more. It

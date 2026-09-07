@@ -9,13 +9,9 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from pathlib import Path
 
 import pytest
 from dh_core import ledger_spec as spec
-from marko import Markdown
-from marko.block import Heading, Quote
-from marko.inline import RawText
 from sam_schema.core.models import TaskStatus
 
 TASK_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.TASK]
@@ -25,10 +21,6 @@ EVENT_KINDS = {e.kind for e in spec.EVENTS}
 REASONS_BY_CODE = {r.code: r for r in spec.REASONS}
 COLUMN_NAMES = {c.name for c in spec.COLUMNS}
 TABLE_NAMES = {c.table for c in spec.COLUMNS}
-
-PLUGIN_ROOT: Path = Path(__file__).resolve().parents[1]
-CONTRACT: Path = PLUGIN_ROOT / "docs" / "graph-ir" / "ASSESSOR-CONTRACT.md"
-AUTHORITY_HEADING = "Authority of a task's instructions, at runtime"
 
 
 def test_statuses_equal_task_status_enum() -> None:
@@ -191,75 +183,3 @@ def test_model_fields_match_models() -> None:
     plan_fields = set(Plan.model_fields) - {"tasks", "source_path", "source_format"}
     assert set(spec.PLAN_MODEL_FIELDS) == plan_fields, plan_fields ^ set(spec.PLAN_MODEL_FIELDS)
     assert set(spec.TASK_MODEL_FIELDS) == set(Task.model_fields), set(Task.model_fields) ^ set(spec.TASK_MODEL_FIELDS)
-
-
-# ---------------------------------------------------------------------------
-# Anti-drift: AUTHORITY_PREAMBLE against ASSESSOR-CONTRACT.md's own block quote
-# ---------------------------------------------------------------------------
-#
-# Mirrors the CONTRACT-path pattern in test_decomposition_gate.py -- reading the governing document
-# as data rather than trusting a hand-copied string -- and, per this repo's rule (AGENTS.md), parses
-# markdown structure with marko rather than a hand-rolled regex. marko locates the block quote
-# structurally (so a structural change -- the quote dropped, replaced, or moved out of its heading --
-# fails this test rather than silently reading something else); the verbatim text is then read from
-# the raw lines that quote spans and stripped of its leading ``> `` markers, the same transform
-# ``ledger_spec.AUTHORITY_PREAMBLE`` was built with.
-
-
-def heading_text(heading: Heading) -> str:
-    return "".join(child.children for child in heading.children if isinstance(child, RawText)).strip()
-
-
-def contract_authority_quote() -> str:
-    """Return ASSESSOR-CONTRACT.md's authority block quote, verbatim with ``> `` markers stripped.
-
-    Returns:
-        The block quote's text, joined by newlines, with no leading ``> ``/``>`` marker on any line.
-    """
-    text = CONTRACT.read_text(encoding="utf-8")
-    children = list(Markdown(extensions=["gfm"]).parse(text).children)
-    heading_index = next(
-        (
-            index
-            for index, child in enumerate(children)
-            if isinstance(child, Heading) and child.level == 3 and heading_text(child) == AUTHORITY_HEADING
-        ),
-        None,
-    )
-    assert heading_index is not None, "could not find the authority heading -- fix the parser, not the test"
-
-    quote_node = None
-    for child in children[heading_index + 1 :]:
-        if isinstance(child, Heading) and child.level <= 3:
-            break
-        if isinstance(child, Quote):
-            quote_node = child
-            break
-    assert quote_node is not None, "no block quote found under the authority heading -- fix the parser, not the test"
-
-    lines = text.splitlines()
-    heading_line = next(i for i, line in enumerate(lines) if line.strip() == f"### {AUTHORITY_HEADING}")
-    start = next(i for i in range(heading_line + 1, len(lines)) if lines[i].startswith(">"))
-    quoted: list[str] = []
-    for line in lines[start:]:
-        if line == ">":
-            quoted.append("")
-            continue
-        if line.startswith("> "):
-            quoted.append(line[2:])
-            continue
-        break
-    return "\n".join(quoted)
-
-
-def test_authority_preamble_matches_the_contracts_block_quote() -> None:
-    """``ledger_spec.AUTHORITY_PREAMBLE`` must equal the contract's own block quote, verbatim.
-
-    Two encodings of the same text drift silently otherwise; this is the check that would catch it.
-    """
-    assert contract_authority_quote() == spec.AUTHORITY_PREAMBLE
-
-
-def test_authority_preamble_anti_drift_check_is_not_vacuous() -> None:
-    """A deliberately wrong body must NOT match the contract's quote -- the comparison is live."""
-    assert contract_authority_quote() != "this is not the real authority preamble text"

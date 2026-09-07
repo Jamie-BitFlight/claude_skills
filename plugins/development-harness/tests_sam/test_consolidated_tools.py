@@ -1014,7 +1014,7 @@ async def test_sam_active_task_different_sessions_are_isolated(client: Client) -
 async def test_sam_active_task_omitted_session_id_is_a_hard_failure(client: Client, config: dict) -> None:
     """Every sam_active_task action rejects a missing session_id.
 
-    Regression guard for the silent '_default' sentinel fallback (#3432): a
+    Regression guard for the silent '_default' sentinel fallback: a
     shared bucket that nothing meaningfully owns, keyed by whichever caller
     wrote last. Omitting session_id here previously resolved to that
     sentinel and silently succeeded.

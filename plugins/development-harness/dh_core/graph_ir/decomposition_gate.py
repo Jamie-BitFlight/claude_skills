@@ -1,8 +1,9 @@
 """The decomposition-exit gate: checks a task's instructions against the referents they name.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The decomposition-exit gate"): "Origin is not measurable
-from text -- a sentence invented from training reads exactly like one recalled from a source.
-Absence of referent is measurable, and the two coincide." This module is that measurement:
+``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "The decomposition-exit gate":
+"Origin is not measurable from text -- a sentence invented from training reads exactly like one
+recalled from a source. Absence of referent is measurable, and the two coincide." This module is
+that measurement:
 :class:`DecompositionGate` resolves every :class:`~dh_core.graph_ir.instructions.Referent` a
 ``DELEGATING`` instruction names (Tier 1) and verifies every quote an ``ASSERTING`` instruction
 cites (Tier 2), and reports a :class:`~dh_core.graph_ir.findings.Finding` for each declared
@@ -25,9 +26,10 @@ itself is never assigned here -- as everywhere in this package, it comes from
 :data:`~dh_core.graph_ir.findings.SEVERITY_BY_BASIS` alone, computed on the :class:`Finding` from
 the ``basis`` this module chooses.
 
-What this module does not decide, per the contract's "What the gate does not decide": a quote that
-resolves and verifies but does not support the claim it is cited for. That is judgement, and it goes
-to the adversarial pass untouched.
+What this module does not decide: a quote that resolves and verifies but does not support the claim
+it is cited for. Per ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §
+"The judgement tier blocks, and demotion clears it", that support question is judgement, not a
+referent or verbatim-quote check, and this module leaves it to the adversarial pass untouched.
 """
 
 from __future__ import annotations
@@ -48,7 +50,7 @@ from dh_core.graph_ir.instructions import Instruction, InstructionKind, Referent
 from dh_core.graph_ir.model import Observation
 from dh_core.graph_ir.work_layer import WorkGraph
 
-CONTRACT_REF = "plugins/development-harness/docs/graph-ir/ASSESSOR-CONTRACT.md#the-decomposition-exit-gate"
+CONTRACT_REF = "plugins/development-harness/ARCHITECTURE.md#the-decomposition-exit-gate"
 """Where the decomposition-exit gate itself is declared; cited as every finding's source span."""
 
 CONTRACT_SPAN = SourceSpan(ref=CONTRACT_REF)
@@ -167,18 +169,20 @@ def normalize(text: str) -> str:
 class RepoResolver:
     """Resolves Tier-1 referents against a repo checkout and a decomposed :class:`WorkGraph`.
 
-    ``SKILL`` accepts a bare skill name (searched under every ``plugins/*/skills/`` and
-    ``.claude/skills/``) or a ``plugin:skill`` qualified name, matching this repo's own skill
-    addressing convention (``AGENTS.md``: ``python-engineering:python3-typing``) -- a bare plugin
-    name is not itself "a directory containing SKILL.md" and so does not resolve as SKILL.
+    Skill existence is deliberately not one of these referents. A skill name is verified by the
+    acting agent in its own harness at runtime, not by this gate at decomposition time: skill
+    availability is a property of the agent harness the work eventually runs in (Claude Code,
+    Codex, Hermes, OpenCode, Cursor, pi, Kimi Code, Kilo Code each resolve skills their own way),
+    not of this repository's filesystem layout, and a built-in skill (Claude Code's ``/code-review``,
+    say) lives in no plugin directory here at all.
     """
 
     def __init__(self, repo_root: Path, work: WorkGraph) -> None:
         """Initialize the resolver.
 
         Args:
-            repo_root: The repository checkout root that ``SKILL``, ``FILE`` and ``RULE`` referents
-                are resolved relative to.
+            repo_root: The repository checkout root that ``FILE`` and ``RULE`` referents are
+                resolved relative to.
             work: The decomposed layer-2 graph that ``TASK_OUTPUT`` and ``GRAPH_POSITION`` referents
                 are resolved against.
         """
@@ -186,7 +190,7 @@ class RepoResolver:
         self._work = work
 
     def resolve(self, referent: Referent) -> str | None:
-        """Resolve ``referent`` per the contract's tier-1 table.
+        """Resolve ``referent`` per the decomposition-exit gate's tier-1 table.
 
         Args:
             referent: The referent to resolve.
@@ -195,7 +199,6 @@ class RepoResolver:
             What was found, or ``None`` when the referent does not resolve.
         """
         resolvers = {
-            ReferentKind.SKILL: self.resolve_skill,
             ReferentKind.FILE: self.resolve_file,
             ReferentKind.RULE: self.resolve_rule,
             ReferentKind.TASK_OUTPUT: self.resolve_work_node,
@@ -203,31 +206,6 @@ class RepoResolver:
             ReferentKind.ARTIFACT: self.resolve_artifact,
         }
         return resolvers[referent.kind](referent.target)
-
-    def resolve_skill(self, target: str) -> str | None:
-        """Resolve a ``SKILL`` referent: a bare skill name, or a ``plugin:skill`` qualified one.
-
-        Args:
-            target: The skill name to resolve.
-
-        Returns:
-            The resolved skill directory's path, or ``None`` when no ``SKILL.md`` is found.
-        """
-        plugin, sep, skill = target.partition(":")
-        if sep:
-            candidate = self._repo_root / "plugins" / plugin / "skills" / skill / "SKILL.md"
-            return str(candidate.parent) if candidate.is_file() else None
-        plugins_root = self._repo_root / "plugins"
-        if plugins_root.is_dir():
-            for skill_md in plugins_root.glob("*/skills/*/SKILL.md"):
-                if skill_md.parent.name == target:
-                    return str(skill_md.parent)
-        claude_skills = self._repo_root / ".claude" / "skills"
-        if claude_skills.is_dir():
-            for skill_md in claude_skills.glob("*/SKILL.md"):
-                if skill_md.parent.name == target:
-                    return str(skill_md.parent)
-        return None
 
     def resolve_file(self, target: str) -> str | None:
         """Resolve a ``FILE`` referent: a repo-relative path that must exist.
@@ -401,7 +379,7 @@ class DecompositionGate:
                     Predicate.REFERENT_DOES_NOT_RESOLVE,
                     ContractBasis.DECLARED,
                     (
-                        "ASSESSOR-CONTRACT.md, Tier 1: 'An instruction that sends the agent somewhere names "
+                        "ARCHITECTURE.md, 'The decomposition-exit gate' Tier 1: 'An instruction that sends the agent somewhere names "
                         "a referent, and the referent must exist at decomposition time. ... The instruction "
                         f"is the declaration.' Instruction {instruction.text!r} declares {referent.target!r} "
                         "exists; it does not."
@@ -440,7 +418,7 @@ class DecompositionGate:
                     Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE,
                     ContractBasis.UNSPECIFIED,
                     (
-                        "ASSESSOR-CONTRACT.md, Tier 2: an assertion marked ASSUMED or ABSENT with the gap "
+                        "ARCHITECTURE.md, 'The decomposition-exit gate' Tier 2: an assertion marked ASSUMED or ABSENT with the gap "
                         "stated 'does not falsify the predicate ... reported at CONTRACT_UNSPECIFIED and "
                         f"does not block'. Instruction {instruction.text!r} records exactly this."
                     ),
@@ -459,7 +437,7 @@ class DecompositionGate:
                 Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE,
                 ContractBasis.DECLARED,
                 (
-                    "ASSESSOR-CONTRACT.md, Tier 2: 'An instruction stating how a system behaves carries a "
+                    "ARCHITECTURE.md, 'The decomposition-exit gate' Tier 2: 'An instruction stating how a system behaves carries a "
                     "SourceSpan whose quote is found verbatim in the text at its ref. Citing is not enough; "
                     f"the quote must be there.' Instruction {instruction.text!r} carries neither."
                 ),

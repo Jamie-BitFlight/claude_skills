@@ -974,7 +974,7 @@ def test_sam_create_returns_plan_ref_with_issue(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# sam_plan — append_task action (#1770)
+# sam_plan — append_task action
 # ---------------------------------------------------------------------------
 
 
@@ -992,7 +992,7 @@ def test_append_task_config_accepts_legacy_task_id_alias() -> None:
 def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task calls backend.append_task for the given plan.
 
-    AC #2: sam_plan(action='append_task', plan=P, task=<TaskDefinition>) must append
+    sam_plan(action='append_task', plan=P, task=<TaskDefinition>) must append
     a single task and return a success acknowledgment.
 
     Arrange: create a plan with empty tasks list; inject mock backend.
@@ -1064,7 +1064,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path, monk
 def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task returns a success acknowledgment dict.
 
-    AC #2: the response must not be an error dict; it must contain a truthy
+    The response must not be an error dict; it must contain a truthy
     success indicator (e.g. 'appended': True or 'task_id': 'T1').
 
     Arrange: create plan via InMemoryTaskProvider; append one task.
@@ -1108,7 +1108,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path, monkeypa
 def test_sam_append_task_plan_not_found_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task raises PlanNotFoundError when plan does not exist.
 
-    AC #6: backend must raise PlanNotFoundError for unknown plan_id.
+    Backend must raise PlanNotFoundError for unknown plan_id.
     FastMCP converts this to a ToolError (isError=true) at the MCP transport.
 
     Arrange: inject fresh InMemoryTaskProvider (no plans).
@@ -1137,7 +1137,7 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path, monkeypatch: pyte
 def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=append_task raises an error when duplicate task ID is appended.
 
-    AC #6: backend raises TaskValidationError when a duplicate task ID is appended.
+    Backend raises TaskValidationError when a duplicate task ID is appended.
 
     Arrange: create a plan with T1; append T1 a second time.
     Act: second append_task call.
@@ -1170,14 +1170,14 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path, monkeypatch: p
 
 
 # ---------------------------------------------------------------------------
-# sam_plan — finalize action (#1770)
+# sam_plan — finalize action
 # ---------------------------------------------------------------------------
 
 
 def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """sam_plan action=finalize calls backend.finalize_plan (or update_plan_fields).
 
-    AC #14: finalize must clear the drafting state via a dedicated backend call.
+    Finalize must clear the drafting state via a dedicated backend call.
 
     Arrange: inject mock backend.
     Act: call sam_plan(action='finalize', plan='P1').

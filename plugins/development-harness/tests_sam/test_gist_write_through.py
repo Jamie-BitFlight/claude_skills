@@ -1,6 +1,6 @@
 """Roundtrip and write-failure tests for GistTaskLayer Gist-backed plan storage.
 
-These tests verify AC1, AC2, AC3, and AC7 from the #2509 architect spec:
+These tests verify AC1, AC2, AC3, and AC7 of the Gist-backed plan storage architect spec:
 
 - AC1 (create_uploads_content): create with issue → content retrievable via
   ArtifactRegistryClient.read.
@@ -315,9 +315,8 @@ def test_mutation_persists(gist_layer: GistTaskLayer, store: _InMemoryArtifactSt
 def test_claim_serial_exactly_once(gist_layer: GistTaskLayer) -> None:
     """AC3/concurrency: serial claim — first returns True, second returns False.
 
-    Tests that the exactly-once claim guarantee holds under the serialized-dispatch
-    pattern (ADR-2509-3, Option 3): two sequential claim calls on the same task
-    produce True then False, not True twice.
+    Tests that the exactly-once claim guarantee holds under the serialized-dispatch pattern: two
+    sequential claim calls on the same task produce True then False, not True twice.
     """
     # Arrange: create plan with one task.
     tasks = [Task(id="T1", title="Claimable task", status=TaskStatus.NOT_STARTED, agent="test-agent", dependencies=[])]

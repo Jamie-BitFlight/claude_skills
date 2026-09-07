@@ -1,4 +1,4 @@
-"""Tests for drafting-state lifecycle introduced by #1770.
+"""Tests for the drafting-state lifecycle.
 
 Covers the create-empty → drafting → append_task → finalize → ready lifecycle:
 
@@ -6,9 +6,8 @@ Covers the create-empty → drafting → append_task → finalize → ready life
 - Test E: ``read`` returns the task list with ``plan.state="drafting"`` for a mid-append plan.
 - Test F: after ``finalize``, ``status`` and ``ready`` report ``state="ready"``.
 
-For the single-writer concurrency contract and the architectural rationale behind
-the ``state`` field and ``finalize`` action, see
-``plugins/development-harness/docs/adrs/ADR-1770-1-single-writer-task-backend.md``.
+``append_task`` is single-writer per plan: callers must serialize writes to the same plan. A plan
+stays in ``state="drafting"`` -- not dispatchable -- until ``finalize`` clears it.
 """
 
 from __future__ import annotations
@@ -54,7 +53,7 @@ _DRAFTING_PLAN_CONFIG = CreatePlanConfig(slug="test-plan", goal="Test goal", tas
 def test_status_returns_drafting_state_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='status') reports state='drafting' while plan is mid-append.
 
-    AC #12: status returns a drafting state instead of dispatchable task data
+    Status returns a drafting state instead of dispatchable task data
     when the plan is in drafting state.
 
     Arrange: create a plan with empty tasks list so it enters drafting state.
@@ -81,7 +80,7 @@ def test_status_returns_drafting_state_on_mid_append_plan(memory_backend: InMemo
 def test_ready_returns_drafting_state_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='ready') reports state='drafting' while plan is mid-append.
 
-    AC #12: ready returns a drafting state instead of dispatchable task data
+    Ready returns a drafting state instead of dispatchable task data
     when the plan is in drafting state.
 
     Arrange: create empty plan; append one task so plan has content.
@@ -116,7 +115,7 @@ def test_ready_returns_drafting_state_on_mid_append_plan(memory_backend: InMemor
 def test_read_returns_tasks_and_drafting_state_on_mid_append_plan(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='read') returns tasks with plan.state='drafting' on a drafting plan.
 
-    AC #11: read on a drafting plan returns the plan body including all tasks
+    Read on a drafting plan returns the plan body including all tasks
     appended so far, with the plan state set to drafting.
 
     Arrange: create empty plan; append one task.
@@ -155,7 +154,7 @@ def test_read_returns_tasks_and_drafting_state_on_mid_append_plan(memory_backend
 def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='status') returns normal task data after finalize clears drafting.
 
-    AC #13/#14: after finalize (or equivalent), status returns real dispatchable data.
+    After finalize (or equivalent), status returns real dispatchable data.
 
     Arrange: create empty plan, append a task, then call finalize.
     Act: call sam_plan(action='status', plan=P).
@@ -183,7 +182,7 @@ def test_status_returns_normal_data_after_finalize(memory_backend: InMemoryTaskP
 def test_ready_returns_normal_data_after_finalize(memory_backend: InMemoryTaskProvider) -> None:
     """sam_plan(action='ready') returns ready tasks after finalize clears drafting.
 
-    AC #13/#14: after finalize, ready lists dispatchable tasks.
+    After finalize, ready lists dispatchable tasks.
 
     Arrange: create empty plan, append a not-started task with no deps, finalize.
     Act: call sam_plan(action='ready', plan=P).
