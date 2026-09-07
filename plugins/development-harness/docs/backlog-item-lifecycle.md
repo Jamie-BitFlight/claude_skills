@@ -7,16 +7,25 @@ the configured backend owns storage and provider-specific persistence.
 
 **Sources**:
 
-- `plugins/development-harness/skills/create-backlog-item/SKILL.md`
-- `plugins/development-harness/skills/groom-backlog-item/SKILL.md`
-- `plugins/development-harness/skills/add-new-feature/SKILL.md`
 - `plugins/development-harness/skills/work-backlog-item/SKILL.md`
+- `plugins/development-harness/skills/work-backlog-item/scripts/parser/command-routes.json`
+- `plugins/development-harness/skills/work-backlog-item/references/workflows/create/start.md`, `.../create/scope.md`
+- `plugins/development-harness/skills/work-backlog-item/references/workflows/groom/start.md`, `.../groom/intake.md`, `.../groom/analyze.md`, `.../groom/swarm.md`, `.../groom/finalize.md`, `.../groom/groom-drift.md`, `.../groom/finally.md`, `.../groom/scope.md`
+- `plugins/development-harness/skills/work-backlog-item/references/workflows/work/start.md`, `.../work/prepare.md`, `.../work/plan.md`, `.../work/rt-ica-gate.md`, `.../work/feasibility-gate.md`
+- `plugins/development-harness/skills/add-new-feature/SKILL.md`
 - `plugins/development-harness/skills/implement-feature/SKILL.md`
 - `plugins/development-harness/skills/start-task/SKILL.md`
 - `plugins/development-harness/skills/complete-implementation/SKILL.md`
-- `plugins/development-harness/docs/adr-9-close-resolve-semantics.md`
 
-**Last verified**: 2026-05-27
+Note: this document's close/resolve semantics (Phase 7) were originally sourced from an ADR
+(`docs/adr-9-close-resolve-semantics.md`), which is a record of a past deliberation, not the
+current-design authority. No `ARCHITECTURE.md` in this plugin currently documents the close/resolve
+semantic split as the authoritative design — that is a documentation gap, not something this
+citation can be redirected to close. The semantics themselves are stated directly in Phase 7 below
+and were re-verified against `backlog_core/ARCHITECTURE.md` and the `work-backlog-item` close/resolve
+workflow rather than against the ADR.
+
+**Last verified**: 2026-09-07
 
 ## Governing Design Constraint: Context-Fit Complexity
 
@@ -103,177 +112,315 @@ providers may privately use `FileCache`, while Beads, SQLite, and Memory use nat
 
 ## Phase 1: Item Capture
 
-**Entry precondition**: User identifies a feature, bug, or chore worth tracking.
+**Entry precondition**: User identifies a feature, bug, or chore worth tracking, and no existing
+backlog item reference already covers it.
 
-**Skill**: `/dh:create-backlog-item`
+**Skill**: `/dh:work-backlog-item create` (the `create` route defined in
+[command-routes.json](../skills/work-backlog-item/scripts/parser/command-routes.json), documented
+in [create/start.md](../skills/work-backlog-item/references/workflows/create/start.md))
 
-**Actor**: Orchestrator (guided/quick mode) or orchestrator in auto mode.
+**Actor**: Orchestrator, in `interactive` mode (default) or `auto` mode.
 
-The following diagram is the authoritative procedure for Phase 1 — Item Capture (/dh:create-backlog-item). Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram is the authoritative procedure for Phase 1 — Item Capture
+(`/dh:work-backlog-item create`). Execute steps in the exact order shown, including branches,
+decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    P1_START([User invokes /dh:create-backlog-item]) --> P1_MODE{Mode?}
-    P1_MODE -->|Guided| P1_COLLECT_GUIDED["Collect 6 fields via questions:<br>1. Title<br>2. Priority (P0/P1/P2/Idea)<br>3. Description + verbatim_user_report<br>4. Source<br>5. Type<br>6. How to reproduce (optional)"]
-    P1_MODE -->|Quick| P1_COLLECT_QUICK["Collect Priority + Description only<br>verbatim_user_report = full argument string<br>Source = Session observation<br>Type = Feature"]
-    P1_MODE -->|--auto| P1_COLLECT_AUTO["Infer from description:<br>Priority from urgency keywords<br>(critical/required/must→P1, default P1)<br>Source = Agent task<br>Type = Feature"]
+    P1_START(["work-backlog-item create &lt;input&gt;"]) --> P1_EXIST{"Existing item_ref<br>already available?"}
+    P1_EXIST -->|"Yes"| P1_SKIP(["STOP — item already exists,<br>creation not needed"])
+    P1_EXIST -->|"No"| P1_SCOPE["Read scope.md<br>Step 0: classify description as<br>BEHAVIORAL/PROCESS, PRODUCT/FEATURE, or MIXED"]
 
-    P1_COLLECT_GUIDED --> P1_VALIDATE["Step 2: Validate inputs<br>Required: title, priority, description<br>Strip implementation instructions from description"]
-    P1_COLLECT_QUICK --> P1_VALIDATE
+    P1_SCOPE --> P1_MODE{Mode?}
+    P1_MODE -->|"interactive (default)"| P1_COLLECT_INT["Step 1: AskUserQuestion for<br>title, priority, description, source, type<br>Extract implementation instructions into<br>'**User-provided context**: {verbatim}'"]
+    P1_MODE -->|"auto"| P1_COLLECT_AUTO["Step 1: Derive fields from item_title + input<br>title = item_title (trimmed)<br>priority = P1 only on explicit urgency evidence,<br>P2 for 'nice to have'/'optional', else default P2<br>description per scope.md classification<br>source/type inferred; each decision logged<br>'[AUTO] {field}: {decision} - {evidence}'"]
+
+    P1_COLLECT_INT --> P1_VALIDATE["Step 2: Validate inputs<br>Required: title, priority (P0/P1/P2/Ideas), description<br>Apply scope.md classification rules per field"]
     P1_COLLECT_AUTO --> P1_VALIDATE
 
-    P1_VALIDATE -->|"required field missing"| P1_STOP_INVALID(["STOP — report missing field<br>(title, priority, or description)"])
-    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>Content-scoped token/boolean match<br>across title, description, and section bodies"}
-    P1_DEDUP -->|"Duplicate found (guided/quick)"| P1_CONFIRM{"User confirms<br>proceed?"}
-    P1_DEDUP -->|"Duplicate found (--auto)"| P1_STOP_DUP(["STOP — duplicate detected<br>No file written"])
-    P1_DEDUP -->|No duplicate| P1_COMPOSE
-    P1_CONFIRM -->|"No — abort"| P1_STOP_DECLINE(["STOP — user declined"])
-    P1_CONFIRM -->|"Yes — proceed anyway"| P1_COMPOSE
+    P1_VALIDATE -->|"required field missing,<br>or stripping leaves description empty"| P1_STOP_INVALID(["STOP — report missing/empty field"])
+    P1_VALIDATE -->|"all required fields present"| P1_DEDUP{"Step 3: Duplicate detection<br>Extract 2-4 key concepts, search<br>backlog_list(search='{c1} OR {c2} OR {c3}')"}
+    P1_DEDUP -->|"Overlap found (interactive)"| P1_CONFIRM{"AskUserQuestion:<br>Proceed anyway?"}
+    P1_DEDUP -->|"Overlap found (auto)"| P1_STOP_DUP(["STOP — log '[AUTO] STOP -<br>duplicate detected' — no write"])
+    P1_DEDUP -->|No overlap| P1_WRITE
+    P1_CONFIRM -->|"No — abort"| P1_STOP_DECLINE(["STOP — no write"])
+    P1_CONFIRM -->|"Yes — proceed anyway"| P1_WRITE
 
-    P1_COMPOSE["Step 4: Compose item block<br>Fields: Title, Source, Added (date),<br>Priority, Type, Description,<br>Verbatim user report (REQUIRED),<br>How to reproduce (if provided)"]
-    P1_COMPOSE --> P1_ADD["Step 5: backlog_add MCP tool<br>Registers backlog item via configured backend"]
+    P1_WRITE["Step 4: Write via backlog_add<br>(MCP or CLI) — title, priority,<br>description, source, type"]
+    P1_WRITE --> P1_RESULT{"Step 5: Response contains<br>error/errors?"}
+    P1_RESULT -->|"No error"| P1_REF["item_ref taken from response"]
+    P1_RESULT -->|"Errors present, but reference/<br>file_path/title non-empty"| P1_PARTIAL["Item stored, backend work-item<br>reference could not be created —<br>use reference (not item_ref) downstream"]
+    P1_RESULT -->|"Errors present, and reference/<br>file_path/title all absent"| P1_STOP_NEVER(["STOP — item was never stored<br>(e.g. duplicate or validation error)"])
 
-    P1_ADD --> P1_ISSUE{"Remote work-item reference?"}
-    P1_ISSUE -->|"Configured backend supports and request confirms"| P1_GH_CREATE["Backend work item linked<br>owner reference recorded"]
-    P1_ISSUE -->|"No remote reference requested or supported"| P1_NO_GH["No remote reference"]
-
-    P1_GH_CREATE --> P1_DONE["Step 6: Confirm write<br>Show title, priority, date<br>Next steps:<br>  /dh:groom-backlog-item {title}<br>  /dh:work-backlog-item {title}"]
-    P1_NO_GH --> P1_DONE
+    P1_REF --> P1_DONE["Step 6: Confirm write<br>Show title, item_ref, priority, type<br>Next steps:<br>  /dh:work-backlog-item groom {item_ref}<br>  /dh:work-backlog-item work {item_ref}"]
+    P1_PARTIAL --> P1_DONE
 ```
 
 ### Node Contracts
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P1_START | user | feature/bug/chore description | skill invocation | always → P1_MODE |
-| P1_MODE | orchestrator | user args, `--auto` flag | mode selection | guided → P1_COLLECT_GUIDED, quick → P1_COLLECT_QUICK, `--auto` → P1_COLLECT_AUTO |
-| P1_COLLECT_GUIDED | orchestrator | 6 user answers (title, priority, description, source, type, reproduction) | collected fields, `verbatim_user_report` | always → P1_VALIDATE |
-| P1_COLLECT_QUICK | orchestrator | priority + description args | collected fields, `verbatim_user_report` = full argument string | always → P1_VALIDATE |
-| P1_COLLECT_AUTO | orchestrator | description text | inferred fields (priority from keywords, source=Agent task, type=Feature) | always → P1_VALIDATE |
-| P1_VALIDATE | orchestrator | collected fields | validated fields, stripped description | valid → P1_DEDUP, missing required field → STOP |
-| P1_DEDUP | orchestrator | validated title, description, cached backlog item list | duplicate match result | duplicate + guided/quick → P1_CONFIRM, duplicate + auto → P1_STOP_DUP, no duplicate → P1_COMPOSE |
-| P1_CONFIRM | user | duplicate item title | proceed/decline decision | yes → P1_COMPOSE, no → P1_STOP_DECLINE |
-| P1_STOP_DUP | orchestrator | duplicate detection result | error report (no file written) | terminal |
+| P1_START | user or orchestrator | `create` route with an item-title/description input | skill invocation | always → P1_EXIST |
+| P1_EXIST | orchestrator | any `item_ref` already resolved by the caller | existence check | existing ref → P1_SKIP, none → P1_SCOPE |
+| P1_SKIP | orchestrator | — | "item already exists" report | terminal |
+| P1_SCOPE | orchestrator | raw description | classification: BEHAVIORAL/PROCESS, PRODUCT/FEATURE, or MIXED | always → P1_MODE |
+| P1_MODE | orchestrator | `mode` input (`interactive` default, or `auto`) | mode selection | interactive → P1_COLLECT_INT, auto → P1_COLLECT_AUTO |
+| P1_COLLECT_INT | user | answers to 5 `AskUserQuestion` prompts (title, priority, description, source, type) | collected fields, extracted `**User-provided context**` block if implementation details were supplied | always → P1_VALIDATE |
+| P1_COLLECT_AUTO | orchestrator | `item_title`, user input, optional matched research file | derived fields, `[AUTO]` decision log per field | always → P1_VALIDATE |
+| P1_VALIDATE | orchestrator | collected fields | validated fields | valid → P1_DEDUP, missing/empty required field → P1_STOP_INVALID |
+| P1_STOP_INVALID | orchestrator | missing/empty field name | error report | terminal |
+| P1_DEDUP | `backlog_list` MCP/CLI | 2-4 extracted concepts | overlap match result | overlap + interactive → P1_CONFIRM, overlap + auto → P1_STOP_DUP, no overlap → P1_WRITE |
+| P1_CONFIRM | user | matched item's title, ref, location | proceed/decline decision | yes → P1_WRITE, no → P1_STOP_DECLINE |
+| P1_STOP_DUP | orchestrator | duplicate match | error report (no write) | terminal |
 | P1_STOP_DECLINE | orchestrator | user decline | error report | terminal |
-| P1_COMPOSE | orchestrator | validated fields | item block (title, source, added, priority, type, description, verbatim_user_report, how_to_reproduce) | always → P1_ADD |
-| P1_ADD | `backlog_add` MCP | item block | registered logical backlog item, optional owner reference | always → P1_ISSUE |
-| P1_ISSUE | orchestrator | priority, user preference, remote-reference flag | linkage decision | confirmed and supported → P1_GH_CREATE, otherwise → P1_NO_GH |
-| P1_GH_CREATE | `backlog_add` MCP | item fields | configured-backend work-item reference | always → P1_DONE |
-| P1_NO_GH | orchestrator | — | no remote reference | always → P1_DONE |
-| P1_DONE | orchestrator | logical item reference, title, priority | confirmation message, next-step suggestions | terminal |
+| P1_WRITE | `backlog_add` MCP/CLI | title, priority, description, source, type | raw tool response | always → P1_RESULT |
+| P1_RESULT | orchestrator | response `error`/`errors`, `item_ref`, `reference`/`file_path`/`title` | 3-way outcome classification | no error → P1_REF, error with a stored-item signal → P1_PARTIAL, error with no stored-item signal → P1_STOP_NEVER |
+| P1_REF | orchestrator | response `item_ref` | normalized `#N` selector | always → P1_DONE |
+| P1_PARTIAL | orchestrator | response `reference`/`file_path`/`title` | selector fallback (item exists, no backend work-item reference yet) | always → P1_DONE |
+| P1_STOP_NEVER | orchestrator | response with no stored-item signal | "item never stored" error report | terminal |
+| P1_DONE | orchestrator | selector (`item_ref` or `reference`), title, priority, type | confirmation message, next-step suggestions | terminal |
 
-**Strip implementation instructions from description** (Step 2): **Why:** Implementation instructions in the description contaminate the problem statement. Grooming and architecture phases need to understand WHAT is broken, not HOW to fix it. The `verbatim_user_report` preserves the original words — including any solution suggestions — for reference.
+**Scope boundary at creation time** (`create/scope.md`): a PRODUCT/FEATURE item strips
+implementation instructions, design decisions, and file/code-level prescriptions from the
+description, preserving them instead as `**User-provided context**: {verbatim text}` or, for an
+unconfirmed causal guess, `**Hypothesis**: {text}`. A BEHAVIORAL/PROCESS item — one whose
+description defines what an agent, workflow, or system must do — preserves the full procedural
+text unchanged (the hypothesis-labeling rule still applies to any embedded causal claim). A MIXED
+item preserves the behavioral spec and isolates only the code-level prescriptions as
+user-provided context. **Why:** grooming and architecture need to know WHAT is broken or required,
+not HOW to fix it — except when the item itself IS the "what," as with a process/behavioral
+requirement.
 
 **Key fields**:
 
-- `verbatim_user_report` — REQUIRED, never omitted. The exact user words from Question 3 (guided) or the full argument string (quick/auto). Never edited, summarized, or reformatted. **Why:** The verbatim report is the only field that captures the user's mental model unfiltered. When grooming reveals a misunderstanding between what the user asked for and what the agent interpreted, it is the arbiter of original intent.
-- `how_to_reproduce` — optional. Omitted entirely from the MCP call if user skipped or no reproduction steps found.
+- `**User-provided context**` / `**Hypothesis**` — the mechanism that preserves the user's own
+  words when implementation detail or an unconfirmed cause is stripped from `description`. Never
+  edited, summarized, or reformatted. **Why:** it is the arbiter of original intent when grooming
+  later needs to check what was actually asked for.
+- `source`, `type` — optional in the schema (`source` defaults to `Not specified`); auto mode
+  derives them from context (research-file match, defect vs. feature keywords) rather than leaving
+  them unset.
 
 **Canonical status after this phase**: `needs-grooming`
 
 **Failure paths**:
 
-- Missing required field (title, priority, description) — STOP, report field name.
-- Content duplicate detected in auto mode — STOP, no file written.
-- Remote provider unavailable — backend reports the failure explicitly; callers do not switch to a local storage provider.
+- Missing/empty required field (title, priority, description) — STOP, report field name.
+- Content overlap detected in `auto` mode — STOP, no write.
+- `backlog_add` response carries `error`/`errors` with no `reference`/`file_path`/`title` — STOP,
+  the item was never stored (a distinct failure mode from the partial-success case where the item
+  is stored but no backend work-item reference could be created).
 
-**Transition to next phase**: Text suggestion only ("Next steps: Groom: /dh:groom-backlog-item {title}"). No automatic invocation. The transition from capture to grooming is entirely implied — a human or orchestrator must decide to invoke the next step. (Confirmed: audit Finding 9 Gap A.)
+**Transition to next phase**: Text suggestion only (Step 6's "Next steps:" block). No automatic
+invocation. The transition from capture to grooming is entirely implied — a human or orchestrator
+must decide to invoke the next step. (Originally confirmed by a 2026-03-02 process audit, Finding 9
+Gap A — see "Unimplemented Extensions and Known Gaps" below; unchanged in the current `create`
+workflow.)
 
 ---
 
 ## Phase 2: Grooming
 
-**Entry precondition**: Item has status `needs-grooming` and is selected for detail work.
+**Entry precondition**: Item is selected for detail work, identified by a single `#N` item
+reference (grooming operates on one item per invocation; it no longer accepts a section-wide
+scope argument — see the note on discontinued behavior below).
 
-**Skill**: `/dh:groom-backlog-item`
+**Skill**: `/dh:work-backlog-item groom` (the `groom` route defined in
+[command-routes.json](../skills/work-backlog-item/scripts/parser/command-routes.json), documented
+in [groom/start.md](../skills/work-backlog-item/references/workflows/groom/start.md))
 
-**Actor**: Orchestrator dispatches a parallel grooming swarm (team mode) or sequential agents (fallback mode).
+**Actor**: Orchestrator dispatches standalone `Agent()` calls per swarm agent — no team, no
+`SendMessage` between agents; an agent that depends on another's output re-reads that agent's
+section from the item via MCP.
 
-The following diagram is the authoritative procedure for Phase 2 — Grooming (/dh:groom-backlog-item). Execute steps in the exact order shown, including branches, decision points, and stop conditions.
+The following diagram is the authoritative procedure for Phase 2 — Grooming
+(`/dh:work-backlog-item groom`). Execute steps in the exact order shown, including branches,
+decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
-    P2_START([Item selected for grooming]) --> P2_LIST["Step 1: backlog_list MCP<br>Filter items by scope argument"]
-    P2_LIST --> P2_VALIDATE["Step 2: Validity Check<br>Run 4 sequential checks per item"]
+    P2_START(["groom &lt;item_ref&gt;"]) --> P2_SCOPE_READ["Read scope.md<br>Grooming answers 'what/is it clear/what do<br>we have' — never architecture or task decomposition"]
+    P2_SCOPE_READ --> P2_LOAD["Intake: Load item<br>backlog_view(selector=item_ref)"]
 
-    P2_VALIDATE --> P2_VALID{"C1: Is the job still valid?<br>Does this item still belong<br>in the backlog given current context?"}
-    P2_VALID -->|"No — scope/priority/context changed"| P2_SKIP(["Report invalid — skip this item"])
-    P2_VALID -->|"Yes — still belongs in backlog"| P2_DONE_CHECK{"C2: Evidence work already done?<br>git log + backlog_list_merged_prs + file read"}
-    P2_DONE_CHECK -->|"Already done — evidence found"| P2_SKIP
-    P2_DONE_CHECK -->|"Not done — no evidence"| P2_ISSUE_CHECK["C3: Check work-item linkage<br>Check the logical owner reference<br>(result does not select storage)"]
-    P2_ISSUE_CHECK --> P2_GROOMED_CHECK{"C4: Already groomed today?<br>groomed == today's date<br>AND all required sections present?"}
-    P2_GROOMED_CHECK -->|"Yes — already groomed today<br>with all sections present"| P2_DRIFT["Step 2.5: Drift Check<br>Mode A: Plan Drift<br>Mode B: Grooming Drift<br>Then STOP — do not proceed to Step 3"]
-    P2_GROOMED_CHECK -->|"No — not groomed today<br>or sections missing"| P2_EXTRACT["Step 3: Extract item details<br>title, description, research questions,<br>source, suggested_location"]
+    P2_LOAD --> P2_A{"Check A — Prior implementation?<br>git log + backlog merged-prs<br>match title keywords"}
+    P2_A -->|"Evidence found"| P2_SKIP_A(["SKIP — backlog_resolve<br>'Completed via PR/commit'"])
+    P2_A -->|"No evidence"| P2_B{"Check B — Location validity?<br>Glob(suggested_location)"}
+    P2_B -->|"Path not found,<br>no substitute via Grep"| P2_SKIP_B(["SKIP — suggested_location<br>gone with no substitute"])
+    P2_B -->|"Path exists, no location set,<br>or substitute found and written"| P2_C{"Check C — Age and activity?<br>added &gt;90d AND ungroomed AND<br>no comments AND no plan"}
+    P2_C -->|"Condition met, overlap with<br>recent item found"| P2_C_ASK["interactive: AskUserQuestion<br>proceed? / auto: log WARN, proceed"]
+    P2_C -->|"Condition not met, or<br>no overlap found"| P2_D
+    P2_C_ASK --> P2_D{"Check D — Item state?<br>state field from Load Item"}
+    P2_D -->|"closed, no commit/PR evidence"| P2_SKIP_D(["SKIP — recommend manual review"])
+    P2_D -->|"closed, evidence found"| P2_RESOLVE_D(["backlog_resolve → SKIP"])
+    P2_D -->|"open"| P2_E{"Check E — Already groomed today?<br>groomed == today AND required<br>sections present"}
+    P2_E -->|"Yes"| P2_DRIFT["groom-drift.md<br>Mode A (has plan): Plan Drift<br>Mode B (no plan): Grooming Drift"]
+    P2_E -->|"No"| P2_EXTRACT["Extract item details:<br>title, description, source,<br>suggested_location, priority, labels,<br>groomed, research_first"]
+    P2_DRIFT --> P2_FINALLY(["finally.md — report drift, STOP"])
 
-    P2_EXTRACT --> P2_RTICA_INIT["Step 3.5: RT-ICA Initial Snapshot<br>(Actor: orchestrator)<br>Categorize info as:<br>AVAILABLE / DERIVABLE / MISSING<br>using extracted item details only<br>Write via backlog_groom section='RT-ICA'"]
+    P2_EXTRACT --> P2_GATE{"Discovery Gate<br>(analyze.md) — skip if item has<br>no issue_number, or is type:fix/type:bug"}
+    P2_GATE -->|"Skip gate"| P2_RTICA_INIT
+    P2_GATE -->|"feature-context artifact exists"| P2_LOADART["Load artifact, use as prior context"]
+    P2_GATE -->|"No artifact, but AC + Expected<br>Behavior + Desired Structure<br>sections all non-empty"| P2_SYNTH["Synthesize feature-context artifact<br>directly from those sections"]
+    P2_GATE -->|"No artifact, sections thin"| P2_DISCOVERY["Skill(skill='dh:discovery', item_ref)<br>then verify artifact registered;<br>retry once; else STOP"]
+    P2_LOADART --> P2_RTICA_INIT
+    P2_SYNTH --> P2_RTICA_INIT
+    P2_DISCOVERY -->|"artifact registered<br>(first or retried attempt)"| P2_RTICA_INIT
+    P2_DISCOVERY -->|"still absent after retry"| P2_STOP_DISCOVERY(["STOP — dh:discovery completed<br>but no feature-context artifact"])
 
-    P2_RTICA_INIT --> P2_SCOPE["Step 3.6: Scope Sizing<br>Choose: MINIMAL / NARROW /<br>STANDARD / FULL<br>Sizes the swarm agents"]
+    P2_RTICA_INIT["RT-ICA Initial Snapshot<br>(orchestrator) — AVAILABLE/DERIVABLE/MISSING<br>from extracted item details only<br>backlog_groom(section='RT-ICA')"]
+    P2_RTICA_INIT --> P2_SCOPE_SIZE["Scope Sizing (orchestrator decision)<br>issue type + AVAILABLE/DERIVABLE/MISSING mix<br>→ MINIMAL / NARROW / STANDARD / FULL"]
 
-    P2_SCOPE --> P2_WAVE1
+    P2_SCOPE_SIZE --> P2_WAVE0{"Wave 0 — pre-swarm research<br>skip for type:bug/type:fix,<br>no researchable technology,<br>or pure admin task"}
+    P2_WAVE0 -->|"Run"| P2_RESEARCH["technical-researcher agent<br>writes Research section<br>BLOCKED → proceed without it, do not halt"]
+    P2_WAVE0 -->|"Skip"| P2_WAVE1
+    P2_RESEARCH --> P2_WAVE1
 
-    subgraph P2_SWARM [Steps 4-8: Parallel Grooming Swarm]
+    subgraph P2_SWARM [Parallel Grooming Swarm — agents sized by Scope Sizing]
         direction TB
-        P2_WAVE1["Wave 1 (parallel):<br>• fact-checker agent<br>• impact-analyst agent<br>• classifier agent"]
-        P2_WAVE2["Wave 2 (blocked by Wave 1):<br>• rtica-assessor agent<br>• alignment-analyst agent"]
-        P2_WAVE3["Wave 3 (blocked by Wave 2):<br>• groomer agent"]
+        P2_WAVE1["Wave 1 (parallel):<br>• impact-analyst → Impact Radius<br>• fact-checker → Fact-Check<br>• classifier → Issue Classification<br>  (+ Root-Cause Analysis if defect/recurring-pattern)"]
+        P2_WAVE2["Wave 2 (after Wave 1):<br>• rtica-assessor → RT-ICA<br>  (re-reads Fact-Check/Impact Radius)<br>• alignment-analyst → Design Intent Alignment<br>  (depends on impact-analyst)"]
+        P2_WAVE3["Wave 3 (after Wave 2):<br>• groomer → all groomed subsections"]
         P2_WAVE1 --> P2_WAVE2
-        P2_WAVE2 --> P2_WAVE3
+        P2_WAVE2 -->|"RT-ICA STATUS: BLOCKED"| P2_WAVE2_BLOCK(["Stop — present MISSING<br>conditions; do not proceed to Wave 3"])
+        P2_WAVE2 -->|"RT-ICA STATUS: DONE"| P2_WAVE3
     end
 
-    P2_WAVE3 --> P2_RTICA_FINAL["Step 8.5: RT-ICA Final Pass<br>(Actor: orchestrator or rtica-assessor)<br>Re-assess ALL conditions with full swarm output<br>Self-resolution pass: attempt tool-based resolution<br>for each MISSING/DERIVABLE condition<br>Replaces Step 3.5 snapshot"]
+    P2_WAVE3 --> P2_RTICA_FINAL["RT-ICA Final Pass (orchestrator)<br>Re-assess every condition, self-resolution<br>pass with Grep/Read/WebSearch/Bash citation<br>per MISSING/DERIVABLE condition"]
 
-    P2_RTICA_FINAL --> P2_DECISION{RT-ICA result?}
-    P2_DECISION -->|"APPROVED — all AVAILABLE<br>or DERIVABLE resolved"| P2_WRITE["Step 9: Write groomed content<br>via backlog_groom MCP calls<br>(one call per section, incremental)"]
-    P2_DECISION -->|"BLOCKED — MISSING conditions<br>remain after self-resolution"| P2_BLOCKED(["STOP — batch all MISSING<br>conditions and present to user<br>Wait for user answers<br>Re-check after responses"])
+    P2_RTICA_FINAL --> P2_DECISION{RT-ICA Final decision?}
+    P2_DECISION -->|"APPROVED"| P2_OUTVAL["Output Validation Gate<br>Check sections_index for 8 required<br>sections + minimum content per section"]
+    P2_DECISION -->|"BLOCKED — MISSING remain"| P2_BLOCKED(["Batch MISSING conditions, present to user<br>Wait for answers, mark AVAILABLE with<br>citation, re-check — loop until APPROVED"])
+    P2_BLOCKED -->|"re-check APPROVED"| P2_OUTVAL
 
-    P2_WRITE --> P2_DONE["Set groomed metadata<br>(YYYY-MM-DD date)<br>Persist through configured backend"]
+    P2_OUTVAL -->|"All present"| P2_HYPOTHESIS["Hypothesis Resolution<br>(if description has **Hypothesis** lines)<br>Rewrite each line per RCA/Fact-Check verdict"]
+    P2_OUTVAL -->|"Missing — attempt 1 or 2"| P2_RETRY["Re-spawn groomer, same model,<br>targeted prompt for missing sections only"]
+    P2_RETRY --> P2_OUTVAL
+    P2_OUTVAL -->|"Missing after 3 attempts"| P2_BLOCKED_VAL(["backlog_update(status='blocked')<br>Report missing sections, STOP"])
+
+    P2_HYPOTHESIS --> P2_WRITE["Write Groomed Content —<br>batch backlog_groom(sections={...},<br>mark_groomed=True) atomically advances<br>needs-grooming → groomed"]
+    P2_WRITE --> P2_FINALLY
 ```
 
 ### Node Contracts
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P2_START | orchestrator | item selector (title or `#N`) | skill invocation | always → P2_LIST |
-| P2_LIST | `backlog_list` MCP | scope argument | filtered item list | always → P2_VALIDATE |
-| P2_VALIDATE | orchestrator | item list | per-item validation sequence | always → P2_VALID (per item) |
-| P2_VALID | orchestrator | item context, current backlog state | validity determination | invalid → P2_SKIP, valid → P2_DONE_CHECK |
-| P2_DONE_CHECK | orchestrator | `git log`, `backlog_list_merged_prs`, `backlog_view` | already-done evidence | done → P2_SKIP, not done → P2_ISSUE_CHECK |
-| P2_ISSUE_CHECK | orchestrator | logical owner reference, backend linkage | work-item linkage | always → P2_GROOMED_CHECK |
-| P2_GROOMED_CHECK | orchestrator | `groomed` metadata, required section presence | groomed-today determination | groomed today → P2_DRIFT, not groomed → P2_EXTRACT |
-| P2_SKIP | orchestrator | validity/done-check result | skip report | terminal (for this item) |
-| P2_DRIFT | orchestrator | plan state, groomed content, codebase state | drift report (Mode A or B) | terminal (STOP — do not proceed to Step 3) |
-| P2_EXTRACT | orchestrator | logical item content | title, description, research questions, source, suggested_location | always → P2_RTICA_INIT |
-| P2_RTICA_INIT | orchestrator | extracted item details only (Wave 1 sections not yet produced) | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')` | always → P2_SCOPE |
-| P2_SCOPE | orchestrator | RT-ICA distribution (AVAILABLE/DERIVABLE/MISSING counts) | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_SWARM |
-| P2_WAVE1 | `fact-checker` + `impact-analyst` + `classifier` (parallel agents) | item description, codebase state, primary sources | Fact-Check Summary via `backlog_groom(section='Fact-Check')`, Impact Radius via `backlog_groom(section='Impact Radius')`, Issue Classification via `backlog_groom(section='Issue Classification')` | all complete → P2_WAVE2 |
-| P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel agents) | Wave 1 outputs, item details | RT-ICA reassessment, Design Intent Alignment via `backlog_groom(section='Design Intent Alignment')` | all complete → P2_WAVE3 |
-| P2_WAVE3 | `groomer` agent | all prior sections | Reproducibility, Priority, Impact, Benefits, Expected Behavior, AC, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
-| P2_RTICA_FINAL | orchestrator or `rtica-assessor` | full swarm output, all groomed sections | final RT-ICA assessment (replaces P2_RTICA_INIT snapshot), self-resolution attempts | always → P2_DECISION |
-| P2_DECISION | orchestrator | RT-ICA final result | APPROVED or BLOCKED determination | APPROVED → P2_WRITE, BLOCKED → P2_BLOCKED |
-| P2_WRITE | `backlog_groom` MCP (multiple calls) | groomed sections content | per-section writes to logical item | always → P2_DONE |
-| P2_BLOCKED | orchestrator | MISSING conditions list | user-facing report of unresolved conditions | terminal (wait for user answers) |
-| P2_DONE | `backlog_groom` MCP | groomed date | `groomed` metadata and configured-backend persistence | terminal |
+| P2_START | orchestrator | `#N` item reference | skill invocation | always → P2_SCOPE_READ |
+| P2_SCOPE_READ | orchestrator | — | grooming scope boundary in context | always → P2_LOAD |
+| P2_LOAD | `backlog_view` MCP/CLI | item_ref | full item content, `state` field | always → P2_A |
+| P2_A | orchestrator | `git log`, `backlog merged-prs` matched on title keywords | evidence of prior completion | found → P2_SKIP_A, none → P2_B |
+| P2_SKIP_A | `backlog_resolve` MCP/CLI | matched PR/commit | item resolved, terminal for this item | terminal |
+| P2_B | orchestrator | `suggested_location` (if any), `Glob`/`Grep` results | location validity | path missing with no substitute → P2_SKIP_B, otherwise (path OK, no location set, or substitute written) → P2_C |
+| P2_SKIP_B | orchestrator | — | skip report | terminal |
+| P2_C | orchestrator | `metadata.added`, `metadata.groomed`, comments, `plan` field, `backlog_list` keyword overlap | staleness/possible-supersession determination | condition met + overlap → P2_C_ASK, otherwise → P2_D |
+| P2_C_ASK | user (interactive) or orchestrator (auto) | possibly-superseded candidate title | proceed decision (auto always proceeds, logged) | always → P2_D |
+| P2_D | orchestrator | `state` field | open/closed determination | closed + no evidence → P2_SKIP_D, closed + evidence → P2_RESOLVE_D, open → P2_E |
+| P2_SKIP_D | orchestrator | — | "closed, no commit/PR found — recommend manual review" | terminal |
+| P2_RESOLVE_D | `backlog_resolve` MCP/CLI | matched evidence | item resolved | terminal |
+| P2_E | orchestrator | `groomed` date, required-section presence | already-groomed-today determination | groomed today → P2_DRIFT, otherwise → P2_EXTRACT |
+| P2_DRIFT | haiku `dh:task-worker` agent (`groom-drift.md`) | plan address (Mode A) or groomed sections' file paths (Mode B), git history since that date | drift findings written to item | always → P2_FINALLY |
+| P2_EXTRACT | orchestrator | full item content | title, description, source, suggested_location, priority, `item_ref`, `issue_number`, labels, groomed, research_first | always → P2_GATE |
+| P2_GATE | orchestrator | `issue_number`, labels, existing `feature-context` artifacts, groomed-section richness | discovery-gate routing | skip conditions met → P2_RTICA_INIT, artifact exists → P2_LOADART, rich sections but no artifact → P2_SYNTH, thin sections and no artifact → P2_DISCOVERY |
+| P2_LOADART | `artifact_read` MCP/CLI | existing `feature-context` artifact | prior context for swarm agents | always → P2_RTICA_INIT |
+| P2_SYNTH | orchestrator + `artifact_register` | AC, Expected Behavior, Desired Structure/Scope sections | synthesized `feature-context` artifact | always → P2_RTICA_INIT |
+| P2_DISCOVERY | `Skill(dh:discovery)` | item_ref | registered `feature-context` artifact (verified via `artifact_list`, retried once on miss) | registered → P2_RTICA_INIT, still absent after retry → P2_STOP_DISCOVERY |
+| P2_STOP_DISCOVERY | orchestrator | — | error report ("re-run /dh:discovery manually") | terminal |
+| P2_RTICA_INIT | orchestrator | extracted item details only | AVAILABLE/DERIVABLE/MISSING categorization written via `backlog_groom(section='RT-ICA')`, dated | always → P2_SCOPE_SIZE |
+| P2_SCOPE_SIZE | orchestrator | RT-ICA snapshot distribution, issue type | scope size (MINIMAL/NARROW/STANDARD/FULL) | always → P2_WAVE0 |
+| P2_WAVE0 | orchestrator | item type, description | Wave 0 skip/run decision | skip conditions met → P2_WAVE1, else → P2_RESEARCH |
+| P2_RESEARCH | `technical-researcher` agent | technology, concern, depth derived from item | Research section written, or `STATUS: BLOCKED` (proceed without it) | always → P2_WAVE1 |
+| P2_WAVE1 | `impact-analyst` + `fact-checker` + `classifier` (parallel `Agent()` calls) | item description, codebase state, primary sources, Research section (if present) | Impact Radius, Fact-Check, Issue Classification (+ Root-Cause Analysis for defect/recurring-pattern) sections | all complete → P2_WAVE2 |
+| P2_WAVE2 | `rtica-assessor` + `alignment-analyst` (parallel `Agent()` calls) | Wave 1 sections, item details | RT-ICA reassessment (`STATUS: DONE` or `BLOCKED`), Design Intent Alignment section | DONE → P2_WAVE3, BLOCKED → P2_WAVE2_BLOCK |
+| P2_WAVE2_BLOCK | orchestrator | MISSING conditions from Wave 2 RT-ICA | user-facing report | terminal (does not reach Wave 3) |
+| P2_WAVE3 | `groomer` agent (`subagent_type="dh:backlog-item-groomer"`) | all prior sections (re-read by the agent itself, not pasted into the prompt) | Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort — each via `backlog_groom(section='{name}')` | complete → P2_RTICA_FINAL |
+| P2_RTICA_FINAL | orchestrator | full swarm output, initial RT-ICA snapshot | final RT-ICA report (replaces snapshot), self-resolution attempts with tool-result citations | always → P2_DECISION |
+| P2_DECISION | orchestrator | RT-ICA final result | APPROVED or BLOCKED determination | APPROVED → P2_OUTVAL, BLOCKED → P2_BLOCKED |
+| P2_BLOCKED | orchestrator | MISSING conditions list, `<mode/>` | batched user-facing report; in `auto` mode, a MISSING condition with exactly one viable option is auto-resolved | user answers received → P2_OUTVAL (re-check), unresolved → remains blocked |
+| P2_OUTVAL | orchestrator | `backlog_view(summary=True).sections_index`, per-section content reads | presence/minimum-content check against the 8 required sections | all present with minimum content → P2_HYPOTHESIS, missing (attempt < 3) → P2_RETRY, missing (attempt 3) → P2_BLOCKED_VAL |
+| P2_RETRY | `groomer` agent (same model, targeted prompt) | list of missing section names | re-attempted section writes | always → P2_OUTVAL |
+| P2_BLOCKED_VAL | `backlog_update` MCP/CLI (`status='blocked'`) | missing-section list after 3 attempts | item marked blocked | terminal |
+| P2_HYPOTHESIS | orchestrator | `description`'s `**Hypothesis**` lines, Root-Cause Analysis / Fact-Check verdicts | `description` rewritten in place via `backlog_update` (each line resolved independently) | always → P2_WRITE |
+| P2_WRITE | `backlog_groom` MCP (`sections=`, `mark_groomed=True`) | all groomed sections including the RT-ICA final report | atomic batch write, status `needs-grooming` → `groomed` | always → P2_FINALLY |
+| P2_FINALLY | orchestrator (`finally.md`) | terminal outcome (Groomed/Blocked/Skipped/Drift) | one-line report to caller, `backlog_pull` refresh if needed, control returned | terminal |
 
-**Swarm agents and their outputs**:
+**Discontinued behavior**: earlier versions of this phase accepted a section-wide scope argument
+(`P0`/`P1`/`P2`/`all`) to groom every matching item in one invocation. The current `groom` route
+takes a single `#N` item reference; grooming multiple items means invoking the route once per item.
 
-- **fact-checker** (Wave 1) — Verifies item claims against primary sources. Produces `Fact-Check Summary` with VERIFIED/REFUTED/INCONCLUSIVE counts and citations. REFUTED claims become MISSING conditions in RT-ICA. INCONCLUSIVE become DERIVABLE. Writes via `backlog_groom(section="Fact-Check")`.
-- **impact-analyst** (Wave 1) — Assesses blast radius. Writes via `backlog_groom(section="Impact Radius")`.
-- **classifier** (Wave 1) — Classifies the issue type using a 5-branch decision tree (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design). No blocking dependencies. Writes via `backlog_groom(section="Issue Classification")`. For `defect` items, also produces a Root-Cause Analysis section via the find-cause skill. For `recurring-pattern` items, runs frequency analysis against resolved items via `backlog_list`.
-- **rtica-assessor** (Wave 2) — Runs RT-ICA analysis with swarm context. Blocked by fact-checker and impact-analyst completion.
-- **alignment-analyst** (Wave 2) — Compares existing implementation against the item's design intent (Description field). Samples affected systems from the Impact Radius section. Produces: Alignment assessment (ALIGNED | DIVERGENT | NOT_APPLICABLE), divergences table (Area, Expected, Actual, Severity, File), and summary counts. Writes via `backlog_groom(section="Design Intent Alignment")`. Blocked by impact-analyst completion.
-- **groomer** (Wave 3) — Reads all prior sections. Produces: Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Each subsection written individually via `backlog_groom(section="{subsection name}")`.
+**Pre-groom checks (Intake, `intake.md`)**: five checks run in order, first failure determines the
+outcome — Check A (prior implementation evidence), Check B (`suggested_location` still valid or
+substitutable), Check C (stale/possibly-superseded: added >90 days ago, ungroomed, no comments, no
+plan, with keyword overlap against recently-added items), Check D (item `state` open vs. closed),
+Check E (already groomed today with required sections present). This replaces an earlier "is the
+job still valid?" check that had no observable criterion attached to it (see Audit Finding F4
+below, now addressed by these five concrete checks).
 
-**RT-ICA runs twice**: Step 3.5 (initial snapshot, item-level info only) and Step 8.5 (final pass, full swarm output). The Step 8.5 result replaces the Step 3.5 snapshot in the logical item (same `section="RT-ICA"` call overwrites). **Why:** The initial snapshot calibrates swarm intensity — scope sizing (Step 3.6) uses the AVAILABLE/DERIVABLE/MISSING distribution to choose swarm intensity. The final pass incorporates swarm discoveries (fact-check results convert DERIVABLE to AVAILABLE, refuted claims convert AVAILABLE to MISSING).
+**Discovery Gate (`analyze.md`)**: new since the earlier version of this document. For a
+feature/refactor item with a linked backend issue, grooming requires a `feature-context` artifact
+before the swarm runs — either an existing one, one synthesized directly from already-rich groomed
+sections, or one produced by invoking `dh:discovery` (retried once on a verification miss, then a
+hard STOP). The gate is skipped entirely for bug/fix items or items with no linked issue.
+
+**Swarm agents and their outputs** (`swarm.md`):
+
+- **technical-researcher** (Wave 0, optional) — Pre-swarm research on the item's primary
+  technology or internal module. Skipped for bug/fix items, items with no researchable technology,
+  or pure administrative tasks. A `STATUS: BLOCKED` result does not halt the groom.
+- **impact-analyst** (Wave 1) — Builds an affected-systems inventory, then runs a 5-question
+  impact checklist per system. Writes `section="Impact Radius"` in 6 named categories (Code
+  Producers/Consumers/Other References, Documentation, Configuration/CI, Agent Instructions),
+  leading with `SCOPE_EXPANSION:` when it finds systems beyond the original description.
+- **fact-checker** (Wave 1) — Verifies item claims against primary sources; training-data recall
+  is not evidence. Every `**Hypothesis**: {text}` line in the description becomes its own claim,
+  prefixed `HYPOTHESIS:` with the line's exact text. Writes `section="Fact-Check"`. `REFUTED` maps
+  to RT-ICA MISSING, `INCONCLUSIVE` to DERIVABLE.
+- **classifier** (Wave 1) — Classifies the issue type via a 5-branch decision tree (procedural,
+  recurring-pattern, defect, missing-guardrail, unbounded-design), no blocking dependencies. Writes
+  `section="Issue Classification"`. For `defect`, invokes the `find-cause` skill for a
+  Root-Cause Analysis section; for `recurring-pattern`, runs a frequency search against resolved
+  items via `backlog_list`.
+- **rtica-assessor** (Wave 2) — Assesses information completeness using Wave 1 output; blocked by
+  impact-analyst and fact-checker. Re-reads Fact-Check (a `REFUTED` claim marks its condition
+  MISSING) and Impact Radius (a `SCOPE_EXPANSION:` line adds conditions). Writes `section="RT-ICA"`.
+- **alignment-analyst** (Wave 2) — Compares existing implementation against the item's design
+  intent, blocked by impact-analyst. Writes `section="Design Intent Alignment"`, leading with a
+  `MISSION_ALIGNED`/`MISSION_DIVERGENT` verdict line.
+- **groomer** (Wave 3, `subagent_type="dh:backlog-item-groomer"`) — Runs after all other agents,
+  reading every prior section itself (`item_ref` only is passed in the dispatch prompt). Produces
+  Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files,
+  Resources, Dependencies, Effort, each via its own `backlog_groom(section=...)` call. The
+  description/acceptance-criteria separation instruction that guides this agent lives in
+  `swarm.md`'s "Groomer prompt" section.
+
+**RT-ICA runs twice**: an initial snapshot (item-level info only, before the swarm — used for
+scope sizing) and a final pass (after the full swarm output — in `finalize.md`). The final report
+replaces the initial snapshot in the item (same `section="RT-ICA"` write overwrites). **Why:** the
+snapshot calibrates swarm intensity; the final pass incorporates swarm discoveries (a fact-checked
+`REFUTED` claim converts a condition from AVAILABLE to MISSING, a self-resolution attempt with a
+cited tool result converts DERIVABLE or MISSING to AVAILABLE).
+
+**Output Validation Gate (`finalize.md`)**: after RT-ICA Final is APPROVED, presence and minimum
+content are checked for 8 required sections (RT-ICA, Impact Radius, Fact-Check, Acceptance
+Criteria, Reproducibility, Issue Classification, Priority, Design Intent Alignment) via
+`backlog_view`'s `sections_index`. A missing section triggers up to two same-model retries with a
+targeted prompt naming only the missing sections; a third failed attempt marks the item `blocked`
+and stops. This gate did not exist in an earlier version of this document — it is the concrete
+implementation of what that version called "Recommended completeness check before Phase 3" (see
+the note below) and of Audit Finding F6's request for a groomer-output quality check (now
+addressed — see "Unimplemented Extensions and Known Gaps" below).
 
 **Metadata written**: `groomed` metadata is set to `YYYY-MM-DD`. This records when grooming
 occurred and is distinct from the item's status field.
 
-**Status advancement via `mark_groomed`**: Passing `mark_groomed=True` to the `backlog_groom` MCP tool triggers a status transition after all content writes complete:
-
-1. The item's status is set to `groomed` through the configured backend.
-2. The backend applies its equivalent status transition and any provider synchronization.
-
-The flag works with both single-section writes and the batch `sections` parameter. When `sections` is used with `mark_groomed=True`, all sections are written first; the status transition fires exactly once after the batch completes.
+**Status advancement via `mark_groomed`**: Passing `mark_groomed=True` to the `backlog_groom` MCP
+tool triggers a status transition after all content writes complete: the item's status is set to
+`groomed` through the configured backend, which applies its equivalent status transition and any
+provider synchronization. The flag works with both single-section writes and the batch `sections`
+parameter; with `sections`, all content is written first and the status transition fires exactly
+once after the batch completes. This is the atomic write-and-advance path `finalize.md` calls
+"Preferred: batch write with atomic status transition" — the current groom workflow always reaches
+this point through that batch call, not a chain of separate single-section calls (see Gap 1 in
+"Unimplemented Extensions and Known Gaps" below).
 
 **Idempotent**: Calling `backlog_groom` with `mark_groomed=True` multiple times is safe; the
 configured backend treats an already-groomed item as a no-op.
@@ -287,19 +434,33 @@ their queued remote mutation, when applicable, retain their backend-defined outc
 
 **Failure paths**:
 
-- Validity check fails (C1-C4) — item skipped with report.
+- Pre-groom check A-D fails — item skipped with report (see per-check outcomes above).
+- Discovery Gate STOP — `dh:discovery` completed without registering a `feature-context` artifact after one retry.
 - RT-ICA BLOCKED — STOP, present MISSING conditions to user, wait for answers.
+- Output Validation Gate fails after 3 attempts — item marked `blocked`, STOP.
 - Advisory AC overlap check: `_check_ac_overlap()` in `operations.py` issues a non-blocking warning when the Acceptance Criteria section is written and the description already contains checkbox items or acceptance headers (`## Acceptance`, `### Acceptance Criteria`). This fires for both single-section and batch `sections` writes.
 
-**Transition to next phase**: No explicit invocation of the next skill. The groomed item is available for `/dh:work-backlog-item` to pick up. Transition from grooming to milestone grouping is not mentioned (audit Finding 9 Gap B).
+**Transition to next phase**: No explicit invocation of the next skill from `finally.md` — control
+returns either to the `work-backlog-item` SKILL.md router (if `groom` was the invoked route) or to
+the `work` route's `prepare.md` (if grooming ran as a prerequisite for `work`). Transition from
+grooming to milestone grouping is still not mentioned anywhere in the `groom` workflow (Audit
+Finding 9 Gap B — unchanged in the current implementation).
 
-**Recommended completeness check before Phase 3**: The RT-ICA presence check in `work-backlog-item` Step 4 does not verify full grooming completeness. The recommended approach before entering Phase 3 is to verify presence of the RT-ICA section AND the Acceptance Criteria section AND the Description section. An item missing acceptance criteria would enter planning with incomplete information, producing a plan that cannot be validated against its own acceptance criteria.
+**Recommended completeness check before Phase 3 — now implemented**: an earlier version of this
+document recommended verifying RT-ICA, Acceptance Criteria, and Description presence before
+entering Phase 3, because the RT-ICA presence check alone did not verify full grooming
+completeness. The Output Validation Gate described above now performs exactly this kind of check
+(and more: 8 required sections, not 3) as part of every groom invocation, so this is no longer an
+open recommendation — it is enforced before an item can be marked `groomed`.
 
 ---
 
 ## Phase 3: Research and Architecture
 
-**Entry precondition**: Item is groomed. `/dh:work-backlog-item` has been invoked, which performs an RT-ICA checkpoint (Step 4) and composes a feature request (Step 5) before invoking `/dh:add-new-feature` via `Skill()` call (Step 6).
+**Entry precondition**: Item is groomed. `/dh:work-backlog-item` has been invoked on the `work`
+route, which runs an RT-ICA gate and a feasibility gate (Prepare phase, `rt-ica-gate.md` Step 3.2
+and `feasibility-gate.md` Step 3.4) and composes a feature request (Plan phase, `plan.md` Step 4.1)
+before invoking `/dh:add-new-feature` via `Skill()` call (Plan phase Step 4.2).
 
 **Skill**: `/dh:add-new-feature` (Phases 1-3 of 6 internal phases)
 
@@ -311,14 +472,25 @@ The following diagram is the authoritative procedure for Phase 3 — Research an
 
 ```mermaid
 flowchart TD
-    P3_RTICA_CHECK(["work-backlog-item Step 4:<br>RT-ICA Checkpoint"]) --> P3_RTICA_PRESENT{"RT-ICA summary<br>present in groomed content?"}
-    P3_RTICA_PRESENT -->|"Present — reuse existing"| P3_RTICA_USE["Use existing RT-ICA"]
-    P3_RTICA_PRESENT -->|"Absent — run inline"| P3_RTICA_RUN["Perform RT-ICA inline<br>(4-step: goal, prerequisites,<br>availability, decision)"]
+    P3_AUTOGROOM(["Prepare Step 3.1:<br>Auto-Groom"]) --> P3_GROOMED_CHECK{"Item's groomed field<br>set (YYYY-MM-DD)?"}
+    P3_GROOMED_CHECK -->|"Absent/empty — ungroomed"| P3_GROOM_NOW["Run the groom route directly:<br>/dh:work-backlog-item groom {item_ref}"]
+    P3_GROOMED_CHECK -->|"Set — groomed"| P3_STALE["Two-phase staleness check:<br>functional commits on Impact Radius<br>files since groom date?"]
+    P3_STALE -->|"None, or COSMETIC_ONLY diff"| P3_RTICA_CHECK
+    P3_STALE -->|"FUNCTIONAL_DRIFT"| P3_REGROOM["Write staleness-context section,<br>then re-enter the groom route directly:<br>/dh:work-backlog-item groom {item_ref}<br>(same route as ungroomed items —<br>not a separate skill)"]
+    P3_STALE -->|"SUPERSEDED"| P3_CLOSE(["backlog_close(reason='superseded') — STOP"])
+    P3_GROOM_NOW --> P3_RTICA_CHECK
+    P3_REGROOM --> P3_RTICA_CHECK
+
+    P3_RTICA_CHECK(["Prepare Step 3.2:<br>RT-ICA Gate"]) --> P3_RTICA_FRESH{"RT-ICA section present AND<br>fresh (Date &lt;= 7 days old,<br>and not older than metadata.updated_at)?"}
+    P3_RTICA_FRESH -->|"Present and fresh — reuse"| P3_RTICA_USE["Use cached APPROVED/BLOCKED decision<br>Carry DERIVABLE items as<br>'Assumptions to confirm'"]
+    P3_RTICA_FRESH -->|"Absent or stale — re-run"| P3_RTICA_RUN["Skill(skill='dh:rt-ica', args=item_ref)<br>Step 3.3: stamp Date: header on result"]
     P3_RTICA_USE --> P3_RTICA_GATE{RT-ICA decision?}
     P3_RTICA_RUN --> P3_RTICA_GATE
-    P3_RTICA_GATE -->|BLOCKED| P3_BLOCKED(["STOP — present unresolved<br>conditions to user<br>Do not invoke add-new-feature"])
-    P3_RTICA_GATE -->|APPROVED| P3_COMPOSE["work-backlog-item Step 5:<br>Compose feature request<br>Carry DERIVABLE items as<br>'Assumptions to confirm'"]
-    P3_COMPOSE --> P3_INVOKE["work-backlog-item Step 6:<br>Skill(skill='add-new-feature',<br>args='{composed feature request}')<br>Direct skill call — not a suggestion"]
+    P3_RTICA_GATE -->|BLOCKED| P3_BLOCKED(["STOP — present unresolved<br>conditions to user<br>Do not proceed to feasibility gate"])
+    P3_RTICA_GATE -->|APPROVED| P3_FEAS["Prepare Step 3.4: Feasibility Gate<br>4 criteria in order: technical feasibility,<br>effort proportionality, blast radius,<br>prior-attempt/over-engineering check"]
+    P3_FEAS -->|"BLOCKED — any criterion fails"| P3_FEAS_BLOCK(["STOP — report failing criterion,<br>observable check, required action<br>Do not proceed to Plan phase"])
+    P3_FEAS -->|"PASS (warnings allowed)"| P3_COMPOSE["Plan Step 4.1:<br>Compose feature request<br>Append Feasibility Assessment block"]
+    P3_COMPOSE --> P3_INVOKE["Plan Step 4.2:<br>Skill(skill='dh:add-new-feature',<br>args='{composed feature request}')<br>Direct skill call — not a suggestion"]
 
     P3_INVOKE --> P3_ARTIFACT_DISCOVER{"Pre-Phase:<br>Artifact Discovery<br>artifact_list(item_id={work_item_reference})<br>Existing artifacts?"}
     P3_ARTIFACT_DISCOVER -->|"Artifacts exist —<br>inject into delegation prompts"| P3_ARTIFACT_APPEND["Append prior_artifacts block<br>to each phase delegation prompt"]
@@ -339,14 +511,22 @@ flowchart TD
 
 | Node | Actor | Inputs | Outputs | Edge Conditions |
 |------|-------|--------|---------|-----------------|
-| P3_RTICA_CHECK | orchestrator (`work-backlog-item` Step 4) | groomed item content | RT-ICA checkpoint invocation | always → P3_RTICA_PRESENT |
-| P3_RTICA_PRESENT | orchestrator | groomed content sections | RT-ICA presence determination | present → P3_RTICA_USE, absent → P3_RTICA_RUN |
-| P3_RTICA_USE | orchestrator | existing RT-ICA section content | RT-ICA decision (APPROVED/BLOCKED) | always → P3_RTICA_GATE |
-| P3_RTICA_RUN | orchestrator | item details (goal, prerequisites, availability) | inline RT-ICA assessment | always → P3_RTICA_GATE |
-| P3_RTICA_GATE | orchestrator | RT-ICA decision | gate result | BLOCKED → P3_BLOCKED, APPROVED → P3_COMPOSE |
-| P3_BLOCKED | orchestrator | MISSING conditions list | user-facing report, skill NOT invoked | terminal |
-| P3_COMPOSE | orchestrator (`work-backlog-item` Step 5) | groomed item, DERIVABLE items | composed feature request with 'Assumptions to confirm' | always → P3_INVOKE |
-| P3_INVOKE | orchestrator (`work-backlog-item` Step 6) | composed feature request | `Skill()` call to `add-new-feature` | always → P3_ARTIFACT_DISCOVER |
+| P3_AUTOGROOM | orchestrator (`work` route, Prepare `groom-check.md`, Step 3.1) | item's `groomed` field | ungroomed/groomed branch | always → P3_GROOMED_CHECK |
+| P3_GROOMED_CHECK | orchestrator | `groomed` field value | ungroomed vs. groomed determination | absent/empty → P3_GROOM_NOW, set → P3_STALE |
+| P3_GROOM_NOW | orchestrator | item_ref | groom route invoked directly (same route Phase 2 describes, not a separate skill) | always → P3_RTICA_CHECK |
+| P3_STALE | orchestrator + drift-assessment agent | Impact Radius file paths, `git log`/`git diff` since groomed date | FUNCTIONAL_DRIFT / SUPERSEDED / COSMETIC_ONLY classification | none or COSMETIC_ONLY → P3_RTICA_CHECK, FUNCTIONAL_DRIFT → P3_REGROOM, SUPERSEDED → P3_CLOSE |
+| P3_REGROOM | orchestrator | staleness diff summary | staleness-context section written, groom route re-entered directly for this same item_ref | always → P3_RTICA_CHECK |
+| P3_CLOSE | `backlog_close` MCP/CLI | commit references | item closed as superseded | terminal |
+| P3_RTICA_CHECK | orchestrator (`work` route, Prepare `rt-ica-gate.md`, Step 3.2) | RT-ICA section (if any), `metadata.updated_at` | freshness determination | always → P3_RTICA_FRESH |
+| P3_RTICA_FRESH | orchestrator | RT-ICA `Date:` header, 7-day threshold, `metadata.updated_at` | present-and-fresh vs. absent-or-stale | fresh → P3_RTICA_USE, absent/stale → P3_RTICA_RUN |
+| P3_RTICA_USE | orchestrator | cached RT-ICA section content | RT-ICA decision (APPROVED/BLOCKED) reused as-is | always → P3_RTICA_GATE |
+| P3_RTICA_RUN | `Skill(dh:rt-ica)` | item_ref | fresh RT-ICA result, `Date:` header stamped (Step 3.3) | always → P3_RTICA_GATE |
+| P3_RTICA_GATE | orchestrator | RT-ICA decision | gate result | BLOCKED → P3_BLOCKED, APPROVED → P3_FEAS |
+| P3_BLOCKED | orchestrator | MISSING conditions list | user-facing report, feasibility gate and `add-new-feature` NOT invoked | terminal |
+| P3_FEAS | orchestrator (Prepare `feasibility-gate.md`, Step 3.4) | `suggested_location`, Priority/Effort section, Impact Radius (or Resources fallback), item body text | PASS (with optional WARNs) or BLOCKED on the first failing criterion | PASS → P3_COMPOSE, BLOCKED → P3_FEAS_BLOCK |
+| P3_FEAS_BLOCK | orchestrator | failing criterion, observable check, required action | structured BLOCKED report; retry path is "re-groom, then re-run `/work-backlog-item {title}`" | terminal |
+| P3_COMPOSE | orchestrator (Plan `plan.md`, Step 4.1) | groomed item, DERIVABLE items, Feasibility Assessment block | composed feature request with 'Assumptions to confirm' and feasibility summary | always → P3_INVOKE |
+| P3_INVOKE | orchestrator (Plan `plan.md`, Step 4.2) | composed feature request | `Skill()` call to `dh:add-new-feature` | always → P3_ARTIFACT_DISCOVER |
 | P3_ARTIFACT_DISCOVER | `artifact_list` MCP | opaque owner reference | existing artifact manifest (or empty) | artifacts exist → P3_ARTIFACT_APPEND, none → P3_RESEARCH |
 | P3_ARTIFACT_APPEND | orchestrator | artifact manifest | `prior_artifacts` block added to delegation prompts | always → P3_RESEARCH |
 | P3_RESEARCH | `@dh:feature-researcher` | composed feature request, prior artifacts (if any) | feature-context artifact registered with owner, `artifact_type`, logical `artifact_id`, and content | always → P3_CODEBASE |
@@ -371,7 +551,16 @@ agent=<producer>, content=<body>)`. Task plans are accessed via `sam_task` and `
 configured backend resolves storage internally — consumers use logical addresses, never provider
 or filesystem paths.
 
-**No feasibility gate exists** between RT-ICA APPROVED and SAM planning invocation. The transition from "do we have enough information?" to "start planning" is direct — no assessment of technical feasibility, effort/value, risk, or alternative approaches (audit Finding 1).
+**A feasibility gate now exists** between RT-ICA APPROVED and SAM planning invocation
+(`feasibility-gate.md`, Prepare Step 3.4 — see the diagram above). It evaluates, in order:
+technical feasibility (does `suggested_location` resolve, do referenced APIs exist), effort
+proportionality (is the estimated effort tier proportionate to the item's priority), blast radius
+(affected-system count, with a live `rg` recount when Impact Radius rows carry a `pattern:` field),
+and a prior-attempt / over-engineering check (a 1-file Impact Radius paired with a 4+ task Effort
+estimate is treated as a signal to use `--quick` instead). This closes what an earlier version of
+this document recorded as Audit Finding F1 — "No Feasibility Assessment Step" — which was accurate
+when the audit that raised it was run (2026-03-02) but is superseded by the current `work` workflow
+(see the "Addressed" note on Finding F1 below).
 
 ---
 
@@ -408,7 +597,7 @@ flowchart TD
 
     P4_CONTEXT["Phase 6: Context Manifest<br>Agent: @dh:dh-context-gathering<br>Writes context manifest INTO the plan<br>via sam_plan (not a separate provider)<br>Maps each task to files, artifacts,<br>external context it needs"]
 
-    P4_CONTEXT --> P4_LINK["work-backlog-item Step 7:<br>backlog_update(selector='{title}',<br>plan='{plan_ref}')<br>Links returned opaque plan_ref to backlog item"]
+    P4_CONTEXT --> P4_LINK["Plan Step 4.3:<br>backlog_update(selector='{title}',<br>plan='{plan_ref}')<br>Links returned opaque plan_ref to backlog item"]
     P4_LINK --> P4_DONE(["add-new-feature complete<br>Report plan address<br>Next: /dh:implement-feature"])
 ```
 
@@ -449,7 +638,7 @@ Bookend generation at P4_BOOKEND_GEN is now backed by hard schema-level enforcem
 **Status advance**: `backlog_update(selector="{title}", plan="{plan_ref}")` links the opaque plan
 reference returned by `sam_plan` to
 the work item through the configured backend. The `status` transition to `in-progress` happens via
-`work-backlog-item` Step 7.
+`work-backlog-item`'s Plan phase, Step 4.3 (`plan.md`).
 
 **Failure paths**:
 
@@ -649,7 +838,7 @@ flowchart TD
 | P6_BLOCKED | orchestrator | failed task list | blocked report with resume instruction | terminal |
 | P6_FOLLOWUP | orchestrator | QG plan state | follow-up routing decision | always → P6_DETECT |
 | P6_DETECT | orchestrator | T1 ARTIFACTS output and artifact manifest | follow-up artifact records | always → P6_ROUTE |
-| P6_ROUTE | orchestrator + `backlog_list` + `backlog_update` or `create-backlog-item` MCP | follow-up files, backlog state | follow-ups linked or created | always → P6_RECURSE |
+| P6_ROUTE | orchestrator + `backlog_list` + `backlog_update`, or `/dh:work-backlog-item create` when no match is found | follow-up files, backlog state | follow-ups linked or created | always → P6_RECURSE |
 | P6_DEPTH_GUARD | orchestrator | `{recursion_depth}`, `DH_RECURSIVE_REVIEW_TASK_DEPTH` (=5) | depth comparison result | depth >= 5 → P6_DEPTH_STOP; depth < 5 → P6_RTCA_GUARD |
 | P6_DEPTH_STOP | orchestrator | in-scope follow-up titles, parent owner reference, depth count | systemic design issue warning; `backlog_add` per remaining in-scope finding | terminal for recursion path |
 | P6_RTCA_GUARD | orchestrator | plan artifact (BLOCKED-FOR-PLANNING signal) | RT-ICA status determination | BLOCKED → P6_RTCA_STOP; not BLOCKED → P6_RECURSE |
@@ -808,9 +997,15 @@ flowchart TD
 
 ## Unimplemented Extensions and Known Gaps
 
-### Gap 1: No Batch Section Write for Grooming (Audit F6, session observation)
+### Gap 1: No Batch Section Write for Grooming (Audit F6, session observation) — Addressed
 
-Each grooming section requires a separate `backlog_groom` call with `section` and `content`. No single-call API writes all sections atomically. This makes the grooming process chatty (7+ sequential MCP calls) and complicates failure recovery if interrupted mid-way.
+Each grooming section required a separate `backlog_groom` call with `section` and `content`. No single-call API wrote all sections atomically. This made the grooming process chatty (7+ sequential MCP calls) and complicated failure recovery if interrupted mid-way.
+
+**Current state**: `finalize.md`'s "Write Groomed Content" step now documents a preferred
+batch-write path — a single `backlog_groom(sections={...}, mark_groomed=True)` call that writes
+every groomed subsection (including the RT-ICA final report) and advances status atomically. The
+incremental single-section path described above remains available and is documented as an
+alternative for sections that become ready mid-swarm, not the default.
 
 ### Gap 2: Description / Groomed Section Overlap (Session observation)
 
@@ -818,14 +1013,19 @@ The item's initial `## Description` body and groomed subsections (especially `##
 
 **Convention enforced as of #1077:**
 - `backlog_groom` emits an advisory warning in `output.warnings` when writing an "Acceptance Criteria" section and the item's description contains checkboxes (`- [ ]`) or an `## Acceptance` / `### Acceptance Criteria` header.
-- The groomer agent prompt (`references/groomer-agent.md`) includes an explicit DESCRIPTION / AC SEPARATION instruction to prevent restatement.
+- The groomer agent prompt included an explicit DESCRIPTION / AC SEPARATION instruction to prevent restatement — that instruction now lives in `groom/swarm.md`'s "Groomer prompt" section (`groom-backlog-item/references/groomer-agent.md`, cited when this convention was first recorded, belonged to the since-retired `groom-backlog-item` skill).
 
 The warning is advisory — the write still proceeds. No suppression mechanism exists; the warning fires on every qualifying `backlog_groom` call.
 
-### Gap 3: No Auto-Advance After Grooming (Session observation)
+### Gap 3: No Auto-Advance After Grooming (Session observation) — Addressed
 
 After `backlog_groom` writes all sections and sets the `groomed` metadata field, status transition
 is owned by the configured backend.
+
+**Current state**: this is no longer accurate as a description of a gap. `finalize.md`'s
+`mark_groomed=True` parameter explicitly and atomically advances the item's status from
+`needs-grooming` to `groomed` as part of the same call that writes content (see "Status
+advancement via `mark_groomed`" above) — there is no separate manual advance step to forget.
 
 ### Gap 4: No Machine-Readable Parent/Child Links (Session observation)
 
@@ -841,9 +1041,13 @@ Target fix: Write dispatch state to beads (`bd`) before dispatching the batch. `
 
 At 40% context pressure, write a structured handoff before compaction rather than losing state. Not yet implemented.
 
-### Audit Finding F1: No Feasibility Assessment Step (Severity: High)
+### Audit Finding F1: No Feasibility Assessment Step (Severity: High) — Addressed
 
 No gate exists between RT-ICA APPROVED and SAM planning invocation for technical feasibility, effort/value assessment, risk assessment, or alternative evaluation. RT-ICA checks information completeness, not feasibility. Source: audit Finding 1 (2026-03-02).
+
+**Current state**: `feasibility-gate.md` (Prepare Step 3.4) now runs between the RT-ICA gate and
+SAM planning invocation, evaluating technical feasibility, effort proportionality, blast radius,
+and a prior-attempt/over-engineering check — see the corrected Phase 3 diagram and prose above.
 
 ### Audit Finding F2: Discussion Phase Absent (Severity: Medium)
 
@@ -853,19 +1057,36 @@ No skill provides a structured discussion or interview step between creation and
 
 No staleness check on RT-ICA results. If groomed in a previous session and codebase changed, old RT-ICA may be stale — yet `work-backlog-item` accepts without re-verification. No defined policy for when RT-ICA should be re-run vs. accepted from cache. Source: audit Finding 3 (2026-03-02).
 
-### Audit Finding F4: Vague "Is Job Valid?" Condition (Severity: Medium)
+### Audit Finding F4: Vague "Is Job Valid?" Condition (Severity: Medium) — Addressed
 
 `groom-backlog-item` Step 2, check C1: "Is the job still valid?" — no observable fact or concrete check specified. What signals indicate invalid scope is not defined. Source: audit Finding 4 (2026-03-02).
 
-### Audit Finding F6: No Feedback Loop on Groomer Agent Quality (Severity: Medium)
+**Current state**: `groom/intake.md`'s five pre-groom checks (A-E, see Phase 2 above) replace the
+single vague C1 check with concrete, observable criteria — Check C specifically operationalizes
+staleness/possible-supersession as "added >90 days ago, ungroomed, no comments, no plan, with
+keyword overlap against recently-added items," each condition independently checkable against tool
+output rather than left to judgment.
+
+### Audit Finding F6: No Feedback Loop on Groomer Agent Quality (Severity: Medium) — Addressed
 
 Groomer output is written through `backlog_groom` in Step 9. No quality check, no section
 completeness validation, no rejection/retry path if output is incomplete or includes implementation
 details. Source: audit Finding 6 (2026-03-02).
 
-### Audit Finding F7: Auto-Mode P1 Default (Severity: Low)
+**Current state**: `groom/finalize.md`'s Output Validation Gate (see Phase 2 above) checks the 8
+required sections for presence and minimum content, retries the groomer with a targeted prompt
+twice on a miss, and marks the item `blocked` after a third failed attempt — a section-completeness
+check and a bounded rejection/retry path both now exist. Its separate "scope boundary check" scans
+groomer-produced sections for implementation-prescriptive language patterns and logs (but does not
+block on) violations.
+
+### Audit Finding F7: Auto-Mode P1 Default (Severity: Low) — Addressed
 
 `create-backlog-item` auto mode defaults to P1 when no urgency keywords match. Most items default to P1 regardless of actual importance. Source: audit Finding 7 (2026-03-02).
+
+**Current state**: `create/start.md`'s auto-mode field derivation table now defaults to `P2`
+("Otherwise default to `P2`") rather than `P1` — `P1` requires explicit urgency evidence
+(`critical`, `required`, `must`, or an explicit priority flag) in the input.
 
 ### Audit Finding F8: Fact-Check Auto-Commits and Pushes (Severity: Low)
 
@@ -888,9 +1109,23 @@ Source: audit Finding 9 (2026-03-02).
 
 A draft lifecycle doc existed but was not referenced by any skill. This document (the one you are reading) was created to address this gap and supersedes the draft. Source: audit Finding 10 (2026-03-02).
 
-### Missing Reference Files (Session observation 2026-03-25)
+### Missing Reference Files — Correction (Session observation 2026-03-25, corrected 2026-09-07)
 
-`groom-backlog-item/SKILL.md` references `./references/issue-classification.md` and `./references/groomer-agent.md` — neither file exists on disk. The `references/` directory under `groom-backlog-item/` does not exist.
+This document previously stated that `groom-backlog-item/SKILL.md` referenced
+`./references/issue-classification.md` and `./references/groomer-agent.md`, that neither file
+existed on disk, and that the `references/` directory under `groom-backlog-item/` did not exist.
+Re-checked directly against the filesystem: `plugins/development-harness/skills/groom-backlog-item/references/`
+exists and contains `issue-classification.md`, `groomer-agent.md`, `groomer-output-validation.md`,
+and `drift-check.md`. `git log --diff-filter=A` on those two files shows both were added when the
+`groom-backlog-item` skill was lifted into this plugin, and `git show` of `groom-backlog-item/SKILL.md`
+as it stood on 2026-03-25 confirms both files were already present in the tree at that commit — the
+original claim was false at the time it was recorded, not something that later went stale. The
+`groom-backlog-item` skill (including this `references/` directory) is being retired in favor of
+`/dh:work-backlog-item groom`, whose own reference files (`groom/swarm.md`, `groom/analyze.md`, and
+the rest — see Phase 2 above) do not reuse or reference `issue-classification.md` or
+`groomer-agent.md`; nothing else in the repository does either
+(checked: `grep -rln "groom-backlog-item/references\|groomer-agent.md\|issue-classification.md" --include="*.md" .`
+matched only this file).
 
 ### BLOCKED Task Handling Undocumented (Session observation 2026-03-25)
 
