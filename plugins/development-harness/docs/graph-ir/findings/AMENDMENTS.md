@@ -112,3 +112,39 @@ structured data (`Finding` in `dh_core/graph_ir/findings.py`) that a test can as
 not an ADR file, for the currently intended graph model and its rationale; and
 `dh_core/graph_ir/findings.py` for the structured form the deleted test's markers are meant to be
 replaced by.
+
+## A-4 — the findings assess a three-layer model the design has replaced
+
+**Date:** 2026-09-07
+**Cause:** the repository owner rejected the premise that the system is several graphs. There is one
+multigraph, traceable end to end, whose parts loop back, branch on decisions and expand as detail is
+needed, spanning grooming fan-out and report synthesis through to closure. `ASSESSOR-CONTRACT.md`
+now states that model; the layers it stated when these findings were written are gone.
+
+Every finding here scoped to the layer split — a task-lifecycle layer, a work-graph layer, a
+workflow layer, and the cross-layer references between them — describes a structure that no longer
+exists as a design. The findings may still hold as observations about the code at the date they were
+made; their frame does not.
+
+What replaced it, and what a re-run would be scored against:
+
+- One graph, described as **types** and executed as **instances**. Expansion is instantiation of a
+  declared type, which is what keeps a graph that grows at runtime checkable.
+- The **actor** is an attribute of a node. **Execution state** is a property of a node, not a graph;
+  `ledger_spec.py`'s transitions are a node's lifecycle, so no projection derives them from the work
+  graph and any criterion asking for one is ill-posed.
+- **Containment and precedence are different relations**; a single parent field destroys joins.
+- **Guards sit on edges** over a declared output, not inside a node. n8n evaluates them inside the
+  node and the consequence is recorded in `CLAIMS-REGISTER.md`: which edge is live cannot be read
+  off the graph.
+- **Graph mutation requires authority**, and **removal is an invalidation cascade**.
+
+Two things these findings rest on are also gone. The `Found-by: IR` and `Previously-known: no`
+markers satisfied a readiness criterion that no longer exists — it was invented during this work
+rather than required, the ADR carrying it was withdrawn, and the test reading it is deleted. And the
+package name `graph_ir` is a misnomer: an intermediate representation is a form between a source and
+a target, and this is the structure itself. A rename is pending and no target name is settled.
+
+**Re-read rather than trusting the frame:** `plugins/development-harness/docs/graph-ir/ASSESSOR-CONTRACT.md`
+for the model, and `plugins/development-harness/ARCHITECTURE.md` for the workflow the model
+describes, including which closure checks are specified.
