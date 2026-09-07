@@ -18,7 +18,7 @@ and the "chore(beads)" commit that inadvertently recreated it).
 
 **Engineering stance**: Every edit improves product design. Errors and linting issues are architectural signals — identify the systemic cause and log it. Patch symptoms only as a last resort.
 
-**Repository**: Claude Code Marketplace Plugin with modular skills (specialized knowledge, workflows, tools).
+**Repository**: see [ARCHITECTURE.md](../ARCHITECTURE.md) for what this repository is, how a plugin composes, the cross-harness targets, and the index of subsystem architecture documents.
 
 - Prose File Classification — review treatment decision tree for markdown/prose files: [Prose File Classification](../rules/prose-file-classification.md)
 

@@ -8,13 +8,10 @@ prefer the cheapest evidence that can resolve the uncertainty rather than maximi
 
 ## Repository Overview
 
-**Project**: Claude Code Marketplace Plugin Collection — marketplace name `jamie-bitflight-skills`,
-defined in `.claude-plugin/marketplace.json`. Most entries are local directories under `plugins/`.
-The rest are external: the upstream `astral` plugin pinned by git-subdir, and
-`hallucination-detector` from a sibling GitHub repo. Read the manifest for the current roster.
-**Purpose**: Extends Claude Code CLI (and secondarily Codex, OpenCode, and GitHub's coding agent)
-with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD,
-AI/LLM tools, documentation, and agent orchestration.
+**What this is and how it fits together**: [ARCHITECTURE.md](./ARCHITECTURE.md) — the marketplace
+and its manifest, how a plugin composes from skills, agents, commands, hooks and MCP servers, the
+cross-harness targets, and an index of subsystem architecture documents. Read it before designing
+a change; this file covers how to work in the repository, not how it is built.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
 JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
@@ -27,8 +24,9 @@ with its own MCP servers (`backlog_core/`, `sam_schema/`), agents, and skills. I
 Backlog backend for this checkout: **GitHub Issues** (`.dh/config.yaml`'s `backend.name: github`).
 This repo does not use Beads (`bd`) for task tracking. **Never run `bd init` or `bd setup` at the
 repo root.** If a Beads integration block reappears in this file, delete it — it does not describe
-this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for the
-backend abstraction's Protocol architecture when extending or modifying `dh`'s backend code.
+this checkout. See [plugins/development-harness/ARCHITECTURE.md](./plugins/development-harness/ARCHITECTURE.md)
+for the backend contract, and `plugins/development-harness/AGENTS.md`'s "Backend Providers" section
+for the Protocol details when extending or modifying `dh`'s backend code.
 
 ## Environment Setup (Required First)
 
