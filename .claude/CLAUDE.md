@@ -346,7 +346,7 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- Architecture Documentation (documentation links to `ARCHITECTURE.md`, never to an ADR; an agent never writes `Accepted`): [Architecture Documentation and ADR Lifecycle](../rules/adr-lifecycle.md)
+- Architecture Documentation (cite `ARCHITECTURE.md` for the current design; a branch ADR carries `Proposed`): [Architecture Documentation and ADR Lifecycle](../rules/adr-lifecycle.md)
 
 ---
 

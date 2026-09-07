@@ -50,10 +50,9 @@ because nothing links to it.
 | `Superseded by <ADR>` | replaced by a later deliberation | anyone, on the superseding change |
 | `Withdrawn` | abandoned, or found not to reflect the intent | anyone; deleting it is equally correct |
 
-**An agent never writes `Accepted`.** Writing it asserts a review that did not happen, and it turns
-a draft into a constraint the branch is then held to. Author every new ADR as `Proposed`.
+**An ADR authored on a branch carries `Proposed`. The merge confers `Accepted`.** The merge is the
+review, so the status follows it rather than being written by hand.
 
-Without a draft state an agent can manufacture binding architecture: write an ADR, write code citing
-it, and the branch is bound to a decision nobody reviewed and no requirement asked for. Both halves
-of this rule exist to close that path — the status, so a proposal cannot pass as a decision, and the
-no-linking rule, so nothing becomes hostage to either.
+A draft state exists because otherwise an ADR written on a branch, with code citing it, binds the
+branch to a decision nobody reviewed and no requirement asked for. The status keeps a proposal
+legible as a proposal; citing `ARCHITECTURE.md` keeps everything else free of it.
