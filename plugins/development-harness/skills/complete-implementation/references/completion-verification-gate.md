@@ -14,7 +14,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{pl
 
 ```mermaid
 flowchart TD
-    Status["sam_plan(plan='{plan_address}', config={action:'status'})"] --> Iter["Iterate over all tasks in the plan"]
+    Status["plan status --plan-address {plan_address}"] --> Iter["Iterate over all tasks in the plan"]
     Iter --> Check{For each task:<br>check status}
     Check -->|"status == 'complete'"| PassTask["Task passes"]
     Check -->|"status == 'skipped' AND task_id == 'T5'"| PassTask

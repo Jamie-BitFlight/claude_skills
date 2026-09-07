@@ -83,11 +83,16 @@ The gate holds no verdict for this plan. An absent verdict is not a passing verd
 is a plan created before the `code-review` type existed whose T1 already completed, so the dispatch
 loop never re-runs the reviewer.
 
-Reset T1 and re-dispatch it:
+Send T1 back and dispatch it again:
 
-```text
-sam_task(plan="{qg_plan_address}", task="T1", config={"action": "state", "status": "not-started"})
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+  --address "{qg_plan_address}/T1" --reason no-verdict \
+  --response "the gate holds no code-review verdict for this plan; register one this time"
 ```
+
+`reclaim` returns the task to `not-started` and records the response the next runner reads first,
+in one move. On `attempts-exhausted`, add `--more-attempts`.
 
 Read the verdict again from Step A. If the second pass also yields no report, report
 `COMPLETION BLOCKED — code review verdict unreadable` and stop.

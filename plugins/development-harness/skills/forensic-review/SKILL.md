@@ -45,17 +45,21 @@ flowchart TD
 
 ### Step 1 — Resolve Task Context
 
-Read the task via MCP:
+Read the task and everything its attempts recorded:
 
-```text
-sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_id}/{task_id}
 ```
 
+Read without `--attempt`: you are reviewing this task, not working an attempt on it, and naming an
+attempt you do not hold is refused as `stale-attempt`.
+
+The result carries the task row and the sections every attempt appended — the `Completion Report`
+and `Verification Results` the runner wrote are what this review is against.
+
 `{plan_id}` and `{task_id}` are the address already supplied to the call above — retain them as-is
-for the rest of this workflow; `sam_task(action="read")` returns a `TaskAssignment` with no
-top-level `plan_id`/`task_id` fields (the plan is `plan-number`, the task is nested at `task.id`),
-so do not attempt to re-extract the address from the response. Never parse `plan_id` for a plan
-number or slug — read those from `sam_plan(config={"action": "read"})`.
+for the rest of this workflow, and never parse `{plan_id}` for a plan number or slug. Read the slug
+from the plan row instead.
 
 From the response, extract:
 
@@ -114,11 +118,11 @@ If the STATUS output named no `artifact_id`, derive it. `code-reviewer` builds
 from SAM — `{plan_id}` is an opaque logical identifier such as `Pdec8934d` and has no slug to parse
 out of it:
 
-```text
-sam_plan(plan="{plan_id}", config={"action": "read"})
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_id}
 ```
 
-Take the response's `feature` field as `{plan_slug}`, making the expected identifier
+Take the plan row's `feature` field as `{plan_slug}`, making the expected identifier
 `code-review-{task_id}-{plan_slug}`. Confirm it exists:
 
 ```text
@@ -140,17 +144,19 @@ for remediation task creation.
 
 Append review results to the task:
 
-```text
-sam_task(
-  plan="{plan_id}",
-  task="{task_id}",
-  config={"action": "update", "append_section": "Review Results", "section_content": "{artifact_content}"}
-)
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+  --plan-address {plan_id} --task-id {task_id} \
+  --append-section "Review Results" --section-content "{artifact_content}"
 ```
+
+No `--attempt` here either. A section named `Completion Report` or `Verification Results` is the
+runner's and requires the attempt that wrote it; every other section, this one included, is
+appended by whoever has something to record and is tagged with the task's current attempt count.
 
 ## Input
 
-- `ARTIFACT:EXECUTION` + `ARTIFACT:TASK` via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})`
+- `ARTIFACT:EXECUTION` + `ARTIFACT:TASK` via `plan read --address {plan_id}/{task_id}`
 - `item_id` — must be present; used by `@dh:code-reviewer` for `artifact_register` and
   by this skill for `artifact_read`
 - `artifact_id` — returned by `@dh:code-reviewer` in its STATUS ARTIFACTS section; addresses the
@@ -190,5 +196,5 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 
 - `@dh:code-reviewer` returns STATUS: DONE with a PASS, FAIL, or NEEDS-WORK verdict
 - `code-review` artifact is registered on issue #{item_id} and its `artifact_id` is named in the agent's STATUS output
-- Review Results appended to the SAM task via `sam_task(action='update')`
+- Review Results appended to the task via `plan update --append-section "Review Results"`
 - Blocking findings (if any) have concrete remediation tasks created
