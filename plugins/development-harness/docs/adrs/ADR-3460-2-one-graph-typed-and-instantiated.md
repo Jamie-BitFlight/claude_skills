@@ -1,6 +1,6 @@
 # ADR-3460-2: One graph, described as types and executed as instances
 
-**Status:** Accepted
+**Status:** Proposed — authored on `worktree-melodic-plotting-emerson`, not yet reviewed or merged. See [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md).
 **Date:** 2026-09-07
 **Issue:** [#3460](https://github.com/Jamie-BitFlight/claude_skills/issues/3460)
 **Supersedes:** [ADR-3460-1](./ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md), whose decision rested

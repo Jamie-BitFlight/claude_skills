@@ -344,6 +344,10 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
+- ADR Lifecycle (an ADR on an unmerged branch is `Proposed`; an agent never writes `Accepted`): [ADR Lifecycle](../rules/adr-lifecycle.md)
+
+---
+
 - Python Development Rules (PEP 723, no uv workspace, ty type-checker errors): [Python Development Rules](../rules/python-development.md)
 
 ---
