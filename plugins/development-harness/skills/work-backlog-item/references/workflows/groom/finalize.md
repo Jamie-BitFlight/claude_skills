@@ -308,6 +308,9 @@ if response.get("mark_groomed_skipped"):
     mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
 
+If the retry also returns `mark_groomed_skipped: true`, do not retry again — report to the user
+that the item may have been renamed or removed during the grooming session.
+
 **Alternative: incremental section updates**
 
 When sections become available during the swarm (not at the end), write each immediately:
