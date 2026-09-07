@@ -82,6 +82,24 @@ def fidelity_verdict() -> str:
     return found.group(1).lower() if found else ""
 
 
+def marker(body: str, name: str) -> str:
+    """Return a marker's value, read from the first line that declares it.
+
+    Anchored to the start of a line and to the document's first declaration, so prose *about* a
+    marker cannot satisfy it — a findings file explaining that "Found-by: IR" is required must not
+    thereby claim it.
+
+    Args:
+        body: The findings file's text.
+        name: The marker name, without punctuation.
+
+    Returns:
+        The declared value lowercased, or "" when the marker is never declared.
+    """
+    found = re.search(rf"^\**{name}:\**\s*(\S+)", body, flags=re.MULTILINE | re.IGNORECASE)
+    return found.group(1).strip("*` ").lower() if found else ""
+
+
 def ir_found_defects() -> list[str]:
     """Return defects the IR found first, read from the findings directory.
 
@@ -95,8 +113,8 @@ def ir_found_defects() -> list[str]:
         return []
     qualifying: list[str] = []
     for path in sorted(FINDINGS.glob("*.md")):
-        body = path.read_text(encoding="utf-8").lower()
-        if "found-by: ir" in body and "previously-known: no" in body:
+        body = path.read_text(encoding="utf-8")
+        if marker(body, "found-by") == "ir" and marker(body, "previously-known") == "no":
             qualifying.append(path.stem)
     return qualifying
 
@@ -196,3 +214,31 @@ def test_scenario_a_is_still_locked() -> None:
         "evidence is not what it appears. Blast radius recorded in the ADR: 71 importing files, "
         "7 TaskBackend implementations, 3 MCP tools, 44 skill and agent files."
     )
+
+
+def test_prose_about_a_marker_does_not_claim_it(tmp_path: Path) -> None:
+    """A findings file explaining the markers must not thereby satisfy them.
+
+    The first version of :func:`ir_found_defects` matched the marker as a substring, so this
+    module's own documentation of the convention satisfied it and the trigger read as unlocked.
+    """
+    explaining = tmp_path / "explains.md"
+    explaining.write_text(
+        "# Findings\n\n"
+        "**Found-by:** hand\n"
+        "**Previously-known:** no\n\n"
+        "A finding qualifies only with `Found-by: IR` and `Previously-known: no`.\n",
+        encoding="utf-8",
+    )
+    body = explaining.read_text(encoding="utf-8")
+    assert marker(body, "found-by") == "hand", "the declaration wins, not the prose that mentions it"
+    assert marker(body, "previously-known") == "no"
+
+
+def test_a_declared_ir_finding_is_recognised(tmp_path: Path) -> None:
+    """The marker check must still accept a genuine claim, or criterion 5 is unreachable."""
+    genuine = tmp_path / "genuine.md"
+    genuine.write_text("**Found-by:** IR\n**Previously-known:** no\n", encoding="utf-8")
+    body = genuine.read_text(encoding="utf-8")
+    assert marker(body, "found-by") == "ir"
+    assert marker(body, "previously-known") == "no"
