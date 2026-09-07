@@ -1,13 +1,16 @@
 """The layer-3 (workflow) graph: the node record, the typed edges, and the queries over them.
 
 The system under assessment is a typed, hierarchical, directed multigraph
-(``docs/graph-ir/ASSESSOR-CONTRACT.md``), and that multigraph is layered, not flat. This module
-holds **layer 3**, the workflow: nodes are process steps with an actor, a guard and source refs
-into a ``SKILL.md`` -- the contract's node record is shaped for this layer specifically. Layer 1
-(task lifecycle) lives in :mod:`dh_core.graph_ir.ledger_layer`; layer 2 (the work graph) lives in
+(``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "The model"). This module
+holds what was implemented as **layer 3**, the workflow: nodes are process steps with an actor, a
+guard and source refs into a ``SKILL.md``. Layer 1 (task lifecycle) lives in
+:mod:`dh_core.graph_ir.ledger_layer`; layer 2 (the work graph) lives in
 :mod:`dh_core.graph_ir.work_layer`; the layers tied together live in :mod:`dh_core.graph_ir.system`.
-One pair of nodes may carry several edges at once, and collapsing them into a single ``then`` arrow
-is what hides the defects worth finding.
+That three-layer split is superseded design: ``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4)
+records the move to one graph, described as types and executed as instances, with no separate
+layer graphs; this module has not yet been migrated to that shape. One pair of nodes may carry
+several edges at once, and collapsing them into a single ``then`` arrow is what hides the defects
+worth finding.
 
 Two rules shape it. **The IR must hold a broken system**: report validation puts model fidelity
 first, and a sound graph proves nothing if the extractor silently repaired an ambiguity. So the

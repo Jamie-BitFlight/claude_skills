@@ -1,13 +1,20 @@
 """Layer 2 -- the work graph: nodes are tasks; edges are the same typed relations layer 3 draws from.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "This layer says what may run
-concurrently and what waits on what. Every layer-2 graph carries bookends: a review step, a
-validate step, and a documentation-check step. They are structural, not optional decoration, and a
-graph without them is malformed rather than merely lacking." And: "Layer 2 is the artifact layer 3
-produces and mutates. It is not static: layer 3 extends it while work is in flight" -- a task split
-before it runs because it would exceed one agent's context window, or a finding inserted mid-work
-that the decomposition did not account for, both "with its own edges -- not appended to a task's
-notes and not deferred to a later plan."
+This layer says what may run concurrently and what waits on what. Every layer-2 graph carries
+bookends: a review step, a validate step, and a documentation-check step -- per
+``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "What the model must carry",
+those closure checks are structural, not optional decoration, and the workflow section specifies
+them: "a review proportional to what changed, a validation, and a documentation check." Layer 2 is
+also the artifact layer 3 produces and mutates. It is not static: per the same section, "extension
+while work is in flight, in the right place and with its own edges" -- a task split before it runs
+because it would exceed one agent's context window, or a finding inserted mid-work that the
+decomposition did not account for -- is required, "rather than appended to a note or deferred to a
+later plan."
+
+This layer's own separation from layers 1 and 3 is itself superseded design:
+``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+types and executed as instances, with no separate layer graphs. This module has not yet been
+migrated to that shape.
 
 This module makes three things unconstructible rather than merely checkable:
 

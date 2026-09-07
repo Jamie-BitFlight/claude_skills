@@ -2,8 +2,9 @@
 
 Split out of :mod:`dh_core.graph_ir.model` so that module stays under the file-size policy as the
 package grows a layer at a time. Nothing here is layer-specific -- ``EdgeType`` is the set of
-types both layer 2 and layer 3 draw edges from (``ASSESSOR-CONTRACT.md``, "Layer 2" and "Edge
-types"), and the facet enums describe a value regardless of which layer's node declares it.
+types both layer 2 and layer 3 draw edges from (``plugins/development-harness/ARCHITECTURE.md``,
+"The work graph" § "Edge types"), and the facet enums describe a value regardless of which layer's
+node declares it.
 """
 
 from __future__ import annotations

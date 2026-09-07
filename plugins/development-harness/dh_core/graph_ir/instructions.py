@@ -1,9 +1,9 @@
 """The instruction record a task carries out of decomposition.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The decomposition-exit gate"): "A task leaving stage 5
-carries instructions. The rule they must satisfy is the owner's: do not write tasks with claims or
-processes from training data. ... So the gate measures referents, in two tiers." This module holds
-the two shapes of instruction that section names:
+``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "The decomposition-exit gate":
+"A task leaving stage 5 carries instructions. The rule they must satisfy is the owner's: do not
+write tasks with claims or processes from training data. ... So the gate measures referents, in
+the tiers below." This module holds the two shapes of instruction that section names:
 
 * a :attr:`InstructionKind.DELEGATING` instruction "sends the agent somewhere" -- it names a
   :class:`Referent` the agent must go resolve, drawn from the contract's tier-1 table
@@ -45,21 +45,24 @@ class InstructionKind(StrEnum):
 
 
 class ReferentKind(StrEnum):
-    """The contract's tier-1 table: what a delegating instruction may point at, and to what it resolves.
+    """What a delegating instruction may point at, and to what it resolves, at decomposition time.
 
-    ``ASSESSOR-CONTRACT.md``, "Tier 1 -- a delegating instruction must resolve":
+    ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "The decomposition-exit
+    gate" § "Tier 1 -- a delegating instruction must resolve":
 
     | referent | resolves to |
     |---|---|
-    | ``SKILL`` | a directory containing ``SKILL.md`` |
     | ``TASK_OUTPUT`` | a work-graph node declaring that output |
     | ``FILE`` | a path that exists |
     | ``RULE`` | a rules file, or a named section of one |
     | ``ARTIFACT`` | a type in the artifact registry, with its id |
     | ``GRAPH_POSITION`` | the successor node the instruction asserts will exist |
+
+    A skill name is deliberately not a referent kind here: skill availability is a property of the
+    agent harness the work eventually runs in, not of this repository, and the acting agent verifies
+    it at runtime rather than the gate at decomposition time.
     """
 
-    SKILL = "SKILL"
     TASK_OUTPUT = "TASK_OUTPUT"
     FILE = "FILE"
     RULE = "RULE"
@@ -89,7 +92,8 @@ class Instruction(BaseModel):
 
     Every instruction is the declaration it makes: a ``DELEGATING`` instruction declares its referent
     exists, and an ``ASSERTING`` one declares its quote is there to be read -- "the instruction is the
-    declaration" (``ASSESSOR-CONTRACT.md``, Tier 1). Whether the declaration holds is
+    declaration" (``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §
+    "The decomposition-exit gate", Tier 1). Whether the declaration holds is
     :mod:`~dh_core.graph_ir.decomposition_gate`'s question, not this model's; this model's own
     :meth:`check_kind_matches_payload` refuses only a payload shaped for the wrong kind.
     """

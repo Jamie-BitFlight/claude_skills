@@ -771,7 +771,7 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
 async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
     """sam_plan list items include plan_ref with correct P-format when no issue is set.
 
-    Tests: plan_ref field in list response — global composite identifier (PR #1725).
+    Tests: plan_ref field in list response — global composite identifier.
     How: Call sam_plan list; verify each item has plan_ref matching 'P<digits>' pattern.
     Why: Callers need plan_ref to construct globally unique plan addresses without issue scope.
     """
