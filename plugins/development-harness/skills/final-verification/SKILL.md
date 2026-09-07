@@ -101,14 +101,23 @@ For the quality gate protocol, reference `/dh:validation-protocol`.
 
 ## Input
 
-- All review results via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "read"})` per task — review content is stored in task body sections
+- All review results via `plan read --address {plan_id}/{task_id}` per task — review content is stored as task sections. Read without `--attempt`: this stage holds no attempt on the tasks it reads, and naming one it does not hold is refused as `stale-attempt`.
 - Feature-context artifact via `artifact_read(item_id={issue}, artifact_type="feature-context")`
 - Architect artifact via `artifact_read(item_id={issue}, artifact_type="architect")`
 - Read access to the codebase
 
 ## Output
 
-Append to the plan via `sam_task(plan="{plan_id}", task="{task_id}", config={"action": "update", "append_section": "Final Verification", "section_content": "{verification_markdown}"})` where `{verification_markdown}` follows this template:
+Append to the task with the SAM CLI, where `{verification_markdown}` follows the template below:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+  --plan-address {plan_id} --task-id {task_id} \
+  --append-section "Final Verification" --section-content "{verification_markdown}"
+```
+
+`Final Verification` is not one of the runner's report sections, so it needs no `--attempt`; it is
+tagged with the task's current attempt count.
 
 ```markdown
 # ARTIFACT:VERIFICATION

@@ -74,9 +74,17 @@ For each module in the feature, extract what it provides and what it should cons
 
 Read the plan record through the plan operations — task plans are SAM state, not registry content:
 
-```text
-mcp__plugin_dh_sam__sam_plan(plan="{plan_address}", config={"action": "read"})
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
 ```
+
+`plan read` names a plan and a task together, as `P/T`. For the plan itself, `plan status` is the
+command: its result carries the plan row and every task row, and it answers from the work ledger
+once the plan is in it and from the content store otherwise.
+
+`plan read` answers from the work ledger once the plan is in it, and from the content store
+otherwise, so the same command is right at either point in the plan's life. Read without
+`--attempt`: naming an attempt you do not hold is refused as `stale-attempt`.
 
 > **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.
 

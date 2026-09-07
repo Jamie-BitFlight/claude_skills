@@ -178,6 +178,13 @@ The `pqg-` prefix (proportional quality gate) distinguishes this plan from full 
 the response's opaque `plan_ref` as `{pqg_plan_address}` and pass it unchanged throughout the
 dispatch loop.
 
+**Step 3a -- Put the plan in the ledger**: the dispatch loop opens an attempt per task, and an
+attempt is a work-ledger row, so bring the freshly authored plan across before the first dispatch:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{pqg_plan_address}"
+```
+
 **Step 4 -- SAM dispatch loop**:
 
 Use the same SAM Dispatch Loop as the full-plan flow (see "SAM Dispatch Loop (Phases T0-T6)" section). The loop operates identically — 5 tasks instead of 7 is the only structural difference. The proportional plan omits T0 (Multi-Perspective Review) and T6 (Context Refinement), but retains the T4/T5 documentation pass.
@@ -191,7 +198,7 @@ flowchart TD
     Done -->|"T2 Test Verification"| T2Post["Check test results in agent output<br>If failures: log but do not block<br>(completion gate handles pass/fail)"]
     Done -->|"T3 Acceptance Check"| T3Post["No post-dispatch action"]
     Done -->|"T4 Drift Audit"| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
-    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{pqg_plan_address}', task='T5',<br>config={action:'state', status:'skipped'})"]
+    T4Post -->|"0 findings — no drift"| SkipT5["plan state --address {pqg_plan_address}/T5<br>--new-status skipped --reason 'no drift found in T4'"]
     T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
     Done -->|"T5 Documentation Update"| T5Post["No post-dispatch action"]
     T1Post --> Continue["Continue loop"]
@@ -244,9 +251,16 @@ The issue-only path does not produce follow-up plans. Skip directly to "Final St
 
 ## Resolve Plan Address
 
+**Where task state lives**: a plan's authored content — its tasks, their criteria, the plan-level
+context — is written and read through the `sam_plan` and `sam_task` operations. Everything about a
+task's execution — its status, the attempts opened on it, the sections each attempt appended, the
+outcome each closed with — lives in the work ledger and is reached through the `<sam_cli/>`
+command's `plan` group. `plan import --from content --plan-address {plan_ref}` moves a plan from
+the first into the second, which is what this workflow runs before its first dispatch.
+
 Treat the supplied plan address as opaque. Pass the exact value to every `sam_plan`, `sam_task`,
 CLI `--plan-address`, and skill invocation below. Read the plan once with
-`sam_plan(plan="{plan_address}", config={"action": "read"})`; use its `feature` field as `{slug}`
+`plan status --plan-address {plan_address}`; use the plan row's `feature` field as `{slug}`
 and its `issue` field as `{item_ref}` when present. Do not derive either value from a path.
 
 ---
@@ -392,18 +406,31 @@ mcp__plugin_dh_sam__sam_plan(
 Store the response's opaque `plan_ref` as `{qg_plan_address}`. This is the only address used for
 subsequent QG plan and task operations.
 
-### Step 3: Reset BLOCKED tasks (on re-run)
+### Step 2a: Put the QG plan in the ledger
 
-If the QG plan already exists and has BLOCKED tasks, reset each to NOT_STARTED before entering the dispatch loop:
+The plan is authored in the content store; the dispatch loop below opens an attempt per task, and
+an attempt is a work-ledger row. Bring the plan across once, whether it was just created or found:
 
-```text
-For each task where status == "blocked":
-    mcp__plugin_dh_sam__sam_task(
-        plan="{qg_plan_address}",
-        task="{task_id}",
-        config={"action": "state", "status": "not-started"}
-    )
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{qg_plan_address}"
 ```
+
+Safe to run when unsure — a plan the ledger already holds answers `exists` and changes nothing.
+After it, every `plan` command naming `{qg_plan_address}` reads and writes the ledger.
+
+### Step 3: Reopen blocked tasks (on re-run)
+
+If the QG plan already exists and has blocked tasks, send each back before entering the dispatch
+loop. `reclaim` returns the task to `not-started` and records why, in one move:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+  --address "{qg_plan_address}/{task_id}" --reason rerun \
+  --response "{what changed since the block, or what to try differently}"
+```
+
+On `attempts-exhausted`, add `--more-attempts` when the block is worth another try; otherwise
+`plan state --address "{qg_plan_address}/{task_id}" --new-status skipped --reason "{why}"`.
 
 This allows re-running `complete-implementation` to resume from the blocked phase without re-executing completed phases.
 
@@ -425,8 +452,7 @@ This allows re-running `complete-implementation` to resume from the blocked phas
 
 ### Dispatch Loop
 
-Repeat until `sam_plan(plan="{qg_plan_address}", config={"action": "ready"})` returns a
-`ReadyTasksResult` with an empty `ready_tasks` list:
+Repeat until `plan ready --plan-address "{qg_plan_address}"` returns an empty `items` list:
 
 **1. Get next ready task:**
 
@@ -436,57 +462,14 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{qg_
 
 If the result is empty, exit the loop and proceed to Completion Verification Gate.
 
-**2. Dispatch the task:**
-
-```mermaid
-flowchart TD
-    Ready["Next ready task_id"] --> IsT0{task_id == 'T0'?}
-    IsT0 -->|"Yes"| Direct["Run T0 directly — see below"]
-    IsT0 -->|"No"| Delegate["Run the start-task workflow<br>against {qg_plan_address} --task {task_id}"]
-```
-
-**T1-T6 — delegate:** run the `dh:start-task` workflow (name it in prose — a harness-specific
-invocation form reaches only the harness that defines it) against `{qg_plan_address} --task
-{task_id}`. `start-task` claims the task and marks it complete on finish. Do not call
-`sam_task(plan="{qg_plan_address}", task="{task_id}", config={"action": "claim"})` in the
-orchestrator before this step — claiming here causes a double-claim that causes `start-task` to
-receive `claimed: false` and stop without executing the task body.
-
-**T0 — run it directly, in your own context; do not delegate it.** Its agent is
-`dh:multi-perspective-review (orchestrated)` — a workflow that already dispatches its own
-reviewers, so a delegated worker would only add a hop to reach the same call.
-
-1. Commit any outstanding changes (`git add -A && git commit ...`).
-2. Read `sam_plan(plan="{plan_address}", config={"action": "read"}).context` for
-   `**Implementation base SHA**: <sha>` (`implement-feature`'s "Record the Implementation Base
-   SHA" step). If absent, or if `git cat-file -e "<sha>"` fails (the commit no longer resolves),
-   stop:
-
-   ```text
-   COMPLETION BLOCKED — No Implementation Base SHA
-
-   This plan has no recorded starting commit for T0's diff review. Every ref-based substitute
-   (a branch name, a merge-base) can silently miss commits once this plan's own work reaches
-   origin/main — falling back to one would report success without reviewing everything changed.
-
-   To resume: determine the correct starting commit and record it —
-   sam_plan(plan="{plan_address}", config={"action": "update", "context": "**Implementation
-   base SHA**: <sha>\n\n{existing context}"}) — then re-run /complete-implementation.
-   ```
-
-   Do not proceed to Step 1 (no QG plan is created); do not apply `status:verified`.
-3. Run the workflow (name it in prose) with `--diff "<sha>..HEAD"`, adding `--issue {item_ref}`
-   when known.
-
-There is no subagent here to claim or complete the task, so do that yourself:
-`sam_task(plan="{qg_plan_address}", task="T0", config={"action": "claim"})` before running the
-workflow, `sam_task(plan="{qg_plan_address}", task="T0", config={"action": "state", "status":
-"complete"})` after — then continue to Step 3 below exactly as for any other completed task.
+**2. Dispatch the task:** open the attempt, run the phase, settle the launch, and judge what the
+ledger holds. The full step — the T1-T6 delegation, the T0 self-run, and the codes each command may
+print — is [qg-dispatch-step.md](./references/qg-dispatch-step.md).
 
 **3. Phase-specific post-dispatch actions:**
 
-After each dispatched phase completes, run the phase-specific processing before querying
-`sam_plan(plan="{qg_plan_address}", config={"action": "ready"})` again:
+After each dispatched phase completes, run the phase-specific processing before running
+`plan ready --plan-address "{qg_plan_address}"` again:
 
 ```mermaid
 flowchart TD
@@ -494,7 +477,7 @@ flowchart TD
     Done -->|T0 Multi-Perspective Review| T0Post["Any REJECT — trigger Recursive Follow-up Handling<br>(same path as T1 NEEDS_WORK)."]
     Done -->|T1 Code Review| T1Post["Read code-review artifact.<br>Verdict drives Recursive Follow-up Handling<br>(Step 1 — fix loop or backlog routing)."]
     Done -->|T4 Drift Audit| T4Post{"Read the Total findings count<br>from T4's ARTIFACTS return block<br>(full report is in the audit-report artifact)"}
-    T4Post -->|"0 findings — no drift"| SkipT5["sam_task(plan='{qg_plan_address}', task='T5',<br>config={action:'state', status:'skipped'})"]
+    T4Post -->|"0 findings — no drift"| SkipT5["plan state --address {qg_plan_address}/T5<br>--new-status skipped --reason 'no drift found in T4'"]
     T4Post -->|"1 or more findings — drift"| T5Ready["T5 remains NOT_STARTED — will be<br>dispatched on next loop iteration"]
     Done -->|T6 Context Refinement| T6Post{"DIVERGENCE_REQUIRING_REVIEW block<br>present in T6 agent output?"}
     T6Post -->|"Yes"| StoreDiv["Store divergence block for final output"]
@@ -572,9 +555,10 @@ Check the `verdict` field in the report:
   fix loop first (max 3 cycles, `{fix_cycle}`=0):** create one task per entry (`agent: dh:task-worker`)
   with `sam_plan(config={"action": "create", "slug": "fix-{slug}-blocking-N", "goal":
   "Resolve blocking review findings", "tasks": [...], "owner_reference": "{item_ref}"})`; store
-  its returned `plan_ref`, dispatch via `subagent_type="dh:task-worker"`, then reset T1 with
-  `sam_task(plan="{qg_plan_address}", task="T1", config={"action": "state", "status":
-  "not-started"})` and re-dispatch T1. If verdict is `PASS` or blocking entries empty →
+  its returned `plan_ref`, dispatch via `subagent_type="dh:task-worker"`, then send T1 back with
+  `plan reclaim --address "{qg_plan_address}/T1" --reason fixed --response "{what the fix changed}"`
+  and dispatch T1 again — `reclaim` returns it to `not-started` and records the response the next
+  runner reads first. If verdict is `PASS` or blocking entries empty →
   proceed to Step 2; else `fix_cycle += 1`, repeat or BLOCKED at 3. **On BLOCKED** (exhausted
   or fix task `blocked`): report `COMPLETION BLOCKED — Blocking Code Review Findings Not
   Resolved`, do NOT route to backlog, stop, do not apply `status:verified`.
@@ -670,7 +654,9 @@ Push after committing; skip if the working tree is clean.
 ## Confirm All Workers Finished
 
 After commit+push, confirm every dispatched worker has reached a terminal state — read that
-through `sam_plan(config={"action": "status"})`, never by assuming a silent worker has finished.
+through `plan status --plan-address "{qg_plan_address}"`, never by assuming a silent worker has
+finished. Each task row carries `status`, `accepted`, `attempts`, and a `stale` flag saying when a
+lease ran out with nobody behind it.
 Each worker was dispatched independently and terminates on its own once its task completes; there
 is no shared group object to release.
 

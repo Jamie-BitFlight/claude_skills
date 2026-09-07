@@ -174,6 +174,13 @@ Revision Protocol:
 
 ## Task Structure Requirements
 
+**Plan authoring writes the content store.** `sam_plan`'s `create`, `append_task` and `finalize`
+actions, and the task fields they carry, land in the store that holds a plan's authored content.
+The work ledger holds the other half — a task's status, the attempts opened on it, the lease each
+holds, and the outcome each closes with — and a workflow that executes this plan brings it across
+with `plan import --from content --plan-address {plan_id}` before its first dispatch. Nothing here
+opens an attempt, so nothing here belongs on the ledger.
+
 `sam_plan`'s `create` action validates all required fields at creation time and returns the plan ID.
 
 A plan exists only once that call returns a plan ID. The plan-validator and every downstream
