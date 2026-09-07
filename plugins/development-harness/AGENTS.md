@@ -257,9 +257,7 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 **Backlog management:**
 
-- `/dh:create-backlog-item` - Create new backlog items
-- `/dh:work-backlog-item` - Work on a backlog item through its lifecycle
-- `/dh:groom-backlog-item` - Groom and prioritize backlog items
+- `/dh:work-backlog-item` - Work on a backlog item through its lifecycle, including item creation and grooming (subcommands defined in `skills/work-backlog-item/scripts/parser/command-routes.json`)
 
 **Milestone management:**
 
