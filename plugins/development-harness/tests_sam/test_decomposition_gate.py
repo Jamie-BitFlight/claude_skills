@@ -133,7 +133,7 @@ def test_case_2_warranted_how_asserting_instruction_quoting_a_verified_real_span
         kind=InstructionKind.ASSERTING,
         text="a delegating instruction must resolve because it sends the agent somewhere",
         source_refs=spans(
-            f"{CONTRACT.relative_to(REPO_ROOT)}#L173", quote="An instruction that sends the agent somewhere"
+            f"{CONTRACT.relative_to(REPO_ROOT)}#L177", quote="An instruction that sends the agent somewhere"
         ),
     )
     findings = gate.check((instruction,))
@@ -200,8 +200,8 @@ def test_case_4_how_citing_a_real_verified_span_that_does_not_support_the_claim_
         kind=InstructionKind.ASSERTING,
         text="the retry queue backs off exponentially, doubling on every failure",
         source_refs=spans(
-            f"{CONTRACT.relative_to(REPO_ROOT)}#L66",
-            quote="Nothing here is preserved because the incumbent implementation has it.",
+            f"{CONTRACT.relative_to(REPO_ROOT)}#L324",
+            quote="Validated JSON is the authoritative analysis representation.",
         ),
     )
     findings = gate.check((instruction,))

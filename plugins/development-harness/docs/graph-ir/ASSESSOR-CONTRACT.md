@@ -11,65 +11,69 @@ environment-dependent activation, and one node refined into a subgraph.
 One structured IR is authoritative. Mermaid, tables and prose are generated from it, never
 maintained beside it.
 
-## The layers
+## The model
 
-The system is several graphs. Each is describable on its own; the system is only drawn when all
-of them exist together. A representation that carries one of them and calls itself the model of the
-system is the flattening this contract exists to prevent.
+One graph. Not several: a single typed, hierarchical, directed multigraph, traceable from entry to
+terminal, whose parts loop back, branch on guards, and expand as detail is needed. It spans the
+whole workflow — the grooming fan-out and its synthesis, design, planning, decomposition, the work
+itself, and closure — and a representation that covers only part of it is not the model.
 
-**Layer 1 — task lifecycle.** Nodes are statuses (`not-started`, `in-progress`, `complete`,
-`blocked`, `deferred`, `skipped`, `failed`); edges are the commands that move between them
-(`dispatch`, `finish`, `accept`, `reclaim`, `state`, `settle`). One uniform machine, instantiated
-per task, tracking where each task's progress is. `dh_core/ledger_spec.py:TRANSITIONS` is this
-layer.
+It is described as **types** and executed as **instances**.
 
-**Layer 2 — the work graph.** Nodes are tasks; edges are the types below. This layer says
-what may run concurrently and what waits on what. Every layer-2 graph carries bookends: a review
-step, a validate step, and a documentation-check step. They are structural, not optional
-decoration, and a graph without them is malformed rather than merely lacking.
+The **type graph** declares node types, their permitted relations, and what each consumes and
+produces. It is finite and can be checked before anything runs. The **instance graph** is what a run
+produces: instances conforming to their types, carrying their own state and data, unbounded and
+growing while work is in flight.
 
-**Layer 3 — the workflow.** Nodes are process steps with an actor, a guard and source refs into a
-`SKILL.md`; the node record below is shaped for these. Layer 3 takes the grooming and architecture
-output — research, fact checks, dependencies, documentation, concerns — and decomposes it into a
-layer-2 graph. It then maintains that graph while work runs.
+Expansion is instantiation of a declared type, and that is what makes a graph that grows at runtime
+checkable at all: a check that holds over types holds over every instantiation of them. Fan-out,
+decomposition, splitting work that will not fit one context window, and inserting a finding the
+decomposition did not account for are the same operation. A node of no declared type is the case
+that breaks the analysis, and it is mechanically detectable rather than a judgement.
 
-### How they relate
+An instance references its type rather than copying it, so a type changing under live instances is
+detectable as drift rather than diverging silently.
 
-Layer 1 is a projection of layer 3 onto a single task. "The judge may accept a complete task under
-this authority" is a layer-3 fact; project the actor away and what remains is the transition
-`accept: complete → accepted`. Discarding the actor is exactly how authority is lost, which is why
-a command could write a judge's verdict with nothing to check it against.
+### What belongs to a node
 
-Layer 2 is the artifact layer 3 produces and mutates. It is not static: layer 3 extends it while
-work is in flight.
+The **actor** is an attribute of a node, not the node. Two dispatches of one specialist are two
+nodes. Keeping the actor is what makes "does this node's actor hold authority for this effect"
+answerable, and projecting it away is how a command came to write a judge's verdict with nothing to
+check it against.
 
-### What the layers must support
+**Execution state** — the lifecycle a node runs through while working — is a property of the node,
+not a graph of its own. `dh_core/ledger_spec.py`'s transitions are that lifecycle, and a status is
+not a thing on the path from grooming to closure.
 
-Decomposition, from the grooming and architecture inputs into a layer-2 graph with its concurrency
-and ordering stated.
+**Containment and precedence are different relations.** The node an expansion came from is
+single-valued and gives the hierarchy. What fed a node is many-valued, because a synthesis step has
+several inputs by definition. One parent field models the first and destroys the second.
 
-Extension at runtime. A task that would exceed one agent's context window is split before it runs,
-and the split is a layer-3 operation on layer 2. A finding discovered mid-work that the
-decomposition did not account for is inserted into the active graph, in the right place, with its
-own edges — not appended to a task's notes and not deferred to a later plan.
+### What belongs to an edge
 
-Bookend guarantee. Review, validate and documentation-check exist on every layer-2 graph, and a
-check can ask whether they do.
+Every relation is an edge. A relation stored as a string attribute with an existence check beside it
+is the flattening this work exists to remove.
 
-This one states the target, not the system. `BookendType` in `sam_schema/core/models.py` admits
-`t0-baseline` and `tn-verification` and nothing else, so an extraction of the system today records
-these three as `ABSENT`, never `OBSERVED`. Getting that wrong decides a severity: a bookend the
-system was never built to have is `CONTRACT_UNSPECIFIED`, while one it declares and does not run
-is `BROKEN`. Every requirement in this section is read the same way — it says what the layer needs,
-and the extraction says what is there.
+**Guards sit on edges**, over a node's declared output. A node that names its own successor puts the
+branch decision inside a model's output, where guard totality and overlap cannot be asked at all.
 
-Nothing here is preserved because the incumbent implementation has it. Where the current system
-answers one of these badly, the answer is to state what the layer requires and let the
-implementation follow, not to describe what exists.
+**Graph mutation is an effect requiring authority.** A decomposer may rewrite the graph; a worker
+may record what it found. Ungated mutation is a control transition performed as a data write.
 
-Meta-harness connection points — the hooks that glue the layers to a particular harness — are
-mechanically assessable only once the layers are distinct. Do not design them before the
-layers are clear.
+**Removal is an invalidation cascade** rather than an operation of its own: whatever consumed a
+removed node's output now rests on nothing.
+
+### What the model must carry
+
+Decomposition from the grooming and design output into work with its concurrency and ordering
+stated. Extension while work is in flight, in the right place and with its own edges, rather than
+appended to a note or deferred to a later plan. And the closure checks the workflow requires, which
+[ARCHITECTURE.md](../../ARCHITECTURE.md) specifies — a review proportional to what changed, a
+validation, and a documentation check.
+
+Those closure checks are the workflow's specification, not a description of the code. An extraction
+of the system records what is there; where the two differ, the difference is the finding, and the
+severity rule below decides which kind.
 
 ## Edge types
 
