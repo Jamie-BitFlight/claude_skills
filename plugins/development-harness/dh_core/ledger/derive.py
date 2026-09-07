@@ -36,8 +36,9 @@ FAILED = ledger_spec.Status.FAILED.value
 DEFERRED = ledger_spec.Status.DEFERRED.value
 SKIPPED = ledger_spec.Status.SKIPPED.value
 
-SUCCESSFUL_DEPENDENCY: tuple[str, ...] = tuple(sorted(s.value for s in ledger_spec.SUCCESSFUL_DEPENDENCY))
-"""Statuses that satisfy a dependency without acceptance, in a stable order for binding to SQL."""
+SUCCESSFUL_DEPENDENCY: tuple[str, ...] = tuple(sorted(ledger_spec.SUCCESSFUL_DEPENDENCY))
+"""Statuses that satisfy a dependency, in a stable order for binding to SQL. Acceptance never
+enters this test -- it is a later, separate verdict on a task already in one of these statuses."""
 
 
 def rule_for(table: str, name: str) -> str:
@@ -72,7 +73,7 @@ READY_PREDICATE = """
                 SELECT 1 FROM tasks dep
                  WHERE dep.plan = tasks.plan
                    AND dep.id = d.value
-                   AND (dep.accepted = 1 OR dep.status IN (SELECT value FROM json_each(:successful)))))
+                   AND dep.status IN (SELECT value FROM json_each(:successful))))
    AND NOT EXISTS (
          SELECT 1 FROM tasks o
           WHERE o.plan = tasks.plan
@@ -84,10 +85,12 @@ READY_PREDICATE = """
 """``tasks.ready`` as a SQL predicate over the ``tasks`` row in scope.
 
 The three clauses are the three the rule names: the status is not-started; every id in
-``dependencies`` names a task that is accepted or in ``SUCCESSFUL_DEPENDENCY``, which a dangling id
-therefore fails; and no other task sharing a non-null ``conflict_group`` is in-progress or
-complete-unaccepted. A dependency read through ``json_each`` sees the same row version the
-statement writes, which is why ``dispatch`` can carry this in its WHERE rather than checking first.
+``dependencies`` names a task in ``SUCCESSFUL_DEPENDENCY``, which a dangling id therefore fails;
+and no other task sharing a non-null ``conflict_group`` is in-progress or complete-unaccepted.
+Acceptance is a separate, later verdict and does not appear in the dependency clause — a dependent
+unblocks the moment its dependency reaches a successful status, whether or not a judge has since
+accepted it. A dependency read through ``json_each`` sees the same row version the statement
+writes, which is why ``dispatch`` can carry this in its WHERE rather than checking first.
 
 Bind :func:`ready_parameters` alongside whatever the surrounding statement binds.
 """
