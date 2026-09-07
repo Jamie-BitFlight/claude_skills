@@ -62,6 +62,18 @@ _Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill". 
 first person for the orchestrator, read by an agent whose assignment is one task inside that
 skill's own loop, reads as instruction to re-enter the loop that produced its assignment.
 
+The Orchestrator runs the work loop over the graph: it dispatches agents against claimable nodes,
+receives the events they produce, and consults the CLI for graph state and for the next claimable
+task. It is the loop rather than a node inside it — not a stage the graph reaches, but the process
+that runs for as long as work is outstanding. An `Agent()` or `Bash()` call returning is the event;
+there is no subscription, queue or callback. Workers notify individually as each completes, so many
+nodes stay active at once and the loop turns on each return rather than on the last member of a
+batch. Scheduling answers come from the CLI; the Orchestrator holds no scheduling state of its own.
+
+Running a loop is what an Orchestrator does, not what makes an agent one. A Manager runs a loop
+over its own scope and is still a Manager: the role is fixed by whose assignment the agent holds,
+per the definition above.
+
 **Manager**:
 An agent whose assignment covers a scoped body of work and its decomposition — the dispatcher
 hands over the scope, and how it is broken down and distributed is part of the assignment. Acts
