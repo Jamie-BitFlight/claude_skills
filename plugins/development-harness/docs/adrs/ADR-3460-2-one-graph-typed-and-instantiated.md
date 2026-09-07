@@ -1,159 +1,103 @@
-# ADR-3460-2: One graph, described as types and executed as instances
+# ADR-3460-2: Add the missing relations to the ledger, and finish the migration, rather than replace Task and Plan
 
-**Status:** Proposed — authored on `worktree-melodic-plotting-emerson`, not yet reviewed or merged. See [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md).
-**Date:** 2026-09-07
-**Issue:** [#3460](https://github.com/Jamie-BitFlight/claude_skills/issues/3460)
-**Replaces:** the withdrawn draft ADR-3460-1 ("The graph IR first owns the edge types nothing
-owns..."), deleted per [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md) — an ADR on an
-unmerged branch is `Proposed`, was never reviewed or merged, and may be withdrawn and deleted
-rather than superseded. Its decision rested on choosing which of three graphs to model; that
-choice does not exist. Its defects, measurements, and its rejection of a representation compiled
-above unchanged models are carried forward below, in "Carried forward from the withdrawn draft".
-**Related:** Governed by [ARCHITECTURE.md](../../ARCHITECTURE.md)'s "The work graph" section, which
-now states the model this ADR decides — superseding `docs/graph-ir/ASSESSOR-CONTRACT.md`'s "The
-layers" and "How they relate" sections, since deleted (see
-[docs/graph-ir/findings/AMENDMENTS.md](../graph-ir/findings/AMENDMENTS.md)).
+**Status:** Proposed — authored on `worktree-melodic-plotting-emerson`, not yet reviewed or merged.
+See [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md).
 
 ## Context
 
-ADR-3460-1 modelled the system as a task lifecycle, a work graph and a workflow, joined by string
-references and left the choice between them open. The repository owner rejected the premise on
-2026-09-07: there is one multigraph, traceable end to end, whose parts loop back, branch on
-decisions, and expand as details are needed — and it spans the whole system, from grooming fan-out
-and report synthesis through to completion. A model that is not universal across those is not the
-model.
+This branch explored replacing the plan and task model with a typed multigraph. A displacement
+analysis against the code, run 2026-09-07, found that most of the proposal re-describes mechanisms
+that already exist, and that the branch's real obstacle is elsewhere.
 
-Two working systems were offered as reference. The first is the harness this work runs inside: a
-Claude Code workflow script declares agents, fan-out with and without a join barrier, guarded loops,
-nested sub-workflows, JSON-Schema output contracts, and a resume rule where the longest unchanged
-prefix of agent calls is cached while the first changed call and everything downstream re-runs. The
-second is n8n, offered as a graph of configurable node templates with conditional data flow between
-them, and since read from source (warrants in [CLAIMS-REGISTER.md](../../CLAIMS-REGISTER.md)).
+**The agent layer cannot reach the ledger.** `rg -ci ledger` across `skills/` and `agents/` returns
+nothing; `sam_task` appears in those directories throughout. `sam_schema/server.py`'s backend
+resolution returns a `ContentTaskProvider`. Every agent that runs a task talks to the content
+store, and the ledger — with leases, attempt budgets, staleness, conflict-group exclusion, the
+failure cascade, and a `status` write that refuses to bypass the state machine — is a store nothing
+calls.
 
-n8n establishes the shape and refutes the checking, and both halves are useful. Its saved workflow
-is node instances referencing registered types by identifier, carrying their own parameters — the
-type-and-instance split, in production. But its connections carry no payload type, nothing checks
-that a producer satisfies a consumer, and no pre-execution check of graph well-formedness exists;
-branch conditions are evaluated inside a node's own code, so which outgoing edge is ever live
-depends on interpreting arbitrary user expressions and cannot be read off the connection graph at
-all. That is the concrete cost of putting the decision in the node rather than on the edge, observed
-in a mature system rather than argued from first principles, and it is why this ADR puts guards on
-edges.
+**One motivating defect is fixed in the ledger and live in the store agents use.** The ledger's
+`update` reaches only columns whose `set_by` names the event it appends, and its docstring states
+why: "moving a task is `dispatch`, `finish`, `state`, `reclaim` or `accept`, each of which runs the
+checks and the cascade that `update` does not." The content store's `update` validates the shape of
+a patch and writes it, so a status transition performed as a data write is still reachable there.
+
+**Most of the proposed model already exists.** Ordering, mutual exclusion, execution lifecycle,
+fan-out, failure cascade, bounded attempts, stall recovery and peer awareness are implemented in
+`dh_core/ledger_spec.py` and `dh_core/ledger/`. Guards on edges carrying an actor and a source
+citation exist in `docs/graph-schema.md` and are assembled into `docs/dh-workflow-graph.json` —
+over the workflow's documentation rather than over a running plan, but the mechanism is built.
 
 ## Decision
 
-**One graph. It is described as node types and their permitted relations, and executed as instances
-conforming to that description.**
+**Finish the migration so the agent layer reaches the ledger. Add the two relations that are
+genuinely absent. Do not replace `Task` and `Plan`.**
 
-The following follow from it, and each was a distinction the superseded model got wrong:
+Four capabilities in the explored design are not provided today:
 
-**Execution state is a property of a node, not a graph.** A status is not a thing on the path from
-grooming to completion. `ledger_spec.TRANSITIONS` is the lifecycle an instance runs through, and the
-ledger is the instance store. This is why the superseded criterion 3 — that a control-flow
-projection reproduce `TRANSITIONS` exactly — was not merely unmet but ill-posed.
+- **A DATA relation** from a producing unit to a consuming one. `Task.handoff` and
+  `Task.expected_outputs` are serialised by models, writers, backends and readers, and resolved by
+  no consumer. This is the absence recorded independently by hand in
+  [docs/graph-ir/findings/data-flow-gaps.md](../graph-ir/findings/data-flow-gaps.md).
+- **An actor attached to an effect**, so authority is checkable. Effects are gated by command and
+  by row state, never by who is calling; `dh_core/ledger_spec.py` states that absence itself.
+- **Referent and quote resolution at decomposition exit** — partly built on this branch.
+- **A declared type graph**, and the provenance of a runtime insertion.
 
-**The actor is an attribute of a node, not the node.** Two dispatches of one specialist are two
-nodes. Keeping the actor on the node is what makes "does this node's actor hold authority for this
-effect" answerable, and projecting it away is how a command came to write a judge's verdict with
-nothing to check it against.
+The first two account for every defect in the data-flow findings. They are additions to the ledger,
+not grounds for replacing the models.
 
-**Every relation is an edge.** A relation stored as a string attribute with an existence check is
-the flattening this work exists to remove, and the superseded model reproduced it at its own layer
-boundaries.
+## Alternatives considered and rejected
 
-**Containment and precedence are different relations.** The node an expansion came from is
-single-valued and gives the hierarchy. What fed a node is many-valued, because a synthesis step has
-several inputs by definition. One parent field models the first and destroys the second.
+**Three peer graphs joined by cross-layer references** — a task lifecycle, a work graph and a
+workflow, each a graph of its own. Rejected: there is one graph, and execution state is a property
+of a node rather than a graph beside it. Cross-layer references stored as strings with existence
+checks reproduced, at the layer boundary, the flattening the work set out to remove.
 
-**Guards belong on edges, over a node's declared output.** A node that names its own successor puts
-the branch decision inside a model's output, where guard totality and overlap cannot be asked. The
-contract already requires those be reportable.
+**Typed descriptors with a producer/consumer compatibility check.** Rejected: an asset moving
+between units is expected, not inspected — its shape is the consuming agent's concern. An input
+names its producer; the schema question does not arise at decomposition time.
 
-**Expansion is instantiation of declared types, and this is what keeps a dynamic graph checkable.**
-Fan-out, decomposition, splitting a task that will not fit one context, and inserting a finding
-discovered mid-work are one operation. Because what they instantiate is declared, the type graph
-stays finite and checkable ahead of any run, and a check that holds over types holds over every
-instantiation. Generation of a node of no declared type is the case that breaks the analysis, and it
-is now mechanically detectable rather than a judgement.
+**Expansion as graph mutation** — splicing a node into an edge, re-parenting, cancelling in place.
+Rejected in favour of additive growth: a unit that needs to create work emits new work, and nothing
+is rewritten underneath what is already running.
 
-**Graph mutation is an effect requiring authority.** A decomposer may rewrite the graph; a worker
-may record what it found. Ungated mutation is `update --set status=complete` again — a control
-transition performed as a data write.
+**Skill resolution inside the decomposition gate.** Rejected: a skill's availability is a property
+of the harness the work runs in, a built-in skill belongs to no plugin directory, and a skill's name
+is a frontmatter field rather than its directory. A legitimate instruction would have been reported
+unresolved and blocked the task. Skill existence is the acting agent's runtime check.
 
-**Removal is an invalidation cascade, not an operation.** What consumed a removed node's output now
-rests on nothing. The workflow resume rule computes exactly this as downstream reachability from a
-changed node.
+**A staged migration gated on exit criteria, enforced by a test.** Rejected: the criteria were
+invented while writing them rather than required, and a test that read a deliberation document from
+disk made that document undeletable. Both are gone.
 
-**An instance references its type rather than copying it,** so a type changing under existing
-instances is detectable as drift instead of diverging silently.
+**A representation compiled above unchanged models.** Rejected when first considered, and the
+reasoning holds: it can only carry what the source records carry, so the absent relations would
+compile empty. What has changed is that this is no longer an argument for replacement — the two
+relations can be added to the records themselves.
 
 ## Consequences
 
-Type-level and instance-level checks are different questions and must not be reported alike. Whether
-a producing type can ever satisfy a consuming type is answerable before anything runs, and is where
-the decomposition-exit gate belongs. Whether a particular node received what it needed is answerable
-only from a run, and an unfed input there may be a guard that legitimately did not fire.
+The blast radius avoided, measured 2026-09-06: replacing `Task` and `Plan` outright would move 71
+importing files, 7 `TaskBackend` implementations across 10 backend modules, 3 MCP tools, 44 skill
+and agent files, and every stored plan record.
 
-Carried forward from the withdrawn draft: the defects in its Context, and its rejection of a
-representation compiled above unchanged models — one that cannot express authority cannot find the
-defect class that motivated the work. See "Carried forward from the withdrawn draft" below for the
-full content, inlined because the draft that recorded it has been deleted. Its staged A/B/C
-placement is withdrawn, because each option was worded in terms of the layer split.
+The migration is the prerequisite either way. A graph built over the content store would inherit an
+unfiltered `status` write, so the relations are worth adding only once the agent layer reads and
+writes through the store that gates it.
 
-Withdrawn: the migration trigger's criterion that a projection reproduce `TRANSITIONS`, per the
-Decision above. `tests_sam/test_adr_3460_migration_trigger.py` enforces the superseded criteria and
-must be reworked against this ADR.
-
-Deleted: the layer split in `dh_core/graph_ir/` — its layer discriminator, the per-layer node and
-edge modules, the composite that bound them, and the separate decomposition-input type. The node
-record, the edge types, the descriptor facets, the finding record with its severity rule, and the
-decomposition-exit gate survive, because none of them depended on there being several graphs.
-
-## Carried forward from the withdrawn draft
-
-ADR-3460-1 recorded defects and measurements that motivated this work and hold independent of
-which graph model is chosen. They are inlined here because that draft was withdrawn as an
-unreviewed proposal (`rules/adr-lifecycle.md`) and its file deleted, and the findings under
-[docs/graph-ir/findings/](../graph-ir/findings/) cite it as the authority they were scored against
-(see `docs/graph-ir/findings/AMENDMENTS.md` for how those citations are now read).
-
-**The flattening, measured 2026-09-06.** The plan and task graph encodes relationships as node
-attributes: `dependencies` is CONTROL, `conflict_group` is STATE mutual exclusion,
-`is_bookend`/`bookend_type` is EVIDENCE. A grep of `dh_core`, `sam_schema` and `backlog_core`
-excluding tests, run 2026-09-06, found `blocked_by` and `parallelize_with` read only by models,
-writers, backends and `cli_inputs` — serialized everywhere, deciding nothing. AUTHORITY, DATA,
-ERROR, RECOVERY and INVALIDATES had no representation at all.
-
-**The defects that trace to it.** Defects found on the branch trace to that flattening. Two of
-them were fixed as separate bugs when they are one authority defect: `import` writing a judge's
-`accepted` over a runner's `complete`, and `update --set status=complete` performing a control
-transition as a data write. The other two are a DATA edge missing (`FILES_CHANGED` overlap is
-prose a judge must eyeball) and an INVALIDATES edge missing (`--replace` deleting rows no event
-accounted for).
-
-**Why a representation compiled above unchanged models (scenario B) was rejected.** ADR-3460-1
-considered representing the missing relations as a layer compiled above the unchanged `Task`/`Plan`
-models, rather than owning them where the harness already stores state. That alternative was
-rejected outright, at either stage of the staged plan it was weighed against: a representation
-compiled above unchanged models can only carry what the source records carry, and AUTHORITY, DATA,
-EVIDENCE, ERROR, RECOVERY and INVALIDATES would compile empty from the current models — it answers
-the structural questions that were not hurting and stays silent on the semantic class that was. A
-representation that cannot express authority cannot find the defect class that motivated the work.
-
-**The blast radius of replacing `Task`/`Plan` outright, measured 2026-09-06.** Replacing them with
-the IR directly — rather than first owning the unrepresented relations alongside them — would move
-71 importing files, 7 `TaskBackend` implementations across 10 backend modules, 3 MCP tools, 44
-skill and agent files, and every stored plan record. That cost is why ADR-3460-1 staged the work
-rather than attempting a full replacement in one change. This ADR does not revisit whether or when
-a full replacement is warranted — only which graph is being modelled in the meantime, which the
-staged plan had left unresolved.
+`Task.blocked_by` and `Task.parallelize_with` are serialised by models, writers, backends and
+`cli_inputs`, and consulted by no scheduler. Removing them removes nothing that runs.
 
 ## What is open
 
-The node record's fields and the edge type set are under adversarial test and are not settled here;
-an ADR records the decision, not the schema.
+Whether a task may carry an acceptance criterion that is judged rather than run. The model requires
+an executable check command; the workflow's closure stage asks whether desired outcomes were met,
+which is a judgement. If both shapes are wanted, the second is a gap to fill.
 
-Type-level checking has no precedent to borrow. n8n does not do it, and the one validation layer it
-has answers activation readiness rather than graph well-formedness. So the checks this design wants
-are ours to build, and the absence of a mature implementation to copy is itself worth knowing before
-estimating the work.
+Whether a dependent waits for a dependency to be `complete` or to be `accepted`. The two stores
+disagree today, and the difference is whether work may build on output nobody has reviewed.
+
+Whether the judgement tier of the decomposition-exit gate is stable enough to block on. No stability
+measurement has been made, and an unstable checker in a blocking gate costs more than the defects it
+catches.
