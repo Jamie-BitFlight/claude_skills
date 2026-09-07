@@ -62,7 +62,8 @@ A begins when all of the following hold, and the migration is not started before
 2. Every falsified predicate in the assessor contract is expressible against the IR, or is
    recorded there as out of scope with the reason.
 3. The control-flow projection derived from the IR reproduces `ledger_spec.TRANSITIONS` exactly,
-   so the hand-maintained table can be deleted rather than kept in sync.
+   so the hand-maintained table can be deleted rather than kept in sync. This criterion assumes
+   the IR models the workflow — see "Which graph" below — and is unreachable if it does not.
 4. A model-fidelity pass confirms the extractor neither repaired an ambiguity nor dropped a
    branch, per the contract's first validation activity.
 5. The IR has caught at least one defect not already known — the evidence that it generalises
@@ -71,6 +72,33 @@ A begins when all of the following hold, and the migration is not started before
 Criterion 5 is the one that can fail quietly. If the IR only ever confirms defects already found
 by hand, it has not earned the 71-file migration, and this ADR should be revisited rather than
 proceeded from.
+
+## Which graph — open
+
+Three graphs are in play and this ADR did not distinguish them, which left criterion 3 resting on
+an unstated assumption.
+
+1. **The task lifecycle.** Nodes are statuses, edges are commands. This is `ledger_spec.TRANSITIONS`
+   — one uniform state machine every task runs through.
+2. **The plan's task graph.** Nodes are tasks, edges are the eight types. `dependencies`,
+   `conflict_group` and the bookends live here.
+3. **The workflow.** Nodes are the steps of `implement-feature` — the wave loop, the launcher, the
+   runner, the judge — with an actor, a guard and source refs into a `SKILL.md`. The assessor
+   contract's node record is shaped for this one.
+
+Graph 1 is a projection of graph 3 onto a single task: "the judge may accept a complete task under
+this authority" is a workflow fact, and projecting away the actor is exactly what loses authority.
+That is why `import` could write a judge's verdict with nothing to check it against.
+
+So criterion 3 is reachable only if the IR models graph 3. An IR of graph 2 alone can never derive
+`TRANSITIONS`, because task-to-task edges say nothing about which command moves a status.
+
+Undecided, and to be settled before the first deliverable is accepted: if the target is graph 3,
+the extractor reads `SKILL.md` files and the ledger's commands, and `ledger_spec` becomes a
+generated artifact. If it is graph 2, `ledger_spec` stays hand-maintained and the IR sits beside
+it. Two of the four defects in the Context — `import` writing `accepted`, and `update --set`
+performing a control transition — are graph 3 defects about actor authority, which is evidence for
+the wider target but not a decision.
 
 ## Consequences
 
