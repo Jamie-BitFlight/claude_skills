@@ -85,4 +85,5 @@ dependents. Text alone leaves the task blocked for a human or dispatcher to rout
 ## Cross-References
 
 - Dispatching side: activate the `/dh:dispatch` skill for orchestration patterns
-- Worktree behavior: activate `/dh:worktree-worker-protocol` when working in an isolated worktree
+- Worktree behavior: read [Worktree Worker Protocol](../skills/work-milestone/references/worktree-worker-protocol.md)
+  when working in an isolated worktree — it is a reference document, not an activatable skill
