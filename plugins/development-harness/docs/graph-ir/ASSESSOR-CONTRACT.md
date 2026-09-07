@@ -163,3 +163,17 @@ Three separate activities, in order.
 The findings document is untrusted and immutable. A verifier issues amendments or counter-findings
 and never silently rewrites it. A reducer then produces a new verified revision accounting for
 every original and newly discovered finding.
+
+### Markers a findings file carries
+
+`tests_sam/test_adr_3460_migration_trigger.py` reads these, so write them deliberately. A file's
+existence is never taken as its conclusion.
+
+| marker | on | means |
+|---|---|---|
+| `Verdict: faithful` | a model-fidelity file | the extractor repaired no ambiguity and dropped no branch. Any other verdict, or none, leaves the criterion unmet |
+| `Found-by: IR` | one finding | the graph surfaced this, rather than a person or a review pass finding it and the graph confirming it |
+| `Previously-known: no` | one finding | it was not already recorded before the graph found it |
+
+Both markers together are what satisfies the ADR-3460-1 criterion that the IR generalises beyond
+the defects it was built against. Claiming either without the other satisfies nothing.
