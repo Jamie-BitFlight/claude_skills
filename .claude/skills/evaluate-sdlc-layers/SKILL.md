@@ -74,7 +74,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 ### 5. Integration Points
 
 - [ ] `work-backlog-item` SKILL — documents `--language`, `--stack`; references layer docs
-- [ ] `groom-backlog-item` SKILL — documents ARL human-probing integration; references arl-human-probing-design
+- [ ] `work-backlog-item` SKILL, groom subcommand (`references/workflows/groom/start.md`) — documents ARL human-probing integration; references arl-human-probing-design
 - [ ] `language-manifest-schema.md` — has "Inherits from Layer 0"; `typecheck: (none)`; Conventions schema
 - [ ] `role-resolution-protocol.md` — has "Layer 0 gates apply before role resolution"
 - [ ] `plugins/development-harness/CLAUDE.md` — references layer model
@@ -139,4 +139,4 @@ Flow experiments and learnings live in [sam-flow-experiments](https://github.com
 
 - [SDLC Layers](../../../plugins/development-harness/docs/sdlc-layers/)
 - [verify-done](../../../plugins/development-harness/skills/verify-done/SKILL.md) — evidence discipline
-- [groom-backlog-item](../../../plugins/development-harness/skills/groom-backlog-item/SKILL.md) — orchestration pattern
+- [work-backlog-item](../../../plugins/development-harness/skills/work-backlog-item/SKILL.md) — orchestration pattern (groom subcommand: `references/workflows/groom/start.md`)

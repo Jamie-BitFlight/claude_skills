@@ -8,7 +8,7 @@ metadata:
   priority: P1
   type: Feature
   status: needs-grooming
-  # groomed: YYYY-MM-DD       # set by groom-backlog-item when all required sections present (see finalize.md)
+  # groomed: YYYY-MM-DD       # set by work-backlog-item groom when all required sections present (see finalize.md)
   # issue: '#N'               # set by backlog script on GitHub issue creation
   # milestone: N              # set by group-items-to-milestone
   # plan: plan/slug.md        # set by work-backlog-item when SAM plan created
@@ -26,7 +26,7 @@ metadata:
 
 ## Acceptance Criteria
 
-<!-- Written by: groom-backlog-item (see finalize.md). Not authored at creation — an item is
+<!-- Written by: work-backlog-item groom (see finalize.md). Not authored at creation — an item is
      created with a Description and nothing else, and grooming has the research needed to state
      a criterion an item's author does not yet have. -->
 <!-- Each criterion must be a specific, verifiable condition. Examples:
@@ -37,7 +37,7 @@ metadata:
 
 ## Fact-Check
 
-<!-- Written by: groom-backlog-item Step 4 (fact-check skill) -->
+<!-- Written by: the fact-checker agent of work-backlog-item groom (see swarm.md) -->
 <!-- Format:
 Claims checked: N
 VERIFIED: N | REFUTED: N | INCONCLUSIVE: N
@@ -48,7 +48,8 @@ Citations: [list]
 
 ## RT-ICA
 
-<!-- Written by: groom-backlog-item Step 5b (MUST be written before groomer agent runs) -->
+<!-- Written by: work-backlog-item groom — baseline in analyze.md, final pass in finalize.md.
+     The swarm's rtica-assessor writes this section before the groomer agent runs (see swarm.md). -->
 <!-- Format:
 Goal: {one sentence}
 Conditions:
@@ -59,7 +60,7 @@ Missing: {list or "None"}
 
 ## Groomed
 
-<!-- Written by: backlog-item-groomer agent (spawned by groom-backlog-item Step 8) -->
+<!-- Written by: the backlog-item-groomer agent, spawned by work-backlog-item groom (see swarm.md) -->
 
 ### Reproducibility
 

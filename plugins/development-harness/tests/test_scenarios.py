@@ -45,12 +45,12 @@ def provider_state(_isolated_backend, monkeypatch: pytest.MonkeyPatch) -> MagicM
 
 
 # ---------------------------------------------------------------------------
-# Group 2.1: create-backlog-item workflow (backlog_add)
+# Group 2.1: work-backlog-item create workflow (backlog_add)
 # ---------------------------------------------------------------------------
 
 
 class TestCreateBacklogItem:
-    """Scenarios consumed by /create-backlog-item skill."""
+    """Scenarios consumed by the /work-backlog-item create route."""
 
     async def test_create_item_with_github_issue(self, backlog_dir, mock_github):
         """backlog_add creates a file, syncs a GitHub issue, and returns all expected fields."""
@@ -264,12 +264,12 @@ class TestWorkBacklogItem:
 
 
 # ---------------------------------------------------------------------------
-# Group 2.6: groom-backlog-item workflow (backlog_groom)
+# Group 2.6: work-backlog-item groom workflow (backlog_groom)
 # ---------------------------------------------------------------------------
 
 
 class TestGroomBacklogItem:
-    """Scenarios consumed by /groom-backlog-item skill."""
+    """Scenarios consumed by the /work-backlog-item groom route."""
 
     async def test_groom_full_content(self, backlog_dir, mock_github, write_test_item, provider_state):
         write_test_item("Groom Full Test", issue="#80")

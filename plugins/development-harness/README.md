@@ -156,33 +156,15 @@ Workflow modes:
 |------|-------------|
 | *(no args)* | Interactive browser — pick an item from your backlog |
 | `#N` or title | Load and work a specific item end-to-end |
-| `create -- "description"` | Capture a new item, then proceed through grooming and planning |
+| `create -- "description"` | Capture a new item in the selected backend (a GitHub issue in the default deployment; supports priorities P0-P2 and Ideas, and types Feature/Bug/Refactor/Docs/Chore), then proceed through grooming and planning |
 | `--quick {title}` | One-file fixes and trivial patches — skip the full pipeline |
 | `--auto {title}` | Autonomous mode — no interactive prompts, decisions logged |
-| `groom {title}` | Run grooming only |
+| `groom {title}` | Run grooming only — fact-checks claims, maps required resources, identifies gaps, estimates effort, and writes structured acceptance criteria |
 | `close {title}` | Dismiss without completing (requires reason) |
 | `resolve {title}` | Mark done with an evidence trail |
 | `progress` | Show current item progress |
 | `resume` | Resume interrupted work |
 | `setup-github` | Initialize labels, project, and milestone for a GitHub-backed repo |
-
-#### `/dh:create-backlog-item`
-
-Creates a new backlog item in the selected backend (a GitHub issue in the default deployment).
-
-```text
-/dh:create-backlog-item "Add rate limiting to the auth endpoints"
-```
-
-Supports priorities P0 through P2 and Ideas. Types: Feature, Bug, Refactor, Docs, Chore.
-
-#### `/dh:groom-backlog-item`
-
-Grooms a backlog item: fact-checks claims, maps required resources, identifies gaps, estimates effort, and writes structured acceptance criteria.
-
-```text
-/dh:groom-backlog-item #42
-```
 
 ### Milestone Management
 
