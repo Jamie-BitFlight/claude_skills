@@ -17,6 +17,19 @@ actually making -- was this predicate ever declared -- the field it has to defen
 
 Findings are frozen. The findings document is untrusted and immutable: a verifier issues amendments
 or counter-findings and never silently rewrites it.
+
+Two predicates come from the contract's "decomposition-exit gate" section rather than its original
+falsified-predicates list: :attr:`Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE` (an instruction's
+prescribed method carries no evidence and none is recorded absent -- the contract's Provenance rule
+applied to a task's method) sits under :attr:`Projection.EVIDENCE_AND_PROVENANCE`, the same
+projection the contract already uses for trust and revision predicates about what supports a claim.
+:attr:`Predicate.REFERENT_DOES_NOT_RESOLVE` sits under :attr:`Projection.CONTROL_FLOW` instead: the
+contract's own wording for that projection is "reachability, dead nodes, guard coverage, joins,
+completion, loops", and Tier 1 of the decomposition-exit gate asks a reachability question of a
+referent -- "the referent must exist at decomposition time" -- the same question
+:attr:`Predicate.UNREACHABLE` already asks of a node or output. A referent is a target an
+instruction must be able to reach, not evidence supporting a claim, so it is grouped with
+reachability rather than with provenance.
 """
 
 from __future__ import annotations
@@ -53,6 +66,8 @@ class Predicate(StrEnum):
     ACTOR_LACKS_AUTHORITY = "actor-lacks-authority-for-the-effect"
     GUARD_INCOMPLETE_OR_OVERLAPPING = "branch-guard-is-incomplete-or-overlaps-another-guard"
     UNREACHABLE = "node-or-output-is-unreachable"
+    PRESCRIBED_METHOD_WITHOUT_EVIDENCE = "prescribed-method-carries-no-evidence-and-none-is-recorded-as-absent"
+    REFERENT_DOES_NOT_RESOLVE = "instruction-names-a-referent-that-does-not-resolve"
 
 
 class PredicateDefinition(BaseModel):
@@ -100,6 +115,16 @@ PREDICATES: dict[Predicate, PredicateDefinition] = {
     ),
     Predicate.UNREACHABLE: PredicateDefinition(
         statement="a node or output is unreachable", projection=Projection.CONTROL_FLOW
+    ),
+    Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE: PredicateDefinition(
+        statement="a prescribed method carries no evidence, and none is recorded as absent",
+        projection=Projection.EVIDENCE_AND_PROVENANCE,
+    ),
+    Predicate.REFERENT_DOES_NOT_RESOLVE: PredicateDefinition(
+        # CONTROL_FLOW, not EVIDENCE_AND_PROVENANCE -- see the module docstring for why: this is a
+        # reachability question, the same one UNREACHABLE already asks of a node or output.
+        statement="an instruction names a referent that does not resolve",
+        projection=Projection.CONTROL_FLOW,
     ),
 }
 """Every :class:`Predicate`, worded as the contract words it. A checker reports from this table."""
