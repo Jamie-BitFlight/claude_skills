@@ -344,7 +344,7 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- ADR Lifecycle (an ADR on an unmerged branch is `Proposed`; an agent never writes `Accepted`): [ADR Lifecycle](../rules/adr-lifecycle.md)
+- Architecture Documentation (documentation links to `ARCHITECTURE.md`, never to an ADR; an agent never writes `Accepted`): [Architecture Documentation and ADR Lifecycle](../rules/adr-lifecycle.md)
 
 ---
 
