@@ -35,7 +35,7 @@ from dh_core.graph_ir.vocabulary import ExtractionStatus
 
 
 class InstructionKind(StrEnum):
-    """The two shapes a decomposed instruction takes, per the contract's decomposition-exit gate."""
+    """The shapes a decomposed instruction takes, per the contract's decomposition-exit gate."""
 
     DELEGATING = "delegating"
     """Sends the agent somewhere -- names a referent that must resolve (Tier 1)."""

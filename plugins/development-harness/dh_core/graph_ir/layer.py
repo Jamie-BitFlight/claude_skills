@@ -1,7 +1,7 @@
 """The layer discriminator shared by every layer's node and edge types.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): the system is three graphs, each
-describable on its own, drawn together only when all three exist. This module holds the one
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): the system is several graphs, each
+describable on its own, drawn together only when all of them exist. This module holds the one
 vocabulary item every layer's model types carry so a reader -- human or query -- can tell which
 layer an element belongs to without inspecting its shape.
 """
@@ -12,7 +12,7 @@ from enum import StrEnum
 
 
 class Layer(StrEnum):
-    """Which of the three graphs an element belongs to.
+    """Which of the graphs an element belongs to.
 
     Each layer's node and edge classes pin this as a ``Literal`` default, so the discriminator is
     part of the type: a layer-2 :class:`~dh_core.graph_ir.work_layer.WorkNode` cannot be

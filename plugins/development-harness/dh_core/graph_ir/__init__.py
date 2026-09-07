@@ -1,7 +1,7 @@
-"""The graph IR: three layers of a workflow, and findings over them.
+"""The graph IR: the layers of a workflow, and findings over them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers") is the authority: the system is three
-graphs, each describable on its own and drawn together only in :class:`~dh_core.graph_ir.system.ThreeLayerGraph`.
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers") is the authority: the system is several
+graphs, each describable on its own and drawn together only in :class:`~dh_core.graph_ir.system.LayeredGraph`.
 
 * :mod:`~dh_core.graph_ir.ledger_layer` -- layer 1, task lifecycle: statuses and the commands
   between them, plus the projection each transition may name back to layer 3.
@@ -10,7 +10,7 @@ graphs, each describable on its own and drawn together only in :class:`~dh_core.
 * :mod:`~dh_core.graph_ir.model` -- layer 3, the workflow: the node record, the eight edge types,
   and the mechanical queries the contract's falsified-predicate list names.
 * :mod:`~dh_core.graph_ir.decomposition` -- the grooming and architecture output layer 3 decomposes
-  into layer 2, and the traceability queries between the two.
+  into layer 2, and the traceability queries between them.
 * :mod:`~dh_core.graph_ir.instructions` -- the instruction record a task carries out of
   decomposition, and :mod:`~dh_core.graph_ir.decomposition_gate` -- the decomposition-exit gate that
   checks those instructions' referents and quotes against a repo checkout and a
@@ -67,7 +67,7 @@ from dh_core.graph_ir.model import (
     Trust,
     WorkflowGraph,
 )
-from dh_core.graph_ir.system import ThreeLayerGraph
+from dh_core.graph_ir.system import LayeredGraph
 from dh_core.graph_ir.work_layer import (
     BookendKind,
     ExtensionKind,
@@ -106,6 +106,7 @@ __all__ = [
     "Instruction",
     "InstructionKind",
     "Layer",
+    "LayeredGraph",
     "LedgerCommand",
     "LedgerEdge",
     "LedgerGraph",
@@ -127,7 +128,6 @@ __all__ = [
     "SourceReader",
     "SourceSpan",
     "Termination",
-    "ThreeLayerGraph",
     "Trust",
     "WorkEdge",
     "WorkGraph",

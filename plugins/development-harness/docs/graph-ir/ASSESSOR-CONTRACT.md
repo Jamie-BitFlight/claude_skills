@@ -11,10 +11,10 @@ environment-dependent activation, and one node refined into a subgraph.
 One structured IR is authoritative. Mermaid, tables and prose are generated from it, never
 maintained beside it.
 
-## The three layers
+## The layers
 
-The system is three graphs. Each is describable on its own; the system is only drawn when all
-three exist together. A representation that carries one of them and calls itself the model of the
+The system is several graphs. Each is describable on its own; the system is only drawn when all
+of them exist together. A representation that carries one of them and calls itself the model of the
 system is the flattening this contract exists to prevent.
 
 **Layer 1 — task lifecycle.** Nodes are statuses (`not-started`, `in-progress`, `complete`,
@@ -68,7 +68,7 @@ answers one of these badly, the answer is to state what the layer requires and l
 implementation follow, not to describe what exists.
 
 Meta-harness connection points — the hooks that glue the layers to a particular harness — are
-mechanically assessable only once the three layers are distinct. Do not design them before the
+mechanically assessable only once the layers are distinct. Do not design them before the
 layers are clear.
 
 ## Edge types
@@ -168,7 +168,7 @@ sentence invented from training reads exactly like one recalled from a source. A
 is measurable, and the two coincide: an instruction written to fill a gap has nothing in the
 sources to point at, because a writer who had a source would have pointed at it.
 
-So the gate measures referents, in two tiers. Both block.
+So the gate measures referents, in the tiers below. Each blocks.
 
 **Tier 1 — a delegating instruction must resolve.** An instruction that sends the agent somewhere
 names a referent, and the referent must exist at decomposition time.
@@ -290,7 +290,7 @@ bounded judgment or an empirical evaluation until a property is made precise eno
 
 ## Validating the report
 
-Three separate activities, in order.
+Separate activities, in order.
 
 1. **Model fidelity.** Does the recovered graph faithfully represent the original prose, code,
    configuration and environment? This one is essential: a perfectly sound graph proves nothing if
