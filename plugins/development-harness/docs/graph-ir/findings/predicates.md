@@ -4,8 +4,9 @@ Lens: the assessor contract's list of falsified predicates. For each, can the sc
 and would the falsification test catch a violation? Then: is the severity rule enforced
 mechanically, or can a checker report `BROKEN` where the contract requires `CONTRACT_UNSPECIFIED`?
 
-Authority: `plugins/development-harness/docs/graph-ir/ASSESSOR-CONTRACT.md`, and
-`docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md` criterion 2, which declares the
+Authority: `dh_core/graph_ir/findings.py`'s `Predicate`/`PREDICATES` and
+`plugins/development-harness/ARCHITECTURE.md`'s "The work graph" (the model this IR implements),
+and `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md` criterion 2, which declares the
 expressibility obligation these findings are scored against:
 
 > Every falsified predicate in the assessor contract is expressible against the IR, or is recorded
@@ -14,8 +15,9 @@ expressibility obligation these findings are scored against:
 Subject under assessment: `dh_core/graph_ir/model.py` (494 lines), `dh_core/graph_ir/findings.py`
 (199), `dh_core/graph_ir/__init__.py` (72), `tests_sam/test_graph_ir_defects.py` (499), all as of
 2026-09-07 on this branch, untracked in git. Severity uses the contract's rule
-(ASSESSOR-CONTRACT.md L77-82): `BROKEN` only where a declared or necessarily implied predicate is
-demonstrably false; otherwise `CONTRACT_UNSPECIFIED` or `AMBIGUOUS`.
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity rule"): `BROKEN` only
+where a declared or necessarily implied predicate is demonstrably false; otherwise
+`CONTRACT_UNSPECIFIED` or `AMBIGUOUS`.
 
 Method. Every claim below was produced by executing the built package, not by reading it: a probe
 script constructed graphs against the public API and printed what each query returned, and two
@@ -89,30 +91,34 @@ not exist, and prints `contract lists 11 predicates; no predicates.py to answer 
 
 ## PREDICATES-2 — "a required field is absent" is not expressible
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L67.
+**Falsified predicate.** `Predicate.REQUIRED_FIELD_ABSENT` — "a required field is absent".
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L67`; `dh_core/graph_ir/model.py#L110-L142` (`Descriptor`).
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_FIELD_ABSENT`;
+`dh_core/graph_ir/model.py#L110-L142` (`Descriptor`).
 
 **Observed.** A field is a member of a schema, and the IR holds no schema members. `Descriptor`
 carries `syntactic_type: str` and `schema_ref: str | None` — a type name and a pointer — and no
 field list, no required/optional partition over fields, and no instance against which presence
 could be decided. The contract requires an input or output to declare "syntactic type **or
-schema**" (L55-57); the IR implements only the first half. Nothing in the schema can be
-interrogated for a missing field, so the predicate is not merely unqueried, it is unstatable.
+schema**" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"); the
+IR implements only the first half. Nothing in the schema can be interrogated for a missing field,
+so the predicate is not merely unqueried, it is unstatable.
 
 ---
 
 ## PREDICATES-3 — "output cardinality conflicts with the join" is not expressible: joins are absent
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L68.
+**Falsified predicate.** `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` — "output cardinality
+conflicts with the join".
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L68`, `#L6-L9` ("parallel branches and joins"), `#L92`
-("joins" as a control-flow mechanical question); `dh_core/graph_ir/model.py#L53-L59`
-(`Cardinality`), `#L190-L232` (`Node`).
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`;
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections" ("joins" as a
+control-flow mechanical question); `dh_core/graph_ir/model.py#L53-L59` (`Cardinality`),
+`#L190-L232` (`Node`).
 
 **Observed.** Half the predicate is expressible and half has no representation at all. `Cardinality`
 exists with four members and is a required field of every `Descriptor` — and is read by no query:
@@ -128,19 +134,22 @@ conflict the predicate names has no second term.
 
 ## PREDICATES-4 — "a branch guard is incomplete, or overlaps another guard" is not decidable
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L74.
+**Falsified predicate.** `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING` — "a branch guard is
+incomplete, or overlaps another guard".
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L74`, `#L92` ("guard coverage"), `#L145` ("guard totality
-and exclusivity"); `dh_core/graph_ir/model.py#L196` (`Node.activation_guard: str | None`), `#L244`
-(`Edge.guard: str | None`).
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING`;
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections" ("guard coverage")
+and → "Mechanical checks" ("guard totality and exclusivity"); `dh_core/graph_ir/model.py#L196`
+(`Node.activation_guard: str | None`), `#L244` (`Edge.guard: str | None`).
 
 **Observed.** Guards are opaque strings. Totality requires a domain to be covered and exclusivity
 requires two guards to be shown disjoint; neither is decidable over free text without a guard
 algebra — a variable, a domain, and a complement operation — and the IR declares none. The contract's
-example guard, `"grade >= tighten"` (L37, node record), is a relational expression over a named
-variable, so the sources show the shape a structured guard would take and the IR does not adopt it.
+example guard, `"grade >= tighten"` (`plugins/development-harness/ARCHITECTURE.md`, "The work
+graph" → "Node record"), is a relational expression over a named variable, so the sources show the
+shape a structured guard would take and the IR does not adopt it.
 Neither `guard` nor `activation_guard` is read by any query (searched the source of `Graph`; no
 occurrence). This is the one omission the builder's report characterises correctly as needing new
 machinery ("the last needs a guard algebra"), and I concur with the diagnosis; the severity is
@@ -151,13 +160,14 @@ as the alternative and that record was not written.
 
 ## PREDICATES-5 — "a node or output is unreachable" covers nodes only
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L75.
+**Falsified predicate.** `Predicate.UNREACHABLE` — "a node or output is unreachable".
 
 **Severity: BROKEN.** Basis DECLARED — the contract's predicate names two subjects and the
 implementation answers for one.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L75`, `#L145` ("dead nodes and unused outputs");
-`dh_core/graph_ir/model.py#L476-L494` (`unreachable_nodes`).
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.UNREACHABLE`;
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" ("dead nodes
+and unused outputs"); `dh_core/graph_ir/model.py#L476-L494` (`unreachable_nodes`).
 
 **Observed.** Four distinct shortfalls in one query, three of them silent.
 
@@ -172,10 +182,13 @@ implementation answers for one.
    points cannot be asked the question without calling the query once per entry and intersecting the
    results by hand, and no helper does that.
 4. **Terminal existence is unchecked.** The contract's mechanical checks require "entry and terminal
-   existence" (L145) and the holistic list requires "successful terminals satisfy the goal" (L129).
-   `Termination` is a required field of every node and is read by no query; searching the source of
-   `Graph` for `termination` returns nothing. Neither is `Termination.bound`, so "loops have
-   progress conditions and termination bounds" (L131) is likewise unanswerable.
+   existence" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical
+   checks"), and its holistic evaluation list — since dropped from the current architecture
+   documentation, not carried forward when the contract's content moved — additionally required
+   that successful terminals satisfy the goal. `Termination` is a required field of every node and
+   is read by no query; searching the source of `Graph` for `termination` returns nothing. Neither
+   is `Termination.bound`, so the same dropped list's requirement that loops carry progress
+   conditions and termination bounds is likewise unanswerable.
 
 No test exercises `unreachable_nodes`: `grep -n unreachable_nodes tests_sam/test_graph_ir_defects.py`
 returns nothing. Shortfalls 2 and 3 would each have been caught by a single test.
@@ -184,21 +197,26 @@ returns nothing. Shortfalls 2 and 3 would each have been caught by a single test
 
 ## PREDICATES-6 — "an input may be stale" is narrowed to required inputs
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L73.
+**Falsified predicate.** `Predicate.STALE_INPUT_UNCHECKED` — "an input may be stale and no
+freshness check exists".
 
 **Severity: BROKEN.** Basis DECLARED — the contract distinguishes "an input" from "a required
-input" in adjacent bullets (L66 versus L73), and the node record separates `required_inputs` from
-`optional_inputs` (L39-40). The narrowing contradicts a distinction the sources make explicitly.
+input", naming `REQUIRED_INPUT_HAS_NO_PRODUCER` and `STALE_INPUT_UNCHECKED` as separate predicates
+in `dh_core/graph_ir/findings.py`'s `Predicate` enum, and the node record
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record") separates
+`required_inputs` from `optional_inputs`. The narrowing contradicts a distinction the sources make
+explicitly.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L66,#L73`, `#L39-L40`;
-`dh_core/graph_ir/model.py#L424-L439` (`unchecked_stale_inputs`), `#L436-L438` (the
-`for needed in node.required_inputs` comprehension).
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER` and
+`Predicate.STALE_INPUT_UNCHECKED`; `plugins/development-harness/ARCHITECTURE.md`, "The work graph"
+→ "Node record"; `dh_core/graph_ir/model.py#L424-L439` (`unchecked_stale_inputs`), `#L436-L438`
+(the `for needed in node.required_inputs` comprehension).
 
 **Observed.** Probed: a node whose *optional* input carries `Freshness(may_be_stale=True)` and an
 empty `freshness_check` yields an empty result from `unchecked_stale_inputs`. An optional input is
 still read when it is present, and a stale optional input corrupts a decision exactly as a stale
-required one does. `Node.input()` (L223-232) already unions both lists — the union the query needs
-exists and is not used here. No test exercises this query at all
+required one does. `Node.input()` (`dh_core/graph_ir/model.py#L223-232`) already unions both
+lists — the union the query needs exists and is not used here. No test exercises this query at all
 (`grep -n unchecked_stale_inputs tests_sam/test_graph_ir_defects.py` returns nothing), so the
 narrowing is not a considered scope decision recorded anywhere; it is unexamined.
 
@@ -206,13 +224,16 @@ narrowing is not a considered scope decision recorded anywhere; it is unexamined
 
 ## PREDICATES-7 — "a failure output has no consuming edge" answers a different question, and can be silenced
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L72.
+**Falsified predicate.** `Predicate.FAILURE_OUTPUT_UNCONSUMED` — "a failure output has no consuming
+edge".
 
 **Severity: BROKEN.** Basis DECLARED — the implementation of a declared predicate is demonstrably
 wrong in both directions.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L72`, `#L144` ("unhandled failure signals");
-`dh_core/graph_ir/model.py#L161-L165` (`ErrorRoute`), `#L458-L474` (`unrouted_failures`), `#L464`
+**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.FAILURE_OUTPUT_UNCONSUMED`;
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" ("unhandled
+failure signals"); `dh_core/graph_ir/model.py#L161-L165` (`ErrorRoute`), `#L458-L474`
+(`unrouted_failures`), `#L464`
 (the `routed` set), `#L290-L296` (edge reference integrity).
 
 **Observed.** The query builds `routed` as `{(e.source, e.source_output) for e in self.edges if
@@ -233,12 +254,13 @@ probed:
 - **False negative, silent.** The only other escape is `ErrorRoute.handled_by`, and it is not
   checked for reference integrity. Probed: a graph whose sole node declares
   `ErrorRoute(signal="timeout", handled_by="NOPE")` constructs without complaint and returns no
-  observation. A dangling node id suppresses the finding permanently. The contract lists "reference
-  integrity" among the mechanical checks (L145) and `check_reference_integrity` enforces it for
-  `Edge.source`, `Edge.target`, `Edge.source_output` and `Edge.target_input` — `handled_by` was
-  missed. (`EvidenceRequirement.supported_by`, documented as holding "Descriptor or node ids", is
-  unvalidated on the same footing and is read by no query, so "evidence-to-claim trace coverage"
-  at L146 is likewise unanswerable.)
+  observation. A dangling node id suppresses the finding permanently. "Reference integrity" is a
+  named mechanical check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+  "Mechanical checks") and `check_reference_integrity` enforces it for `Edge.source`, `Edge.target`,
+  `Edge.source_output` and `Edge.target_input` — `handled_by` was missed.
+  (`EvidenceRequirement.supported_by`, documented as holding "Descriptor or node ids", is
+  unvalidated on the same footing and is read by no query, so "evidence-to-claim trace coverage",
+  the same mechanical-checks list's next item, is likewise unanswerable.)
 
 No test exercises this query (`grep -n unrouted_failures tests_sam/test_graph_ir_defects.py`
 returns nothing). All three behaviours would have been caught by the first test written against it.
@@ -247,12 +269,14 @@ returns nothing). All three behaviours would have been caught by the first test 
 
 ## PREDICATES-8 — "a required input has no producer" accepts any edge type as a producer
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L66.
+**Falsified predicate.** `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER` — "a required input has no
+producer".
 
 **Severity: BROKEN.** Basis DECLARED — the contract's edge-type table states what each type
 relates, and CONTROL relates "what may run after what", not a produced object.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L19-L28` (the edge-type table), `#L66`;
+**Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
+(the edge-type table); `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER`;
 `dh_core/graph_ir/model.py#L325-L341` (`inputs_without_producer`), `#L331` (the `filled` set).
 
 **Observed.** `filled` is `{(e.target, e.target_input) for e in self.edges if e.target_input is not
@@ -270,15 +294,18 @@ invalidated by the defect — the defect only ever hides findings, never invents
 
 ## PREDICATES-9 — "an actor lacks authority" is checked for side effects and not for produced values
 
-**Falsified predicate.** ASSESSOR-CONTRACT.md L73 (`an actor lacks authority for the effect`).
+**Falsified predicate.** `Predicate.ACTOR_LACKS_AUTHORITY` — "an actor lacks authority for the
+effect".
 
 **Severity: BROKEN.** Basis NECESSARILY_IMPLIED — no source states the comparison outright, and an
 authority facet that is never compared against the holder constrains nothing, so the contract's
-authority-and-effects projection ("who may decide, mutate, approve, publish, retry or terminate",
-L96) cannot be answered without it.
+authority-and-effects projection ("who may decide, mutate, approve, publish, retry or terminate" —
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") cannot be
+answered without it.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L25`, `#L59-L61` ("Identical schema, incompatible
-authority"), `#L96`, `#L124` ("decisions occur under the correct authority");
+**Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
+(AUTHORITY) and → "Node record" ("Identical schema, incompatible authority") and → "Projections";
+`dh_core/graph_ir/findings.py`, `Predicate.ACTOR_LACKS_AUTHORITY`;
 `dh_core/graph_ir/model.py#L146-L150` (`Authority`), `#L125-L126` (`required_authority` /
 `granting_authority`), `#L375-L389` (`authority_shortfalls`), `#L391-L406`
 (`effects_without_authority`).
@@ -303,8 +330,9 @@ Two consequences for the existing findings:
 - The query cannot distinguish a wrong authority from an unrecorded one. Probed: a producer whose
   `granting_authority` is `None` against a consumer requiring `'judge'` reports
   `p.out was produced under None`. An absent facet and a mismatched one produce the same
-  observation, and the contract's severity rule turns on exactly that distinction — a missing
-  contract may not be reported as `BROKEN` (L79-82).
+  observation, and the severity rule (`plugins/development-harness/ARCHITECTURE.md`, "The work
+  graph" → "Severity rule") turns on exactly that distinction — a missing contract may not be
+  reported as `BROKEN`.
 
 ---
 
@@ -312,14 +340,15 @@ Two consequences for the existing findings:
 
 **Omission** (no contract predicate covers it, which is itself the finding).
 
-**Severity: CONTRACT_UNSPECIFIED.** Basis UNSPECIFIED — the contract lists "producer/consumer schema
-compatibility" among the mechanical checks (L145) but nowhere states that an edge lacking descriptor
-bindings must be reported. Under the rule this may not be `BROKEN`, and I record it at the lower
-severity deliberately: it is the largest silent-false-negative surface in the deliverable, and
-saying so does not license inflating it.
+**Severity: CONTRACT_UNSPECIFIED.** Basis UNSPECIFIED — "producer/consumer schema compatibility"
+is a named mechanical check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+"Mechanical checks") but nowhere is it stated that an edge lacking descriptor bindings must be
+reported. Under the rule this may not be `BROKEN`, and I record it at the lower severity
+deliberately: it is the largest silent-false-negative surface in the deliverable, and saying so
+does not license inflating it.
 
 **Source spans.** `dh_core/graph_ir/model.py#L313-L321` (`_pairs`), `#L316-L317` (the `continue`);
-`ASSESSOR-CONTRACT.md#L145`, `#L155-L158` (model fidelity as the first validation activity).
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks".
 
 **Observed.** `_pairs` skips every edge whose `source_output` or `target_input` is `None`. Four of
 the eight queries — `type_incompatible_edges`, `trust_shortfalls`, `authority_shortfalls`,
@@ -329,9 +358,9 @@ the eight queries — `type_incompatible_edges`, `trust_shortfalls`, `authority_
 Every semantic defect the IR exists to find disappears if the edge is written without bindings, and
 no query, no validator and no test reports the unbound edge.
 
-This is the mechanism the contract's first validation activity is aimed at — "a perfectly sound
-graph proves nothing if the extractor silently repaired an ambiguity" (L156-157) — and the IR
-provides no signal that the repair occurred. The builder's model refuses an *incoherent* graph;
+This is the mechanism the model-fidelity validation activity is aimed at — a perfectly sound graph
+proves nothing if the extractor silently repaired an ambiguity — and the IR provides no signal that
+the repair occurred. The builder's model refuses an *incoherent* graph;
 an under-bound graph is coherent and empty of findings.
 
 D2's own graph is an instance: its edge `e1` carries `source_output="changed"` and no
@@ -392,10 +421,12 @@ This is the question the lens asks directly. The answer is yes, by two independe
 
 **Severity: CONTRACT_UNSPECIFIED.** Basis UNSPECIFIED — the contract states the rule but says
 nothing about how a basis is established, and cannot: "Semantic conformance stays a bounded
-judgment or an empirical evaluation until a property is made precise enough to test" (L148-149).
+judgment or an empirical evaluation until a property is made precise enough to test"
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L77-L82`, `#L148-L149`;
-`dh_core/graph_ir/findings.py#L108-L135` (`ContractBasis`, `SEVERITY_BY_BASIS`), `#L145-L160`
+**Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity
+rule" and → "Mechanical checks"; `dh_core/graph_ir/findings.py#L108-L135` (`ContractBasis`,
+`SEVERITY_BY_BASIS`), `#L145-L160`
 (`Finding` config and computed `severity`), `#L149` (`basis_evidence`);
 `tests_sam/test_graph_ir_defects.py#L329-L332`.
 
@@ -418,8 +449,9 @@ judgement, but it would refuse its most obvious abuse.
 
 **Route B — the rule table is a mutable module-level dict.**
 
-**Severity: BROKEN.** Basis DECLARED — the contract states the rule (L77-82) and the
-implementation permits its inversion at runtime while the test that guards it stays green.
+**Severity: BROKEN.** Basis DECLARED — the severity rule
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity rule") is stated, and
+the implementation permits its inversion at runtime while the test that guards it stays green.
 
 **Source spans.** `dh_core/graph_ir/findings.py#L129-L135` (`SEVERITY_BY_BASIS`), `#L67-L105`
 (`PREDICATES`), `dh_core/graph_ir/model.py#L71` (`TRUST_ORDER`);
@@ -447,11 +479,13 @@ literal, not a coverage assertion. I did not apply it.
 
 **Omission.**
 
-**Severity: CONTRACT_UNSPECIFIED.** Basis UNSPECIFIED — the contract makes finding verification a
-separate activity performed against "the frozen graph and the sources" (L159) and does not declare
-that the binding be mechanical.
+**Severity: CONTRACT_UNSPECIFIED.** Basis UNSPECIFIED — the contract made finding verification a
+separate activity performed against "the frozen graph and the sources" and did not declare that
+the binding be mechanical (that activity's own definition was scaffolding for a one-off exercise
+and was dropped rather than carried into `ARCHITECTURE.md`; see this directory's `AMENDMENTS.md`
+entry A-5).
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L153-L165`; `dh_core/graph_ir/findings.py#L138-L199`
+**Source spans.** `dh_core/graph_ir/findings.py#L138-L199`
 (`Finding`), `#L154` (`graph_refs`, defaulting to `()`); `dh_core/graph_ir/__init__.py#L43-L72`
 (`__all__`, which exports no report or finding-set type).
 
@@ -465,7 +499,9 @@ present?", cannot be started from the artifacts the package produces, because no
 which graph was frozen. A verifier must re-run the queries by hand and match strings.
 
 The graph itself has no identity either — no id, no fingerprint, no source-set field — so the
-contract's "target and artifact fingerprints" for traces (L102) has nothing to fingerprint.
+contract's requirement that a trace bind "target and artifact fingerprints" (part of the Traces
+section, dropped rather than carried into `ARCHITECTURE.md`; see `AMENDMENTS.md` entry A-5) has
+nothing to fingerprint.
 
 ---
 
@@ -509,16 +545,22 @@ and is maintained by hand; adding a twelfth bullet to the contract would leave e
 
 **Omission.**
 
-**Severity: AMBIGUOUS.** Basis AMBIGUOUS. The contract declares the system "a typed, hierarchical,
-directed multigraph" that "must represent ... one node refined into a subgraph" (L6-9). Whether
-recording an unresolvable *reference* to a subgraph satisfies "must represent" admits two plausible
-readings, and the contract settles neither: on one, the node record's `subgraph_ref: null` field
-(L50) is the whole requirement and it is met; on the other, a hierarchy that no query can traverse
-is a hierarchy in name. The rule forbids `BROKEN` where the sources admit several readings, so I
-record AMBIGUOUS rather than choose. The consequence below is the same under either reading.
+**Severity: AMBIGUOUS.** Basis AMBIGUOUS. The IR's own model is "a single typed, hierarchical,
+directed multigraph" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The
+model"); the contract that model was extracted from additionally required the system to represent
+"one node refined into a subgraph" — a requirement dropped rather than carried forward when the
+contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5). Whether recording
+an unresolvable *reference* to a subgraph satisfies "must represent" admits two plausible readings,
+and neither the dropped requirement nor its replacement settles which: on one, the node record's
+`subgraph_ref: null` field (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+"Node record") is the whole requirement and it is met; on the other, a hierarchy that no query can
+traverse is a hierarchy in name. The rule forbids `BROKEN` where the sources admit several
+readings, so I record AMBIGUOUS rather than choose. The consequence below is the same under either
+reading.
 
-**Source spans.** `ASSESSOR-CONTRACT.md#L6-L9`, `#L50`, `#L87-L88` ("keep the richer property graph
-for semantics"); `dh_core/graph_ir/model.py#L209` (`subgraph_ref: str | None`), `#L273-L297`
+**Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The model" and
+→ "Node record" and → "Projections" ("keep the richer property graph for semantics");
+`dh_core/graph_ir/model.py#L209` (`subgraph_ref: str | None`), `#L273-L297`
 (`check_reference_integrity`), `#L262-L268` (`Graph`).
 
 **Observed.** `subgraph_ref` is a free string. `Graph` has no id, so there is no namespace a

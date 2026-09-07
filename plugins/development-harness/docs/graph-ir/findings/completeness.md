@@ -1,15 +1,16 @@
 # Blind completeness audit — the graph IR
 
-Activity 3 of `docs/graph-ir/ASSESSOR-CONTRACT.md` ("Validating the report"): given the sources and
-the contract but not the assessor's findings, can an independent reviewer discover material
-omissions?
+A blind completeness audit — the third of the assessor contract's validation activities, distinct
+from model fidelity and finding verification: given the sources and the contract but not the
+assessor's findings, can an independent reviewer discover material omissions?
 
 This file is immutable. A verifier issues amendments or counter-findings against it and never
 rewrites it.
 
 ## What was read, and what was not
 
-Read: `docs/graph-ir/ASSESSOR-CONTRACT.md`; `dh_core/ledger_spec.py`;
+Read: the assessor contract (since deleted; its architecture content now lives in
+`plugins/development-harness/ARCHITECTURE.md` under "The work graph"); `dh_core/ledger_spec.py`;
 `sam_schema/core/models.py`; `dh_core/graph_ir/model.py`; `dh_core/graph_ir/findings.py`;
 `dh_core/graph_ir/__init__.py`; `tests_sam/test_graph_ir_defects.py`.
 
@@ -24,23 +25,28 @@ The subject of this audit is **the IR as built** — the schema, the facets it c
 queries over it — not the ledger the IR models. Every finding is an omission in the representation.
 
 Applying the severity rule to that subject needs one stated reading, because the rule is worded for
-the system under assessment. Here, a predicate counts as **declared** when
-`ASSESSOR-CONTRACT.md` states it (it is the IR's own specification, and the authority this work was
-given), or when the built module states it in its own docstrings and constraints. It counts as
+the system under assessment. Here, a predicate counts as **declared** when the assessor contract
+states it (it is the IR's own specification, and the authority this work was given — its
+architecture content now lives in `plugins/development-harness/ARCHITECTURE.md` under "The work
+graph"), or when the built module states it in its own docstrings and constraints. It counts as
 **necessarily implied** when nothing works unless it holds. Where the contract is silent on whether
 a facet must be *decided* rather than merely *declared*, the finding is `CONTRACT_UNSPECIFIED`, not
 `BROKEN` — see COMPLETENESS-16 and COMPLETENESS-17, which are held below `BROKEN` for exactly that
 reason.
 
-The contract distinguishes two lists that carry different weight, and the severities below respect
+The contract distinguished two lists that carry different weight, and the severities below respect
 the difference:
 
-- the **Mechanical checks** list (contract L142-L146) enumerates what must be decidable by machine.
-  A named check with no structure to decide it is `BROKEN`.
-- the **Holistic evaluation** list (L118-L132) enumerates what the composed system must be evaluated
-  on. The contract permits some of these to stay "a bounded judgment or an empirical evaluation
-  until a property is made precise enough to test" (L148-L149), so a holistic item absent from the
-  mechanical list, with no structural demand elsewhere in the contract, is not `BROKEN` on its own.
+- the **Mechanical checks** list (`plugins/development-harness/ARCHITECTURE.md`, "The work graph"
+  → "Mechanical checks") enumerates what must be decidable by machine. A named check with no
+  structure to decide it is `BROKEN`.
+- the **Holistic evaluation** list enumerated what the composed system must be evaluated on — a
+  list dropped rather than carried forward when the contract's architecture content moved into
+  `ARCHITECTURE.md` (see this directory's `AMENDMENTS.md` entry A-5). The contract permitted some
+  of these to stay "a bounded judgment or an empirical evaluation until a property is made precise
+  enough to test" — wording that *did* carry forward, and now closes "The work graph" → "Mechanical
+  checks" — so a holistic item absent from the mechanical list, with no structural demand elsewhere
+  in the contract, is not `BROKEN` on its own.
 
 ## On the report markers
 
@@ -59,12 +65,13 @@ this file as evidence for them either way.
 **Omission**: the IR has no representation of a requirement, an intent claim or a goal, so nothing
 can be traced to or from one.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract names `Intent and requirements` as one of six
-projections "derived mechanically from the one IR", with the mechanical questions "goal coverage,
-unjustified behaviour, lost or weakened requirements" (L92-L94); names
-`requirement-to-node trace coverage` in the Mechanical checks list (L146); and opens the holistic
-evaluation with "every required intent claim reaches at least one implementing path" and "every
-material behaviour has an authoritative justification" (L118-L119).
+**Severity**: BROKEN. Basis: DECLARED. `Intent and requirements` is one of six projections "derived
+mechanically from the one IR", with the mechanical questions "goal coverage, unjustified behaviour,
+lost or weakened requirements" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+"Projections"); `requirement-to-node trace coverage` is a named check in the same document's
+"Mechanical checks"; and the contract's holistic evaluation list — since dropped rather than
+carried forward, see `AMENDMENTS.md` entry A-5 — opened with "every required intent claim reaches
+at least one implementing path" and "every material behaviour has an authoritative justification".
 
 **Observed**:
 
@@ -93,13 +100,18 @@ open the list, cannot be asked of this IR at all — not answered wrongly, but n
 **Omission**: the IR has no representation of an execution, symbolic or observed, so the
 expected-versus-observed half of the contract is absent.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract devotes a section to Traces (L99-L114), fixing
-what a trace binds: "the environment and host, target and artifact fingerprints, initial state,
-representative input objects, selected guards, node sequence, state changes, transformations,
-emitted evidence, and the terminal outcome" (L102-L104). It names `Runtime traces` as a projection
-with the mechanical questions "which path actually occurred, and how it deviated from the model"
-(L97), and it names the analysis precedents: program slicing forward and backward, and data-aware
-conformance checking (L112-L114).
+**Severity**: BROKEN. Basis: DECLARED. `Runtime traces` is a named projection, with the mechanical
+questions "which path actually occurred, and how it deviated from the model"
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections"). The contract
+additionally devoted a section to Traces, fixing what a trace binds — the environment and host,
+target and artifact fingerprints, initial state, representative input objects, selected guards,
+node sequence, state changes, transformations, emitted evidence, and the terminal outcome — naming
+nine things to track separately (facts, user intent, constraints, uncertainty, authority, evidence,
+provenance, decisions, generated content), nine transformation questions, and the analysis
+precedents of program slicing and data-aware conformance checking. That section was dropped rather
+than carried forward when the contract's content moved into `ARCHITECTURE.md` (see this
+directory's `AMENDMENTS.md` entry A-5); the requirements it stated are restated here directly since
+there is no longer a document to cite them from.
 
 **Observed**:
 
@@ -109,12 +121,11 @@ conformance checking (L112-L114).
 - No class binds any of the ten things a trace must bind. The nearest field is
   `Edge.recorded_by` (`model.py#L245-L247`), a list of free strings described as "What records this
   relation happened", which is a property of the model, not of a run.
-- The nine transformation questions at L110 — "what was preserved, removed, summarised,
-  strengthened or weakened, invented, made unverifiable, changed in authority, or made stale" —
-  have no carrier. `Operation` (`model.py#L175-L180`) is `kind` and `summary`, both free text, and
-  neither is read by any query (`operation` appears in `model.py` only at its field declaration,
-  L200).
-- The nine facets the contract says to "track separately" at L106-L107 — facts, user intent,
+- The nine transformation questions — "what was preserved, removed, summarised, strengthened or
+  weakened, invented, made unverifiable, changed in authority, or made stale" — have no carrier.
+  `Operation` (`model.py#L175-L180`) is `kind` and `summary`, both free text, and neither is read by
+  any query (`operation` appears in `model.py` only at its field declaration, L200).
+- The nine facets the contract said to "track separately" — facts, user intent,
   constraints, uncertainty, authority, evidence, provenance, decisions, generated content — have no
   vocabulary in the model. Three of them (authority, evidence, provenance) have partial carriers;
   the rest have none.
@@ -126,10 +137,13 @@ conformance checking (L112-L114).
 **Omission**: guard totality and exclusivity are not decidable, because a guard is a string with no
 branch grouping, no domain and no relation to the other guards it must partition.
 
-**Severity**: BROKEN. Basis: DECLARED. `a branch guard is incomplete, or overlaps another guard` is
-one of the eleven falsified predicates to report (contract L74); `guard totality and exclusivity` is
-a named mechanical check (L145); `environment-dependent activation` is one of the things the IR
-"must represent" (L9).
+**Severity**: BROKEN. Basis: DECLARED. `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING`
+(`dh_core/graph_ir/findings.py`) is a falsified predicate to report — "a branch guard is
+incomplete, or overlaps another guard"; `guard totality and exclusivity` is a named mechanical
+check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and
+the contract required the IR to represent "environment-dependent activation" among the system's
+other structural properties — a requirements list dropped rather than carried forward when the
+contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5).
 
 **Observed**:
 
@@ -163,10 +177,14 @@ a named mechanical check (L145); `environment-dependent activation` is one of th
 **Omission**: the IR cannot say that a node's inputs are joined conjunctively rather than
 disjunctively, so join requirements and cardinality-against-join conflicts are undecidable.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract requires the IR to represent "parallel branches
-and joins" (L8); `output cardinality conflicts with the join` is a falsified predicate to report
-(L69); `required join inputs` is a named mechanical check (L146); `joins` is a mechanical question
-of the Control-flow projection (L92).
+**Severity**: BROKEN. Basis: DECLARED. The contract required the IR to represent "parallel branches
+and joins" among the system's other structural properties — a requirements list dropped rather than
+carried forward when the contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry
+A-5); `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/graph_ir/findings.py`) — "output
+cardinality conflicts with the join" — is a falsified predicate to report; `required join inputs`
+is a named mechanical check and `joins` a mechanical question of the Control-flow projection
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" and →
+"Projections").
 
 **Observed**:
 
@@ -190,11 +208,15 @@ of the Control-flow projection (L92).
 **Omission**: the IR cannot express a cycle, a bound on one, or a progress variable, so no loop can
 be checked for termination.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract requires the IR to represent "cycles and
-bounded loops, recursion" (L8); `loop bounds and progress variables` is a named mechanical check
-(L146); `loops` is a mechanical question of the Control-flow projection (L92); "loops have progress
-conditions and termination bounds" and "retry, escalation, recursion or feedback occurs where
-required" are holistic evaluation items (L127-L128).
+**Severity**: BROKEN. Basis: DECLARED. The contract required the IR to represent "cycles and
+bounded loops, recursion" among the system's other structural properties — a requirements list
+dropped rather than carried forward when the contract's content moved into `ARCHITECTURE.md` (see
+`AMENDMENTS.md` entry A-5); `loop bounds and progress variables` is a named mechanical check and
+`loops` a mechanical question of the Control-flow projection
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" and →
+"Projections"); the contract's holistic evaluation list — also dropped, per the same amendment —
+additionally required that loops have progress conditions and termination bounds, and that retry,
+escalation, recursion or feedback occur where required.
 
 **Observed**:
 
@@ -255,11 +277,14 @@ under one of the eleven. Filing it as `REQUIRED_INPUT_HAS_NO_PRODUCER` would giv
 **Omission**: shared persistent state has no identity in the IR — no resource, no generation, no
 version — so its lifecycle cannot be checked and exclusion over it cannot be stated.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract defines the STATE edge as "shared persistent
-state, including mutual exclusion over a resource" (L23); names `state generation and invalidation`
-as a mechanical check (L146); asks the Data-and-state projection about "freshness, lifecycle"
-(L93); and holds the composed system to "setup state is established, checked, versioned and
-invalidated correctly" (L124) and "no path terminates while relevant work remains active" (L131).
+**Severity**: BROKEN. Basis: DECLARED. The `STATE` edge type relates "shared persistent state,
+including mutual exclusion over a resource"; `state generation and invalidation` is a named
+mechanical check; the Data-and-state projection asks about "freshness, lifecycle" (all three:
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types", "Mechanical
+checks" and "Projections"). The contract's holistic evaluation list — dropped rather than carried
+forward, see `AMENDMENTS.md` entry A-5 — additionally held the composed system to "setup state is
+established, checked, versioned and invalidated correctly" and "no path terminates while relevant
+work remains active".
 
 **Observed**:
 
@@ -280,8 +305,8 @@ invalidated correctly" (L124) and "no path terminates while relevant work remain
   with the same non-null conflict_group is in-progress or complete-unaccepted". The lease is a
   time-bounded state resource: `expires`, `ttl_seconds`, and the derived `expired`, `stale` and
   `renew_by` columns (`ledger_spec.py#L306-L328`), with `lease.ttl_seconds` configured at
-  `ledger_spec.py#L1212-L1216`. `attempt_open` is the "relevant work remains active" flag that
-  L131 asks about.
+  `ledger_spec.py#L1212-L1216`. `attempt_open` is the "relevant work remains active" flag the
+  contract's (dropped) holistic evaluation list asked about, per the Severity paragraph above.
 
 ---
 
@@ -292,9 +317,11 @@ query reads them, reference integrity does not resolve them, and no query distin
 edge from a DATA edge.
 
 **Severity**: BROKEN. Basis: DECLARED. `evidence-to-claim trace coverage` is a named mechanical
-check (contract L146); the Evidence-and-provenance projection asks "what supports each claim, who
-produced it, which snapshot it describes" (L95); "failed terminals preserve enough evidence for
-recovery" is a holistic item (L130).
+check, and the Evidence-and-provenance projection asks "what supports each claim, who produced it,
+which snapshot it describes" (both: `plugins/development-harness/ARCHITECTURE.md`, "The work
+graph" → "Mechanical checks" and → "Projections"). The contract's holistic evaluation list —
+dropped rather than carried forward, see `AMENDMENTS.md` entry A-5 — additionally required that
+failed terminals preserve enough evidence for recovery.
 
 **Observed**:
 
@@ -316,7 +343,8 @@ recovery" is a holistic item (L130).
   (`sam_schema/core/models.py#L403-L420`) records `criterion_id`, `check_command`, `exit_code`,
   `stdout` and `stderr`; `AcceptanceCriterion.expected_baseline`/`expected_final`
   (`models.py#L390-L399`) name the T0 and TN snapshots a claim is measured between — precisely the
-  "which snapshot it describes" question at L95. `Task.is_bookend` and `Task.bookend_type`
+  "which snapshot it describes" question the Evidence-and-provenance projection asks (per the
+  Severity paragraph above). `Task.is_bookend` and `Task.bookend_type`
   (`models.py#L234-L239`), the EVIDENCE relation in the domain, have no IR carrier.
 
 ---
@@ -327,11 +355,13 @@ recovery" is a holistic item (L130).
 authority, and the authority check compares that node's effects against its own declaration, so
 widening the declaration silences the finding.
 
-**Severity**: BROKEN. Basis: DECLARED. `authority constraints` is a named mechanical check
-(contract L146); the Authority-and-effects projection asks "who may decide, mutate, approve,
-publish, retry or terminate" (L96) — a question about an actor, not about a node; "decisions occur
-under the correct authority" is a holistic item (L123); AUTHORITY is one of the eight edge types
-(L25).
+**Severity**: BROKEN. Basis: DECLARED. `authority constraints` is a named mechanical check; the
+Authority-and-effects projection asks "who may decide, mutate, approve, publish, retry or
+terminate" — a question about an actor, not about a node; AUTHORITY is one of the eight edge types
+(all three: `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks",
+"Projections" and "Edge types"). The contract's holistic evaluation list — dropped rather than
+carried forward, see `AMENDMENTS.md` entry A-5 — additionally required that decisions occur under
+the correct authority.
 
 **Observed**:
 
@@ -368,9 +398,13 @@ under the correct authority" is a holistic item (L123); AUTHORITY is one of the 
 nothing, and is traversed by nothing; three further id-bearing fields sit outside reference
 integrity.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract's first sentence about the system is that it is
-a "typed, hierarchical, directed multigraph" (L6); it must represent "recursion" and "one node
-refined into a subgraph" (L8-L9); `reference integrity` is a named mechanical check (L143).
+**Severity**: BROKEN. Basis: DECLARED. The IR's own model is "a single typed, hierarchical,
+directed multigraph" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The
+model"); the contract it was extracted from additionally required the system to represent
+"recursion" and "one node refined into a subgraph" among its other structural properties — a
+requirements list dropped rather than carried forward when the contract's content moved into
+`ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5); `reference integrity` is a named mechanical
+check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 
 **Observed**:
 
@@ -396,9 +430,12 @@ refined into a subgraph" (L8-L9); `reference integrity` is a named mechanical ch
 declared predicate "a node **or output** is unreachable" is implemented for nodes only.
 
 **Severity**: BROKEN. Basis: DECLARED. `entry and terminal existence` and `dead nodes and unused
-outputs` are named mechanical checks (contract L143-L144); `a node or output is unreachable` is a
-falsified predicate to report (L76); "successful terminals satisfy the goal" and "failed terminals
-preserve enough evidence for recovery" are holistic items (L129-L130).
+outputs` are named mechanical checks (`plugins/development-harness/ARCHITECTURE.md`, "The work
+graph" → "Mechanical checks"); `Predicate.UNREACHABLE` (`dh_core/graph_ir/findings.py`) — "a node
+or output is unreachable" — is a falsified predicate to report. The contract's holistic evaluation
+list — dropped rather than carried forward, see `AMENDMENTS.md` entry A-5 — additionally required
+that successful terminals satisfy the goal and that failed terminals preserve enough evidence for
+recovery.
 
 **Observed**:
 
@@ -425,11 +462,12 @@ preserve enough evidence for recovery" are holistic items (L129-L130).
 finding*, distinct from nonconformance. The IR's report vocabulary has no such category, so such an
 observation can only be dropped or misfiled as nonconformance.
 
-**Severity**: BROKEN. Basis: DECLARED. "unnecessary path length is identified" is a holistic item
-(contract L132), and L134-L136 makes the requirement explicit and normative: "Path length is
-separated from correctness. A path is nonconformant when its length violates a constraint or causes
-outcome failure. Otherwise unnecessary length is an optimisation finding, so that 'could be shorter'
-is never reported as 'does not conform'."
+**Severity**: BROKEN. Basis: DECLARED. The contract's holistic evaluation list — dropped rather
+than carried forward when the contract's content moved into `ARCHITECTURE.md`, see `AMENDMENTS.md`
+entry A-5 — required that "unnecessary path length is identified", and made the requirement
+explicit and normative: "Path length is separated from correctness. A path is nonconformant when
+its length violates a constraint or causes outcome failure. Otherwise unnecessary length is an
+optimisation finding, so that 'could be shorter' is never reported as 'does not conform'."
 
 **Observed**:
 
@@ -440,7 +478,7 @@ is never reported as 'does not conform'."
   `test_severity_taxonomy_is_closed` (`test_graph_ir_defects.py#L463-L474`) asserts
   `set(SEVERITY_BY_BASIS.values()) == set(Severity)`, closing the taxonomy in both directions.
 - `Finding` (`findings.py#L147-L199`) is the only report record, it is `extra="forbid"`, and its
-  `predicate` must be one of the eleven — none of which concerns length.
+  `predicate` must be one of the enumerated `Predicate` members — none of which concerns length.
 - No path or length structure exists. Searching `model.py` for `path` returns three hits, all
   docstring prose (`#L183`, `#L477`, `#L491`); the word does not appear as a field.
 - So the one thing the contract explicitly warns against — collapsing "could be shorter" into "does
@@ -456,9 +494,11 @@ supports the element, and simultaneously requires every element to carry at leas
 The two statements cannot both hold.
 
 **Severity**: BROKEN. Basis: DECLARED — both statements are declarations of the built module. The
-contract makes the stakes explicit at L155-L158: model fidelity "is essential: a perfectly sound
-graph proves nothing if the extractor silently repaired an ambiguity or dropped an inconvenient
-branch". `source-span coverage` is a named mechanical check (L143).
+contract made the stakes explicit in its model-fidelity validation activity — that activity's
+definition was dropped rather than carried forward, see `AMENDMENTS.md` entry A-5, but its
+substance was: a perfectly sound graph proves nothing if the extractor silently repaired an
+ambiguity or dropped an inconvenient branch. `source-span coverage` is a named mechanical check
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 
 **Observed**:
 
@@ -484,9 +524,11 @@ branch". `source-span coverage` is a named mechanical check (L143).
 revision". `revision_mismatches` fires only when *both* descriptors name a version, so a consumer
 that expects a revision and a producer that names none is reported as consistent.
 
-**Severity**: BROKEN. Basis: DECLARED. The predicate is contract L70; `snapshot and fingerprint
-consistency` is a named mechanical check (L146); a trace binds "target and artifact fingerprints"
-(L102-L103).
+**Severity**: BROKEN. Basis: DECLARED. `Predicate.REVISION_MISMATCH` (`dh_core/graph_ir/findings.py`)
+is the predicate; `snapshot and fingerprint consistency` is a named mechanical check
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); a trace —
+per the contract's Traces section, dropped rather than carried forward, see `AMENDMENTS.md` entry
+A-5 — was additionally required to bind "target and artifact fingerprints".
 
 **Observed**:
 
@@ -511,9 +553,13 @@ consistency` is a named mechanical check (L146); a trace binds "target and artif
 *descriptor*. There is no way to say "this ERROR edge carries signal S", and the routed-set is
 computed as though there were.
 
-**Severity**: BROKEN. Basis: DECLARED. `a failure output has no consuming edge` is a falsified
-predicate to report (contract L73); `unhandled failure signals` is a named mechanical check (L146);
-the IR must represent "error/recovery/rollback/retry paths" (L8).
+**Severity**: BROKEN. Basis: DECLARED. `Predicate.FAILURE_OUTPUT_UNCONSUMED`
+(`dh_core/graph_ir/findings.py`) — "a failure output has no consuming edge" — is a falsified
+predicate to report; `unhandled failure signals` is a named mechanical check
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and the
+contract required the IR to represent "error/recovery/rollback/retry paths" among the system's
+other structural properties — a requirements list dropped rather than carried forward, see
+`AMENDMENTS.md` entry A-5.
 
 **Observed**:
 
@@ -542,13 +588,16 @@ the IR must represent "error/recovery/rollback/retry paths" (L8).
 **Omission**: nothing on a node or its operation states whether the work is one-shot or recurring,
 or whether repeating it is safe.
 
-**Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. "one-time work is not incorrectly repeated"
-and "recurring work is not incorrectly one-shot" are holistic evaluation items (contract
-L125-L126), but neither appears in the Mechanical checks list (L142-L146), and L148-L149 permits a
-property to stay "a bounded judgment or an empirical evaluation until a property is made precise
-enough to test". The contract therefore does not declare that the IR must carry a multiplicity or
-idempotence facet, and `BROKEN` would be speculating about a requirement nobody wrote. Recording it
-so a reducer can decide whether to make the property precise.
+**Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. The contract's holistic evaluation list —
+dropped rather than carried forward when the contract's content moved into `ARCHITECTURE.md`, see
+`AMENDMENTS.md` entry A-5 — required that "one-time work is not incorrectly repeated" and
+"recurring work is not incorrectly one-shot", but neither appeared in its Mechanical checks list
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"), which
+permits a property to stay "a bounded judgment or an empirical evaluation until a property is made
+precise enough to test" — wording that did carry forward, closing that same section. The contract
+therefore did not declare that the IR must carry a multiplicity or idempotence facet, and `BROKEN`
+would be speculating about a requirement nobody wrote. Recording it so a reducer can decide whether
+to make the property precise.
 
 **Observed**:
 
@@ -568,11 +617,13 @@ so a reducer can decide whether to make the property precise.
 **Omission**: a producer declaring `Completeness.UNSPECIFIED` into a consumer requiring
 `Completeness.TOTAL` is representable and undetected.
 
-**Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. The contract requires "completeness
-expectations" as a declared facet of every input and output (L57), and the IR declares it. It does
-not name a completeness predicate in the falsified-predicate list (L64-L76) nor a completeness check
-in the mechanical list (L142-L146). Whether the facet must also be *decided* is not stated, so the
-severity rule forbids `BROKEN`. Recording it because the gap sits directly on the defect set.
+**Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. The contract required "completeness
+expectations" as a declared facet of every input and output
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"), and the IR
+declares it. It names no completeness predicate in `dh_core/graph_ir/findings.py`'s `Predicate`
+enum, nor a completeness check in that same document's "Mechanical checks". Whether the facet must
+also be *decided* is not stated, so the severity rule forbids `BROKEN`. Recording it because the
+gap sits directly on the defect set.
 
 **Observed**:
 
@@ -592,27 +643,32 @@ severity rule forbids `BROKEN`. Recording it because the gap sits directly on th
 
 ## Summary
 
-| # | Omission | Severity | Contract anchor |
+| # | Omission | Severity | Where the basis is stated |
 |---|---|---|---|
-| 1 | No requirement or intent entity | BROKEN | L92-L94, L118-L119, L146 |
-| 2 | No trace record | BROKEN | L97, L99-L114 |
-| 3 | Guards unstructured; no guard query | BROKEN | L9, L74, L145 |
-| 4 | No join semantics; `Cardinality` inert | BROKEN | L8, L69, L146 |
-| 5 | No loop or cycle representation | BROKEN | L8, L127-L128, L146 |
-| 6 | Unrecorded invalidations unreportable | BROKEN | L28, L124, L146 |
-| 7 | No state resource; STATE inert | BROKEN | L23, L124, L131, L146 |
-| 8 | Evidence declared, never checked | BROKEN | L95, L130, L146 |
-| 9 | Authority is per-node self-assertion | BROKEN | L25, L96, L123, L146 |
-| 10 | Hierarchy nominal; `subgraph_ref` unresolved | BROKEN | L6, L8-L9, L143 |
-| 11 | No entry/terminal marking; unused outputs uncovered | BROKEN | L76, L129-L130, L143-L144 |
-| 12 | Unnecessary path length unreportable | BROKEN | L132, L134-L136 |
-| 13 | `ASSUMED`/`ABSENT` require a source span | BROKEN | L143, L155-L158 |
-| 14 | Revision check passes when either side unversioned | BROKEN | L70, L102-L103, L146 |
-| 15 | Failure signals are not carried by edges | BROKEN | L8, L73, L146 |
-| 16 | One-time versus recurring work has no carrier | CONTRACT_UNSPECIFIED | L125-L126 |
-| 17 | `Completeness` compared by nothing | CONTRACT_UNSPECIFIED | L57 |
+| 1 | No requirement or intent entity | BROKEN | Projections, Mechanical checks; holistic list (dropped) |
+| 2 | No trace record | BROKEN | Projections; Traces section (dropped) |
+| 3 | Guards unstructured; no guard query | BROKEN | `Predicate` table, Mechanical checks; requirements list (dropped) |
+| 4 | No join semantics; `Cardinality` inert | BROKEN | `Predicate` table, Mechanical checks, Projections; requirements list (dropped) |
+| 5 | No loop or cycle representation | BROKEN | Mechanical checks, Projections; requirements list and holistic list (both dropped) |
+| 6 | Unrecorded invalidations unreportable | BROKEN | self-contradiction within `dh_core/graph_ir/findings.py` and `model.py` |
+| 7 | No state resource; STATE inert | BROKEN | Edge types, Mechanical checks, Projections; holistic list (dropped) |
+| 8 | Evidence declared, never checked | BROKEN | Mechanical checks, Projections; holistic list (dropped) |
+| 9 | Authority is per-node self-assertion | BROKEN | Mechanical checks, Projections, Edge types; holistic list (dropped) |
+| 10 | Hierarchy nominal; `subgraph_ref` unresolved | BROKEN | The model, Mechanical checks; requirements list (dropped) |
+| 11 | No entry/terminal marking; unused outputs uncovered | BROKEN | `Predicate` table, Mechanical checks; holistic list (dropped) |
+| 12 | Unnecessary path length unreportable | BROKEN | holistic list (dropped) |
+| 13 | `ASSUMED`/`ABSENT` require a source span | BROKEN | Mechanical checks; model-fidelity activity (dropped) |
+| 14 | Revision check passes when either side unversioned | BROKEN | `Predicate` table, Mechanical checks; Traces section (dropped) |
+| 15 | Failure signals are not carried by edges | BROKEN | `Predicate` table, Mechanical checks; requirements list (dropped) |
+| 16 | One-time versus recurring work has no carrier | CONTRACT_UNSPECIFIED | holistic list (dropped); absent from Mechanical checks |
+| 17 | `Completeness` compared by nothing | CONTRACT_UNSPECIFIED | Node record |
 
-Counts in this table are derived from the findings above; the findings are the source of truth.
+"Dropped" marks contract content that did not carry forward when the assessor contract's
+architecture moved into `plugins/development-harness/ARCHITECTURE.md` (see this directory's
+`AMENDMENTS.md` entry A-5); each finding above states that content's substance directly since there
+is no longer a document section to cite. Every other heading named is under `ARCHITECTURE.md`, "The
+work graph". Severities in this table are restated from the findings above; the findings are the
+source of truth.
 
 ## Where this audit's judgement differs from the contract
 
@@ -621,9 +677,10 @@ One place, stated rather than acted on silently.
 The contract's severity rule is written for findings about the system under assessment. This audit
 reports on the IR itself, and the rule does not say what "declared" means when the subject is the
 representation rather than the represented. The reading applied here is stated in
-"Subject and severity reading" above: `ASSESSOR-CONTRACT.md` and the built module's own docstrings
-and constraints both count as declarations. A verifier who rejects that reading should re-derive
-every `BROKEN` above; the observations do not change, only the basis.
+"Subject and severity reading" above: the assessor contract (its architecture content now in
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph") and the built module's own
+docstrings and constraints both count as declarations. A verifier who rejects that reading should
+re-derive every `BROKEN` above; the observations do not change, only the basis.
 
 Two consequences of that reading are worth flagging for the reducer, because they are the places a
 reasonable verifier could disagree:
@@ -632,7 +689,9 @@ reasonable verifier could disagree:
   contradiction with the contract. Each names both halves of the contradiction explicitly so the
   disagreement can be adjudicated on the text.
 - COMPLETENESS-16 and -17 are held at `CONTRACT_UNSPECIFIED` even though both look, from the
-  holistic list, like plain gaps. They are held there because the contract's own escape clause at
-  L148-L149 covers them and neither appears in the mechanical-checks list. If a reducer promotes
-  either to `BROKEN`, the promotion should come with the contract text that declares the obligation,
-  not with the observation, which is not in dispute.
+  holistic list, like plain gaps. They are held there because the contract's own escape clause —
+  "a bounded judgment or an empirical evaluation until a property is made precise enough to test",
+  which carried forward into `plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+  "Mechanical checks" — covers them and neither appears in that same section's mechanical-checks
+  list. If a reducer promotes either to `BROKEN`, the promotion should come with the contract text
+  that declares the obligation, not with the observation, which is not in dispute.
