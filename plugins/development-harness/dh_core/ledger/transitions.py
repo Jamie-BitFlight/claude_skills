@@ -88,7 +88,8 @@ REASON_KINDS: dict[str, ledger_spec.ReasonKind] = {reason.code: reason.kind for 
 """Every reason code the specification defines, with the kind that decides raise versus return."""
 
 SUCCESSFUL_DEPENDENCY: tuple[str, ...] = derive.SUCCESSFUL_DEPENDENCY
-"""Statuses that satisfy a dependency without acceptance; ``derive`` binds them into the SQL."""
+"""Statuses that satisfy a dependency; ``derive`` binds them into the SQL. Acceptance is a later,
+separate verdict and does not gate a dependent's readiness."""
 
 EVENT_KINDS: frozenset[str] = frozenset(event.kind for event in ledger_spec.EVENTS)
 """Every event kind the specification declares; :func:`append` refuses any other."""

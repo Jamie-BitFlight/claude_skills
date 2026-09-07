@@ -34,6 +34,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES
 from sam_schema.core.models import TaskStatus
 
 # ---------------------------------------------------------------------------
@@ -48,8 +49,12 @@ keeps ``spec.Status`` reading well at every call site in this module and its tes
 ANY = "*"
 """Wildcard ``from_status`` for a transition that applies in every status."""
 
-SUCCESSFUL_DEPENDENCY = frozenset({Status.DEFERRED, Status.SKIPPED})
-"""A dependency counts as satisfied when it is accepted, or in one of these statuses."""
+SUCCESSFUL_DEPENDENCY = frozenset(SUCCESSFUL_STATUSES)
+"""A dependency counts as satisfied when it is in one of these statuses.
+
+Acceptance is a separate, later verdict on a completed task and does not gate a dependent's
+readiness. Imported from ``sam_schema.core.dependencies.SUCCESSFUL_STATUSES`` so there is one
+encoding of this predicate rather than two that happen to agree."""
 
 BATCH_TERMINAL = frozenset({Status.COMPLETE, Status.FAILED, Status.BLOCKED, Status.DEFERRED, Status.SKIPPED})
 """Statuses in which a task needs no runner; ``in-progress`` is batch-terminal only when returned."""
@@ -289,7 +294,7 @@ COLUMNS: list[Column] = [
         type="bool",
         provenance=Provenance.DERIVED,
         rule=(
-            "status is not-started, and every id in dependencies names a task that is accepted or in SUCCESSFUL_DEPENDENCY, "
+            "status is not-started, and every id in dependencies names a task in SUCCESSFUL_DEPENDENCY, "
             "and no other task with the same non-null conflict_group is in-progress or complete-unaccepted"
         ),
     ),
