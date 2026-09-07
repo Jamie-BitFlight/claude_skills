@@ -1114,18 +1114,14 @@ A draft lifecycle doc existed but was not referenced by any skill. This document
 This document previously stated that `groom-backlog-item/SKILL.md` referenced
 `./references/issue-classification.md` and `./references/groomer-agent.md`, that neither file
 existed on disk, and that the `references/` directory under `groom-backlog-item/` did not exist.
-Re-checked directly against the filesystem: `plugins/development-harness/skills/groom-backlog-item/references/`
-exists and contains `issue-classification.md`, `groomer-agent.md`, `groomer-output-validation.md`,
-and `drift-check.md`. `git log --diff-filter=A` on those two files shows both were added when the
-`groom-backlog-item` skill was lifted into this plugin, and `git show` of `groom-backlog-item/SKILL.md`
-as it stood on 2026-03-25 confirms both files were already present in the tree at that commit — the
-original claim was false at the time it was recorded, not something that later went stale. The
-`groom-backlog-item` skill (including this `references/` directory) is being retired in favor of
-`/dh:work-backlog-item groom`, whose own reference files (`groom/swarm.md`, `groom/analyze.md`, and
-the rest — see Phase 2 above) do not reuse or reference `issue-classification.md` or
-`groomer-agent.md`; nothing else in the repository does either
-(checked: `grep -rln "groom-backlog-item/references\|groomer-agent.md\|issue-classification.md" --include="*.md" .`
-matched only this file).
+That claim was false when it was recorded: `git show` of `groom-backlog-item/SKILL.md` as it stood
+on that date confirms both files were already in the tree, so this was never a case of a true
+claim going stale.
+
+The `groom-backlog-item` skill has since been retired in favour of `/dh:work-backlog-item groom`,
+and its `references/` directory deleted along with it. The rules those files still carried that
+nothing else did were carried into the groom workflow first; `work-backlog-item/maintenance/
+groom-hardening-provenance.md` records what moved and what was deliberately left behind.
 
 ### BLOCKED Task Handling Undocumented (Session observation 2026-03-25)
 
