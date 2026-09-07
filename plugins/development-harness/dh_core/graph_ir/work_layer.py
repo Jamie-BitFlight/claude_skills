@@ -1,4 +1,4 @@
-"""Layer 2 -- the work graph: nodes are tasks; edges are the eight types layer 3 also draws from.
+"""Layer 2 -- the work graph: nodes are tasks; edges are the same typed relations layer 3 draws from.
 
 ``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): "This layer says what may run
 concurrently and what waits on what. Every layer-2 graph carries bookends: a review step, a
@@ -135,7 +135,7 @@ class WorkNode(BaseModel):
 
 
 class WorkEdge(BaseModel):
-    """One typed relation between two layer-2 nodes, drawn from the same eight types as layer 3."""
+    """One typed relation between two layer-2 nodes, drawn from the same ``EdgeType`` as layer 3."""
 
     layer: Literal[Layer.WORK] = Layer.WORK
     id: str = Field(min_length=1)

@@ -80,7 +80,7 @@ an unstated assumption.
 
 1. **The task lifecycle.** Nodes are statuses, edges are commands. This is `ledger_spec.TRANSITIONS`
    — one uniform state machine every task runs through.
-2. **The plan's task graph.** Nodes are tasks, edges are the eight types. `dependencies`,
+2. **The plan's task graph.** Nodes are tasks, edges are the typed relations of `EdgeType`. `dependencies`,
    `conflict_group` and the bookends live here.
 3. **The workflow.** Nodes are the steps of `implement-feature` — the wave loop, the launcher, the
    runner, the judge — with an actor, a guard and source refs into a `SKILL.md`. The assessor
