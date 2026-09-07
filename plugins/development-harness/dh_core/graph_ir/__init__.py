@@ -11,6 +11,10 @@ graphs, each describable on its own and drawn together only in :class:`~dh_core.
   and the mechanical queries the contract's falsified-predicate list names.
 * :mod:`~dh_core.graph_ir.decomposition` -- the grooming and architecture output layer 3 decomposes
   into layer 2, and the traceability queries between the two.
+* :mod:`~dh_core.graph_ir.instructions` -- the instruction record a task carries out of
+  decomposition, and :mod:`~dh_core.graph_ir.decomposition_gate` -- the decomposition-exit gate that
+  checks those instructions' referents and quotes against a repo checkout and a
+  :class:`~dh_core.graph_ir.work_layer.WorkGraph`.
 * :mod:`~dh_core.graph_ir.vocabulary`, :mod:`~dh_core.graph_ir.descriptors`,
   :mod:`~dh_core.graph_ir.node_parts` -- the facet and node-part types layer 3 (and, for the edge
   types and source spans, layer 2) draws from.
@@ -20,6 +24,13 @@ graphs, each describable on its own and drawn together only in :class:`~dh_core.
 from __future__ import annotations
 
 from dh_core.graph_ir.decomposition import DecompositionInput, DecompositionItem, DecompositionSourceKind
+from dh_core.graph_ir.decomposition_gate import (
+    DecompositionGate,
+    ReferentResolver,
+    RepoResolver,
+    RepoSourceReader,
+    SourceReader,
+)
 from dh_core.graph_ir.findings import (
     PREDICATES,
     SEVERITY_BY_BASIS,
@@ -30,6 +41,7 @@ from dh_core.graph_ir.findings import (
     Projection,
     Severity,
 )
+from dh_core.graph_ir.instructions import Instruction, InstructionKind, Referent, ReferentKind
 from dh_core.graph_ir.layer import Layer
 from dh_core.graph_ir.ledger_layer import LedgerCommand, LedgerEdge, LedgerGraph, LedgerNode, LedgerStatus
 from dh_core.graph_ir.model import (
@@ -75,6 +87,7 @@ __all__ = [
     "Cardinality",
     "Completeness",
     "ContractBasis",
+    "DecompositionGate",
     "DecompositionInput",
     "DecompositionItem",
     "DecompositionSourceKind",
@@ -90,6 +103,8 @@ __all__ = [
     "Finding",
     "Freshness",
     "Graph",
+    "Instruction",
+    "InstructionKind",
     "Layer",
     "LedgerCommand",
     "LedgerEdge",
@@ -102,8 +117,14 @@ __all__ = [
     "Predicate",
     "PredicateDefinition",
     "Projection",
+    "Referent",
+    "ReferentKind",
+    "ReferentResolver",
+    "RepoResolver",
+    "RepoSourceReader",
     "Severity",
     "SideEffect",
+    "SourceReader",
     "SourceSpan",
     "Termination",
     "ThreeLayerGraph",
