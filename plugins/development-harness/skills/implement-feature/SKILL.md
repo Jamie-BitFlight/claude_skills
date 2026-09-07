@@ -333,15 +333,16 @@ Skip this gate when `autonomy_mode` is `"full_auto"` or `"per_task"`.
 
 Note: under `"per_task"`, per-task gates already fire for each task; no additional wave gate is needed.
 
-> **Hook behavior on SubagentStop**: When a sub-agent finishes, `task_status_hook.py` reads the
-> active-task context that `start-task` registered and syncs completion to the external tracker
-> (if `parent_issue_number` is set there). External tracker sync failure does not affect the hook
-> exit code. `parent_issue_number` accepts `str | int` — GitHub integer IDs and beads string IDs
-> are both supported.
+> **Hook behavior on SubagentStop**: when a sub-agent finishes, `task_status_hook.py` runs
+> `plan settle` for the attempt named in that sub-agent's own launch prompt, with its final
+> message as the return text, then clears the active-task context. That is the same settle step 4
+> asks of you; whichever runs first wins and the other is answered `already-settled`, so running
+> step 4 yourself is never wrong. The hook covers the case where this session ends before step 4
+> does. A settle it could not perform is printed to stderr, never absorbed.
 >
-> Do not treat the hook as the thing that moves the task. A task reaches its outcome because the
-> worker ran `plan finish` and you ran `plan accept` — the loop above reads the ledger for that,
-> not the hook's exit.
+> Do not treat the hook as the thing that moves the task. It writes no status at all. A task
+> reaches its outcome because the worker ran `plan finish` and you ran `plan accept` — the loop
+> above reads the ledger for that, not the hook's exit.
 
 ---
 

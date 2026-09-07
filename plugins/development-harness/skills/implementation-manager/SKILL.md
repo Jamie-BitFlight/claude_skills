@@ -189,18 +189,37 @@ The `task_status_hook.py` script provides automated task status tracking via Cla
 
 | Command              | Hook Event   | Matcher             | Purpose                                        |
 | -------------------- | ------------ | ------------------- | ---------------------------------------------- |
-| `/dh:execution` | SubagentStop | (all)               | Mark task COMPLETE, add Completed timestamp    |
+| `/dh:execution` | SubagentStop | (all)               | Settle the attempt the stopping worker was launched for |
 | `/dh:start-task`        | PostToolUse  | `Write\|Edit\|Bash` | Update LastActivity timestamp during execution |
 
 ### How It Works
 
-**SubagentStop (Task Completion)**:
+**SubagentStop (settle)**:
 
-When `/dh:execution` launches a sub-agent via `/start-task {plan} --task {id}`, the SubagentStop hook fires when the sub-agent completes. The hook script:
+A SubagentStop hook registered in `hooks/hooks.json` runs in the orchestrator's session when a
+sub-agent it launched stops, so it is the supervisor's observation point. It records that the
+launch ended, and nothing else:
 
-1. Parses the original prompt to extract the plan address and task ID
-2. Updates task status from `IN PROGRESS` to `COMPLETE`
-3. Adds `**Completed**: {ISO timestamp}` to the task section
+1. Reads the sub-agent's own initial prompt from `agent_transcript_path` and takes the plan
+   address, the task id and the attempt number from it. The dispatch contract requires all three
+   in the prompt (`{plan}/{task}, attempt {n}`), and the transcript is per-sub-agent, so parallel
+   workers correlate to distinct attempts.
+2. Runs `plan settle --address {plan}/{task} --attempt {n} --return-text "{the final message}"`.
+3. Clears the session-scoped active-task context.
+
+It writes no task status. The runner's own `plan finish --result` records the outcome and the
+orchestrator's `plan accept` / `plan reclaim` records the verdict — see
+[ARCHITECTURE.md](../../ARCHITECTURE.md) § "What a hook may write" for why a third writer of that
+one fact would drift from both. The worker's final message is stored verbatim as the attempt's
+return text, which is evidence the judge reads.
+
+Nothing it cannot do is absorbed: a prompt naming no attempt, a plan the ledger does not hold,
+and a settle the CLI refused are each reported on stderr. The hook still exits 0, because the
+SubagentStop critical path must not be blocked.
+
+The orchestrator settles as its own next step too, and whichever gets there first wins — the
+other is answered `already-settled`. The hook exists for the launch whose orchestrator step never
+ran.
 
 **PostToolUse (Activity Tracking)**:
 
@@ -215,8 +234,8 @@ When `/dh:start-task` runs on the local-YAML backend, it creates a context file 
 
 | Field              | Added By                  | When                              |
 | ------------------ | ------------------------- | --------------------------------- |
-| `**Started**`      | Agent (via `/dh:start-task`) | When agent begins work on task    |
-| `**Completed**`    | Hook (SubagentStop)       | When sub-agent finishes           |
+| `**Started**`      | `plan dispatch`, when the orchestrator opens the attempt | When the worker is launched |
+| `**Completed**`    | `plan finish --result complete`, or `plan accept` on a returned task | When the runner or the judge closes it |
 | `**LastActivity**` | Hook (PostToolUse)        | On each Write, Edit, or Bash call |
 
 ## Hook Runtime Profile Controls
@@ -227,9 +246,9 @@ The `task_status_hook.py` script supports environment-variable-based profile con
 
 Controls which hook handlers run. Case-sensitive lowercase. Default when unset or empty: `standard`.
 
-- **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (task completion) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
+- **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (settle) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
 - **`standard`** — All handlers run.
-- **`strict`** — All handlers run. SubagentStop additionally performs pre-completion validation checks and emits warnings to stderr. Warnings are observational only — they do not prevent task completion. Strict checks verify that the task was claimed (status was `in-progress` before completion) and that acceptance criteria were defined (non-empty).
+- **`strict`** — All handlers run. The profile decides which handlers run, not what they do: settling records that a launch ended, which is evidence rather than a verdict, so there is nothing for a stricter profile to scrutinise before it is written. Whether the work met its acceptance criteria is the judge's question, answered from the ledger — see [the work loop](../../docs/work-ledger/work-loop.md).
 
 Invalid values produce a warning to stderr and fall back to `standard`.
 
@@ -240,9 +259,9 @@ Comma-separated list of hook IDs to disable. Each ID is stripped of whitespace. 
 Hook IDs for this script:
 
 - `task-status:post-tool-use` — the PostToolUse handler (LastActivity timestamp updates)
-- `task-status:subagent-stop` — the SubagentStop handler (task completion marking)
+- `task-status:subagent-stop` — the SubagentStop handler (settling the attempt)
 
-Disabled hooks take precedence over profile. If both `CLAUDE_SKILLS_HOOK_PROFILE=strict` and `CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop` are set, SubagentStop is skipped entirely (no strict checks run).
+Disabled hooks take precedence over profile. If both `CLAUDE_SKILLS_HOOK_PROFILE=strict` and `CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop` are set, SubagentStop is skipped entirely and no attempt is settled by the hook — the orchestrator's own settle step is then the only one.
 
 Disabled hooks exit 0 (Claude Code treats non-zero hook exit as an error that kills the hook chain).
 

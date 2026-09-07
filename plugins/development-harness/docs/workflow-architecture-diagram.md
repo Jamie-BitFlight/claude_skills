@@ -296,8 +296,9 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `{qg_plan_address}` plan record | `/complete-implementation` via `build_quality_gate_plan` + the `sam_plan` create action | SAM dispatch loop (T1–T6 quality gate tasks) |
 | session active-task context | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
-| `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | ``plan ready` readiness evaluation |
-| `status: in-progress`, `started` field | `sam_task claim` via `/start-task` | `sam_plan status`, `sam_plan ready` exclusion |
+| `settled`, `return_text` on an attempt | `plan settle`, run by the orchestrator's step 4 or by `task_status_hook.py` SubagentStop | the judge, per [the work loop](./work-ledger/work-loop.md) |
+| `status: complete`, `completed` field | `plan finish --result complete`, run by the worker | `plan ready` readiness evaluation |
+| `status: in-progress`, `started` field | `plan dispatch`, run by the orchestrator | `plan status`, `plan ready` exclusion |
 | Follow-up tasks | `code-reviewer` | `/complete-implementation` recursion gate |
 | Context Manifest in task | `context-gathering`, `context-refinement` | executing agents, future sessions |
 | Artifact manifest (configured backend) | Producer agents via `artifact_register` | Consumer agents via `artifact_list`, worktree agents via `artifact_read` |
@@ -310,7 +311,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 flowchart TD
     Created([Task created]) -->|"swarm-task-planner via `plan create`"| NS[not-started]
     NS -->|"start-task skill via sam_task claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via sam plan state --address {plan_address}/{task_address} --new-status complete"| CO[complete]
+    IP -->|"the worker via `plan finish --result complete`<br>(the SubagentStop hook writes no status;<br>it runs `plan settle` for the attempt)"| CO[complete]
     IP -->|"agent or human operator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'blocked'})"| BL[blocked]
     IP -->|"agent or orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'failed'})"| FA[failed]
     NS -->|"orchestrator<br>via sam_task(plan='{plan_address}', task='{task_address}', config={action:'state', status:'deferred'})"| DE[deferred]
@@ -398,15 +399,15 @@ Context:    Declared on /implement-feature skill and /complete-implementation sk
 
 Processing sequence:
 
-1. Read `prompt` field from hook input (falls back to `tool_input.prompt`).
-2. Parse prompt for `/start-task <path> --task <id>` or `Skill(skill="start-task", args="<path> --task <id>")` pattern.
-3. If no match, read the session-scoped active-task context.
-4. If still no match, exit 0 silently (not a `/start-task` sub-agent).
-5. Call `sam plan state --address {plan_address}/{task_address} --new-status complete` via the SAM CLI subprocess (`scripts/run_sam_cli.py`); on failure, exit 0 (best-effort).
-6. Call `sam plan update --plan-address {plan_address}/{task_address} --completed <ISO timestamp>` via the SAM CLI subprocess.
-7. Clear the session-scoped active-task context.
+1. Read the sub-agent's own initial prompt from `agent_transcript_path`.
+2. Take the plan address, task ID and attempt number from it — `{plan}/{task}, attempt {n}`, or a `/start-task` or `Skill(skill="start-task", …)` invocation carrying `--attempt`.
+3. If the prompt names no launch, exit 0 silently (not a dispatched worker). If it names one but no attempt, or a plan the ledger does not hold, say so on stderr and settle nothing.
+4. Call `sam plan settle --address {plan_address}/{task_address} --attempt {n} --return-text "{the final message}"` via the SAM CLI subprocess (`scripts/run_sam_cli.py`). `already-settled` means the orchestrator got there first, and is success. A failure is printed to stderr; the hook still exits 0.
+5. Clear the session-scoped active-task context.
 
-Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and only routes status writes through the provider-neutral SAM CLI.
+The hook writes no task status. Which actor may write what is settled in [ARCHITECTURE.md](../ARCHITECTURE.md) § "What a hook may write".
+
+Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and routes its one write through the provider-neutral SAM CLI.
 
 Fields written: `status: complete`, `completed: <ISO timestamp>`
 
@@ -454,7 +455,7 @@ flowchart TD
         Claim --> ClaimedOK{claimed?}
         ClaimedOK -->|No| Ready
         ClaimedOK -->|Yes| Dispatch["Skill(skill='start-task',<br>args='{qg_plan_address} --task {task_address}')"]
-        Dispatch --> Hook["SubagentStop hook<br>sam_task config={action:'state'} → status: complete"]
+        Dispatch --> Hook["SubagentStop hook<br>`plan settle --attempt {n}` → attempt settled"]
         Hook --> PostDispatch{Which task<br>completed?}
         PostDispatch -->|"research phase"| StoreFollowups["Register follow-up artifacts<br>from ARTIFACTS output"]
         PostDispatch -->|"doc phase — no drift"| SkipT5["sam_task config={action:'state'} → skipped"]

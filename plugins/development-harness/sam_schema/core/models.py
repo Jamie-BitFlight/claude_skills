@@ -741,9 +741,14 @@ class ActiveTaskContext(BaseModel):
 
     Persistence as context_dir()/active-task-{session_id}.json is a local-YAML
     ContextBackend storage detail, not a universal contract — the memory, GitHub,
-    and beads backends hold the same binding without writing that file. The
-    SubagentStop hook's primary retrieval path is the sam_active_task(action="get")
-    fastmcp call; a file read is only a local-backend fallback.
+    and beads backends hold the same binding without writing that file.
+
+    The record carries no attempt number, and does not identify which sub-agent wrote it:
+    ``session_id`` inside a sub-agent is the parent session's, so one wave's workers share a
+    record. It is therefore not a correlation key for anything per-attempt. The SubagentStop
+    hook reads the address and attempt from the sub-agent's own launch prompt instead, and
+    touches this record only to clear it when the session stops; the PostToolUse handler reads
+    it for the ``last-activity`` timestamp, which needs no attempt.
 
     Schema note: new fields (session_id, feature_slug, started_at) are additive.
     Existing files without these fields remain valid — all new fields default to None.
