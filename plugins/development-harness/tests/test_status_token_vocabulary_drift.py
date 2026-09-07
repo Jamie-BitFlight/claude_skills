@@ -2,18 +2,18 @@
 
 ``subagent-contract`` pins a worker's completion report to three tokens on a
 ``STATUS:`` line in its final message: ``STATUS: DONE | PARTIAL | BLOCKED``. The hook
-matches that line anywhere in the message, because ``agents/task-worker.md`` prescribes
-the report inside a fenced block and a first-line-only match scored it as absent. The
-token still has to be one a consumer recognises. The SubagentStop hook
-(``skills/implementation-manager/scripts/task_status_hook.py``) branches on that token
-to decide whether a SAM task is marked complete or blocked, so a token no consumer
-recognises produces a silently wrong task state rather than an error.
+prescribes the report inside a fenced block, so the token can sit below the first line.
+The token still has to be one a consumer recognises: the orchestrator judges what a
+launch returned (``docs/work-ledger/work-loop.md``), and a token no consumer recognises
+sends the judge down the wrong row rather than raising an error.
+
+No consumer maps this token onto a task status. The runner's own ``plan finish
+--result`` records the outcome and the judge's ``accept``/``reclaim`` records the
+verdict; the STATUS line is the report's header, and the SubagentStop hook stores it
+verbatim as ``settle --return-text`` rather than branching on it.
 
 The vocabulary is not yet unified. Several producers still emit the pre-contract
-spellings ``COMPLETE`` and ``COMPLETED``, which the hook accepts through
-``_COMPLETE_STATUS_TOKENS`` as deliberate, temporary breadth. ``FAILED`` also appears;
-it maps to blocked, because only an explicit ``sam_task(state='failed')`` cascades
-skips to dependents.
+spellings ``COMPLETE`` and ``COMPLETED``. ``FAILED`` also appears.
 
 This test enumerates every ``STATUS: X`` token written in ``skills/**`` and
 ``agents/**`` and fails on any token outside the pinned set plus those tolerated
@@ -40,9 +40,8 @@ _PINNED_TOKENS = frozenset({"DONE", "PARTIAL", "BLOCKED"})
 # scheduled for removal once its producers adopt a pinned token; shrinking this set
 # is the measure of that work.
 #
-# COMPLETED is deliberately absent: it has no producer anywhere in plugins/. The hook's
-# _COMPLETE_STATUS_TOKENS still accepts it defensively, which costs nothing, but there
-# is no drift here to track.
+# COMPLETED is deliberately absent: grepped `STATUS: COMPLETED` across plugins/ and found
+# no producer, so there is no drift here to track.
 _TOLERATED_TOKENS = frozenset({"COMPLETE", "FAILED"})
 
 _ALLOWED_TOKENS = _PINNED_TOKENS | _TOLERATED_TOKENS
@@ -110,6 +109,5 @@ def test_tolerated_spellings_report_their_remaining_producers() -> None:
         if token not in still_tolerated:
             raise AssertionError(
                 f"STATUS: {token} has no producers left in skills/ or agents/. "
-                f"Remove it from _TOLERATED_TOKENS and from _COMPLETE_STATUS_TOKENS "
-                f"in task_status_hook.py if it is a completion spelling."
+                f"Remove it from _TOLERATED_TOKENS so the vocabulary cannot widen back."
             )

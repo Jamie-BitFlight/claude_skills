@@ -153,13 +153,17 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
      --session-id "${CLAUDE_CODE_SESSION_ID}"
    ```
 
-   This is session-scoped context for this agent's hooks, not task state — it parks your address
-   where the hook can find it when your session stops, and holds nothing the ledger holds. It stays
-   on this store for that reason.
+   This is session-scoped context for the PostToolUse hook, which stamps `last-activity` on the
+   task while you work. It is not task state and holds nothing the ledger holds.
 
-   Omit `--parent-issue` if the story issue number is not known. The hook treats absence as `None`
-   and skips backend sync. `--parent-issue` accepts `str | int` — GitHub integer IDs (e.g., `42`)
-   and beads string IDs (e.g., `"bd-a3f8"`) are both valid.
+   It is not how the SubagentStop hook finds you. That hook takes your address and attempt from
+   your own launch prompt, because this record is keyed by `${CLAUDE_CODE_SESSION_ID}` — the
+   parent session's id inside a sub-agent, so a wave's workers all share one — and carries no
+   attempt number.
+
+   Omit `--parent-issue` if the story issue number is not known; absence is `None`. It accepts
+   `str | int` — GitHub integer IDs (e.g., `42`) and beads string IDs (e.g., `"bd-a3f8"`) are both
+   valid.
 
 4a. **Renew the lease before work that may outrun it.**
 
