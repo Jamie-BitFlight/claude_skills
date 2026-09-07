@@ -105,8 +105,13 @@ Read as the architecture's statement of expectation, against which the current s
   documentation-check bookend returns nothing.
 - **A distinct Design stage.** No architect skill or agent exists; `skills/planning` carries Design
   and Plan together.
-- **Non-repository outputs.** Acceptance criteria run as shell check commands, so validating an
-  external system is expressible as intent and not as a criterion the harness can evaluate.
+- **Criteria that are not executable.** `AcceptanceCriterion.check_command`
+  (`sam_schema/core/models.py`) is required and has no default, and the baseline and verification
+  agents iterate over it, so every structured criterion must be a command a machine can run. Work
+  whose completion is an assessment rather than a check — with evidence recorded and judged — has no
+  criterion shape here. This is the harness's one structural limit on what work it can carry, and it
+  is a limit on verification, not on domain: a UI test and a microcontroller reading are commands,
+  while "the design holds up" is not.
 
 ## Automation Boundary
 

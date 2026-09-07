@@ -98,12 +98,21 @@ assessment of this system that cannot say which outcome a defect belongs to has 
 
 ## Domain reach
 
-The intended model is domain-generic: work that benefits from durable scope, relationships,
-coordination and evidence, whether or not it produces code. A piece of work may equally be
-validation of an external system — a UI test against a web page, a radio reading from a
-microcontroller — rather than a change to a repository.
+No domain. The loop is user agreement, then research and discovery, design, planning,
+implementation and verification, and nothing in those stages is specific to software. The work that
+happens inside is dynamic, organised by planning against whatever the item turned out to need.
 
-This is a target, not a current capability. As of 2026-09-07 nothing in the plugin's code, skills or
-composition model supports non-software work: the language-manifest template, which is the only
-extension point a domain plugs into, asks for a typecheck command and for config files that identify
-a language, and the artifact types and acceptance-criteria checks are shaped around a codebase.
+A piece of work may be a change to a repository, and it may equally be the validation of an external
+system — a UI test against a web page, a radio reading from a microcontroller — or work that
+produces no repository artifact at all.
+
+Two things are software-shaped today and neither makes the model domain-specific. The specialist
+composition is optional: a language manifest resolves roles when one matches, and without one the
+generic worker runs the stage directly. And the artifact-type vocabulary is named for code —
+`codebase-analysis`, `code-review` — which is naming debt in an extensible table rather than a
+constraint on what work can be carried.
+
+The one real constraint is stated in [ARCHITECTURE.md](../ARCHITECTURE.md): a structured acceptance
+criterion carries an executable check command. That bounds verification to what a machine can run,
+not the work to what a codebase contains — and the domains it excludes are the ones whose completion
+is a judgement rather than a check, not the ones that are not software.
