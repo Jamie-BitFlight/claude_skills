@@ -2,7 +2,7 @@
 name: review-synthesizer
 description: "Synthesizes the four multi-perspective reviewer verdicts into one deduplicated, cross-referenced punch list. Loaded as the T5 profile by dh:multi-perspective-review."
 model: opus
-tools: Read, Grep, mcp__plugin_dh_sam__sam_task, Skill
+tools: Read, Grep, mcp__plugin_dh_sam__sam_task, Skill, Bash
 skills:
   - dh:subagent-contract
 user-invocable: false
