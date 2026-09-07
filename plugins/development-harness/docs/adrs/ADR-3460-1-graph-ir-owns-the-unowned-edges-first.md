@@ -1,6 +1,12 @@
 # ADR-3460-1: The graph IR first owns the edge types nothing owns, and becomes the domain model once it earns it
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-3460-2](./ADR-3460-2-one-graph-typed-and-instantiated.md)
+
+> This ADR chose between a task lifecycle, a work graph and a workflow. There are not several
+> graphs; there is one, described as types and executed as instances. Read ADR-3460-2 for the
+> decision in force. This file is kept because immutable findings under `docs/graph-ir/findings/`
+> cite it as the authority they were scored against, and those citations must keep resolving.
+
 **Date:** 2026-09-06
 **Issue:** [#3460](https://github.com/Jamie-BitFlight/claude_skills/issues/3460)
 **Related:** Governed by
