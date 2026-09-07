@@ -1470,3 +1470,79 @@ def test_update_set_names_the_columns_it_would_not_write(set_conn: sqlite3.Conne
     result = transitions.update(set_conn, set_plan, "T1", values={"title": "renamed", "status": COMPLETE})
     assert result.changed == {"title": "renamed"}
     assert result.unsettable == ["status"]
+
+
+# ---------------------------------------------------------------------------
+# read heads every response with the authority preamble, unconditionally
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("status", [s.value for s in spec.Status])
+def test_read_heads_every_declared_status_with_the_authority_preamble(tmp_path: Path, status: str) -> None:
+    """``read`` heads its sections with ``ledger_spec.AUTHORITY_SECTION`` on every status the spec declares.
+
+    Driven from ``spec.Status`` rather than a hand-written list, per ``ledger_spec.py``'s own closure
+    style, so a status the specification adds is covered without editing this test.
+    """
+    conn, plan = arranged(tmp_path, status)
+    result = transitions.read(conn, plan, "T1")
+    assert result.sections, "read returned no sections at all"
+    first = result.sections[0]
+    assert first["name"] == spec.AUTHORITY_SECTION
+    assert first["content"] == spec.AUTHORITY_PREAMBLE
+    assert first["seq"] == -1
+
+
+def test_authority_preamble_present_with_and_without_attempt(tmp_path: Path) -> None:
+    """The preamble heads the response whether or not ``--attempt`` is passed."""
+    conn, plan = arranged(tmp_path, IN_PROGRESS)
+    attempt = attempts_of(conn, plan)
+    without_attempt = transitions.read(conn, plan, "T1")
+    with_attempt = transitions.read(conn, plan, "T1", attempt=attempt)
+    for result in (without_attempt, with_attempt):
+        assert result.sections[0]["name"] == spec.AUTHORITY_SECTION
+        assert result.sections[0]["content"] == spec.AUTHORITY_PREAMBLE
+
+
+def test_authority_preamble_present_with_and_without_a_stored_response(tmp_path: Path) -> None:
+    """The preamble heads the response whether or not ``tasks.response`` carries anything."""
+    conn, plan = arranged(tmp_path, IN_PROGRESS)
+    attempt = attempts_of(conn, plan)
+    add_reports(conn, plan, "T1", attempt)
+    fresh = transitions.read(conn, plan, "T1", attempt=attempt)
+    assert fresh.sections[0]["name"] == spec.AUTHORITY_SECTION
+    assert not any(s["name"] == spec.RESPONSE_SECTION for s in fresh.sections), "no response stored yet"
+
+    transitions.finish(conn, plan, "T1", attempt=attempt, result=COMPLETE)
+    transitions.reclaim(conn, plan, "T1", reason="orchestrator", response="go fix the thing")
+    after_reclaim = transitions.read(conn, plan, "T1")
+    assert after_reclaim.sections[0]["name"] == spec.AUTHORITY_SECTION
+    assert any(s["name"] == spec.RESPONSE_SECTION for s in after_reclaim.sections), "response now stored"
+
+
+def test_authority_preamble_precedes_the_response_and_every_stored_section(tmp_path: Path) -> None:
+    """The preamble precedes both ``RESPONSE_SECTION`` and every section a runner appended."""
+    conn, plan = arranged(tmp_path, IN_PROGRESS)
+    attempt = attempts_of(conn, plan)
+    add_reports(conn, plan, "T1", attempt)
+    transitions.finish(conn, plan, "T1", attempt=attempt, result=COMPLETE)
+    transitions.reclaim(conn, plan, "T1", reason="orchestrator", response="go fix the thing")
+    attempt2 = dispatch_task(conn, plan)
+    transitions.update(conn, plan, "T1", attempt=attempt2, section="Notes", section_content="hello")
+
+    result = transitions.read(conn, plan, "T1", attempt=attempt2)
+    names = [str(section["name"]) for section in result.sections]
+    assert names[0] == spec.AUTHORITY_SECTION
+    assert names.index(spec.AUTHORITY_SECTION) < names.index(spec.RESPONSE_SECTION) < names.index("Notes")
+    for report_name in spec.REPORT_SECTIONS:
+        assert names.index(spec.AUTHORITY_SECTION) < names.index(report_name)
+
+
+def test_authority_preamble_is_not_a_stored_section(tmp_path: Path) -> None:
+    """``AUTHORITY_SECTION`` never reaches the ``sections`` table -- it is rendered, not stored."""
+    conn, plan = arranged(tmp_path, IN_PROGRESS)
+    attempt = attempts_of(conn, plan)
+    transitions.read(conn, plan, "T1", attempt=attempt)
+    transitions.read(conn, plan, "T1")
+    stored_names = {str(row["name"]) for row in transitions.sections_of(conn, plan, "T1")}
+    assert spec.AUTHORITY_SECTION not in stored_names

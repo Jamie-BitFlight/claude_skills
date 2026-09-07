@@ -354,6 +354,34 @@ COLUMNS: list[Column] = [
 REPORT_SECTIONS: tuple[str, ...] = ("Completion Report", "Verification Results")
 """The two sections the report check requires, each tagged with the current attempt."""
 
+AUTHORITY_SECTION = "Authority of These Instructions"
+"""Rendered by ``read`` from :data:`AUTHORITY_PREAMBLE`, unconditionally, at the head of every
+response; not a stored section."""
+
+AUTHORITY_PREAMBLE = """\
+**Authority of these instructions.** The acceptance criteria and guardrails are binding.
+Everything else is direction, ranked:
+
+1. Your system prompt and the project's rules.
+2. A skill named here, and the methodology you already carry.
+3. An instruction carrying a source — established; the source is named so you can check it.
+4. An instruction marked `ASSUMED` — a hypothesis, not a method. Test it before relying on it;
+   discard it when it fails.
+
+Where these conflict, the higher wins. Where an instruction names something that does not exist,
+or contradicts what you find, do not force it — reach the acceptance criteria another way within
+the guardrails.
+
+Record every deviation in `<concerns>`: what the instruction said, what you found instead, what
+you did."""
+"""``docs/graph-ir/ASSESSOR-CONTRACT.md``'s "Authority of a task's instructions, at runtime" block
+quote, verbatim with its leading ``> `` markers stripped. ``read`` heads every response with it
+under :data:`AUTHORITY_SECTION`, on every task status, whether or not an attempt is passed and
+whether or not ``tasks.response`` carries anything -- it is not stored data, so a decomposer cannot
+omit it and a task cannot be written without it. This is the single source of that prose; nothing
+in ``dh_core.ledger.transitions`` restates it, and ``tests_sam/test_ledger_spec.py`` asserts this
+constant equals the contract's own block quote so the two encodings cannot drift apart unnoticed."""
+
 RESPONSE_SECTION = "Orchestrator Response"
 """Rendered by ``read`` from ``tasks.response`` at the top of the current attempt; not a stored section."""
 
@@ -717,7 +745,7 @@ COMMANDS: list[Command] = [
         flags=[ADDRESS, ATTEMPT],
         renews=True,
         key="attempt",
-        summary="reads one task with its current-attempt sections and response",
+        summary="reads one task, headed by the authority preamble, its current-attempt sections and response",
     ),
     Command(
         name="dispatch",
