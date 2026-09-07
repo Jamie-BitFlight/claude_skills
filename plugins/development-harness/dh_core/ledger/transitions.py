@@ -371,6 +371,36 @@ def with_response(row: Mapping[str, Any], sections: list[dict[str, Any]]) -> lis
     return [*sections[:index], entry, *sections[index:]]
 
 
+def with_authority(row: Mapping[str, Any], sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Head the sections list with the contract's authority preamble, unconditionally.
+
+    ``ledger_spec.AUTHORITY_SECTION`` is rendered from ``ledger_spec.AUTHORITY_PREAMBLE`` and is not
+    a stored section, so it is built here rather than read from ``sections`` -- the same reason
+    :func:`with_response` builds its entry rather than reading one. Unlike :func:`with_response` it
+    does not depend on anything the row carries beyond its address: it is emitted on every ``read``,
+    for every task status, whether or not an attempt is passed and whether or not the task carries a
+    response. Its ``seq`` is -1, negative so it cannot collide with a stored section's positive
+    ``seq`` or with :data:`ledger_spec.RESPONSE_SECTION`'s ``seq`` of zero -- a reader can tell all
+    three apart.
+
+    Args:
+        row: The task row, carrying ``plan`` and ``id``.
+        sections: The section rows to head, already carrying the response section when there is one.
+
+    Returns:
+        The section rows with the authority preamble inserted first.
+    """
+    entry: dict[str, Any] = {
+        "plan": str(row["plan"]),
+        "task": str(row["id"]),
+        "name": ledger_spec.AUTHORITY_SECTION,
+        "attempt": int(row["attempts"] or 0),
+        "content": ledger_spec.AUTHORITY_PREAMBLE,
+        "seq": -1,
+    }
+    return [entry, *sections]
+
+
 def report_complete(conn: sqlite3.Connection, plan: str, task: str, attempt: int) -> bool:
     """Report whether every ``ledger_spec.REPORT_SECTIONS`` name has a row for one attempt.
 
@@ -820,13 +850,18 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
         attempt: The attempt the runner holds, or None.
 
     Returns:
-        A result carrying the task row and every section row, headed by
-        ``ledger_spec.RESPONSE_SECTION`` when the task carries an orchestrator response.
+        A result carrying the task row and every section row, headed unconditionally by
+        ``ledger_spec.AUTHORITY_SECTION`` and then by ``ledger_spec.RESPONSE_SECTION`` when the task
+        carries an orchestrator response.
     """
     if attempt is None:
         row = fetch_task(conn, plan, task)
         return TransitionResult(
-            command="read", plan=plan, task=task, row=row, sections=with_response(row, sections_of(conn, plan, task))
+            command="read",
+            plan=plan,
+            task=task,
+            row=row,
+            sections=with_authority(row, with_response(row, sections_of(conn, plan, task))),
         )
     events: list[str] = []
     with store.transaction(conn):
@@ -838,7 +873,7 @@ def read(conn: sqlite3.Connection, plan: str, task: str, *, attempt: int | None 
             renew_lease(conn, row, moment, via="read")
             events.append("lease.renewed")
         row = fetch_task(conn, plan, task)
-        found_sections = with_response(row, sections_of(conn, plan, task))
+        found_sections = with_authority(row, with_response(row, sections_of(conn, plan, task)))
     return TransitionResult(
         command="read", plan=plan, task=task, row=row, sections=found_sections, events=events, attempt=attempt
     )
