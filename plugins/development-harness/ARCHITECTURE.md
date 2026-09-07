@@ -408,6 +408,46 @@ same operation safely as a script, hook, CLI command, or MCP tool. Automation
 must simplify the agent's work without hiding the logical workflow or the
 evidence needed to reason about it.
 
+### What a hook may write
+
+Automating a step does not transfer authority for it. A hook writes only what its own position
+in the run gives it standing to assert; a fact some other actor already reports is that actor's
+to write, and a hook that writes it too is a second encoding of one fact — the shape the model
+above rules out when it keeps the actor on the node, so that "does this node's actor hold
+authority for this effect" stays answerable.
+
+The execution lifecycle in `dh_core/ledger_spec.py` names three actors and gives each exactly one
+command, on that basis:
+
+| Actor | Command | The fact only it holds |
+|---|---|---|
+| runner | `plan finish --result` | whether the work was done |
+| judge | `plan accept` / `plan reclaim` | whether what was done meets the criteria |
+| supervisor | `plan settle --attempt N --return-text` | that the launch ended at all, and what came back |
+
+`plan state --new-status X --reason Y` sits outside that table: it is the status move no attempt
+is responsible for, which is why the ledger refuses it without a reason.
+
+A sub-agent-stop hook is the supervisor's observation point — it fires in the orchestrator's
+session at the moment a launch ends — so `settle` is its command and the whole of it. It does
+not write status: the runner's `finish` and the judge's verdict already encode that, and the
+runner contract has a worker return `STATUS: DONE` once `finish` was recorded whatever its
+`--result`, so a hook reading that token would contradict them by construction. The final
+message reaches the ledger as `--return-text`, where it is evidence the judge reads, not a
+verdict the hook reached.
+
+The hook is a safety net, not the mechanism: the orchestrator settles as its own next step, and
+`settle` answers `already-settled` when it got there first. What the hook adds is the case where
+the orchestrator's step never runs — a session that died or was compacted — which without it
+leaves an attempt open, indistinguishable from a worker still at work.
+
+Correlating a stopping sub-agent to its attempt is the hook's one hard problem, and it is solved
+by reading the sub-agent's own initial prompt, which the dispatch contract requires to name both
+the address and the attempt. Session-scoped context cannot serve: inside a sub-agent the session
+id is the parent's, so one wave's workers share a record. The liveness half of the same hook —
+renewing an attempt's lease from tool activity — stays unimplemented for that reason and is not
+approximated by writing a timestamp somewhere else.
+
 ## The logical model
 
 Agents work only with logical objects and relationships:

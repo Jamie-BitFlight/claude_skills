@@ -79,7 +79,7 @@ flowchart TD
         S3 -->|"§2.2"| C5
         S3 -->|"§2.6"| H2
         A7 -->|"§2.3"| A8
-        H1 -->|"status: complete"| C4
+        H1 -->|"attempt settled"| C4
         H2 -->|"last-activity"| C4
         S3 -->|"§2.2 update fields"| C6
     end
@@ -245,7 +245,7 @@ Written by `/start-task` skill. Read by `task_status_hook.py` PostToolUse handle
 
 The `ActiveTaskContext` model also carries a local-YAML-only absolute plan-file-path field, populated only by the `LocalContextBackend`; it is `None` for the memory, GitHub, and beads backends. `parent_issue_number` is omitted when the story issue number is unknown. The hook treats absence as `None` and skips GitHub sync.
 
-The two hooks that read this file differ in retrieval path. **SubagentStop**'s `_resolve_active_task_context()` tries `sam_active_task(action="get")` via MCP first and falls back to this filesystem file only for local-YAML sessions (see §6.1). **PostToolUse**'s `handle_activity_update()` reads only this filesystem file via `read_task_context()` — it has no MCP fallback and exits silently when the file is absent, so `last-activity` tracking works only for local-YAML backend sessions.
+Only **PostToolUse** reads this file for task identity: `handle_activity_update()` reads it via `read_task_context()`, exits silently when the file is absent, and so tracks `last-activity` for local-YAML backend sessions only. **SubagentStop** takes the address and attempt from the stopping sub-agent's own launch prompt instead — this record is keyed by the parent session's id and carries no attempt number, so it can identify neither which sub-agent stopped nor which attempt to settle. SubagentStop touches this file only to clear it (see §6.1).
 
 ### 2.7 sam_claim output
 
@@ -277,7 +277,8 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 | `~/.dh/projects/{slug}/plan/QG{NNN}-qg-{slug}.yaml` | `/complete-implementation` via `build_quality_gate_plan` + `sam_create` | SAM dispatch loop (T1–T6 quality gate tasks) |
 | `~/.dh/projects/{slug}/context/active-task-{sid}.json` | `/start-task` skill | `task_status_hook.py` PostToolUse handler |
 | `last-activity` field in task | `task_status_hook.py` PostToolUse handler | progress reporting |
-| `status: complete`, `completed` field | `task_status_hook.py` SubagentStop handler | `sam ready` readiness evaluation |
+| `settled`, `return_text` on an attempt | `plan settle`, run by the orchestrator or by `task_status_hook.py` SubagentStop | the judge, per the work loop |
+| `status: complete`, `completed` field | `plan finish --result complete`, run by the worker | `plan ready` readiness evaluation |
 | `status: in-progress`, `started` field | `sam claim` via `/start-task` | `sam status`, `sam ready` exclusion |
 | Follow-up task files | `code-reviewer` | `/complete-implementation` recursion gate |
 | Context Manifest in task file | `context-gathering`, `context-refinement` | executing agents, future sessions |
@@ -291,7 +292,7 @@ Exit code 1 when: already claimed, task not found, or `status != not-started`.
 flowchart TD
     Created([Task created]) -->|"swarm-task-planner via sam create"| NS[not-started]
     NS -->|"start-task skill via sam claim<br>Guard: exit code 0 only<br>Fails if already claimed"| IP[in-progress]
-    IP -->|"task_status_hook.py SubagentStop<br>via sam state P{N}/T{M} complete"| CO[complete]
+    IP -->|"the worker via `plan finish --result complete`<br>(the SubagentStop hook writes no status;<br>it runs `plan settle` for the attempt)"| CO[complete]
     IP -->|"agent or human operator<br>via sam state P{N}/T{M} blocked"| BL[blocked]
     NS -->|"orchestrator<br>via sam state P{N}/T{M} deferred"| DE[deferred]
     NS -->|"orchestrator<br>via sam state P{N}/T{M} skipped"| SK[skipped]
@@ -313,7 +314,7 @@ flowchart TD
     BI["BacklogItem.issue field<br>(string, e.g. '719')"]
     PF["plan file name<br>~/.dh/projects/{slug}/plan/P{NNN}-{slug}.yaml<br>issue: N in plan YAML"]
     CTX["~/.dh/projects/{slug}/context/active-task-{sid}.json<br>parent_issue_number: N<br>written by /start-task"]
-    HOOK["task_status_hook.py<br>reads parent_issue_number<br>syncs completion to GitHub sub-issue"]
+    HOOK["task_status_hook.py<br>settles the attempt named in the<br>stopping worker's launch prompt"]
     TF["Task field: github_issue<br>linked sub-issue number"]
     GH --> BI
     BI -->|"backlog_update(selector, plan)"| PF
@@ -322,7 +323,7 @@ flowchart TD
     TF --> HOOK
 ```
 
-Key invariant: `parent_issue_number` in the context file is the GitHub story issue number for the plan. `task.github_issue` is the sub-issue to close on completion. The hook uses both fields independently.
+Key invariant: `parent_issue_number` in the context file is the GitHub story issue number for the plan, and `task.github_issue` is the sub-issue to close on completion. Neither is read by the hook — grepped `parent_issue_number` and `github_issue` across `task_status_hook.py` and found no read of either; issue closure is `/dh:complete-implementation`'s final step.
 
 ---
 
@@ -340,18 +341,15 @@ Matcher:    (none — fires on every sub-agent completion)
 Context:    Declared on /implement-feature skill and /complete-implementation skill
 ```
 
-Processing sequence — `_resolve_active_task_context()` resolves the task in three ordered steps, MCP first:
+Processing sequence — the address and the attempt both come from the stopping sub-agent's own transcript, which is per-sub-agent and so tells parallel workers apart:
 
-1. Read `agent_transcript_path` from hook input; call `_extract_session_id_from_transcript(transcript_path)` — reads the first 10 JSONL lines, returns the `session_id` field of the first parseable record.
-2. **Primary path**: if a session_id was found, call `sam_active_task(action="get")` via the MCP server for `plan`, `task_id`, `parent_issue_number`.
-3. **Fallback**: if `plan`/`task_id` are still unresolved, resolve `~/.dh/projects/{slug}/context/active-task-{sub_agent_session_id}.json` via `dh_paths.context_dir()` and read `plan`, `task_id`, `parent_issue_number` from that file. This path exists only for local-YAML sessions predating full MCP tracking; memory, GitHub, and beads sessions never write this file and rely on step 2.
-4. **Final fallback**: if still unresolved and a transcript path is present, extract the task reference from the dispatching agent's own prompt in the JSONL transcript.
-5. If `plan`/`task_id` remain unresolved after all three steps, exit 0 (not a task-tracked sub-agent).
-6. Read the current task via `sam_task(action="read")`. If already `status: complete` or `status: failed`, clean up the active-task context (MCP clear and/or file delete) and exit 0 — a `failed` task also cascades a skip to its downstream dependents via `sam_task(action="state")` before exiting.
-7. Call `sam_task(action="state", status="complete")`, then `sam_task(action="update")` to set `completed: <ISO timestamp>`.
-8. Clean up the active-task context (MCP clear and/or file delete).
+1. Read `agent_transcript_path` from hook input. Without it there is no correlation at all; say so on stderr and stop.
+2. Read the sub-agent's initial prompt from that transcript and take the plan address, task id and attempt number from it — `{plan}/{task}, attempt {n}`, or a `/start-task` or `Skill(skill="start-task", …)` invocation carrying `--attempt`.
+3. A prompt naming no launch is an ordinary sub-agent of some other plugin: settle nothing, quietly. A prompt naming a launch but no attempt, or a plan file rather than a ledger address, cannot be settled: say which on stderr.
+4. Run `plan settle --address {plan}/{task} --attempt {n} --return-text "{the final message}"` through the SAM CLI. `already-settled` means the orchestrator settled first, and is success. A failure is printed to stderr; the hook exits 0 either way.
+5. Clear the session-scoped active-task context.
 
-Fields written: `status: complete`, `completed: <ISO timestamp>`
+Fields written: `settled`, `return_text` — on the attempt, never on the task's status. The runner's `plan finish --result` and the judge's `plan accept`/`plan reclaim` own status; see `plugins/development-harness/ARCHITECTURE.md` § "What a hook may write".
 
 ### 6.2 PostToolUse (Write|Edit|Bash)
 
@@ -397,7 +395,7 @@ flowchart TD
         Claim --> ClaimedOK{claimed?}
         ClaimedOK -->|No| Ready
         ClaimedOK -->|Yes| Dispatch["Skill(skill='start-task',<br>args='plan/QG{NNN}-qg-{slug}.yaml --task T{M}')"]
-        Dispatch --> Hook["SubagentStop hook<br>sam_state → status: complete"]
+        Dispatch --> Hook["SubagentStop hook<br>`plan settle --attempt {n}` → attempt settled"]
         Hook --> PostDispatch{Which task<br>completed?}
         PostDispatch -->|T1| StoreFollowups["Store follow-up file paths<br>from ARTIFACTS output"]
         PostDispatch -->|"T4 — no drift"| SkipT5["sam_state T5 → skipped"]

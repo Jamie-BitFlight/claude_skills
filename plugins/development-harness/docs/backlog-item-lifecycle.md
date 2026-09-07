@@ -670,7 +670,7 @@ flowchart TD
     P5_DISPATCH_SINGLE --> P5_HOOK
     P5_DISPATCH_TEAM --> P5_HOOK
 
-    P5_HOOK["SubagentStop hook fires:<br>task_status_hook.py marks<br>task COMPLETE through configured backend"]
+    P5_HOOK["SubagentStop hook fires:<br>task_status_hook.py settles the attempt<br>(the worker's own `plan finish` set the status)"]
 
     P5_HOOK --> P5_CONCERNS{"Agent returned<br>&lt;concerns&gt; block?"}
     P5_CONCERNS -->|Yes| P5_LOG_CONCERNS["Append concerns to backlog<br>via backlog_groom"]
@@ -695,7 +695,7 @@ flowchart TD
 | P5_READY | `sam_plan` MCP (`plan="<plan-address>", config={"action":"ready"}`) | plan address | list of ready tasks (deps resolved, not claimed) | none ready + all terminal → P5_COMPLETE, 1 ready → P5_DISPATCH_SINGLE, 2+ ready → P5_DISPATCH_TEAM |
 | P5_DISPATCH_SINGLE | orchestrator | plan address, task ID | `Skill('start-task', args)` call | always → P5_HOOK |
 | P5_DISPATCH_TEAM | orchestrator | plan address, ready task IDs | one `Agent()` call per ready task, dispatched in parallel, each calls `start-task` | always → P5_HOOK |
-| P5_HOOK | `task_status_hook.py` (SubagentStop) | agent completion signal, active-task context | task status → COMPLETE through configured backend | always → P5_CONCERNS |
+| P5_HOOK | `task_status_hook.py` (SubagentStop) | the sub-agent's launch prompt (address + attempt), its final message | attempt settled, with the final message as its return text; no status write | always → P5_CONCERNS |
 | P5_CONCERNS | orchestrator | agent output | concerns block presence check | concerns present → P5_LOG_CONCERNS, none → P5_BATCH_CHECK |
 | P5_LOG_CONCERNS | `backlog_groom` MCP | concerns text | concerns appended to backlog item | always → P5_BATCH_CHECK |
 | P5_BATCH_CHECK | orchestrator | batch task states | batch completion check | all complete → P5_STATUS (loop), incomplete → P5_WAIT |
@@ -716,7 +716,7 @@ flowchart TD
 
 **Hook mechanisms**:
 
-- `SubagentStop` hook (on `/dh:implement-feature`) — marks task COMPLETE after sub-agent finishes through the configured backend
+- `SubagentStop` hook (on `/dh:implement-feature`) — settles the attempt the stopping worker was launched for, recording what came back. It writes no status: see [ARCHITECTURE.md](../ARCHITECTURE.md) § "What a hook may write"
 - `PostToolUse` hook (on `/dh:start-task`, matcher: Write|Edit|Bash) — records `last-activity` timestamp on every tool call during task execution through the active-task context.
 
 **Bookend task dispatch**:

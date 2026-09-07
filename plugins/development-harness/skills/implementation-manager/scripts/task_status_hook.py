@@ -10,36 +10,78 @@
 # [tool.ty.environment]
 # extra-paths = ["../../..", "../../../scripts"]
 # ///
-"""Task Status Hook - Update task status and timestamps automatically.
+"""Task status hook — the orchestrator's automatic ``settle`` when a launch ends.
 
-This hook script handles multiple hook events:
-- SubagentStop: Parse prompt for task info; set status to COMPLETE with a Completed timestamp
-  if the worker's final message reports a complete STATUS, otherwise set status to BLOCKED.
-- PostToolUse (Write|Edit|Bash): Update LastActivity timestamp using context file
+Two hook events reach this script:
 
-All task state WRITES route through the SAM CLI (scripts/run_sam_cli.py) as a single
-subprocess, making the hook backend-agnostic (hooks must not write directly to YAML).
+- **SubagentStop**: settle the attempt the stopping sub-agent was launched for, recording what
+  came back. It writes no status.
+- **PostToolUse** (``Write|Edit|Bash``): update the ``last-activity`` timestamp of the session's
+  active task.
 
-Context File Mechanism:
-- The /start-task command writes task context to ~/.dh/projects/{slug}/context/active-task-{session_id}.json
-- PostToolUse hooks read from this file to know which task is active
-- SubagentStop extracts a session_id from agent_transcript_path, then looks up
-  active-task-{session_id}.json directly
+Every write routes through the SAM CLI (``scripts/run_sam_cli.py``) as a single subprocess, so
+the hook stays backend-agnostic and never touches storage directly.
 
-KNOWN DEFECT in that correlation: a sub-agent's transcript carries its PARENT session's id, not
-its own, so every sub-agent of one plan resolves to the same record. A wave running N tasks in
-parallel writes N registrations to one path and only the last survives, and a stopping agent can
-therefore be attributed to another agent's task. The per-sub-agent identifier the harness does
-supply is not read here. Task state written by this hook during parallel dispatch is unreliable
-until the record is keyed by something unique to the task.
+Why SubagentStop settles and does not decide
+--------------------------------------------
+The work ledger gives each of the three actors one command, and the reason each exists is that
+no other actor can supply what it records:
+
+- ``plan finish --result <complete|partial|failed|…>`` is the **runner's** own exit status. Only
+  the runner knows whether the work was done.
+- ``plan accept`` / ``plan reclaim`` is the **judge's** verdict, taken after reading the report
+  against the acceptance criteria. Only a reader of the report can reach it.
+- ``plan settle --attempt N --return-text …`` is the **supervisor** recording that the launch
+  ended at all, and what it returned. That is the one fact neither of the others can produce: a
+  runner that died mid-flight writes nothing, and an unsettled attempt is indistinguishable from
+  a worker still at work, so the loop waits on an agent that is gone.
+- ``plan state --new-status X --reason Y`` is the runner-less status move — a decision nobody's
+  attempt is responsible for, which is why the ledger demands a reason for it.
+
+A ``SubagentStop`` hook registered in a plugin's ``hooks/hooks.json`` runs in the **orchestrator's
+session** when a sub-agent it launched stops (``code.claude.com/docs/en/sub-agents.md`` §
+"Project-level hooks for subagent events", as cached in
+``plugins/plugin-creator/skills/claude-subagent-reference/references/hooks-for-subagents.md``,
+accessed 2026-05-28: hooks configured this way "run in the main session when subagents start or
+stop"). It is therefore the supervisor's observation point, and ``settle`` is its command.
+
+The orchestrator skills (``implement-feature``, ``dispatch``) settle explicitly as their own next
+step. This hook is not a replacement for that; it is the safety net for the launch whose
+orchestrator step never ran — a session that died, compacted, or skipped it. ``settle`` answers
+the no-op code ``already-settled`` on exit 0 when the orchestrator got there first, so the two
+never fight.
+
+The hook writes no status because status already has a writer. ``runner-contract.md`` and
+``start-task/SKILL.md`` both instruct a worker to "return ``STATUS: DONE`` once ``finish`` was
+recorded, **whatever its ``--result``**". A hook mapping that returned token onto a status would
+therefore write ``complete`` for a task whose runner reported ``failed`` — two encodings of one
+fact, guaranteed by the contract to disagree. The worker's final message reaches the ledger here
+as ``--return-text``, which is evidence for the judge, not a verdict.
+
+Correlating the stopping agent to its attempt
+---------------------------------------------
+The address and the attempt both come from the sub-agent's own initial prompt, read from
+``agent_transcript_path``. That transcript is per-sub-agent, so N workers dispatched in parallel
+correlate to N distinct attempts.
+
+The session-scoped active-task record is deliberately not used for this. It is keyed by
+``${CLAUDE_CODE_SESSION_ID}``, which inside a sub-agent is the parent session's id, so every
+sub-agent of one wave writes to one record and only the last survives; and it carries no attempt
+number at all (``ActiveTaskContext`` in ``sam_schema/core/models.py`` declares none, and
+``active-task set`` exposes no ``--attempt`` flag). It is still cleared here, because the record
+is session state and the session stopped.
+
+When the prompt names no attempt, no settle is possible and the hook says so on stderr rather
+than absorbing it.
 
 Usage:
     Called automatically via hooks configuration.
     Receives JSON via stdin with hook context.
 
 Exit Codes:
-    0: Success
-    2: Error (stderr message shown to Claude)
+    0: Success. The SubagentStop critical path must never be blocked by a failed write, so every
+       failure is reported on stderr and the hook still exits 0.
+    2: Malformed hook input (stderr message shown to Claude).
 """
 
 from __future__ import annotations
@@ -56,6 +98,8 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from pydantic import BaseModel
 
 _DH_PLUGIN_DIR = Path(__file__).resolve().parents[3]
 if str(_DH_PLUGIN_DIR) not in sys.path:
@@ -76,8 +120,7 @@ if _HOOK_SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
 
 # Import directly from submodules for concrete types (avoids lazy __getattr__ object).
-from sam_schema.core.addressing import AddressingError, resolve_plan_address
-from sam_schema.core.models import Task as SamTask, TaskStatus as SamTaskStatus
+from sam_schema.core.models import TaskStatus as SamTaskStatus
 
 from run_bounded import terminate_process_tree
 
@@ -89,27 +132,23 @@ _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
 _PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
 
-# A worker's self-reported status, per subagent-contract. Every line is scanned rather
-# than only the first, because agents/task-worker.md prescribes the completion report
-# inside a ```text fence, so a worker following its own template emits a fence marker as
-# line one. Leading markdown — fence, bold, bullet, blockquote — is tolerated, and the
-# token may carry underscores (GAPS_FOUND).
-#
-# The token must END the line. That rejects two lookalikes that are not verdicts: the
-# literal template placeholder `STATUS: COMPLETE|PARTIAL|FAILED` that task-worker.md
-# prints, and prose such as `STATUS: DONE was reported by the sibling task`. Without the
-# anchor the pattern captures a token out of both.
-_STATUS_LINE_RE = re.compile(r"^[\s>*_`-]*STATUS:\s*\**\s*([A-Za-z][A-Za-z_]*)\s*\**\s*$", re.IGNORECASE)
+# The ledger address form alone. Pattern 1 below searches for this inside a longer prompt, so it
+# excludes the file-path form: a bare path followed by the word "attempt" is not a dispatch.
+_PLAN_ADDRESS_RE = r"(?P<plan>P[0-9a-f]+)"
 
-# Tokens meaning the worker finished. ponytail: accepts all three spellings in use across
-# the plugin; narrow to one token once the status vocabulary is unified.
-_COMPLETE_STATUS_TOKENS = frozenset({"DONE", "COMPLETE", "COMPLETED"})
+# The attempt clause the dispatch contract writes after the address, as an optional suffix.
+# implement-feature/SKILL.md launches with "{plan_ref}/{task_id}, attempt {attempt}" and
+# dispatch/SKILL.md with "You are working on P.../T..., attempt 1." — the comma and the
+# surrounding prose both vary, so only "attempt <n>" itself is required.
+_ATTEMPT_CLAUSE_RE = r"[\s,]*attempt\s+(?P<attempt>\d+)"
 
-# Tokens that positively report NOT finishing. Only these block a task. A token outside
-# both sets is a vocabulary this hook does not know — several shipped specialists report
-# VERIFIED, CONNECTED, READY — and an unknown word is not evidence of failure, so it
-# leaves task state alone rather than blocking correct work.
-_INCOMPLETE_STATUS_TOKENS = frozenset({"PARTIAL", "FAILED", "BLOCKED", "INCOMPLETE"})
+# The same clause as a flag, for the /start-task and Skill() forms.
+_ATTEMPT_FLAG_RE = r"(?:\s+--attempt\s+(?P<attempt>\d+))?"
+
+# Recorded as the return text when the launch produced no final message at all. settle is still
+# run in that case: the work loop's step 4 settles "including when the response is empty or the
+# agent crashed", because an unsettled attempt reads as a worker still at work.
+_NO_FINAL_MESSAGE = "(no final message: the launch ended without one)"
 
 
 class HookProfile(enum.StrEnum):
@@ -187,35 +226,6 @@ def should_skip_hook(event_name: str, profile: HookProfile, disabled_hooks: set[
     return bool(profile == HookProfile.MINIMAL and event_name == "PostToolUse")
 
 
-def run_strict_pre_completion_checks(task: SamTask, task_id: str) -> list[str]:
-    """Run pre-completion validation checks for strict mode.
-
-    Called when CLAUDE_SKILLS_HOOK_PROFILE=strict and a SubagentStop event fires.
-    Warnings are observational — they do not prevent task completion.
-
-    Args:
-        task: The already-loaded SamTask object (avoids a second SAM CLI subprocess call).
-        task_id: Task ID being completed (used in warning messages).
-
-    Returns:
-        List of warning strings. Empty list means all checks passed.
-    """
-    warnings: list[str] = []
-
-    # Check 1: task must have been claimed (status should be IN_PROGRESS, not NOT_STARTED).
-    if task.status == SamTaskStatus.NOT_STARTED:
-        warnings.append(
-            f"[hook] strict: task {task_id} status is not-started — task may not have been claimed before completion"
-        )
-
-    # Check 2: acceptance criteria must be non-empty.
-    acceptance_criteria = getattr(task, "acceptance_criteria", "") or ""
-    if not acceptance_criteria.strip():
-        warnings.append(f"[hook] strict: task {task_id} has no acceptance criteria defined")
-
-    return warnings
-
-
 def parse_hook_input() -> dict[str, Any]:
     """Parse JSON input from stdin.
 
@@ -233,95 +243,105 @@ def parse_hook_input() -> dict[str, Any]:
     return result
 
 
-def _plan_arg_to_path(plan_arg: str) -> Path | None:
-    """Convert a plan argument string (file path or plan address) to an absolute Path.
+class Launch(BaseModel):
+    """The dispatch one stopping sub-agent was launched for, as read from its own prompt.
 
-    File path form (.md/.yaml) is returned as ``Path`` directly.
-    Plan address form (e.g. ``Pdec8934d``) is resolved via ``resolve_plan_address()``.
-
-    Returns:
-        Resolved ``Path``, or ``None`` when resolution fails (plan not found in DH
-        state directory or plan directory does not exist).
+    The plan is carried as the address token the prompt wrote, not as a filesystem path: the
+    ledger addresses a task as ``P/T`` and holds no plan file to resolve one against.
     """
-    if plan_arg.endswith((".md", ".yaml")):
-        return Path(plan_arg)
-    try:
-        return resolve_plan_address(plan_arg, _dh_paths.plan_dir())
-    except (AddressingError, FileNotFoundError):
-        print(
-            f"[hook] extract_task_info: plan address {plan_arg!r} not found in {_dh_paths.plan_dir()} — skipping",
-            file=sys.stderr,
-        )
-        return None
+
+    plan: str
+    task_id: str
+    attempt: int | None = None
+    """The attempt ``dispatch`` opened, when the prompt named it. ``None`` means no ``settle``
+    is possible — ``settle`` names the attempt it records against."""
+
+    @property
+    def address(self) -> str:
+        """Return the ``P/T`` address the SAM CLI takes.
+
+        Returns:
+            The plan token and task id joined by a slash.
+        """
+        return f"{self.plan}/{self.task_id}"
+
+    @property
+    def is_ledger_address(self) -> bool:
+        """Report whether the plan token is a ledger plan address rather than a legacy file path.
+
+        Returns:
+            True when the token has the ``P<hex>`` form every ledger command takes.
+        """
+        return re.fullmatch(r"P[0-9a-f]+", self.plan, re.IGNORECASE) is not None
 
 
-def _resolve_matched_task(match: re.Match[str]) -> tuple[Path | None, str | None]:
-    """Resolve a plan/task regex match's groups to (task_file, task_id).
+def extract_launch_from_prompt(prompt: str) -> Launch | None:
+    """Read the plan address, task id and attempt number out of a sub-agent's initial prompt.
 
-    Shared by every pattern in ``extract_task_info_from_prompt`` — each pattern differs
-    only in how it locates the plan-arg/task-id groups in the prompt, not in what happens
-    once they're found.
+    The prompt is the only per-sub-agent carrier of these three facts. The session-scoped
+    active-task record is keyed by the parent session's id and holds no attempt number, so it
+    cannot name the attempt a settle must record against — see the module docstring.
 
-    Returns:
-        ``(task_file, task_id)``, or ``(None, None)`` when the plan arg cannot be resolved
-        to a filesystem path (plan not found in the DH state directory).
-    """
-    task_file = _plan_arg_to_path(match.group("plan"))
-    if task_file is None:
-        return None, None
-    return task_file, match.group("task_id")
+    Four prompt shapes are recognised, in this order:
 
-
-def extract_task_info_from_prompt(prompt: str) -> tuple[Path | None, str | None]:
-    """Extract task file path and task ID from sub-agent prompt.
-
-    Accepts two arg forms for the plan argument:
-    - File path form: ``<path>.md`` or ``<path>.yaml`` — returned as ``Path`` directly.
-    - Plan address form: ``P[0-9a-f]+`` (e.g. ``Pdec8934d``) — resolved to the actual
-      filesystem path via ``resolve_plan_address()``.
+    1. ``/start-task <plan> [--task <id>] [--attempt <n>]`` — the literal slash command.
+    2. ``Skill(skill="start-task", args="<plan> [--task <id>] [--attempt <n>]")``.
+    3. ``<plan-address>/<task-id>[,] attempt <n>`` anywhere in the prompt — the shape
+       ``implement-feature/SKILL.md`` and ``dispatch/SKILL.md`` launch with. Searched rather
+       than full-matched because ``dispatch`` wraps it in a sentence; the required ``attempt
+       <n>`` suffix is what keeps the search from matching an address mentioned in passing.
+    4. ``<plan>/<task-id>`` as the whole prompt, full-matched. This form names no attempt, so it
+       identifies the task without enabling a settle.
 
     Args:
-        prompt: The sub-agent's prompt string.
+        prompt: The sub-agent's initial prompt string.
 
     Returns:
-        Tuple of (resolved_path, task_id) or (None, None) if not extractable.
-        Returns (None, None) when a plan address is found but cannot be resolved
-        (plan not found in the DH state directory).
+        The :class:`Launch` the prompt names, or ``None`` when it names none.
     """
     if not prompt:
-        return None, None
+        return None
 
-    # Pattern 1: /start-task <plan-arg> --task <id>  (literal slash-command)
-    # Matches both file-path form and plan-address form.
-    match = re.search(
-        rf"/start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?", prompt, re.IGNORECASE
+    command_forms = (
+        rf"/start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?{_ATTEMPT_FLAG_RE}",
+        (
+            rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
+            rf"{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?{_ATTEMPT_FLAG_RE}"
+            rf'["\']'
+        ),
     )
-    if match:
-        return _resolve_matched_task(match)
+    for pattern in command_forms:
+        match = re.search(pattern, prompt, re.IGNORECASE)
+        if match and match.group("task_id"):
+            return _launch_of(match)
 
-    # Pattern 2: Skill(skill="start-task", args="<plan-arg> --task <id>")
-    # The orchestrator invokes start-task via the Skill tool, not as a literal command.
-    # Matches both file-path form and plan-address form.
-    skill_match = re.search(
-        rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
-        rf"{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?"
-        rf'["\']',
-        prompt,
-        re.IGNORECASE,
+    dispatch_match = re.search(
+        rf"{_PLAN_ADDRESS_RE}/(?P<task_id>{_TASK_ID_RE}){_ATTEMPT_CLAUSE_RE}", prompt, re.IGNORECASE
     )
-    if skill_match:
-        return _resolve_matched_task(skill_match)
+    if dispatch_match:
+        return _launch_of(dispatch_match)
 
-    # Pattern 3: bare "<plan-arg>/<task-id>" address, with no /start-task prefix and no
-    # Skill() wrapper. implement-feature/SKILL.md dispatches dh:task-worker with the task
-    # reference as the sub-agent's ENTIRE prompt in this form, so it is matched as a full-string
-    # match (not a substring search like Patterns 1 and 2) to avoid false-positiving on an
-    # address mentioned in passing within a longer, unrelated prompt.
     bare_match = re.fullmatch(rf"{_PLAN_ARG_RE}/(?P<task_id>{_TASK_ID_RE})", prompt.strip(), re.IGNORECASE)
     if bare_match:
-        return _resolve_matched_task(bare_match)
+        return _launch_of(bare_match)
 
-    return None, None
+    return None
+
+
+def _launch_of(match: re.Match[str]) -> Launch:
+    """Build a :class:`Launch` from a match carrying ``plan``, ``task_id`` and optional ``attempt``.
+
+    Args:
+        match: A match of one of :func:`extract_launch_from_prompt`'s patterns.
+
+    Returns:
+        The launch the match names.
+    """
+    groups = match.groupdict()
+    raw_attempt = groups.get("attempt")
+    return Launch(
+        plan=match.group("plan"), task_id=match.group("task_id"), attempt=int(raw_attempt) if raw_attempt else None
+    )
 
 
 def get_context_file_path(cwd: Path, session_id: str) -> Path:
@@ -374,54 +394,6 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
         print(f"[hook] read_task_context: malformed JSON in {context_file}: {exc}", file=sys.stderr)
 
     return None, None
-
-
-def _call_sam_active_task_get(session_id: str, timeout: float = 8) -> tuple[str | None, str | None, str | int | None]:
-    """Retrieve active task context via the SAM CLI's ``active-task get`` subcommand.
-
-    Primary retrieval path for SubagentStop. Returns parsed fields from the
-    ``ActiveTaskContext`` on success, or ``(None, None, None)`` if the call fails
-    or no active task is stored for the session.
-
-    Args:
-        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
-            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
-            answered here rather than spent on a subprocess that can only fail.
-        timeout: Subprocess timeout in seconds.
-
-    Returns:
-        Tuple of ``(plan_address, task_id, parent_issue_number)``.
-        All ``None`` when the id is empty, the call fails, or active task is not set.
-    """
-    resolved = session_id
-    if not resolved:
-        return None, None, None
-    stdout = _call_sam_cli(["active-task", "get", "--session-id", resolved], timeout=timeout)
-    if stdout is None:
-        return None, None, None
-
-    try:
-        data: dict[str, Any] = json.loads(stdout)
-        active = data.get("active_task")
-        if not active:
-            return None, None, None
-        plan_addr = active.get("plan")
-        task_id = active.get("task_id")
-        if plan_addr and task_id:
-            parent_issue: str | int | None = active.get("parent_issue_number")
-            return plan_addr, task_id, parent_issue
-        if active.get("task_file_path") and task_id:
-            print(
-                f"[hook] _call_sam_active_task_get: session {resolved}: legacy active-task "
-                "record has task_file_path but no plan address (predates the plan/task "
-                "fields) — not falling back to path-parsing; activity tracking for this "
-                "session will not resume until a fresh /start-task runs",
-                file=sys.stderr,
-            )
-    except (json.JSONDecodeError, KeyError, IndexError):
-        pass
-
-    return None, None, None
 
 
 def _call_sam_active_task_clear(session_id: str, timeout: float = 8) -> bool:
@@ -512,39 +484,52 @@ def _call_sam_cli(args: list[str], timeout: float = 8) -> str | None:
     return stdout
 
 
-def _call_sam_task_state(plan_addr: str, task_id: str, status: SamTaskStatus, timeout: float = 8) -> bool:
-    """Update task status via the SAM CLI's ``plan state`` subcommand.
+def _call_sam_plan_settle(launch: Launch, return_text: str, timeout: float = 8) -> bool:
+    """Record that one launch ended, and what it returned, via the SAM CLI's ``plan settle``.
 
-    Routes state writes through the SAM CLI, keeping the hook
-    backend-agnostic. The CLI handles downstream skip cascades when
-    ``status="failed"``.
+    ``settle`` is the supervisor's command: it marks the attempt settled and stores the harness
+    return text, which is what makes a launch that ended distinguishable from a worker still at
+    work. It writes no status — the runner's ``finish`` and the judge's ``accept``/``reclaim``
+    own that, and a second writer of the same fact would drift from them.
+
+    The call is safe to repeat. When the orchestrator already settled this attempt, ``settle``
+    prints the no-op code ``already-settled`` on stdout and exits 0.
 
     Args:
-        plan_addr: Plan address (e.g. ``"Pf4281187"``).
-        task_id: Task ID within the plan (e.g. ``"T1"``).
-        status: New task status string (e.g. ``"complete"``, ``"skipped"``).
+        launch: The dispatch to settle. Its ``attempt`` must not be ``None``.
+        return_text: What the launch returned — the sub-agent's final message, or
+            :data:`_NO_FINAL_MESSAGE` when it produced none.
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        ``True`` if the CLI call succeeded, ``False`` on any failure.
+        ``True`` when the ledger recorded the settle or reported it already settled,
+        ``False`` on any failure.
     """
     stdout = _call_sam_cli(
-        ["plan", "state", "--address", f"{plan_addr}/{task_id}", "--new-status", str(status)], timeout=timeout
+        ["plan", "settle", "--address", launch.address, "--attempt", str(launch.attempt), "--return-text", return_text],
+        timeout=timeout,
     )
     if stdout is None:
-        print(f"[hook] sam_task state={status} failed for {plan_addr}/{task_id}", file=sys.stderr)
+        print(
+            f"[hook] SubagentStop: settle failed for {launch.address} attempt {launch.attempt} — "
+            "the attempt stays open and the loop will read it as a worker still at work",
+            file=sys.stderr,
+        )
         return False
 
+    reported = stdout.strip()
     try:
-        json.loads(stdout)
+        json.loads(reported)
     except json.JSONDecodeError:
-        print(f"[hook] sam_task state: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
-        return False
+        # A no-op code (`already-settled`) is printed as a bare word on stdout with exit 0.
+        print(f"[hook] SubagentStop: settle of {launch.address} attempt {launch.attempt}: {reported}", file=sys.stderr)
+        return True
 
+    print(f"[hook] SubagentStop: settled {launch.address} attempt {launch.attempt}", file=sys.stderr)
     return True
 
 
-_UPDATE_FIELD_OPTIONS: dict[str, str] = {"completed": "--completed", "last-activity": "--last-activity"}
+_UPDATE_FIELD_OPTIONS: dict[str, str] = {"last-activity": "--last-activity"}
 
 
 def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: float = 8) -> bool:
@@ -587,11 +572,17 @@ def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, An
     return True
 
 
-def _call_sam_task_read(plan_id: str, task_id: str, timeout: float = 8) -> SamTask | None:
-    """Read a task via the SAM CLI's ``plan read`` subcommand.
+def _call_sam_task_status(plan_id: str, task_id: str, timeout: float = 8) -> SamTaskStatus | None:
+    """Read one task's current status via the SAM CLI's ``plan read`` subcommand.
 
-    Routes task reads through the SAM CLI, keeping the hook backend-agnostic.
-    Returns the parsed Task object on success, None on any failure.
+    Two response shapes reach this function, because ``plan read`` serves two stores. The work
+    ledger returns the task row under ``row`` and puts the task *id* — a bare string — under
+    ``task``; the content store returns the task object under ``task``. Reading ``task`` alone
+    therefore yields a string on a ledger plan, which is why this looks at ``row`` first.
+
+    Only the status is extracted. Validating the whole row as a ``Task`` fails on a ledger
+    response regardless of shape: the ledger stores list-valued columns as JSON text, and
+    ``Task``'s own validators reject ``dependencies="[]"``.
 
     Args:
         plan_id: Plan address (e.g. ``"Pf4281187"``).
@@ -599,7 +590,8 @@ def _call_sam_task_read(plan_id: str, task_id: str, timeout: float = 8) -> SamTa
         timeout: Subprocess timeout in seconds.
 
     Returns:
-        The parsed ``SamTask`` on success, ``None`` on any failure.
+        The task's status, or ``None`` when the call failed or the response carried no
+        recognisable status.
     """
     stdout = _call_sam_cli(["plan", "read", "--address", f"{plan_id}/{task_id}"], timeout=timeout)
     if stdout is None:
@@ -607,10 +599,19 @@ def _call_sam_task_read(plan_id: str, task_id: str, timeout: float = 8) -> SamTa
 
     try:
         data: dict[str, Any] = json.loads(stdout)
-        task_data = data.get("task")
-        return SamTask.model_validate(task_data) if task_data else None
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError:
         return None
+
+    for key in ("row", "task"):
+        candidate = data.get(key)
+        if isinstance(candidate, dict):
+            raw_status = candidate.get("status")
+            if isinstance(raw_status, str):
+                try:
+                    return SamTaskStatus(raw_status)
+                except ValueError:
+                    return None
+    return None
 
 
 def _cleanup_active_task_context(session_id: str | None, fallback_context_file: Path | None) -> None:
@@ -770,186 +771,6 @@ def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
     return None
 
 
-def _parse_status_line(final_text: str) -> str | None:
-    """Return the upper-cased STATUS token from *final_text*, or None if it carries none.
-
-    Takes the FIRST match, because ``skills/subagent-contract/SKILL.md`` places the verdict
-    on the report's opening line and says consumers branch on it "in that position". A later
-    ``STATUS:`` line is therefore not a verdict — the ``NOTES:`` field of the
-    ``agents/task-worker.md`` template is free text and comes last, so preferring the final
-    match would let a note override the worker's own report.
-
-    Every line is scanned rather than only line one because that same template wraps the
-    report in a fence, which occupies the first line.
-
-    Args:
-        final_text: The worker's final message.
-
-    Returns:
-        The token in upper case, or None when no line is a well-formed STATUS report line.
-    """
-    for line in final_text.strip().splitlines():
-        match = _STATUS_LINE_RE.match(line)
-        if match:
-            return match.group(1).upper()
-    return None
-
-
-def _resolve_final_message(hook_input: dict[str, Any]) -> tuple[str | None, str | None]:
-    """Resolve the sub-agent's final message and its STATUS token.
-
-    Prefers ``last_assistant_message`` from the hook payload. Claude Code's hook
-    documentation is explicit that hooks needing the final assistant text "should use
-    last_assistant_message on Stop and SubagentStop instead of reading the transcript",
-    and Codex supplies the same field. Reading it costs one dictionary lookup where
-    scanning the transcript costs a full file read on every sub-agent stop.
-
-    Falls back to the transcript when the field is absent, which covers harnesses that
-    do not supply it and older releases that predate it.
-
-    Args:
-        hook_input: Parsed SubagentStop hook input.
-
-    Returns:
-        Tuple of ``(status_token, final_text)``. ``final_text`` is None only when the
-        message could not be obtained at all, which callers treat as evidence of nothing.
-    """
-    payload_message = hook_input.get("last_assistant_message")
-    if isinstance(payload_message, str) and payload_message.strip():
-        return _parse_status_line(payload_message), payload_message
-
-    return _extract_status_from_transcript(Path(hook_input.get("agent_transcript_path", "")))
-
-
-def _extract_status_from_transcript(transcript_path: Path) -> tuple[str | None, str | None]:
-    """Extract the sub-agent's self-reported status from its final assistant message.
-
-    Scans the whole transcript for the LAST ``type: "assistant"`` record with
-    text content, then hands that text to :func:`_parse_status_line`, which reads
-    the first well-formed ``STATUS: <TOKEN>`` line anywhere in it per
-    subagent-contract — not only line one, which the fenced report template occupies.
-
-    Args:
-        transcript_path: Path to the sub-agent's JSONL transcript file.
-
-    Returns:
-        Tuple of ``(status_token, final_text)``. ``status_token`` is the
-        upper-cased token (e.g. ``"DONE"``, ``"PARTIAL"``) or ``None`` if the
-        final message has no recognizable ``STATUS:`` line. ``final_text`` is
-        the full text of that message, or ``None`` if the transcript is
-        missing, unreadable, or has no assistant text content at all.
-    """
-    if not transcript_path.exists():
-        print(f"[hook] transcript not found: {transcript_path}", file=sys.stderr)
-        return None, None
-
-    final_text: str | None = None
-    try:
-        with transcript_path.open(encoding="utf-8") as fh:
-            for raw_line in fh:
-                stripped_line = raw_line.strip()
-                if not stripped_line:
-                    continue
-                try:
-                    record: dict[str, Any] = json.loads(stripped_line)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(record, dict) or record.get("type") != "assistant":
-                    continue
-                message = record.get("message", {})
-                if not isinstance(message, dict):
-                    continue
-                text = _first_text_block(message.get("content", []))
-                if text:
-                    final_text = text
-    except OSError as e:
-        print(f"[hook] could not read transcript for status extraction {transcript_path}: {e}", file=sys.stderr)
-        return None, None
-
-    if not final_text or not final_text.strip():
-        return None, None
-
-    return _parse_status_line(final_text), final_text
-
-
-def _read_context_file(context_file: Path) -> tuple[str | None, str | None, str | int | None]:
-    """Read plan address, task_id, and parent_issue_number from a context file.
-
-    Args:
-        context_file: Path to an active-task-*.json file.
-
-    Returns:
-        Tuple of (plan_address, task_id, parent_issue_number). Any field absent
-        or unreadable is returned as None.
-    """
-    try:
-        data: dict[str, Any] = json.loads(context_file.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None, None, None
-
-    plan_addr = data.get("plan")
-    task_id = data.get("task_id")
-    if not plan_addr or not task_id:
-        if data.get("task_file_path") and task_id:
-            print(
-                f"[hook] {context_file}: legacy context record has task_file_path but no plan "
-                "address (predates the plan/task fields) — not falling back to path-parsing; "
-                "activity tracking for this session will not resume until a fresh /start-task runs",
-                file=sys.stderr,
-            )
-        return None, None, None
-
-    parent_issue: str | int | None = data.get("parent_issue_number")
-
-    return plan_addr, task_id, parent_issue
-
-
-def _resolve_context_file_from_transcript(hook_input: dict[str, Any]) -> Path | None:
-    """Resolve the active-task context file for the agent that just stopped.
-
-    Reads ``agent_transcript_path`` from hook input, extracts the sub-agent's
-    session_id from the transcript, and returns the path to the matching
-    ``active-task-{session_id}.json`` context file. Returns None (with a stderr
-    warning) if any step fails or the context file does not exist.
-
-    Args:
-        hook_input: Parsed SubagentStop hook input from stdin.
-
-    Returns:
-        Path to the context file if found, or None.
-    """
-    transcript_path_raw = hook_input.get("agent_transcript_path", "")
-    if not transcript_path_raw:
-        print(
-            "[hook] SubagentStop: no agent_transcript_path in hook input — cannot correlate agent to task",
-            file=sys.stderr,
-        )
-        return None
-
-    sub_agent_session_id = _extract_session_id_from_transcript(Path(transcript_path_raw))
-    if not sub_agent_session_id:
-        print(
-            f"[hook] SubagentStop: could not extract session_id from transcript {transcript_path_raw} — skipping",
-            file=sys.stderr,
-        )
-        return None
-
-    try:
-        context_dir = _dh_paths.context_dir()
-    except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError):
-        return None
-
-    context_file = context_dir / f"active-task-{sub_agent_session_id}.json"
-    if not context_file.exists():
-        print(
-            f"[hook] SubagentStop: no context file for session {sub_agent_session_id} — not a /start-task agent",
-            file=sys.stderr,
-        )
-        return None
-
-    return context_file
-
-
 def _local_active_task_file(session_id: str) -> Path | None:
     """Return the local-backend active-task record for *session_id*, or None.
 
@@ -984,299 +805,168 @@ def _local_active_task_file(session_id: str) -> Path | None:
     return context_dir / f"active-task-{session_id}.json"
 
 
-def _resolve_active_task_context(
-    hook_input: dict[str, Any],
-) -> tuple[str | None, str | None, str | None, str | int | None, Path | None] | None:
-    """Resolve the active task context for the agent that just stopped.
+def _resolve_return_text(hook_input: dict[str, Any], transcript_path: Path | None) -> str:
+    """Return what the launch came back with, for ``settle --return-text``.
 
-    Three-step resolution chain:
-    1. The SAM CLI's ``active-task get`` subcommand, using the sub-agent's
-       session_id extracted from the transcript (primary path).
-    2. Filesystem context file via ``_resolve_context_file_from_transcript``
-       (fallback when the agent did not call ``active-task set``).
-    3. Prompt extraction from the JSONL transcript via
-       ``_extract_prompt_from_transcript`` + ``extract_task_info_from_prompt``
-       (final fallback for agents dispatched without context registration).
+    Prefers ``last_assistant_message`` from the hook payload. Claude Code's hook documentation is
+    explicit that hooks needing the final assistant text "should use last_assistant_message on
+    Stop and SubagentStop instead of reading the transcript", and Codex supplies the same field.
+    Reading it costs one dictionary lookup where scanning the transcript costs a full file read on
+    every sub-agent stop.
+
+    Falls back to the last assistant text block in the sub-agent's transcript, which covers
+    harnesses that do not supply the field and older releases that predate it. When neither
+    yields text, :data:`_NO_FINAL_MESSAGE` is returned rather than nothing: a launch that came
+    back empty still ended, and recording that it ended is the whole point of settling.
 
     Args:
-        hook_input: Parsed SubagentStop hook input from stdin.
+        hook_input: Parsed SubagentStop hook input.
+        transcript_path: The sub-agent's own transcript, or ``None`` when the payload named none.
 
     Returns:
-        ``(sub_agent_session_id, plan_id, task_id, parent_issue_number, context_file)``
-        where ``plan_id`` is the plan address string.
-        Returns ``None`` when no active task exists (caller should exit 0).
+        The text to record against the attempt. Never empty.
     """
-    transcript_path_raw = hook_input.get("agent_transcript_path", "")
-    sub_agent_session_id: str | None = None
-    if transcript_path_raw:
-        sub_agent_session_id = _extract_session_id_from_transcript(Path(transcript_path_raw))
+    payload_message = hook_input.get("last_assistant_message")
+    if isinstance(payload_message, str) and payload_message.strip():
+        return payload_message
 
-    plan_id: str | None = None
-    task_id: str | None = None
-    parent_issue_number: str | int | None = None
-    context_file: Path | None = None
+    if transcript_path is not None:
+        transcript_text = _last_assistant_text(transcript_path)
+        if transcript_text:
+            return transcript_text
 
-    # Step 1: the active-task record.
-    if sub_agent_session_id:
-        local_record = _local_active_task_file(sub_agent_session_id)
-        if local_record is None:
-            # Backend stores the record somewhere this process cannot stat — ask the CLI.
-            plan_id, task_id, parent_issue_number = _call_sam_active_task_get(sub_agent_session_id)
-        elif local_record.exists():
-            context_file = local_record
-            plan_id, task_id, parent_issue_number = _read_context_file(local_record)
-        # Local backend with no record: no active task. Steps 2 and 3 still run, and
-        # both read files, so the no-active-task path spawns no subprocess at all.
+    return _NO_FINAL_MESSAGE
 
-    # Step 2: Filesystem context file written by /start-task
-    if plan_id is None or task_id is None:
-        context_file = _resolve_context_file_from_transcript(hook_input)
-        if context_file is not None:
-            plan_id, task_id, parent_issue_number = _read_context_file(context_file)
 
-    # Step 3: Extract task reference from the agent's prompt in the JSONL transcript
-    if (plan_id is None or task_id is None) and transcript_path_raw:
-        prompt_text = _extract_prompt_from_transcript(Path(transcript_path_raw))
-        if prompt_text:
-            extracted_path, extracted_id = extract_task_info_from_prompt(prompt_text)
-            if extracted_path is not None and extracted_id is not None:
-                # extract_task_info_from_prompt resolves plan-arg to a local filesystem
-                # path (resolve_plan_address). Recover the address token from its filename,
-                # falling back to the path string itself if no address token is present.
-                address_match = re.search(r"(P[0-9a-f]+)", extracted_path.name, re.IGNORECASE)
-                extracted_plan_id = address_match.group(1) if address_match else str(extracted_path)
-                print(
-                    f"[hook] SubagentStop: resolved task from prompt — {extracted_plan_id} / {extracted_id}",
-                    file=sys.stderr,
-                )
-                plan_id = extracted_plan_id
-                task_id = extracted_id
-                # parent_issue_number remains None — not available from prompt alone
+def _last_assistant_text(transcript_path: Path) -> str | None:
+    """Return the text of the last assistant message in a JSONL transcript.
 
-    if plan_id is None or task_id is None:
+    Args:
+        transcript_path: Path to the sub-agent's JSONL transcript file.
+
+    Returns:
+        The final assistant text block, or ``None`` when the file is missing, unreadable, or
+        carries no assistant text at all.
+    """
+    if not transcript_path.exists():
+        print(f"[hook] transcript not found: {transcript_path}", file=sys.stderr)
         return None
 
-    return sub_agent_session_id, plan_id, task_id, parent_issue_number, context_file
+    final_text: str | None = None
+    try:
+        with transcript_path.open(encoding="utf-8") as fh:
+            for raw_line in fh:
+                stripped_line = raw_line.strip()
+                if not stripped_line:
+                    continue
+                try:
+                    record: dict[str, Any] = json.loads(stripped_line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict) or record.get("type") != "assistant":
+                    continue
+                message = record.get("message", {})
+                if not isinstance(message, dict):
+                    continue
+                text = _first_text_block(message.get("content", []))
+                if text:
+                    final_text = text
+    except OSError as e:
+        print(f"[hook] could not read transcript for return text {transcript_path}: {e}", file=sys.stderr)
+        return None
 
-
-def _cascade_failed_task(
-    plan_id: str, task_id: str, sub_agent_session_id: str | None, context_file: Path | None
-) -> None:
-    """Best-effort downstream skip cascade when a task is already in FAILED status.
-
-    Routes the cascade through the SAM CLI's ``plan state`` subcommand
-    (``--new-status failed``). The CLI handles DependencyGraph construction and
-    downstream SKIPPED writes atomically. Absorbs all failures — SubagentStop
-    critical path must not be blocked by subprocess or write errors.
-
-    Args:
-        plan_id: Plan address string (e.g. ``"Pf4281187"``).
-        task_id: ID of the task that transitioned to FAILED.
-        sub_agent_session_id: Agent session ID for context cleanup.
-        context_file: Context file path for cleanup.
-    """
-    ok = _call_sam_task_state(plan_id, task_id, SamTaskStatus.FAILED)
-    if not ok:
-        print(f"[hook] SubagentStop: downstream skip cascade failed for {task_id}", file=sys.stderr)
-    _cleanup_active_task_context(sub_agent_session_id, context_file)
-    sys.exit(0)
-
-
-def _block_task_on_report(
-    plan_addr: str,
-    task_id: str,
-    status_token: str | None,
-    final_text: str | None,
-    sub_agent_session_id: str | None,
-    context_file: Path | None,
-) -> None:
-    """Mark a task BLOCKED because its worker did not report completion.
-
-    Echoes the worker's own first line to stderr so the reported token and reason
-    survive into the hook log. Names the specific contract failure: a non-complete
-    token, a final message with no ``STATUS:`` line, or no final message at all.
-    Terminal — calls sys.exit(0).
-
-    Args:
-        plan_addr: Plan address (e.g. ``"Pf4281187"``).
-        task_id: Task ID within the plan.
-        status_token: The token parsed from the worker's STATUS line, or None if
-            the final message carried no recognizable STATUS line.
-        final_text: The worker's final message, or None if unavailable.
-        sub_agent_session_id: Agent session ID for context cleanup.
-        context_file: Context file path for cleanup.
-    """
-    if status_token is not None:
-        cause = f"reported STATUS: {status_token}"
-    elif final_text is not None:
-        cause = "final message has no 'STATUS:' first line"
-    else:
-        cause = "produced no final message"
-    first_line = final_text.strip().splitlines()[0] if final_text else "(no final message found)"
-    print(f"[hook] SubagentStop: {task_id} {cause} ({first_line!r}) — marking blocked instead", file=sys.stderr)
-    if not _call_sam_task_state(plan_addr, task_id, SamTaskStatus.BLOCKED):
-        print(f"[hook] SubagentStop: failed to mark {task_id} blocked via the SAM CLI", file=sys.stderr)
-    _cleanup_active_task_context(sub_agent_session_id, context_file)
-    sys.exit(0)
-
-
-def _resolve_non_complete_report(
-    plan_addr: str,
-    task_id: str,
-    status_token: str | None,
-    final_text: str | None,
-    already_complete: bool,
-    sub_agent_session_id: str | None,
-    context_file: Path | None,
-) -> None:
-    """Decide what a non-completion report does to task state. Terminal — calls sys.exit(0).
-
-    Three outcomes, because the reasons a report is not a completion are not equivalent:
-
-    - **Unreadable transcript, task already COMPLETE** — leave it. Writing COMPLETE and
-      reverting one both need positive evidence, and a failed read is evidence of nothing.
-      Un-completing finished work here would stall the whole wave.
-    - **A token in neither vocabulary** — leave state alone. Shipped specialists report
-      VERIFIED, CONNECTED, GAPS_FOUND, READY and DRAFTING; since the SubagentStop matcher
-      no longer filters non-task-worker agents out, blocking on an unrecognised word would
-      turn their correct work into BLOCKED.
-    - **Everything else** — block. A known non-completion token, or a readable final message
-      with no STATUS line at all, both positively evidence that the worker did not finish.
-
-    Args:
-        plan_addr: Plan address (e.g. ``"Pf4281187"``).
-        task_id: Task ID within the plan.
-        status_token: Token parsed from the worker's STATUS line, or None if there was none.
-        final_text: The worker's final message, or None if the transcript was unreadable.
-        already_complete: Whether the task already reads COMPLETE.
-        sub_agent_session_id: Agent session ID for context cleanup.
-        context_file: Context file path for cleanup.
-    """
-    if final_text is None and already_complete:
-        print(
-            f"[hook] SubagentStop: no final message readable for {task_id}; leaving existing COMPLETE unchanged",
-            file=sys.stderr,
-        )
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
-    if status_token is not None and status_token not in _INCOMPLETE_STATUS_TOKENS:
-        print(
-            f"[hook] SubagentStop: {task_id} reported STATUS: {status_token}, which is neither a "
-            "completion nor a failure token — task state unchanged",
-            file=sys.stderr,
-        )
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
-    _block_task_on_report(plan_addr, task_id, status_token, final_text, sub_agent_session_id, context_file)
+    return final_text
 
 
 def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
-    """Handle SubagentStop event - mark task COMPLETE or BLOCKED based on the worker's report.
+    """Settle the attempt the stopping sub-agent was launched for; write no status.
 
-    Discovers the active task via the SAM CLI's ``active-task get`` subcommand
-    (primary) or the ``active-task-{session_id}.json`` context file (fallback).
-    This ensures only the task belonging to the finished agent is marked
-    complete — not all in-progress tasks — which is critical for correct
-    behaviour with parallel agents.
+    The one fact this hook holds that nobody else does is that the launch ended. It records that,
+    with the text that came back, through ``plan settle``. What the work amounted to is the
+    runner's ``finish`` to report and the judge's ``accept``/``reclaim`` to decide — see the
+    module docstring for why a hook writing status alongside them would drift from them.
 
-    Discovery steps:
-    1. Extract sub-agent's session_id from ``agent_transcript_path``.
-    2. Call the SAM CLI's ``active-task get`` subcommand (primary path).
-    3. Fall back to ``active-task-{session_id}.json`` on disk if that call fails.
-    4. After status update, call ``active-task clear`` or delete the file.
+    Sequence:
 
-    Before writing COMPLETE, reads the worker's own final message via
-    ``_extract_status_from_transcript`` and checks its ``STATUS:`` line against
-    ``_COMPLETE_STATUS_TOKENS``. Anything else — a non-complete token, an
-    unrecognized one, or a final message with no STATUS line — marks the task
-    BLOCKED instead.
+    1. Read the sub-agent's own initial prompt from ``agent_transcript_path`` and take the plan
+       address, task id and attempt number from it. The transcript is per-sub-agent, so parallel
+       workers do not collide here.
+    2. ``plan settle --address P/T --attempt N --return-text "<what came back>"``.
+    3. Clear the session's active-task context.
 
-    Evidence is asymmetric, and the two failure kinds are not the same:
-
-    - **The worker's report** decides the state. A readable final message that
-      does not report completion blocks the task, including one that omits the
-      ``STATUS:`` line entirely — that is a contract violation by the worker,
-      and the most common one.
-    - **A transcript the hook could not read** decides nothing. Writing COMPLETE
-      and reverting a COMPLETE both require positive evidence, so a missing,
-      unreadable, or empty transcript leaves an existing COMPLETE untouched
-      rather than un-completing finished work and stalling the wave. With no
-      existing COMPLETE it still blocks, because nothing has evidenced success.
-
-    All status and field writes route through the SAM CLI as a single
-    subprocess, making the hook backend-agnostic.
-
-    When profile is STRICT, runs pre-completion validation checks and prints
-    any warnings to stderr before completing (warnings do not prevent completion).
+    Every failure is printed to stderr and none is fatal: the SubagentStop critical path must not
+    be blocked, so this returns normally however the settle went and :func:`main` exits 0. It never
+    no-ops silently — a settle that could not be attempted says which fact was missing, and one
+    that failed says the attempt stays open.
 
     Args:
         hook_input: Parsed hook input from stdin.
-        profile: Active hook profile. Defaults to STANDARD.
+        profile: Active hook profile. Accepted for call-site compatibility; the profile gates
+            whether this handler runs at all (see :func:`should_skip_hook`) and no longer varies
+            what it does, because settling records evidence rather than deciding an outcome.
     """
-    resolved = _resolve_active_task_context(hook_input)
-    if resolved is None:
-        sys.exit(0)
+    del profile
 
-    sub_agent_session_id, plan_id, task_id, _parent_issue_number, context_file = resolved
-
-    if plan_id is None or task_id is None:
-        if context_file is not None:
-            print(f"[hook] SubagentStop: malformed context file {context_file} — cleaning up", file=sys.stderr)
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
-    plan_addr = plan_id
-
-    current_task = _call_sam_task_read(plan_addr, task_id)
-    if current_task is None:
+    transcript_path_raw = hook_input.get("agent_transcript_path", "")
+    transcript_path = Path(transcript_path_raw) if transcript_path_raw else None
+    if transcript_path is None:
         print(
-            f"[hook] SubagentStop: could not read task {task_id} from plan {plan_addr} via the SAM CLI — skipping",
+            "[hook] SubagentStop: no agent_transcript_path in hook input — cannot correlate the "
+            "stopping agent to an attempt, so nothing was settled",
             file=sys.stderr,
         )
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
-    if current_task.status == SamTaskStatus.FAILED:
-        # Agent explicitly set task to FAILED before stopping. That is a deliberate
-        # self-report of a terminal state, more specific than anything the transcript
-        # says, so it wins. Cascade skip signals to all downstream dependents.
-        # _cascade_failed_task is terminal (calls sys.exit(0)); return guards mocked callers.
-        _cascade_failed_task(plan_addr, task_id, sub_agent_session_id, context_file)
         return
 
-    # The worker's final message is the authority on whether it finished, NOT the task
-    # state — start-task lets a worker mark itself complete before stopping, so a task
-    # already reading COMPLETE proves nothing about what the worker actually reported.
-    # This check therefore runs before any COMPLETE short-circuit.
-    status_token, final_text = _resolve_final_message(hook_input)
-    already_complete = current_task.status == SamTaskStatus.COMPLETE
+    sub_agent_session_id = _extract_session_id_from_transcript(transcript_path)
+    context_file = _local_active_task_file(sub_agent_session_id) if sub_agent_session_id else None
 
-    if status_token not in _COMPLETE_STATUS_TOKENS:
-        # _resolve_non_complete_report is terminal (calls sys.exit(0)); return guards mocked callers.
-        _resolve_non_complete_report(
-            plan_addr, task_id, status_token, final_text, already_complete, sub_agent_session_id, context_file
-        )
-        return
-
-    # Worker reported completion and already marked itself complete — nothing to write.
-    if already_complete:
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-
-    if profile == HookProfile.STRICT:
-        for warning in run_strict_pre_completion_checks(current_task, task_id):
-            print(warning, file=sys.stderr)
-
-    timestamp = get_iso_timestamp()
-    state_ok = _call_sam_task_state(plan_addr, task_id, SamTaskStatus.COMPLETE)
-    if not state_ok:
-        print(f"[hook] SubagentStop: failed to mark {task_id} complete via the SAM CLI", file=sys.stderr)
-        _cleanup_active_task_context(sub_agent_session_id, context_file)
-        sys.exit(0)
-    _call_sam_task_update(plan_addr, task_id, {"completed": timestamp})
+    launch = _resolve_launch(transcript_path)
+    if launch is not None:
+        _call_sam_plan_settle(launch, _resolve_return_text(hook_input, transcript_path))
     _cleanup_active_task_context(sub_agent_session_id, context_file)
+
+
+def _resolve_launch(transcript_path: Path) -> Launch | None:
+    """Return the settle-able launch the sub-agent's prompt names, saying why when there is none.
+
+    Args:
+        transcript_path: The sub-agent's own JSONL transcript.
+
+    Returns:
+        A :class:`Launch` naming a ledger address and an attempt number, or ``None`` when the
+        prompt names no dispatch, names one this hook cannot settle, or names no attempt.
+    """
+    prompt_text = _extract_prompt_from_transcript(transcript_path)
+    if not prompt_text:
+        print(
+            f"[hook] SubagentStop: no initial prompt found in {transcript_path} — nothing was settled", file=sys.stderr
+        )
+        return None
+
+    launch = extract_launch_from_prompt(prompt_text)
+    if launch is None:
+        # Not a dispatched task worker. Every sub-agent of every plugin reaches this hook, so this
+        # is the ordinary case and not a fault.
+        return None
+
+    if not launch.is_ledger_address:
+        print(
+            f"[hook] SubagentStop: {launch.address} names a plan file rather than a ledger address; "
+            "settle acts on ledger attempts only — nothing was settled",
+            file=sys.stderr,
+        )
+        return None
+
+    if launch.attempt is None:
+        print(
+            f"[hook] SubagentStop: {launch.address} was launched without an attempt number in its "
+            "prompt; settle names the attempt it records against, so nothing was settled. Launch "
+            "workers as the dispatch contract specifies: '{plan}/{task}, attempt {n}'",
+            file=sys.stderr,
+        )
+        return None
+
+    return launch
 
 
 # Total wall-clock budget shared across every _call_sam_cli invocation made within
@@ -1288,10 +978,23 @@ _POST_TOOL_USE_BUDGET_SECONDS = 8.0
 
 
 def handle_activity_update(hook_input: dict[str, Any]) -> None:
-    """Handle PostToolUse event - update LastActivity timestamp.
+    """Handle PostToolUse event — update the active task's ``last-activity`` timestamp.
 
-    Reads task info from context file and updates the last-activity field
-    via the SAM CLI (backend-agnostic write path).
+    Reads the session's active task from the context record and updates the ``last-activity``
+    field through the SAM CLI.
+
+    Scope limit, deliberate and recorded here so it is not mistaken for a lease renewal: the
+    ledger's liveness signal is the attempt's lease, pushed out by ``plan renew --address P/T
+    --attempt N``, and ``--last-activity`` is a content-store field (``store_for`` in
+    ``sam_schema/sam_plan.py`` classes it as a legacy flag, so an invocation naming it routes to
+    the content store). This handler cannot renew a lease instead, because renewing needs the
+    attempt number and the record it reads has none — ``ActiveTaskContext`` declares no attempt
+    field and ``active-task set`` exposes no ``--attempt`` flag. Nor could adding one be enough:
+    the record is keyed by ``session_id``, which inside a sub-agent is the parent session's, so
+    one wave's workers share a record and this handler would renew a sibling's lease. Keying it
+    per sub-agent needs an identifier the sub-agent can read for itself; looked for one in the
+    cached Claude Code hooks documentation (``docs/work-ledger/measurements/harness-claude-code.md``
+    § 6) and found ``agent_id`` only as a hook input field, never as an environment variable.
 
     Args:
         hook_input: Parsed hook input from stdin.
@@ -1309,13 +1012,13 @@ def handle_activity_update(hook_input: dict[str, Any]) -> None:
 
     deadline = time.monotonic() + _POST_TOOL_USE_BUDGET_SECONDS
 
-    current_task = _call_sam_task_read(plan_addr, task_id, timeout=max(0.1, deadline - time.monotonic()))
-    if current_task is None:
+    current_status = _call_sam_task_status(plan_addr, task_id, timeout=max(0.1, deadline - time.monotonic()))
+    if current_status is None:
         print(
             f"[hook] PostToolUse: could not read task {task_id} from plan {plan_addr} via the SAM CLI — skipping",
             file=sys.stderr,
         )
-    elif current_task.status == SamTaskStatus.COMPLETE:
+    elif current_status == SamTaskStatus.COMPLETE:
         return
 
     remaining = deadline - time.monotonic()

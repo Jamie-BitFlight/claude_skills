@@ -92,7 +92,7 @@ What happens:
 - Queries the plan for ready tasks (not-started with all dependencies complete)
 - When 2 or more tasks are ready simultaneously, dispatches one parallel `Agent()` call per task
 - Each task runs through `/dh:start-task`, which claims the task, executes it, and records divergence notes when implementation differs from plan
-- A SubagentStop hook automatically marks tasks complete
+- A SubagentStop hook automatically settles the attempt when a worker's launch ends
 - Bookend tasks run automatically: T0 captures baseline state before implementation begins, TN verifies acceptance criteria after all implementation tasks finish
 
 #### `/dh:complete-implementation`
