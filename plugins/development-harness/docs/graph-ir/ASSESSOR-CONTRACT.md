@@ -355,7 +355,9 @@ existence is never taken as its conclusion.
 | `Found-by: IR` | one finding | the graph surfaced this, rather than a person or a review pass finding it and the graph confirming it |
 | `Previously-known: no` | one finding | it was not already recorded before the graph found it |
 
-Both markers together are what satisfies the migration-trigger criterion, evaluated in
-`tests_sam/test_adr_3460_migration_trigger.py`, that the IR generalises beyond the defects it was
-built against: it must have caught a defect nobody had already found. Claiming either marker
-without the other satisfies nothing.
+Both markers together are what satisfies the migration-trigger criterion that the IR generalises
+beyond the defects it was built against: it must have caught a defect nobody had already found.
+Claiming either marker without the other satisfies nothing. The test that formerly evaluated this
+criterion (`tests_sam/test_adr_3460_migration_trigger.py`) has since been deleted for reading an
+ADR from disk and parsing these markers out of markdown by regex; the criterion is recorded here
+until it is re-stated against structured data a test can assert on directly.
