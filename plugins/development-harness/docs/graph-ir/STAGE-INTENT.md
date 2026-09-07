@@ -1,4 +1,4 @@
-# The nine stages, and what each is for
+# The stages, and what each is for
 
 Design-time. Stated by the repository owner, 2026-09-07, as what the harness was built to do and
 what it solves. `docs/PURPOSE.md` "Closed-Loop Work Management" is the older ten-step summary of

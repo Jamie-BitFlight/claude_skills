@@ -1,6 +1,6 @@
 """Layer 2 -- the work graph: nodes are tasks; edges are the same typed relations layer 3 draws from.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): "This layer says what may run
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "This layer says what may run
 concurrently and what waits on what. Every layer-2 graph carries bookends: a review step, a
 validate step, and a documentation-check step. They are structural, not optional decoration, and a
 graph without them is malformed rather than merely lacking." And: "Layer 2 is the artifact layer 3
@@ -12,7 +12,7 @@ notes and not deferred to a later plan."
 This module makes three things unconstructible rather than merely checkable:
 
 * a bookend-typed node without a review/validate/documentation-check semantics is impossible --
-  :class:`BookendKind` is a closed three-member enum, not free text;
+  :class:`BookendKind` is a closed enum, not free text;
 * a node with :attr:`WorkNode.provenance` other than :attr:`WorkNodeProvenance.PLANNED` cannot be
   built without naming :attr:`WorkNode.inserted_by` and :attr:`WorkNode.inserted_reason`
   (:meth:`WorkNode.check_extension_fields`);
@@ -44,7 +44,7 @@ from dh_core.graph_ir.vocabulary import EdgeType, ExtractionStatus
 
 
 class BookendKind(StrEnum):
-    """The three structural bookends every layer-2 graph must carry."""
+    """The structural bookends every layer-2 graph must carry."""
 
     REVIEW = "review"
     VALIDATE = "validate"
@@ -65,7 +65,7 @@ class WorkNodeProvenance(StrEnum):
 
 
 class ExtensionKind(StrEnum):
-    """The two ways layer 3 mutates layer 2 while work is in flight."""
+    """The ways layer 3 mutates layer 2 while work is in flight."""
 
     SPLIT = "split"
     INSERT = "insert"

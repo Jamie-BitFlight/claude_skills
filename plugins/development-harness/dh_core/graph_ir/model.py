@@ -1,11 +1,11 @@
 """The layer-3 (workflow) graph: the node record, the typed edges, and the queries over them.
 
 The system under assessment is a typed, hierarchical, directed multigraph
-(``docs/graph-ir/ASSESSOR-CONTRACT.md``), and that multigraph is three layers, not one. This module
+(``docs/graph-ir/ASSESSOR-CONTRACT.md``), and that multigraph is layered, not flat. This module
 holds **layer 3**, the workflow: nodes are process steps with an actor, a guard and source refs
 into a ``SKILL.md`` -- the contract's node record is shaped for this layer specifically. Layer 1
 (task lifecycle) lives in :mod:`dh_core.graph_ir.ledger_layer`; layer 2 (the work graph) lives in
-:mod:`dh_core.graph_ir.work_layer`; the three tied together live in :mod:`dh_core.graph_ir.system`.
+:mod:`dh_core.graph_ir.work_layer`; the layers tied together live in :mod:`dh_core.graph_ir.system`.
 One pair of nodes may carry several edges at once, and collapsing them into a single ``then`` arrow
 is what hides the defects worth finding.
 
@@ -386,4 +386,4 @@ class Graph(BaseModel):
 
 
 WorkflowGraph = Graph
-"""Alias naming :class:`Graph` by its layer, for code that assembles all three layers together."""
+"""Alias naming :class:`Graph` by its layer, for code that assembles the layers together."""
