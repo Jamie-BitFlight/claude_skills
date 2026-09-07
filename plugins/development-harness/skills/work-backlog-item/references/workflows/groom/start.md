@@ -44,7 +44,7 @@ Track progress using your task list. Check off each step as it completes.
 
 1. [ ] Read `scope.md` — align all actions with the grooming scope boundary
 2. [ ] **Intake** (`intake.md`) — validate <item_ref/>, run pre-groom checks, extract item details
-   - If SKIP: report reason, stop (or next item if batch)
+   - If SKIP: report reason, stop (or next item if batch — see Batch Grooming below)
    - If DRIFT: route to `groom-drift.md`, report findings, stop
    - If PROCEED: continue
 3. [ ] **Analyze** (`analyze.md`) — run discovery gate, build RT-ICA snapshot, determine scope sizing
@@ -90,6 +90,12 @@ Every exit path — success, block, skip, drift, or error — ends at [finally.m
 | <item_ref/> | Backlog item to groom — `#N` format | Yes |
 | <mode/> | `auto` or `interactive` (default: `interactive`) | No |
 | <user_text/> | Additional context from the user, if any | No |
+
+## Batch Grooming
+
+When <item_ref/> resolves to more than one item (e.g. `all` from the interactive browser's
+`G all`), groom items in parallel, capped at 5 concurrent items. Batch in waves of 5 if more
+than 5 items need grooming.
 
 ## Identifier Convention
 

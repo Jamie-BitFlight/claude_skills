@@ -242,7 +242,11 @@ Problem space and outcomes only. Do NOT include implementation steps, architectu
 
 #### Description / AC separation
 
-Description is the problem statement. Acceptance Criteria are verifiable success conditions. Do not restate description inside ACs.
+Description is the problem statement. Acceptance Criteria are verifiable success conditions. Do not restate description inside ACs. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
+
+#### Scope-gate ACs and repo hooks
+
+When an AC limits scope (e.g. "no other file changes", "only file X is modified"), scope it to changes the agent makes by hand. A repo's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not a scope violation. Do not word the criterion to fail on a mutation the agent did not make itself.
 
 Groomer agent: `subagent_type="dh:backlog-item-groomer"`, model=sonnet.
 
