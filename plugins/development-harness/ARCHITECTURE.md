@@ -72,9 +72,11 @@ read as though the stage were already built out of that mechanism.
 Likewise **create** is the stage and the route; `intake` is a step inside grooming
 (`skills/work-backlog-item/references/workflows/groom/intake.md`) and does not name this stage.
 
-Where this plugin's prose and its code disagree, the code's identifier is canonical. The artifact
-that Design and Plan produce is registered as `architect`; several skills call it `ARTIFACT:PLAN`,
-which names no registered type and is a defect in those documents rather than a synonym.
+`ARTIFACT:{STAGE}({scope})` is a cross-reference token naming the stage that produced an artifact,
+and it is a separate namespace from `ArtifactType`. `ARTIFACT:DISCOVERY`, `ARTIFACT:CONTEXT`,
+`ARTIFACT:TASK`, `ARTIFACT:EXECUTION`, `ARTIFACT:REVIEW` and `ARTIFACT:VERIFICATION` name no
+artifact type either. So `ARTIFACT:PLAN` for the planning stage's output is correct, and reading it
+as a misspelling of the `architect` type conflates the two namespaces.
 
 ### Acceptance criteria
 

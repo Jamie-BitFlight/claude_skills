@@ -47,7 +47,7 @@ flowchart TD
 
     Q1 -->|Work a single specific task<br>inside an existing plan| Single["/dh:start-task {plan path} --task {task-id}<br>Used by implement-feature per-task dispatch —<br>invoke directly to target one task"]
 
-    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>7-phase SAM path (with plan) or<br>3-phase proportional path (issue only):<br>multi-perspective review → code review →<br>verification → integration →<br>doc drift → doc update → context refinement"]
+    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>7-task SAM path (with plan): multi-perspective review →<br>code review → verification → integration →<br>doc drift → doc update → context refinement<br>or 5-task proportional path (issue only), which omits<br>multi-perspective review and context refinement"]
 
     Q1 -->|Work a full milestone<br>in parallel isolated worktrees| Milestone["/dh:work-milestone<br>Wave-based parallel execution — each item<br>gets its own worktree. Use /dh:groom-milestone first."]
 ```
