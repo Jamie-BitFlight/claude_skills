@@ -17,9 +17,13 @@ design. Only a defect the IR found first shows it generalises.
 
 from __future__ import annotations
 
+import importlib
 import re
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pytest
 from pydantic import BaseModel, Field
 
 PLUGIN_ROOT: Path = Path(__file__).resolve().parents[1]
@@ -27,7 +31,10 @@ CONTRACT: Path = PLUGIN_ROOT / "docs" / "graph-ir" / "ASSESSOR-CONTRACT.md"
 ADR: Path = PLUGIN_ROOT / "docs" / "adrs" / "ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md"
 FINDINGS: Path = PLUGIN_ROOT / "docs" / "graph-ir" / "findings"
 DEFECT_TESTS: Path = PLUGIN_ROOT / "tests_sam" / "test_graph_ir_defects.py"
-IR_PACKAGE: Path = PLUGIN_ROOT / "dh_core" / "graph_ir"
+OUT_OF_SCOPE: Path = PLUGIN_ROOT / "docs" / "graph-ir" / "PREDICATES-OUT-OF-SCOPE.md"
+
+EM_DASH: str = " \u2014 "
+"""The separator an out-of-scope register row puts between a predicate and the reason for it."""
 
 KNOWN_DEFECTS: tuple[str, ...] = ("D1", "D2", "D3", "D4")
 """The defects already found by hand, which the IR must refuse or detect. ADR-3460-1, Context."""
@@ -56,6 +63,77 @@ def contract_predicates() -> list[str]:
         if part.startswith("Falsified predicates to report"):
             return [line[2:].strip() for line in part.splitlines() if line.startswith("- ")]
     return []
+
+
+def normalise(statement: str) -> str:
+    """Return a predicate statement with backticks, case and runs of whitespace flattened.
+
+    Args:
+        statement: The statement as the contract or the enum words it.
+
+    Returns:
+        The comparable form. The contract writes ``VERIFIED`` in backticks and the enum does not,
+        so a literal comparison would report a drift that is only typography.
+    """
+    return re.sub(r"\s+", " ", statement.replace("`", "")).strip().lower()
+
+
+def out_of_scope_predicates() -> dict[str, str]:
+    """Return the predicate statements recorded out of scope, mapped to the reason given.
+
+    Returns:
+        One entry per ``- <statement> - <reason>`` row of the out-of-scope register, keyed by the
+        normalised statement. A row with no reason is not an excusal: the ADR requires the reason.
+    """
+    if not OUT_OF_SCOPE.is_file():
+        return {}
+    rows: dict[str, str] = {}
+    for line in OUT_OF_SCOPE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("- ") and EM_DASH in line:
+            statement, _, reason = line[2:].partition(EM_DASH)
+            if reason.strip():
+                rows[normalise(statement)] = reason.strip()
+    return rows
+
+
+def unexpressible_predicates() -> list[str]:
+    """Return contract predicates the IR neither encodes nor records out of scope.
+
+    Returns:
+        The contract's own wording of each predicate that no :class:`Predicate` member states and
+        no register row excuses. Criterion 2 is met exactly when this is empty.
+    """
+    predicates = contract_predicates()
+    try:
+        from dh_core.graph_ir.findings import PREDICATES
+    except ImportError:
+        return predicates
+    encoded = {normalise(definition.statement) for definition in PREDICATES.values()}
+    excused = set(out_of_scope_predicates())
+    return [p for p in predicates if normalise(p) not in encoded | excused]
+
+
+def projection_reproduces_transitions() -> tuple[bool, str]:
+    """Answer whether the IR's control-flow projection reproduces ``ledger_spec.TRANSITIONS``.
+
+    Returns:
+        Whether it does, and what was read to decide. The ADR's criterion is reproduction, not
+        presence: a module that exists and derives a different table leaves the hand-maintained
+        one undeletable, which is the whole point of the criterion.
+    """
+    try:
+        module = importlib.import_module("dh_core.graph_ir.control_flow")
+    except ImportError:
+        return False, "no dh_core.graph_ir.control_flow.derive_transitions to derive the table from"
+    derive = getattr(module, "derive_transitions", None)
+    if derive is None:
+        return False, "dh_core.graph_ir.control_flow exists but declares no derive_transitions"
+    from dh_core.ledger_spec import TRANSITIONS
+
+    derived = list(derive())
+    if derived == list(TRANSITIONS):
+        return True, f"derive_transitions() reproduces all {len(TRANSITIONS)} transitions in ledger_spec"
+    return False, f"derive_transitions() yields {len(derived)} transitions; ledger_spec declares {len(TRANSITIONS)}"
 
 
 def defects_covered() -> set[str]:
@@ -128,9 +206,9 @@ def evaluate() -> list[Criterion]:
     covered = defects_covered()
     missing_defects = sorted(set(KNOWN_DEFECTS) - covered)
     predicates = contract_predicates()
-    expressible = IR_PACKAGE / "predicates.py"
+    unexpressible = unexpressible_predicates()
     verdict = fidelity_verdict()
-    projection = IR_PACKAGE / "control_flow.py"
+    projection_met, projection_evidence = projection_reproduces_transitions()
     found = ir_found_defects()
 
     return [
@@ -148,17 +226,21 @@ def evaluate() -> list[Criterion]:
         Criterion(
             key="contract-predicates-expressible",
             question="Is every falsified predicate in the contract expressible against the IR, or recorded out of scope?",
-            met=bool(predicates) and expressible.is_file(),
+            met=bool(predicates) and not unexpressible,
             evidence=(
                 f"contract lists {len(predicates)} predicates; "
-                f"{'found' if expressible.is_file() else 'no'} {expressible.name} to answer them"
+                + (
+                    f"{len(unexpressible)} neither encoded nor excused: {unexpressible}"
+                    if unexpressible
+                    else "each is a Predicate member or carries an out-of-scope reason"
+                )
             ),
         ),
         Criterion(
             key="projection-replaces-transitions",
             question="Does the control-flow projection reproduce ledger_spec.TRANSITIONS exactly?",
-            met=projection.is_file(),
-            evidence=f"{'found' if projection.is_file() else 'no'} {projection.name}",
+            met=projection_met,
+            evidence=projection_evidence,
         ),
         Criterion(
             key="model-fidelity-verified",
@@ -242,3 +324,69 @@ def test_a_declared_ir_finding_is_recognised(tmp_path: Path) -> None:
     body = genuine.read_text(encoding="utf-8")
     assert marker(body, "found-by") == "ir"
     assert marker(body, "previously-known") == "no"
+
+
+def test_a_contract_predicate_with_no_enum_member_is_unexpressible(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Criterion 2 must answer from the enum's contents, not from a file's existence.
+
+    Its first form was ``predicates.py.is_file()``, which an empty file satisfied. This is the
+    same defect criterion 4 carried, and the enum had in fact drifted a bullet behind the contract
+    while that check read as answerable.
+    """
+    monkeypatch.setattr(
+        "tests_sam.test_adr_3460_migration_trigger.contract_predicates",
+        lambda: ["a spectral edge inverts its own guard"],
+    )
+    assert unexpressible_predicates() == ["a spectral edge inverts its own guard"]
+
+
+def test_an_encoded_predicate_is_expressible(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check must still clear a predicate the enum states, or criterion 2 is unreachable."""
+    from dh_core.graph_ir.findings import PREDICATES, Predicate
+
+    contract_wording = PREDICATES[Predicate.TRUST_BELOW_REQUIREMENT].statement.replace("VERIFIED", "`VERIFIED`")
+    monkeypatch.setattr("tests_sam.test_adr_3460_migration_trigger.contract_predicates", lambda: [contract_wording])
+    assert unexpressible_predicates() == [], "backticks are typography, not drift"
+
+
+def test_an_out_of_scope_row_excuses_only_with_a_reason(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The ADR admits an out-of-scope predicate only "with the reason", so a bare row excuses nothing."""
+    register = tmp_path / "PREDICATES-OUT-OF-SCOPE.md"
+    register.write_text("- a spectral edge inverts its own guard\n", encoding="utf-8")
+    monkeypatch.setattr("tests_sam.test_adr_3460_migration_trigger.OUT_OF_SCOPE", register)
+    monkeypatch.setattr(
+        "tests_sam.test_adr_3460_migration_trigger.contract_predicates",
+        lambda: ["a spectral edge inverts its own guard"],
+    )
+    assert unexpressible_predicates() == ["a spectral edge inverts its own guard"]
+
+    register.write_text("- a spectral edge inverts its own guard \u2014 layer 4 owns guards\n", encoding="utf-8")
+    assert unexpressible_predicates() == []
+
+
+def test_the_projection_criterion_requires_reproduction_not_presence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A projection module that derives a different table leaves ``TRANSITIONS`` undeletable.
+
+    ADR-3460-1 criterion 3 asks whether the derived control-flow projection reproduces
+    ``ledger_spec.TRANSITIONS`` *exactly*, which is what makes the hand-maintained table
+    deletable. A module that merely exists answers nothing.
+    """
+    from dh_core.ledger_spec import TRANSITIONS
+
+    wrong = SimpleNamespace(derive_transitions=lambda: list(TRANSITIONS)[:-1])
+    monkeypatch.setitem(sys.modules, "dh_core.graph_ir.control_flow", wrong)
+    met, evidence = projection_reproduces_transitions()
+    assert not met
+    assert str(len(TRANSITIONS)) in evidence
+
+    faithful = SimpleNamespace(derive_transitions=lambda: list(TRANSITIONS))
+    monkeypatch.setitem(sys.modules, "dh_core.graph_ir.control_flow", faithful)
+    met, evidence = projection_reproduces_transitions()
+    assert met, evidence
+
+
+def test_the_projection_criterion_is_unmet_while_no_projection_exists() -> None:
+    """With no projection module, the criterion says so rather than reading as answerable."""
+    met, evidence = projection_reproduces_transitions()
+    assert not met
+    assert "derive_transitions" in evidence
