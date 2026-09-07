@@ -76,6 +76,15 @@ Where this plugin's prose and its code disagree, the code's identifier is canoni
 that Design and Plan produce is registered as `architect`; several skills call it `ARTIFACT:PLAN`,
 which names no registered type and is a defect in those documents rather than a synonym.
 
+### Acceptance criteria
+
+A structured acceptance criterion carries an executable check command
+(`AcceptanceCriterion.check_command` in `sam_schema/core/models.py`), and the baseline and
+verification agents iterate over the list to compare before against after. Verification is therefore
+what a machine can run: a UI test and a microcontroller reading are criteria; an assessment such as
+"the design holds up" is not, and needs a criterion shape that carries evidence and a judgement
+instead of an exit code.
+
 ### Relation to the SAM stage numbering
 
 `skills/dh-meta-docs/references/sdlc-stage-taxonomy.md` defines a numbered pipeline whose stages are
@@ -92,26 +101,6 @@ workflow above, and forcing either onto the other loses distinctions both make.
 | Act | `execution` |
 | Loop | outside it; the pipeline has loop-back edges scoped to a task verdict in `forensic-review` and a feature verdict in `final-verification`, not routing by cause |
 | Closure | `final-verification`, partially |
-
-### What is specified here and not yet built
-
-Read as the architecture's statement of expectation, against which the current state is a gap.
-
-- **Routing by cause in Loop.** The implemented loop-backs are a per-task and a per-feature verdict.
-  An architectural finding has no route to Design, and an environmental one no route to Plan.
-- **Conditional closure checks.** `BookendType` admits the baseline and verification pair and
-  nothing else, so a review conditional on what changed, and a documentation check, exist as
-  requirements here and as no step in any graph. A grep of `skills/` and `agents/` for a
-  documentation-check bookend returns nothing.
-- **A distinct Design stage.** No architect skill or agent exists; `skills/planning` carries Design
-  and Plan together.
-- **Criteria that are not executable.** `AcceptanceCriterion.check_command`
-  (`sam_schema/core/models.py`) is required and has no default, and the baseline and verification
-  agents iterate over it, so every structured criterion must be a command a machine can run. Work
-  whose completion is an assessment rather than a check — with evidence recorded and judged — has no
-  criterion shape here. This is the harness's one structural limit on what work it can carry, and it
-  is a limit on verification, not on domain: a UI test and a microcontroller reading are commands,
-  while "the design holds up" is not.
 
 ## Automation Boundary
 
@@ -142,10 +131,9 @@ same operation safely as a script, hook, CLI command, or MCP tool. Automation
 must simplify the agent's work without hiding the logical workflow or the
 evidence needed to reason about it.
 
-## Target Logical Model
+## The logical model
 
-Under the target contract, agents work only with logical objects and
-relationships:
+Agents work only with logical objects and relationships:
 
 - backlog item;
 - research, reference, guide, or note;
@@ -159,7 +147,7 @@ relationships:
 An agent uses logical identifiers and relationships, not provider IDs, file
 paths, issue bodies, database rows, Gists, or API-specific objects.
 
-## Target Frontend Contract
+## The frontend contract
 
 CLI and MCP should expose stable logical CRUD and workflow operations for:
 
@@ -171,7 +159,7 @@ CLI and MCP should expose stable logical CRUD and workflow operations for:
 - assigning sequence and ownership; and
 - querying by logical ID, relationship, status, capability, and provenance.
 
-The target frontend contract treats CLI and MCP as interchangeable structured
+The frontend contract treats CLI and MCP as interchangeable structured
 transports for the logical operations they expose. They are not required to
 proxy every provider-native capability. Skills and agents may use an existing
 backend tool directly when it is the authoritative and capable interface (for
@@ -182,19 +170,19 @@ either one.
 The frontend contract must not depend on a selected provider's object model or
 addressing scheme.
 
-## Target Backend Guarantee
+## The backend guarantee
 
 Storage is an implementation detail. Logical objects may be stored together or
 across providers such as GitHub, GitLab, Linear, SQLite, Beads, local storage,
 or Gist-backed storage.
 
-The target backend contract is canonical and provider-neutral. It defines object
+The backend contract is canonical and provider-neutral. It defines object
 and relationship semantics, content and revisions, links, append behavior,
 statuses, query capabilities, ownership, and provenance. Adding a provider must
 change only provider implementation, registration, and configuration—not CLI or
 MCP commands or workflow behavior.
 
-## Current Boundary
+## Storage and routing
 
 The configured backend is the single routing decision for work items, grooming, plans, tasks,
 artifact manifests, and artifact content. MCP and CLI expose interchangeable logical operations;
@@ -208,6 +196,5 @@ cache misses, conflicts, and unsupported capabilities are explicit results; call
 to an independent task backend, artifact provider, local filesystem fallback, or per-plan provider.
 
 Provider IDs, issue bodies, paths, database rows, and wire formats remain implementation details.
-Consumers should use logical identifiers and the supported MCP/CLI operations. The architecture
-spec marks any remaining direct YAML or independent-provider code paths as migration debt; those
-paths are not supported workflow contracts.
+Consumers should use logical identifiers and the supported MCP/CLI operations. Direct YAML access and independent-provider code paths are not supported
+workflow contracts.
