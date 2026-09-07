@@ -1,8 +1,8 @@
 """Tests for backlog_core.backends.beads_backend.BeadsBackend.
 
 All tests mock BdRunner via constructor injection — no live ``bd`` binary is
-invoked.  See ADR-001 and ADR-002 in the project architecture documentation
-for the design rationale behind which methods are implemented vs. stubbed.
+invoked.  See ``backlog_core/backends/beads_backend.py``'s module docstring
+for which methods are implemented vs. stubbed, and why.
 
 Divergence Notes
 ----------------
@@ -12,7 +12,7 @@ DN-1: BeadsBackend no longer stubs BranchBackend methods (T-P6-BEADS).  It
 DN-2: ``sync_issues_graphql`` and other GitHubExtras methods are no longer
     stubbed on BeadsBackend (T-P6-BEADS).  Callers gate on
     ``isinstance(backend, GitHubExtras)`` before invoking them.
-DN-4: ``create_issue_for_item`` raises ``NotImplementedError`` (ADR-001) —
+DN-4: ``create_issue_for_item`` raises ``NotImplementedError`` —
     the WorkItemBackend signature returns ``int | None``, but beads IDs are
     string nanoids; use the beads-native ``create_beads_issue_for_item``.
 DN-3: ``create_task_issue`` is a GitHubExtras method and is no longer
@@ -271,7 +271,7 @@ def test_isinstance_satisfies_work_item_backend_protocol() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Constructor — filesystem-free (ADR-003)
+# Constructor — filesystem-free
 # ---------------------------------------------------------------------------
 
 
@@ -279,7 +279,7 @@ def test_isinstance_satisfies_work_item_backend_protocol() -> None:
 def test_init_without_runner_does_not_call_shutil_which(mocker: MockerFixture) -> None:
     """BeadsBackend() constructs a default BdRunner without touching the filesystem.
 
-    Why: ADR-003 mandates lazy bd resolution — tests and CI must be able to
+    Why: bd resolution must be lazy — tests and CI must be able to
          import and instantiate BeadsBackend without bd on PATH.
     """
     mock_which = mocker.patch("backlog_core.backends.bd_runner.shutil.which")
@@ -385,17 +385,18 @@ def test_try_get_github_returns_none_without_raising_and_satisfies_protocol() ->
 
 
 # ---------------------------------------------------------------------------
-# ADR-001/ADR-002 — WorkItemBackend stubs raise NotImplementedError
+# WorkItemBackend stubs raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 # BeadsBackend implements WorkItemBackend only.  Four WorkItemBackend methods
 # are genuinely unimplementable because their signatures assume a PyGithub
-# Repository or int issue numbers; they raise NotImplementedError with an
-# ADR-001/ADR-002 reference.  The 19 GitHubExtras stubs and 5 BranchBackend
-# stubs that previously existed here were removed in T-P6-BEADS — BeadsBackend
-# no longer claims to implement those protocols.
+# Repository or int issue numbers; they raise NotImplementedError with a
+# message naming the beads-native shadow method to use instead.  The 19
+# GitHubExtras stubs and 5 BranchBackend stubs that previously existed here
+# were removed in T-P6-BEADS — BeadsBackend no longer claims to implement
+# those protocols.
 
-_ADR_STUB_METHODS = pytest.mark.parametrize(
+_GITHUB_ONLY_STUB_METHODS = pytest.mark.parametrize(
     ("method_name", "kwargs"),
     [
         pytest.param("create_issue_for_item", {"repo": MagicMock(), "item": _make_item()}, id="create_issue_for_item"),
@@ -407,9 +408,9 @@ _ADR_STUB_METHODS = pytest.mark.parametrize(
 
 
 @pytest.mark.unit
-@_ADR_STUB_METHODS
-def test_adr_stub_method_raises_not_implemented(method_name: str, kwargs: dict) -> None:
-    """WorkItemBackend stubs raise NotImplementedError with an ADR reference.
+@_GITHUB_ONLY_STUB_METHODS
+def test_github_only_stub_method_raises_not_implemented(method_name: str, kwargs: dict) -> None:
+    """WorkItemBackend stubs raise NotImplementedError naming the incompatibility.
 
     Why: Protocol callers must get a clear NotImplementedError — swallowing
          the exception or returning a default silently breaks callers.  These
@@ -421,18 +422,18 @@ def test_adr_stub_method_raises_not_implemented(method_name: str, kwargs: dict) 
     backend = BeadsBackend(runner=runner)
     method = getattr(backend, method_name)
 
-    with pytest.raises(NotImplementedError, match=r"ADR-00[12]"):
+    with pytest.raises(NotImplementedError, match="does not implement GitHub-specific operations"):
         method(**kwargs)
 
 
 # ---------------------------------------------------------------------------
-# ADR-002 — fetch_open_issues_by_title raises NotImplementedError
+# fetch_open_issues_by_title raises NotImplementedError
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-def test_fetch_open_issues_by_title_raises_adr002() -> None:
-    """fetch_open_issues_by_title raises NotImplementedError with ADR-002 message.
+def test_fetch_open_issues_by_title_raises_not_implemented() -> None:
+    """fetch_open_issues_by_title raises NotImplementedError naming the shadow method.
 
     Why: Protocol callers must discover the beads-native shadow method
          fetch_open_issues_by_title_str() — the exception message directs them
@@ -442,7 +443,7 @@ def test_fetch_open_issues_by_title_raises_adr002() -> None:
     runner = _make_runner()
     backend = BeadsBackend(runner=runner)
 
-    with pytest.raises(NotImplementedError, match="ADR-002"):
+    with pytest.raises(NotImplementedError, match="beads issue IDs are strings"):
         backend.fetch_open_issues_by_title(repo=MagicMock())  # type: ignore[arg-type]
 
 
@@ -522,8 +523,8 @@ def test_batch_fetch_statuses_raises_not_implemented() -> None:
 
     Why: Protocol contract uses dict[int, IssueStatus] keyed by GitHub issue
          number.  Beads issue IDs are strings with no meaningful integer
-         representation, so the operation cannot be implemented.  Per ADR-002,
-         unsupported operations raise NotImplementedError explicitly rather than
+         representation, so the operation cannot be implemented.  Unsupported
+         operations raise NotImplementedError explicitly rather than
          silently returning an empty value.
     """
     runner = _make_runner()

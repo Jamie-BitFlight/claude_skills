@@ -453,7 +453,7 @@ class TestADR002TypeWidening:
         mock_runner.run_json.assert_called_once()
 
     def test_get_manifest_with_int_raises_not_implemented(self, provider: BeadsArtifactProvider) -> None:
-        """get_manifest(int) raises NotImplementedError per ADR-002."""
+        """get_manifest(int) raises NotImplementedError."""
         with pytest.raises(NotImplementedError, match="beads ID"):
             provider.get_manifest(42)
 
@@ -468,7 +468,7 @@ class TestADR002TypeWidening:
         mock_runner.run_text.assert_called_once()
 
     def test_set_manifest_with_int_raises_not_implemented(self, provider: BeadsArtifactProvider) -> None:
-        """set_manifest(int, manifest) raises NotImplementedError per ADR-002."""
+        """set_manifest(int, manifest) raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             provider.set_manifest(42, ArtifactManifest(issue_number=0))
 

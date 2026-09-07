@@ -5,8 +5,7 @@ All functions that previously used typer.echo() accept an optional Output parame
 
 GraphQL migration: All public functions use GraphQL internally via _graphql_request()
 except operations where GitHub GraphQL mutations do not exist (milestone creation,
-label creation — see ADR-004). PyGithub's repo.requester.graphql_query() is the
-transport (established in Phase 1, #773).
+label creation). PyGithub's repo.requester.graphql_query() is the transport.
 """
 
 from __future__ import annotations
@@ -88,7 +87,7 @@ _HTTP_NOT_FOUND = 404
 # ---------------------------------------------------------------------------
 #
 # Used by ensure_dh_labels() to auto-create missing labels on first use.
-# Label creation uses REST (ADR-004 — no GraphQL createLabel mutation).
+# Label creation uses REST — no GraphQL createLabel mutation.
 # Colours are hex without '#' prefix (PyGithub convention).
 
 DH_LABELS: dict[str, str] = {
@@ -112,7 +111,7 @@ def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
 
     Iterates ``DH_LABELS`` and creates each label that does not yet exist.
     Idempotent — existing labels are left unchanged.  Label creation uses
-    REST per ADR-004 (no GraphQL createLabel mutation).
+    REST — there is no GraphQL createLabel mutation.
 
     Args:
         repo: PyGithub Repository object.
@@ -130,7 +129,8 @@ def ensure_dh_labels(repo: Repository, output: Output | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# TypedDict response models — private to gh_client.py (ADR-002)
+# TypedDict response models — shape raw GraphQL responses for internal parsing only;
+# nothing outside this module imports them.
 # ---------------------------------------------------------------------------
 
 
@@ -756,7 +756,7 @@ def _update_issue_graphql(
         state: Target state — ``"OPEN"`` or ``"CLOSED"``.
         body: New body text (full replacement).
         title: New title.
-        label_ids: Full replacement label ID list (ADR-003 — not additive).
+        label_ids: Full replacement label ID list — not additive.
         milestone_id: GraphQL node ID of target milestone, or ``None`` to clear.
 
     Raises:
@@ -1262,7 +1262,7 @@ def create_issue_for_item(
     every time, so the mutation queue for every GitHub-backend item never
     drains and every reconcile re-applies the same "still pending" content,
     producing new duplicate provider-comment "patches" on each subsequent
-    reconcile (#2963). Mutating here — the single place the prefixed title is
+    reconcile. Mutating here — the single place the prefixed title is
     computed — keeps the local record and the live issue title identical from
     the moment of creation, for every caller, with no signature change.
 
@@ -1295,7 +1295,7 @@ def create_issue_for_item(
 def close_github_issue(
     issue_ref: str, reason: str, *, reference: str = "", comment: str = "", repo: str = "", output: Output | None = None
 ) -> None:
-    """Close GitHub issue as dismissed (not completed). ADR-9."""
+    """Close GitHub issue as dismissed (not completed)."""
     out = output or Output()
     try:
         repository = get_github(repo)
@@ -1327,7 +1327,7 @@ def resolve_github_issue(
     repo: str = "",
     output: Output | None = None,
 ) -> None:
-    """Close GitHub issue as completed with structured evidence trail. ADR-9."""
+    """Close GitHub issue as completed with structured evidence trail."""
     out = output or Output()
     try:
         repository = get_github(repo)
@@ -1480,8 +1480,9 @@ def _apply_status_label(
 ) -> None:
     """Fetch an issue's labels and add ``label``, optionally removing others.
 
-    Shared by all four ``apply_status_*`` public functions — see ADR-003 for
-    the fetch-then-update pattern and ADR-004 for why label creation stays REST.
+    Shared by all four ``apply_status_*`` public functions: fetches current
+    labels, then updates via GraphQL with the full desired list. Label
+    creation stays on REST since there is no GraphQL createLabel mutation.
 
     Args:
         repository: PyGithub Repository to operate on.
@@ -1492,7 +1493,7 @@ def _apply_status_label(
         colour: Hex colour for label auto-creation. Required when ``create_if_missing``.
         description: Description for label auto-creation. Required when ``create_if_missing``.
         removes: Label names to drop from the desired set (e.g. the prior lifecycle state).
-        create_if_missing: Whether to auto-create ``label`` via REST when absent (ADR-004).
+        create_if_missing: Whether to auto-create ``label`` via REST when absent.
         already_message: Info message when ``label`` is already present.
         applied_message: Info message after the label update succeeds.
         output: Output collector for status/warning messages.
@@ -1527,7 +1528,7 @@ def _apply_status_label(
 def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output | None = None) -> None:
     """Set GitHub issue label to status:in-progress.
 
-    Uses fetch-then-update pattern (ADR-003): fetches current labels, computes
+    Uses fetch-then-update pattern: fetches current labels, computes
     desired set (add in-progress, remove needs-grooming), updates via GraphQL
     with the full label list.
     """
@@ -1559,8 +1560,8 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
 
     Adds the ``status:verified`` label and removes ``status:in-progress`` if
     present. Auto-creates the ``status:verified`` label when it does not exist
-    (label creation stays REST per ADR-004 — no GraphQL createLabel mutation).
-    Uses fetch-then-update pattern (ADR-003) for label replacement via GraphQL.
+    (label creation stays REST — there is no GraphQL createLabel mutation).
+    Uses fetch-then-update pattern for label replacement via GraphQL.
     Skips gracefully when the item has no issue number.
 
     Args:
@@ -1601,8 +1602,8 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
 
     Adds the ``status:groomed`` label and removes ``status:needs-grooming``
     if present (idempotent). Auto-creates the ``status:groomed`` label
-    when it does not exist (label creation stays REST per ADR-004 — no
-    GraphQL createLabel mutation). Uses fetch-then-update pattern (ADR-003)
+    when it does not exist (label creation stays REST — there is no
+    GraphQL createLabel mutation). Uses fetch-then-update pattern
     for label replacement via GraphQL. Skips gracefully when the item has
     no issue number.
 
@@ -1645,9 +1646,9 @@ def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | Non
     Adds the ``status:blocked`` label without removing other ``status:*``
     labels (blocked is an overlay state, not a lifecycle replacement — e.g.
     an item can be both in-progress and blocked). Auto-creates the label
-    when it does not exist (REST per ADR-004). Uses fetch-then-update
-    pattern (ADR-003) for label replacement via GraphQL. Skips gracefully
-    when the item has no issue number.
+    when it does not exist (REST — there is no GraphQL createLabel mutation).
+    Uses fetch-then-update pattern for label replacement via GraphQL. Skips
+    gracefully when the item has no issue number.
 
     Args:
         item: BacklogItem to mark blocked. No-op when ``item.issue`` is empty.
@@ -1771,9 +1772,8 @@ def view_enrich_from_github(
 def issue_to_local_fields(issue: IssueNode) -> IssueLocalFields:
     """Extract backlog-relevant fields from a GraphQL IssueNode dict.
 
-    Signature change from Phase 1 (ADR-005): accepts IssueNode TypedDict
-    instead of PyGithub Issue object. All callers are in operations.py
-    and are updated in T03.
+    Accepts an ``IssueNode`` TypedDict instead of a PyGithub ``Issue`` object.
+    All callers are in operations.py.
 
     Args:
         issue: IssueNode TypedDict from _fetch_issue_graphql or _fetch_issues_graphql.

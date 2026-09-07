@@ -5,12 +5,12 @@ This module provides :class:`ArtifactRegistryClient`, which wraps the
 a typed, SAM-oriented interface for storing and retrieving plan YAML content
 via GitHub Gist.
 
-Write contract (ADR-2509-5):
+Write contract:
     ``store()`` raises :exc:`~sam_schema.core.exceptions.ArtifactWriteError`
     on any failure.  There is **no** silent fallback to local storage on the
     write path — a write that cannot reach Gist must not silently succeed.
 
-Read contract (ADR-2509-5):
+Read contract:
     ``read()`` fetches only from the configured remote provider.  GitHub's
     provider-owned ``FileCache`` is the only offline/stale read path.
 """

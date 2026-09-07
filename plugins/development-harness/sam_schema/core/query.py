@@ -237,8 +237,7 @@ def get_task_assignment(plan_path: Path, task_id: str) -> TaskAssignment:
 
     Composes a ``TaskAssignment`` by loading the plan and embedding the
     plan-level fields (goal, context, acceptance criteria) alongside the
-    requested task.  This gives agents everything they need in one call
-    per ADR-003.
+    requested task.  This gives agents everything they need in one call.
 
     Args:
         plan_path: Path to the plan file or directory.

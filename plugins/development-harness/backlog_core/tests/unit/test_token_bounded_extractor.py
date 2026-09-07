@@ -20,8 +20,8 @@ Behavioral contract pinned by this file:
 6. **Encoding consistency**: Uses the same ``ENCODING`` singleton as
    ``progressive_markdown.list_navigator`` — token math is deterministic and verifiable.
 
-See architect spec §4.5 (extract signature + semantics) and ADR-5 (skip_tokens
-continuation).
+See architect spec §4.5 (extract signature + semantics) for the skip_tokens
+continuation contract.
 """
 
 from __future__ import annotations
@@ -533,8 +533,8 @@ class TestExtractOnParentNode:
     def test_extract_on_parent_bounds_child_map_text_not_content(self) -> None:
         """AC#3: EXTRACT on has_sub_heading_children=True node returns bounded child_map.
 
-        Expected RED until T10.  Current handler uses unit.content (``""`` for parents
-        per ADR-7), so result.content is ``""`` instead of the expected child_map text.
+        Expected RED until T10.  Current handler uses unit.content (``""`` for parents),
+        so result.content is ``""`` instead of the expected child_map text.
         """
         child_map_tokens = _token_count(_CHILD_MAP_TEXT)
         # head larger than child_map — no truncation on the child_map side
@@ -542,7 +542,7 @@ class TestExtractOnParentNode:
 
         mock_unit = MagicMock()
         mock_unit.title = "Parent Node"
-        mock_unit.content = ""  # ADR-7: parent content is empty string when sub-headings exist
+        mock_unit.content = ""  # parent content is empty string when sub-headings exist
         mock_unit.has_sub_heading_children = True
         mock_unit.is_code_block = False
         mock_unit.child_map = _CHILD_MAP_TEXT
@@ -577,7 +577,7 @@ class TestExtractOnParentNode:
 
         mock_unit = MagicMock()
         mock_unit.title = "Large Parent Node"
-        mock_unit.content = ""  # ADR-7: parent content is empty string
+        mock_unit.content = ""  # parent content is empty string
         mock_unit.has_sub_heading_children = True
         mock_unit.is_code_block = False
         mock_unit.child_map = long_child_map

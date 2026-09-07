@@ -514,8 +514,8 @@ class GitHubTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan as a GitHub sub-issue.
 
-        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
-        single-writer contract (callers must serialise writes to the same plan).
+        Duplicate-ID check via ``validate_appended_task``. Single-writer
+        contract: callers must serialise writes to the same plan.
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).
@@ -561,8 +561,8 @@ class GitHubTaskProvider:
         """Transition a plan from drafting state to ready state.
 
         Clears the ``<!-- sam:state=drafting -->`` marker from the issue body.
-        See ADR-1770-1 for the single-writer contract (callers must serialise
-        writes to the same plan).
+        Single-writer contract: callers must serialise
+        writes to the same plan.
 
         Args:
             plan_id: Plan identifier (GitHub issue number string).

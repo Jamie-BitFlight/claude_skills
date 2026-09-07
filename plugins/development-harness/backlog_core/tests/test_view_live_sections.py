@@ -127,10 +127,10 @@ class TestViewItemSectionsCoherence:
             "sections_index must be non-empty when enrichment is unavailable; use the provider record."
         )
 
-        # Assert — ADR-002 staleness warning present
+        # Assert — staleness warning present
         assert any("backend unreachable" in w for w in result.warnings), (
             "result.warnings must contain 'backend unreachable' when view_enrich_from_github "
-            "returns False.  This satisfies ADR-002: callers must be able to detect that "
+            "returns False.  Callers must be able to detect that "
             "sections_index reflects the stored provider record, not live GitHub state."
         )
 

@@ -11,7 +11,7 @@ TDD state (T23 — test author, separate from T24 implementor):
 Architecture reference:
   Architect spec §4.6 — backlog_view tool parameter changes
   Architect spec §9.2 — async boundary (pipeline inside asyncio.to_thread)
-  ADR-5 — un-gated operations.view_item() call path
+  Un-gated operations.view_item() call path
   DN-2 — RT-ICA is ~560 tokens; head=100 used for truncation (not 4000)
 
 Test cases:
@@ -46,7 +46,7 @@ Expected response key contracts (for T24 implementor):
   NAVIGATE (no head, leaf): ordinal, title, content, total_tokens, truncated (False),
     child_map=None, has_children=False
   NAVIGATE (no head, parent w/ sub-headings): ordinal, title, content='', total_tokens,
-    truncated=False, child_map=<str>, has_children=True  (ADR-7)
+    truncated=False, child_map=<str>, has_children=True
   NAVIGATE miss: error, requested_ordinal, valid_ordinals
   PASSTHROUGH (summary=True, observed 2026-06-01):
     _full_chars, _hint, _summary, issue_number, labels, plan_address,
@@ -810,7 +810,7 @@ class TestSubHeadingScopeIsolation:
 
     Three sub-cases:
       A) navigate to parent entry (N.M) with sub-headings → has_children=True,
-         content="" (ADR-7: prose accessed via children, not parent blob).
+         content="" (prose accessed via children, not parent blob).
       B) navigate to parent entry (N.M) → content="" (not full entry blob).
       C) navigate to first child (N.M.0) → ONLY that sub-heading's body,
          not the sibling (N.M.1) content.
@@ -859,7 +859,7 @@ class TestSubHeadingScopeIsolation:
         normalized_recursive_nav: list[NormalizedSection],
         mocker: MockerFixture,
     ) -> None:
-        """navigate to parent entry returns content='' when has sub-headings (ADR-7).
+        """navigate to parent entry returns content='' when has sub-headings.
 
         Verifies AC#3: prose is accessed by navigating to individual sub-headings,
         not by reading the parent blob directly.
@@ -875,12 +875,12 @@ class TestSubHeadingScopeIsolation:
         content = data.get("content", "MISSING")
         has_children = data.get("has_children", False)
         assert has_children is True, (
-            f"Parent node with sub-headings must have has_children=True (ADR-7). "
+            f"Parent node with sub-headings must have has_children=True. "
             f"Got has_children={has_children!r}. "
             "RED: currently returns has_children=False."
         )
         assert content == "", (
-            f"Parent node with sub-headings must have content='' (ADR-7). "
+            f"Parent node with sub-headings must have content=''. "
             f"Got content={content!r} "
             f"(len={len(content) if isinstance(content, str) else '?'}). "
             "RED: currently returns full entry blob."
