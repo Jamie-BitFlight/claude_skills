@@ -1660,7 +1660,7 @@ def add_item(
     out.info(f"Backlog item created.\n  Title: {title}\n  Priority: {priority}\n  Reference: {item_reference}")
     if issue_ref:
         out.info(f"  Issue: {issue_ref}")
-    out.info(f"Next steps: /groom-backlog-item {title}  /work-backlog-item {title}")
+    out.info(f"Next steps: /work-backlog-item groom {title}  /work-backlog-item work {title}")
 
     result: dict[str, str | int | bool | list[str]] = {
         "title": title,
