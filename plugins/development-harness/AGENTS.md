@@ -82,8 +82,14 @@ CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_
 
 `append_task` is single-writer for a given plan. Serialize appends through the configured backend;
 concurrent writes are outside the contract. Do NOT call `append_task` for
-the same plan from multiple agents or sessions simultaneously. See
-[backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md) for the rationale.
+the same plan from multiple agents or sessions simultaneously. The content-store `TaskBackend`
+(`ContentTaskProvider`) mutates its in-memory plan copy before writing it through
+`ContentProvider.put_content` with the last-observed revision as `expected_revision`
+([sam_schema/core/backends/content.py](./sam_schema/core/backends/content.py)); a losing
+concurrent write is not merged — it fails the compare-and-swap, raises `ContentConflictError`, and
+is discarded after a refresh from the now-current remote record, so its own append does not apply
+and the caller must retry rather than assume the append succeeded. See
+[dh_core/operations.py](./dh_core/operations.py)'s `append_task` for the operation-level contract.
 
 Plans, tasks, and artifacts are logical backend records. Their physical representation is private to
 the configured backend; access them through `sam_*` and `artifact_*` operations.
