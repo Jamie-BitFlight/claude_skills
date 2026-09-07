@@ -76,21 +76,21 @@ The two stores had encoded this differently. The content store's `DependencyGrap
 `dep.accepted = 1 OR dep.status IN (…)`, so a completed dependency could not unblock its dependents
 until a review step ran. At `8d7af47d` the ledger imports the same set and the disjunct is gone.
 
-### The supervisor loop
+### The orchestrator loop
 
-The supervisor is the loop. It is not a node in the graph and not a stage the graph reaches; it is
+The orchestrator is the loop. It is not a node in the graph and not a stage the graph reaches; it is
 the process that runs for as long as any work is outstanding.
 
 An `Agent()` or `Bash()` call returning is the event. There is no subscription, no queue and no
 callback — the return of a launched call is the whole of the notification mechanism.
 
 Parallel workers notify individually, as each one completes. Many nodes are active at once, and the
-loop turns on each individual return rather than on the last member of a batch; a supervisor that
+loop turns on each individual return rather than on the last member of a batch; an orchestrator that
 waited for a batch to finish before acting on its first result would serialise work the graph
 declared parallel.
 
-On each event the supervisor consults the CLI for graph state and for the next claimable task. The
-CLI holds the scheduling answer; the supervisor holds no scheduling state of its own.
+On each event the orchestrator consults the CLI for graph state and for the next claimable task.
+The CLI holds the scheduling answer; the orchestrator holds no scheduling state of its own.
 
 ## Alternatives considered and rejected
 
