@@ -306,16 +306,18 @@ A claim whose warrant you cannot state is one to re-establish, not repeat. A reg
 
 ---
 
-## Read the Decisions Before Changing the Design
+## Read the Architecture Before Changing the Design
 
-An accepted ADR or a `*-contract` skill outranks the code and the tests. Tests record what the previous change implemented; they cannot tell you the design was wrong, because they were written after it was decided. A green suite means nothing regressed, never that the change is correct.
+The nearest `ARCHITECTURE.md` or a `*-contract` skill outranks the code and the tests. It says what the system is expected to do; the code is that expectation implemented. Tests record what the previous change implemented; they cannot tell you the design was wrong, because they were written after it was decided. A green suite means nothing regressed, never that the change is correct. Write system and end-to-end tests against the architecture, not against the code, or they ratify whatever the implementation happens to do and drift from the intent together with it.
 
 **Trigger**: Changing behaviour in a subsystem — a key, a protocol, a state transition, a parsed format.
-**Action**: Read `plugins/*/docs/adrs/`, `.claude/decisions/`, and any `*-contract` skill governing it, before writing code. Search for a superseding ADR: a decision may already have been reversed. When a test fails after your change, ask whether the contract objects before editing the test — a failing test is a question, not a verdict.
+**Action**: Read the touched module's own `ARCHITECTURE.md` before anything higher, plus `.claude/decisions/` and any `*-contract` skill governing it, before writing code. When a test fails after your change, ask whether the architecture objects before editing the test — a failing test is a question, not a verdict.
 
-- **Do**: cite the ADR that settles a design question, and say when your change reverses one
+- **Do**: cite the architecture document that settles a design question, and update it in place when your change alters what it states
 - **Don't**: re-derive a decision the repo already made, or edit a test until it accepts your change
 - **Why**: two designs were re-derived from scratch this way, and one shipped a contract violation that the full suite passed
+
+Do not read an ADR for this, and do not link one. An ADR records a deliberation, not the current design; reaching current truth by replaying a chain of decisions is the failure [Architecture Documentation](../rules/adr-lifecycle.md) exists to prevent.
 
 ---
 

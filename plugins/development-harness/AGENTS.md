@@ -82,7 +82,7 @@ CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_
 `append_task` is single-writer for a given plan. Serialize appends through the configured backend;
 concurrent writes are outside the contract. Do NOT call `append_task` for
 the same plan from multiple agents or sessions simultaneously. See
-[ADR-1770-1](./docs/adrs/ADR-1770-1-single-writer-task-backend.md) for the rationale.
+[backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md) for the rationale.
 
 Plans, tasks, and artifacts are logical backend records. Their physical representation is private to
 the configured backend; access them through `sam_*` and `artifact_*` operations.
@@ -326,8 +326,8 @@ Load these documents based on what you are doing. They contain the system design
 
 **Designing new architecture for a feature (any module, before writing an architect spec):**
 
-- Nearest-first: check the touched module's own subtree for an `ARCHITECTURE.md`, `CONTEXT.md`, or `adrs/ADR-*.md` before designing from scratch — extend what exists rather than re-deriving it.
-- Files under `docs/adrs/` follow `ADR-{issue}-{n}-{slug}.md`. Other ADR identifier schemes are referenced elsewhere in the plugin and not yet reconciled to this one — see #3050 before assuming this naming is universal across the whole codebase.
+- Nearest-first: check the touched module's own subtree for an `ARCHITECTURE.md` or `CONTEXT.md` before designing from scratch — extend what exists rather than re-deriving it.
+- ADRs are deliberation, not the design. Read the nearest `ARCHITECTURE.md` for what the system is expected to do, and see [rules/adr-lifecycle.md](../../rules/adr-lifecycle.md) for why nothing links to an ADR. Existing ADR filenames embed an issue number, which is the same staleness this rule removes elsewhere; that convention has not yet been reworked.
 
 **Modifying the pipeline process, stage sequencing, or touchpoint gates:**
 
@@ -349,7 +349,7 @@ Load these documents based on what you are doing. They contain the system design
 - Load [Agent Markdown Consumption — Behaviour Specification](./docs/agent-markdown-consumption-contract.md) — normative requirements R1-R8 for how markdown reaches an agent, across every transport
 - Load [MCP Progressive-Disclosure Contract](./docs/mcp-progressive-disclosure-contract.md) — mechanical reference for ordinal addressing, navigation parameters, and response shapes
 - Load [CONTEXT.md](./CONTEXT.md) — domain vocabulary for this area (Collection, Generation, Navigation, Control set, and related terms); read before writing new prose about markdown consumption so terminology matches
-- Read [docs/adrs/](./docs/adrs/) — reasoning and rejected alternatives behind the contract's decisions, not restated in the contract itself
+- The reasoning and rejected alternatives behind the contract's decisions belong in the contract or the nearest `ARCHITECTURE.md`. Where they are only recorded in a deliberation document, that is a gap to close, not a place to send a reader
 
 **Modifying `backlog_core/` internals — any backend implementation, GitHub content/CAS storage, offline queueing, or collaborator boundaries within `GitHubBackend`:**
 
