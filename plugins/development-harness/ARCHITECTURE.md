@@ -12,13 +12,12 @@ reads and what it produces. The outcomes these exist to deliver are in
 
 **Create.** Steps through creating a requirement, feature or defect without speculating how it
 should work in the system before understanding the system as a whole. Produces the backlog item in
-the backend store. Implemented by `skills/create-backlog-item`, routing through
-`work-backlog-item`'s `create` route.
+the backend store. Implemented by `work-backlog-item`'s `create` route.
 
 **Groom.** Gathers detail, questions the user, researches the state of the art, understands the
 existing system and the impact of changing it, checks and corrects every claim, and assesses whether
 the problem is being considered from the right altitudes. Produces the groomed item plus report
-artifacts. Implemented by `skills/groom-backlog-item` and `agents/backlog-item-groomer.md`.
+artifacts. Implemented by `work-backlog-item`'s `groom` route and `agents/backlog-item-groomer.md`.
 
 **Design.** Reads the grooming reports, the item, the existing architecture documents, and the
 project's rules and documented conventions. Designs or modifies architecture compliant with those,
@@ -96,7 +95,7 @@ workflow above, and forcing either onto the other loses distinctions both make.
 
 | stage above | numbered pipeline |
 |---|---|
-| Create, Groom | outside it; `create-backlog-item` and `groom-backlog-item` run before it, and `discovery` re-surveys more narrowly inside it |
+| Create, Groom | outside it; `work-backlog-item`'s `create` and `groom` routes run before it, and `discovery` re-surveys more narrowly inside it |
 | Design, Plan | both inside `planning`, which produces one `architect` artifact for the two |
 | Decomposition | `task-decomposition` |
 | Orchestration | outside it; `dispatch` and `work-milestone` have no numbered slot |
