@@ -98,22 +98,24 @@ assessment of this system that cannot say which outcome a defect belongs to has 
 
 ## Domain reach
 
-No domain. The loop is user agreement, then research and discovery, design, planning,
-implementation and verification, and nothing in those stages is specific to software. The work that
-happens inside is dynamic, organised by planning against whatever the item turned out to need.
+Domain-generic, by construction. The harness orchestrates work; it does not perform it. It carries
+scope, relationships, coordination and evidence, and what happens inside a unit of work belongs to
+the agent doing it. So the domain arrives at runtime, with whatever is asked of it — the same way a
+CI system is language-agnostic because it runs commands rather than compiling.
 
-A piece of work may be a change to a repository, and it may equally be the validation of an external
+There is no implementation of software work here either. Asking where the harness implements font
+work, a job search or a ranking exercise asks the wrong layer: it implements the loop, and the loop
+is the same one whatever the work is.
+
+A unit of work may be a change to a repository, and it may equally be the validation of an external
 system — a UI test against a web page, a radio reading from a microcontroller — or work that
 produces no repository artifact at all.
 
-Two things are software-shaped today and neither makes the model domain-specific. The specialist
-composition is optional: the worker that executes a piece of work loads whatever specialist profile
-that work names, and a language manifest only decides which name that is. And the artifact-type
-vocabulary is named for code —
-`codebase-analysis`, `code-review` — which is naming debt in an extensible table rather than a
-constraint on what work can be carried.
+The default artifact-type vocabulary is named for code (`codebase-analysis`, `code-review`). That is
+vocabulary in an extensible table, and it names the types a software project happens to register
+first.
 
-The one real constraint is stated in [ARCHITECTURE.md](../ARCHITECTURE.md): a structured acceptance
-criterion carries an executable check command. That bounds verification to what a machine can run,
-not the work to what a codebase contains — and the domains it excludes are the ones whose completion
-is a judgement rather than a check, not the ones that are not software.
+One constraint is real and it belongs to automation rather than to any domain: a structured
+acceptance criterion carries an executable check command, so completion is decided by something a
+machine can run. A CI job passes on an exit code whether it compiled a binary or sent an email;
+what this excludes is work whose completion is a judgement rather than a check.
