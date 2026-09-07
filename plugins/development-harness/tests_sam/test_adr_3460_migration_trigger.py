@@ -293,8 +293,8 @@ def test_scenario_a_is_still_locked() -> None:
         "Every exit criterion in ADR-3460-1 is now met. The graph IR has earned the scenario-A "
         "migration: the IR becomes the domain model and Task/Plan become a serialization view. "
         "Read the ADR, start the migration, and delete this test — or amend the ADR if the "
-        "evidence is not what it appears. Blast radius recorded in the ADR: 71 importing files, "
-        "7 TaskBackend implementations, 3 MCP tools, 44 skill and agent files."
+        "evidence is not what it appears. The ADR's Context records the blast radius as measured "
+        "on 2026-09-06; read it there rather than from this message."
     )
 
 

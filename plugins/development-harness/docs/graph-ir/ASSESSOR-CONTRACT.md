@@ -23,7 +23,7 @@ system is the flattening this contract exists to prevent.
 per task, tracking where each task's progress is. `dh_core/ledger_spec.py:TRANSITIONS` is this
 layer.
 
-**Layer 2 — the work graph.** Nodes are tasks; edges are the eight types below. This layer says
+**Layer 2 — the work graph.** Nodes are tasks; edges are the types below. This layer says
 what may run concurrently and what waits on what. Every layer-2 graph carries bookends: a review
 step, a validate step, and a documentation-check step. They are structural, not optional
 decoration, and a graph without them is malformed rather than merely lacking.
