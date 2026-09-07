@@ -107,8 +107,9 @@ system — a UI test against a web page, a radio reading from a microcontroller 
 produces no repository artifact at all.
 
 Two things are software-shaped today and neither makes the model domain-specific. The specialist
-composition is optional: a language manifest resolves roles when one matches, and without one the
-generic worker runs the stage directly. And the artifact-type vocabulary is named for code —
+composition is optional: the worker that executes a piece of work loads whatever specialist profile
+that work names, and a language manifest only decides which name that is. And the artifact-type
+vocabulary is named for code —
 `codebase-analysis`, `code-review` — which is naming debt in an extensible table rather than a
 constraint on what work can be carried.
 
