@@ -11,6 +11,59 @@ environment-dependent activation, and one node refined into a subgraph.
 One structured IR is authoritative. Mermaid, tables and prose are generated from it, never
 maintained beside it.
 
+## The three layers
+
+The system is three graphs. Each is describable on its own; the system is only drawn when all
+three exist together. A representation that carries one of them and calls itself the model of the
+system is the flattening this contract exists to prevent.
+
+**Layer 1 — task lifecycle.** Nodes are statuses (`not-started`, `in-progress`, `complete`,
+`blocked`, `deferred`, `skipped`, `failed`); edges are the commands that move between them
+(`dispatch`, `finish`, `accept`, `reclaim`, `state`, `settle`). One uniform machine, instantiated
+per task, tracking where each task's progress is. `dh_core/ledger_spec.py:TRANSITIONS` is this
+layer.
+
+**Layer 2 — the work graph.** Nodes are tasks; edges are the eight types below. This layer says
+what may run concurrently and what waits on what. Every layer-2 graph carries bookends: a review
+step, a validate step, and a documentation-check step. They are structural, not optional
+decoration, and a graph without them is malformed rather than merely lacking.
+
+**Layer 3 — the workflow.** Nodes are process steps with an actor, a guard and source refs into a
+`SKILL.md`; the node record below is shaped for these. Layer 3 takes the grooming and architecture
+output — research, fact checks, dependencies, documentation, concerns — and decomposes it into a
+layer-2 graph. It then maintains that graph while work runs.
+
+### How they relate
+
+Layer 1 is a projection of layer 3 onto a single task. "The judge may accept a complete task under
+this authority" is a layer-3 fact; project the actor away and what remains is the transition
+`accept: complete → accepted`. Discarding the actor is exactly how authority is lost, which is why
+a command could write a judge's verdict with nothing to check it against.
+
+Layer 2 is the artifact layer 3 produces and mutates. It is not static: layer 3 extends it while
+work is in flight.
+
+### What the layers must support
+
+Decomposition, from the grooming and architecture inputs into a layer-2 graph with its concurrency
+and ordering stated.
+
+Extension at runtime. A task that would exceed one agent's context window is split before it runs,
+and the split is a layer-3 operation on layer 2. A finding discovered mid-work that the
+decomposition did not account for is inserted into the active graph, in the right place, with its
+own edges — not appended to a task's notes and not deferred to a later plan.
+
+Bookend guarantee. Review, validate and documentation-check exist on every layer-2 graph, and a
+check can ask whether they do.
+
+Nothing here is preserved because the incumbent implementation has it. Where the current system
+answers one of these badly, the answer is to state what the layer requires and let the
+implementation follow, not to describe what exists.
+
+Meta-harness connection points — the hooks that glue the layers to a particular harness — are
+mechanically assessable only once the three layers are distinct. Do not design them before the
+layers are clear.
+
 ## Edge types
 
 A single pair of nodes may carry several edges at once. Collapsing them into one `then` arrow
