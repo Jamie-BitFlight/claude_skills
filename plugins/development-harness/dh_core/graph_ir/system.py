@@ -1,15 +1,15 @@
-"""The system: the three layers bound together, and the checks that only make sense across them.
+"""The system: the layers bound together, and the checks that only make sense across them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): "The system is three graphs. Each is
-describable on its own; the system is only drawn when all three exist together. A representation
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "The system is several graphs. Each is
+describable on its own; the system is only drawn when all of them exist together. A representation
 that carries one of them and calls itself the model of the system is the flattening this contract
-exists to prevent." :class:`ThreeLayerGraph` is that "all three exist together" object: it holds a
+exists to prevent." :class:`LayeredGraph` is that "all of them exist together" object: it holds a
 :class:`~dh_core.graph_ir.ledger_layer.LedgerGraph`, a :class:`~dh_core.graph_ir.work_layer.WorkGraph`,
 a :class:`~dh_core.graph_ir.model.Graph` (workflow, layer 3), and the
 :class:`~dh_core.graph_ir.decomposition.DecompositionInput` layer 3 consumed -- and nothing more. It
 adds no new node or edge type; it only makes cross-layer references resolvable.
 
-Three checks belong here rather than on a single layer, because each is a claim one layer's element
+Some checks belong here rather than on a single layer, because each is a claim one layer's element
 makes about a *different* layer's graph, and only an object holding both can tell whether it
 resolves: :meth:`unresolved_projections` (a ledger edge's ``projects_from`` against the workflow
 graph), :meth:`unresolved_task_refs` (a ledger edge's ``task_ref`` against the work graph), and
@@ -29,7 +29,7 @@ from dh_core.graph_ir.model import Graph, Observation
 from dh_core.graph_ir.work_layer import WorkGraph
 
 
-class ThreeLayerGraph(BaseModel):
+class LayeredGraph(BaseModel):
     """The ledger, work and workflow graphs together.
 
     Layer 1 (ledger), layer 2 (work) and layer 3 (workflow), plus the decomposition input layer 3

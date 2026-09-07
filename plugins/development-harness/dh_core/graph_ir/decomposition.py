@@ -1,8 +1,8 @@
 """The decomposition input: what layer 3 consumes to produce a layer-2 work graph.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): "Layer 3 ... takes the grooming and
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "Layer 3 ... takes the grooming and
 architecture output -- research, fact checks, dependencies, documentation, concerns -- and
-decomposes it into a layer-2 graph." Each of those five nouns becomes a :class:`DecompositionItem`
+decomposes it into a layer-2 graph." Each of those nouns becomes a :class:`DecompositionItem`
 of the matching :class:`DecompositionSourceKind`, so a :class:`~dh_core.graph_ir.work_layer.WorkNode`
 can name the item it traces back to and a check can ask the traceability question in both
 directions: :meth:`DecompositionInput.untraced_planned_nodes` (a work node tracing to nothing here)
@@ -29,7 +29,7 @@ from dh_core.graph_ir.work_layer import WorkGraph, WorkNodeProvenance
 
 
 class DecompositionSourceKind(StrEnum):
-    """The five kinds of grooming and architecture output layer 3 decomposes."""
+    """The kinds of grooming and architecture output layer 3 decomposes, as the contract names them."""
 
     RESEARCH = "research"
     FACT_CHECK = "fact-check"

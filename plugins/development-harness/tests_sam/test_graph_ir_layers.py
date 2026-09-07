@@ -1,4 +1,4 @@
-"""Falsification of the three-layer graph IR against ``ASSESSOR-CONTRACT.md``'s "The three layers".
+"""Falsification of the layered graph IR against ``ASSESSOR-CONTRACT.md``'s "The layers".
 
 Each test targets one obligation from that section: the projection relationship between layer 1
 and layer 3, the layer-2 bookend guarantee, extension provenance for a runtime-mutated layer-2
@@ -15,7 +15,7 @@ from dh_core.graph_ir.decomposition import DecompositionInput, DecompositionItem
 from dh_core.graph_ir.layer import Layer
 from dh_core.graph_ir.ledger_layer import LedgerCommand, LedgerEdge, LedgerGraph, LedgerStatus
 from dh_core.graph_ir.model import Authority, ExtractionStatus, Graph, Node, SourceSpan
-from dh_core.graph_ir.system import ThreeLayerGraph
+from dh_core.graph_ir.system import LayeredGraph
 from dh_core.graph_ir.vocabulary import EdgeType
 from dh_core.graph_ir.work_layer import (
     BookendKind,
@@ -89,7 +89,7 @@ def test_ledger_edge_projection_must_resolve_against_the_workflow_graph():
         source_refs=spans(SPEC),
         extraction_status=ExtractionStatus.OBSERVED,
     )
-    system = ThreeLayerGraph(
+    system = LayeredGraph(
         ledger=LedgerGraph.canonical_machine([accept], source_refs=spans(SPEC)),
         work=WorkGraph(),
         workflow=Graph(nodes=[workflow_node("judge-accepts")]),
@@ -111,7 +111,7 @@ def test_ledger_edge_projection_resolving_is_clean():
         source_refs=spans(SPEC),
         extraction_status=ExtractionStatus.OBSERVED,
     )
-    system = ThreeLayerGraph(
+    system = LayeredGraph(
         ledger=LedgerGraph.canonical_machine([accept], source_refs=spans(SPEC)),
         work=WorkGraph(),
         workflow=Graph(nodes=[workflow_node("judge-accepts")]),
@@ -131,7 +131,7 @@ def test_ledger_edge_task_ref_must_resolve_against_the_work_graph():
         source_refs=spans(SPEC),
         extraction_status=ExtractionStatus.OBSERVED,
     )
-    system = ThreeLayerGraph(
+    system = LayeredGraph(
         ledger=LedgerGraph.canonical_machine([accept], source_refs=spans(SPEC)),
         work=WorkGraph(nodes=[work_node("T1")]),
         workflow=Graph(),
@@ -158,7 +158,7 @@ def test_extension_performer_must_resolve_against_the_workflow_graph():
         source_refs=spans(CONTRACT),
         extraction_status=ExtractionStatus.OBSERVED,
     )
-    system = ThreeLayerGraph(
+    system = LayeredGraph(
         ledger=LedgerGraph.canonical_machine([], source_refs=spans(SPEC)),
         work=WorkGraph(nodes=[split_child], extensions=[operation]),
         workflow=Graph(),  # no "ghost-node" here

@@ -1,6 +1,6 @@
 """Layer 1 -- task lifecycle: nodes are statuses, edges are the commands that move between them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The three layers"): "One uniform machine, instantiated per
+``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): "One uniform machine, instantiated per
 task, tracking where each task's progress is. ``dh_core/ledger_spec.py:TRANSITIONS`` is this
 layer." This module gives that machine a graph shape distinct from :mod:`dh_core.graph_ir.model`
 (layer 3): a :class:`LedgerNode` is a bare status, not a process step, and it carries no actor.
@@ -92,7 +92,7 @@ class LedgerGraph(BaseModel):
     Construction enforces reference integrity only, matching
     :class:`~dh_core.graph_ir.model.Graph`: unique node and edge ids, and every edge endpoint
     resolving. Whether every edge has a layer-3 origin, and whether that origin exists, are
-    questions for the queries below and for :class:`dh_core.graph_ir.system.ThreeLayerGraph`
+    questions for the queries below and for :class:`dh_core.graph_ir.system.LayeredGraph`
     respectively -- an edge with no origin is a well-formed graph that has lost its authority, not
     an incoherent one, and the contract requires the IR to be able to hold that.
     """

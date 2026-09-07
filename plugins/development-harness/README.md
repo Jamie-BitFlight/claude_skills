@@ -452,7 +452,7 @@ workflow state does not pollute your working tree.
 
 ## SDLC Layer Architecture
 
-The harness is organized in three layers:
+The harness is organized in layers:
 
 | Layer | Owns | Examples |
 |---|---|---|
