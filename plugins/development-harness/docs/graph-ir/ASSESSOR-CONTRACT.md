@@ -133,6 +133,31 @@ authority.
 - an actor lacks authority for the effect
 - a branch guard is incomplete, or overlaps another guard
 - a node or output is unreachable
+- a prescribed method carries no evidence, and none is recorded as absent
+
+## Provenance: one rule, three sites
+
+An assertion carries how it was established, or it is marked as unestablished. That holds for a
+claim in prose, for an element of the graph, and for a method attached to a task. The mechanism is
+the same each time: `extraction_status` with `source_refs`, or the equivalent warrant beside the
+claim.
+
+This is not a rule against saying how. Withholding a method that grooming actually established
+wastes the investigation that produced it, and the next agent pays for it twice. Carry the evidence
+you have; mark the gaps you do not.
+
+What it forbids is prescription without evidence — a method supplied to fill a gap, from training
+or from plausibility, in the same voice as one that was tested. That is worse than silence, because
+it arrives with the authority of the task, and the one agent positioned to falsify it now treats it
+as given. An untested "how" written as an instruction converts the agent that could have
+disproved it into the agent that follows it.
+
+So a task's method is legitimate context when it is `OBSERVED` with a source, and is a finding when
+it is `ASSUMED` with none. Which severity depends on the usual rule below: absent evidence where
+evidence is required is `BROKEN`; where nothing declares it required, `CONTRACT_UNSPECIFIED`.
+
+The same test applies to the assessor's own output. A finding asserting what a system does, with no
+span naming where that was read, is the defect it purports to report.
 
 ## Severity rule
 
