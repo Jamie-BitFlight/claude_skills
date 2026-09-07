@@ -36,8 +36,11 @@ reads the utility, configuration or test rows.
 
 **Predicate falsified:** a required intent claim reaches no implementing path.
 **Severity:** CONTRACT_UNSPECIFIED. The requirement is stated in
-`docs/graph-ir/ASSESSOR-CONTRACT.md` as the target, not by the current system, so nothing here is
-demonstrably false about the implementation — it simply has no such step to check.
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The model" →
+"What the model must carry" ("the closure checks the workflow requires... a review proportional to
+what changed, a validation, and a documentation check") as the target, not by the current system,
+so nothing here is demonstrably false about the implementation — it simply has no such step to
+check.
 
 `BookendType` in `sam_schema/core/models.py:121` admits exactly `t0-baseline` and
 `tn-verification`. There is no review, validate or documentation-check bookend. A grep of

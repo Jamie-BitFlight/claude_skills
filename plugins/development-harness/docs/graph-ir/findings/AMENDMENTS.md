@@ -1,9 +1,9 @@
 # Amendments to the findings files
 
-The findings files in this directory are immutable. `ASSESSOR-CONTRACT.md` ("Validating the
-report"): "The findings document is untrusted and immutable. A verifier issues amendments or
-counter-findings and never silently rewrites it." So a finding that has since gone stale is
-superseded here, not edited there.
+The findings files in this directory are immutable — the same rule `dh_core/graph_ir/findings.py`'s
+module docstring states of a `Finding`: "the findings document is untrusted and immutable: a
+verifier issues amendments or counter-findings and never silently rewrites it." So a finding that
+has since gone stale is superseded here, not edited there.
 
 ## A-1 — the predicate counts in `predicates.md` and `completeness.md` are superseded
 
@@ -104,9 +104,12 @@ first drafted; it has since been resolved by deleting `tests_sam/test_adr_3460_m
 outright, on the grounds that it read the withdrawn ADR from disk and enforced its criteria as
 tests, and parsed the markers above out of markdown by regex — coupling executable checks to a
 deliberation document and to prose that could satisfy a marker by mentioning it. The criterion
-worth keeping — that the IR must catch a defect nobody had already found — is recorded in
-`ASSESSOR-CONTRACT.md`'s "Markers a findings file carries" until it is re-stated against
-structured data (`Finding` in `dh_core/graph_ir/findings.py`) that a test can assert on directly.
+worth keeping — that the IR must catch a defect nobody had already found — is no longer recorded
+anywhere as a marker a findings file carries: the "Markers a findings file carries" table
+(`Found-by:` / `Previously-known:`) was scaffolding for the one-off exercise and was dropped, not
+moved, when `ASSESSOR-CONTRACT.md` was deleted (see A-5 below). It remains unstated until it is
+re-recorded against structured data (`Finding` in `dh_core/graph_ir/findings.py`) that a test can
+assert on directly.
 
 **Re-read rather than trusting a citation in prose:** see the commit or PR history for this branch,
 not an ADR file, for the currently intended graph model and its rationale; and
@@ -145,9 +148,10 @@ rather than required, the ADR carrying it was withdrawn, and the test reading it
 package name `graph_ir` is a misnomer: an intermediate representation is a form between a source and
 a target, and this is the structure itself. A rename is pending and no target name is settled.
 
-**Re-read rather than trusting the frame:** `plugins/development-harness/docs/graph-ir/ASSESSOR-CONTRACT.md`
-for the model, and `plugins/development-harness/ARCHITECTURE.md` for the workflow the model
-describes, including which closure checks are specified.
+**Re-read rather than trusting the frame:** `plugins/development-harness/ARCHITECTURE.md`, "The
+work graph" heading, for the model — and the same file's "The workflow" heading for the closure
+checks the model must carry. (`ASSESSOR-CONTRACT.md`, cited here when this entry was written, has
+since been deleted in full; see A-5 below for where its content went.)
 
 ## A-5 — `ASSESSOR-CONTRACT.md`, the authority these findings cite, has been deleted
 
@@ -185,3 +189,28 @@ read as citing the matching subsection of "The work graph" instead.
 **Re-read rather than trusting a citation in prose:** `plugins/development-harness/ARCHITECTURE.md`,
 "The work graph" heading, for the current model; `dh_core/graph_ir/findings.py` for the predicates
 a check may report.
+
+## A-6 — the citations named in A-5 have now been repointed, not merely documented as broken
+
+**Date:** 2026-09-07
+**Cause:** A-5 recorded that every `ASSESSOR-CONTRACT.md` citation across this directory no longer
+resolves, and where the content went, but left the citations themselves unedited on the reasoning
+that findings files are immutable. That reasoning rested on a rule `ASSESSOR-CONTRACT.md` itself
+declared ("Validating the report": findings are untrusted and immutable); with that document
+deleted, the rule survives only where a successor states it — `dh_core/graph_ir/findings.py`'s
+module docstring, quoted at the top of this file — and nothing there extends immutability to a
+citation's *target* once that target stops existing. A citation is a pointer, not a finding; fixing
+where it points changes no observation, no basis, and no severity.
+
+`predicates.md`, `fidelity.md`, `completeness.md` and `data-flow-gaps.md` have accordingly been
+edited directly, following the routing A-5 already set out: a citation of moved content now names
+the matching subsection of `plugins/development-harness/ARCHITECTURE.md`'s "The work graph" by
+heading, never by line number; a citation of a specific falsified predicate now names the
+`Predicate` member in `dh_core/graph_ir/findings.py`; a citation of dropped content (traces,
+holistic evaluation, the report-validation activities, the findings-marker table) has been replaced
+by the substance stated inline, so the finding stands on its own without a file to point at. No
+finding's observation, basis, or severity was changed in the process. Two findings whose citation
+could not be repointed without changing what they claim were left as A-5 found them and are noted
+in place: PREDICATES-1's `find docs/graph-ir -type f` result (already separately superseded by
+A-1's note that the directory has since gained files) and any citation naming the withdrawn
+edge-ownership draft, which A-3 already covers and this entry does not reopen.

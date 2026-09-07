@@ -2,10 +2,10 @@
 
 **Verdict: not-faithful**
 
-This is validation activity 1 of `docs/graph-ir/ASSESSOR-CONTRACT.md` ("Validating the report"),
-and criterion 4 of `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`. The question
-is not whether the graph is sound. It is whether the recovered graph faithfully represents the
-original prose, code, configuration and environment.
+This assesses model fidelity, a validation activity distinct from finding verification: not
+whether the graph is sound, but whether the recovered graph faithfully represents the original
+prose, code, configuration and environment. It is also criterion 4 of
+`docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`.
 
 It does not, on two counts. The schema cannot express four relationships the real system has
 (FIDELITY-7 through FIDELITY-10, FIDELITY-13). And the only extraction that exists —
@@ -19,7 +19,9 @@ nothing but the four fragments in its own test file.
 
 ## Scope of this pass, and what it did not cover
 
-Read in full: `ASSESSOR-CONTRACT.md`; `dh_core/ledger_spec.py` (1220 lines);
+Read in full: the assessor contract (since deleted; its architecture content now lives in
+`plugins/development-harness/ARCHITECTURE.md` under "The work graph"); `dh_core/ledger_spec.py`
+(1220 lines);
 `sam_schema/core/models.py` (908 lines); `dh_core/graph_ir/model.py`,
 `findings.py`, `__init__.py`; `tests_sam/test_graph_ir_defects.py`;
 `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`. Read in part:
@@ -37,13 +39,15 @@ the system.
 
 The contract's list of falsified predicates has no entry for a fidelity failure. It enumerates
 predicates over a *frozen graph*; fidelity is the question of whether that graph is the right
-graph, and it is asked in a different section (lines 155-157). So most findings below name the
-contract clause they falsify instead of a `Predicate` member, and say so in their **Falsifies**
-line. Where a listed predicate does apply, it is named.
+graph, and it is asked as a separate validation activity from finding verification, not as a
+predicate over the graph itself. So most findings below name the contract clause they falsify
+instead of a `Predicate` member, and say so in their **Falsifies** line. Where a listed predicate
+does apply, it is named.
 
 The severity rule is applied as written: `BROKEN` only where a declared or necessarily implied
 predicate is demonstrably false. For a fidelity pass the declaring sources are
-`ASSESSOR-CONTRACT.md`, `ADR-3460-1`, and the IR's own field definitions in `model.py` — the last
+`plugins/development-harness/ARCHITECTURE.md` ("The work graph"), `ADR-3460-1`, and the IR's own
+field definitions in `model.py` — the last
 because `ExtractionStatus.OBSERVED` is *defined* there as "stated by a source span", which makes it
 a declared predicate about every element that carries it.
 
@@ -129,8 +133,9 @@ in any `source_refs`.
 
 ## FIDELITY-3 — D3's severity rests on an absence claim a source in the same tree contradicts
 
-**Falsifies:** contract line 79-82 (the severity rule), by supplying it a false basis; and
-`ASSESSOR-CONTRACT.md:155-157`.
+**Falsifies:** the severity rule (`plugins/development-harness/ARCHITECTURE.md`, "The work graph"
+→ "Severity rule"), by supplying it a false basis; this is also a model-fidelity failure, per the
+intro above.
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
@@ -179,7 +184,7 @@ What is demonstrable is that the basis as written is false.
 ## FIDELITY-4 — D4's two findings assert absences `ledger_spec.py` fills
 
 **Falsifies:** `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER` and the unrecorded-invalidation
-observation, as applied; and `ASSESSOR-CONTRACT.md:155-157`.
+observation, as applied; this is also a model-fidelity failure, per the intro above.
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
@@ -214,8 +219,9 @@ puts in it is not stated. That is a narrower and better-founded claim than the o
 
 ## FIDELITY-5 — there is no extraction of the ledger, only four disjoint fragments
 
-**Falsifies:** `ASSESSOR-CONTRACT.md:155-157` ("Does the recovered graph faithfully represent the
-original prose, code, configuration and environment?") and `ADR-3460-1` criterion 4.
+**Falsifies:** the model-fidelity validation activity — "does the recovered graph faithfully
+represent the original prose, code, configuration and environment?", per the intro above — and
+`ADR-3460-1` criterion 4.
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
@@ -251,13 +257,14 @@ reintroducing a defect in the ledger changes no test outcome, and repairing one 
 
 ## FIDELITY-6 — a descriptor's facets have one provenance field between them
 
-**Falsifies:** no listed predicate. The contract requires eight facets per descriptor (line 55-57)
-and one `extraction_status` per element (line 51); it does not say what to record when they differ.
+**Falsifies:** no listed predicate. The contract requires eight facets per descriptor and one
+`extraction_status` per element (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+"Node record"); it does not say what to record when they differ.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:51, 55-57`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"
 - `dh_core/graph_ir/model.py:83-89, 110-134`
 
 **Observed**
@@ -283,13 +290,14 @@ the provenance of the extraction rather than of the value.
 
 ## FIDELITY-7 — mutual exclusion over a resource has no construct
 
-**Falsifies:** `ASSESSOR-CONTRACT.md:23` — `STATE` "relates shared persistent state, **including
-mutual exclusion over a resource**".
+**Falsifies:** the `STATE` edge type — "relates shared persistent state, **including mutual
+exclusion over a resource**" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
+"Edge types").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:23`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
 - `dh_core/ledger_spec.py:294-299` (the `tasks.ready` derived rule) and `:233` (the
   `conflict_group` column)
 - `dh_core/graph_ir/model.py:53-59, 235-249`
@@ -314,15 +322,17 @@ ownership of it at stage A. It presently cannot hold it.
 
 ## FIDELITY-8 — there is no join, and `CARDINALITY_CONFLICTS_WITH_JOIN` cannot be expressed
 
-**Falsifies:** `ASSESSOR-CONTRACT.md:68` (the predicate "output cardinality conflicts with the
-join"), `:92` (the control-flow projection answers "joins"), and `ADR-3460-1` criterion 2 ("Every
-falsified predicate in the assessor contract is expressible against the IR, or is recorded there as
-out of scope with the reason").
+**Falsifies:** `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/graph_ir/findings.py`) —
+"output cardinality conflicts with the join" — and the control-flow projection's "joins" question
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") — and
+`ADR-3460-1` criterion 2 ("Every falsified predicate in the assessor contract is expressible
+against the IR, or is recorded there as out of scope with the reason").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:68, 92`
+- `dh_core/graph_ir/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections"
 - `dh_core/graph_ir/findings.py:48, 78-80`
 - `dh_core/ledger_spec.py:294-299`
 
@@ -349,13 +359,14 @@ the builder's session report only, which is not in the repository.
 
 ## FIDELITY-9 — evidence cannot carry who produced it or which snapshot it describes
 
-**Falsifies:** `ASSESSOR-CONTRACT.md:95` — the evidence-and-provenance projection answers "what
-supports each claim, **who produced it, which snapshot it describes**".
+**Falsifies:** the evidence-and-provenance projection — "what supports each claim, **who produced
+it, which snapshot it describes**" (`plugins/development-harness/ARCHITECTURE.md`, "The work
+graph" → "Projections").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:95, 101-104`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections"
 - `dh_core/graph_ir/model.py:168-172` (`EvidenceRequirement`)
 - `sam_schema/core/models.py:310-314, 368-375, 377-401, 403-427, 429-450`
 
@@ -386,13 +397,14 @@ in no fragment (`grep -n "bookend" tests_sam/test_graph_ir_defects.py` returns n
 
 ## FIDELITY-10 — a specification's quantified rules have no representation in a ground graph
 
-**Falsifies:** no listed predicate. The contract requires the IR to represent "recursion" (line 8)
-but does not say whether the IR models a specification or one instance of it.
+**Falsifies:** no listed predicate. The contract required the IR to represent "recursion" among
+the system's other structural properties — a requirements list dropped rather than carried forward
+when the contract's architecture content was consolidated into `ARCHITECTURE.md` — but did not say
+whether the IR models a specification or one instance of it.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:6-9`
 - `dh_core/ledger_spec.py:852-860` (`CASCADE` and `REVERSAL`), `:52-53` (`ANY`), `:868-1201`
   (`TRANSITIONS`)
 - `dh_core/graph_ir/model.py:235-249`
@@ -425,13 +437,15 @@ the finding most likely to block the ADR.
 
 ## FIDELITY-11 — ordered checks, waivers, and the refusal/noop/outcome trichotomy are lost
 
-**Falsifies:** no listed predicate. The contract's node record (line 43) shows `preconditions` as an
-untyped list, so the IR is faithful to the *contract* here; the loss is against the *system*.
+**Falsifies:** no listed predicate. The contract's node record
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record") shows
+`preconditions` as an untyped list, so the IR is faithful to the *contract* here; the loss is
+against the *system*.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:33-53`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"
 - `dh_core/ledger_spec.py:479-490` (`ReasonKind`), `:802-806` (`Check`), `:873-877` and
   `:1055-1060` (representative check lists)
 - `dh_core/graph_ir/model.py:182-188, 199, 205`
@@ -453,20 +467,22 @@ work is not incorrectly repeated"). `Termination` offers `terminal: bool` and a 
 
 Consequence for a checker: `reclaim` from `not-started` is a `NOOP` (`already-open`) while
 `reclaim` from `complete` with `accepted=1` is a `REFUSAL` (`task-accepted`) unless `--force`. In
-the IR both are strings in a list, so a guard-coverage query — the one the contract names at line 92
-and `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING` names in `findings.py` — has nothing to read.
+the IR both are strings in a list, so a guard-coverage query — the one the control-flow projection
+names (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") and
+`Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING` names in `findings.py` — has nothing to read.
 
 ---
 
 ## FIDELITY-12 — type satisfaction is string equality, so a value range is invisible
 
-**Falsifies:** no listed predicate. The contract asserts the predicate "a producer's output type
-does not satisfy the consumer's input type" (line 66) without defining satisfaction.
+**Falsifies:** no listed predicate. `Predicate.PRODUCER_TYPE_UNSATISFIED` (`dh_core/graph_ir/findings.py`)
+asserts "a producer's output type does not satisfy the consumer's input type" without defining
+satisfaction.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:66`
+- `dh_core/graph_ir/findings.py`, `Predicate.PRODUCER_TYPE_UNSATISFIED`
 - `dh_core/graph_ir/model.py:121, 132, 136-142`
 - `sam_schema/core/models.py:44-69` (`STATUS_MAP`), `:72-81` (`TaskStatus`)
 - `dh_core/ledger_spec.py:549-553` (`status-invalid`)
@@ -495,14 +511,14 @@ I am recording this as a property of the IR, not asserting the `wont-fix` mappin
 
 ## FIDELITY-13 — half the declared edge types are inert, and the semantic queries read node attributes
 
-**Falsifies:** `ASSESSOR-CONTRACT.md:14-28` (the eight edge types, and "collapsing them into one
-`then` arrow hides the defects worth finding") and `ADR-3460-1` Decision C ("the IR owns the six
-unowned edge types").
+**Falsifies:** the eight edge types, and "collapsing them into one `then` arrow hides the defects
+worth finding" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types")
+and `ADR-3460-1` Decision C ("the IR owns the six unowned edge types").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
 
-- `ASSESSOR-CONTRACT.md:14-28`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
 - `dh_core/graph_ir/model.py:29-39, 313-321, 359-406, 421, 464, 487`
 - `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`, Context and Decision
 
@@ -547,7 +563,8 @@ reproduces it for four of the eight types, including the one whose absence motiv
 `postconditions`, `invariants`, `subgraph_ref`, `operation`, `termination`,
 `evidence_requirements`, and `guard`. `subgraph_ref` is additionally never checked for resolution,
 so a node may name a subgraph that does not exist without the reference-integrity validator
-objecting (contract line 142 lists "reference integrity" among the mechanical checks).
+objecting ("reference integrity" is a named mechanical check —
+`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 
 In the only extraction, the split falls cleanly along that line. The facets a query reads — `trust`,
 `required_authority`, `granting_authority`, `syntactic_type`, `freshness.version`,
@@ -567,15 +584,16 @@ distinguish a considered `TOTAL` from a defaulted one.
 ## FIDELITY-15 — every source span in the extraction is a bare 1220-line file path
 
 **Falsifies:** `model.py:98` — `ref` is declared as "Path with an anchor or line range, e.g.
-'a.py#L10-L20'"; and `ASSESSOR-CONTRACT.md:142` lists "source-span coverage" among the mechanical
-checks.
+'a.py#L10-L20'"; and "source-span coverage" is a named mechanical check
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
 
 - `dh_core/graph_ir/model.py:93-99`
 - `tests_sam/test_graph_ir_defects.py:58-59, 63-64`
-- `ASSESSOR-CONTRACT.md:33-53, 142`
+- `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record" and
+  "Mechanical checks"
 
 **Observed**
 
