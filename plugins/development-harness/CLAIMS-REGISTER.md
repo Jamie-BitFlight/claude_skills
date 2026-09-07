@@ -103,3 +103,71 @@ Consequences the design draws, each a claim in its own right:
   Source: `sqlite/sqlite` `src/wal.c` header comment, read 2026-09-06. Confidence: source.
   Re-check: the same file at `master`. The mount types in
   `dh_core/ledger_spec.py:NETWORK_FILESYSTEMS` are this plugin's choice, not SQLite's.
+
+## n8n as a reference for the graph model (read 2026-09-07)
+
+Cited by `docs/adrs/ADR-3460-2-one-graph-typed-and-instantiated.md`. n8n was offered as an analogy
+for configurable node templates with conditional data flow; these entries separate what it
+establishes from what it does not.
+
+- **A node in a saved workflow is an instance referencing a registered type, not a copy of it.**
+  `INode` carries `type: string` (e.g. `n8n-nodes-base.httpRequest`), `typeVersion` and its own
+  `parameters`; a workflow is `{ nodes: INode[], connections: IConnections, settings, ... }`. The
+  type's behaviour and property schema live in a separately registered `INodeTypeDescription`.
+  Source: `n8n-io/n8n` `packages/workflow/src/interfaces.ts` at `master`, read 2026-09-07.
+  Confidence: source. Re-check: the same interface at `master`.
+
+- **Connections carry no payload type, so nothing checks that a producer satisfies a consumer.**
+  `NodeConnectionType` (`main`, `ai_tool`, `ai_languageModel`, …) distinguishes wiring-slot kind,
+  not data shape, and neither `INodeInputConfiguration` nor `INodeOutputConfiguration` carries a
+  schema field — only `required` and `maxConnections`, which are cardinality. Looked in those
+  interfaces and in `packages/cli/src/workflows/workflow-validation.service.ts`, found cardinality
+  and channel-kind only. Source: the same files, read 2026-09-07. Confidence: source for those
+  files; not established repository-wide, since the search covered the structures that would carry
+  such a check rather than every file. Re-check: grep the repository for a schema or data-type
+  field on either configuration interface.
+
+- **Branch conditions are evaluated inside a node, not on the connection.** `IfV2.node.ts` declares
+  two `main` outputs named `true`/`false` and, per item, reads `conditions` from node parameters in
+  `execute()` and pushes to an output array index. `SwitchV3.node.ts` computes its output count from
+  a parameter expression and routes in `execute()` likewise. Source: `packages/nodes-base/nodes/If/
+  V2/IfV2.node.ts` and `packages/nodes-base/nodes/Switch/V3/SwitchV3.node.ts`, read 2026-09-07.
+  Confidence: source. Re-check: the same files.
+
+- **No pre-execution check of graph well-formedness exists at activation or execution start.**
+  `validateForActivation` checks trigger presence, node-type registration, credential presence and
+  required-parameter validity. Looked there and in `packages/core/src/execution-engine/
+  workflow-execute.ts` for cycle detection, reachability, or connection compatibility, and found
+  none; the only cycle-adjacent mechanism is a runtime guard that throws once the same
+  `nodeName:runIndex` repeats. Cycles are a supported pattern, not an error — the Loop Over Items
+  node exists to create one. Source: those two files, read 2026-09-07. Confidence: source for those
+  files; partially established repository-wide. Re-check: the same files, plus
+  `packages/core/src/execution-engine/partial-execution-utils/`, whose `DirectedGraph` is reported
+  to serve partial re-execution rather than topology rejection and was not read directly.
+
+- **A node can invoke an entire other workflow, and no depth limit was found.** The Execute
+  Sub-workflow node (`packages/nodes-base/nodes/ExecuteWorkflow/ExecuteWorkflow.node.ts`) passes
+  items into a saved workflow and receives its output back. Looked in
+  `packages/cli/src/workflow-execute-additional-data.ts`, which owns sub-workflow invocation, and
+  found no maximum-depth constant or self-call guard. Source: those files, read 2026-09-07.
+  Confidence: source for the mechanism; the absence of a limit is partially established, from one
+  file rather than the repository, and a community forum thread reporting a practical bound of
+  server memory is **reported**, not vendor-confirmed. Re-check: grep the repository for a
+  recursion-depth constant on the sub-workflow path.
+
+- **Error routing is a per-node flag that changes effective topology at runtime.** `OnError` is
+  `'continueErrorOutput' | 'continueRegularOutput' | 'stopWorkflow'`, set on `INode`; when a node
+  selects the error output, `handleNodeErrorOutput` moves failed items into the last output slot.
+  `INodeOutputConfiguration.category: 'error'` marks a declared output as the error one. Source:
+  `packages/workflow/src/interfaces.ts` and `packages/core/src/execution-engine/workflow-execute.ts`,
+  read 2026-09-07. Confidence: source. The workflow-level Error Trigger and error-workflow setting
+  rest on search-result excerpts because the proxy blocked `docs.n8n.io`: **snippet**. Re-check:
+  fetch the error-handling documentation page directly.
+
+- **Per-node input and output data is retained per run, keyed by node name.** `IRunExecutionData`
+  and `ITaskData` are imported by `packages/workflow/src/interfaces.ts` from
+  `packages/workflow/src/run-execution-data/run-execution-data.ts`; that file was not opened, so the
+  field list rests on converging secondary descriptions of `resultData.runData[nodeName][runIndex]`
+  and on the `$node["Name"].json` expression form reading the same structure. Read 2026-09-07.
+  Confidence: **reported** at the level of the field list; the import itself is source. Re-check:
+  read `run-execution-data.ts` directly.
