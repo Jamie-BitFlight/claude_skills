@@ -23,7 +23,7 @@ This skill routes to the correct entry point for the development lifecycle. Read
 
 The development-harness plugin implements the structured development lifecycle for tracked backlog items. It spans capture through verified closure using a chain of skills backed by the configured backlog backend provider as the source of truth and `~/.dh/projects/{slug}/` as the local state directory. The repository's default configuration currently selects GitHub Issues.
 
-**Skills available:** `/dh:create-backlog-item`, `/dh:groom-backlog-item`, `/dh:work-backlog-item`, `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:gate-push`, `/dh:work-milestone`
+**Skills available:** `/dh:work-backlog-item`, `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:gate-push`, `/dh:work-milestone`
 
 Plugin-level source copies exist at `plugins/development-harness/skills/` for each skill.
 
@@ -35,9 +35,9 @@ Plugin-level source copies exist at `plugins/development-harness/skills/` for ea
 flowchart TD
     Start([What do you want to do?]) --> Q1{Intent?}
 
-    Q1 -->|Capture new work —<br>bug, feature idea, observation| Create["/dh:create-backlog-item<br>Modes: guided intake, quick title, --auto title<br>Writes to ~/.dh/projects/{slug}/backlog/"]
+    Q1 -->|Capture new work —<br>bug, feature idea, observation| Create["/dh:work-backlog-item create<br>Modes: guided intake, quick title, --auto title<br>Writes to ~/.dh/projects/{slug}/backlog/"]
 
-    Q1 -->|Prepare an item for planning —<br>verify claims, map impact, estimate effort| Groom["/dh:groom-backlog-item {title|section|all}<br>RT-ICA + parallel swarm: fact-checker,<br>impact-analyst, rtica-assessor, classifier, groomer<br>Requires: item exists in backlog"]
+    Q1 -->|Prepare an item for planning —<br>verify claims, map impact, estimate effort| Groom["/dh:work-backlog-item groom {title|section|all}<br>RT-ICA + parallel swarm: fact-checker,<br>impact-analyst, rtica-assessor, classifier, groomer<br>Requires: item exists in backlog"]
 
     Q1 -->|Plan AND execute a backlog item<br>end-to-end through closure| Work["/dh:work-backlog-item {title|#N|--auto}<br>Handles: auto-groom, RT-ICA gate, SAM planning,<br>GitHub sync, close, resolve<br>STOPS if item already has a Plan field"]
 
@@ -58,8 +58,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Capture["/dh:create-backlog-item<br>Per-item file in ~/.dh/.../backlog/"] --> Groom
-    Groom["/dh:groom-backlog-item<br>RT-ICA + impact radius + fact-check<br>Item status: needs-grooming → groomed"] --> Work
+    Capture["/dh:work-backlog-item create<br>Per-item file in ~/.dh/.../backlog/"] --> Groom
+    Groom["/dh:work-backlog-item groom<br>RT-ICA + impact radius + fact-check<br>Item status: needs-grooming → groomed"] --> Work
     Work["/dh:work-backlog-item<br>Auto-groom gate → RT-ICA gate →<br>SAM planning via /add-new-feature<br>Attaches plan to backlog item"] --> Execute
     Execute["/dh:implement-feature<br>SAM dispatch loop — ready tasks →<br>agents → hooks update task status"] --> QG
     QG["/dh:complete-implementation<br>7 quality gate phases → status:verified label<br>Fixes #N commit — issue closure"] --> Done(["Item resolved"])
@@ -81,8 +81,8 @@ flowchart TD
 
 | Situation | Skill |
 |---|---|
-| Item does not exist yet | `/dh:create-backlog-item` |
-| Item exists, not yet groomed | `/dh:groom-backlog-item {title}` |
+| Item does not exist yet | `/dh:work-backlog-item create` |
+| Item exists, not yet groomed | `/dh:work-backlog-item groom {title}` |
 | Item is groomed, no plan yet | `/dh:work-backlog-item {title}` |
 | Item has a Plan field | `/dh:implement-feature {plan path or slug}` |
 | Plan is executing, one task needs focus | `/dh:start-task {plan} --task {id}` |

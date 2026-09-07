@@ -96,7 +96,7 @@ STALE_GROOM: Impact Radius count stale
   ratio: {ratio:.1f}x (threshold: 1.5x)
 
 Required action: Re-groom this item to refresh the Impact Radius count before proceeding.
-Run: /dh:groom-backlog-item {item title}
+Run: /dh:work-backlog-item groom {item title}
 ```
 
 The fields `manual_count`, `live_count`, `ratio`, and `Required action` are all required. Do not
