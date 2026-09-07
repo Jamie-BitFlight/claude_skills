@@ -507,8 +507,8 @@ class InMemoryTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan.
 
-        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
-        single-writer contract (callers must serialise writes to the same plan).
+        Duplicate-ID check via ``validate_appended_task``. Single-writer
+        contract: callers must serialise writes to the same plan.
 
         Args:
             plan_id: Backend-assigned plan identifier.
@@ -535,8 +535,8 @@ class InMemoryTaskProvider:
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
         """Finalize a drafting plan, transitioning its state to 'ready'.
 
-        Clears the drafting marker set during create_plan. See ADR-1770-1 for the
-        single-writer contract (callers must serialise writes to the same plan).
+        Clears the drafting marker set during create_plan. Single-writer
+        contract: callers must serialise writes to the same plan.
 
         Args:
             plan_id: Backend-assigned plan identifier.

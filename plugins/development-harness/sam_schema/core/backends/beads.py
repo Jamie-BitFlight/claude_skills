@@ -1032,7 +1032,7 @@ class BeadsTaskProvider:
         Creates a new child issue under the plan epic and registers it in
         the task index via bd remember.
 
-        Single-writer assumption applies (ADR-1770-1): callers must serialize
+        Single-writer assumption applies: callers must serialize
         writes to the same plan.
 
         Args:
