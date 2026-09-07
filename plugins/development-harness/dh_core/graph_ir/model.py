@@ -1,4 +1,4 @@
-"""The layer-3 (workflow) graph: the node record, the eight edge types, and the queries over them.
+"""The layer-3 (workflow) graph: the node record, the typed edges, and the queries over them.
 
 The system under assessment is a typed, hierarchical, directed multigraph
 (``docs/graph-ir/ASSESSOR-CONTRACT.md``), and that multigraph is three layers, not one. This module
