@@ -40,8 +40,19 @@ Your delegation prompt carries `item_id` and a plan address (`P{N}`, or the task
 
 ```bash
 mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="T0-baseline")
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
 ```
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
+```
+
+`plan read` names a plan and a task together, as `P/T`. For the plan itself, `plan status` is the
+command: its result carries the plan row and every task row, and it answers from the work ledger
+once the plan is in it and from the content store otherwise.
+
+`plan read` answers from the work ledger once the plan is in it, and from the content store
+otherwise, so the same command is right at either point in the plan's life. Read without
+`--attempt`: naming an attempt you do not hold is refused as `stale-attempt`.
 
 Task plans are SAM records, never artifact-registry content. Do not attempt
 `artifact_read(item_id, "task-plan")` — nothing registers that type, and the call returns no content.

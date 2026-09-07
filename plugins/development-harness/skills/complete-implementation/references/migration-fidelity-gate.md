@@ -12,7 +12,7 @@ flowchart TD
     %% Detection phase — scan three signal sources before gate activates
     D1["Check issue title for migration keywords:<br>'migrat', 'convert format', 'replace .md',<br>'format conversion', 'move from', 'transition from'"]
     D1 --> D2["Check issue body/description for same keywords"]
-    D2 --> D3["For each task in the plan, call<br>sam_task(plan='{plan_id}', task='{task_id}', config={action:'read'})<br>and check acceptance_criteria field<br>for: 'delete', 'remove source',<br>'after migration complete', 'drop the source'<br>Note: acceptance_criteria is a direct str field on Task model"]
+    D2 --> D3["For each task in the plan, run<br>plan read --address {plan_id}/{task_id}<br>and check the acceptance_criteria field<br>for: 'delete', 'remove source',<br>'after migration complete', 'drop the source'<br>Note: acceptance_criteria is a direct str field on the task row"]
     D3 --> Signal{"Any migration signal found<br>across issue title, body, or task criteria?"}
     Signal -->|"No signal found"| Skip(["Skip gate — proceed to Artifact Discovery"])
     Signal -->|"Signal found — gate activates"| Fid1{"Evidence exists (verification summary or commit SHA)<br>that fidelity check ran on REAL production records<br>(not only synthetic fixtures) with zero data loss?"}

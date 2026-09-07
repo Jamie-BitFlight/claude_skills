@@ -90,6 +90,14 @@ Changed files:
 Create all five tasks in one typed MCP call. Replace `{changed_files_block}` with the literal
 newline-separated changed-files block. Omit `issue` when `--issue` was not provided.
 
+**This workflow's plan stays on the content store.** It is authored, polled and read through the
+`sam_plan` and `sam_task` operations, and it never opens an attempt — no `dispatch`, no lease, no
+`finish`. The work ledger exists for tasks a runner is dispatched onto and held to; these review
+tasks are dispatched as agents whose findings land as sections and artifacts, and moving them would
+mean building a dispatch loop this workflow does not have. Read and write them with the operations
+below.
+
+
 ```python
 mcp__plugin_dh_sam__sam_plan(
     config={

@@ -104,34 +104,47 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P1
 
 #### read
 
-Read full plan data including task fields and context:
+`plan read` names a plan and a task together, as `P/T`, and reads that task with the sections its
+attempts recorded:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1/T01
 ```
 
-#### claim
+Add `--attempt {n}` only when you hold that attempt; naming one you do not is refused as
+`stale-attempt`. For the plan itself — its fields plus every task row — use `plan status
+--plan-address P1`.
 
-Claim a task in-progress (prevents duplicate dispatch):
+#### dispatch
+
+Open an attempt on a ready task. This is what sets it in-progress, starts its lease, and prevents a
+second runner from taking it. It prints the attempt number, which every command the runner issues
+carries back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan claim --address P1/T01
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address P1/T01
 ```
 
-Returns `{"claimed": false, "error": "..."}` if task is already claimed or not found.
+Prints `leased` when a runner already holds the task and `not-ready` when its dependencies have not
+landed; either way the task is not the one to start now.
+
+The `plan claim` command writes to the content store rather than the ledger, so a task claimed that
+way leaves the ledger row where it was. Open attempts with `dispatch`.
 
 #### update
 
-Update plan-level fields (e.g., context manifest):
+Set plan-level fields on the ledger, such as the context manifest:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Manifest content"}, plan="P1")
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P1 --set context="Context Manifest content"
 ```
 
-Note: the CLI equivalent is `plan update --plan-address P1 [...]`, but the specific flag for
-setting the plan-level `context` field is not enumerated in the current CLI-parity mapping —
-verify the exact flag via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --help`
-before converting this call site to CLI form.
+`--set` names the ledger column, so write field names with underscores. Setting a field replaces
+its whole value; read the current one with `plan status --plan-address P1` and write back the result when
+you mean to add to it rather than replace it.
+
+The same command's `--context` flag reaches the content store instead — the two stores hold
+different plans, and the flag chosen is what selects between them.
 
 ## Task Schema
 
@@ -255,5 +268,7 @@ The `/dh:execution` orchestrator uses this skill to:
 
 1. Query task status via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status`
 2. Find ready tasks via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready`
-3. Launch appropriate agents based on task's `agent` field
-4. Update timestamps via hook scripts when tasks start/complete
+3. Open an attempt per task via `plan dispatch`, then launch the agent its `agent` field names,
+   passing the address and the attempt number
+4. Settle each launch with `plan settle` when it returns, then judge with `plan read` and close
+   with `plan accept` or send back with `plan reclaim`

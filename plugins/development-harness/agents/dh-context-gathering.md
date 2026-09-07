@@ -116,6 +116,12 @@ Write the Context Manifest to the task using the SAM MCP tool:
 mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Manifest content here"}, plan="P{N}")
 ```
 
+The context manifest is authored content, and this agent runs before any task is dispatched, so it
+writes the content store — the same store the plan was created in. A workflow that has already run
+`plan import` sets the plan's context on the ledger instead, with
+`plan update --plan-address P{N} --set context="..."`; the flag chosen is what selects the store,
+and setting the field replaces its whole value rather than appending to it.
+
 The content passed to `context` is the full text of the Context Manifest section (everything inside the markdown block below). Do NOT use the Edit tool on the task.
 
 The Context Manifest is added as the plan-level `context` field. It should contain:

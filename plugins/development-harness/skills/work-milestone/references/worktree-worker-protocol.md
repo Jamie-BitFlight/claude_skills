@@ -2,7 +2,7 @@
 
 Each worktree worker is spawned by the milestone orchestrator as an isolated `Agent(isolation: "worktree")` subagent branched from the integration branch. This protocol governs the full lifecycle from setup through completion reporting.
 
-**Critical constraint**: Worktree workers have NO Agent tool. All work is executed directly — no delegation to subagents or the SAM pipeline. Workers self-discover task lists, acceptance criteria, and skills via MCP tools after spawning.
+**Critical constraint**: Worktree workers have NO Agent tool. All work is executed directly — no delegation to subagents or the SAM pipeline. Workers self-discover task lists, acceptance criteria, and skills after spawning: the backlog item through `backlog_view`, and the plan and its tasks through the SAM CLI's `plan` group.
 
 ## Full Protocol (Steps M1, M2, M4, M8, M9)
 
@@ -10,11 +10,11 @@ Each worktree worker is spawned by the milestone orchestrator as an isolated `Ag
 flowchart TD
     Start(["Worktree worker spawned<br>in isolated worktree on integration branch"]) --> M1["M1: Setup<br>Verify worktree is on integration branch.<br>Enable constant commits."]
 
-    M1 --> M2["M2: Self-Discovery<br>backlog_view(selector='#{issue}') — description + AC.<br>sam_plan(config={'action': 'list'}) — find the plan_ref.<br>sam_plan(plan=plan_ref, config={'action': 'status'}) — inspect progress.<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'read'}) — task, skills, architect spec.<br>Load each skill: Skill(skill='{name}'). Warn and continue on failure."]
+    M1 --> M2["M2: Self-Discovery<br>backlog_view(selector='#{issue}') — description + AC.<br>plan list — find the plan_ref.<br>plan status --plan-address {plan_ref} — inspect progress.<br>plan read --address {plan_ref}/{task_id} --attempt {n} — task, skills, orchestrator response.<br>Load each skill: Skill(skill='{name}'). Warn and continue on failure."]
 
     M2 --> SkillLoad["Skill Loading complete.<br>Task list and AC in context."]
 
-    SkillLoad --> M4["M4: Execute Work<br>Execute each task sequentially:<br>1. Read task acceptance criteria<br>2. Implement required changes<br>3. Run task verification commands<br>4. Commit changes<br>Update SAM status via MCP:<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'claim'}) before starting each task.<br>sam_task(plan=plan_ref, task=task_id, config={'action': 'state', 'status': 'complete'}) after."]
+    SkillLoad --> M4["M4: Execute Work<br>Execute each task sequentially:<br>1. Read task acceptance criteria<br>2. Implement required changes<br>3. Run task verification commands<br>4. Commit changes<br>Record state on the ledger:<br>plan update --attempt {n} — Completion Report + Verification Results.<br>plan finish --attempt {n} --result … closes the attempt."]
 
     M4 --> M8{"M8: Item Complete?<br>All tasks in task list done?"}
 
@@ -85,7 +85,15 @@ Do not wait for resolution. Do not stop all work because one task is blocked —
 
 ## Completion Report Format
 
-Output one of these structured reports as the final response. The orchestrator parses this output to determine merge actions and relay content for subsequent waves.
+Output one of these structured reports as the final response. The orchestrator parses this output
+to determine merge actions and relay content for subsequent waves.
+
+This report and the ledger carry different things, and each needs the other. The report is what the
+orchestrator reads the moment your launch returns, and it records it against your attempt as the
+attempt's return text; `plan finish --result` is the durable outcome the orchestrator queries, and
+the only thing that moves the task. Send both: `finish` as your last ledger command, and the report
+as your response. Where a plan exists, append the same body as this attempt's `Completion Report`
+section before you finish, since `finish --result complete` requires it.
 
 ### COMPLETE report
 
@@ -128,11 +136,34 @@ BLOCKER: {description of the failure — be specific}
 
 ## SAM Task Status Tracking
 
-Update SAM task status via MCP tools as you work. SAM MCP is available to worktree workers.
+Task state lives in the work ledger, and the SAM CLI is how you reach it. It needs no MCP server,
+which matters here: a worktree worker runs where the orchestrator's session state does not reach,
+and the CLI resolves the same ledger from a linked worktree as from the main checkout.
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan <command> …
+```
+
+Your prompt names an address `P{N}/T{M}` and the attempt number the orchestrator opened. Carry the
+attempt on every command; it is what proves the command belongs to this dispatch.
 
 For each task:
 
-1. Before starting: `sam_task(plan="P{N}", task="T{M}", config={"action": "claim"})` — marks task IN PROGRESS
-2. After completing: `sam_task(plan="P{N}", task="T{M}", config={"action": "state", "status": "complete"})` — marks task COMPLETE
+1. Read it, naming the attempt. This is also what pushes out your lease:
+   `plan read --address P{N}/T{M} --attempt {n}`. Act on any `Orchestrator Response` first.
+2. Before anything long — a full test suite, a build — push the lease out again:
+   `plan renew --address P{N}/T{M} --attempt {n}`. It prints `renew_by`, the instant the lease next
+   expires. A lease left to run out lets the orchestrator hand the task to another runner, and your
+   later commands are then refused with `stale-attempt`.
+3. After the work and its verification: append `Completion Report` and `Verification Results` for
+   this attempt with `plan update --plan-address P{N} --task-id T{M} --attempt {n}
+   --append-section … --section-content …`, then close it once with
+   `plan finish --address P{N}/T{M} --attempt {n} --result complete|failed|blocked|needs-input`.
 
-If no SAM plan is found during M2 self-discovery, skip these calls — the worker executes against acceptance criteria directly.
+There is nothing to claim: `dispatch` opened your attempt and set the task in-progress before you
+were launched. The CLI's `plan claim` command writes to the content store rather than the ledger,
+so a task claimed that way leaves the ledger row where it was and the orchestrator watching a task
+that never moved.
+
+If no plan is found during M2 self-discovery, skip these commands — the worker executes against the
+item's acceptance criteria directly and reports in text only.
