@@ -99,15 +99,16 @@ What this does not settle: the withdrawn draft's other numbered exit criteria (d
 refused-or-detected, predicates expressible, model-fidelity, IR-found-something-new) are not
 restated anywhere in a form addressed to a specific migration scenario, because the staged
 placement that gated them is withdrawn along with the projection criterion. Whether a readiness
-gate of that shape still has a subject, and what it should require, is open and is not decided
-here.
+gate of that shape still has a subject, and what it should require, was open when this entry was
+first drafted; it has since been resolved by deleting `tests_sam/test_adr_3460_migration_trigger.py`
+outright, on the grounds that it read the withdrawn ADR from disk and enforced its criteria as
+tests, and parsed the markers above out of markdown by regex — coupling executable checks to a
+deliberation document and to prose that could satisfy a marker by mentioning it. The criterion
+worth keeping — that the IR must catch a defect nobody had already found — is recorded in
+`ASSESSOR-CONTRACT.md`'s "Markers a findings file carries" until it is re-stated against
+structured data (`Finding` in `dh_core/graph_ir/findings.py`) that a test can assert on directly.
 
-**Recompute or re-read rather than trusting a citation in prose:**
-
-```bash
-uv run pytest plugins/development-harness/tests_sam/test_adr_3460_migration_trigger.py -q
-```
-
-That test still reads the withdrawn draft's file from disk and asserts it exists; deleting that
-file without also deciding the test's fate is expected to fail it. See the commit or PR history
-for this branch, not an ADR file, for the currently intended graph model and its rationale.
+**Re-read rather than trusting a citation in prose:** see the commit or PR history for this branch,
+not an ADR file, for the currently intended graph model and its rationale; and
+`dh_core/graph_ir/findings.py` for the structured form the deleted test's markers are meant to be
+replaced by.
