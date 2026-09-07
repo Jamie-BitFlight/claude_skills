@@ -134,6 +134,7 @@ authority.
 - a branch guard is incomplete, or overlaps another guard
 - a node or output is unreachable
 - a prescribed method carries no evidence, and none is recorded as absent
+- an instruction names a referent that does not resolve
 
 ## Provenance: one rule, three sites
 
@@ -158,6 +159,60 @@ evidence is required is `BROKEN`; where nothing declares it required, `CONTRACT_
 
 The same test applies to the assessor's own output. A finding asserting what a system does, with no
 span naming where that was read, is the defect it purports to report.
+
+## The decomposition-exit gate
+
+A task leaving stage 5 carries instructions. The rule they must satisfy is the owner's: do not
+write tasks with claims or processes from training data. Origin is not measurable from text — a
+sentence invented from training reads exactly like one recalled from a source. Absence of referent
+is measurable, and the two coincide: an instruction written to fill a gap has nothing in the
+sources to point at, because a writer who had a source would have pointed at it.
+
+So the gate measures referents, in two tiers. Both block.
+
+**Tier 1 — a delegating instruction must resolve.** An instruction that sends the agent somewhere
+names a referent, and the referent must exist at decomposition time.
+
+| referent | resolves to |
+|---|---|
+| `SKILL` | a directory containing `SKILL.md` |
+| `TASK_OUTPUT` | a work-graph node declaring that output |
+| `FILE` | a path that exists |
+| `RULE` | a rules file, or a named section of one |
+| `ARTIFACT` | a type in the artifact registry, with its id |
+| `GRAPH_POSITION` | the successor node the instruction asserts will exist |
+
+The instruction is the declaration. "Load `restructuring-to-solid`" declares that skill exists; the
+repository demonstrably lacks it; a declared predicate is demonstrably false, so the basis is
+`DECLARED` and the severity `BROKEN`.
+
+**Tier 2 — an asserting instruction must quote.** An instruction stating how a system behaves
+carries a `SourceSpan` whose `quote` is found verbatim in the text at its `ref`. Citing is not
+enough; the quote must be there. A citation that does not resolve is worse than none, because it
+buys the authority of a source without one.
+
+Recording the absence is the honest exit, and it is not silence. An assertion marked `ASSUMED` or
+`ABSENT` with the gap stated — "no source establishes this; falsify it before relying on it" —
+does not falsify the predicate, which reads "carries no evidence, **and none is recorded as
+absent**". It is reported at `CONTRACT_UNSPECIFIED` and does not block. That is the difference
+between handing the next agent a method to follow and handing it a hypothesis to test, which is the
+whole of what the rule protects: an untested method written as an instruction converts the one
+agent positioned to disprove it into the agent that follows it.
+
+### What the gate does not decide
+
+A quote that resolves and verifies but does not support the claim passes. So does citation padding
+— a real span quoted beside an invented method to dress it. Both are judgement, and both go to the
+adversarial pass. The gate's contribution is making them the *only* remaining failure mode rather
+than two among many.
+
+### An unresolved referent is an upstream task, not a deletion
+
+The instruction is not struck out. It becomes a task that produces what it wanted to point at:
+capture the datasheet, write the runbook, trace the call chain. The dependent task then names that
+output as its referent and tier 1 resolves. This is how "do not speculate how" becomes "produce the
+artifact first" — a shape the graph can hold, as a DATA edge from the new node to the one that
+wanted the method.
 
 ## Severity rule
 
