@@ -3,8 +3,12 @@
 **Status:** Proposed — authored on `worktree-melodic-plotting-emerson`, not yet reviewed or merged. See [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md).
 **Date:** 2026-09-07
 **Issue:** [#3460](https://github.com/Jamie-BitFlight/claude_skills/issues/3460)
-**Supersedes:** [ADR-3460-1](./ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md), whose decision rested
-on choosing which of three graphs to model. That choice does not exist.
+**Replaces:** the withdrawn draft ADR-3460-1 ("The graph IR first owns the edge types nothing
+owns..."), deleted per [rules/adr-lifecycle.md](../../../../rules/adr-lifecycle.md) — an ADR on an
+unmerged branch is `Proposed`, was never reviewed or merged, and may be withdrawn and deleted
+rather than superseded. Its decision rested on choosing which of three graphs to model; that
+choice does not exist. Its defects, measurements, and its rejection of a representation compiled
+above unchanged models are carried forward below, in "Carried forward from the withdrawn draft".
 **Related:** Governed by [ASSESSOR-CONTRACT.md](../graph-ir/ASSESSOR-CONTRACT.md), which this ADR
 requires be rewritten — its "The layers" and "How they relate" sections state the superseded model.
 
@@ -88,10 +92,11 @@ a producing type can ever satisfy a consuming type is answerable before anything
 the decomposition-exit gate belongs. Whether a particular node received what it needed is answerable
 only from a run, and an unfed input there may be a guard that legitimately did not fire.
 
-Carried forward from the superseded ADR: the defects in its Context, and its rejection of a
+Carried forward from the withdrawn draft: the defects in its Context, and its rejection of a
 representation compiled above unchanged models — one that cannot express authority cannot find the
-defect class that motivated the work. Its staged A/B/C placement is withdrawn, because each option
-was worded in terms of the layer split.
+defect class that motivated the work. See "Carried forward from the withdrawn draft" below for the
+full content, inlined because the draft that recorded it has been deleted. Its staged A/B/C
+placement is withdrawn, because each option was worded in terms of the layer split.
 
 Withdrawn: the migration trigger's criterion that a projection reproduce `TRANSITIONS`, per the
 Decision above. `tests_sam/test_adr_3460_migration_trigger.py` enforces the superseded criteria and
@@ -101,6 +106,45 @@ Deleted: the layer split in `dh_core/graph_ir/` — its layer discriminator, the
 edge modules, the composite that bound them, and the separate decomposition-input type. The node
 record, the edge types, the descriptor facets, the finding record with its severity rule, and the
 decomposition-exit gate survive, because none of them depended on there being several graphs.
+
+## Carried forward from the withdrawn draft
+
+ADR-3460-1 recorded defects and measurements that motivated this work and hold independent of
+which graph model is chosen. They are inlined here because that draft was withdrawn as an
+unreviewed proposal (`rules/adr-lifecycle.md`) and its file deleted, and the findings under
+[docs/graph-ir/findings/](../graph-ir/findings/) cite it as the authority they were scored against
+(see `docs/graph-ir/findings/AMENDMENTS.md` for how those citations are now read).
+
+**The flattening, measured 2026-09-06.** The plan and task graph encodes relationships as node
+attributes: `dependencies` is CONTROL, `conflict_group` is STATE mutual exclusion,
+`is_bookend`/`bookend_type` is EVIDENCE. A grep of `dh_core`, `sam_schema` and `backlog_core`
+excluding tests, run 2026-09-06, found `blocked_by` and `parallelize_with` read only by models,
+writers, backends and `cli_inputs` — serialized everywhere, deciding nothing. AUTHORITY, DATA,
+ERROR, RECOVERY and INVALIDATES had no representation at all.
+
+**The defects that trace to it.** Defects found on the branch trace to that flattening. Two of
+them were fixed as separate bugs when they are one authority defect: `import` writing a judge's
+`accepted` over a runner's `complete`, and `update --set status=complete` performing a control
+transition as a data write. The other two are a DATA edge missing (`FILES_CHANGED` overlap is
+prose a judge must eyeball) and an INVALIDATES edge missing (`--replace` deleting rows no event
+accounted for).
+
+**Why a representation compiled above unchanged models (scenario B) was rejected.** ADR-3460-1
+considered representing the missing relations as a layer compiled above the unchanged `Task`/`Plan`
+models, rather than owning them where the harness already stores state. That alternative was
+rejected outright, at either stage of the staged plan it was weighed against: a representation
+compiled above unchanged models can only carry what the source records carry, and AUTHORITY, DATA,
+EVIDENCE, ERROR, RECOVERY and INVALIDATES would compile empty from the current models — it answers
+the structural questions that were not hurting and stays silent on the semantic class that was. A
+representation that cannot express authority cannot find the defect class that motivated the work.
+
+**The blast radius of replacing `Task`/`Plan` outright, measured 2026-09-06.** Replacing them with
+the IR directly — rather than first owning the unrepresented relations alongside them — would move
+71 importing files, 7 `TaskBackend` implementations across 10 backend modules, 3 MCP tools, 44
+skill and agent files, and every stored plan record. That cost is why ADR-3460-1 staged the work
+rather than attempting a full replacement in one change. This ADR does not revisit whether or when
+a full replacement is warranted — only which graph is being modelled in the meantime, which the
+staged plan had left unresolved.
 
 ## What is open
 
