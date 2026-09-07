@@ -7,7 +7,7 @@ alwaysApply: true
 
 When you identify that work will need multiple steps or jobs: create backlog items for them — don't just describe them.
 
-1. **Create or match a backlog item** — Use `create-backlog-item` or `work-backlog-item` before starting.
+1. **Create or match a backlog item** — Use `work-backlog-item create` or `work-backlog-item` before starting.
 2. **Plan** — When writing a plan, add it to the item via `mcp__plugin_dh_backlog__backlog_update(selector="{title}", plan="{path}")`.
 3. **Progress** — When completing actions, update the task/plan artifact so progression is visible.
 
