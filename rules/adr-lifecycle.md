@@ -2,9 +2,11 @@
 
 Two different artifacts, and conflating them is what makes a deliberation binding.
 
-**`ARCHITECTURE.md` states what is true now.** It is rewritten in place as the design changes, it
-lives nearest the code it describes — the touched module's own subtree before anything higher — and
-it is what documentation, skills, agents, code and tests reference.
+**`ARCHITECTURE.md` states what is true now.** It is the formalized design of the system it
+describes, or the entry point routing to the subsystem architecture document that lives with that
+subsystem's code. It is rewritten in place as the design changes, it lives nearest the code it
+describes — the touched module's own subtree before anything higher — and it is what documentation,
+skills, agents, code and tests reference.
 
 **An ADR records a deliberation**: the context, the options, why one was taken and what was
 rejected. It is planning material. Many repositories never commit one at all.
@@ -17,6 +19,11 @@ A link makes the ADR load-bearing, and the repository owner must be able to dism
 turns out not to reflect the goal or the intent without the repository being stuck with it. The
 citation is precisely what removes that right. Where an ADR's substance is needed, write the
 substance into `ARCHITECTURE.md`; where its rationale is worth keeping, write that there too.
+
+An ADR need not live in the repository at all. A decision record belongs equally in an issue
+tracker or a project board, where an agent reading the code may have no access to it. So a citation
+is not merely stale-prone — it can be unresolvable by construction for whoever reads the code next.
+`ARCHITECTURE.md` lives with the code and is always readable by anyone who has the code.
 
 The consequence to watch for: a reader who must replay a chain of decisions and supersessions to
 work out what is currently true is reading the deliberation because nothing else states the outcome.
