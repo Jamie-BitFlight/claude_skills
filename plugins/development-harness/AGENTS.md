@@ -18,7 +18,7 @@ Language-agnostic development process harness that orchestrates feature developm
 - The harness owns the *process*; language plugins own the *specialists*
 - Every stage produces a logical handoff. Document artifacts use `artifact_register` and `artifact_read`; plans and task state use `sam_plan` and `sam_task`. Neither surface exposes direct filesystem paths.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
-- Without a language manifest, the harness falls back to `dh:task-worker` (specialist profile not loaded — task-worker executes directly)
+- `dh:task-worker` executes a SAM task and loads the specialist profile the task's `agent` field names; a language manifest decides which specialist that is, and without one no profile is named. It is the executor in both cases, never a specialist a task can name for itself
 - Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
 
 ---
@@ -42,7 +42,7 @@ touchpoint model.
 
 Language plugins snap into the harness by providing a manifest that maps abstract roles to
 concrete agents and declares quality gate commands. The harness resolves roles at runtime based on
-project-language detection, falling back to `dh:task-worker` when no manifest matches. Load
+project-language detection, and `dh:task-worker` executes with whatever profile that resolves to. Load
 `dh:dh-meta-docs` for the role-resolution protocol.
 
 ---
@@ -199,7 +199,7 @@ flowchart TD
 - Process orchestration (stage sequencing, gating, looping)
 - Human touchpoint decisions (ARL constraint analysis)
 - Artifact management (naming, storage, cross-referencing)
-- Fallback behavior (`dh:task-worker` when no manifest exists)
+- Execution substrate (`dh:task-worker`, which loads whatever specialist profile a task names)
 
 **What language plugins own:**
 

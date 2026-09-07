@@ -121,7 +121,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 
 The SAM (Stateless Agent Methodology) pipeline in a single plugin. Every feature request moves through seven stages that each produce a file artifact: Discovery, Planning (with RT-ICA information completeness analysis), Context Integration, Task Decomposition, Execution, Forensic Review, and Final Verification.
 
-Language plugins like `python3-development` plug into the harness by telling it which specialist agents to use for each task. Without a language plugin, the harness falls back to `dh:task-worker`, which executes the task without a specialist profile.
+Language plugins like `python3-development` plug into the harness by telling it which specialist agents to use for each task. The harness dispatches `dh:task-worker` either way — it loads the specialist profile the task names, and without a language plugin no profile is named and it executes with the skills the task carries.
 
 Install name: `dh`
 
