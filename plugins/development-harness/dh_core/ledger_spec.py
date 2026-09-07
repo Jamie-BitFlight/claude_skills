@@ -374,13 +374,13 @@ the guardrails.
 
 Record every deviation in `<concerns>`: what the instruction said, what you found instead, what
 you did."""
-"""``docs/graph-ir/ASSESSOR-CONTRACT.md``'s "Authority of a task's instructions, at runtime" block
-quote, verbatim with its leading ``> `` markers stripped. ``read`` heads every response with it
-under :data:`AUTHORITY_SECTION`, on every task status, whether or not an attempt is passed and
-whether or not ``tasks.response`` carries anything -- it is not stored data, so a decomposer cannot
-omit it and a task cannot be written without it. This is the single source of that prose; nothing
-in ``dh_core.ledger.transitions`` restates it, and ``tests_sam/test_ledger_spec.py`` asserts this
-constant equals the contract's own block quote so the two encodings cannot drift apart unnoticed."""
+"""The preamble every task response leads with. ``read`` heads every response with it under
+:data:`AUTHORITY_SECTION`, on every task status, whether or not an attempt is passed and whether or
+not ``tasks.response`` carries anything -- it is not stored data, so a decomposer cannot omit it and
+a task cannot be written without it. This is the single source of that prose: nothing in
+``dh_core.ledger.transitions`` restates it, and ``plugins/development-harness/ARCHITECTURE.md``'s
+"The work graph" § "Authority of a task's instructions, at runtime" states this exact ranking as the
+specification this constant implements, rather than duplicating the text itself."""
 
 RESPONSE_SECTION = "Orchestrator Response"
 """Rendered by ``read`` from ``tasks.response`` at the top of the current attempt; not a stored section."""

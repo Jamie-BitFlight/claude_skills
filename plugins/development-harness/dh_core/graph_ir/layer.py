@@ -1,9 +1,12 @@
 """The layer discriminator shared by every layer's node and edge types.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers"): the system is several graphs, each
-describable on its own, drawn together only when all of them exist. This module holds the one
-vocabulary item every layer's model types carry so a reader -- human or query -- can tell which
-layer an element belongs to without inspecting its shape.
+This discriminator belongs to a three-layer split -- several graphs, each describable on its own,
+drawn together only when all of them exist -- that is superseded design:
+``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+types and executed as instances, with no separate layer graphs. This module has not yet been
+migrated to that shape. Until then, it holds the one vocabulary item every layer's model types
+carry so a reader -- human or query -- can tell which layer an element belongs to without
+inspecting its shape.
 """
 
 from __future__ import annotations

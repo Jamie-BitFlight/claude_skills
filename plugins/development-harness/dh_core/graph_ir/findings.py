@@ -1,7 +1,8 @@
 """The finding record and its severity taxonomy.
 
-A finding is one falsified predicate over a frozen graph. The contract (``docs/graph-ir/
-ASSESSOR-CONTRACT.md``) fixes both halves of what may be claimed:
+A finding is one falsified predicate over a frozen graph.
+``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §§ "Falsified predicates" and
+"Severity rule" fix both halves of what may be claimed:
 
 * the predicates worth reporting are an enumerated list, not free prose -- :class:`Predicate`;
 * the severity rule is mechanical. ``BROKEN`` only when a declared or necessarily implied predicate
@@ -18,14 +19,15 @@ actually making -- was this predicate ever declared -- the field it has to defen
 Findings are frozen. The findings document is untrusted and immutable: a verifier issues amendments
 or counter-findings and never silently rewrites it.
 
-Two predicates come from the contract's "decomposition-exit gate" section rather than its original
-falsified-predicates list: :attr:`Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE` (an instruction's
-prescribed method carries no evidence and none is recorded absent -- the contract's Provenance rule
-applied to a task's method) sits under :attr:`Projection.EVIDENCE_AND_PROVENANCE`, the same
-projection the contract already uses for trust and revision predicates about what supports a claim.
-:attr:`Predicate.REFERENT_DOES_NOT_RESOLVE` sits under :attr:`Projection.CONTROL_FLOW` instead: the
-contract's own wording for that projection is "reachability, dead nodes, guard coverage, joins,
-completion, loops", and Tier 1 of the decomposition-exit gate asks a reachability question of a
+Two predicates come from ARCHITECTURE.md's "The decomposition-exit gate" section rather than
+:data:`PREDICATES`' original set: :attr:`Predicate.PRESCRIBED_METHOD_WITHOUT_EVIDENCE` (an
+instruction's prescribed method carries no evidence and none is recorded absent -- the
+"Provenance: one rule, three sites" rule applied to a task's method) sits under
+:attr:`Projection.EVIDENCE_AND_PROVENANCE`, the same projection already used for trust and revision
+predicates about what supports a claim. :attr:`Predicate.REFERENT_DOES_NOT_RESOLVE` sits under
+:attr:`Projection.CONTROL_FLOW` instead: ARCHITECTURE.md's own wording for that projection is
+"reachability, dead nodes, guard coverage, joins, completion, loops", and Tier 1 of the
+decomposition-exit gate asks a reachability question of a
 referent -- "the referent must exist at decomposition time" -- the same question
 :attr:`Predicate.UNREACHABLE` already asks of a node or output. A referent is a target an
 instruction must be able to reach, not evidence supporting a claim, so it is grouped with

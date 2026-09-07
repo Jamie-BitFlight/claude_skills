@@ -1,14 +1,18 @@
 """The graph IR: the layers of a workflow, and findings over them.
 
-``docs/graph-ir/ASSESSOR-CONTRACT.md`` ("The layers") is the authority: the system is several
-graphs, each describable on its own and drawn together only in :class:`~dh_core.graph_ir.system.LayeredGraph`.
+This package implements a three-layer split -- several graphs, each describable on its own and
+drawn together only in :class:`~dh_core.graph_ir.system.LayeredGraph` -- that is superseded design:
+``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+types and executed as instances, with no separate layer graphs. This package has not yet been
+migrated to that shape; ``plugins/development-harness/ARCHITECTURE.md``'s "The work graph" section
+is the current authority.
 
 * :mod:`~dh_core.graph_ir.ledger_layer` -- layer 1, task lifecycle: statuses and the commands
   between them, plus the projection each transition may name back to layer 3.
 * :mod:`~dh_core.graph_ir.work_layer` -- layer 2, the work graph: tasks, their concurrency and
   ordering, the bookend guarantee, and the extension operations layer 3 applies at runtime.
 * :mod:`~dh_core.graph_ir.model` -- layer 3, the workflow: the node record, the eight edge types,
-  and the mechanical queries the contract's falsified-predicate list names.
+  and the mechanical queries :data:`~dh_core.graph_ir.findings.PREDICATES` names.
 * :mod:`~dh_core.graph_ir.decomposition` -- the grooming and architecture output layer 3 decomposes
   into layer 2, and the traceability queries between them.
 * :mod:`~dh_core.graph_ir.instructions` -- the instruction record a task carries out of

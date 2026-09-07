@@ -258,16 +258,21 @@ names a referent, and the referent must exist at decomposition time.
 
 | referent | resolves to |
 |---|---|
-| `SKILL` | a directory containing `SKILL.md` |
 | `TASK_OUTPUT` | a work-graph node declaring that output |
 | `FILE` | a path that exists |
 | `RULE` | a rules file, or a named section of one |
 | `ARTIFACT` | a type in the artifact registry, with its id |
 | `GRAPH_POSITION` | the successor node the instruction asserts will exist |
 
-The instruction is the declaration. "Load `restructuring-to-solid`" declares that skill exists; the
-repository demonstrably lacks it; a declared predicate is demonstrably false, so the basis is
-`DECLARED` and the severity `BROKEN`.
+A skill an instruction names is not one of these referents, and the gate does not check it. Skill
+availability is a property of the agent harness the work eventually runs in — Claude Code, Codex,
+Hermes, OpenCode, Cursor, pi, Kimi Code and Kilo Code each resolve skills their own way — not of
+this repository, and a built-in skill belongs to no plugin directory here at all. The acting agent
+verifies it at runtime instead, under "Authority of a task's instructions, at runtime" below.
+
+The instruction is the declaration. An instruction naming a `FILE` referent declares that path
+exists; when the repository demonstrably lacks it, a declared predicate is demonstrably false, so
+the basis is `DECLARED` and the severity `BROKEN`.
 
 **Tier 2 — an asserting instruction must quote.** An instruction stating how a system behaves
 carries a `SourceSpan` whose `quote` is found verbatim in the text at its `ref`. Citing is not
@@ -307,23 +312,14 @@ been made; until it has, nothing here asserts the tier is churn-free.
 
 No gate knows what the acting agent will find. An instruction warranted at decomposition can be
 stale at execution, and only the actor sees that. So the marking does work at runtime too, and
-every task carries the precedence order that makes it operative:
-
-> **Authority of these instructions.** The acceptance criteria and guardrails are binding.
-> Everything else is direction, ranked:
->
-> 1. Your system prompt and the project's rules.
-> 2. A skill named here, and the methodology you already carry.
-> 3. An instruction carrying a source — established; the source is named so you can check it.
-> 4. An instruction marked `ASSUMED` — a hypothesis, not a method. Test it before relying on it;
->    discard it when it fails.
->
-> Where these conflict, the higher wins. Where an instruction names something that does not exist,
-> or contradicts what you find, do not force it — reach the acceptance criteria another way within
-> the guardrails.
->
-> Record every deviation in `<concerns>`: what the instruction said, what you found instead, what
-> you did.
+every task carries the precedence order that makes it operative: the system prompt and project
+rules outrank a skill or an already-carried methodology, which outrank an instruction carrying an
+established source, which outranks one marked `ASSUMED` — a hypothesis, not a method, to be tested
+and discarded on failure. Where an instruction names something that does not exist, or contradicts
+what the agent finds, it is not forced; the agent reaches the acceptance criteria another way within
+the guardrails, and records every deviation in `<concerns>`. That preamble, verbatim, is
+`AUTHORITY_PREAMBLE` in `dh_core/ledger_spec.py` — the single encoding `read` heads every task
+response with, stated once here rather than duplicated.
 
 `<concerns>` is an edge, not a section of a report. It is the stage-8 route an environmental factor
 takes straight to the planner, and a task whose deviations reach no consumer has the same defect as
