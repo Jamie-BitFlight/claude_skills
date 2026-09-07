@@ -199,12 +199,52 @@ between handing the next agent a method to follow and handing it a hypothesis to
 whole of what the rule protects: an untested method written as an instruction converts the one
 agent positioned to disprove it into the agent that follows it.
 
-### What the gate does not decide
+### The judgement tier blocks, and demotion clears it
 
-A quote that resolves and verifies but does not support the claim passes. So does citation padding
-— a real span quoted beside an invented method to dress it. Both are judgement, and both go to the
-adversarial pass. The gate's contribution is making them the *only* remaining failure mode rather
-than two among many.
+Whether a verified quote actually supports the instruction is judgement, and citation padding — a
+real span quoted beside an invented method to dress it — is the same call. Both block.
+
+Blocking is affordable here because it is clearable without winning the argument. A decomposer can
+defend the citation, or demote the claim to `ASSUMED` with the gap stated, and ship. Churn needs a
+block whose only exit is adjudication; this one resolves by recording uncertainty instead.
+
+The obvious objection is that a decomposer will mark everything `ASSUMED` to get through. That
+degrades in the right direction. An unmarked instruction is *implicitly certain* — that is the
+default this rule exists to correct — so a task whose every method is marked as a hypothesis is
+strictly more honest than the same task unmarked. The gate was never there to stop speculation. It
+is there to stop speculation wearing the authority of established fact.
+
+What must be established before the judgement tier is trusted is verdict *stability*, ahead of
+accuracy: a checker answering differently on identical input generates a rewrite loop however
+accurate it is on average. Measure repeated trials over a labelled corpus — supported, padded,
+partially supported, supported-but-stale — and report stability first. That measurement has not
+been made; until it has, nothing here asserts the tier is churn-free.
+
+### Authority of a task's instructions, at runtime
+
+No gate knows what the acting agent will find. An instruction warranted at decomposition can be
+stale at execution, and only the actor sees that. So the marking does work at runtime too, and
+every task carries the precedence order that makes it operative:
+
+> **Authority of these instructions.** The acceptance criteria and guardrails are binding.
+> Everything else is direction, ranked:
+>
+> 1. Your system prompt and the project's rules.
+> 2. A skill named here, and the methodology you already carry.
+> 3. An instruction carrying a source — established; the source is named so you can check it.
+> 4. An instruction marked `ASSUMED` — a hypothesis, not a method. Test it before relying on it;
+>    discard it when it fails.
+>
+> Where these conflict, the higher wins. Where an instruction names something that does not exist,
+> or contradicts what you find, do not force it — reach the acceptance criteria another way within
+> the guardrails.
+>
+> Record every deviation in `<concerns>`: what the instruction said, what you found instead, what
+> you did.
+
+`<concerns>` is an edge, not a section of a report. It is the stage-8 route an environmental factor
+takes straight to the planner, and a task whose deviations reach no consumer has the same defect as
+a `File Impact Summary` nobody reads.
 
 ### An unresolved referent is an upstream task, not a deletion
 
