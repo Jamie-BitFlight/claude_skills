@@ -56,6 +56,13 @@ own edges — not appended to a task's notes and not deferred to a later plan.
 Bookend guarantee. Review, validate and documentation-check exist on every layer-2 graph, and a
 check can ask whether they do.
 
+This one states the target, not the system. `BookendType` in `sam_schema/core/models.py` admits
+`t0-baseline` and `tn-verification` and nothing else, so an extraction of the system today records
+these three as `ABSENT`, never `OBSERVED`. Getting that wrong decides a severity: a bookend the
+system was never built to have is `CONTRACT_UNSPECIFIED`, while one it declares and does not run
+is `BROKEN`. Every requirement in this section is read the same way — it says what the layer needs,
+and the extraction says what is there.
+
 Nothing here is preserved because the incumbent implementation has it. Where the current system
 answers one of these badly, the answer is to state what the layer requires and let the
 implementation follow, not to describe what exists.
