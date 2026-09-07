@@ -12,7 +12,6 @@ from collections import Counter
 
 import pytest
 from dh_core import ledger_spec as spec
-from sam_schema.core.models import TaskStatus
 
 TASK_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.TASK]
 PLAN_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.PLAN]
@@ -21,10 +20,6 @@ EVENT_KINDS = {e.kind for e in spec.EVENTS}
 REASONS_BY_CODE = {r.code: r for r in spec.REASONS}
 COLUMN_NAMES = {c.name for c in spec.COLUMNS}
 TABLE_NAMES = {c.table for c in spec.COLUMNS}
-
-
-def test_statuses_equal_task_status_enum() -> None:
-    assert {s.value for s in spec.Status} == {s.value for s in TaskStatus}
 
 
 def test_every_event_column_names_declared_events() -> None:

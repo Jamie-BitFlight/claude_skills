@@ -7,8 +7,10 @@ and their flags, the reason codes, and every transition a command can make, as d
 
 ``tests_sam/test_ledger_spec.py`` proves the specification closed: every column is set by an
 event or derived by a named rule, every event kind is emitted by a transition, every reason code
-is owned by one definition and used by one or more transitions, every task status is handled by
-every task command, and the statuses equal ``sam_schema.core.models.TaskStatus``.
+is owned by one definition and used by one or more transitions, and every task status is handled
+by every task command. Task statuses are not part of that closure: :data:`Status` is
+``sam_schema.core.models.TaskStatus`` itself, imported rather than redeclared, so there is one
+definition to keep closed rather than two to keep in step.
 
 ``dh_core/ledger.py`` (Slice 2 of ``docs/work-ledger/plan.md``) implements this module and is
 tested against it. Until it exists, this module is the design; after it exists, this module is
@@ -32,22 +34,15 @@ from __future__ import annotations
 from enum import StrEnum
 
 from pydantic import BaseModel, Field
+from sam_schema.core.models import TaskStatus
 
 # ---------------------------------------------------------------------------
 # Statuses
 # ---------------------------------------------------------------------------
 
-
-class Status(StrEnum):
-    """Task statuses; the closure test asserts these equal ``TaskStatus``."""
-
-    NOT_STARTED = "not-started"
-    IN_PROGRESS = "in-progress"
-    COMPLETE = "complete"
-    BLOCKED = "blocked"
-    DEFERRED = "deferred"
-    SKIPPED = "skipped"
-    FAILED = "failed"
+Status = TaskStatus
+"""Task statuses. ``sam_schema.core.models.TaskStatus`` is the single definition; this alias
+keeps ``spec.Status`` reading well at every call site in this module and its tests."""
 
 
 ANY = "*"
