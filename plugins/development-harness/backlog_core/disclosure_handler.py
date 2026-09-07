@@ -197,7 +197,7 @@ class TokenBoundedExtractor:
     and does NOT fetch content from any external source.
 
     Uses the shared ``ENCODING`` singleton from ``progressive_markdown.list_navigator``
-    (ADR-2) so token counts are consistent with budget gates, map estimates, and the
+    so token counts are consistent with budget gates, map estimates, and the
     rest of the progressive disclosure pipeline.
 
     Example::
@@ -268,7 +268,7 @@ class BacklogViewDisclosureHandler:
     is isolated with no cross-call state leakage.  ``normalizer`` and
     ``extractor`` are stateless and may be injected or left as defaults.
 
-    **Un-gated path** (ADR-5): The gated ``backlog_view`` tool returns
+    **Un-gated path**: The gated ``backlog_view`` tool returns
     ``body=""`` for over-budget items.  ``operations.view_item()`` is called
     directly (via the module reference ``backlog_core.operations``) to obtain
     the full body regardless of token budget.
@@ -329,7 +329,7 @@ class BacklogViewDisclosureHandler:
                 in the item's ordinal map (raised from ``_handle_navigate`` or
                 ``_handle_extract``).
         """
-        # Un-gated fetch (ADR-5): call via module reference so spy on
+        # Un-gated fetch — call via module reference so spy on
         # ``backlog_core.operations.view_item`` intercepts the call.
         # ``include_content=True`` is the default — full body and sections.
         view_result = operations.view_item(selector, refresh=refresh)
@@ -386,7 +386,7 @@ class BacklogViewDisclosureHandler:
         ``MapResponse.total_est_tokens`` sums LEVEL-1 section estimates only
         (ordinals without a dot).  Level-2 entry lines are excluded to prevent
         double-counting body text already included in the parent section
-        estimate (architect spec §5.2, #2495 regression guard).
+        estimate (architect spec §5.2 — regression guard).
 
         Args:
             selector: Item selector echoed into the response.
@@ -396,7 +396,7 @@ class BacklogViewDisclosureHandler:
         Returns:
             ``MapResponse`` with formatted ``map_text``, ``total_sections``
             (level-1 count), ``total_est_tokens`` (level-1 sum only),
-            ``over_budget`` flag, and ``struck_ordinals`` (#3187) — the
+            ``over_budget`` flag, and ``struck_ordinals`` — the
             ordinals of every struck entry or descendant in the map.
         """
         level1_entries = [e for e in entries if "." not in e.ordinal]
@@ -427,11 +427,11 @@ class BacklogViewDisclosureHandler:
             ``NavigateResponse`` with either:
 
             - ``has_children=True``, ``child_map`` populated, ``content=""``
-              (ADR-7) when the node is a sub-heading parent.
+              when the node is a sub-heading parent.
             - ``has_children=False``, ``content`` set to the full body text or
               raw fence body, ``child_map=None`` for leaves and code blocks.
 
-            Both branches carry ``struck``/``entry_id`` (#3187) mirrored
+            Both branches carry ``struck``/``entry_id`` mirrored
             directly from the resolved ``ResolvedUnit``.
 
         Raises:
@@ -442,7 +442,7 @@ class BacklogViewDisclosureHandler:
         unit = mapper.resolve(ordinal)
         if unit.has_sub_heading_children:
             # Parent node: return child map so agents can navigate to children.
-            # content="" per ADR-7 — prose is accessed via individual child ordinals.
+            # content="" — prose is accessed via individual child ordinals.
             return NavigateResponse(
                 ordinal=ordinal,
                 title=unit.title,
@@ -481,7 +481,7 @@ class BacklogViewDisclosureHandler:
 
         Args:
             selector: Item selector included in the ``next_call`` hint (in
-                scope here; ``BoundedContent`` carries no selector — ADR-5).
+                scope here; ``BoundedContent`` carries no selector).
             ordinal: Validated dot-path ordinal.
             head_tokens: Token window size from the ``DisclosureRequest``.
             skip_tokens: Token offset from the ``DisclosureRequest`` (0 for
@@ -492,7 +492,7 @@ class BacklogViewDisclosureHandler:
             ``BoundedResponse`` with ``next_call`` populated when truncated,
             ``None`` otherwise.  When the node is a sub-heading parent,
             ``content`` holds the bounded ``child_map`` text.  ``struck``/
-            ``entry_id`` (#3187) are mirrored from the resolved
+            ``entry_id`` are mirrored from the resolved
             ``ResolvedUnit`` — struck state is metadata, not content, so it
             survives windowing even when ``content`` is truncated.
 
@@ -501,7 +501,7 @@ class BacklogViewDisclosureHandler:
                 map.
         """
         unit = mapper.resolve(ordinal)
-        # §4.4 EXTRACT-on-parent: bound child_map text, not empty prose (ADR-7).
+        # §4.4 EXTRACT-on-parent: bound child_map text, not empty prose.
         text_to_bound = unit.child_map if unit.has_sub_heading_children else unit.content
         bounded = self._extractor.extract(text_to_bound, head_tokens=head_tokens, skip_tokens=skip_tokens)
         next_call: str | None = None

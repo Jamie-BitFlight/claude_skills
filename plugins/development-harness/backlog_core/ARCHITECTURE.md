@@ -378,9 +378,9 @@ below), `from ruamel.yaml import YAML, YAMLError`.
 
 **Responsibility**: Full-text search engine over the `list[dict[str, str | bool]]` item shape
 produced by `operations._build_list_entry`, plus content-based duplicate detection built on top of
-it (#3169). Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
-`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`
-(ADR-001: search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`).
+it. Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
+`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`:
+search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`.
 
 **Search engine**:
 
@@ -396,7 +396,7 @@ it (#3169). Must never import `fastmcp` or `mcp` — that constraint is what mak
   `_parse_body_sections()`.
 
 **Content-based duplicate detection** (replaces the deleted title-character-ratio matcher that
-previously lived in `parsing.py`, per ADR-004):
+previously lived in `parsing.py`):
 
 - `DuplicateCheckStatus(StrEnum)` — `DUPLICATE_FOUND`, `NO_DUPLICATE`, `COULD_NOT_VERIFY`. The
   tri-state result `operations._classify_duplicate_check()` returns; `COULD_NOT_VERIFY` never blocks
@@ -1132,8 +1132,8 @@ Deep ordinals remain resolvable via `navigate=`.
 
 ### Token Counting
 
-All token counts use the `ENCODING` singleton from `progressive_markdown.list_navigator`
-(ADR-2). No additional tiktoken instantiation occurs in this subsystem.
+All token counts use the `ENCODING` singleton from `progressive_markdown.list_navigator`.
+No additional tiktoken instantiation occurs in this subsystem.
 
 ### Key Files
 

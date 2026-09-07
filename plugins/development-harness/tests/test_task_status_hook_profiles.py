@@ -178,7 +178,7 @@ class TestResolveProfile:
 
         Tests: resolve_profile() case sensitivity.
         How: Set env var to 'MINIMAL', call resolve_profile().
-        Why: ADR-004 mandates case-sensitive lowercase values; uppercase triggers warning.
+        Why: Profile values are case-sensitive lowercase; uppercase triggers warning.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_HOOK_PROFILE", "MINIMAL")
         result = resolve_profile()
@@ -193,7 +193,7 @@ class TestResolveProfile:
 
         Tests: resolve_profile() case sensitivity with title case.
         How: Set env var to 'Standard', call resolve_profile().
-        Why: Consistent with ADR-004 case-sensitivity requirement.
+        Why: Profile values are case-sensitive.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_HOOK_PROFILE", "Standard")
         result = resolve_profile()
@@ -309,7 +309,7 @@ class TestParseDisabledHooks:
 
         Tests: parse_disabled_hooks() unknown ID forward compatibility.
         How: Set env var to an unrecognized hook ID.
-        Why: ADR-003 mandates no validation — unknown IDs silently never match.
+        Why: No validation is performed — unknown IDs silently never match.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_DISABLED_HOOKS", "future-hook:some-handler")
         result = parse_disabled_hooks()
@@ -325,7 +325,7 @@ class TestShouldSkipHook:
     """Unit tests for should_skip_hook().
 
     Tests: All combinations of event x profile x disabled set covering the
-    behavior matrix and ADR-002 (disabled takes precedence over profile).
+    behavior matrix, including that disabled takes precedence over profile.
     """
 
     def test_post_tool_use_minimal_skipped(self) -> None:
@@ -393,7 +393,7 @@ class TestShouldSkipHook:
 
         Tests: should_skip_hook() disabled set takes precedence.
         How: Pass PostToolUse with standard profile but disable its hook ID.
-        Why: Explicit disable is a stronger signal than profile (ADR-002).
+        Why: Explicit disable is a stronger signal than profile.
         """
         disabled = {HOOK_ID_POST_TOOL_USE}
         result = should_skip_hook("PostToolUse", HookProfile.STANDARD, disabled)
@@ -722,7 +722,7 @@ class TestMainIntegration:
 
         Tests: main() disabled hook early exit.
         How: Disable subagent-stop hook ID, provide SubagentStop event.
-        Why: Explicit disable must prevent handler from running (ADR-002).
+        Why: Explicit disable must prevent handler from running.
         """
         monkeypatch.delenv("CLAUDE_SKILLS_HOOK_PROFILE", raising=False)
         monkeypatch.setenv("CLAUDE_SKILLS_DISABLED_HOOKS", HOOK_ID_SUBAGENT_STOP)
@@ -770,7 +770,7 @@ class TestMainIntegration:
     ) -> None:
         """profile=strict + DISABLED_HOOKS=subagent-stop -> disabled wins, handler skipped.
 
-        Tests: main() disabled takes precedence over strict profile (ADR-002).
+        Tests: main() disabled takes precedence over strict profile.
         How: Set HOOK_PROFILE=strict and disable subagent-stop. Handler must not run.
         Why: Explicit disable overrides profile semantics in all cases.
         """

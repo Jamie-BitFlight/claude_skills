@@ -13,9 +13,14 @@ every other area of the plugin as it gets resolved.
 Load, Dispatch, and Delegate name actions. Dispatcher, Orchestrator, Manager, and Worker name
 the scope an agent's assignment covers — not a capability it holds or is denied.
 Every agent may decompose its own assignment however the work requires, including by dispatching
-further agents; the scope of the assignment is what differs. See
-[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
-incident that required stating this precisely.
+further agents; the scope of the assignment is what differs. This distinction was drawn precisely
+after a dispatched agent, handed a plan-level skill invocation written in first person for "the
+orchestrator," delegated the whole invocation to a further subagent instead of running it inline —
+re-entering the workflow level that produced its own assignment and restarting a loop whose
+earlier round was still in flight, at real unplanned cost. An agent's assignment must not
+re-enter the workflow level that produced that assignment; enforcement sits with the dispatching
+agent (which can observe whether it is about to hand an invocation onward), never the receiving
+one (which cannot observe which workflow level dispatched it).
 
 **Load**:
 Reading a skill's instructions into the current agent's own context. The agent that loads a skill
@@ -103,13 +108,13 @@ between the methodology and one literal stateless agent instance).
 
 **Resolve**:
 Mark a work item DONE with an evidence trail (summary, method, notes, follow-ups, findings) —
-`resolve_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)). The evidence trail is meant
+`resolve_item()`. The evidence trail is meant
 as contractual, not a GitHub-only artifact — persisting it on every backend, not only rendering it
 into a GitHub comment, is tracked by [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
 _Avoid_: "close" for completed work — that is Close below, a different, incompatible contract.
 
 **Close**:
-Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
+Dismiss a work item without completion — `close_item()`,
 requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, permanently
 blocked — not a temporary wait on a dependency or input). No
 resolution evidence trail — that is Resolve's contract above, not Close's. `close_item()` also
@@ -118,8 +123,8 @@ remains distinct from `BacklogItem.reference`, the storage identity. Close persi
 `close_reference`, and `close_comment` in neutral metadata on every backend, and GitHub's closing
 comment uses those same caller-provided values — see
 [#3230](https://github.com/Jamie-BitFlight/claude_skills/issues/3230).
-_Avoid_: "resolve" for a dismissal — [ADR-9](./docs/adr-9-close-resolve-semantics.md) exists
-because these were once conflated and callers used the wrong one for already-completed work.
+_Avoid_: "resolve" for a dismissal — these were once conflated and callers used the wrong one
+for already-completed work; close and resolve are now a deliberate, distinct pair.
 
 **Evidence trail**:
 The structured resolution record Resolve above requires. Only `summary` is enforced today;
@@ -197,11 +202,11 @@ SQLite database at `state_root()/control-set.db` (per-project, WAL mode), rows k
 eviction by size, not entry count) and a periodic, rate-limited age-based cleanup pass (hourly to
 daily, not on every write). Holds no authoritative data — every row is a disposable cache
 Collection and Generation can rebuild on demand, so losing the whole database costs nothing but a
-cold cache. See ADR-3082-1.
+cold cache.
 _Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
 "same entry regardless of transport" no matter how carefully it's wired. Also avoid describing
-this as "a directory per session" — that was ADR-3075-4's original storage mechanism, superseded
-by ADR-3082-1.
+this as "a directory per session" — that was an earlier storage mechanism, since superseded by
+the content-keyed SQLite store described above.
 
 **Navigate** (action):
 Requesting content at a specific address from the table of contents. Matches the `navigate`

@@ -22,7 +22,7 @@ def validate_appended_task(task: Task, existing_ids: set[str], plan_id: str) -> 
     Centralises the duplicate-ID guard that all three backends share.
     Call before persisting the task to storage.
 
-    Single-writer contract (ADR-1770-1): backends are NOT required to be
+    Single-writer contract: backends are NOT required to be
     atomic under concurrent writers. Callers must serialise writes to the
     same plan. Behavior under concurrent writes is undefined.
 

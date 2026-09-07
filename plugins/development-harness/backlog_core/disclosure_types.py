@@ -76,7 +76,7 @@ class NavigateResponse:
     When ``has_children`` is ``True`` the node has sub-heading children and
     ``child_map`` contains a formatted listing of their ordinals and titles.
     ``content`` is an empty string in that case — prose is accessed by
-    navigating to individual child ordinals (ADR-7).
+    navigating to individual child ordinals.
 
     When ``has_children`` is ``False`` the node is a leaf (or a code-only
     node) and ``content`` carries the full body text or raw fence body.
@@ -92,7 +92,7 @@ class NavigateResponse:
     content: str
     """Full section/entry content — may be large.
 
-    Empty string (not ``None``) when ``has_children`` is ``True`` (ADR-7).
+    Empty string (not ``None``) when ``has_children`` is ``True``.
     """
 
     total_tokens: int
@@ -112,8 +112,8 @@ class NavigateResponse:
     has_children: bool = False
     """``True`` iff this node has sub-heading children (``SectionNode`` children).
 
-    Code-only nodes (prose + fences, no sub-headings) have ``has_children=False``
-    (ADR-4).  When ``True``, callers should display ``child_map`` and navigate
+    Code-only nodes (prose + fences, no sub-headings) have ``has_children=False``.
+    When ``True``, callers should display ``child_map`` and navigate
     to a child ordinal rather than using ``content`` directly.
     """
 

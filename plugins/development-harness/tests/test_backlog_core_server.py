@@ -3164,9 +3164,9 @@ async def test_backlog_view_sections_multiple_sections_returns_all_requested():
 
 
 async def test_backlog_view_sections_invalid_section_name_returns_error():
-    """backlog_view sections with an unknown name returns an ADR-3 error dict.
+    """backlog_view sections with an unknown name returns an error dict.
 
-    Tests: error-on-miss contract (ADR-3) — a section name not present in the item
+    Tests: error-on-miss contract — a section name not present in the item
            produces an error response rather than silently omitting the name.
     How: Request a section name that does not exist on the item. Assert the response
          contains an ``error`` key, the ``section_filter_miss`` flag is True, and

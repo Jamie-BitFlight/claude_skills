@@ -1,7 +1,7 @@
 """Local filesystem implementation of the ArtifactBackend protocol.
 
 Stores artifact manifests at ``~/.dh/projects/{slug}/artifacts/{issue_number}.json``
-(one file per issue, matching architect ADR-001) and artifact content files at
+(one file per issue) and artifact content files at
 ``{root_worktree}/{artifact_id}`` (same convention as remote providers).
 
 Advisory locking via ``fcntl.flock(LOCK_EX)`` on a per-issue ``.lock`` file
@@ -13,7 +13,7 @@ All writes are atomic: content is written to a temporary file, then
 ``os.replace`` replaces the target atomically.  The temporary file is deleted
 on failure via a ``try/finally`` guard.
 
-Lock files are never deleted (TOCTOU risk per architect ADR-003).
+Lock files are never deleted (TOCTOU risk).
 
 Uses only the standard library (``json``, ``os``, ``fcntl``, ``tempfile``,
 ``pathlib``, ``datetime``, ``typing``), plus Pydantic models already available
@@ -286,7 +286,7 @@ class LocalFilesystemArtifactProvider:
         """Return the path to the advisory lock file for *item_id*.
 
         Lock files are created on first acquire and **never** deleted
-        (TOCTOU risk per architect ADR-003).
+        (TOCTOU risk).
 
         Args:
             item_id: Issue number.

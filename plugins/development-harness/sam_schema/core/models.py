@@ -491,7 +491,7 @@ class TaskAssignment(WireContractModel):
     with the specific task details, so agents receive everything needed in a
     single call without separate plan-level lookups.
 
-    Per ADR-003: all task dispatches return this shape when a task address is
+    All task dispatches return this shape when a task address is
     provided. Plan-only reads (``sam read P{N}``) continue to return ``Plan``.
     """
 
@@ -682,8 +682,8 @@ class CreatePlanResult(BaseModel):
 class CreatePlanError(BaseModel):
     """Structured error returned when plan creation's artifact write fails.
 
-    Returned by ``operations.create_plan`` on the ArtifactWriteError path
-    (ADR-2509-5). The plan may exist on local disk but is NOT durable; callers
+    Returned by ``operations.create_plan`` on the ArtifactWriteError path.
+    The plan may exist on local disk but is NOT durable; callers
     inspect ``error``/``reason`` to decide retry behaviour.
     """
 

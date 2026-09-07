@@ -75,8 +75,7 @@ Owns: plan and task models, plan lifecycle, and the CLI entry point.
 Consumes: `progressive_markdown` for all markdown handling; `dh_core` for shared operations.
 
 Constraint: plan mutation is single-writer. Operations that append a task or finalise a plan
-must not be performed concurrently by more than one writer. See
-[ADR-1770-1](./adrs/ADR-1770-1-single-writer-task-backend.md) — this constraint is easy to
+must not be performed concurrently by more than one writer — this constraint is easy to
 violate silently when adding a new mutation path.
 
 Do not confuse with: `dispatch_schema`. Plans describe work; dispatch plans describe how

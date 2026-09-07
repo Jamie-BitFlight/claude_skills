@@ -16,8 +16,8 @@ CREATE → GROOM → WORK → (IMPLEMENT) → CLOSE/RESOLVE
 /groom-backlog-item      → validity check → fact-check → RT-ICA → classify → root-cause → groomer agent → write sections
 /work-backlog-item       → find item → already-implemented? → GitHub sync → auto-groom → RT-ICA gate → compose → /add-new-feature → update plan ref
   /add-new-feature       → discovery → codebase analysis → architecture → tasks → validate → context manifest
-/work-backlog-item close → dismiss with reason (ADR-9)
-/work-backlog-item resolve → checklist → acceptance criteria → PR check → evidence trail (ADR-9)
+/work-backlog-item close → dismiss with reason
+/work-backlog-item resolve → checklist → acceptance criteria → PR check → evidence trail
 ```
 
 ---
@@ -150,7 +150,7 @@ Phase 1: Locate (find item, issue-first path, extract fields)
 Phase 2: Validate (already-implemented check, GitHub sync, set labels)
 Phase 3: Prepare (auto-groom, RT-ICA gate)
 Phase 4: Plan (compose request, invoke SAM, update backlog)
-Phase 5: Close/Resolve (ADR-9 procedure)
+Phase 5: Close/Resolve
 ```
 
 ---
@@ -282,7 +282,7 @@ The canonical flow should be:
 
 1. **Actor ownership** is excellent — every step names who does it
 2. **Terminal states** are well-defined (STOP, BLOCKED, APPROVED, RESOLVED, CLOSED)
-3. **ADR-9 close/resolve** is a clean, well-structured decision tree
+3. **Close/resolve** is a clean, well-structured decision tree
 4. **Fact-check + RT-ICA integration** (REFUTED → MISSING) is a strong design
 5. **Issue classification + root-cause analysis** (5-whys, 6-sigma) is sophisticated
 

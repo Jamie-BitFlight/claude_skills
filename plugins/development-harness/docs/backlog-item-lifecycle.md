@@ -611,7 +611,7 @@ flowchart TD
     P6_DEPTH_GUARD -->|"Yes — limit reached"| P6_DEPTH_STOP["RECURSION DEPTH LIMIT REACHED<br>Route remaining to backlog"]
     P6_DEPTH_GUARD -->|"No — continue"| P6_RTCA_GUARD{BLOCKED-FOR-PLANNING?}
     P6_RTCA_GUARD -->|"Yes — blocked"| P6_RTCA_STOP["RECURSION STOPPED — RT-ICA BLOCKED<br>Resume: /dh:work-backlog-item"]
-    P6_RTCA_GUARD -->|"No — proceed"| P6_RECURSE{"Recursion gate:<br>BOTH conditions required<br>1. follow-up slug matches parent (ADR-3)<br>2. follow-up priority = High (ADR-2)"}
+    P6_RTCA_GUARD -->|"No — proceed"| P6_RECURSE{"Recursion gate:<br>BOTH conditions required<br>1. follow-up slug matches parent<br>2. follow-up priority = High"}
     P6_RECURSE -->|"Both conditions met"| P6_RECURSE_IMMEDIATE["Recurse immediately:<br>Skill('implement-feature', followup)<br>Then re-run complete-implementation"]
     P6_RECURSE -->|"Either condition not met"| P6_DEFER(["Defer follow-up<br>Output: 'to resume:<br>/dh:work-backlog-item &lt;title&gt;'"])
 
@@ -673,7 +673,7 @@ flowchart TD
 
 **T5 skip condition** (applies to both the SAM and proportional paths): After T4 completes, the orchestrator reads the `Total findings: {count}` line from the `doc-drift-auditor` agent's `ARTIFACTS` return block (the full drift report is registered as the `audit-report` artifact). If `Total findings: 0` → skip T5 via `sam_task(config={"action":"state","status":"skipped"})`. If 1 or more → T5 proceeds. If the count line is absent, the orchestrator reads the `audit-report` artifact and treats a non-empty `## Findings by Category` as drift. **Why:** Documentation update has no value when no drift exists. Other QG tasks (code review, feature verification, integration check) always have verification value even if the implementation is perfect — but running `service-docs-maintainer` on a codebase with no drift would produce no changes.
 
-**Recursive follow-up routing** requires BOTH conditions: (1) the follow-up slug matches the parent feature slug (ADR-3), and (2) the follow-up priority is High (ADR-2). **Why:** Slug matching prevents unrelated bugs found during review from hijacking the current feature's quality gates. Priority gating prevents low-priority same-feature follow-ups from delaying completion.
+**Recursive follow-up routing** requires BOTH conditions: (1) the follow-up slug matches the parent feature slug, and (2) the follow-up priority is High. **Why:** Slug matching prevents unrelated bugs found during review from hijacking the current feature's quality gates. Priority gating prevents low-priority same-feature follow-ups from delaying completion.
 
 **Depth guard**: The recursion counter `{recursion_depth}` is initialized to 0 at skill invocation and increments by 1 before each call to `implement-feature`. When `{recursion_depth}` reaches `DH_RECURSIVE_REVIEW_TASK_DEPTH = 5`, Guard 1 fires: all remaining in-scope follow-ups are routed to the backlog with a systemic design issue warning and recursion stops. The counter resets between separate `/complete-implementation` invocations — it is not persisted.
 
@@ -703,9 +703,9 @@ the current implementation cycle.
 
 **Actor**: Orchestrator, with user input for reason/summary.
 
-### Semantics (ADR-9)
+### Semantics
 
-ADR-9 inverted the close/resolve semantics from ADR-8 to match natural language:
+The close/resolve semantics match natural language:
 
 - **close** = dismissed without completion. Item will NOT be worked. Terminal, no work done.
 - **resolve** = completed with evidence trail. Work IS done. Terminal.
@@ -785,11 +785,11 @@ flowchart TD
 | P7_STOP_PR_WAIT | orchestrator | open PR reference | local status update only, wait for PR merge | terminal |
 | P7_RESOLVE_CALL | `backlog_resolve` MCP | selector, summary (required), plan, method, notes, follow_ups, findings | work item closed, `{"status": "done", "priority": "completed", "plan": "{plan}"}` metadata | terminal |
 
-**close metadata** (ADR-9): `{"status": "closed", "close_reason": "{reason}", "close_reference": "{reference}", "close_comment": "{comment}"}`. The configured backend records the close reason, related reference, and comment and transitions the work item to closed.
+**close metadata**: `{"status": "closed", "close_reason": "{reason}", "close_reference": "{reference}", "close_comment": "{comment}"}`. The configured backend records the close reason, related reference, and comment and transitions the work item to closed.
 
-**resolve metadata** (ADR-9): `{"status": "done", "priority": "completed", "plan": "{plan}"}`. The configured backend records the evidence and transitions the work item to resolved.
+**resolve metadata**: `{"status": "done", "priority": "completed", "plan": "{plan}"}`. The configured backend records the evidence and transitions the work item to resolved.
 
-**"Already implemented" discovery** during grooming should use `resolve(summary="Already implemented via PR #N / commit {sha}")`, not `close` (per ADR-9 Consequences).
+**"Already implemented" discovery** during grooming should use `resolve(summary="Already implemented via PR #N / commit {sha}")`, not `close` — the work IS done, matching resolve's semantics above, not close's "no work done" semantics.
 
 **complete-milestone is NOT referenced** anywhere in `work-backlog-item/SKILL.md`. The transition from resolve to milestone closure is not documented (audit Finding 9 Gap E).
 
@@ -906,5 +906,4 @@ Neither `implement-feature` nor `start-task` documents an explicit procedure for
   `dh:dh-meta-docs`, which routes to both.
 - [Domain model source (authoritative field definitions)](../sam_schema/core/models.py)
 - [Backend Providers](./backend-providers.md)
-- [ADR-9: Close/Resolve Semantics](./adr-9-close-resolve-semantics.md)
 - [Process Audit (2026-03-02)](./process-audit-backlog-lifecycle-2026-03-02.md)

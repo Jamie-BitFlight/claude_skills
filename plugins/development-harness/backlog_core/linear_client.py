@@ -41,7 +41,7 @@ class LinearAttachmentNode(TypedDict):
 
 
 # ---------------------------------------------------------------------------
-# Type-narrowing helpers (ADR-002: module-local, not shared)
+# Type-narrowing helpers — module-local, not shared
 # ---------------------------------------------------------------------------
 
 

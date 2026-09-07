@@ -1198,7 +1198,7 @@ class TestListItemsBeadsBackend:
     """list_items does not crash and returns correct status with BeadsBackend.
 
     BUG-1: batch_fetch_statuses raises NotImplementedError for beads because
-    beads IDs are strings with no integer representation (ADR-002).  The fix
+    beads IDs are strings with no integer representation.  The fix
     detects BeadsBackend via isinstance and passes status_map={} instead.
     _item_derived_status and _build_list_entry both fall back to item.status
     when the map is empty.
@@ -1224,8 +1224,8 @@ class TestListItemsBeadsBackend:
         Tests: BUG-1 crash prevention.
         How: Swap backend to BeadsBackend; assert batch_fetch_statuses is never
              called (it would raise NotImplementedError for beads).
-        Why: Calling batch_fetch_statuses on BeadsBackend raises NotImplementedError
-             (ADR-002).  The fix must skip that call entirely.
+        Why: Calling batch_fetch_statuses on BeadsBackend raises NotImplementedError.
+             The fix must skip that call entirely.
         """
         self._make_beads_backend_config(mocker)
         _seed_items([])
@@ -1865,7 +1865,7 @@ class TestViewItem:
         Why: 52 pre-existing tests elsewhere in the suite (via
              backlog_core/tests/_view_test_helpers.py::_configure_memory_view)
              depend on this unconditional call for numeric selectors. `refresh`
-             is additive-only (ADR-3, corrected) — it must never remove this
+             is additive-only — it must never remove this
              existing behavior.
         """
         import backlog_core.models as models
@@ -1887,14 +1887,14 @@ class TestViewItem:
         """No cached item + numeric selector + refresh=False still performs a live lookup.
 
         Tests: view_item's unconditional identity-resolution live call (Case C/D).
-             REGRESSION GUARD (ADR-3): a not-yet-synced item must still resolve via
+             REGRESSION GUARD: a not-yet-synced item must still resolve via
              a live lookup regardless of refresh, or it would raise a false
              ItemNotFoundError.
         How: Write NO local item; call view_item("999") with no refresh kwarg and
              enrich mocked to succeed; assert enrich was called with "999" and no
              exception was raised.
         Why: Gating the identity-resolution call behind refresh would break every
-             not-yet-synced item lookup — the exact bug ADR-3 exists to prevent.
+             not-yet-synced item lookup — the exact bug this guards against.
         """
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 

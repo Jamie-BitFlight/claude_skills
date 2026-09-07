@@ -4,7 +4,7 @@ version: '1.0'
 description: Historical implementation-plan snapshot. Embedded tool-call forms are extraction evidence, not current executable signatures.
 state: ready
 goal: |-
-  Implement the DH Workflow Extractor System: deterministic scope enumeration + per-file haiku/sonnet ensemble extraction producing a verified actor-step graph, with idempotent fragment ETL, SessionStart staleness detection, an agent-facing query skill, and aligned documentation/config. Source: architect spec plan/architect-dh-workflow-extractor-system.md (#2646).
+  Implement the DH Workflow Extractor System: deterministic scope enumeration + per-file haiku/sonnet ensemble extraction producing a verified actor-step graph, with idempotent fragment ETL, SessionStart staleness detection, an agent-facing query skill, and aligned documentation/config. Source: architect spec plan/architect-dh-workflow-extractor-system.md (see `issue` field below).
 issue: '2646'
 autonomy: full_auto
 tasks:
@@ -24,11 +24,11 @@ tasks:
   accuracy-risk: medium
   reason: Root of the dependency spine. SCOPE.md is the contract consumed by the
     SessionStart hook and the extraction pipeline. Deterministic — no LLM, no 
-    hallucination risk (ADR-1).
+    hallucination risk.
   body: "## Context\nNew producer for the DH Workflow Extractor System. Performs deterministic
     BFS from entry-point SKILL.md files to compute the full in-scope file set. Source:
     architect spec plan/architect-dh-workflow-extractor-system.md §1.1, §2.1, §2.9,
-    §3.3, §4.1, ADR-1. This file does NOT exist yet (Codebase Audit: must create).\n\
+    §3.3, §4.1. This file does NOT exist yet (Codebase Audit: must create).\n\
     \n## Objective\nProduce a deterministic `enumerate_scope.py` that crawls entry
     points, resolves 4 reference types, and writes `docs/workflow-layers/SCOPE.md`
     — one row per reachable file, stable output for identical input.\n\n## Inputs\n\
@@ -93,7 +93,7 @@ tasks:
   accuracy-risk: medium
   reason: Root of the dependency spine. The idempotent ETL that turns per-file 
     extraction fragments into the step layer JSON. Required before 
-    dh-extract-file.js step 5 can run (ADR-1, §4.2).
+    dh-extract-file.js step 5 can run (§4.2).
   body: "## Context\nNew producer for the DH Workflow Extractor System. Performs the
     idempotent fragment→layer ETL: removes prior nodes from the same source file,
     appends new verified nodes, writes atomically. Source: architect spec §1.1, §2.4,
@@ -406,12 +406,12 @@ tasks:
   - T05
   - T06
   accuracy-risk: high
-  reason: Cross-plugin contribution (ADR-4). reduce.py is owned by 
+  reason: Cross-plugin contribution. reduce.py is owned by 
     plugin-creator; DH must NOT call it until these changes land behind a 
     passing backward-compat gate. Required before dh-extract-file.js integration
     (T10).
   body: "## Context\nThe ensemble reducer `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`
-    needs 2 changes for the step-extraction use case (architect §8.2, ADR-4). DH does
+    needs 2 changes for the step-extraction use case (architect §8.2). DH does
     NOT own this file — changes are contributed upstream to plugin-creator. A backward-compat
     gate (§8.3) decides upstream-edit vs DH-owned wrapper. This file already exists
     (fact-checked: reduce.py exists).\n\n## Objective\nApply Change 1 (slug-normalised
@@ -419,7 +419,7 @@ tasks:
     to reduce.py, gated by the §8.3 backward-compat protocol; fall back to a DH wrapper
     (scripts/dh_reduce.py) only if backward-compat breaks.\n\n## Inputs\n- Architect
     spec §8.2 (exact code for both changes + backward-compat tests), §8.3 (verification
-    protocol + wrapper fallback), ADR-4\n- Current `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`\n\
+    protocol + wrapper fallback)\n- Current `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`\n\
     - Load `/plugin-creator:ensemble-rule-review` to understand the reducer design
     intent before editing.\n\n## Requirements\n1. Change 1 — in `normalize_location()`:
     when no line-number match, normalise the heading portion. Split on first `:`,
@@ -438,7 +438,7 @@ tasks:
     as post-processing (architect §8.3 fallback). Attempt upstream edit FIRST.\n\n\
     ## Constraints\n- Do NOT fork/copy reduce.py wholesale.\n- Do NOT change the existing
     line-number normalisation behaviour.\n- Do NOT create dh_reduce.py proactively
-    — only if the gate fails (ADR-4 consequence).\n- Do NOT break the existing reduce.py
+    — only if the gate fails.\n- Do NOT break the existing reduce.py
     public API consumed by other ensemble callers.\n\n## Expected Outputs\n- `plugins/plugin-creator/skills/ensemble-rule-review/scripts/reduce.py`
     (edited) OR `plugins/development-harness/scripts/dh_reduce.py` (fallback wrapper)
     — exactly one path taken\n\n## Acceptance Criteria\n1. `normalize_location('src/foo.md:42')
@@ -896,14 +896,14 @@ tasks:
     staleness and dispatches incremental extraction. This is where the orchestration
     logic lives — it is a substantial JS file, distinct from the hooks.json registration
     (T15). Source: architect §4.6 (module boundary + 7-step contract), §7.1 (full
-    algorithm, timeout, error handling), ADR-5. Load `/plugin-creator:hook-creator`
+    algorithm, timeout, error handling). Load `/plugin-creator:hook-creator`
     for hook conventions.\n\n## Objective\nProduce session-start-workflow-staleness.cjs
     implementing the §7.1 algorithm: read meta.json, diff against HEAD, intersect
     with SCOPE.md, dispatch dh-extract-file.js (background) per changed in-scope file,
     update meta.json and regenerate COVERAGE.md — non-blocking, never exits non-zero.\n\
     \n## Inputs\n- Architect spec §4.6 (7-step inter-module contract), §7.1 (algorithm
     pseudocode, timeout 30000ms, SCOPE.md dependency, error handling, env access),
-    ADR-5\n- dh-extract-file.js (T12) — the workflow it dispatches\n- meta.json +
+    \n- dh-extract-file.js (T12) — the workflow it dispatches\n- meta.json +
     step.json (T13), enumerate_scope.py (T01, invoked if SCOPE.md missing)\n\n## Requirements\n\
     1. JavaScript (Node.js CJS) per repo language conventions.\n2. Implement the §4.6/§7.1
     algorithm: (1) read meta.json → last_analyzed_commit (empty=first run); (2) `git
@@ -988,7 +988,7 @@ tasks:
     SubagentStop, SessionEnd per §7.2 table).\n4. hooks.json remains valid JSON.\n\
     \n## Constraints\n- Do NOT remove or reorder existing hooks.\n- Do NOT change
     the existing session-start-session-id.cjs command or timeout.\n- Do NOT add the
-    entry as a git hook — it is a Claude Code SessionStart lifecycle entry (ADR-5).\n\
+    entry as a git hook — it is a Claude Code SessionStart lifecycle entry.\n\
     \n## Expected Outputs\n- `plugins/development-harness/hooks/hooks.json` (updated)\n\
     \n## Acceptance Criteria\n1. hooks.json contains both SessionStart entries: existing
     session-start-session-id.cjs AND new session-start-workflow-staleness.cjs.\n2.
@@ -1030,13 +1030,13 @@ tasks:
   - T17
   - T18
   accuracy-risk: medium
-  reason: Agent query interface (ADR-3). Reads step.json so the bootstrap (T13) 
+  reason: Agent query interface. Reads step.json so the bootstrap (T13) 
     and rewritten schema (T04) must exist. Implementable on partial step layer 
     data. Lowest-criticality consumer of the spine.
   body: "## Context\nCreate the agent-facing query skill that reads the step layer
     JSON for blast-radius analysis, component inventory, downstream traversal, and
     coverage gaps. Loaded on demand by agents (not session-injected). This skill does
-    NOT exist. Source: architect §4.7, §6 (full spec), ADR-3. Load `/plugin-creator:skill-creator`.\n\
+    NOT exist. Source: architect §4.7, §6 (full spec). Load `/plugin-creator:skill-creator`.\n\
     \n## Objective\nProduce workflow-query/SKILL.md with the §6 frontmatter and the
     4 query-pattern contracts plus the required freshness check.\n\n## Inputs\n- Architect
     spec §6 (frontmatter, 4 query patterns, data sources, freshness check, no-session-injection
@@ -1051,12 +1051,12 @@ tasks:
     + all gap edges).\n3. Data sources read: step.json, dh-workflow-graph.json (enrichment),
     COVERAGE.md (freshness) per §6.\n4. Freshness check (required): before answering,
     read meta.json, compare last_analyzed_commit with current HEAD; if different,
-    prefix answer with the §6 stale warning.\n5. No session-start injection (ADR-3
+    prefix answer with the §6 stale warning.\n5. No session-start injection (
     / anti-instruction-bloat). The skill is loaded on demand only.\n6. Stateless:
     every invocation reads fresh from disk; no MCP calls, no writes (§4.7).\n\n##
     Constraints\n- Do NOT make the skill user-invocable (§6: user-invocable: false).\n\
     - Do NOT add write/MCP operations (§4.7 Does NOT own).\n- Do NOT add session-start
-    injection (ADR-3 prohibits).\n- Do NOT grant tools beyond Read.\n\n## Expected
+    injection (architect spec prohibits).\n- Do NOT grant tools beyond Read.\n\n## Expected
     Outputs\n- `plugins/development-harness/skills/workflow-query/SKILL.md` (new skill)\n\
     \n## Acceptance Criteria\n1. Frontmatter matches §6 (name, description, user-invocable:
     false, tools: Read).\n2. All 4 query patterns are present with the §6 output contracts.\n\
@@ -1318,16 +1318,16 @@ tasks:
     check (not post-commit) and dh-extract-file.js dispatch, with the new agent names
     and dispatch-via-agentType mechanism.'
   body: "## Context\nUpdate the workflow-extraction rule to match the adopted architecture:
-    SessionStart staleness detection (ADR-5, NOT git post-commit), dh-extract-file.js
+    SessionStart staleness detection (NOT git post-commit), dh-extract-file.js
     dispatch, and the two new agents (worker/reducer). Source: architect §1.2 (.claude/rules/workflow-extraction.md:
-    update agent names and dispatch mechanism), ADR-5.\n\n## Objective\nProduce a
+    update agent names and dispatch mechanism).\n\n## Objective\nProduce a
     workflow-extraction.md that describes the SessionStart-triggered, dh-extract-file.js-orchestrated,
     worker+reducer ensemble — with no stale post-commit or single-agent references.\n\
-    \n## Inputs\n- Architect spec §1.2 (rule update scope), ADR-5 (SessionStart over
+    \n## Inputs\n- Architect spec §1.2 (rule update scope; SessionStart over
     post-commit), §5.1/§5.2 (agent names), §4.3/§4.6 (dispatch mechanism)\n- Current
     `plugins/development-harness/.claude/rules/workflow-extraction.md`\n\n## Requirements\n\
     1. Replace any post-commit-hook trigger description with the SessionStart staleness-check
-    trigger (ADR-5).\n2. Update agent references to workflow-extractor-worker (haiku)
+    trigger).\n2. Update agent references to workflow-extractor-worker (haiku)
     and workflow-extractor-reducer (sonnet); remove the retired single workflow-extractor.\n\
     3. Describe dispatch via dh-extract-file.js and the agentType mechanism (no Skill()
     in -p/hook context).\n4. Use `./` relative links and language-fenced code blocks
@@ -1489,7 +1489,7 @@ tasks:
     and overlay updates; gap edges render as dashed amber (feature-context Expected
     Behavior). Explicitly scoped to a separate task; NOT blocking extraction — lowest
     priority. Source: architect §1.2, feature-context Expected Behavior (gap edges
-    dashed amber), ADR-2/ADR-3 (explorer remains for human visualization).\n\n## Objective\n\
+    dashed amber; explorer remains for human visualization).\n\n## Objective\n\
     Add step-node and hook-node type support and render next/triggered_by edges and
     gap edges (dashed amber) in dh-workflow-explorer.html, without breaking existing
     layer rendering.\n\n## Inputs\n- Architect spec §1.2 (explorer CODE_CHANGE: step/hook

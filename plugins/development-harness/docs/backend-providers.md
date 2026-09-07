@@ -130,7 +130,7 @@ probing behavior or catching a stub's exception:
 | `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
 | `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
 | `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
-| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept (ADR-003) — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
+| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
 
 **Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
 `runtime_checkable` Protocols. `isinstance(backend, SomeProtocol)` checks
@@ -158,8 +158,8 @@ more than one legacy link), then drops that table. `sqlite`/`memory` order
 `list_milestones` by `due_on` then `number`; neither has a priority-ordering
 concept.
 
-`beads` sets `supports_milestones = False` (ADR-003 — its milestone IDs are
-string nanoids, `MilestoneFullNode.number` is `int`). Use its beads-native
+`beads` sets `supports_milestones = False` — its milestone IDs are
+string nanoids, `MilestoneFullNode.number` is `int`. Use its beads-native
 shadow methods instead of the generic Protocol methods:
 `list_beads_milestones`/`create_beads_milestone`/`assign_beads_item_to_milestone`,
 backed by `bd create --type milestone [--due] [--parent]` and

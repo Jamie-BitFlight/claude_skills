@@ -673,7 +673,7 @@ class TestBeadsBackendConformance:
     Uses constructor injection to mock BdRunner — no live bd binary is
     invoked.  These tests are NOT parametrised over the shared ``backend``
     fixture because BeadsBackend stubs out most Protocol methods as
-    NotImplementedError (ADR-001) — running those tests against beads would
+    NotImplementedError — running those tests against beads would
     produce 20+ expected failures rather than signal a problem.
 
     Marked ``cross_backend`` so they are included in the CI matrix job.
