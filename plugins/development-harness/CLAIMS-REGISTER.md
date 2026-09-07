@@ -106,9 +106,8 @@ Consequences the design draws, each a claim in its own right:
 
 ## n8n as a reference for the graph model (read 2026-09-07)
 
-Cited by `docs/adrs/ADR-3460-2-one-graph-typed-and-instantiated.md`. n8n was offered as an analogy
-for configurable node templates with conditional data flow; these entries separate what it
-establishes from what it does not.
+n8n was offered as an analogy for configurable node templates with conditional data flow; these
+entries separate what it establishes from what it does not.
 
 - **A node in a saved workflow is an instance referencing a registered type, not a copy of it.**
   `INode` carries `type: string` (e.g. `n8n-nodes-base.httpRequest`), `typeVersion` and its own
