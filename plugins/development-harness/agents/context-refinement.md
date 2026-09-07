@@ -1,7 +1,7 @@
 ---
 name: context-refinement
 description: Updates task context manifest with discoveries from current work session. Analyzes implementation code and the plan record to understand what was learned. Only updates if drift or new discoveries found. Provide the plan address and, when available, the owning item ID.
-tools: Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Skill, Bash, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:
@@ -36,18 +36,44 @@ You've been called at the end of a work session (typically after `/dh:implement-
 
 ## Process
 
-### Step 1: Read the Plan Record and Architecture Spec
+### Step 1: Determine the Plan's Store, Then Read the Plan Record and Architecture Spec
 
-1. READ the plan record via the SAM MCP tool:
+The `mcp__plugin_dh_sam__sam_plan` and `mcp__plugin_dh_sam__sam_task` tools reach only the content
+store — never the work ledger — regardless of where the plan actually lives. A plan the ledger
+holds is invisible to them: a read returns nothing of it, and a write to it lands in a record
+nothing later reads. Determine which store holds `P{N}` before reading, and remember the answer
+as **STORE** for Step 4 (and Step 6, when it runs).
 
-   ```text
-   mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
+1. Run this via Bash — it is the plan group's own store-selection rule, so it reads the ledger
+   when the ledger already holds `P{N}` and the content store otherwise:
+
+   ```bash
+   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
    ```
 
-   Replace `P{N}` with the plan address. The JSON response includes the plan goal, context (which contains the Context Manifest added by context-gathering), the `issue` field (fallback source for `item_id` — see Inputs), and all task fields.
+   The response shape tells you which store answered:
 
-2. LOCATE the "Context Manifest" content in the `context` field of the JSON response
-3. If `item_id` is available (see Inputs), read the architecture spec through the artifact operations:
+   - **A top-level `"row"` key present → STORE = LEDGER.** `row.context` is the Context Manifest,
+     `row.issue` is the fallback `item_id` source (see Inputs), and `row.goal` /
+     `row.feature_context` / `row.architecture` are the other plan-level fields. Each entry of the
+     top-level `"tasks"` array already carries that task's `expected_outputs`, `body`,
+     `description`, etc. merged with its derived columns, so no further per-task read is needed
+     for Step 2.
+   - **No `"row"` key — a `feature` / `total_tasks` / `by_status` / ... shape instead → STORE =
+     CONTENT.** Read the plan the way this agent always has:
+
+     ```text
+     mcp__plugin_dh_sam__sam_plan(config={"action": "read"}, plan="P{N}")
+     ```
+
+     The JSON response includes the plan goal, `context` (the Context Manifest), the `issue` field
+     (fallback source for `item_id` — see Inputs), and all task fields.
+
+2. LOCATE the Context Manifest content the way Step 1.1 found it for that STORE (`row.context` on
+   the ledger, `context` on the content store).
+3. If `item_id` is available (see Inputs), read the architecture spec through the artifact
+   operations — this is unaffected by which store holds the plan; artifacts always route through
+   the backlog backend, never the ledger:
 
    ```text
    mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="architect")
@@ -86,21 +112,74 @@ Look for:
 
 ### Step 4: Update Format (ONLY if needed)
 
-The plan's `context` field is set as a whole, not appended to. Take the `context` value from the
-Step 1 response, concatenate your new section onto the end of it, and write the combined value
-back:
+The plan's `context` field is set as a whole, not appended to. Take the existing context value
+Step 1 located, concatenate your new section onto the end of it, and write the combined value back
+**through the STORE Step 1 found the plan on** — writing to the other store leaves a record
+nothing reads.
+
+**STORE = CONTENT** (from Step 1): unchanged —
 
 ```text
 mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "update", "context": "{existing_context}\n\n{new_section}"})
 ```
 
-For a discovery scoped to one task, append it to that task's body instead:
+**STORE = LEDGER** (from Step 1): the MCP tool cannot reach the ledger at all (Step 1) — write
+through the CLI instead, naming the ledger column directly:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P{N} --set context="{combined value}"
+```
+
+`--set` takes `field=value` and writes the named ledger column; the field name here is the bare
+word `context` (ledger field names never take hyphens — `--set feature-context=...` is refused
+with `--set may not write feature-context: no fields event sets them in ledger_spec.COLUMNS`; the
+underscore form `feature_context` is what the ledger recognizes). Do NOT use this same command's
+`--context` flag for a ledger-held plan: `--context` is the pre-ledger flag and it always selects
+the content store, regardless of where the plan lives — passing it here silently writes a
+different, unrelated record at the same address, one nothing in the ledger-backed pipeline ever
+reads.
+
+The combined value routinely contains blank lines, backticks, and quoted text (the annotation
+format below quotes original/actual text verbatim), so do not inline it into the shell command
+line — an embedded `"` would terminate the argument early and corrupt the write. Write it to a
+file, then pass it through `subprocess` with an argv list so nothing in the content is
+reinterpreted by a shell:
+
+```bash
+cat > /tmp/context-update.txt <<'CONTEXT_EOF'
+{existing_context}
+
+{new_section}
+CONTEXT_EOF
+python3 - <<'PYEOF'
+import subprocess
+content = open("/tmp/context-update.txt").read()
+subprocess.run(
+    ["uv", "run", "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py", "plan", "update",
+     "--plan-address", "P{N}", "--set", f"context={content}"],
+    check=True,
+)
+PYEOF
+```
+
+For a discovery scoped to one task, append it to that task's body instead, through the same STORE:
+
+**STORE = CONTENT** (from Step 1): unchanged —
 
 ```text
 mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "update", "append_section": "Discovered During Implementation", "section_content": "{new_section}"})
 ```
 
-Do NOT use the Edit or Write tool on plan or task state. The section content follows this structure:
+**STORE = LEDGER** (from Step 1): the same `plan update` command, addressed to the task —
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P{N}/T{M} --append-section "Discovered During Implementation" --section-content "{new_section}"
+```
+
+(the same quoting hazard applies — write `{new_section}` to a file and pass it through
+`subprocess` with an argv list when it is not a short one-liner, as shown above)
+
+Do NOT use the Edit or Write tool on plan or task state, on either store. The section content follows this structure:
 
 ```markdown
 ### Discovered During Implementation
@@ -149,7 +228,9 @@ here resolves a filesystem path.
 
 ### Step 6: Collect Divergence Evidence
 
-1. Read every task in the plan (all tasks, not just the current one) — `sam_plan(plan="P{N}", config={"action": "read"})` returns them all
+1. Read every task in the plan (all tasks, not just the current one), through the same STORE Step 1 found the plan on:
+   - **STORE = CONTENT:** `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})` returns them all.
+   - **STORE = LEDGER:** the MCP tool still cannot reach it. `plan status --plan-address P{N}` (Step 1) already named every task id; for each one, run `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M}` — its `sections` array is where a `Divergence Notes` or `Discovered During Implementation` section (added via `--append-section`, Step 4) actually lands; the flat task fields `status` returns do not carry it.
 2. Collect all `## Divergence Notes` sections from task bodies
 3. Collect all `### Discovered During Implementation` sections from Context Manifests
 4. Compare key claims in the architecture spec against the actual implementation files
