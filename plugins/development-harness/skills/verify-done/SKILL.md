@@ -223,10 +223,11 @@ flowchart TD
     Q -->|"None"| None["Record: No observations"]
     Q -->|"Yes"| Gate{"Any item is contextually significant<br>OR was already flagged during the task<br>as needing a bug or backlog entry?"}
     Gate -->|"No — minor, not worth a ticket"| ObsOnly["Record as observation only<br>Include in summary below"]
-    Gate -->|"Yes — significant"| Detect{"Which issue system does this project use?"}
-    Detect -->|".beads/dh-backend marker exists"| Beads["bd create --title='...' --description='...' --type=bug --priority=2<br>Canonical Beads-native follow-up"]
-    Detect -->|"GitHub remote / dh plugin present"| DH["Skill(skill='dh:work-backlog-item', args='create -- \"...\"')"]
-    Detect -->|"Other"| Other["Create entry in whatever issue system the project uses"]
+    Gate -->|"Yes — significant"| Detect{"Is the dh plugin installed in this project?"}
+    Detect -->|"No"| Other["Create entry in whatever issue system the project uses"]
+    Detect -->|"Yes"| Resolve{"Which backend does it resolve to?<br>Follow the dh:backend-resolution skill"}
+    Resolve -->|"beads"| Beads["bd create --title='...' --description='...' --type=bug --priority=2<br>Canonical Beads-native follow-up"]
+    Resolve -->|"any other backend"| DH["Skill(skill='dh:work-backlog-item', args='create -- \"...\"')"]
     Beads --> Ref["Record issue reference in summary"]
     DH --> Ref
     Other --> Ref
@@ -243,6 +244,16 @@ OBSERVATIONS:
 - Improvements:     [list or "none"]
 - Issues logged:    [issue refs or "none"]
 ```
+
+The first fork asks whether this project has a dh backend at all. Many do not — this checklist runs
+anywhere. When there is none, the `Other` branch stands on its own: file the follow-up wherever
+that project tracks issues, and nothing below applies.
+
+When there is one, use the `/dh:backend-resolution` skill to determine which backend it is. Do not
+infer it from what is on disk: testing for the `.beads/dh-backend` marker on its own inverts the
+resolution order, so a project that carries the marker but configures a different backend resolves
+to that other backend, and filing the follow-up with `bd` would put it somewhere the project's own
+tooling does not read.
 
 For a Beads workspace, the `bd create` branch above is canonical for native follow-ups; do not
 route the same CRUD operation through `sam backlog` merely for symmetry. Use DH CLI/MCP only for
