@@ -1,6 +1,10 @@
 # The work loop
 
-How a task goes from ready to accepted, and what the orchestrator runs at each observation.
+The procedure: which command the orchestrator runs, with which flags, and how to read what each
+one prints. What the loop *is* — its invariants, what reaches the orchestrator as a return and what
+it can only learn by asking, and how loops nest — is the orchestration loop section of
+[ARCHITECTURE.md](../../ARCHITECTURE.md), and this page assumes it rather than restating it.
+
 The commands, their preconditions, their effects and the codes they print are defined in
 [ledger_spec.py](../../dh_core/ledger_spec.py). The runner's side is
 [runner-contract.md](./runner-contract.md).
@@ -18,13 +22,17 @@ exhaustively in `server.py`'s `match config.action` arms; grepped both for `disp
 commands in either union. Until an MCP surface for the ledger exists, run every command below
 through the CLI.
 
-## One task, one loop
+## Each turn
 
-1. `ready --plan-address P` lists the tasks to start. For each:
+1. `status --plan-address P` — run this on every turn, whatever prompted it. It returns every task
+   row with its derived columns (`ready`, `expired`, `stale`, `returned`, `renew_by`) and the
+   plan's `progress`. Nothing announces a lease running out, a conflict group freeing or an attempt
+   going stale; this query is the only thing that reports them. `ready --plan-address P` narrows to
+   the tasks that may be started now. For each:
 2. `dispatch --address P/T [--ttl S] [--worktree DIR]` prints the attempt number. Give the runner
    its own git worktree where the harness offers one, and pass that directory as `--worktree`. On
-   `leased` or `not-ready`, go to the next task. Any other code stops the wave and goes to the
-   user.
+   `leased` or `not-ready`, go to the next task. Any other code stops this plan's loop and goes to
+   the user.
 3. Launch the runner with a prompt naming the address, the attempt number, and the specialist
    profile the task's `agent` field names when it names one. Launch it whichever way this harness
    allows: its own sub-agent call, a script that starts one in a directory you choose, or a child
@@ -32,8 +40,9 @@ through the CLI.
    your working notes.
 4. When the launch ends, `settle --address P/T --attempt N --return-text "<what came back>"`.
 5. Judge, per the table below.
-6. Repeat from step 1 until `status --plan-address P` reports plan progress `done`, or a judge
-   row puts the task to the user.
+6. Repeat from step 1 on the next return, without waiting for the tasks you started together to
+   return together, until `status --plan-address P` reports plan progress `done` or a judge row
+   puts the task to the user.
 
 ## The judge
 
@@ -70,8 +79,16 @@ item's branch in a throwaway worktree, then accept, then fast-forward `integrati
 
 ## Waves
 
-A wave is every task `ready` lists at one moment. Accept each task the moment J1 says so.
+A wave is a set of work loops running at once, not a set of tasks running inside one. Each of its
+members is a separate session in its own worktree, running its own plan under its own manager —
+`skills/kage-bunshin` launches those sessions and `skills/work-milestone` launches one per
+milestone item. That level is the outer one in ARCHITECTURE.md's orchestration loop section.
+
+Nothing on this page is a wave. This page is one loop, and what `ready` lists at a given moment is
+that loop's readiness answer, not a batch: the answer changes as each return lands, so re-ask it
+rather than working through the set you last received. Accept each task the moment J1 says so.
 
 ## Export
 
-Run `export --plan-address P` at each wave end and at completion.
+Run `export --plan-address P` after each judgement and at completion; it prints `unchanged` when
+there is nothing new to write.
