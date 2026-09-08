@@ -1,41 +1,41 @@
 """The graph IR: the layers of a workflow, and findings over them.
 
 This package implements a three-layer split -- several graphs, each describable on its own and
-drawn together only in :class:`~dh_core.graph_ir.system.LayeredGraph` -- that is superseded design:
-``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+drawn together only in :class:`~dh_core.workflow_multigraph.system.LayeredGraph` -- that is superseded design:
+``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
 types and executed as instances, with no separate layer graphs. This package has not yet been
 migrated to that shape; ``plugins/development-harness/ARCHITECTURE.md``'s "The work graph" section
 is the current authority.
 
-* :mod:`~dh_core.graph_ir.ledger_layer` -- layer 1, task lifecycle: statuses and the commands
+* :mod:`~dh_core.workflow_multigraph.ledger_layer` -- layer 1, task lifecycle: statuses and the commands
   between them, plus the projection each transition may name back to layer 3.
-* :mod:`~dh_core.graph_ir.work_layer` -- layer 2, the work graph: tasks, their concurrency and
+* :mod:`~dh_core.workflow_multigraph.work_layer` -- layer 2, the work graph: tasks, their concurrency and
   ordering, the bookend guarantee, and the extension operations layer 3 applies at runtime.
-* :mod:`~dh_core.graph_ir.model` -- layer 3, the workflow: the node record, the eight edge types,
-  and the mechanical queries :data:`~dh_core.graph_ir.findings.PREDICATES` names.
-* :mod:`~dh_core.graph_ir.decomposition` -- the grooming and architecture output layer 3 decomposes
+* :mod:`~dh_core.workflow_multigraph.model` -- layer 3, the workflow: the node record, the eight edge types,
+  and the mechanical queries :data:`~dh_core.workflow_multigraph.findings.PREDICATES` names.
+* :mod:`~dh_core.workflow_multigraph.decomposition` -- the grooming and architecture output layer 3 decomposes
   into layer 2, and the traceability queries between them.
-* :mod:`~dh_core.graph_ir.instructions` -- the instruction record a task carries out of
-  decomposition, and :mod:`~dh_core.graph_ir.decomposition_gate` -- the decomposition-exit gate that
+* :mod:`~dh_core.workflow_multigraph.instructions` -- the instruction record a task carries out of
+  decomposition, and :mod:`~dh_core.workflow_multigraph.decomposition_gate` -- the decomposition-exit gate that
   checks those instructions' referents and quotes against a repo checkout and a
-  :class:`~dh_core.graph_ir.work_layer.WorkGraph`.
-* :mod:`~dh_core.graph_ir.vocabulary`, :mod:`~dh_core.graph_ir.descriptors`,
-  :mod:`~dh_core.graph_ir.node_parts` -- the facet and node-part types layer 3 (and, for the edge
+  :class:`~dh_core.workflow_multigraph.work_layer.WorkGraph`.
+* :mod:`~dh_core.workflow_multigraph.vocabulary`, :mod:`~dh_core.workflow_multigraph.descriptors`,
+  :mod:`~dh_core.workflow_multigraph.node_parts` -- the facet and node-part types layer 3 (and, for the edge
   types and source spans, layer 2) draws from.
-* :mod:`~dh_core.graph_ir.findings` -- the finding record and the severity rule, layer-agnostic.
+* :mod:`~dh_core.workflow_multigraph.findings` -- the finding record and the severity rule, layer-agnostic.
 """
 
 from __future__ import annotations
 
-from dh_core.graph_ir.decomposition import DecompositionInput, DecompositionItem, DecompositionSourceKind
-from dh_core.graph_ir.decomposition_gate import (
+from dh_core.workflow_multigraph.decomposition import DecompositionInput, DecompositionItem, DecompositionSourceKind
+from dh_core.workflow_multigraph.decomposition_gate import (
     DecompositionGate,
     ReferentResolver,
     RepoResolver,
     RepoSourceReader,
     SourceReader,
 )
-from dh_core.graph_ir.findings import (
+from dh_core.workflow_multigraph.findings import (
     PREDICATES,
     SEVERITY_BY_BASIS,
     ContractBasis,
@@ -45,10 +45,10 @@ from dh_core.graph_ir.findings import (
     Projection,
     Severity,
 )
-from dh_core.graph_ir.instructions import Instruction, InstructionKind, Referent, ReferentKind
-from dh_core.graph_ir.layer import Layer
-from dh_core.graph_ir.ledger_layer import LedgerCommand, LedgerEdge, LedgerGraph, LedgerNode, LedgerStatus
-from dh_core.graph_ir.model import (
+from dh_core.workflow_multigraph.instructions import Instruction, InstructionKind, Referent, ReferentKind
+from dh_core.workflow_multigraph.layer import Layer
+from dh_core.workflow_multigraph.ledger_layer import LedgerCommand, LedgerEdge, LedgerGraph, LedgerNode, LedgerStatus
+from dh_core.workflow_multigraph.model import (
     TRUST_ORDER,
     Authority,
     Cardinality,
@@ -71,8 +71,8 @@ from dh_core.graph_ir.model import (
     Trust,
     WorkflowGraph,
 )
-from dh_core.graph_ir.system import LayeredGraph
-from dh_core.graph_ir.work_layer import (
+from dh_core.workflow_multigraph.system import LayeredGraph
+from dh_core.workflow_multigraph.work_layer import (
     BookendKind,
     ExtensionKind,
     ExtensionOperation,

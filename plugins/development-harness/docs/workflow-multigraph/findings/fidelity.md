@@ -5,11 +5,11 @@
 This assesses model fidelity, a validation activity distinct from finding verification: not
 whether the graph is sound, but whether the recovered graph faithfully represents the original
 prose, code, configuration and environment. It is also criterion 4 of
-`docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`.
+`docs/adrs/ADR-3460-1-workflow-multigraph-owns-the-unowned-edges-first.md`.
 
 It does not, on two counts. The schema cannot express four relationships the real system has
 (FIDELITY-7 through FIDELITY-10, FIDELITY-13). And the only extraction that exists —
-`tests_sam/test_graph_ir_defects.py` — records as `OBSERVED` a set of values that no source
+`tests_sam/test_workflow_multigraph_defects.py` — records as `OBSERVED` a set of values that no source
 states, that one source contradicts, and whose absence-shaped halves are properties of a four-node
 fragment rather than of the ledger (FIDELITY-1 through FIDELITY-5).
 
@@ -22,9 +22,9 @@ nothing but the four fragments in its own test file.
 Read in full: the assessor contract (since deleted; its architecture content now lives in
 `plugins/development-harness/ARCHITECTURE.md` under "The work graph"); `dh_core/ledger_spec.py`
 (1220 lines);
-`sam_schema/core/models.py` (908 lines); `dh_core/graph_ir/model.py`,
-`findings.py`, `__init__.py`; `tests_sam/test_graph_ir_defects.py`;
-`docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`. Read in part:
+`sam_schema/core/models.py` (908 lines); `dh_core/workflow_multigraph/model.py`,
+`findings.py`, `__init__.py`; `tests_sam/test_workflow_multigraph_defects.py`;
+`docs/adrs/ADR-3460-1-workflow-multigraph-owns-the-unowned-edges-first.md`. Read in part:
 `docs/work-ledger/work-loop.md` lines 25-60; `docs/work-ledger/runner-contract.md` lines 15-35.
 
 Not covered, and therefore not claimed either way: `dh_core/ledger.py` and the conformance suites
@@ -60,8 +60,8 @@ a declared predicate about every element that carries it.
 
 **Source spans**
 
-- `dh_core/graph_ir/model.py:83-89` (the `ExtractionStatus` definitions)
-- `tests_sam/test_graph_ir_defects.py:92-128` (`d1_graph`), and `:72` — the `desc()` helper's
+- `dh_core/workflow_multigraph/model.py:83-89` (the `ExtractionStatus` definitions)
+- `tests_sam/test_workflow_multigraph_defects.py:92-128` (`d1_graph`), and `:72` — the `desc()` helper's
   `kw.setdefault("extraction_status", ExtractionStatus.OBSERVED)`
 - `dh_core/ledger_spec.py:1169`
 
@@ -96,10 +96,10 @@ the field distinguishes nothing.
 
 **Source spans**
 
-- `tests_sam/test_graph_ir_defects.py:67-86` (the `desc()`, `node()` and `edge()` helpers, all three
+- `tests_sam/test_workflow_multigraph_defects.py:67-86` (the `desc()`, `node()` and `edge()` helpers, all three
   of which default `extraction_status` to `OBSERVED`)
-- `tests_sam/test_graph_ir_defects.py:93-107, 171-199, 338-378`
-- `dh_core/graph_ir/model.py:62-89, 146-150`
+- `tests_sam/test_workflow_multigraph_defects.py:93-107, 171-199, 338-378`
+- `dh_core/workflow_multigraph/model.py:62-89, 146-150`
 
 **Observed**
 
@@ -140,7 +140,7 @@ intro above.
 
 **Source spans**
 
-- `tests_sam/test_graph_ir_defects.py:317-327` (the D3 finding's `basis_evidence`)
+- `tests_sam/test_workflow_multigraph_defects.py:317-327` (the D3 finding's `basis_evidence`)
 - `docs/work-ledger/work-loop.md:54` (row J17)
 - `docs/work-ledger/runner-contract.md:24`
 
@@ -189,9 +189,9 @@ observation, as applied; this is also a model-fidelity failure, per the intro ab
 
 **Source spans**
 
-- `tests_sam/test_graph_ir_defects.py:338-441` (`d4_graph` and its test)
+- `tests_sam/test_workflow_multigraph_defects.py:338-441` (`d4_graph` and its test)
 - `dh_core/ledger_spec.py:401-421` (the `plan.replaced` event kind and the comment under it)
-- `dh_core/graph_ir/model.py:245-247` (`Edge.recorded_by`, `default_factory=list`)
+- `dh_core/workflow_multigraph/model.py:245-247` (`Edge.recorded_by`, `default_factory=list`)
 
 **Observed**
 
@@ -226,8 +226,8 @@ represent the original prose, code, configuration and environment?", per the int
 
 **Source spans**
 
-- `tests_sam/test_graph_ir_defects.py:92-128, 171-203, 252-297, 338-393`
-- `dh_core/graph_ir/model.py:325-341, 476-494`
+- `tests_sam/test_workflow_multigraph_defects.py:92-128, 171-203, 252-297, 338-393`
+- `dh_core/workflow_multigraph/model.py:325-341, 476-494`
 
 **Observed**
 
@@ -265,7 +265,7 @@ reintroducing a defect in the ledger changes no test outcome, and repairing one 
 **Source spans**
 
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"
-- `dh_core/graph_ir/model.py:83-89, 110-134`
+- `dh_core/workflow_multigraph/model.py:83-89, 110-134`
 
 **Observed**
 
@@ -283,7 +283,7 @@ neither can be used without demoting the whole descriptor.
 
 A second instance of the same collapse: `provenance` is a required `min_length=1` string meaning
 "where the value comes from", and `desc()` defaults it to the *file the extraction was read from*
-(`test_graph_ir_defects.py:71`). Five of the ten descriptors take that default, so the facet holds
+(`test_workflow_multigraph_defects.py:71`). Five of the ten descriptors take that default, so the facet holds
 the provenance of the extraction rather than of the value.
 
 ---
@@ -300,7 +300,7 @@ exclusion over a resource**" (`plugins/development-harness/ARCHITECTURE.md`, "Th
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
 - `dh_core/ledger_spec.py:294-299` (the `tasks.ready` derived rule) and `:233` (the
   `conflict_group` column)
-- `dh_core/graph_ir/model.py:53-59, 235-249`
+- `dh_core/workflow_multigraph/model.py:53-59, 235-249`
 
 **Observed**
 
@@ -322,7 +322,7 @@ ownership of it at stage A. It presently cannot hold it.
 
 ## FIDELITY-8 — there is no join, and `CARDINALITY_CONFLICTS_WITH_JOIN` cannot be expressed
 
-**Falsifies:** `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/graph_ir/findings.py`) —
+**Falsifies:** `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/workflow_multigraph/findings.py`) —
 "output cardinality conflicts with the join" — and the control-flow projection's "joins" question
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") — and
 `ADR-3460-1` criterion 2 ("Every falsified predicate in the assessor contract is expressible
@@ -331,9 +331,9 @@ against the IR, or is recorded there as out of scope with the reason").
 
 **Source spans**
 
-- `dh_core/graph_ir/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`
+- `dh_core/workflow_multigraph/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections"
-- `dh_core/graph_ir/findings.py:48, 78-80`
+- `dh_core/workflow_multigraph/findings.py:48, 78-80`
 - `dh_core/ledger_spec.py:294-299`
 
 **Observed**
@@ -352,7 +352,7 @@ finished" but "the predecessor reached one of a named set of statuses" — `SUCC
 so the join's arity, its conjunction, and its per-member status predicate all become prose.
 
 ADR criterion 2 permits recording a predicate as out of scope with a reason. `grep -rn "out of
-scope"` over `dh_core/graph_ir/` returns nothing; the three query-less predicates are disclosed in
+scope"` over `dh_core/workflow_multigraph/` returns nothing; the three query-less predicates are disclosed in
 the builder's session report only, which is not in the repository.
 
 ---
@@ -367,7 +367,7 @@ graph" → "Projections").
 **Source spans**
 
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections"
-- `dh_core/graph_ir/model.py:168-172` (`EvidenceRequirement`)
+- `dh_core/workflow_multigraph/model.py:168-172` (`EvidenceRequirement`)
 - `sam_schema/core/models.py:310-314, 368-375, 377-401, 403-427, 429-450`
 
 **Observed**
@@ -391,7 +391,7 @@ edge from a report to a judge, with no criterion, no baseline, and no pair of sn
 of the system that makes the send-back necessary is not in the graph at all.
 
 `Task.is_bookend` / `bookend_type` — named in ADR-3460-1 as the current home of EVIDENCE — appear
-in no fragment (`grep -n "bookend" tests_sam/test_graph_ir_defects.py` returns nothing).
+in no fragment (`grep -n "bookend" tests_sam/test_workflow_multigraph_defects.py` returns nothing).
 
 ---
 
@@ -407,7 +407,7 @@ whether the IR models a specification or one instance of it.
 
 - `dh_core/ledger_spec.py:852-860` (`CASCADE` and `REVERSAL`), `:52-53` (`ANY`), `:868-1201`
   (`TRANSITIONS`)
-- `dh_core/graph_ir/model.py:235-249`
+- `dh_core/workflow_multigraph/model.py:235-249`
 
 **Observed**
 
@@ -448,7 +448,7 @@ against the *system*.
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"
 - `dh_core/ledger_spec.py:479-490` (`ReasonKind`), `:802-806` (`Check`), `:873-877` and
   `:1055-1060` (representative check lists)
-- `dh_core/graph_ir/model.py:182-188, 199, 205`
+- `dh_core/workflow_multigraph/model.py:182-188, 199, 205`
 
 **Observed**
 
@@ -475,15 +475,15 @@ names (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Proj
 
 ## FIDELITY-12 — type satisfaction is string equality, so a value range is invisible
 
-**Falsifies:** no listed predicate. `Predicate.PRODUCER_TYPE_UNSATISFIED` (`dh_core/graph_ir/findings.py`)
+**Falsifies:** no listed predicate. `Predicate.PRODUCER_TYPE_UNSATISFIED` (`dh_core/workflow_multigraph/findings.py`)
 asserts "a producer's output type does not satisfy the consumer's input type" without defining
 satisfaction.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
 
-- `dh_core/graph_ir/findings.py`, `Predicate.PRODUCER_TYPE_UNSATISFIED`
-- `dh_core/graph_ir/model.py:121, 132, 136-142`
+- `dh_core/workflow_multigraph/findings.py`, `Predicate.PRODUCER_TYPE_UNSATISFIED`
+- `dh_core/workflow_multigraph/model.py:121, 132, 136-142`
 - `sam_schema/core/models.py:44-69` (`STATUS_MAP`), `:72-81` (`TaskStatus`)
 - `dh_core/ledger_spec.py:549-553` (`status-invalid`)
 
@@ -519,12 +519,12 @@ and `ADR-3460-1` Decision C ("the IR owns the six unowned edge types").
 **Source spans**
 
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
-- `dh_core/graph_ir/model.py:29-39, 313-321, 359-406, 421, 464, 487`
-- `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md`, Context and Decision
+- `dh_core/workflow_multigraph/model.py:29-39, 313-321, 359-406, 421, 464, 487`
+- `docs/adrs/ADR-3460-1-workflow-multigraph-owns-the-unowned-edges-first.md`, Context and Decision
 
 **Observed**
 
-`grep -n "EdgeType\." dh_core/graph_ir/model.py` returns three query sites: `INVALIDATES` (line
+`grep -n "EdgeType\." dh_core/workflow_multigraph/model.py` returns three query sites: `INVALIDATES` (line
 421), `{ERROR, RECOVERY}` (464), `CONTROL` (487). `DATA`, `STATE`, `EVIDENCE` and `AUTHORITY` are
 declared in the enum and read by nothing.
 
@@ -538,7 +538,7 @@ The AUTHORITY case is the one the ADR turns on. `EdgeType.AUTHORITY` exists and 
 authority is checked instead through `Node.authority.grants` versus `Node.side_effects`
 (`effects_without_authority`) and through two descriptor fields (`authority_shortfalls`). Those are
 node attributes. `Authority` has `holder` and `grants` and no delegation field, and every node in
-the extraction sets `holder == actor` (`test_graph_ir_defects.py:80`), so "a runner executing a
+the extraction sets `holder == actor` (`test_workflow_multigraph_defects.py:80`), so "a runner executing a
 command the orchestrator authorises" — the shape of D2 — cannot be written as an authority relation
 between two parties. It can only be written as one party whose own grant set is short.
 
@@ -553,8 +553,8 @@ reproduces it for four of the eight types, including the one whose absence motiv
 
 **Source spans**
 
-- `dh_core/graph_ir/model.py:110-134, 190-210`
-- `tests_sam/test_graph_ir_defects.py:67-86`
+- `dh_core/workflow_multigraph/model.py:110-134, 190-210`
+- `tests_sam/test_workflow_multigraph_defects.py:67-86`
 
 **Observed**
 
@@ -570,7 +570,7 @@ In the only extraction, the split falls cleanly along that line. The facets a qu
 `required_authority`, `granting_authority`, `syntactic_type`, `freshness.version`,
 `side_effects`, `authority.grants` — are set explicitly, per fragment, to the values that make the
 intended query fire. The facets nothing reads sit at helper defaults: `desc()` supplies
-`cardinality=EXACTLY_ONE` and `completeness=TOTAL` (`test_graph_ir_defects.py:68-69`), and no
+`cardinality=EXACTLY_ONE` and `completeness=TOTAL` (`test_workflow_multigraph_defects.py:68-69`), and no
 fragment sets `operation`, `termination`, `invariants`, `preconditions`, `postconditions`,
 `activation_guard` or `evidence_requirements` at all.
 
@@ -590,8 +590,8 @@ distinguish a considered `TOTAL` from a defaulted one.
 
 **Source spans**
 
-- `dh_core/graph_ir/model.py:93-99`
-- `tests_sam/test_graph_ir_defects.py:58-59, 63-64`
+- `dh_core/workflow_multigraph/model.py:93-99`
+- `tests_sam/test_workflow_multigraph_defects.py:58-59, 63-64`
 - `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record" and
   "Mechanical checks"
 
