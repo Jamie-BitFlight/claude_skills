@@ -14,6 +14,7 @@ been added yet.
 | `astral-tool-overrides.md` | Python files, `pyproject.toml`, `uv.lock` — this repo's uv/ty/ruff policy overrides |
 | `ci-workflows.md` | `.github/workflows/*.yml` — CI workflow modification protocol |
 | `citation-requirements.md` | SKILL.md/agents/commands/CLAUDE.md — factual claims need a cited source |
+| `data-format-selection.md` | Python/JSON/markdown/SQL — pick the format closest to the consumer; never parse prose for your own data |
 | `delegation-format.md` | SKILL.md/agents/commands/references — wrong delegation-instruction formats to avoid in prose |
 | `exception-handling.md` | Python/TS/JS — narrow exception catches only, no broad `except Exception` |
 | `frontmatter-requirements.md` | SKILL.md/agents/commands — required frontmatter fields |
