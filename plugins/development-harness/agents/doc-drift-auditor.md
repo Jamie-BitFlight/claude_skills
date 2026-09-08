@@ -199,7 +199,7 @@ NEEDED:
   - {missing_input_1}
   - {missing_input_2}
 SUGGESTED NEXT STEP:
-  - {what_supervisor_should_do_next}
+  - {what_dispatcher_should_do_next}
 ```
 
 Block immediately if:

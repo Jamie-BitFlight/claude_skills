@@ -827,7 +827,7 @@ def test_extract_launch_from_prompt_empty_returns_none() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _call_sam_plan_settle — the supervisor's command, and the only write this hook makes
+# _call_sam_plan_settle — the orchestrator's command, and the only write this hook makes
 # ---------------------------------------------------------------------------
 
 

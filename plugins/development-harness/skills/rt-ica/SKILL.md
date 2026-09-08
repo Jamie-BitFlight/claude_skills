@@ -190,7 +190,7 @@ Respect the human's attention:
 
 ## Report Back For Review
 
-Exploration for RT-ICA often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the orchestrator or supervisor agent so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
+Exploration for RT-ICA often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the dispatcher so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
 
 Create a review report for findings such as:
 
@@ -219,7 +219,7 @@ For each report-back item, record:
 - Recommended owner or destination
 - Recommended follow-up action or backlog item
 
-When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the orchestrator or supervisor can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
+When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the dispatcher can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
 
 ## RT-ICA Procedure
 
@@ -344,7 +344,7 @@ ELSE:
    - Then present the human with a compact batched decision packet: findings, open questions, options, constraints, risk, and recommended path
 7. If any review-worthy findings were discovered:
    - Emit them in a `<concerns>` block
-   - Hand that block back to the orchestrator or supervisor so each concern can be appended into backlog `## Concerns`
+   - Hand that block back to the dispatcher so each concern can be appended into backlog `## Concerns`
 
 **IF APPROVED:**
 
@@ -415,7 +415,7 @@ Safe Defaults Applied (SAFE-DEFAULTED only):
   Observation: [what was found]
   Why it matters: [impact]
   Blocks current work: [yes/no]
-  Recommended owner/destination: [owner, supervisor, backlog, or task stream]
+  Recommended owner/destination: [owner, dispatcher, backlog, or task stream]
   Recommended follow-up: [task/backlog/escalation]
 </concerns>
 ```

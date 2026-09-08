@@ -31,7 +31,7 @@ no other actor can supply what it records:
   the runner knows whether the work was done.
 - ``plan accept`` / ``plan reclaim`` is the **judge's** verdict, taken after reading the report
   against the acceptance criteria. Only a reader of the report can reach it.
-- ``plan settle --attempt N --return-text …`` is the **supervisor** recording that the launch
+- ``plan settle --attempt N --return-text …`` is the **orchestrator** recording that the launch
   ended at all, and what it returned. That is the one fact neither of the others can produce: a
   runner that died mid-flight writes nothing, and an unsettled attempt is indistinguishable from
   a worker still at work, so the loop waits on an agent that is gone.
@@ -43,7 +43,7 @@ session** when a sub-agent it launched stops (``code.claude.com/docs/en/sub-agen
 "Project-level hooks for subagent events", as cached in
 ``plugins/plugin-creator/skills/claude-subagent-reference/references/hooks-for-subagents.md``,
 accessed 2026-05-28: hooks configured this way "run in the main session when subagents start or
-stop"). It is therefore the supervisor's observation point, and ``settle`` is its command.
+stop"). It is therefore the orchestrator's observation point, and ``settle`` is its command.
 
 The orchestrator skills (``implement-feature``, ``dispatch``) settle explicitly as their own next
 step. This hook is not a replacement for that; it is the safety net for the launch whose
@@ -487,7 +487,7 @@ def _call_sam_cli(args: list[str], timeout: float = 8) -> str | None:
 def _call_sam_plan_settle(launch: Launch, return_text: str, timeout: float = 8) -> bool:
     """Record that one launch ended, and what it returned, via the SAM CLI's ``plan settle``.
 
-    ``settle`` is the supervisor's command: it marks the attempt settled and stores the harness
+    ``settle`` is the orchestrator's command: it marks the attempt settled and stores the harness
     return text, which is what makes a launch that ended distinguishable from a worker still at
     work. It writes no status — the runner's ``finish`` and the judge's ``accept``/``reclaim``
     own that, and a second writer of the same fact would drift from them.
