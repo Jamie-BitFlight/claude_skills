@@ -83,13 +83,13 @@ Historical direction comes from the project's configured backend, never from a r
 mcp__plugin_dh_backlog__backlog_list_merged_prs(limit=20)
 ```
 
-This tool resolves the repository through the configured backend, so it needs no `-R` flag, no repository slug, and no `gh` installation. Prefer it over `gh pr list` — the project's GitHub CLI conventions direct new work to the backlog MCP tools rather than to new `gh` usage.
+The tool exposes no repository parameter: it resolves the installing project's own repository at runtime (the `GITHUB_REPO` environment variable, otherwise the `origin` git remote). So it needs no `-R` flag, no repository slug, and no `gh` installation. Prefer it over `gh pr list` — the project's GitHub CLI conventions direct new work to the backlog MCP tools rather than to new `gh` usage.
 
 Pass a `search` substring only when the item is narrow enough that an unfiltered window of merged PRs would miss it. Filtering by a component name pulled from the affected paths is legitimate; filtering by a hardcoded plugin name is not.
 
 Read the response's `error` field before its `pull_requests` field:
 
-- `error` set → the configured backend has no PR support, or the query failed. This is not "no history". Go to the git-history branch below.
+- `error` set → the configured backend has no PR support, credentials are missing, or the query failed. All three arrive here as a populated `error` string, and none of them is "no history". Go to the git-history branch below, and carry the `error` text forward in case that branch also fails.
 - `error` unset and `count` is 0 → the query succeeded and the project has no merged PRs matching it.
 - `error` unset and `count` is above 0 → extract directional signals: what has been accepted, what refactors have merged, what patterns were explicitly established or reversed. Note the PR numbers; you will cite them.
 
