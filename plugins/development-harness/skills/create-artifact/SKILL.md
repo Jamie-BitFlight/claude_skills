@@ -56,12 +56,13 @@ in your STATUS: DONE report — do NOT paste the full content.
 ### `artifact_type`
 
 The registry of recognised type strings, the agent permitted to register each, and which types a
-gate reads is [docs/artifact-registry.md](../../docs/artifact-registry.md). That document is parsed
-by the decomposition-exit gate and by the test holding every shipped registration against it, so it
-is the only place a type is added or its writer changed. A call naming a `(type, agent)` pair it
-does not declare fails that test.
+gate reads is [dh_core/artifact_registry.py](../../dh_core/artifact_registry.py). The
+decomposition-exit gate imports it, and a test holds every shipped registration against it, so it is
+the only place a type is added or its writer changed. A call naming a `(type, agent)` pair it does
+not declare fails that test. The rules governing the registry — ownership, registration, discovery —
+are in [docs/artifact-registry.md](../../docs/artifact-registry.md).
 
-`task-plan` is in the enum and deliberately absent from the registry table — see
+`task-plan` is in the enum and deliberately carries no registry row — see
 [task-plan](#task-plan) below.
 
 ### `artifact_id`
@@ -128,8 +129,8 @@ mcp__plugin_dh_backlog__artifact_register(
 registers it, so a worktree-isolated reader can resolve the plan's address. That is a capability of
 the plan store, not a route an agent uses.
 
-No agent may register or read it that way, which is why the registry table declares no writer for
-it. Create plans with `mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve
+No agent may register or read it that way, which is why the registry carries no row for it. Create
+plans with `mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve
 them with `mcp__plugin_dh_sam__sam_plan(plan="{plan_ref}", config={"action": "read"})`, never
 through `artifact_register` or `artifact_read`.
 

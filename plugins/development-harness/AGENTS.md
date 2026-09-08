@@ -76,10 +76,9 @@ discovered via `artifact_list`/`artifact_read` rather than filesystem access.
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-The artifact types, the agent permitted to register each, which types a gate reads, and the rules
-governing all three are declared in [docs/artifact-registry.md](./docs/artifact-registry.md). That
-document is the registry itself rather than a description of one — the decomposition-exit gate and
-the tests holding shipped registrations against it parse it directly — so read it before writing an
+The artifact types, the agent permitted to register each, and which types a gate reads are
+declared in [dh_core/artifact_registry.py](./dh_core/artifact_registry.py); the rules governing all
+three are in [docs/artifact-registry.md](./docs/artifact-registry.md). Read both before writing an
 `artifact_register` call or adding a type. Load `dh:create-artifact` for worked per-type examples.
 
 ## Dispatch Orchestration System
@@ -278,7 +277,7 @@ that change depends on.
 
 **Modifying artifact handling, divergence detection, or plan management:**
 
-- Load [Artifact Type Registry](./docs/artifact-registry.md) — the artifact types, the agent permitted to register each, which types a gate reads, and the ownership rules that follow. Parsed by the decomposition-exit gate, so it is where a type is added rather than a description of one
+- Load [Artifact Type Registry](./docs/artifact-registry.md) — the ownership rules, the `task-plan` exception, and the registration and discovery contract. The map itself is [dh_core/artifact_registry.py](./dh_core/artifact_registry.py), which the decomposition-exit gate imports; that is where a type is added
 - Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
 - Load `dh:dh-meta-docs` — routes the artifact storage model, file naming, and cross-reference tokens
 
@@ -304,7 +303,7 @@ A completed change in one of these categories carries a documentation obligation
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
 | Data structure change (new field, changed type, new entity) | Yes — update `models.py` first |
 | New or removed MCP tool | Yes — update Workflow Architecture Diagram; run `/dh:meta-workflow-graph-refresh` to update G8 layer |
-| New artifact type | Yes — add the `ArtifactType` member in `backlog_core/models.py` and, unless no agent registers it, the row in [docs/artifact-registry.md](./docs/artifact-registry.md); the gate accepts the type only once both exist |
+| New artifact type | Yes — add the `ArtifactType` member in `backlog_core/models.py` and, unless no agent registers it, the row in [dh_core/artifact_registry.py](./dh_core/artifact_registry.py); the gate accepts the type only once both exist |
 | Changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
 | New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |
 | Refactoring (same behavior, different code structure) | No |
