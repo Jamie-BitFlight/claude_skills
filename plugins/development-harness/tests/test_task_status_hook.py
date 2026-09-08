@@ -797,6 +797,13 @@ def test_subagent_stop_hook_is_not_restricted_to_task_worker() -> None:
     task-state tracking by which specialist got picked, and a specialist's task is never
     marked at all. The hook gates on whether an active SAM task resolves, so it is safe
     to run for every sub-agent.
+
+    A matcher cannot express "dh dispatched this" either way: a SubagentStop matcher takes
+    the *agent type name* and nothing else (claude-subagent-reference's cached
+    references/hooks-for-subagents.md, "Project-level hooks for subagent lifecycle", accessed
+    2026-05-28), and dispatch-contract lets a task name any specialist, so the set of agent
+    types dh launches is open. Narrowing the launch this hook acts on is therefore the
+    prompt-shape job that extract_launch_from_prompt does, not a matcher's.
     """
     hooks_config = json.loads((_plugin_dir / "hooks" / "hooks.json").read_text(encoding="utf-8"))
 
@@ -859,12 +866,54 @@ def test_bare_address_yields_no_attempt() -> None:
 
 
 def test_an_address_mentioned_in_passing_is_not_a_launch() -> None:
-    """An address inside unrelated prose, with no attempt clause, does not name a launch.
-
-    The attempt clause is what makes the in-prose search safe: without it the pattern would
-    settle whatever address a sub-agent happened to mention.
-    """
+    """An address inside unrelated prose, with no attempt clause, does not name a launch."""
     assert extract_launch_from_prompt("The blocker was tracked under Pdec8934d/T01 last week.") is None
+
+
+@pytest.mark.parametrize(
+    ("label", "prompt"),
+    [
+        ("prose continues past the attempt", "Investigate why Pdec8934d/T01, attempt 3 failed to settle."),
+        ("attempt quoted mid-sentence", "Compare Pdec8934d/T01, attempt 3 against attempt 2 and report."),
+        (
+            "launch shape quoted below the first line",
+            "Review the settle path.\n\nAn orchestrator launches with: Pdec8934d/T01, attempt 3",
+        ),
+        (
+            "slash command quoted in a task description",
+            "Document what /start-task Pdec8934d --task T01 --attempt 3 does for a reader.",
+        ),
+    ],
+)
+def test_an_attempt_clause_in_free_text_is_not_a_launch(label: str, prompt: str) -> None:
+    """A sub-agent of any plugin may discuss a dispatch; discussing one must not settle it.
+
+    This hook fires for every sub-agent of every installed plugin, and settling an attempt
+    that is still live tells the work loop a worker is gone while it is still working. The
+    containment is positional: the launch reference must be the whole of the prompt's first
+    line, which is where the dispatch contract writes it and nothing follows it. Free text
+    mentioning an attempt runs on past it or sits below the opening line.
+
+    It is containment, not a closure — see the hook module docstring for the residual case
+    and for the search that found no dispatcher-owned channel to replace this with.
+    """
+    assert extract_launch_from_prompt(prompt) is None, label
+
+
+def test_the_launch_line_may_lead_a_longer_prompt() -> None:
+    """A real dispatch whose prompt carries further lines still settles.
+
+    The dispatch contract makes the reference the opening line, not the only line — relaying
+    discoveries into a wave's prompts is part of dispatch/SKILL.md — so anchoring to the first
+    line must not require a one-line prompt.
+    """
+    launch = extract_launch_from_prompt(
+        "Pdec8934d/T01, attempt 3\n\nOBSERVATIONS: the T40 worker reported the API returns 404 on an empty body."
+    )
+
+    assert launch is not None
+    assert launch.address == "Pdec8934d/T01"
+    assert launch.attempt == 3
 
 
 def test_a_file_path_plan_is_recognised_but_not_a_ledger_address() -> None:
