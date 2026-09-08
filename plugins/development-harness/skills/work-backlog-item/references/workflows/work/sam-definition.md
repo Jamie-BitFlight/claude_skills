@@ -69,7 +69,7 @@ Then read:
 |-----------|------|---------|
 | **Development harness** | `plugins/development-harness/` | SAM 7-stage pipeline, artifact conventions |
 | **Shared references** | `dh:dh-meta-docs` | Routes the default flow, artifact conventions, and human touchpoint model |
-| **Work-backlog-item bridge** | `.claude/skills/work-backlog-item/SKILL.md` | Bridges backlog items into SAM planning |
+| **Work-backlog-item bridge** | `dh:work-backlog-item` | Bridges backlog items into SAM planning |
 
 ---
 
