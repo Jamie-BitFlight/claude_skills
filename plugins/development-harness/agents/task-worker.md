@@ -117,4 +117,6 @@ exactly where it was.
 
 - Dispatching side: activate the `/dh:dispatch` skill for orchestration patterns
 - Worktree behavior: read [Worktree Worker Protocol](../skills/work-milestone/references/worktree-worker-protocol.md)
-  when working in an isolated worktree — it is a reference document, not an activatable skill
+  when working in an isolated worktree — it is a reference document, not an activatable skill. It
+  adds worktree setup, self-discovery and commit cadence on top of this file; it does not change
+  the `STATUS:` line, which is `DONE`/`BLOCKED` there for the same reason it is here

@@ -57,7 +57,7 @@ flowchart TD
     InvestigateFail -->|"No"| SkipFailed["Skip failed item<br>Log to output"]
     SkipFailed --> ParseResults
 
-    ParseResults["Step 6b: Parse Completion Reports<br>Extract STATUS, BRANCH, FILES_CHANGED,<br>COMMITS, NOTES from each result JSON."]
+    ParseResults["Step 6b: Read Outcomes<br>plan status --plan-address {plan_ref} per item<br>for each task's status and result.<br>Extract BRANCH, FILES_CHANGED, COMMITS, NOTES<br>from the report body in each result JSON."]
 
     ParseResults --> MergeLoop["Step 6b: Merge Worktree Branches<br>Sequential merge into integration branch.<br>One at a time, in return order."]
 
@@ -74,7 +74,7 @@ flowchart TD
 
     WaveComplete --> DiscoveryRelay["Step 6d: Discovery Relay<br>Build relay document from agent outputs.<br>Include FILES_CHANGED, COMMITS, NOTES<br>in next wave agent prompts."]
 
-    DiscoveryRelay --> PartialCheck{"Any agents returned PARTIAL?"}
+    DiscoveryRelay --> PartialCheck{"Any task rows blocked or failed<br>on the ledger?"}
     PartialCheck -->|"Yes"| HandlePartial["Create backlog items for<br>blocked tasks. Add to milestone."]
     PartialCheck -->|"No"| NextWaveCheck
 
@@ -205,12 +205,19 @@ Auto-stash ref {ref} pending; run 'git stash pop {ref}' to restore.
 
 ## Agent Result Handling
 
+Branch on the ledger, not on the returned text. The `STATUS:` line an agent returns says only
+whether it closed its attempts (`/dh:subagent-contract`); `plan status --plan-address {plan_ref}`
+says how each one turned out, and it answers the same way for a session that resumed after the
+launch was long gone. Read the ledger first and use the returned text as the evidence that explains
+what it shows.
+
 ```mermaid
 flowchart TD
-    Result(["Agent returned"]) --> Status{"Agent output indicates success?"}
-    Status -->|"STATUS: COMPLETE — tasks done, changes committed"| Merge["Proceed to merge"]
-    Status -->|"STATUS: PARTIAL — some tasks done, some blocked"| Partial["Merge completed work.<br>Create backlog item for remaining tasks.<br>Add to current milestone."]
-    Status -->|"Failure — no useful work done"| Failure["Log failure context.<br>Escalate to user:<br>item title, error, agent output summary."]
+    Result(["Agent returned"]) --> Read["plan status --plan-address {plan_ref}"]
+    Read --> Status{"Task rows for this item"}
+    Status -->|"All complete"| Merge["Proceed to merge"]
+    Status -->|"Some complete, some blocked or failed"| Partial["Merge completed work.<br>Create backlog item for the blocked or failed tasks,<br>carrying each row's note.<br>Add to current milestone."]
+    Status -->|"None complete, or STATUS: BLOCKED with no finish recorded"| Failure["Log failure context.<br>Escalate to user:<br>item title, error, agent output summary."]
 ```
 
 ## Discovery Relay Between Waves
@@ -223,14 +230,14 @@ After all wave agents return, the orchestrator builds a relay document from thei
 ### Wave 1 Results
 
 #### Item: #{issue1} — {title1}
-- Status: COMPLETE
+- Status: {from the item's plan rows — 'all complete', or the IDs left blocked or failed}
 - Files changed: {file_list}
 - Key commits:
   - {hash}: {message}
 - Design notes: {notes_if_any}
 
 #### Item: #{issue2} — {title2}
-- Status: COMPLETE
+- Status: {from the item's plan rows — 'all complete', or the IDs left blocked or failed}
 - Files changed: {file_list}
 - Key commits:
   - {hash}: {message}
@@ -282,7 +289,7 @@ Conflict resolution agent receives both branches' diffs and resolves in-place on
 - **SAM MCP unavailable**: PROCESS ERROR — report with exact error text
 - **Integration branch already exists**: check for stale branch (no commits in 7+ days) — offer to delete and recreate, or resume
 - **Kage-bunshin session exited non-zero**: read error log, investigate if fixable, re-spawn if yes, skip item if no
-- **Kage-bunshin result contains PARTIAL status**: create backlog items for blocked tasks, add to milestone, continue with other items
+- **Item's plan has blocked or failed task rows after its session returned**: create backlog items for those tasks carrying each row's note, add to milestone, continue with other items
 - **All quality gates fail on integration branch**: escalate to user before landing
 - **Main diverged during milestone work**: rebase integration branch onto main before landing
 
