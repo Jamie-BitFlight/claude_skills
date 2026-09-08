@@ -39,11 +39,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from marko import Markdown
-from marko.block import Heading
-from marko.ext.gfm.elements import Table
-from marko.inline import CodeSpan, RawText
-
+from dh_core.artifact_registry import REPO_RELATIVE_AGENTS_MD, artifact_types
 from dh_core.workflow_multigraph.descriptors import SourceSpan
 from dh_core.workflow_multigraph.findings import ContractBasis, Finding, Predicate, Severity
 from dh_core.workflow_multigraph.instructions import Instruction, InstructionKind, Referent, ReferentKind
@@ -55,9 +51,6 @@ CONTRACT_REF = "plugins/development-harness/ARCHITECTURE.md#the-decomposition-ex
 
 CONTRACT_SPAN = SourceSpan(ref=CONTRACT_REF)
 """The one source span every gate finding cites: where the rule it falsifies is declared."""
-
-ARTIFACT_SECTION_HEADING = "Artifact types and registering agents"
-"""The AGENTS.md heading whose table :func:`artifact_types` reads."""
 
 
 @runtime_checkable
@@ -91,66 +84,6 @@ class SourceReader(Protocol):
             does not exist.
         """
         ...
-
-
-def heading_text(heading: Heading) -> str:
-    """Reconstruct a marko ``Heading``'s plain text from its inline children.
-
-    Args:
-        heading: A parsed marko ``Heading`` node.
-
-    Returns:
-        The heading's text, inline formatting stripped.
-    """
-    return "".join(child.children for child in heading.children if isinstance(child, RawText))
-
-
-def cell_text(cell: object) -> str:
-    """Reconstruct a marko GFM table cell's plain text, unwrapping a code span.
-
-    Args:
-        cell: A parsed marko ``TableCell`` node.
-
-    Returns:
-        The cell's text, with any backtick code-span markers removed.
-    """
-    parts = [str(child.children) for child in getattr(cell, "children", []) if isinstance(child, (RawText, CodeSpan))]
-    return "".join(parts)
-
-
-def artifact_types(agents_md: Path) -> frozenset[str]:
-    """Return the artifact types the plugin's own registry table names.
-
-    Parses the "Artifact types and registering agents" table in ``plugins/development-harness/
-    AGENTS.md`` via the marko GFM AST, per this repo's rule to parse markdown structure with marko
-    rather than regex. Returns an empty set, rather than raising, when the file or table is absent
-    -- an ARTIFACT referent then simply fails to resolve, which is the gate's own reporting job.
-
-    Args:
-        agents_md: Path to the plugin's ``AGENTS.md``.
-
-    Returns:
-        Every value in the table's ``Type`` column, backtick markers stripped.
-    """
-    if not agents_md.is_file():
-        return frozenset()
-    doc = Markdown(extensions=["gfm"]).parse(agents_md.read_text(encoding="utf-8"))
-    in_section = False
-    for child in doc.children:
-        if isinstance(child, Heading):
-            if in_section:
-                break
-            in_section = heading_text(child).strip() == ARTIFACT_SECTION_HEADING
-            continue
-        if in_section and isinstance(child, Table):
-            body_rows = child.children[1:]  # first row is the header
-            types: set[str] = set()
-            for row in body_rows:
-                cells = getattr(row, "children", None)
-                if cells:
-                    types.add(cell_text(cells[0]).strip())
-            return frozenset(types)
-    return frozenset()
 
 
 def normalize(text: str) -> str:
@@ -259,18 +192,27 @@ class RepoResolver:
     def resolve_artifact(self, target: str) -> str | None:
         """Resolve an ``ARTIFACT`` referent: a ``type#id`` pair against the artifact registry.
 
+        The registry is the "Artifact types and registering agents" table in the plugin's
+        ``AGENTS.md``, located and parsed by :mod:`dh_core.artifact_registry` -- the one locator
+        both this gate and ``tests/test_artifact_type_ownership_drift.py`` read it through.
+
         Args:
             target: A ``'<type>#<id>'`` string.
 
         Returns:
             ``target`` unchanged when its type is in the registry and it carries an id; ``None``
-            otherwise.
+            when it carries no id, or names a type the registry does not declare.
+
+        Raises:
+            ~dh_core.artifact_registry.ArtifactRegistryError: If the checkout ships an ``AGENTS.md``
+                whose registry is not where :mod:`dh_core.artifact_registry` declares it. A checkout
+                with no such file ships no registry, and every ``ARTIFACT`` referent then fails to
+                resolve and is reported as a finding, which is this gate's own job.
         """
         artifact_type, sep, artifact_id = target.partition("#")
         if not sep or not artifact_id:
             return None
-        agents_md = self._repo_root / "plugins" / "development-harness" / "AGENTS.md"
-        if artifact_type in artifact_types(agents_md):
+        if artifact_type in artifact_types(self._repo_root / REPO_RELATIVE_AGENTS_MD):
             return target
         return None
 
