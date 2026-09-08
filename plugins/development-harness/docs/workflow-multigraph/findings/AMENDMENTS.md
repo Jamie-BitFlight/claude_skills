@@ -20,7 +20,7 @@ about 2026-09-06.
 
 Superseded, in `completeness.md`: the tally of predicates carrying a `Graph` method.
 
-Also superseded, in `predicates.md`: the observation that `docs/workflow-multigraph/` contains exactly one
+Also superseded, in `predicates.md`: the observation that `docs/graph-ir/` contains exactly one
 file. That was a fact about a `find` run on 2026-09-06 and the directory has since gained
 `STAGE-INTENT.md` and this `findings/` subtree. The search was stated, which is what makes the
 supersession checkable rather than a contradiction.
@@ -54,7 +54,7 @@ not depend on the arithmetic.
 ## A-3 — the ADR these findings were scored against was withdrawn as an unreviewed draft
 
 **Date:** 2026-09-07
-**Cause:** the ADR these findings cite as their authority — a draft proposing that the graph IR
+**Cause:** the ADR these findings cite as their authority — a draft proposing that the multigraph
 first own the edge types nothing else in the harness owns — was authored and cited on this branch
 while under review, never merged, and was withdrawn and its file deleted before merge, per
 `rules/adr-lifecycle.md`: an ADR on an unmerged branch may be withdrawn and deleted rather than
@@ -75,7 +75,7 @@ ledger is the instance store, not something a graph derives by projection.
 Superseded, in `predicates.md`: every citation of the withdrawn draft as the authority for the
 expressibility obligation — the header's "Authority" line and its quoted sentence, each finding's
 "Basis DECLARED — [that draft] ..." line, and the closing reference to the draft itself in the
-out-of-scope grep. The predicates the contract lists, the IR's queries, and this document's
+out-of-scope grep. The predicates the contract lists, the multigraph's queries, and this document's
 verdicts on each stand unchanged — a citation of the withdrawn draft's file path or line numbers is
 what no longer resolves, not the finding it supports.
 
@@ -91,12 +91,12 @@ which source spans are bare — stand independent of which draft is cited as aut
 superseded is the citation, not the observation.
 
 Superseded, in `data-flow-gaps.md`: the statement that the withdrawn draft's staged migration
-"requires the IR to find a defect nobody had already found" — that staged placement is withdrawn in
+"requires the multigraph to find a defect nobody had already found" — that staged placement is withdrawn in
 full, not only the projection criterion above — and the closing reference to "the two authority
 defects [the draft] cites". The DF findings themselves, and their predicates and severities, stand.
 
 What this does not settle: the withdrawn draft's other numbered exit criteria (defects
-refused-or-detected, predicates expressible, model-fidelity, IR-found-something-new) are not
+refused-or-detected, predicates expressible, model-fidelity, multigraph-found-something-new) are not
 restated anywhere in a form addressed to a specific migration scenario, because the staged
 placement that gated them is withdrawn along with the projection criterion. Whether a readiness
 gate of that shape still has a subject, and what it should require, was open when this entry was
@@ -104,7 +104,7 @@ first drafted; it has since been resolved by deleting `tests_sam/test_adr_3460_m
 outright, on the grounds that it read the withdrawn ADR from disk and enforced its criteria as
 tests, and parsed the markers above out of markdown by regex — coupling executable checks to a
 deliberation document and to prose that could satisfy a marker by mentioning it. The criterion
-worth keeping — that the IR must catch a defect nobody had already found — is no longer recorded
+worth keeping — that the multigraph must catch a defect nobody had already found — is no longer recorded
 anywhere as a marker a findings file carries: the "Markers a findings file carries" table
 (`Found-by:` / `Previously-known:`) was scaffolding for the one-off exercise and was dropped, not
 moved, when `ASSESSOR-CONTRACT.md` was deleted (see A-5 below). It remains unstated until it is
@@ -145,8 +145,9 @@ What replaced it, and what a re-run would be scored against:
 Two things these findings rest on are also gone. The `Found-by: IR` and `Previously-known: no`
 markers satisfied a readiness criterion that no longer exists — it was invented during this work
 rather than required, the ADR carrying it was withdrawn, and the test reading it is deleted. And the
-package name `workflow_multigraph` is a misnomer: an intermediate representation is a form between a source and
-a target, and this is the structure itself. A rename is pending and no target name is settled.
+package name `graph_ir` is a misnomer: an intermediate representation is a form between a source
+and a target, and this is the structure itself. A rename is pending and no target name is settled.
+(The rename has since been made; see A-7 below.)
 
 **Re-read rather than trusting the frame:** `plugins/development-harness/ARCHITECTURE.md`, "The
 work graph" heading, for the model — and the same file's "The workflow" heading for the closure
@@ -211,6 +212,68 @@ holistic evaluation, the report-validation activities, the findings-marker table
 by the substance stated inline, so the finding stands on its own without a file to point at. No
 finding's observation, basis, or severity was changed in the process. Two findings whose citation
 could not be repointed without changing what they claim were left as A-5 found them and are noted
-in place: PREDICATES-1's `find docs/workflow-multigraph -type f` result (already separately superseded by
+in place: PREDICATES-1's `find docs/graph-ir -type f` result (already separately superseded by
 A-1's note that the directory has since gained files) and any citation naming the withdrawn
 edge-ownership draft, which A-3 already covers and this entry does not reopen.
+
+## A-7 — `graph_ir` is renamed to `workflow_multigraph`, and "IR" no longer names the subject
+
+**Date:** 2026-09-07
+**Cause:** A-4 recorded that the package name was a misnomer and that a rename was pending with no
+target settled. The repository owner has settled it: `dh_core/graph_ir/` is now
+`dh_core/workflow_multigraph/`, `docs/graph-ir/` is now `docs/workflow-multigraph/`, and
+`tests_sam/test_graph_ir_defects.py` is now `tests_sam/test_workflow_multigraph_defects.py`. All
+three moved with `git mv`, so history follows the files.
+
+The name change is not only a name change. "IR" abbreviates *intermediate representation* — a form
+standing between a source and a target — and a form compiled above the `Task` and `Plan` records is
+a design this project considered and did not adopt, on the grounds that it can only carry what the
+source records carry, so the relations absent from those records would compile empty. Prose calling
+the subject an IR therefore asserted an architecture that is not the one in force. What is in force
+is stated in `plugins/development-harness/ARCHITECTURE.md`, "The work graph" § "The model": one
+typed, hierarchical, directed multigraph over the whole workflow, described as **types** — node
+types, their permitted relations, and what each consumes and produces — and executed as
+**instances** of those types created while a run is in flight.
+
+**What was rewritten rather than renamed.** In `completeness.md`, the audit's subject sentence read
+"the schema, the facets it carries, and the queries over it — not the ledger the IR models. Every
+finding is an omission in the representation", and its closing note read "the subject is the
+representation rather than the represented". Both framed the subject as a representation standing
+over the ledger. They now name the multigraph and the system it holds. The module docstrings of
+`dh_core/workflow_multigraph/__init__.py` and `tests_sam/test_workflow_multigraph_defects.py` were
+rewritten on the same grounds, and `ledger_layer.py`'s note on why `LedgerStatus` duplicates
+`ledger_spec.Status` now says that this package *declares the node types* the contract states the
+layer has, rather than that it *models* them.
+
+**Every other change is the artifact's name.** Where these findings said "the IR" as the name of the
+thing under audit, they now say "the multigraph". No observation, basis, severity or verdict was
+changed, and the findings scoped to the superseded three-layer split remain scoped to it — A-4
+still governs their frame. In particular, FIDELITY-10's open question of "whether the multigraph
+models a specification or one instance of it" is left standing as a finding of its date, not
+retired, even though the types-and-instances model above is the answer the design has since given.
+
+**What deliberately still says "IR".** Three kinds of string keep the old letters because changing
+them would falsify a record rather than fix a pointer:
+
+- the `Found-by: IR` marker token, in `data-flow-gaps.md`, `fidelity.md`, `completeness.md` and
+  A-4 above — a literal field name from the deleted `ASSESSOR-CONTRACT.md`, which no rename reaches;
+- two verbatim quotations of the withdrawn edge-ownership draft, in `fidelity.md`
+  ("becomes derived from the IR rather than ..." and "the IR owns the six unowned edge types") —
+  A-3 already supersedes the citation, and a quotation is not repointable;
+- A-4's own sentence about the package name `graph_ir`, which is a statement about that name.
+
+**What deliberately still says `graph-ir` or `graph_ir`.** The recorded searches, because a search
+is an observation and the paths it names are what was actually run: PREDICATES-1's
+`grep -rni ... across docs/graph-ir/, dh_core/graph_ir/, tests_sam/test_graph_ir_defects.py`, its
+`find docs/graph-ir -type f`, and its note that the deleted trigger's `evaluate()` looked for
+`dh_core/graph_ir/predicates.py`; plus A-1's and A-6's references to that `find` result. Read those
+paths as the pre-rename names of the directories and file named at the top of this entry. Every
+other path citation in this directory was repointed to the new name, on the reasoning A-6 already
+set out: a citation is a pointer, and fixing where it points changes no finding.
+
+**Re-check rather than trusting this entry:**
+
+```bash
+git log --follow --oneline -- plugins/development-harness/dh_core/workflow_multigraph/model.py
+grep -rn '\bIR\b' plugins/development-harness/docs/workflow-multigraph/
+```

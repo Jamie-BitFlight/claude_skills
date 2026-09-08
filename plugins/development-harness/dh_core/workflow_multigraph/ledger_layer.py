@@ -33,9 +33,9 @@ from dh_core.workflow_multigraph.vocabulary import ExtractionStatus
 class LedgerStatus(StrEnum):
     """The seven task statuses; layer 1's nodes. Mirrors ``dh_core.ledger_spec.Status``.
 
-    Kept as this module's own enum rather than importing ``ledger_spec.Status`` directly: the IR
-    models what the contract states the layer *is*, and ``ledger_spec.py`` is one concrete
-    implementation of it, not the layer's definition.
+    Kept as this module's own enum rather than importing ``ledger_spec.Status`` directly: this
+    package declares the node types the contract states the layer has, and ``ledger_spec.py`` is one
+    concrete implementation of them, not the layer's definition.
     """
 
     NOT_STARTED = "not-started"
@@ -97,7 +97,7 @@ class LedgerGraph(BaseModel):
     resolving. Whether every edge has a layer-3 origin, and whether that origin exists, are
     questions for the queries below and for :class:`dh_core.workflow_multigraph.system.LayeredGraph`
     respectively -- an edge with no origin is a well-formed graph that has lost its authority, not
-    an incoherent one, and the contract requires the IR to be able to hold that.
+    an incoherent one, and the contract requires the multigraph to be able to hold that.
     """
 
     layer: Literal[Layer.LEDGER] = Layer.LEDGER

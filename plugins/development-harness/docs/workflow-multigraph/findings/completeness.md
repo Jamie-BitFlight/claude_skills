@@ -1,4 +1,4 @@
-# Blind completeness audit — the graph IR
+# Blind completeness audit — the workflow multigraph
 
 A blind completeness audit — the third of the assessor contract's validation activities, distinct
 from model fidelity and finding verification: given the sources and the contract but not the
@@ -21,12 +21,13 @@ independent observations of the same gap rather than as one finding confirmed tw
 
 ## Subject and severity reading
 
-The subject of this audit is **the IR as built** — the schema, the facets it carries, and the
-queries over it — not the ledger the IR models. Every finding is an omission in the representation.
+The subject of this audit is **the multigraph as built** — the schema, the facets it carries, and
+the queries over it — not the ledger whose records its instances carry. Every finding is an
+omission in the graph itself.
 
 Applying the severity rule to that subject needs one stated reading, because the rule is worded for
 the system under assessment. Here, a predicate counts as **declared** when the assessor contract
-states it (it is the IR's own specification, and the authority this work was given — its
+states it (it is the multigraph's own specification, and the authority this work was given — its
 architecture content now lives in `plugins/development-harness/ARCHITECTURE.md` under "The work
 graph"), or when the built module states it in its own docstrings and constraints. It counts as
 **necessarily implied** when nothing works unless it holds. Where the contract is silent on whether
@@ -52,7 +53,7 @@ the difference:
 
 No finding here carries `Found-by: IR` or `Previously-known: no`. Both would be false. These
 findings were not surfaced by running the graph — they were found by reading the schema against the
-contract, which is what a completeness audit is. The markers belong to findings the IR produced
+contract, which is what a completeness audit is. The markers belong to findings the multigraph produced
 about the system it models, and the `test_adr_3460_migration_trigger.py` criterion should not read
 this file as evidence for them either way.
 
@@ -62,11 +63,11 @@ this file as evidence for them either way.
 
 ## COMPLETENESS-1 — No requirement or intent entity exists
 
-**Omission**: the IR has no representation of a requirement, an intent claim or a goal, so nothing
+**Omission**: the multigraph has no representation of a requirement, an intent claim or a goal, so nothing
 can be traced to or from one.
 
 **Severity**: BROKEN. Basis: DECLARED. `Intent and requirements` is one of six projections "derived
-mechanically from the one IR", with the mechanical questions "goal coverage, unjustified behaviour,
+mechanically from the one multigraph", with the mechanical questions "goal coverage, unjustified behaviour,
 lost or weakened requirements" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" →
 "Projections"); `requirement-to-node trace coverage` is a named check in the same document's
 "Mechanical checks"; and the contract's holistic evaluation list — since dropped rather than
@@ -83,21 +84,21 @@ at least one implementing path" and "every material behaviour has an authoritati
   case-insensitive search of the whole package for `requirement` matches only the class
   `EvidenceRequirement` and the field `evidence_requirements`; for `intent`, only the projection
   member above; for `goal`, nothing.
-- The domain already carries the entity the IR drops.
+- The domain already carries the entity the multigraph drops.
   `sam_schema/core/models.py#L310-L314` declares
   `Plan.acceptance_criteria_structured: list[AcceptanceCriterion]`, and
   `models.py#L376-L399` declares `AcceptanceCriterion` with `criterion_id`, `check_command`,
   `expected_baseline` and `expected_final` — a structured, executable requirement with an identity
-  to trace against. `Plan.goal` is at `models.py#L303`. None of it has an IR carrier.
+  to trace against. `Plan.goal` is at `models.py#L303`. None of it has a carrier in the multigraph.
 
 **Consequence**: the whole Intent-and-requirements projection, and the two holistic questions that
-open the list, cannot be asked of this IR at all — not answered wrongly, but not posed.
+open the list, cannot be asked of this multigraph at all — not answered wrongly, but not posed.
 
 ---
 
 ## COMPLETENESS-2 — No trace record exists
 
-**Omission**: the IR has no representation of an execution, symbolic or observed, so the
+**Omission**: the multigraph has no representation of an execution, symbolic or observed, so the
 expected-versus-observed half of the contract is absent.
 
 **Severity**: BROKEN. Basis: DECLARED. `Runtime traces` is a named projection, with the mechanical
@@ -141,7 +142,7 @@ branch grouping, no domain and no relation to the other guards it must partition
 (`dh_core/workflow_multigraph/findings.py`) is a falsified predicate to report — "a branch guard is
 incomplete, or overlaps another guard"; `guard totality and exclusivity` is a named mechanical
 check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and
-the contract required the IR to represent "environment-dependent activation" among the system's
+the contract required the multigraph to represent "environment-dependent activation" among the system's
 other structural properties — a requirements list dropped rather than carried forward when the
 contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5).
 
@@ -152,7 +153,7 @@ contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5).
   reader — both fields appear once each, at their declaration.
 - Nothing groups guards into a branch. Totality ("do these guards cover the domain?") and
   exclusivity ("do two of them overlap?") are questions about a *set* of guards over a *domain*, and
-  the IR represents neither the set nor the domain. This is not a missing query; it is a missing
+  the multigraph represents neither the set nor the domain. This is not a missing query; it is a missing
   structure, and no query could be written against what is there.
 - `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING` (`findings.py#L54`, defined at `findings.py#L98-L100`)
   therefore has no `Graph` method. Compare the eight predicates that do:
@@ -168,16 +169,16 @@ contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry A-5).
   waives the check". `TRANSITIONS` (`ledger_spec.py#L871-L1200`) is a `(command, from_status)`
   matrix whose rows are generated per status, several of them by comprehension over `OPEN_STATUSES`.
   Ordered checks with waivers over a status matrix is the guard-partition problem in its canonical
-  form, and it is the part of the ledger the IR cannot hold.
+  form, and it is the part of the ledger the multigraph cannot hold.
 
 ---
 
 ## COMPLETENESS-4 — No join semantics; `Cardinality` is carried and never read
 
-**Omission**: the IR cannot say that a node's inputs are joined conjunctively rather than
+**Omission**: the multigraph cannot say that a node's inputs are joined conjunctively rather than
 disjunctively, so join requirements and cardinality-against-join conflicts are undecidable.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract required the IR to represent "parallel branches
+**Severity**: BROKEN. Basis: DECLARED. The contract required the multigraph to represent "parallel branches
 and joins" among the system's other structural properties — a requirements list dropped rather than
 carried forward when the contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry
 A-5); `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/workflow_multigraph/findings.py`) — "output
@@ -205,10 +206,10 @@ is a named mechanical check and `joins` a mechanical question of the Control-flo
 
 ## COMPLETENESS-5 — No loop or cycle representation
 
-**Omission**: the IR cannot express a cycle, a bound on one, or a progress variable, so no loop can
+**Omission**: the multigraph cannot express a cycle, a bound on one, or a progress variable, so no loop can
 be checked for termination.
 
-**Severity**: BROKEN. Basis: DECLARED. The contract required the IR to represent "cycles and
+**Severity**: BROKEN. Basis: DECLARED. The contract required the multigraph to represent "cycles and
 bounded loops, recursion" among the system's other structural properties — a requirements list
 dropped rather than carried forward when the contract's content moved into `ARCHITECTURE.md` (see
 `AMENDMENTS.md` entry A-5); `loop bounds and progress variables` is a named mechanical check and
@@ -234,8 +235,8 @@ escalation, recursion or feedback occur where required.
   absent" (`ledger_spec.py#L545-L549`), checked by reclaim at `ledger_spec.py#L1073`; and
   `loop.max_attempts` is the configured bound (`ledger_spec.py#L1217-L1219`). The
   dispatch → finish → reclaim → dispatch cycle, with `attempts` as its progress variable and
-  `attempts_allowed` as its bound, is the single most prominent loop in the sources and has no IR
-  representation beyond a string.
+  `attempts_allowed` as its bound, is the single most prominent loop in the sources and has no
+  representation in the multigraph beyond a string.
 
 ---
 
@@ -274,7 +275,7 @@ under one of the eleven. Filing it as `REQUIRED_INPUT_HAS_NO_PRODUCER` would giv
 
 ## COMPLETENESS-7 — No state resource; `STATE` edges are inert and mutual exclusion is unrepresentable
 
-**Omission**: shared persistent state has no identity in the IR — no resource, no generation, no
+**Omission**: shared persistent state has no identity in the multigraph — no resource, no generation, no
 version — so its lifecycle cannot be checked and exclusion over it cannot be stated.
 
 **Severity**: BROKEN. Basis: DECLARED. The `STATE` edge type relates "shared persistent state,
@@ -339,13 +340,13 @@ failed terminals preserve enough evidence for recovery.
 - No test in `test_workflow_multigraph_defects.py` populates `evidence_requirements` — the four defect graphs
   construct nodes through the `node()` helper (`test_workflow_multigraph_defects.py#L77-L80`) and never pass
   it.
-- The system under assessment has the evidence entities the IR omits. `BookendResult`
+- The system under assessment has the evidence entities the multigraph omits. `BookendResult`
   (`sam_schema/core/models.py#L403-L420`) records `criterion_id`, `check_command`, `exit_code`,
   `stdout` and `stderr`; `AcceptanceCriterion.expected_baseline`/`expected_final`
   (`models.py#L390-L399`) name the T0 and TN snapshots a claim is measured between — precisely the
   "which snapshot it describes" question the Evidence-and-provenance projection asks (per the
   Severity paragraph above). `Task.is_bookend` and `Task.bookend_type`
-  (`models.py#L234-L239`), the EVIDENCE relation in the domain, have no IR carrier.
+  (`models.py#L234-L239`), the EVIDENCE relation in the domain, have no carrier in the multigraph.
 
 ---
 
@@ -377,15 +378,15 @@ the correct authority.
   subsumption, and no way to say an orchestrator may act as a judge or may not.
 - `EdgeType.AUTHORITY` is read by no query, and `Edge` carries no `Effect` field
   (`model.py#L235-L250`), so an AUTHORITY edge cannot state *which* effect one node grants another.
-  The two AUTHORITY defects this IR was built against (D1, D2) are both caught by descriptor fields
+  The two AUTHORITY defects this multigraph was built against (D1, D2) are both caught by descriptor fields
   on DATA edges (`test_workflow_multigraph_defects.py#L120-L124`, `#L216-L221`); no AUTHORITY edge appears in
   any test graph.
 - The load-bearing consequence: D2 is detected only because the modeller wrote
   `grants=[Effect.MUTATE]` on the `update_set_status` node (`test_workflow_multigraph_defects.py#L175`).
   Writing `grants=[Effect.MUTATE, Effect.DECIDE]` there removes the finding and contradicts nothing
-  the IR can check. The defect's detection rests on the extractor's discretion, which is the
+  the multigraph can check. The defect's detection rests on the extractor's discretion, which is the
   condition activity 1 exists to rule out.
-- The policy the IR would need is already data in the sources. `EventKind.written_by`
+- The policy the multigraph would need is already data in the sources. `EventKind.written_by`
   (`ledger_spec.py#L366-L373`) names, per event kind, the commands permitted to append it —
   `task.accepted` is `written_by=["accept"]` alone (`ledger_spec.py#L458`), which is exactly the
   statement D1 falsifies.
@@ -394,11 +395,11 @@ the correct authority.
 
 ## COMPLETENESS-10 — Hierarchy is nominal; `subgraph_ref` has no referent
 
-**Omission**: the IR is declared hierarchical and is not. `subgraph_ref` names nothing, resolves to
+**Omission**: the multigraph is declared hierarchical and is not. `subgraph_ref` names nothing, resolves to
 nothing, and is traversed by nothing; three further id-bearing fields sit outside reference
 integrity.
 
-**Severity**: BROKEN. Basis: DECLARED. The IR's own model is "a single typed, hierarchical,
+**Severity**: BROKEN. Basis: DECLARED. The multigraph's own model is "a single typed, hierarchical,
 directed multigraph" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The
 model"); the contract it was extracted from additionally required the system to represent
 "recursion" and "one node refined into a subgraph" among its other structural properties — a
@@ -459,7 +460,7 @@ recovery.
 ## COMPLETENESS-12 — Unnecessary path length cannot be reported at all
 
 **Falsified predicate**: the contract requires unnecessary length to be reported *as an optimisation
-finding*, distinct from nonconformance. The IR's report vocabulary has no such category, so such an
+finding*, distinct from nonconformance. The multigraph's report vocabulary has no such category, so such an
 observation can only be dropped or misfiled as nonconformance.
 
 **Severity**: BROKEN. Basis: DECLARED. The contract's holistic evaluation list — dropped rather
@@ -489,7 +490,7 @@ optimisation finding, so that 'could be shorter' is never reported as 'does not 
 
 ## COMPLETENESS-13 — `ExtractionStatus.ASSUMED` and `ABSENT` cannot be recorded without inventing a span
 
-**Falsified predicate**: the IR declares two extraction statuses whose definition is that no source
+**Falsified predicate**: the multigraph declares two extraction statuses whose definition is that no source
 supports the element, and simultaneously requires every element to carry at least one source span.
 The two statements cannot both hold.
 
@@ -557,7 +558,7 @@ computed as though there were.
 (`dh_core/workflow_multigraph/findings.py`) — "a failure output has no consuming edge" — is a falsified
 predicate to report; `unhandled failure signals` is a named mechanical check
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and the
-contract required the IR to represent "error/recovery/rollback/retry paths" among the system's
+contract required the multigraph to represent "error/recovery/rollback/retry paths" among the system's
 other structural properties — a requirements list dropped rather than carried forward, see
 `AMENDMENTS.md` entry A-5.
 
@@ -578,7 +579,7 @@ other structural properties — a requirements list dropped rather than carried 
 - The system under assessment routes failures as first-class values: `REASONS`
   (`ledger_spec.py#L500-L583`) is a closed vocabulary of reason codes with a `ReasonKind` deciding
   whether each is a refusal, a no-op or an outcome recorded on a `task.state` event
-  (`ledger_spec.py#L479-L497`). None of that structure survives into an IR where a signal is a
+  (`ledger_spec.py#L479-L497`). None of that structure survives into a multigraph where a signal is a
   string on a node.
 
 ---
@@ -595,7 +596,7 @@ dropped rather than carried forward when the contract's content moved into `ARCH
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"), which
 permits a property to stay "a bounded judgment or an empirical evaluation until a property is made
 precise enough to test" — wording that did carry forward, closing that same section. The contract
-therefore did not declare that the IR must carry a multiplicity or idempotence facet, and `BROKEN`
+therefore did not declare that the multigraph must carry a multiplicity or idempotence facet, and `BROKEN`
 would be speculating about a requirement nobody wrote. Recording it so a reducer can decide whether
 to make the property precise.
 
@@ -619,7 +620,7 @@ to make the property precise.
 
 **Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. The contract required "completeness
 expectations" as a declared facet of every input and output
-(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"), and the IR
+(`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"), and the multigraph
 declares it. It names no completeness predicate in `dh_core/workflow_multigraph/findings.py`'s `Predicate`
 enum, nor a completeness check in that same document's "Mechanical checks". Whether the facet must
 also be *decided* is not stated, so the severity rule forbids `BROKEN`. Recording it because the
@@ -675,8 +676,8 @@ source of truth.
 One place, stated rather than acted on silently.
 
 The contract's severity rule is written for findings about the system under assessment. This audit
-reports on the IR itself, and the rule does not say what "declared" means when the subject is the
-representation rather than the represented. The reading applied here is stated in
+reports on the multigraph itself, and the rule does not say what "declared" means when the subject
+is the graph rather than the system it holds. The reading applied here is stated in
 "Subject and severity reading" above: the assessor contract (its architecture content now in
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph") and the built module's own
 docstrings and constraints both count as declarations. A verifier who rejects that reading should

@@ -4,11 +4,11 @@
 **Previously-known:** no
 **Date:** 2026-09-07
 **Assessed:** the pipeline from grooming and architecture through to the verification bookend, as
-it exists in `skills/` and `agents/` today. Not the graph IR.
+it exists in `skills/` and `agents/` today. Not the workflow multigraph.
 
-Recorded here so the IR cannot later report these as new. Under ADR-3460-1 the migration to
-scenario A requires the IR to find a defect nobody had already found; these are found, by hand,
-before the IR existed. A finding qualifies for that criterion only with `Found-by: IR` **and**
+Recorded here so the multigraph cannot later report these as new. Under ADR-3460-1 the migration to
+scenario A requires the multigraph to find a defect nobody had already found; these are found, by
+hand, before it existed. A finding qualifies for that criterion only with `Found-by: IR` **and**
 `Previously-known: no`, and these carry `Found-by: hand`.
 
 ## DF-1 — `File Impact Summary` is produced and consumed by nothing
@@ -72,9 +72,9 @@ system holds; it is simply a section in a markdown document that nobody opens.
 
 This is the same root as the two authority defects ADR-3460-1 cites, in a different edge type.
 
-## What this constrains in the IR
+## What this constrains in the multigraph
 
 The contract's layer-2 bookends (review, validate, documentation-check) describe the target, not
-the system. The IR must not record them as OBSERVED. Their `extraction_status` is the difference
+the system. The multigraph must not record them as OBSERVED. Their `extraction_status` is the difference
 between modelling what exists and modelling what was intended, and DF-3 is precisely where that
 distinction decides whether a later finding is BROKEN or CONTRACT_UNSPECIFIED.

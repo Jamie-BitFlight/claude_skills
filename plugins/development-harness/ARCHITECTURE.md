@@ -353,7 +353,7 @@ broken without speculating why.
 
 ### Projections
 
-Derived mechanically from the one IR. Compile the control-flow projection into a workflow net or
+Derived mechanically from the one multigraph. Compile the control-flow projection into a workflow net or
 state-transition model where that enables soundness analysis; keep the richer property graph for
 semantics, provenance and traceability. Do not force everything into Petri-net notation.
 
