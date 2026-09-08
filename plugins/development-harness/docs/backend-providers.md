@@ -54,8 +54,65 @@ items go through `WorkItemBackend`; plans and tasks go through a separate
 adapter over the same `ContentProvider` that `artifact_*` calls use — the
 same underlying configured backend, reached through a different interface.
 `sam_active_task` primarily routes through a third protocol, `ContextBackend`,
-for its session-scoped state. See [AGENTS.md](../AGENTS.md)'s "Plan and artifact
-capability boundary" section for the concrete protocol names and file paths.
+for its session-scoped state. The concrete protocol names and file paths are below.
+
+### Plan and artifact capability boundary
+
+Backlog items and SAM plans/tasks do NOT share one backend protocol, but this is a distinct-interface
+split, not a distinct-storage one. Backlog operations (`backlog_add`, `backlog_view`, etc.) route
+through `WorkItemBackend` (`backlog_core/backend_types.py`), which is independently configurable
+across the `github`/`sqlite`/`memory`/`beads` families above. `sam_plan` and `sam_task` route
+through a separate `TaskBackend` protocol — defined in `sam_schema/core/task_backend.py`,
+re-exported by `dh_core/protocols.py` — and every plan/task CRUD function in
+`dh_core/operations.py` (`create_plan`, `read_plan`, `list_plans`, `read_task`, `claim_task`,
+etc.) takes a `TaskBackend` parameter, not a `WorkItemBackend`. Concretely, `TaskBackend` is
+implemented by `ContentTaskProvider` (`sam_schema/core/backends/content.py`), which is not an
+independently-selected backend the way `WorkItemBackend`'s GitHub/SQLite/Beads/Memory choice is —
+it is an adapter that persists plan/task state through the *same* `ContentProvider`
+(`backlog_core/backend_types.py`) that `artifact_*` calls use, wrapping `InMemoryTaskProvider`'s
+established in-memory behavior. `sam_active_task` is not a `TaskBackend` consumer in the same way as
+`sam_plan`/`sam_task`: it primarily routes through a third, separate protocol, `ContextBackend`
+(`get_context_config().backend`), for session-scoped active-task state, and only incidentally
+resolves a `TaskBackend` on its `update` action (to cross-validate/append task-section content
+against the plan the active-task address points at). There is no local filesystem fallback or
+per-plan backend selection — each protocol still resolves to exactly one configured backend
+instance per its own selection rules. Remote providers may use a private `FileCache` for stale
+reads and queued writes. Beads, SQLite, and Memory remain native-only and never use YAML or cache
+storage.
+
+### Plan drafting and the single-writer append
+
+**Large plans must use the incremental append workflow.**
+
+For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
+`sam_plan` create action:
+
+1. `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[], "owner_reference":<work_item_reference>})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
+2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", "task":<single_task_object>})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
+3. `sam_plan(plan='Pa1b2c3d4', config={"action":"finalize"})` — clears drafting state and makes the plan ready
+
+While a plan is in `state="drafting"`, `sam_plan(plan='<returned-plan-id>', config={"action":"ready"})`
+and `sam_plan(plan='<returned-plan-id>', config={"action":"status"})` return their normal result
+models with `state="drafting"` instead of dispatchable task data — this prevents dispatching a
+partial plan. Only `finalize` makes the plan visible to the dispatch loop.
+
+CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_reference>` (omit
+`--task-id`/`--task-title` to start in `state="drafting"`) → `plan append-task --plan-address
+<plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`.
+
+**`append_task` is single-writer only.**
+
+`append_task` is single-writer for a given plan. Serialize appends through the configured backend;
+concurrent writes are outside the contract. Do NOT call `append_task` for
+the same plan from multiple agents or sessions simultaneously. The content-store `TaskBackend`
+(`ContentTaskProvider`) mutates its in-memory plan copy before writing it through
+`ContentProvider.put_content` with the last-observed revision as `expected_revision`
+([sam_schema/core/backends/content.py](../sam_schema/core/backends/content.py)); a losing
+concurrent write is not merged — it fails the compare-and-swap, raises `ContentConflictError`, and
+is discarded after a refresh from the now-current remote record, so its own append does not apply
+and the caller must retry rather than assume the append succeeded. See
+[dh_core/operations.py](../dh_core/operations.py)'s `append_task` for the operation-level contract.
+
 
 ## CLI vs MCP Capability Surface
 

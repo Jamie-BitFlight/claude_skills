@@ -1,4 +1,4 @@
-"""Guards the artifact-type owner map declared in the plugin's AGENTS.md.
+"""Guards the artifact-type owner map declared in the plugin's ``docs/artifact-registry.md``.
 
 ``artifact_read`` called without an ``artifact_id`` resolves a manifest entry by
 ``(item_id, artifact_type)`` alone — it sorts all matching entries by ``created_at`` descending and
@@ -12,9 +12,9 @@ that registers one entry per unit reviewed leaves several under its own type; it
 ``artifact_id`` instead of reading by type. The owner map's ``Gate-read`` column bounds who may
 write a type, not how many entries one writer leaves.
 
-AGENTS.md's "Artifact types and registering agents" table is the declared map, and this module does
-not locate it for itself: ``dh_core.artifact_registry`` is the one locator, shared with the
-decomposition-exit gate, which resolves an ``ARTIFACT`` referent against the same table. Two
+``docs/artifact-registry.md``'s "Artifact types and registering agents" table is the declared map,
+and this module does not locate it for itself: ``dh_core.artifact_registry`` is the one locator,
+shared with the decomposition-exit gate, which resolves an ``ARTIFACT`` referent against it. Two
 locators for one table drifted apart once already — this module anchored on the table's header row
 and passed while the gate anchored on a heading that did not exist, so every ``ARTIFACT`` referent
 resolved to nothing with the suite green.
@@ -23,7 +23,9 @@ These tests hold the shipped markdown and that map in agreement:
 
 * every ``artifact_register`` call in shipped markdown — MCP tool form and ``artifact register``
   CLI form — names a ``(type, agent)`` pair the map declares;
-* every gate-read type in the map has exactly one registering agent.
+* every gate-read type in the map has exactly one registering agent;
+* every type in the map is a member of ``backlog_core.models.ArtifactType``, and the map's own
+  document is where the locator says it is and declares at least one type.
 
 The map, not the scan, is the source of truth for ownership. Some producers are directed in prose
 that contains no call to parse — an agent told to "use ``artifact_type=...``" registers the same
@@ -41,9 +43,9 @@ from pathlib import Path
 import pytest
 from backlog_core.models import ArtifactType
 from dh_core.artifact_registry import (
-    AGENTS_MD,
     PLUGIN_ROOT,
-    REPO_RELATIVE_AGENTS_MD,
+    REGISTRY_DOC,
+    REPO_RELATIVE_REGISTRY_DOC,
     ArtifactRegistryError,
     ArtifactTypeRow,
     artifact_types,
@@ -332,10 +334,10 @@ def owner_map() -> dict[str, ArtifactTypeRow]:
         AssertionError: If the map declares no rows.
         ~dh_core.artifact_registry.ArtifactRegistryError: If the registry is not where
             ``dh_core.artifact_registry`` declares it — raised by ``registry_rows``, not caught
-            here, because a map this module cannot find is a repair to make in AGENTS.md.
+            here, because a map this module cannot find is a repair to make in the registry document.
     """
-    owners = {row.artifact_type: row for row in registry_rows(AGENTS_MD)}
-    assert owners, "The artifact-type owner map in AGENTS.md declares no rows."
+    owners = {row.artifact_type: row for row in registry_rows(REGISTRY_DOC)}
+    assert owners, "The artifact-type owner map in docs/artifact-registry.md declares no rows."
     return owners
 
 
@@ -407,7 +409,7 @@ def scan_registrations() -> list[Registration]:
 
 
 def test_every_registration_is_declared_in_the_owner_map() -> None:
-    """Every scanned ``(artifact_type, agent)`` pair appears in the AGENTS.md owner map."""
+    """Every scanned ``(artifact_type, agent)`` pair appears in the registry document's owner map."""
     owners = owner_map()
     undeclared = sorted({
         (r.artifact_type, r.agent, r.source)
@@ -416,10 +418,10 @@ def test_every_registration_is_declared_in_the_owner_map() -> None:
     })
 
     assert not undeclared, (
-        "artifact_register call(s) name a (type, agent) pair the AGENTS.md owner map does not "
-        "declare. Either the writer is registering under the wrong type, or the map is stale — "
-        "resolve it in AGENTS.md before the call ships, because a read by type alone returns only "
-        "the newest entry and cannot tell two writers apart. Each entry is "
+        "artifact_register call(s) name a (type, agent) pair the artifact-type registry does not "
+        "declare. Either the writer is registering under the wrong type, or the registry is "
+        "stale — resolve it in docs/artifact-registry.md before the call ships, because a read by "
+        "type alone returns only the newest entry and cannot tell two writers apart. Each entry is "
         "(artifact_type, agent, source): " + repr(undeclared)
     )
 
@@ -464,7 +466,7 @@ def test_every_registry_type_is_an_artifact_type_member() -> None:
          nothing reported. Containment one way is mandatory; the reverse is not — a type in the enum
          and absent from the registry is written by the harness rather than by an agent.
     """
-    assert types_absent_from_the_enum(AGENTS_MD) == [], (
+    assert types_absent_from_the_enum(REGISTRY_DOC) == [], (
         "artifact-type registry row(s) name a type that is not an ArtifactType member. A manifest "
         "row stored under such a type is silently dropped when the manifest is parsed, so the "
         "artifact reads as absent rather than as unreadable. Add the member to "
@@ -486,6 +488,45 @@ def test_a_registry_type_outside_the_enum_is_reported(tmp_path: Path) -> None:
     assert types_absent_from_the_enum(_write(tmp_path, bogus)) == ["not-an-enum-member"]
 
 
+KNOWN_ENTITIES = PLUGIN_ROOT / "docs" / "workflow-layers" / "KNOWN_ENTITIES.md"
+"""The extraction workers' vocabulary oracle, which maps registry types to producer/consumer skills."""
+
+_KNOWN_ENTITIES_KEY_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|", re.MULTILINE)
+"""A leading table cell holding one backtick-quoted key, as the oracle's tables write their first column."""
+
+
+def known_entities_artifact_keys() -> frozenset[str]:
+    """Return the artifact-type keys the vocabulary oracle's Registered Artifacts table names.
+
+    Returns:
+        Every first-column key of the table under the oracle's "Registered Artifacts" heading.
+    """
+    text = KNOWN_ENTITIES.read_text(encoding="utf-8")
+    start = text.index("## Registered Artifacts")
+    end = text.index("\n## ", start)
+    return frozenset(_KNOWN_ENTITIES_KEY_RE.findall(text[start:end]))
+
+
+def test_the_vocabulary_oracle_names_only_registered_artifact_types() -> None:
+    """Every artifact key the extraction oracle lists is a type the registry declares.
+
+    Tests: docs/workflow-layers/KNOWN_ENTITIES.md's Registered Artifacts keys against the registry
+    How: Read the oracle's first column and subtract the registry's types.
+    Why: The oracle restates the registry's key set to map each type onto the skills that produce
+         and consume it, and extraction workers reject any reference outside it. A key the registry
+         no longer declares makes the oracle authorise a type nothing can register; the oracle
+         cannot detect that itself, because it is the thing being checked.
+    """
+    registered = {row.artifact_type for row in registry_rows(REGISTRY_DOC)}
+    stale = sorted(known_entities_artifact_keys() - registered)
+
+    assert not stale, (
+        "the vocabulary oracle's Registered Artifacts table names artifact type(s) the registry "
+        "does not declare. docs/artifact-registry.md is the key set; the oracle maps those keys "
+        "onto producer and consumer skills and adds none of its own. Stale key(s): " + repr(stale)
+    )
+
+
 def test_the_shipped_registry_declares_types() -> None:
     """The registry document this checkout ships exists and declares at least one type.
 
@@ -498,8 +539,8 @@ def test_the_shipped_registry_declares_types() -> None:
          over the same set would generate zero test items and vanish rather than fail. This is the
          only assertion that catches a locator constant pointed somewhere the registry is not.
     """
-    assert AGENTS_MD.is_file(), f"{AGENTS_MD}: the shipped artifact-type registry is not at its locator's path"
-    assert artifact_types(AGENTS_MD), f"{AGENTS_MD}: the shipped artifact-type registry declares no types"
+    assert REGISTRY_DOC.is_file(), f"{REGISTRY_DOC}: the shipped artifact-type registry is not at its locator's path"
+    assert artifact_types(REGISTRY_DOC), f"{REGISTRY_DOC}: the shipped artifact-type registry declares no types"
 
 
 @pytest.mark.parametrize(
@@ -697,7 +738,7 @@ _REGISTRY_FIXTURE = """# Doc
 
 
 def _write(tmp_path: Path, text: str) -> Path:
-    """Write ``text`` as an AGENTS.md under ``tmp_path``.
+    """Write ``text`` as a registry document under ``tmp_path``.
 
     Args:
         tmp_path: The pytest temporary directory.
@@ -706,7 +747,7 @@ def _write(tmp_path: Path, text: str) -> Path:
     Returns:
         The path written.
     """
-    path = tmp_path / "AGENTS.md"
+    path = tmp_path / "artifact-registry.md"
     path.write_text(text, encoding="utf-8")
     return path
 
@@ -732,8 +773,8 @@ def test_registry_rows_raises_when_the_heading_is_not_a_heading(tmp_path: Path) 
 
     Tests: dh_core.artifact_registry.registry_rows heading anchor
     How: Parse a document whose registry sits under ``**Artifact types and registering agents:**``.
-    Why: This is the shipped defect. The gate read the registry by heading, AGENTS.md carried the
-         same words as a bold paragraph, and the parse returned an empty registry — so every
+    Why: This is the shipped defect. The gate read the registry by heading, the document carried
+         the same words as a bold paragraph, and the parse returned an empty registry — so every
          ARTIFACT referent failed to resolve and the gate blocked every valid one, reporting
          nothing about why. An empty result cannot be told apart from a registry naming no types;
          raising can.
@@ -787,11 +828,11 @@ def test_registry_rows_raises_when_the_file_does_not_exist(tmp_path: Path) -> No
     Why: A caller handed the wrong path must learn that, not that the registry is empty.
     """
     with pytest.raises(ArtifactRegistryError, match="no such file"):
-        registry_rows(tmp_path / "AGENTS.md")
+        registry_rows(tmp_path / "artifact-registry.md")
 
 
 def test_the_locator_names_one_file_by_two_paths_that_agree() -> None:
-    """``AGENTS_MD`` and ``REPO_RELATIVE_AGENTS_MD`` address the same shipped file.
+    """``REGISTRY_DOC`` and ``REPO_RELATIVE_REGISTRY_DOC`` address the same shipped file.
 
     Tests: dh_core.artifact_registry path constants
     How: Resolve the repo-relative path against the repository root this checkout sits in and
@@ -800,8 +841,8 @@ def test_the_locator_names_one_file_by_two_paths_that_agree() -> None:
          this one uses the absolute path. Two spellings of one location is the drift shape this
          module exists to remove, so they are held in agreement rather than trusted.
     """
-    assert PLUGIN_ROOT.parents[1] / REPO_RELATIVE_AGENTS_MD == AGENTS_MD
-    assert AGENTS_MD.is_file()
+    assert PLUGIN_ROOT.parents[1] / REPO_RELATIVE_REGISTRY_DOC == REGISTRY_DOC
+    assert REGISTRY_DOC.is_file()
 
 
 def test_iter_tool_call_bodies_ignores_an_unclosed_call() -> None:

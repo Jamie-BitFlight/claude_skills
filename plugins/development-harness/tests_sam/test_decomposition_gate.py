@@ -9,8 +9,8 @@ with no stated gap still blocks.
 
 Tier-1 ``ARTIFACT`` resolution is falsified here too, against this checkout's own artifact
 registry: that referent kind shipped with no test over the gate's own path, and the gate rejected
-every valid ``ARTIFACT`` referent because it looked for the registry under a heading AGENTS.md did
-not carry. A test over the registry table's contents sat green throughout -- it read the same table
+every valid ``ARTIFACT`` referent because it looked for the registry under a heading the registry
+document did not carry. A test over the registry table's contents sat green throughout -- it read the same table
 by its header row -- so the test that closes this reads nothing directly and asks the gate.
 Tier-1 ``FILE``, ``RULE``, ``TASK_OUTPUT`` and ``GRAPH_POSITION`` resolution, and Tier-2 quote
 verification against a real span, remain uncovered as of this writing -- a gap, not a decision.
@@ -25,7 +25,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from dh_core.artifact_registry import AGENTS_MD, registry_rows
+from dh_core.artifact_registry import REGISTRY_DOC, registry_rows
 from dh_core.workflow_multigraph.decomposition_gate import DecompositionGate, RepoResolver, RepoSourceReader
 from dh_core.workflow_multigraph.descriptors import SourceSpan
 from dh_core.workflow_multigraph.findings import Predicate, Severity
@@ -115,24 +115,24 @@ def artifact_instruction(target: str) -> Instruction:
             Referent(
                 kind=ReferentKind.ARTIFACT,
                 target=target,
-                source_refs=[SourceSpan(ref="plugins/development-harness/AGENTS.md")],
+                source_refs=[SourceSpan(ref="plugins/development-harness/docs/artifact-registry.md")],
             ),
         ),
     )
 
 
-@pytest.mark.parametrize("artifact_type", sorted(row.artifact_type for row in registry_rows(AGENTS_MD)))
+@pytest.mark.parametrize("artifact_type", sorted(row.artifact_type for row in registry_rows(REGISTRY_DOC)))
 def test_every_registered_artifact_type_resolves_through_the_gate(artifact_type: str) -> None:
     """A referent naming a registered type and an id resolves, so the gate does not block it.
 
     Tests: RepoResolver.resolve_artifact over this checkout, through DecompositionGate.blocks
-    How: For each type the shared locator reads out of AGENTS.md, ask the gate to check a
-         DELEGATING instruction naming that type with an id.
-    Why: The gate located the registry by a heading AGENTS.md did not carry, so it read no types at
-         all and rejected every valid ARTIFACT referent as BROKEN. The parametrisation takes the
-         types from the locator rather than restating them, so this asserts what the pair of
-         readers must agree on -- the gate resolves exactly what the registry declares -- rather
-         than re-encoding the table's contents a third time. Reading the table and checking its
+    How: For each type the shared locator reads out of the registry document, ask the gate to check
+         a DELEGATING instruction naming that type with an id.
+    Why: The gate located the registry by a heading the document did not carry, so it read no types
+         at all and rejected every valid ARTIFACT referent as BROKEN. The parametrisation takes the
+         types from the locator rather than restating them, so this asserts what the readers must
+         agree on -- the gate resolves exactly what the registry declares -- rather than
+         re-encoding the table's contents again. Reading the table and checking its
          contents cannot catch this: a test of that shape was green while the gate was broken.
     """
     gate = build_gate()

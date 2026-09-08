@@ -1,20 +1,29 @@
-"""The artifact-type registry declared in this plugin's ``AGENTS.md``, and the one locator for it.
+"""The artifact-type registry this plugin declares, and the one locator for it.
 
-``AGENTS.md``'s "Artifact types and registering agents" section holds the complete registry of
-document-artifact types: every ``artifact_register`` call must match a ``(Type, Registering
-agents)`` pair it lists, and its ``Gate-read`` column marks the types whose read decides a workflow
-branch. Two readers consume that one table and they must not encode where it is twice:
+``docs/artifact-registry.md``'s "Artifact types and registering agents" section holds the complete
+registry of document-artifact types: every ``artifact_register`` call must match a ``(Type,
+Registering agents)`` pair it lists, and its ``Gate-read`` column marks the types whose read decides
+a workflow branch. Three readers consume that one table and they must not encode where it is three
+times:
 
 * :mod:`dh_core.workflow_multigraph.decomposition_gate` resolves an ``ARTIFACT`` referent against
   the ``Type`` column -- ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §
   "The decomposition-exit gate", Tier 1: an ``ARTIFACT`` referent resolves to "a type in the
   artifact registry, with its id";
 * ``tests/test_artifact_type_ownership_drift.py`` holds the shipped markdown's registrations
-  against the same table's ownership and gate-read columns.
+  against the same table's ownership and gate-read columns, and holds every row's type inside
+  :class:`backlog_core.models.ArtifactType`;
+* ``tests_sam/test_decomposition_gate.py`` falsifies the gate's own ``ARTIFACT`` resolution over
+  every type the same table declares.
 
-Both call :func:`registry_rows` here. A locator each reader spells for itself is two encodings of
-one fact: the heading anchor and the header-row anchor drifted apart once already, and only the
-reader that was not a test noticed.
+All three call :func:`registry_rows` here. A locator each reader spells for itself is one encoding
+of one fact per reader: the heading anchor and the header-row anchor drifted apart once already, and
+only the reader that was not a test noticed.
+
+The registry lives in ``docs/`` rather than in this plugin's ``AGENTS.md`` because ``AGENTS.md`` is
+a contributor document, loaded into the context of agents working in this repository and invisible
+to an agent that merely uses the installed plugin. Nothing a reader parses at runtime may live
+there.
 
 The locator is loud on purpose. A registry that cannot be found in a file that exists raises
 :class:`ArtifactRegistryError` rather than reporting an empty registry, because an empty registry
@@ -37,7 +46,7 @@ from marko.ext.gfm.elements import Table
 from pydantic import BaseModel, ConfigDict, Field
 
 REGISTRY_HEADING = "Artifact types and registering agents"
-"""The AGENTS.md heading whose table is the artifact-type registry."""
+"""The heading in the registry document whose table is the artifact-type registry."""
 
 TYPE_COLUMN = "Type"
 """The registry column naming the artifact type an ``artifact_register`` call passes."""
@@ -55,12 +64,12 @@ GATE_READ_VALUES = {"yes": True, "no": False}
 """The ``Gate-read`` cell values the registry declares, and what each means."""
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-"""This plugin's root -- the directory holding the ``AGENTS.md`` that declares the registry."""
+"""This plugin's root -- the directory holding the document that declares the registry."""
 
-AGENTS_MD = PLUGIN_ROOT / "AGENTS.md"
+REGISTRY_DOC = PLUGIN_ROOT / "docs" / "artifact-registry.md"
 """The registry's own file, for a reader that already runs inside this checkout."""
 
-REPO_RELATIVE_AGENTS_MD = Path("plugins/development-harness/AGENTS.md")
+REPO_RELATIVE_REGISTRY_DOC = Path("plugins/development-harness/docs/artifact-registry.md")
 """The same file, relative to a repository root, for a reader resolving against a given checkout."""
 
 
@@ -104,15 +113,15 @@ def inline_text(node: object) -> str:
     return "".join(inline_text(child) for child in children)
 
 
-def registry_rows(agents_md: Path) -> tuple[ArtifactTypeRow, ...]:
-    """Parse the artifact-type registry table out of an ``AGENTS.md``.
+def registry_rows(registry: Path) -> tuple[ArtifactTypeRow, ...]:
+    """Parse the artifact-type registry table out of the document declaring it.
 
     Locates the table by the :data:`REGISTRY_HEADING` section it lives under, then reads its
     columns by the names in :data:`REQUIRED_COLUMNS` rather than by position, so a column added or
     reordered does not silently shift what each reader reads.
 
     Args:
-        agents_md: Path to the ``AGENTS.md`` declaring the registry.
+        registry: Path to the document declaring the registry.
 
     Returns:
         One :class:`ArtifactTypeRow` per body row of the registry table, in document order.
@@ -124,21 +133,21 @@ def registry_rows(agents_md: Path) -> tuple[ArtifactTypeRow, ...]:
             somewhere other than where this module says it is, which no caller can detect from an
             empty result.
     """
-    if not agents_md.is_file():
-        raise ArtifactRegistryError(f"{agents_md}: no such file, so it declares no artifact-type registry")
-    document = Markdown(extensions=["gfm"]).parse(agents_md.read_text(encoding="utf-8"))
-    table = find_registry_table(document, agents_md)
+    if not registry.is_file():
+        raise ArtifactRegistryError(f"{registry}: no such file, so it declares no artifact-type registry")
+    document = Markdown(extensions=["gfm"]).parse(registry.read_text(encoding="utf-8"))
+    table = find_registry_table(document, registry)
     header, *body = table.children
-    columns = column_indices(header, agents_md)
-    return tuple(parse_row(row, columns, agents_md) for row in body)
+    columns = column_indices(header, registry)
+    return tuple(parse_row(row, columns, registry) for row in body)
 
 
-def find_registry_table(document: object, agents_md: Path) -> Table:
+def find_registry_table(document: object, registry: Path) -> Table:
     """Return the GFM table under the registry's heading.
 
     Args:
         document: The parsed marko document.
-        agents_md: The file it was parsed from, named in the raised error.
+        registry: The file it was parsed from, named in the raised error.
 
     Returns:
         The first table appearing under the :data:`REGISTRY_HEADING` section.
@@ -156,15 +165,15 @@ def find_registry_table(document: object, agents_md: Path) -> Table:
         if in_section and isinstance(child, Table):
             return child
     found = "the section holds no table" if in_section else "no heading matches"
-    raise ArtifactRegistryError(f"{agents_md}: no artifact-type registry under heading {REGISTRY_HEADING!r} -- {found}")
+    raise ArtifactRegistryError(f"{registry}: no artifact-type registry under heading {REGISTRY_HEADING!r} -- {found}")
 
 
-def column_indices(header: object, agents_md: Path) -> dict[str, int]:
+def column_indices(header: object, registry: Path) -> dict[str, int]:
     """Map each required column name to its position in the registry table's header row.
 
     Args:
         header: The table's header row.
-        agents_md: The file it was parsed from, named in the raised error.
+        registry: The file it was parsed from, named in the raised error.
 
     Returns:
         One entry per name in :data:`REQUIRED_COLUMNS`.
@@ -176,18 +185,18 @@ def column_indices(header: object, agents_md: Path) -> dict[str, int]:
     missing = [column for column in REQUIRED_COLUMNS if column not in names]
     if missing:
         raise ArtifactRegistryError(
-            f"{agents_md}: the artifact-type registry table omits column(s) {missing!r}; its header row names {names!r}"
+            f"{registry}: the artifact-type registry table omits column(s) {missing!r}; its header row names {names!r}"
         )
     return {column: names.index(column) for column in REQUIRED_COLUMNS}
 
 
-def parse_row(row: object, columns: dict[str, int], agents_md: Path) -> ArtifactTypeRow:
+def parse_row(row: object, columns: dict[str, int], registry: Path) -> ArtifactTypeRow:
     """Read one body row of the registry table into an :class:`ArtifactTypeRow`.
 
     Args:
         row: The table body row.
         columns: Column-name to position map, from :func:`column_indices`.
-        agents_md: The file it was parsed from, named in the raised error.
+        registry: The file it was parsed from, named in the raised error.
 
     Returns:
         The row's declared type, its registering agents, and its gate-read flag.
@@ -198,28 +207,28 @@ def parse_row(row: object, columns: dict[str, int], agents_md: Path) -> Artifact
     """
     cells = [inline_text(cell).strip() for cell in getattr(row, "children", [])]
     if len(cells) <= max(columns.values()):
-        raise ArtifactRegistryError(f"{agents_md}: artifact-type registry row {cells!r} is short of its columns")
+        raise ArtifactRegistryError(f"{registry}: artifact-type registry row {cells!r} is short of its columns")
     artifact_type = cells[columns[TYPE_COLUMN]]
     if not artifact_type:
-        raise ArtifactRegistryError(f"{agents_md}: artifact-type registry row {cells!r} names no type")
+        raise ArtifactRegistryError(f"{registry}: artifact-type registry row {cells!r} names no type")
     gate_read = cells[columns[GATE_READ_COLUMN]].lower()
     if gate_read not in GATE_READ_VALUES:
         raise ArtifactRegistryError(
-            f"{agents_md}: artifact type {artifact_type!r} declares {GATE_READ_COLUMN} {gate_read!r}, "
+            f"{registry}: artifact type {artifact_type!r} declares {GATE_READ_COLUMN} {gate_read!r}, "
             f"which is not one of {sorted(GATE_READ_VALUES)}"
         )
     agents = frozenset(agent.strip() for agent in cells[columns[AGENTS_COLUMN]].split(",") if agent.strip())
     return ArtifactTypeRow(artifact_type=artifact_type, agents=agents, gate_read=GATE_READ_VALUES[gate_read])
 
 
-def artifact_types(agents_md: Path) -> frozenset[str]:
+def artifact_types(registry: Path) -> frozenset[str]:
     """Return the artifact types the registry names.
 
     Args:
-        agents_md: Path to the ``AGENTS.md`` declaring the registry.
+        registry: Path to the document declaring the registry.
 
     Returns:
-        Every value in the registry's :data:`TYPE_COLUMN`; the empty set when ``agents_md`` itself
+        Every value in the registry's :data:`TYPE_COLUMN`; the empty set when ``registry`` itself
         does not exist, which is the case of a checkout that ships no such registry rather than one
         whose registry moved.
 
@@ -227,6 +236,6 @@ def artifact_types(agents_md: Path) -> frozenset[str]:
         ArtifactRegistryError: If the file exists but its registry is not where this module says it
             is -- see :func:`registry_rows`.
     """
-    if not agents_md.is_file():
+    if not registry.is_file():
         return frozenset()
-    return frozenset(row.artifact_type for row in registry_rows(agents_md))
+    return frozenset(row.artifact_type for row in registry_rows(registry))

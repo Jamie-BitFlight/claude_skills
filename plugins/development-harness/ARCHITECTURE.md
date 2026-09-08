@@ -77,6 +77,15 @@ and it is a separate namespace from `ArtifactType`. `ARTIFACT:DISCOVERY`, `ARTIF
 artifact type either. So `ARTIFACT:PLAN` for the planning stage's output is correct, and reading it
 as a misspelling of the `architect` type conflates the two namespaces.
 
+The artifact registry and `ArtifactType` answer different questions, and are a third distinct thing
+again. `ArtifactType` is the manifest's vocabulary: every type a manifest entry can hold, and every
+value the `artifact_register` tool accepts. The registry
+(`docs/artifact-registry.md`) is the subset an agent may register, and names the writer permitted
+for each. A type in the enum and absent from the registry is written by the harness itself rather
+than by an agent — `task-plan`, written by SAM's plan store. Every registry type is an enum member;
+the reverse does not hold, and the decomposition-exit gate resolves `ARTIFACT` referents against the
+registry, not the enum.
+
 ### Acceptance criteria
 
 A structured acceptance criterion carries an executable check command
