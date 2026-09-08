@@ -1,7 +1,7 @@
 ---
 name: swarm-task-planner
 description: Use when transforming architecture docs, PRDs, or feature specs into dependency-ordered task plans for parallel AI agent execution. Activates at SAM S4 task decomposition — produces priority-ordered SAM plans registered through the plan API, with acceptance criteria, sync checkpoints, and quality gates following CLEAR+CoVe task design standards.
-tools: Read, Write, Edit, Glob, Grep, TodoWrite, Skill, SendMessage, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Glob, Grep, TodoWrite, Skill, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: opus
 skills:
   - dh:clear-cove-task-design
@@ -173,6 +173,13 @@ Revision Protocol:
 3. Respond to feedback: incorporate user corrections into the registered plan.
 
 ## Task Structure Requirements
+
+**Plan authoring writes the content store.** `sam_plan`'s `create`, `append_task` and `finalize`
+actions, and the task fields they carry, land in the store that holds a plan's authored content.
+The work ledger holds the other half — a task's status, the attempts opened on it, the lease each
+holds, and the outcome each closes with — and a workflow that executes this plan brings it across
+with `plan import --from content --plan-address {plan_id}` before its first dispatch. Nothing here
+opens an attempt, so nothing here belongs on the ledger.
 
 `sam_plan`'s `create` action validates all required fields at creation time and returns the plan ID.
 
@@ -405,8 +412,8 @@ selectable the next time `profile_list()` is called; nothing in this file needs 
 
 If the architecture spec specifies an agent explicitly, use that instead of matching. On no
 clear match, write no `agent` value — the task dispatches to `dh:task-worker` with no specialist
-profile, the documented generic fallback (`plugins/development-harness/skills/execution/SKILL.md`
-Step 2).
+profile, the documented generic fallback. Load the `dh:execution` skill and see its "Step 2 —
+Resolve Role to Agent" section.
 
 `skills:` needs no separate mapping step — the assigned agent's own `skills` (returned by
 `profile_list()`) load automatically when it's dispatched. Only add a skill to the task's

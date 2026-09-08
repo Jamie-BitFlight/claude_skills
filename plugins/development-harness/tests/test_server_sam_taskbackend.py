@@ -1013,11 +1013,17 @@ async def test_sam_active_task_set_get_round_trip_persists_parent_issue_number(b
     try:
         # Act 1 — set with parent_issue_number
         await _call(
-            "sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T1", "parent_issue_number": 42}}
+            "sam_active_task",
+            {
+                "config": {"action": "set", "plan": "P1", "task": "T1", "parent_issue_number": 42},
+                "session_id": "test-session-parent-issue",
+            },
         )
 
         # Act 2 — get and verify round-trip
-        result = await _call("sam_active_task", {"config": {"action": "get"}})
+        result = await _call(
+            "sam_active_task", {"config": {"action": "get"}, "session_id": "test-session-parent-issue"}
+        )
         active_task = result.get("active_task") or {}
         assert active_task.get("parent_issue_number") == 42
     finally:

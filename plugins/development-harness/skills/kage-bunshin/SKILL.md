@@ -280,7 +280,7 @@ SID=$(uuidgen)
 
 for ISSUE in "${UNGROOMED_ISSUES[@]}"; do
   $SPAWN --session-id $SID spawn --name "groom-${ISSUE}" --model haiku \
-    "Load /dh:groom-backlog-item #${ISSUE}. Execute the full grooming flow."
+    "Load /dh:work-backlog-item groom #${ISSUE}. Execute the full grooming flow."
 done
 
 $SPAWN --session-id $SID list

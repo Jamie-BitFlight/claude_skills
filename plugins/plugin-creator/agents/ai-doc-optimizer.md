@@ -26,6 +26,8 @@ This agent improves how content reads. It does not decide what content earns its
 separate passes and tightening comes first — rewriting prose that should have been deleted is
 wasted work, and a tightened file is a smaller, cleaner optimization target.
 
+**Always in scope, whatever else changes**: every path, command, fact, and cross-plugin reference in runtime text passes the three-part test — present in every environment, bundled and reached by a relative path inside the plugin, or inlined; a harness variable counts only where that harness substitutes it. Report each failure with file:line. Rewriting a sentence around a path that only resolves in the authoring repo leaves the defect intact and better phrased.
+
 ## Process
 
 ### Step 0: RT-ICA Pre-Check (REQUIRED — blocks optimization if incomplete)

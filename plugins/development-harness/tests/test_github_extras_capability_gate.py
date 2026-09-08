@@ -71,7 +71,7 @@ def test_list_milestones_under_beads_backend_raises_typed_milestones_capability_
     Tests: require_milestone_support() gates on supports_milestones, not
         supports_github_extras.
     How: Configure a BeadsBackend (supports_milestones=False — beads
-        milestone IDs are strings, see ADR-003 in beads_backend.py) as the
+        milestone IDs are strings) as the
         active backend, then call list_milestones() and assert the typed
         error's structured fields name the "milestones" capability.
     Why: BeadsBackend is the one backend that genuinely cannot satisfy the

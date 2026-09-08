@@ -51,12 +51,13 @@ for issue in issues: process(issue)
 
 ## Must-Stay-REST Operations
 
-Two operations have no GraphQL mutation equivalent and remain on REST permanently (ADR-004):
+Two operations have no GraphQL mutation equivalent and remain on REST permanently:
 
 - `create_milestone` — uses PyGithub REST
 - `create_label` — uses PyGithub REST
 
-Do not attempt to rewrite these as GraphQL mutations. When ADR-004 is revisited, update this document first.
+Do not attempt to rewrite these as GraphQL mutations. If GitHub ever adds a GraphQL mutation for
+either, update this document first.
 
 ## Cursor Pagination vs. GitLab Batch Aliases
 
@@ -97,5 +98,5 @@ SOURCE: Observed during GraphQL migration (issues #916, #1018, #1020), 2026-03-2
 - `backlog_core/gh_client.py` — `sync_issues_graphql` and `_fetch_issues_graphql` implementation
 - `backlog_core/operations.py` — callers of `sync_issues_graphql`
 - `backlog_core/server.py` — MCP tool wrappers
-- [backend-providers.md](./backend-providers.md) — GitHub backend architecture and ADR-004 reference
+- [backend-providers.md](./backend-providers.md) — GitHub backend architecture
 - [backlog-lifecycle.md](./backlog-lifecycle.md) — full sync lifecycle and state machine

@@ -18,14 +18,13 @@ stated goal through its prerequisite chain: what must exist to reach the goal, t
 those things requires, recursively back to the current state. Classifies each prerequisite as
 AVAILABLE, DERIVABLE, or MISSING. `dh:rt-ica` blocks planning on any MISSING condition (S2
 implementation gate); `dh:planner-rt-ica` is the non-blocking sister used during grooming, which
-localizes a MISSING condition to the affected task instead of halting. Canonical:
-[`skills/rt-ica/SKILL.md`](../rt-ica/SKILL.md).
+localizes a MISSING condition to the affected task instead of halting. Canonical: load the
+`dh:rt-ica` skill.
 
 **ARL** (Autonomous Refinement Loop) — research into the prerequisites for autonomous agent
 execution without synchronous human blocking gates: failure categories, and the conditions under
 which a machine-verifiable check can replace human judgment. dh's human-touchpoint model is
-ARL-derived — see the S1-S7 entry below. Canonical:
-`plugins/plugin-creator/skills/arl/SKILL.md`.
+ARL-derived — see the S1-S7 entry below. Canonical: load the `plugin-creator:arl` skill.
 
 **SAM** (Stateless Agent Methodology) — the 7-stage development pipeline this harness implements
 (S1-S7, below). "Stateless" means each stage's state lives in a provider-owned artifact, never in

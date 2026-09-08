@@ -49,8 +49,13 @@ Changes from snapshot:
 - {condition X}: DERIVABLE → AVAILABLE (resolved by fact-checker — cite: {tool result})
 - {condition Y}: AVAILABLE → MISSING (refuted by fact-checker)
 - {condition Z}: (new) MISSING (discovered by impact-analyst)
-Decision: {APPROVED|BLOCKED}
+Decision: {APPROVED-FOR-PLANNING|APPROVED-WITH-GAPS|BLOCKED-FOR-PLANNING}
 ```
+
+`Decision:` carries one token from the vocabulary `dh:planner-rt-ica` owns, written as a plain
+unbolded line with the token alone. Choose it with the same rule `rtica-assessor` applies: no
+MISSING left → `APPROVED-FOR-PLANNING`; a data-deletion hard block or no planning signal at all →
+`BLOCKED-FOR-PLANNING`; otherwise → `APPROVED-WITH-GAPS`.
 
 5. Write final RT-ICA to item (replaces the initial snapshot). Store the report content as
    `{rt_ica_final_content}` — it will be included in the batch write at the end of this workflow
@@ -66,40 +71,56 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{final repor
 
 ```mermaid
 flowchart TD
-    FD{"All conditions AVAILABLE<br>or DERIVABLE resolved?"}
-    FD -->|"Yes — APPROVED"| Proceed(["Proceed to output validation"])
-    FD -->|"No — MISSING conditions remain"| Batch["Batch all MISSING conditions<br>For each: what was tried,<br>options found, trade-offs"]
+    FD{"Decision: token"}
+    FD -->|"APPROVED-FOR-PLANNING"| Proceed(["Proceed to output validation"])
+    FD -->|"BLOCKED-FOR-PLANNING"| Block(["Workflow Block — error.md"])
+    FD -->|"unrecognised or absent"| Err(["Error — error.md, naming the token found"])
+    FD -->|"APPROVED-WITH-GAPS"| Batch["Batch every unresolved MISSING condition<br>For each: what was tried,<br>options found, trade-offs"]
     Batch --> Present(["Present batch to user"])
-    Present --> UserAnswers["User provides answers"]
-    UserAnswers --> Mark["Mark each resolved condition AVAILABLE<br>with user citation"]
-    Mark --> Recheck{"Re-check: all resolved?"}
-    Recheck -->|Yes — APPROVED| Proceed
-    Recheck -->|No| Present
+    Present --> UserAnswers{"User answers?"}
+    UserAnswers -->|"Answers given"| Mark["Mark each resolved condition AVAILABLE<br>with the user's exact words as citation<br>Recompute the Decision: token"]
+    Mark --> FD
+    UserAnswers -->|"Skipped or unanswered"| Carry["Record the remaining gaps in<br>Blockers and Questions for Human"]
+    Carry --> Proceed
 ```
 
-#### BLOCKED batch format
+`APPROVED-WITH-GAPS` does not stop the groom. It is the expected outcome for a brownfield,
+refactor, or discovery item, and the gaps it carries are the point: they reach the groomed item as
+Blockers and Questions for Human, where the planner and the human can see them. Only
+`BLOCKED-FOR-PLANNING` is a Workflow Block. An unrecognised token is an error, never a silent pass
+and never a silent block.
+
+#### Clarification batch format (`APPROVED-WITH-GAPS`)
 
 ```text
-RT-ICA: BLOCKED
+RT-ICA: APPROVED-WITH-GAPS
 
-The following inputs could not be resolved autonomously.
+The following inputs could not be resolved autonomously. Grooming will finish either way —
+answering now folds the answer into the groomed item instead of leaving it as an open question.
 
 [Category]:
 - Question: {what is unknown}
   Tried: {tools used, what they returned}
   Options found: {a) option with trade-off | b) option with trade-off | c) open-ended}
 
-Answer what you can — skip what you don't know.
-Grooming will not proceed to output validation with unresolved gaps.
+Answer what you can — skip what you don't know. Anything left unanswered is recorded under
+Blockers and Questions for Human on the item.
 ```
 
-#### When `<mode/>` is `auto` (RT-ICA BLOCKED only)
+#### When `<mode/>` is `auto`
 
-BLOCKED conditions with exactly one viable option are auto-resolved with `[AUTO] Resolved {condition} — {option} — {evidence}`. Conditions with multiple options or no options remain BLOCKED and halt the workflow. This auto-resolution applies only to the RT-ICA BLOCKED state above — output validation retries always use the same model regardless of mode.
+Unresolved MISSING conditions with exactly one viable option are auto-resolved with
+`[AUTO] Resolved {condition} — {option} — {evidence}`, and the `Decision:` token is recomputed.
+Conditions with multiple options or none are recorded under Blockers and Questions for Human, and
+the groom proceeds — auto mode asks no questions, so an unanswerable gap is carried forward rather
+than held open. A `BLOCKED-FOR-PLANNING` token still halts the workflow in auto mode: it means the
+item cannot be planned at all, which no auto-resolution can fix. This auto-resolution applies only
+to the RT-ICA final pass — output validation retries always use the same model regardless of mode.
 
 ## Output Validation Gate
 
-Runs when RT-ICA Final Decision is APPROVED, before the final write with `mark_groomed=True`.
+Runs when the RT-ICA Final `Decision:` token is `APPROVED-FOR-PLANNING` or `APPROVED-WITH-GAPS`,
+before the final write with `mark_groomed=True`.
 
 1. Check section presence — Step 1: query summary:
 
@@ -124,7 +145,7 @@ Use the `section` filter to read each required section individually. The `sectio
 
 | Section | Minimum content |
 |---|---|
-| `RT-ICA` | Contains `Decision: APPROVED` or `Decision: BLOCKED` and `Date: YYYY-MM-DD` |
+| `RT-ICA` | Contains a plain `Decision:` line whose token is `APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, or `BLOCKED-FOR-PLANNING`, and a `Date: YYYY-MM-DD` line. Any other token, or a missing line, fails the gate — do not accept it as either pass or block. |
 | `Impact Radius` | At least one entry under `Systems Inventory` |
 | `Fact-Check` | At least one claim with `verdict:` field |
 | `Acceptance Criteria` | Non-empty — at least one criterion listed |
@@ -288,8 +309,9 @@ After the batch write, verify the RT-ICA section was persisted:
 backlog view --selector "{item_ref}"
 ```
 
-Check `response["sections"]["RT-ICA"]` is non-empty and contains `Date: YYYY-MM-DD` and
-`Decision: APPROVED`. If absent or malformed, write it again individually before proceeding:
+Check `response["sections"]["RT-ICA"]` is non-empty and contains a `Date: YYYY-MM-DD` line and
+the same `Decision:` token the final pass computed. If absent or malformed, write it again
+individually before proceeding:
 
 ```bash
 backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_final_content}"
@@ -307,6 +329,9 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt_ica_fina
 if response.get("mark_groomed_skipped"):
     mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', mark_groomed=True)
 ```
+
+If the retry also returns `mark_groomed_skipped: true`, do not retry again — report to the user
+that the item may have been renamed or removed during the grooming session.
 
 **Alternative: incremental section updates**
 
@@ -338,7 +363,8 @@ After grooming completes, the item is ready for SAM planning. The caller
 | State | Condition | Action |
 |---|---|---|
 | Groomed | Output validation passed, `mark_groomed=True` called | Report completion to caller |
-| Blocked (RT-ICA) | MISSING conditions unresolved after user batch | `backlog_update(selector='{item_ref}', status='blocked')`, report, stop |
+| Blocked (RT-ICA) | RT-ICA Final `Decision:` is `BLOCKED-FOR-PLANNING` | `backlog_update(selector='{item_ref}', status='blocked')`, report, stop |
+| Error (RT-ICA) | RT-ICA Final `Decision:` line absent, or its token is none of the three | Route to [error.md](./error.md) naming the token found; never treat it as pass or block |
 | Blocked (validation) | 3 retry attempts failed to produce required sections | `backlog_update(selector='{item_ref}', status='blocked')`, report, stop |
 | Skipped | Pre-groom check returned SKIP | Report reason, next item |
 | Drift | Already groomed today | Route to [groom-drift.md](./groom-drift.md), report, stop |

@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import typer
 
-from sam_schema import artifacts, backlog, cli_active_task, dispatch, sam_plan
+from sam_schema import artifacts, backlog, cli_active_task, cli_known_failure_types, dispatch, sam_plan
 
 app = typer.Typer(
     name="sam", help="Provider-neutral development harness CLI.", no_args_is_help=True, rich_markup_mode=None
@@ -62,6 +62,9 @@ app.add_typer(backlog.app, name="backlog")
 app.add_typer(dispatch.app, name="dispatch")
 app.add_typer(artifacts.app, name="artifact")
 app.add_typer(cli_active_task.app, name="active-task")
+# A leaf command, not a domain app: the failure-type table is one thing to read, and its
+# behavior still lives beside its operation in cli_known_failure_types.py.
+app.command("known-failure-types")(cli_known_failure_types.known_failure_types)
 
 if __name__ == "__main__":  # pragma: no cover
     app()

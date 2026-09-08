@@ -25,7 +25,7 @@ Do not stop for user input after any announcement. Announce then immediately exe
 | No title given and no open P0/P1 items found | Log `[AUTO] STOP — no open P0/P1 items found`, stop. Do not attempt to create a new item. |
 | Auto-selected P0/P1 item already has RT-ICA BLOCKED status | Log `[AUTO] STOP — RT-ICA BLOCKED on auto-selected item: {title}. {missing inputs}`, stop. Cannot resolve without human — select a different item manually. |
 | Step 1.2: issue not found | Log `[AUTO] STOP — Issue #N not found`, stop |
-| Step 1.3: zero matches → ask user to create | Auto-invoke `create-backlog-item --auto {title}`, log `[AUTO] No item found — invoking create-backlog-item --auto`. If `create-backlog-item --auto` itself fails (e.g., GitHub issue creation error, invalid title), log `[AUTO] STOP — create-backlog-item --auto failed: {error}` and stop. |
+| Step 1.3: zero matches → ask user to create | Auto-invoke the create workflow via `references/workflows/create/start.md` with `mode=auto`, `item_title={title}`, log `[AUTO] No item found — invoking create workflow (auto)`. If the create workflow itself fails (e.g., GitHub issue creation error, invalid title), log `[AUTO] STOP — create workflow (auto) failed: {error}` and stop. |
 | Step 1: multiple matches → ask user to pick | Log `[AUTO] Multiple matches — picking first: {title}`, proceed with first match |
 | Step 2.2: offer GitHub issue for P0/P1 | Log `[AUTO] Skipping GitHub issue offer`, continue without issue |
 | Step 2.2: ask milestone assignment | Log `[AUTO] Skipping milestone assignment`, skip |
@@ -35,7 +35,7 @@ Do not stop for user input after any announcement. Announce then immediately exe
 | Step 3.4: Feasibility WARN (prior attempt) | Log `[AUTO] WARN: prior attempt referenced — including in feature request`, continue |
 | Step 3.4: Feasibility BLOCKED (any criterion) | Log `[AUTO] STOP — feasibility blocked: {criterion}`, stop |
 | Step 5.1–5.7 interactive questions (summary, method, notes, follow_ups, findings) | Log `[AUTO] Decision: {chosen option} — reason: {evidence}`, proceed with agent-derived values for each field |
-| Step 3.1: Phase 2 agent returns `FUNCTIONAL_DRIFT` | Log `[AUTO] STALENESS: FUNCTIONAL_DRIFT — {one-line reason from diff}`. Write 'staleness context' section via `backlog_groom`, invoke `dh:groom-backlog-item`, proceed to Step 3.2. |
+| Step 3.1: Phase 2 agent returns `FUNCTIONAL_DRIFT` | Log `[AUTO] STALENESS: FUNCTIONAL_DRIFT — {one-line reason from diff}`. Write 'staleness context' section via `backlog_groom`, run the grooming workflow via `references/workflows/groom/start.md`, proceed to Step 3.2. |
 | Step 3.1: Phase 2 agent returns `SUPERSEDED` | Log `[AUTO] STALENESS: SUPERSEDED — {commit refs}`. Call `backlog_close(reason='superseded', comment='{commits}')`. Stop — do not proceed to planning. |
 | Step 3.1: Phase 2 agent returns `COSMETIC_ONLY` | Log `[AUTO] STALENESS: COSMETIC_ONLY — cached groom content valid`. Proceed to Step 3.2 without re-grooming. |
 | Any other `AskUserQuestion` | Log `[AUTO] Decision: {chosen option} — reason: {evidence}`, proceed with logged choice |

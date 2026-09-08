@@ -1,4 +1,4 @@
-"""Regression tests for large-plan write correctness — AC #18 from #1770.
+"""Regression tests for large-plan write correctness.
 
 Tests A, B, C verify that a 50-task plan round-trips correctly regardless of
 whether it is written monolithically (create) or incrementally (append_task).
@@ -111,7 +111,7 @@ def _extract_task_fields(task: Mapping[str, Any]) -> dict[str, Any]:
 def test_A_monolithic_50_task_create_round_trips(memory_backend: ContentTaskProvider) -> None:
     """Monolithic create with 50 tasks completes and round-trips field content correctly.
 
-    AC #18 Test A: sam_plan(action='create', tasks=<50 TaskDefinition objects>) must succeed
+    Test A: sam_plan(action='create', tasks=<50 TaskDefinition objects>) must succeed
     and all task fields must survive the round-trip through the backend.
 
     Arrange: build a list of 50 TaskDefinition objects.
@@ -155,7 +155,7 @@ def test_A_monolithic_50_task_create_round_trips(memory_backend: ContentTaskProv
 def test_B_incremental_50_append_matches_monolithic_create(memory_backend: ContentTaskProvider) -> None:
     """50 sequential append_task calls produce plan with identical content to monolithic create.
 
-    AC #18 Test B: the plan produced by create({tasks:[]}) + 50 x append_task
+    Test B: the plan produced by create({tasks:[]}) + 50 x append_task
     must have field content identical to a monolithic create with the same 50 tasks.
 
     Arrange: build a monolithic plan (reference) and an incremental plan (subject).
@@ -210,7 +210,7 @@ def test_B_incremental_50_append_matches_monolithic_create(memory_backend: Conte
 def test_C_mixed_5_create_45_append_preserves_order_and_fields(memory_backend: ContentTaskProvider) -> None:
     """Create with 5 tasks then append 45 more: total 50 tasks in correct order.
 
-    AC #18 Test C: mixed approach must produce correct task ordering (T01 first,
+    Test C: mixed approach must produce correct task ordering (T01 first,
     T50 last) with all fields preserved.
 
     Arrange: create plan with T01..T05; append T06..T50.

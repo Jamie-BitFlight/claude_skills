@@ -1,0 +1,1 @@
+Drive three tasks from ready to accepted through the sam plan CLI alone.

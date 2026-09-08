@@ -10,9 +10,12 @@ prevent it:
 - `${CLAUDE_PLUGIN_ROOT}` — the plugin's root directory. Applies only when the loaded `SKILL.md`
   belongs to a plugin (not a project-level `.claude/skills/` skill). Substitutes throughout the
   entire rendered body — plain prose and markdown link targets, not only `` !`bash` `` injection
-  lines — before the model sees the text. Absent from `code.claude.com/docs/en/skills.md`'s own
-  substitution table (a documentation gap on Anthropic's side, not evidence against the behavior).
-  Verified live via `dh-meta-docs` and `implementation-manager`, and canary-tested against a
+  lines — before the model sees the text. Now listed in `code.claude.com/docs/en/skills`'s own
+  substitution table, under "Available string substitutions" (checked 2026-09-06); that page
+  scopes it to the skill's markdown content and `allowed-tools` Bash rules, while
+  `code.claude.com/docs/en/plugins-reference` says skill content substitutes "anywhere the
+  placeholder appears" — the two pages disagree, and the canary result below is what this repo
+  relies on. Verified live via `dh-meta-docs` and `implementation-manager`, and canary-tested against a
   no-variable control line (2026-08-06) — see
   `.claude/agent-memory/python-engineering-python-cli-architect/project_claude_plugin_root_bang_exec_vs_later_bash.md`.
 

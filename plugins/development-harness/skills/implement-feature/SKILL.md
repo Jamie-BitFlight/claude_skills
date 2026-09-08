@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Use when the plan_ref returned by add-new-feature is provided. Executes the SAM implementation loop — dispatches ready tasks to specialist agents in parallel, manages bookend tasks (T0 baseline capture and TN verification), tracks concerns and contract violations per task, and relies on hooks to update task status. Manages task batches via sam_plan and sam_task MCP tools.
+description: Use when the plan_ref returned by add-new-feature is provided. Executes the SAM implementation loop — opens an attempt per ready task, dispatches each to a specialist agent in parallel, settles and judges what comes back, manages bookend tasks (T0 baseline capture and TN verification), and tracks concerns and contract violations per task. Drives task state through the work ledger via the SAM CLI.
 argument-hint: "<plan_ref>"
 user-invocable: true
 ---
@@ -22,11 +22,19 @@ Backlog server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_serve
 
 ---
 
-**MCP server availability**: This skill uses both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools. Both servers initialize in ~1–2 seconds after a session restart. Claude Code handles connection waiting automatically. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md — its commands use the `<sam_cli/>` and `<mcp_server_scripts/>` values above.
+**Where task state lives**: every command that moves a task — `ready`, `dispatch`, `settle`,
+`read`, `accept`, `reclaim`, `state`, `status` — runs through the `<sam_cli/>` command above,
+against the work ledger. The `sam_plan` and `sam_task` MCP tools answer from the content store,
+which holds the plan's authored content and none of the attempt, lease, or outcome state this loop
+turns on, so this workflow reaches task state through the CLI.
+
+**MCP server availability**: This skill uses `mcp__plugin_dh_backlog__*` tools for backlog items
+and artifacts. The server initializes in ~1–2 seconds after a session restart, and Claude Code
+handles connection waiting automatically. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md — its commands use the `<sam_cli/>` and `<mcp_server_scripts/>` values above.
 
 ## Resolve Plan
 
-Treat the value from the `plan_ref` key as the opaque reference returned by `sam_plan` create. Pass it unchanged to every SAM operation and delegation prompt.
+Treat the value from the `plan_ref` key as an opaque reference. Pass it unchanged to every SAM operation and delegation prompt.
 
 Confirm the plan exists:
 
@@ -34,16 +42,49 @@ Confirm the plan exists:
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
 
+## Put the Plan in the Ledger
+
+The loop below opens an attempt per task, and an attempt is a ledger row. A plan authored through
+the SAM plan operations lives in the content store, where there is nothing to open — `plan
+dispatch` on such a plan answers `no task {plan_ref}/{task_id} in the ledger` and the wave cannot
+start. Bring the plan across before the first dispatch:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{plan_ref}"
+```
+
+This is safe to run when you are unsure: a plan the ledger already holds answers `exists` and
+changes nothing. Once it has run, every `plan` command naming this address reads and writes the
+ledger — including the `status` command above, which then reports the ledger's own columns.
+
+The two stores answer `status` in shapes that share field names while disagreeing about where
+those fields sit, so the import above changes how every later status read is addressed: plan-level
+fields move inside a top-level `row` key, and `tasks` becomes an array of task rows. Read
+[./references/plan-status-shapes.md](./references/plan-status-shapes.md) before reading any field
+off a status response. The short of it: a key absent from the shape that answered reads as a
+default, and where that key gates a confirmation the gate never fires.
+
 ## Record the Implementation Base SHA
 
-Read `sam_plan(plan="{plan_ref}", config={"action": "read"}).context`. If it already contains a
-line matching `**Implementation base SHA**: <sha>`, skip this step — a prior run already recorded
-it, and re-running this step now would capture a later commit instead of the true starting point.
+The judge diffs a worker's `FILES_CHANGED` against the commit the plan started from, so that commit
+has to be recorded before the first one lands.
+
+Re-run the status command now that the import has run, and read `row.base_sha`. When it carries a
+value the plan already records it and this step is done — a plan created in the ledger sets it at
+creation, and re-recording it now would capture a later commit instead of the true starting point.
+The pre-import status cannot answer this: the content shape has no `base_sha` field at all.
+
+Otherwise read the plan's `row.context`. If it already contains a line matching
+`**Implementation base SHA**: <sha>`, a prior run recorded it; skip this step for the same reason.
 
 Otherwise, before the Progress Loop makes its first commit: run `git rev-parse HEAD` and prepend
-`**Implementation base SHA**: {sha}\n\n` to the existing context (do not replace it —
-`sam_plan(action='update', context=...)` overwrites the whole field), then write it back via
-`sam_plan(plan="{plan_ref}", config={"action": "update", "context": "{updated context}"})`.
+`**Implementation base SHA**: {sha}\n\n` to the existing context — do not replace it, since
+setting `context` overwrites the whole field — then write it back:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+  --plan-address "{plan_ref}" --set context="{updated context}"
+```
 
 ---
 
@@ -55,32 +96,39 @@ Otherwise, before the Progress Loop makes its first commit: run `git rev-parse H
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
 
-After receiving the status response, extract and store the autonomy mode:
+After receiving the status response, extract and store the autonomy mode. This loop runs after the
+import, so the ledger is what answered and the mode is a column of its plan row:
 
-`autonomy_mode = status["autonomy"]`
+`autonomy_mode = status["row"]["autonomy"]`
 
 This value governs gate behavior throughout the remainder of the Progress Loop for this plan.
-Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default).
 
-2. If tasks remain, query ready tasks **once** and store the result as the current batch. In a Beads workspace, use `bd ready --parent <bead-id> --json` for native dependency readiness; use the SAM/DH adapter only for richer structured plan rules:
+A resolved mode is what a working read looks like: the ledger writes its `plans.autonomy` column
+when the plan is created, and `plan import` carries the authored value across. Supplying a default
+yourself is never part of this read.
 
-If parent story identifier is known and structured SAM readiness is required (`str | int` — GitHub integer ID such as `42` or beads string ID such as `"bd-a3f8"`), use the adapter tool:
+**If `autonomy_mode` does not resolve to `full_auto`, `checkpoint` or `per_task`** — the response
+carries no `row`, the column is empty, or it holds something else — STOP the Progress Loop before
+dispatching anything. Report the plan address, the status response's top-level keys, and that
+autonomy could not be determined; ask the user which mode to run under, and use the mode they name.
 
-```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan sam-ready-tasks --parent-issue-number N
-```
+Do not fall back to `full_auto`. The modes differ only in which confirmations reach the user and
+`full_auto` is the one that asks for none, so reading an unresolved value as `full_auto` turns
+every failure of this read into an unattended run the user did not choose — and does it silently,
+because a run that asks for nothing looks exactly like a run the user asked not to be asked about.
+A halt costs one question; work committed by agents the user meant to approve one at a time cannot
+be taken back.
 
-Output shape: `{"feature": "...", "ready_tasks": [...], "count": N}`. The selected provider owns
-availability handling and any private cache it requires.
-
-If parent issue number is unknown, use the SAM CLI:
+2. If tasks remain, query ready tasks **once** and store the result as the current batch:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{plan_ref}"
 ```
 
-> **Call `mcp__plugin_dh_sam__sam_plan(config={"action": "ready"}, plan="{plan_ref}")` (or
-> `backlog_get_ready_sam_tasks`) ONCE per batch.** Store the returned task list. Loop over the stored list
+Output shape: `{"items": [...], "count": N}`. Readiness is derived from each task's status and its
+dependencies, so this command answers it rather than you.
+
+> **Run `plan ready` ONCE per batch.** Store the returned task list. Loop over the stored list
 > without fetching ready tasks again — step 5 below governs when the next batch is fetched.
 
 3. Dispatch based on `autonomy_mode`:
@@ -101,11 +149,22 @@ it with a single `Agent` call the same way `per_task` mode does.
 
 For each task being dispatched:
 
-- Choose which agent to dispatch with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) — the task definition's `agent` field is read after dispatch, not by the orchestrator.
-- Launch the chosen agent with the task reference as its entire prompt:
+- Choose which agent to dispatch with the decision in `dh:dispatch-contract`. Pass only the task reference (`plan_ref` + task ID) and the attempt number — the task definition's `agent` field is read after dispatch, not by the orchestrator.
+- Open the attempt. This sets the task in-progress, starts its lease, and prints the attempt
+  number, which is the key every command the worker runs carries back:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{plan_ref}/{task_id}"
+```
+
+  Add `--worktree {dir}` when the worker gets its own git worktree. Two codes mean "move to the
+  next task in the batch rather than this one": `leased` and `not-ready`. Any other code stops the
+  wave and goes to the user.
+
+- Launch the chosen agent with the task reference and the attempt number as its entire prompt:
 
 ```text
-{plan_ref}/{task_id}
+{plan_ref}/{task_id}, attempt {attempt}
 ```
 
 - The dispatch carries a task reference and the receiver resolves what to load from it.
@@ -113,6 +172,9 @@ For each task being dispatched:
   task-execution skill it delegates to loads the task's own `skills` list; a specialist dispatched
   directly already carries its own behavior. Task-level skills stay additive to whatever the agent
   profile declares.
+
+- Keep a table of launch handle to address and attempt. It is what lets you tell a worker still
+  running from one whose launch already ended, and it is what step 4 needs in order to settle.
 
 ### Agent Health Check (While Waiting)
 
@@ -122,7 +184,45 @@ user asks about agent status, or `git log` shows no new commits when implementat
 in progress. Execute the full check — crash/idle/active branches and re-spawn logic — defined in
 [./references/agent-health-check.md](./references/agent-health-check.md).
 
-4. After each agent returns, check its output for a `<concerns>` block. If present, append each concern to the backlog item as a checklist entry:
+4. After each agent returns, record what came back against the attempt you opened, then judge it.
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+  --address "{plan_ref}/{task_id}" --attempt {attempt} --return-text "{the agent's response}"
+```
+
+Run `settle` as soon as a launch returns, including when the response is empty or the agent
+crashed. It is what makes a launch that ended distinguishable from one still working; an unsettled
+attempt reads as a worker still at it, and the loop waits on a worker that is gone.
+
+Then judge against the ledger rather than the response text:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address "{plan_ref}/{task_id}"
+```
+
+Compare the `Completion Report` and `Verification Results` sections against the task's acceptance
+criteria and verification steps, and against the diff of the files the report lists since the
+plan's base SHA. Where they hold:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan accept --address "{plan_ref}/{task_id}" --note "{why}"
+```
+
+Where a criterion is unmet, a verification step failed, or a report section is missing, send it
+back with what to change — `reclaim` writes the response and returns the task to `not-started` in
+one move, so the next `dispatch` finds it ready and its worker reads the answer first:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+  --address "{plan_ref}/{task_id}" --reason judge --response "{what to change and why}"
+```
+
+The full judge table — every status and settled state, and the command each calls for, including
+the stale-lease and attempts-exhausted rows — is
+[the work loop](../../docs/work-ledger/work-loop.md).
+
+Read the agent's output for a `<concerns>` block as well. If present, append each concern to the backlog item as a checklist entry:
 
 ```text
 mcp__plugin_dh_backlog__backlog_groom(
@@ -181,7 +281,9 @@ If `artifact_read` fails or returns no content (no architect spec for this issue
 In `per_task` mode this is a no-op: the single dispatched `Agent()` call already returned, so the
 task is terminal by construction. In `full_auto`/`checkpoint` mode, multiple agents were dispatched
 concurrently — before the batch commit, confirm every task in the batch is terminal through
-`sam_plan(config={"action": "status"})`, never by assuming a silent agent has finished.
+`plan status --plan-address "{plan_ref}"`, never by assuming a silent agent has finished. Each task
+row carries `status`, `accepted`, `attempts`, and a `stale` flag that says when a lease ran out
+with no worker behind it.
 
 **Commit Ownership**
 
@@ -230,18 +332,22 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
 
 5. After all tasks in the current batch complete, call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to
-   check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
-   tasks. Do not fetch another ready batch until the previous batch is fully dispatched.
+   check plan progress. Tasks remain while the plan-level `progress` is `open`; return to step 2
+   then to fetch the next batch of ready tasks. Do not fetch another ready batch until the previous
+   batch is fully dispatched.
 
 **5a. Wave-Completion Confirmation Gate** (active when `autonomy_mode == "checkpoint"` only):
 
 After all tasks in the current batch complete and the status response from step 5 confirms that tasks remain:
 
-1. Display a compact wave-completion summary:
+1. Display a compact wave-completion summary from the step 5 status response. The ledger reports
+   no completion percentage and no top-level ready list; derive both from its `tasks` array, where
+   a row counts as done when `accepted` is 1 or `status` is `deferred` or `skipped`:
    - Number of tasks completed in this wave
-   - Current plan completion percentage (from `status["completion_pct"]`)
-   - Number of tasks remaining
-   - Next ready tasks (from `status["ready_tasks"]` list — task IDs only)
+   - Plan progress: how many rows are done out of how many `tasks` holds, with the plan-level
+     `progress` word beside it
+   - Number of tasks remaining: the rows that are not done
+   - Next ready tasks: the rows whose `ready` is true — task IDs only
 
 2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
    examples include "Wave complete. Proceed with the next wave? (yes/no)".
@@ -255,12 +361,16 @@ Skip this gate when `autonomy_mode` is `"full_auto"` or `"per_task"`.
 
 Note: under `"per_task"`, per-task gates already fire for each task; no additional wave gate is needed.
 
-> **Hook behavior on SubagentStop**: When a sub-agent finishes, `task_status_hook.py` marks
-> the task complete via the SAM CLI (backend-agnostic). After updating the SAM state,
-> the hook syncs completion to the external tracker (if `parent_issue_number` is set in the
-> active-task context). External tracker sync failure does not affect the hook exit code.
-> `parent_issue_number` accepts `str | int` — GitHub integer IDs and beads string IDs are
-> both supported.
+> **Hook behavior on SubagentStop**: when a sub-agent finishes, `task_status_hook.py` runs
+> `plan settle` for the attempt named in that sub-agent's own launch prompt, with its final
+> message as the return text, then clears the active-task context. That is the same settle step 4
+> asks of you; whichever runs first wins and the other is answered `already-settled`, so running
+> step 4 yourself is never wrong. The hook covers the case where this session ends before step 4
+> does. A settle it could not perform is printed to stderr, never absorbed.
+>
+> Do not treat the hook as the thing that moves the task. It writes no status at all. A task
+> reaches its outcome because the worker ran `plan finish` and you ran `plan accept` — the loop
+> above reads the ledger for that, not the hook's exit.
 
 ---
 

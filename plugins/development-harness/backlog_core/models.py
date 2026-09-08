@@ -1569,7 +1569,7 @@ class ViewItemResultCompact(BaseModel):
     section inventory (names and entry counts) instead.
 
     Fields are duplicated from :class:`ViewItemResult` rather than inherited
-    (ADR-1) so that the two response shapes remain independently evolvable.
+    so that the two response shapes remain independently evolvable.
     """
 
     title: str = ""

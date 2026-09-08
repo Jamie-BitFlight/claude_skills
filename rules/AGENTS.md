@@ -14,6 +14,7 @@ been added yet.
 | `astral-tool-overrides.md` | Python files, `pyproject.toml`, `uv.lock` — this repo's uv/ty/ruff policy overrides |
 | `ci-workflows.md` | `.github/workflows/*.yml` — CI workflow modification protocol |
 | `citation-requirements.md` | SKILL.md/agents/commands/CLAUDE.md — factual claims need a cited source |
+| `data-format-selection.md` | Python/JSON/markdown/SQL — pick the format closest to the consumer; never parse prose for your own data |
 | `delegation-format.md` | SKILL.md/agents/commands/references — wrong delegation-instruction formats to avoid in prose |
 | `exception-handling.md` | Python/TS/JS — narrow exception catches only, no broad `except Exception` |
 | `frontmatter-requirements.md` | SKILL.md/agents/commands — required frontmatter fields |
@@ -30,6 +31,7 @@ been added yet.
 | `silent-failure-prevention.md` | Python/TS/JS — write operations must report what changed |
 | `skill-content-optimization.md` | SKILL.md, references/*.md — load skill-creator before editing skills |
 | `skill-documentation-verification.md` | SKILL.md, references/*.md — skill docs are AI-facing, not user-facing |
+| `shared-process-extraction.md` | agent files/SKILL.md — writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it |
 | `skill-substitution.md` | SKILL.md — load-time string substitution gotcha |
 | `uv-run-fallback.md` | scripts/, Python files, `.claude/hooks/` — uv run fallback when uv unavailable |
 | `yaml-toml-libraries.md` | Python files — `ruamel.yaml`/`tomlkit` only, never `pyyaml` |

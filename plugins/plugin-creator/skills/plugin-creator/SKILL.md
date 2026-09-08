@@ -45,7 +45,7 @@ flowchart TD
 **How to spawn agents:**
 
 - **Agent tool** (`subagent_type=...`) — for focused, isolated work where only the result matters
-- **TeamCreate** — for multi-agent coordination where agents need to communicate (see `agent-orchestration:parallel-work` "Persistent teams")
+- **Named teammate** (`Agent(name=...)`) — for multi-agent coordination where agents need to communicate (see `agent-orchestration:parallel-work` "Persistent teams")
 
 **Why delegation matters:**
 
@@ -59,6 +59,8 @@ flowchart TD
 ### Component Selection Guidance
 
 When deciding which component type to create (skill, agent, hook, MCP server, or command), use `/plugin-creator:component-patterns` for the complete decision framework covering component lifecycle, discovery and activation phases, and organization patterns.
+
+Before any component's runtime text names a path, command, fact, or another plugin, confirm it is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
 
 ---
 
@@ -812,7 +814,7 @@ VERDICT: [COMPLETE / NOT COMPLETE - reason]
 
 ## Quick Reference: Agent Delegation
 
-Use concurrent **Agent** calls for parallel work (`agent-orchestration:parallel-work`); reach for **TeamCreate** only when agents must exchange messages mid-task.
+Use concurrent **Agent** calls for parallel work (`agent-orchestration:parallel-work`); reach for a **named teammate** (`Agent(name=...)`) only when agents must exchange messages mid-task.
 
 | Phase    | Agent Type                  | Purpose                                                                       |
 | -------- | --------------------------- | ----------------------------------------------------------------------------- |

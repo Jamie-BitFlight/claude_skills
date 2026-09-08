@@ -12,15 +12,15 @@ operations on the ``supports_branches`` flag (via ``require_branch_support()``)
 — ``isinstance`` alone is not sufficient, since both protocols are
 ``runtime_checkable`` and check attribute names only.
 
-ADR-001: GitHub-specific operations (GraphQL, integration branches, task
+GitHub-specific operations (GraphQL, integration branches, task
 issues, milestone/project management) are not implemented for beads and have
 no stubs here.  These methods require a PyGithub ``Repository`` transport that
 has no beads equivalent.
 
-ADR-002: Methods whose Protocol signature uses GitHub issue *numbers* (``int``)
+Methods whose Protocol signature uses GitHub issue *numbers* (``int``)
 as keys cannot be implemented for beads because beads IDs are strings with no
 meaningful integer representation.  Affected methods raise
-:exc:`NotImplementedError` with a reference to ADR-002:
+:exc:`NotImplementedError`:
 
 - :meth:`BeadsBackend.create_issue_for_item` — takes ``Repository``, returns
   ``int | None``; use the beads-native shadow method
@@ -256,31 +256,29 @@ def _normalize_due_at(due_at: str | None) -> str | None:
     return parsed.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-_ADR_001_NOTE = (
-    "BeadsBackend does not implement GitHub-specific operations. See ADR-001 in the project architecture documentation."
-)
+_GITHUB_ONLY_NOTE = "BeadsBackend does not implement GitHub-specific operations."
 
-_ADR_002_NOTE = (
+_STRING_ID_NOTE = (
     "fetch_open_issues_by_title returns dict[str, int] but beads issue IDs are strings. "
-    "Use fetch_open_issues_by_title_str() for beads-native title lookup. See ADR-002."
+    "Use fetch_open_issues_by_title_str() for beads-native title lookup."
 )
 
-# ADR-003: the same int-vs-string-ID mismatch ADR-002 describes for issues,
+# The same int-vs-string-ID mismatch the note above describes for issues,
 # applied to milestones — MilestoneFullNode.number is int, beads milestone
 # IDs are string nanoids. Design-time rationale only; kept out of the raised
 # message text below, which callers receive at runtime and only need told
 # what to call instead, not why the Protocol method can't be implemented.
-_ADR_003_NOTE = (
+_MILESTONE_ID_NOTE = (
     "list_milestones/create_milestone/assign_item_to_milestone use int issue/milestone numbers "
     "(MilestoneFullNode.number: int) but beads milestones are issues with string nanoid IDs "
     "(bd create --type milestone). Use list_beads_milestones/create_beads_milestone/"
     "assign_beads_item_to_milestone for beads-native milestone support instead."
 )
 
-_ADR_002_BATCH_NOTE = (
+_BATCH_STATUS_ID_NOTE = (
     "batch_fetch_statuses returns dict[int, IssueStatus] but beads issue IDs are strings "
     "with no meaningful integer representation. "
-    "Use fetch_item_status() for individual beads issue status lookups. See ADR-002."
+    "Use fetch_item_status() for individual beads issue status lookups."
 )
 
 
@@ -293,7 +291,7 @@ class BeadsBackend:
     Capability flags:
 
     - ``supports_batch_status_fetch = False`` — beads issue IDs are strings;
-      :meth:`batch_fetch_statuses` raises :exc:`NotImplementedError` (ADR-002).
+      :meth:`batch_fetch_statuses` raises :exc:`NotImplementedError`.
       Callers must check this flag before invoking the method.
     - ``supports_batch_issue_update = False`` — beads does not expose GraphQL.
     - ``issue_id_type = "string"`` — beads issues are identified by string
@@ -307,8 +305,8 @@ class BeadsBackend:
       caught correctly.
     - ``supports_milestones = False`` — the generic ``list_milestones``/
       ``create_milestone``/``assign_item_to_milestone`` methods use ``int``
-      issue/milestone numbers, which beads' string nanoid IDs cannot satisfy
-      (see ADR-003). Beads-native milestone support is real, just reached
+      issue/milestone numbers, which beads' string nanoid IDs cannot satisfy.
+      Beads-native milestone support is real, just reached
       through the beads-native shadow methods
       (:meth:`list_beads_milestones`, :meth:`create_beads_milestone`,
       :meth:`assign_beads_item_to_milestone`) instead of the generic gate.
@@ -532,10 +530,9 @@ class BeadsBackend:
 
         The ``WorkItemBackend`` signature returns ``int | None`` (a GitHub issue
         number).  Beads IDs are string nanoids, so this method cannot satisfy
-        the contract; use :meth:`create_beads_issue_for_item` instead.  See
-        ADR-001 and ADR-002.
+        the contract; use :meth:`create_beads_issue_for_item` instead.
         """
-        raise NotImplementedError(_ADR_001_NOTE)  # type: ignore[return]
+        raise NotImplementedError(_GITHUB_ONLY_NOTE)  # type: ignore[return]
 
     def create_beads_issue_for_item(self, item: BacklogItem, output: Output | None = None) -> str | None:
         """Create a beads issue via ``bd create`` and return the nanoid.
@@ -660,14 +657,14 @@ class BeadsBackend:
         self._runner.run_text(argv)
 
     def fetch_open_issues_by_title(self, repo: Repository) -> dict[str, int]:
-        """Raise NotImplementedError — beads IDs are strings; see ADR-002.
+        """Raise NotImplementedError — beads IDs are strings.
 
         Use :meth:`fetch_open_issues_by_title_str` for beads-native lookup.
 
         Args:
             repo: Ignored.
         """
-        raise NotImplementedError(_ADR_002_NOTE)
+        raise NotImplementedError(_STRING_ID_NOTE)
 
     def fetch_open_issues_by_title_str(self) -> dict[str, str]:
         """Return a mapping of open beads issue titles to beads IDs.
@@ -694,9 +691,8 @@ class BeadsBackend:
 
         No beads equivalent exists; the ``WorkItemBackend`` signature takes
         ``Repository`` + ``int`` issue number, which beads cannot satisfy.
-        See ADR-001.
         """
-        raise NotImplementedError(_ADR_001_NOTE)
+        raise NotImplementedError(_GITHUB_ONLY_NOTE)
 
     def check_open_prs_for_issue(self, issue_num: int, repo: str = "") -> list[PullRequestRef]:
         """Return an empty list — beads does not expose pull request data.
@@ -712,7 +708,7 @@ class BeadsBackend:
         return []
 
     def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
-        """Raise NotImplementedError — beads IDs are strings; see ADR-002.
+        """Raise NotImplementedError — beads IDs are strings.
 
         The Protocol signature uses ``int`` keys (GitHub issue numbers).
         Beads issue IDs are strings with no meaningful integer representation,
@@ -727,7 +723,7 @@ class BeadsBackend:
             NotImplementedError: Always — this operation is not supported for
                 the beads backend.
         """
-        raise NotImplementedError(_ADR_002_BATCH_NOTE)  # type: ignore[return]
+        raise NotImplementedError(_BATCH_STATUS_ID_NOTE)  # type: ignore[return]
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
         """Return the current status string for a beads issue.
@@ -833,27 +829,27 @@ class BeadsBackend:
     # ------------------------------------------------------------------
 
     def list_milestones(self, states: list[str] | None = None, repo: str = "") -> list[MilestoneFullNode]:
-        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+        """Raise NotImplementedError — beads milestone IDs are strings.
 
         Use :meth:`list_beads_milestones` for beads-native milestone listing.
         """
-        raise NotImplementedError(_ADR_003_NOTE)
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def create_milestone(
         self, title: str, description: str = "", due_on: datetime | None = None, repo: str = ""
     ) -> MilestoneFullNode:
-        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+        """Raise NotImplementedError — beads milestone IDs are strings.
 
         Use :meth:`create_beads_milestone` for beads-native milestone creation.
         """
-        raise NotImplementedError(_ADR_003_NOTE)
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def assign_item_to_milestone(self, issue_number: int, milestone_number: int, repo: str = "") -> None:
-        """Raise NotImplementedError — beads milestone IDs are strings; see ADR-003.
+        """Raise NotImplementedError — beads milestone IDs are strings.
 
         Use :meth:`assign_beads_item_to_milestone` for beads-native assignment.
         """
-        raise NotImplementedError(_ADR_003_NOTE)
+        raise NotImplementedError(_MILESTONE_ID_NOTE)
 
     def list_beads_milestones(self, states: list[str] | None = None) -> list[dict[str, object]]:
         """List beads issues of type ``milestone``, with member counts via ``parent``.

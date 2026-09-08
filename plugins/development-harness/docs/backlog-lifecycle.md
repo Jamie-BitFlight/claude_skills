@@ -444,7 +444,7 @@ An item is considered fully groomed only when ALL required sections are present 
 
 | Section | Required | Minimum Content |
 |---|---|---|
-| `RT-ICA` | Required | Contains `Decision: APPROVED` or `Decision: BLOCKED` and `Date: YYYY-MM-DD` |
+| `RT-ICA` | Required | Contains a plain `Decision:` line carrying one token of the vocabulary `dh:planner-rt-ica` owns, and `Date: YYYY-MM-DD` |
 | `Impact Radius` | Required | Contains at least one entry under `Systems Inventory` |
 | `Fact-Check` | Required | Contains at least one claim with `verdict:` field |
 | `Acceptance Criteria` | Required | Non-empty — at least one criterion listed |
@@ -486,9 +486,17 @@ Conditions:
 1. {condition} | Status: AVAILABLE | Info needed: —
 2. {condition} | Status: DERIVABLE | Info needed: {what to check}
 3. {condition} | Status: MISSING | Info needed: {what is required}
-Decision: APPROVED | BLOCKED
+Decision: APPROVED-FOR-PLANNING | APPROVED-WITH-GAPS | BLOCKED-FOR-PLANNING
 Missing: {list of MISSING conditions, or "None"}
 ```
+
+The `Decision:` line is a plain unbolded line carrying the token alone; consumers match it
+literally. The groom stage writes the three-value planning vocabulary that `dh:planner-rt-ica`
+owns, in which only `BLOCKED-FOR-PLANNING` stops a consumer and `APPROVED-WITH-GAPS` is the
+expected outcome for a brownfield or refactor item. The work stage's own gate may replace this
+section with a `dh:rt-ica` result, which carries that skill's separate two-value set (`APPROVED`,
+`BLOCKED`). A consumer that gates on this line treats any other token — and a missing line — as an
+error, never as pass and never as block.
 
 The `Date:` header is mandatory. It is used by the work stage staleness policy: an RT-ICA
 result is stale if the date is older than 7 calendar days OR the item's `metadata.updated_at`

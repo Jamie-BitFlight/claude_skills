@@ -526,7 +526,7 @@ def _canonicalize_patch_keys(model_cls: type[BaseModel], raw_fields: Mapping[str
     normalization step, a patch field spelled differently than the merge
     base's dump convention lands under a second key that ``AliasChoices``
     validation then silently prefers over the stale value already present
-    under the base's own alias — the #1528 data-loss bug class, in either
+    under the base's own alias — a data-loss bug class, in either
     direction. Mapping every raw key to the field's canonical name before
     merging removes the ambiguity: both sides of the merge always agree on one
     spelling per field, so the patch value always wins regardless of which
@@ -781,8 +781,7 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
     MCP boundary when the frontend passes a ``TaskDefinition`` (subclass of
     ``Task``); no YAML parsing or re-normalisation is required downstream.
 
-    See the single-writer contract in ADR-1770-1: callers MUST serialize
-    writes to the same plan.
+    Callers MUST serialize writes to the same plan: this operation is single-writer only.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -806,7 +805,7 @@ def append_task(backend: TaskBackend, plan: str, task: Task | dict[str, Any]) ->
         BookendValidationError: When the plan is already ``ready`` and
             appending this task would leave its T0/TN bookends structurally
             invalid. Appending to a ``drafting`` plan is never gated — that
-            is the incremental-build repair path (architect ADR-1770-1).
+            is the incremental-build repair path.
     """
     if not isinstance(task, Task):
         if isinstance(task, dict) and "task" in task and "id" not in task:
@@ -839,8 +838,7 @@ def finalize_plan(backend: TaskBackend, plan: str) -> FinalizePlanResult:
     ``state="ready"`` and becomes available for execution via
     ``sam_plan(action='ready')`` and ``/dh:implement-feature``.
 
-    See ADR-1770-1 for the single-writer contract (callers must serialize
-    writes to the same plan).
+    Callers must serialize writes to the same plan; this operation is single-writer only.
 
     Args:
         backend: The resolved TaskBackend instance (e.g. GistTaskLayer,
@@ -912,8 +910,8 @@ def claim_task(backend: TaskBackend, plan: str, task: str) -> ClaimResult:
     Both frontends resolve the backend (local YAML, GistTaskLayer, etc.)
     and pass it here. The operation handles all business logic: claim
     attempt, ``ConcurrentClaimUnsupportedError`` fallback to the local
-    backend for local-only plans (ADR-2509-3), and the "not claimed"
-    status-check error path.
+    backend for local-only plans, and the "not claimed" status-check error
+    path.
 
     When the backend raises :class:`ConcurrentClaimUnsupportedError`
     (indicating a local-only plan with no GitHub issue), the operation
@@ -1121,6 +1119,51 @@ def update_task_fields(
     if append_section is not None:
         backend.append_task_section(plan, task, append_section, section_content or "")
     return UpdateTaskResult(updated=True, address=f"{plan}/{task}")
+
+
+#: Reserved key the active-task store used to receive on a missing or empty
+#: session id. No caller may pass this value or omit the id entirely — see
+#: :func:`require_session_id`. Kept as a named constant because the local
+#: backend's on-disk filename and existing records still use this literal.
+DEFAULT_SESSION_ID = "_default"
+
+
+class MissingSessionIdError(ValueError):
+    """Raised when an active-task operation is attempted without a real session id."""
+
+
+def require_session_id(session_id: str | None) -> str:
+    """Reject a missing, empty, or sentinel session id for an active-task operation.
+
+    The active-task record correlates a caller to the task it is working on.
+    A blank or omitted identifier and the reserved ``"_default"`` sentinel all
+    resolve to the same unowned bucket, where one caller's read, write, or
+    clear can land on a different caller's task — the mechanism observed
+    producing misattributed and overwritten task state. The CLI and the MCP
+    server both call this before any active-task get/set/update/clear, so
+    the rule is enforced once rather than duplicated across the two
+    frontends.
+
+    Args:
+        session_id: The caller-supplied session identifier, or None.
+
+    Returns:
+        The validated, non-empty, non-sentinel session id.
+
+    Raises:
+        MissingSessionIdError: When session_id is None, empty, or equal to
+            :data:`DEFAULT_SESSION_ID`.
+    """
+    if not session_id or session_id == DEFAULT_SESSION_ID:
+        msg = (
+            "A session id is required for active-task operations. Pass a real, "
+            "caller-specific identifier — never omit it and never pass the "
+            f"reserved {DEFAULT_SESSION_ID!r} sentinel. An operation without one "
+            "cannot be told apart from a different caller's, and that shared "
+            "bucket has already produced task state attributed to the wrong caller."
+        )
+        raise MissingSessionIdError(msg)
+    return session_id
 
 
 def get_active_task(ctx_backend: ContextBackend, session_id: str) -> ActiveTaskGetResult:

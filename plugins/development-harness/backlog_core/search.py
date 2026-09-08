@@ -661,7 +661,7 @@ def find_content_duplicates(
 
     Replaces character-sequence title matching (``difflib.SequenceMatcher``)
     with token-overlap matching over the full item content (title, description,
-    and all section bodies), per ADR-004.
+    and all section bodies).
 
     Args:
         title: New item title.

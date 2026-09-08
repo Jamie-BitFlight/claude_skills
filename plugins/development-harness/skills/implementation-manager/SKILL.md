@@ -104,34 +104,47 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P1
 
 #### read
 
-Read full plan data including task fields and context:
+`plan read` names a plan and a task together, as `P/T`, and reads that task with the sections its
+attempts recorded:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1/T01
 ```
 
-#### claim
+Add `--attempt {n}` only when you hold that attempt; naming one you do not is refused as
+`stale-attempt`. For the plan itself — its fields plus every task row — use `plan status
+--plan-address P1`.
 
-Claim a task in-progress (prevents duplicate dispatch):
+#### dispatch
+
+Open an attempt on a ready task. This is what sets it in-progress, starts its lease, and prevents a
+second runner from taking it. It prints the attempt number, which every command the runner issues
+carries back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan claim --address P1/T01
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address P1/T01
 ```
 
-Returns `{"claimed": false, "error": "..."}` if task is already claimed or not found.
+Prints `leased` when a runner already holds the task and `not-ready` when its dependencies have not
+landed; either way the task is not the one to start now.
+
+The `plan claim` command writes to the content store rather than the ledger, so a task claimed that
+way leaves the ledger row where it was. Open attempts with `dispatch`.
 
 #### update
 
-Update plan-level fields (e.g., context manifest):
+Set plan-level fields on the ledger, such as the context manifest:
 
-```text
-mcp__plugin_dh_sam__sam_plan(config={"action": "update", "context": "Context Manifest content"}, plan="P1")
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P1 --set context="Context Manifest content"
 ```
 
-Note: the CLI equivalent is `plan update --plan-address P1 [...]`, but the specific flag for
-setting the plan-level `context` field is not enumerated in the current CLI-parity mapping —
-verify the exact flag via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --help`
-before converting this call site to CLI form.
+`--set` names the ledger column, so write field names with underscores. Setting a field replaces
+its whole value; read the current one with `plan status --plan-address P1` and write back the result when
+you mean to add to it rather than replace it.
+
+The same command's `--context` flag reaches the content store instead — the two stores hold
+different plans, and the flag chosen is what selects between them.
 
 ## Task Schema
 
@@ -176,18 +189,37 @@ The `task_status_hook.py` script provides automated task status tracking via Cla
 
 | Command              | Hook Event   | Matcher             | Purpose                                        |
 | -------------------- | ------------ | ------------------- | ---------------------------------------------- |
-| `/dh:execution` | SubagentStop | (all)               | Mark task COMPLETE, add Completed timestamp    |
+| `/dh:execution` | SubagentStop | (all)               | Settle the attempt the stopping worker was launched for |
 | `/dh:start-task`        | PostToolUse  | `Write\|Edit\|Bash` | Update LastActivity timestamp during execution |
 
 ### How It Works
 
-**SubagentStop (Task Completion)**:
+**SubagentStop (settle)**:
 
-When `/dh:execution` launches a sub-agent via `/start-task {plan} --task {id}`, the SubagentStop hook fires when the sub-agent completes. The hook script:
+A SubagentStop hook registered in `hooks/hooks.json` runs in the orchestrator's session when a
+sub-agent it launched stops, so it is the orchestrator's observation point. It records that the
+launch ended, and nothing else:
 
-1. Parses the original prompt to extract the plan address and task ID
-2. Updates task status from `IN PROGRESS` to `COMPLETE`
-3. Adds `**Completed**: {ISO timestamp}` to the task section
+1. Reads the sub-agent's own initial prompt from `agent_transcript_path` and takes the plan
+   address, the task id and the attempt number from it. The dispatch contract requires all three
+   in the prompt (`{plan}/{task}, attempt {n}`), and the transcript is per-sub-agent, so parallel
+   workers correlate to distinct attempts.
+2. Runs `plan settle --address {plan}/{task} --attempt {n} --return-text "{the final message}"`.
+3. Clears the session-scoped active-task context.
+
+It writes no task status. The runner's own `plan finish --result` records the outcome and the
+orchestrator's `plan accept` / `plan reclaim` records the verdict — see
+[ARCHITECTURE.md](../../ARCHITECTURE.md) § "What a hook may write" for why a third writer of that
+one fact would drift from both. The worker's final message is stored verbatim as the attempt's
+return text, which is evidence the judge reads.
+
+Nothing it cannot do is absorbed: a prompt naming no attempt, a plan the ledger does not hold,
+and a settle the CLI refused are each reported on stderr. The hook still exits 0, because the
+SubagentStop critical path must not be blocked.
+
+The orchestrator settles as its own next step too, and whichever gets there first wins — the
+other is answered `already-settled`. The hook exists for the launch whose orchestrator step never
+ran.
 
 **PostToolUse (Activity Tracking)**:
 
@@ -202,8 +234,8 @@ When `/dh:start-task` runs on the local-YAML backend, it creates a context file 
 
 | Field              | Added By                  | When                              |
 | ------------------ | ------------------------- | --------------------------------- |
-| `**Started**`      | Agent (via `/dh:start-task`) | When agent begins work on task    |
-| `**Completed**`    | Hook (SubagentStop)       | When sub-agent finishes           |
+| `**Started**`      | `plan dispatch`, when the orchestrator opens the attempt | When the worker is launched |
+| `**Completed**`    | `plan finish --result complete`, or `plan accept` on a returned task | When the runner or the judge closes it |
 | `**LastActivity**` | Hook (PostToolUse)        | On each Write, Edit, or Bash call |
 
 ## Hook Runtime Profile Controls
@@ -214,9 +246,9 @@ The `task_status_hook.py` script supports environment-variable-based profile con
 
 Controls which hook handlers run. Case-sensitive lowercase. Default when unset or empty: `standard`.
 
-- **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (task completion) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
+- **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (settle) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
 - **`standard`** — All handlers run.
-- **`strict`** — All handlers run. SubagentStop additionally performs pre-completion validation checks and emits warnings to stderr. Warnings are observational only — they do not prevent task completion. Strict checks verify that the task was claimed (status was `in-progress` before completion) and that acceptance criteria were defined (non-empty).
+- **`strict`** — All handlers run. The profile decides which handlers run, not what they do: settling records that a launch ended, which is evidence rather than a verdict, so there is nothing for a stricter profile to scrutinise before it is written. Whether the work met its acceptance criteria is the judge's question, answered from the ledger — see [the work loop](../../docs/work-ledger/work-loop.md).
 
 Invalid values produce a warning to stderr and fall back to `standard`.
 
@@ -227,9 +259,9 @@ Comma-separated list of hook IDs to disable. Each ID is stripped of whitespace. 
 Hook IDs for this script:
 
 - `task-status:post-tool-use` — the PostToolUse handler (LastActivity timestamp updates)
-- `task-status:subagent-stop` — the SubagentStop handler (task completion marking)
+- `task-status:subagent-stop` — the SubagentStop handler (settling the attempt)
 
-Disabled hooks take precedence over profile. If both `CLAUDE_SKILLS_HOOK_PROFILE=strict` and `CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop` are set, SubagentStop is skipped entirely (no strict checks run).
+Disabled hooks take precedence over profile. If both `CLAUDE_SKILLS_HOOK_PROFILE=strict` and `CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop` are set, SubagentStop is skipped entirely and no attempt is settled by the hook — the orchestrator's own settle step is then the only one.
 
 Disabled hooks exit 0 (Claude Code treats non-zero hook exit as an error that kills the hook chain).
 
@@ -239,7 +271,7 @@ Disabled hooks exit 0 (Claude Code treats non-zero hook exit as an error that ki
 # Skip PostToolUse activity tracking (reduces I/O during task execution)
 export CLAUDE_SKILLS_HOOK_PROFILE=minimal
 
-# Enable strict pre-completion validation warnings
+# Run every handler — same set as `standard`; no extra validation is performed
 export CLAUDE_SKILLS_HOOK_PROFILE=strict
 
 # Disable a specific hook by ID
@@ -255,5 +287,7 @@ The `/dh:execution` orchestrator uses this skill to:
 
 1. Query task status via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status`
 2. Find ready tasks via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready`
-3. Launch appropriate agents based on task's `agent` field
-4. Update timestamps via hook scripts when tasks start/complete
+3. Open an attempt per task via `plan dispatch`, then launch the agent its `agent` field names,
+   passing the address and the attempt number
+4. Settle each launch with `plan settle` when it returns, then judge with `plan read` and close
+   with `plan accept` or send back with `plan reclaim`

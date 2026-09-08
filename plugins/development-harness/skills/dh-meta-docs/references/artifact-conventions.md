@@ -51,27 +51,56 @@ Document-level artifacts (discovery, plan, context integration) are managed by t
 - **Read:** `artifact_read(item_id=item_id, artifact_type=artifact_type, artifact_id=None)` — returns `{artifact_type, path, content, status}` from the configured provider. The `path` response field carries the registered logical `artifact_id`. Supplying `artifact_id` returns that one entry. Omitting it selects by owner and type alone: when several entries share one type, the most recently registered entry is returned and the others are reported as skipped in the response warnings.
 - **List:** `artifact_list(item_id=item_id, artifact_type=None)` — enumerates registered artifacts for an issue, each with its `artifact_id`, `agent`, `status`, and `created_at`.
 
-Load the `dh:create-artifact` skill before registering or reading an artifact — it defines the accepted `artifact_type` strings, the producing agent for each, and when to use them.
+Load the `dh:create-artifact` skill before registering or reading an artifact — it routes to the artifact registry, which declares the accepted `artifact_type` strings and the agent permitted to register each, and it carries worked per-type examples.
 
 A type is either multi-entry — several current documents per owner, such as one codebase analysis per focus area — or single-entry, one document per owner. Any document a gate reads by type alone requires its own single-entry type. Sharing a type with a multi-entry class hands the gate whichever document was registered last. To read one specific entry of a multi-entry type, discover it with `artifact_list` and pass its `artifact_id` to `artifact_read` or to the provider-neutral CLI's `artifact read --artifact-id`.
 
 A type of its own is necessary but not sufficient. A single producer that registers one entry per reviewed task — `code-reviewer` under `code-review` — leaves several entries under a type no one else writes, so its consumers must still address the entry by `artifact_id` rather than by type. The producer reports the identifier it used in its STATUS output for exactly that purpose.
 
-Task plans are SAM-owned records, not artifact-registry content. Use `sam_plan` and `sam_task` for
-their complete lifecycle; never register or read task-plan content with `artifact_register` or
-`artifact_read`.
+Task plans are SAM-owned records. A `task-plan` manifest entry does exist — SAM's plan store writes
+it so a worktree-isolated reader can resolve the plan's address — but no agent may register or read
+one, which is why the artifact registry declares no writer for the type. Never register or read
+task-plan content with `artifact_register` or `artifact_read`; use `sam_plan`.
 
 ### SAM System
 
-Task plans and task-level state are managed by the SAM MCP server:
+SAM answers across two stores, and which one a call reaches is a property of the call, not of the
+plan.
+
+**The content store** holds a plan's authored content — its tasks, their acceptance criteria and
+verification steps, the plan-level context manifest. The `sam_plan` and `sam_task` MCP tools reach
+this store and only this store; the CLI reaches it through the flags that belong to it, such as
+`--context` and `--plan-dir`.
+
+**The work ledger** holds everything about a task's execution: its status, the attempts opened on
+it, the lease each attempt holds, the sections each attempt appended, and the outcome it closed
+with. The SAM CLI's `plan` group reaches it — `ready`, `dispatch`, `read --attempt`,
+`update --attempt`, `renew`, `finish`, `settle`, `accept`, `reclaim`, `state` and `status`. No MCP
+tool carries these commands.
+
+`plan import --from content --plan-address {plan_ref}` copies a content-store plan into the ledger,
+which is what a workflow runs before its first `dispatch`. After it, every `plan` command naming
+that address reads and writes the ledger.
+
+Plan authoring, on the content store:
 
 - **Create:** `sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": [task_dict, ...], "owner_reference": item_ref})` — creates a provider-owned plan associated with the backlog item's opaque reference and returns its `plan_ref`. Pass `tasks=[]` to create a drafting plan for incremental append.
 - **Link:** `backlog_update(selector=item_ref, plan=plan_ref)` — stores the returned plan address on the backlog item.
 - **Read plan:** `sam_plan(plan=plan_ref, config={"action": "read"})` — returns the provider-owned plan.
 - **Read task:** `sam_task(plan=plan_ref, task=task_id, config={"action": "read"})` — returns a `TaskAssignment` model with plan-level context and task fields.
-- **Update task:** `sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies. Used by S5 Execution, S6 Forensic Review, and S7 Final Verification to store results within the task structure.
+- **Update task:** `sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": ..., "section_content": ...})` — appends sections to task bodies on the content store.
 
-Task plans are stored by the configured SAM backend and addressed by the `plan_ref` returned from creation. Access is exclusively via MCP tools. The storage format is an implementation detail of the backend; do not assume YAML, JSON, or any filesystem path.
+Execution results, review results and verification results are written by a runner working an
+attempt, so they go to the ledger:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+  --plan-address {plan_ref} --task-id {task_id} --attempt {n} \
+  --append-section "{section name}" --section-content "{content}"
+```
+
+Task plans are addressed by the `plan_ref` returned from creation, in either store. The storage
+format is an implementation detail; do not assume YAML, JSON, or any filesystem path.
 
 ### Backlog System
 

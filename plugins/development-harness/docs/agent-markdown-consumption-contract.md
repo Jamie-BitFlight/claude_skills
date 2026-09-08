@@ -3,8 +3,9 @@
 Every consumer of every operation described here is an AI agent. There is no human reader.
 
 Requirements R1–R8 are normative. Design decisions resulting from questions raised while
-implementing this contract are recorded as ADRs in `docs/adrs/`, referenced from the
-requirement they resolve — not left as unresolved prose in this document.
+implementing this contract, along with their reasoning and rejected alternatives, are recorded
+inline in the requirement they resolve — not left as unresolved prose, and not sent to a
+separate deliberation document.
 
 ## Purpose
 
@@ -53,7 +54,7 @@ before, not after, `ordinal_mapper` is removed.
 Sources include, and are not limited to: issue and item bodies, plan documents, task
 documents, and the reports and artifacts produced during grooming.
 
-**Pipeline layering** (ADR-3072-1): three stages, in order — Collection (gathering source
+**Pipeline layering**: three stages, in order — Collection (gathering source
 content from wherever it lives), Generation (assembling the complete document for a requested
 scope: description and every requested section or artifact), and Navigation (this engine).
 Generation supplies Navigation the document to parse; it does not assign addresses or build the
@@ -64,10 +65,10 @@ and the table of contents built from them, exist only after Navigation parses th
 document and builds its addressable tree. Collection and Generation are unbounded — never
 truncated, never budget-checked. The engine's authority is over Navigation only: it receives a
 complete generated document,
-gives it a content identity (R8), caches it globally (ADR-3082-1), and is the only point anywhere in
+gives it a content identity (R8), caches it globally, and is the only point anywhere in
 the path where a size budget is applied. "Unbounded" is a real cost for a pathological source,
-not a theoretical one — see ADR-3072-1's known limitation for a concrete measurement and why
-this decision does not add a ceiling to fix it.
+not a theoretical one, and this decision deliberately does not add a ceiling to fix it —
+Collection and Generation stay unbounded regardless of source size.
 
 **Navigation is source-agnostic.** It has no knowledge of, and no need to know, what kind of
 thing it is windowing — an issue, a PR, a plan, an artifact, a local file. It receives markdown
@@ -79,7 +80,7 @@ to the page it renders, indifferent to whether the page came from `file://` or `
 every source implements `get_markdown(source) -> str`, and nothing past that seam is
 source-specific.
 
-The control set (ADR-3082-1) extends this analogy: it is that browser's local cache, not a
+The control set extends this analogy: it is that browser's local cache, not a
 shared server-side one. It serves an already-fetched page back to the same browsing activity
 without hitting the network again — that's what makes a follow-up page request cheap — but it
 isn't there to save a *different* tab, a *different* session, or a repeat visit later from
@@ -96,8 +97,8 @@ No response may drop, elide, or truncate addressable nodes to fit a budget. Cont
 does not fit the current page is reachable on a subsequent page, never merely implied.
 
 Harnesses commonly cap a single tool response at ~10,000 tokens, adjustable. The engine's
-budget is configurable and must not exceed the harness cap, is sourced from one constant
-(ADR-3072-1), and is never applied outside the Navigation stage (R1).
+budget is configurable and must not exceed the harness cap, is sourced from one constant,
+and is never applied outside the Navigation stage (R1).
 
 A caller may request a page smaller than the configured default. A tool response has no local
 equivalent of `tail` — a caller that wants to peek at part of a large result depends on the
@@ -153,7 +154,7 @@ lookup. It states intended behaviour, not current behaviour.
 The Generation stage (R1) realizes this directly: sections and artifact content are assembled
 into one document before Navigation parses it, assigns it one address space (R4), and windows
 it. There is no separate pagination path for the artifact inventory — it pages exactly as the
-rest of the generated document does (ADR-3072-1), so a combined inventory larger than one page
+rest of the generated document does, so a combined inventory larger than one page
 is reached by a page request, not by a second call to a different tool.
 
 ### R7 — Hints must be actionable
@@ -171,17 +172,17 @@ selector or an address, never by re-describing the source. The original scope or
 repeated on follow-up calls — it is retained server-side as the entry's stored command (see
 below), not something the caller carries forward.
 
-The control set (ADR-3075-4, ADR-3082-1) is out-of-process and content-keyed only — no
+The control set is out-of-process and content-keyed only — no
 session-identifying value is part of any request. Concretely, an initial request states scope
 (`selector="#2529", section="RT-ICA"` or similar); every request after that states only
 `hash="<identifier>"` plus `page`, `navigate` (R4's address), `pagesize` (the caller override
-from R2), and an optional `refresh` selector — one of `revalidate` or `force` (ADR-3075-3) —
+from R2), and an optional `refresh` selector — one of `revalidate` or `force` —
 absent by default, meaning "serve whatever the control set already holds." Nothing about locating
 the control set depends on which session, tool, or transport made the request — `content_id`
 alone addresses the row.
 
 This hash-based shape states intended behaviour, not current behaviour: the
-control set it depends on (ADR-3075-1 through ADR-3075-4) is not yet implemented, and
+control set it depends on is not yet implemented, and
 `backlog_view`'s current parameters carry no `hash` or session-routing field. [MCP
 Progressive-Disclosure Contract](./mcp-progressive-disclosure-contract.md) documents today's
 shipped parameter set (`selector` plus `navigate`, repeated on every call) and must be updated
@@ -190,14 +191,13 @@ to this shape once the control set ships.
 The identifier resolves against cached content. Serving a later page does not re-collect from the
 provider and does not re-run Generation — "does not re-parse" means no repeated network
 round-trip and no repeated document assembly, not a promise that the stored raw markdown is never
-turned back into an addressable structure. The control set (ADR-3082-1) stores raw generated
+turned back into an addressable structure. The control set stores raw generated
 content, not a parsed tree, and a follow-up call landing on a fresh CLI process reparses that
-stored content in-memory to serve the requested page — a cheap, deterministic, in-process step,
-consistent with ADR-3075-1's premise that re-parsing is cheap.
+stored content in-memory to serve the requested page — a cheap, deterministic, in-process step.
 
 A request whose identifier no longer matches current content, because of a write this
 contract's own paths can see, is reported as stale and then automatically recovered — see
-"Stale entries are recoverable, not dead ends" below (ADR-3075-2) for the recovery behaviour,
+"Stale entries are recoverable, not dead ends" below for the recovery behaviour,
 which happens on the same ordinary request and is not gated behind a caller opt-in. Pages from
 two different versions of a document are never returned as though they were one document.
 **This is not a contradiction of "does not re-collect" above** (flagged in review — worth
@@ -208,15 +208,15 @@ the write that changed the source. Recovery does re-collect, automatically, once
 known stale (below).
 
 Only a write made through a path outside this contract's Scope is invisible to write-triggered
-invalidation — a write from a concurrent session is not a blind spot: invalidation is global
-(ADR-3082-1, ADR-3075-2), so any caller's write reaches the one shared entry. An agent that needs
+invalidation — a write from a concurrent session is not a blind spot: invalidation is global,
+so any caller's write reaches the one shared entry. An agent that needs
 certainty against the out-of-Scope-write blind spot uses the explicit, caller-requested
 revalidation or forced refresh described in "Cache metadata is visible to the agent" below — an
 opt-in path the caller chooses for confidence before automatic detection would otherwise catch a
 change, additive to write-triggered invalidation, not the only path that ever re-collects.
 
 The identifier is derived from both the command (source, scope, parameters) and the Generation
-stage's output for that command — not a hash of the raw upstream source alone (ADR-3075-1), and
+stage's output for that command — not a hash of the raw upstream source alone, and
 not a hash of the generated content alone either. Content-only hashing was flagged in review as
 a real collision: two different commands can produce byte-identical generated documents (a
 coincidence, not a contract violation), and a content-only hash would give them the same
@@ -226,13 +226,12 @@ for. The identifier binds command and content together precisely so two differen
 never collide even when their output happens to match. Two different scopes of the same source
 (the whole item vs. one filtered section) produce different generated documents and, by the
 same binding, different identifiers. The cache backing this has no fixed retention window tied
-to any session — see ADR-3082-1's "Reversal: content-keyed, not session-keyed", which corrects
-ADR-3075-1's original "session-scoped only" framing: entries age out by a global TTL and size
+to any session — an earlier design keyed entries to the session; that framing was reversed in
+favor of content-keying alone: entries age out by a global TTL and size
 budget, not by the requesting session ending, and an entry can outlive the session that created
 it or be read by a different session entirely.
 
-**One shared, global control set — out-of-process, not an in-process cache** (ADR-3075-4,
-storage mechanism and content-keying per ADR-3082-1). The control set is a single store for
+**One shared, global control set — out-of-process, not an in-process cache.** The control set is a single store for
 every caller, not reinstantiated per operation, per subcommand, per transport, or per session —
 but it cannot be an in-process cache (a server-held dict, an MCP lifespan context) and satisfy
 that, because the CLI is not a running service: it is a separate OS process per invocation with
@@ -251,7 +250,7 @@ error or silent empty result. A cache scoped to one process is a violation of R1
 second, narrower implementation of what the engine already owns), not a smaller version of a
 correct implementation.
 
-**Stale entries are recoverable, not dead ends** (ADR-3075-2). A control-set entry retains the
+**Stale entries are recoverable, not dead ends.** A control-set entry retains the
 command that produced it — the source, scope, and parameters Collection and Generation used to
 build it — not only its content identity. When a request's identifier no longer matches
 current content, the stored command is used to requery the backend and regenerate the
@@ -264,11 +263,11 @@ changed — this is what keeps the "never mixed-versions" guarantee above true r
 contradicting it. The caller is not required to restate its whole request from scratch, and this
 recovery happens automatically on the very request that surfaces the stale identifier — it is
 not an opt-in the caller must request separately. The explicit revalidation and forced-refresh
-paths (ADR-3075-3, below) serve a different purpose: gaining certainty before write-triggered
+paths (below) serve a different purpose: gaining certainty before write-triggered
 invalidation would otherwise catch a change, not the only path that ever recollects.
 
-**Writes invalidate globally; reads do not have to discover staleness on their own**
-(ADR-3075-2, scoping corrected by ADR-3082-1's content-keyed reversal). A control-set entry is
+**Writes invalidate globally; reads do not have to discover staleness on their own.**
+A control-set entry is
 not left to be discovered stale only when a later read happens to hit it with a mismatched hash.
 A write that modifies the source a cache entry was generated from marks that entry stale (not
 deleted — its stored command survives, see "Stale entries are recoverable" below) as a side
@@ -277,7 +276,7 @@ this contract's sources — item updates, section writes, artifact registration,
 state changes — is a source of invalidation for the one shared control-set entry generated from
 what it touched, whichever session or tool happens to have written it.
 
-**Cache metadata is visible to the agent, not only used internally** (ADR-3075-3). Every
+**Cache metadata is visible to the agent, not only used internally.** Every
 response backed by the control set carries its content identity, the command that produced it,
 and when it was generated — the same three things the cache uses internally to detect
 staleness. This is not exposed as a debugging aid; it gives the agent a basis to judge
@@ -320,18 +319,12 @@ flowchart TD
 
 ## Design decisions
 
-The five questions previously open in this section (#3072–#3076) are resolved and folded into
-R1, R2, R6, and R8 above. The reasoning, rejected alternatives, and why each choice is hard to
-reverse are recorded in ADRs, not restated here:
-[ADR-3072-1](./adrs/ADR-3072-1-budget-applies-only-at-navigation.md) (budget/layering),
-[ADR-3075-1](./adrs/ADR-3075-1-content-identity-and-cache-scope.md) (identity/scope),
-[ADR-3075-2](./adrs/ADR-3075-2-stale-cache-recovery-and-write-invalidation.md) (requery on
-stale, write invalidation),
-[ADR-3075-3](./adrs/ADR-3075-3-cache-metadata-visible-to-agent.md) (agent-visible cache
-metadata), and
-[ADR-3075-4](./adrs/ADR-3075-4-out-of-process-session-keyed-control-set.md) (out-of-process
-store; its session-keying decision is superseded by
-[ADR-3082-1](./adrs/ADR-3082-1-sqlite-backed-bounded-eviction.md), which is content-keyed only).
+Five questions previously open in this section are resolved and folded into R1, R2, R6, and R8
+above: budget/layering (R1, R2), content identity and cache scope (R8), stale-cache recovery and
+write invalidation (R8), agent-visible cache metadata (R8), and the out-of-process,
+content-keyed control set (R8, including the reversal from an earlier session-keyed design). The
+reasoning, rejected alternatives, and why each choice is hard to reverse are recorded inline in
+those requirements above, not in a separate document.
 
 Vocabulary introduced by these decisions — Collection, Generation, Navigation, Navigate, table
 of contents, budget — is defined once in [`CONTEXT.md`](../CONTEXT.md), not duplicated in this

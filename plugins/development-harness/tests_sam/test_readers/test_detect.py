@@ -88,7 +88,8 @@ def test_detect_format_global_manifest_returns_global_manifest() -> None:
 
     Tests: GLOBAL_MANIFEST format detection.
     How: Point detect_format at the global manifest fixture.
-    Why: This is the format that triggered issue #715.
+    Why: GLOBAL_MANIFEST must be distinguished from the other frontmatter formats detect_format
+        recognizes rather than falling through to a default.
     """
     path = _FIXTURES / "global_manifest.md"
     result = detect_format(path)
@@ -276,7 +277,7 @@ def test_read_plan_routes_global_manifest_returns_tuple_with_format_type() -> No
 
     Tests: read_plan routing for GLOBAL_MANIFEST format.
     How: Call read_plan on global manifest fixture.
-    Why: This is the format that triggered issue #715.
+    Why: read_plan must route GLOBAL_MANIFEST to manifest_reader rather than a default reader.
     """
     path = _FIXTURES / "global_manifest.md"
     _plan_meta, task_dicts, fmt = read_plan(path)

@@ -1,7 +1,7 @@
 ---
 name: t0-baseline-capture
 description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check-command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
-tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Bash, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: haiku
 skills:
   - dh:subagent-contract
@@ -32,8 +32,16 @@ plan component is `P{N}`). Read the plan through it — it is a logical identifi
 filesystem path, so never open it with a file read:
 
 ```bash
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
 ```
+
+`plan read` names a plan and a task together, as `P/T`. For the plan itself, `plan status` is the
+command: its result carries the plan row and every task row, and it answers from the work ledger
+once the plan is in it and from the content store otherwise.
+
+`plan read` answers from the work ledger once the plan is in it, and from the content store
+otherwise, so the same command is right at either point in the plan's life. Read without
+`--attempt`: naming an attempt you do not hold is refused as `stale-attempt`.
 
 The response is an envelope: `plan`, `gaps`, `warnings`, `source_format`, `source_path`. Every plan
 field sits inside `plan`, never at the top level. Extract:
@@ -65,7 +73,7 @@ For each entry in `plan.acceptance-criteria-structured`:
 ```bash
 # Run each check command. Non-zero exit is expected and normal.
 # Example:
-Bash("uv run pytest plugins/development-harness/tests/<test_file>.py -k <selector> -v")
+Bash("uv run pytest tests/<test_file>.py -k <selector> -v")
 ```
 
 Capture:

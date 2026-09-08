@@ -31,9 +31,11 @@ Each agent's section is how the others reach its findings — an agent that must
    Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Runs AFTER all
    other agents complete. Write each via `section="{name}"`.
 
-6. **alignment-analyst** — Compare existing implementation against item design intent.
-   Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
-   leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
+6. **alignment-analyst** — Compare the item's proposed change against the mission and historical
+   direction governing the paths it touches. Depends on impact-analyst: it reads the affected-path
+   list to resolve the governing docs nearest-first, and does not read the implementation files
+   themselves. Write to section="Design Intent Alignment", leading the section with a
+   MISSION_ALIGNED, MISSION_DIVERGENT, or MISSION_UNASSESSED verdict line.
 
 ## Dispatch sequence
 
@@ -105,13 +107,35 @@ sequenceDiagram
 
     RT->>RT: re-read Fact-Check, mark condition MISSING if REFUTED
     RT->>RT: assess completeness using Impact Radius + Fact-Check
-    RT-->>O: STATUS: DONE or BLOCKED — RT-ICA written
+    RT-->>O: STATUS: DONE — RT-ICA written, carrying its Decision: line
 
-    AA->>AA: compare design intent vs implementation
+    AA->>AA: compare proposed change vs governing mission
     AA-->>O: STATUS: DONE — Design Intent Alignment written
 ```
 
-If RT-ICA returns `STATUS: BLOCKED`, stop and present MISSING conditions. Do not proceed to Wave 3.
+#### Wave 2 gate — read the verdict, not the delivery signal
+
+Two different signals come back from `rtica-assessor` and they mean different things:
+
+- Its terminal `STATUS:` line is the `dh:subagent-contract` delivery signal. `STATUS: BLOCKED`
+  means it could not write an assessment at all — its upstream sections never appeared. Route that
+  to [error.md](./error.md) as an agent failure; there is no verdict to read.
+- Its verdict is the `Decision:` line inside the RT-ICA section it wrote. Read it with
+  `backlog_view(selector='{item_ref}', summary=False, section='RT-ICA')` and match the plain
+  `Decision: <TOKEN>` line.
+
+Gate on the `Decision:` token, using the vocabulary `dh:planner-rt-ica` owns:
+
+| `Decision:` token | Action |
+|---|---|
+| `APPROVED-FOR-PLANNING` | Proceed to Wave 3. |
+| `APPROVED-WITH-GAPS` | Proceed to Wave 3. Pass the MISSING rows of the conditions table to the groomer so it can populate Blockers, Human Input, and Questions for Human. This is the expected outcome for a brownfield or refactor item. |
+| `BLOCKED-FOR-PLANNING` | Stop. Present the MISSING conditions. Do not proceed to Wave 3. |
+| anything else, or no `Decision:` line | Route to [error.md](./error.md) naming the token found. Do not guess. |
+
+An unrecognised token is an error, not a block and not a pass. Reading an unknown verdict as
+"blocked" is how a producer and a consumer stay split without anyone noticing: the pipeline halts
+on every run and the halt looks like a correct gate doing its job.
 
 #### Wave 3 — depends on Wave 2
 
@@ -242,7 +266,11 @@ Problem space and outcomes only. Do NOT include implementation steps, architectu
 
 #### Description / AC separation
 
-Description is the problem statement. Acceptance Criteria are verifiable success conditions. Do not restate description inside ACs.
+Description is the problem statement. Acceptance Criteria are verifiable success conditions. Do not restate description inside ACs. If the description already contains checkboxes or an Acceptance header, treat them as informal notes — write formal, non-overlapping ACs that complement rather than duplicate them.
+
+#### Scope-gate ACs and repo hooks
+
+When an AC limits scope (e.g. "no other file changes", "only file X is modified"), scope it to changes the agent makes by hand. A repo's own hooks (pre-commit, husky, prek, lint-staged, or similar) may rewrite other files as an enforced side effect of committing — that is the hook doing its job, not a scope violation. Do not word the criterion to fail on a mutation the agent did not make itself.
 
 Groomer agent: `subagent_type="dh:backlog-item-groomer"`, model=sonnet.
 

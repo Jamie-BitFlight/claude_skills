@@ -8,8 +8,8 @@ a specific storage implementation.
 
 During the incremental extraction, this module re-exports the existing
 backend protocols so Phase 1 has concrete types to work against. The end
-state is a single unified ``DHBackend`` protocol (or a composite of
-sub-protocols — see open question #3 in the plan).
+state is a single unified ``DHBackend`` protocol, or a composite of
+sub-protocols; which shape wins is still open.
 
 Dependency direction (must remain acyclic):
     models <- protocols <- operations <- frontends

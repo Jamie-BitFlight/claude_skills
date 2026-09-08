@@ -14,7 +14,7 @@ Functions under test:
   - Public API: fetch_github_issue_body, sync_groomed_to_github_issue
 
 REST-fallback operations (label create, milestone create) retain
-PyGithub REST mocks — those are documented ADR-004 exceptions.
+PyGithub REST mocks — those are documented exceptions with no GraphQL mutation equivalent.
 """
 
 from __future__ import annotations
@@ -513,10 +513,10 @@ class TestGetRepoNodeId:
 
 
 class TestResolveLabelIdsGraphql:
-    """Tests for _resolve_label_ids_graphql() — ADR-003 label update helper.
+    """Tests for _resolve_label_ids_graphql() — label update helper.
 
     Tests: _resolve_label_ids_graphql returns {name: node_id} for existing labels.
-    Why: This function is the foundation of the ADR-003 fetch-then-update pattern
+    Why: This function is the foundation of the fetch-then-update pattern
          for label mutations. Incorrect IDs corrupt all label state.
     """
 
@@ -552,7 +552,7 @@ class TestResolveLabelIdsGraphql:
 
         Tests: _resolve_label_ids_graphql missing label handling
         How: Return None for label1 alias; verify it is absent from the result.
-        Why: Missing labels must not crash — they are silently excluded (ADR-003).
+        Why: Missing labels must not crash — they are silently excluded.
         """
         # Arrange
         repo = _make_mock_repo(mocker)
@@ -632,7 +632,7 @@ class TestResolveLabelIdsGraphql:
 
 
 # ---------------------------------------------------------------------------
-# create_issue_for_item — GraphQL mutation (ADR-003 label pattern)
+# create_issue_for_item — GraphQL mutation (label pattern)
 # ---------------------------------------------------------------------------
 
 
@@ -1024,16 +1024,16 @@ class TestCheckOpenPrsForIssue:
 
 
 # ---------------------------------------------------------------------------
-# issue_to_local_fields — accepts IssueNode (ADR-005 signature change)
+# issue_to_local_fields — accepts IssueNode
 # ---------------------------------------------------------------------------
 
 
 class TestIssueToLocalFields:
-    """issue_to_local_fields accepts IssueNode TypedDict (ADR-005 change from PyGithub Issue).
+    """issue_to_local_fields accepts IssueNode TypedDict instead of a PyGithub Issue object.
 
     Tests: issue_to_local_fields correctly maps IssueNode fields to IssueLocalFields.
-    Why: ADR-005 changed the function signature — the tests must validate the new
-         contract (dict input) not the old one (PyGithub Issue object input).
+    Why: The function accepts a dict, not a PyGithub Issue object — the tests must validate the
+         current contract (dict input), not the old one (PyGithub Issue object input).
     """
 
     def test_maps_priority_from_label(self) -> None:
@@ -1336,16 +1336,16 @@ class TestTryGetGithub:
 
 
 # ---------------------------------------------------------------------------
-# apply_status_in_progress — ADR-003 fetch-then-update label pattern
+# apply_status_in_progress — fetch-then-update label pattern
 # ---------------------------------------------------------------------------
 
 
 class TestApplyStatusInProgress:
-    """apply_status_in_progress uses fetch-then-update GraphQL label pattern (ADR-003).
+    """apply_status_in_progress uses fetch-then-update GraphQL label pattern.
 
     Tests: apply_status_in_progress fetches issue labels, computes desired set,
            and calls _update_issue_graphql with the full label ID list.
-    Why: ADR-003 requires full label ID replacement (not additive); the test
+    Why: The label update requires full label ID replacement (not additive); the test
          verifies that the fetch-then-compute-then-update flow is followed.
     """
 
@@ -1354,7 +1354,7 @@ class TestApplyStatusInProgress:
 
         Tests: apply_status_in_progress happy path
         How: Mock get_github, _graphql_request sequence (fetch issue, resolve labels, update).
-        Why: Verifies the ADR-003 fetch-then-update pattern is used correctly.
+        Why: Verifies the fetch-then-update pattern is used correctly.
         """
         # Arrange
         issue_node = make_issue_node(
@@ -1550,17 +1550,17 @@ class TestSyncGroomedToGithubIssue:
 
 
 # ---------------------------------------------------------------------------
-# apply_status_groomed — ADR-003 fetch-then-update label pattern
+# apply_status_groomed — fetch-then-update label pattern
 # ---------------------------------------------------------------------------
 
 
 class TestApplyStatusGroomed:
-    """apply_status_groomed uses fetch-then-update GraphQL label pattern (ADR-003).
+    """apply_status_groomed uses fetch-then-update GraphQL label pattern.
 
     Tests: apply_status_groomed fetches issue labels, computes desired set
            (add status:groomed, remove status:needs-grooming), and calls
            _update_issue_graphql with the full label ID list.
-    Why: ADR-003 requires full label ID replacement (not additive); tests verify
+    Why: The label update requires full label ID replacement (not additive); tests verify
          the fetch-then-compute-then-update flow, idempotency, label creation, and
          no-issue early exit.
     """
@@ -1682,11 +1682,11 @@ class TestApplyStatusGroomed:
     def test_apply_status_groomed_creates_label_if_absent(self, mocker: MockerFixture) -> None:
         """apply_status_groomed creates status:groomed label when it does not exist.
 
-        Tests: apply_status_groomed label auto-creation (ADR-004 REST exception)
+        Tests: apply_status_groomed label auto-creation (REST exception)
         How: get_label raises GithubException(status=404); verify create_label is
              called with name='status:groomed' and color='0075ca'.
-        Why: ADR-004 — label creation stays REST; new repos need the label created
-             on first use.
+        Why: Label creation stays REST — there is no GraphQL createLabel mutation;
+             new repos need the label created on first use.
         """
         from github import GithubException
 

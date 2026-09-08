@@ -43,8 +43,8 @@ classification and handling instructions.
 
 5. Handle the response:
    - `[number]` — use that item's title as the working title and proceed to [find-item.md](./find-item.md)
-   - `G [number]` — invoke `dh:groom-backlog-item {item title}` then re-display the list
-   - `G all` — invoke `dh:groom-backlog-item all` then re-display the list
+   - `G [number]` — run the grooming workflow via `references/workflows/groom/start.md` with `<item_ref/>` = that item's title, then re-display the list
+   - `G all` — run the grooming workflow via `references/workflows/groom/start.md` with `<item_ref/>` = all (batch grooming), then re-display the list
    - `D [number]` — display the full item description, research_first field, and groomed content (if present), then re-display the list
    - `C [number]` — proceed to close path with that item's title
    - `R [number]` — proceed to resolve path with that item's title

@@ -154,7 +154,7 @@ Loads [references/workflows/quick/start.md](./references/workflows/quick/start.m
 
 ### --auto mode rules
 
-All interactive `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the full substitution table. BLOCKED states (RT-ICA MISSING conditions, feasibility gate BLOCKED) require human resolution regardless of mode.
+All interactive `AskUserQuestion` calls are replaced with evidence-derived decisions. Load [auto-mode.md](./references/workflows/work/auto-mode.md) for the full substitution table. Blocking states require human resolution regardless of mode: a feasibility gate `BLOCKED`, and an RT-ICA `Decision: BLOCKED-FOR-PLANNING` or `Decision: BLOCKED`. An RT-ICA `Decision: APPROVED-WITH-GAPS` is not a blocking state — its unresolved MISSING conditions are recorded on the item and the workflow continues.
 
 ## Workflow
 

@@ -12,13 +12,14 @@ The `backlog_view` MCP tool exposes progressive disclosure for backlog items —
 navigation protocol that lets agents browse large items incrementally, from a token-efficient
 map down to full section, sub-heading, or code-fence content.
 
-Design decisions are specified in the architecture spec for issue #2529 (artifact type
+Design decisions are specified in the architecture spec (artifact type
 `architect`). This document describes the shipped contract — what agents observe.
 
-R8's hash-only follow-up-call shape (ADR-3075-1 through ADR-3082-1) is not reflected
+R8's hash-only follow-up-call shape is not reflected
 below: that control set is not yet implemented, and `backlog_view` currently has no `hash`
-parameter. There is no session-identifying value anywhere in that shape — ADR-3082-1 reversed
-session-keying, so the control set is addressed by `content_id` alone. Every example in this
+parameter. There is no session-identifying value anywhere in that shape — an earlier design
+keyed the control set to the session, but that was reversed, so the control set is addressed by
+`content_id` alone. Every example in this
 document — including "Typical Navigation Flow" below — uses today's shipped shape, repeating
 `selector` on every call. Update this document's examples and response shapes to the hash-only
 shape once the control set ships.
@@ -90,11 +91,11 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 |----------------|---------------|------------------------------------------------------------------------------------------|
 | `ordinal`      | `str`         | Echoed ordinal.                                                                          |
 | `title`        | `str`         | Heading text or code-block language tag.                                                 |
-| `content`      | `str`         | Full body text. Empty string (`""`) when `has_children=True` (ADR-7).                   |
+| `content`      | `str`         | Full body text. Empty string (`""`) when `has_children=True`.                           |
 | `total_tokens` | `int`         | tiktoken `cl100k_base` count of `content`. `0` when `has_children=True`.                |
 | `truncated`    | `bool`        | Always `False` for navigate-without-head responses.                                     |
 | `child_map`    | `str \| None` | Formatted listing of direct sub-heading children. `None` for leaves and code blocks.    |
-| `has_children` | `bool`        | `True` iff the node has sub-heading children (ADR-4). `False` for code-only nodes.      |
+| `has_children` | `bool`        | `True` iff the node has sub-heading children. `False` for code-only nodes.              |
 | `struck`       | `bool`        | `True` iff the ordinal addresses a struck (retracted) entry, or a descendant of one.    |
 | `entry_id`     | `str`         | Stable identifier of the owning entry. `""` for level-1 section ordinals (no dot).      |
 

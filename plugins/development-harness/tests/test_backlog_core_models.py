@@ -528,7 +528,7 @@ class TestDuplicateItemError:
     """DuplicateItemError formats its message from ContentDuplicateMatch entries.
 
     No similarity percentage is derived or displayed — content matching is
-    token-overlap based, not a distance metric (spec #3169 ADR-004/ADR-005).
+    token-overlap based, not a distance metric.
     """
 
     def test_duplicate_item_error_stores_duplicates(self) -> None:

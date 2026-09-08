@@ -114,7 +114,7 @@ backlog update --selector "{matched_item_title}" --plan "{followup_plan_address}
 **No match found** -- create a new backlog item, then attach the follow-up as plan:
 
 ```text
-Skill(skill: "dh:create-backlog-item", args: "--auto {derived_title}")
+Skill(skill: "dh:work-backlog-item", args: "create --auto {derived_title}")
 ```
 
 Then attach the follow-up plan using the same opaque address:
@@ -126,10 +126,10 @@ backlog update --selector "{derived_title}" --plan "{followup_plan_address}"
 **Error handling**:
 
 - If the `backlog update` call fails after creation (title mismatch between what
-  `dh:create-backlog-item` produced and what `update` searched for): re-invoke `backlog list`, find
+  `dh:work-backlog-item create` produced and what `update` searched for): re-invoke `backlog list`, find
   the most recently added item, and retry `backlog update` with its exact title. If the retry also
   fails, log the error and continue to the next follow-up plan.
-- If `dh:create-backlog-item --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `backlog update` on the duplicate's title to attach the plan.
+- If `dh:work-backlog-item create --auto` logs `[AUTO] STOP -- duplicate detected`: treat this as "match found" -- run `backlog update` on the duplicate's title to attach the plan.
 
 ### Step 5: Recursion Gate
 

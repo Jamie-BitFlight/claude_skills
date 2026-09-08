@@ -26,6 +26,13 @@ Anything longer than a few lines goes to the path named in `DELIVERY` (default `
 
 No response is indistinguishable from a crash. Always return STATUS.
 
+`PARTIAL` exists here because this message is the only channel: nothing else records what you got
+through, so a mixed outcome has nowhere else to go. Where a durable store does hold the outcome,
+the token set is narrower — the development-harness plugin's `dh:subagent-contract` pins `DONE` and
+`BLOCKED` only, and its work ledger carries the rest. The two contracts share a name and not a
+vocabulary; this one is the one your prompt named when it opened with `Your ROLE_TYPE is
+sub-agent.`
+
 ## Evidence over assurance
 
 Claims about commands come with the command and its output. Claims about files come with paths and, where it matters, quoted lines. If a check was not run, say it was not run.

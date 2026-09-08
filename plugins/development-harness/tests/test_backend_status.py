@@ -656,17 +656,17 @@ class TestBacklogListBackendIntegration:
 
         Tests: backlog_list response — backend value fidelity
         How: Create known BackendStatus with empty items list (cache_open_count=0 after
-             ADR-5 server assignment); mock probe; call tool; compare backend dict to
+             server assignment); mock probe; call tool; compare backend dict to
              model_dump(mode='json') output which serialises enum values to strings
         Why: Any transformation between model_dump and response output is a bug.
-             cache_open_count is always overwritten by server.py (ADR-5) with len(items),
+             cache_open_count is always overwritten by server.py with len(items),
              so the expected value must match items=[] -> total=0.
         """
         backend_status = BackendStatus(
             availability=BackendAvailability.REACHABLE,
             open_count=3,
             total_count=10,
-            # cache_open_count will be overwritten by server.py ADR-5 to len(items)==0
+            # cache_open_count will be overwritten by server.py to len(items)==0
             cache_open_count=0,
             cache_total_count=8,
             last_sync="2026-03-23T08:00:00Z",

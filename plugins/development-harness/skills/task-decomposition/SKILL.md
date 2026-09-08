@@ -128,6 +128,13 @@ field contains the full contextualized ARTIFACT:PLAN markdown.
 
 ### Choosing a plan-creation path
 
+**Plan authoring writes the content store.** `sam_plan`'s `create`, `append_task` and `finalize`
+actions, and the task fields they carry, land in the store that holds a plan's authored content.
+The work ledger holds the other half — a task's status, the attempts opened on it, the lease each
+holds, and the outcome each closes with — and a workflow that executes this plan brings it across
+with `plan import --from content --plan-address {plan_id}` before its first dispatch. Nothing here
+opens an attempt, so nothing here belongs on the ledger.
+
 | Plan size | Preferred path |
 |-----------|----------------|
 | Small (fewer than 16 tasks) | Monolithic — single `sam_plan create` call |
@@ -174,8 +181,8 @@ Use three calls to avoid large single-call payloads:
 
 **Single-writer constraint**: `append_task` is NOT safe under concurrent writers. Do not
 call `append_task` for the same plan from multiple agents or sessions simultaneously. For
-the full single-writer contract, see the `CLAUDE.md` gotcha note in
-`plugins/development-harness/CLAUDE.md`.
+the full single-writer contract, see "SAM Storage Model" in
+`plugins/development-harness/docs/backend-providers.md`.
 
 Each task definition carries these routing fields. Any key outside the accepted set is
 rejected — do not invent fields:

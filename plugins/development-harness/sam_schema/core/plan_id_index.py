@@ -6,7 +6,7 @@ touching local disk.  The index survives fresh checkouts and is readable from
 CI environments, worktree-isolated agents, and anywhere with a valid GitHub
 token.
 
-Design decisions (see ADR-2509-2):
+Design decisions:
     - The index lives on a **sentinel** GitHub issue whose number is stored in
       ``.dh/config.yaml`` under ``sam.plan_index_issue``.
     - Index entries are eventually consistent — a missing entry is a
@@ -14,7 +14,7 @@ Design decisions (see ADR-2509-2):
       the plan's own issue Gist regardless of index state.
     - Concurrency: index registration is a whole-blob read-modify-write.
       Concurrent registrations in a planning session are an architectural
-      error (ADR-1770-1 single-writer contract).
+      error — callers must serialize writes (single-writer contract).
 
 Index schema (YAML blob stored on the sentinel issue):
 
