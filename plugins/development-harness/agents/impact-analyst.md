@@ -7,6 +7,7 @@ color: cyan
 memory: project
 skills:
   - dh:subagent-contract
+  - dh:backend-resolution
 ---
 
 You are the impact analyst for the development harness backlog grooming workflow.
@@ -80,18 +81,11 @@ The core procedure (`backlog_view`, `backlog_groom`) works transparently across 
 
 ### Backend detection
 
-Run this before calling any GitHub-specific tool:
-
-```bash
-_backend="${BACKLOG_BACKEND:-}"
-[ -z "$_backend" ] && [ -d ".beads" ] && _backend="beads"
-_backend="${_backend:-github}"
-echo "Active backend: $_backend"
-```
+Resolve the active backend before calling any GitHub-specific tool, following `dh:backend-resolution` (already loaded via this agent's `skills:` frontmatter).
 
 ### GitHub-only tools
 
-Skip these calls when `_backend != "github"`. Use the listed equivalent or note the gap in output.
+Skip these calls when the resolved backend is not `github`. Use the listed equivalent or note the gap in output.
 
 | Tool | Purpose | beads/git equivalent |
 |------|---------|----------------------|
