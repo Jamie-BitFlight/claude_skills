@@ -65,8 +65,8 @@ skill's own loop, reads as instruction to re-enter the loop that produced its as
 The Orchestrator runs the work loop over the graph: it dispatches agents against claimable nodes,
 receives the events they produce, and consults the CLI for graph state and for the next claimable
 task. It is the loop rather than a node inside it — not a stage the graph reaches, but the process
-that runs for as long as work is outstanding. An `Agent()` or `Bash()` call returning is the event;
-there is no subscription, queue or callback. Workers notify individually as each completes, so many
+that runs for as long as work is outstanding. A dispatch returning — or a launched command
+completing — is the event; there is no subscription, queue or callback. Workers notify individually as each completes, so many
 nodes stay active at once and the loop turns on each return rather than on the last member of a
 batch. Scheduling answers come from the CLI; the Orchestrator holds no scheduling state of its own.
 
