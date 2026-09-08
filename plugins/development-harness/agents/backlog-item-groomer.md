@@ -114,7 +114,7 @@ Use `dh:planner-rt-ica`, the non-blocking grooming-phase framework.
 
 Do NOT use `dh:rt-ica`, the blocking pre-implementation gate. During grooming, a `MISSING` condition becomes a research task or a question for the human, not a halt. The implementation-gate variant is loaded later in the SAM pipeline by agents that must refuse to proceed on incomplete information.
 
-The skill provides the authoritative definitions of `AVAILABLE`, `DERIVABLE`, and `MISSING` and the planner-phase output format. Apply that framework to the item and include the resulting assessment at the top of the output manifest.
+The skill owns the planner-phase verdict vocabulary — `APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING` — and the format for emitting it. The condition states used across this grooming stack (`AVAILABLE`, `DERIVABLE`, `MISSING`) are defined in [`rtica-assessor.md`](./rtica-assessor.md) Phase 4 and in the groom workflow's `analyze.md`; the skill's own evidence-status set is wider. Apply that framework to the item and include the resulting assessment at the top of the output manifest.
 
 If the orchestrator or `rtica-assessor` has pre-computed RT-ICA, prefer that result over running your own pass.
 
@@ -314,7 +314,7 @@ Section guidance:
 - **Expected Behavior**: Describe how the system, agent, skill, tool, or workflow should behave when correct. Use the artifact's behavioral boundary.
 - **Desired Structure**: Describe the target state that should be observable or testable once done. Do not describe implementation architecture.
 - **Acceptance Criteria**: Write concrete checks for "done" that evaluate the artifact at its behavioral boundary. Each criterion must be verifiable by running a command, observing output, checking a generated artifact, invoking a tool, or executing a representative scenario. Criteria must use domain knowledge of the task. For skills, criteria must evaluate whether the skill changes agent behavior correctly on representative tasks, not merely whether skill files exist or contain documentation.
-- **Human Input**: Include when RT-ICA is BLOCKED or when domain judgment, examples, or prioritization are needed from the human.
+- **Human Input**: Include when the RT-ICA decision is `APPROVED-WITH-GAPS` or `BLOCKED-FOR-PLANNING`, or when domain judgment, examples, or prioritization are needed from the human. `APPROVED-WITH-GAPS` is the common case and is not a reason to stop — the gaps belong here, on the item, where the planner and the human can see them.
 - **Questions for Human**: Include targeted questions for missing information. Do not ask broad or vague questions.
 - **Resources**: Populate from Steps 1 through 3. Include relevant skills, agents, files, prior work, docs, schemas, tests, and backlog items.
 - **Dependencies**: Populate from Step 4.
@@ -439,7 +439,7 @@ Include sections that apply. Omit sections that do not.
 ### RT-ICA Assessment
 
 - Goal: {goal}
-- Status: APPROVED / BLOCKED
+- Decision: {APPROVED-FOR-PLANNING | APPROVED-WITH-GAPS | BLOCKED-FOR-PLANNING}
 - AVAILABLE:
   - {available prerequisite}
 - DERIVABLE:
@@ -494,7 +494,7 @@ Include sections that apply. Omit sections that do not.
 
 ### Human Input
 
-{Output of interviewing the human partner; desired outcome. Include when RT-ICA is BLOCKED or human input is needed.}
+{Output of interviewing the human partner; desired outcome. Include when the RT-ICA decision is `APPROVED-WITH-GAPS` or `BLOCKED-FOR-PLANNING`, or human input is needed.}
 
 ### Questions for Human
 
@@ -519,7 +519,7 @@ Include sections that apply. Omit sections that do not.
 ### Blockers
 
 - {missing prerequisite}
-- {RT-ICA BLOCKED reason}
+- {unresolved RT-ICA MISSING condition}
 
 ### Effort
 
