@@ -7,6 +7,7 @@ Tools:
     sam_plan        — Consolidated plan-level operations (read, create, list, status, ready, update)
     sam_task        — Consolidated task-level operations (read, claim, state, update)
     sam_active_task — Session-scoped active task context management (get, set, update, clear)
+    sam_known_failure_types — The work-failure vocabulary an agent names when work could not proceed
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import tiktoken
 from backlog_core.backend_protocol import get_config as get_backlog_config
 from backlog_core.backend_types import ContentProvider
 from dh_core import operations
+from dh_core.known_failure_types import KnownFailureTypesPage, page as known_failure_types_page
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -101,7 +103,9 @@ mcp: FastMCP = FastMCP(
         "set config.action to: read | create | list | status | ready | update | append_task | finalize. "
         "Use sam_active_task to park and retrieve the task currently being worked on "
         "within an agent session — "
-        "set config.action to: get | set | update | clear."
+        "set config.action to: get | set | update | clear. "
+        "Use sam_known_failure_types to read the shared vocabulary of work-failure types an agent names "
+        "when work could not proceed — it returns the whole table by default."
     ),
 )
 
@@ -634,3 +638,53 @@ def sam_active_task(
         case _:  # pragma: no cover
             msg = f"sam_active_task: unhandled action '{config.action}'"
             raise ValueError(msg)
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="SAM Known Failure Types",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
+def sam_known_failure_types(
+    offset: Annotated[int, Field(description="Skip this many rows. 0 (the default) starts at the beginning.")] = 0,
+    limit: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Return at most this many rows. Omitted (the default) returns every remaining row; "
+                "the table is never truncated on the caller's behalf."
+            )
+        ),
+    ] = None,
+) -> KnownFailureTypesPage:
+    """Return the shared vocabulary of work-failure types, as data.
+
+    A Worker names one of these codes when work could not proceed, so the reason is routable rather
+    than reinvented as prose in each status report. The table is
+    ``dh_core.known_failure_types.KNOWN_FAILURE_TYPES``; the ``sam known-failure-types`` CLI command
+    returns the same rows from the same source.
+
+    This vocabulary is deliberately separate from the ledger's own reason codes
+    (``dh_core.ledger_spec.REASONS``, why a command refused) and from ``reclaim --reason`` (what the
+    Orchestrator says when it sends a task back). If the ledger already refuses a condition with a
+    ``REASONS`` code, name that code instead of a failure type.
+
+    Args:
+        offset: How many rows to skip before the window starts.
+        limit: How many rows the window holds at most; omitted returns every remaining row.
+
+    Returns:
+        :class:`~dh_core.known_failure_types.KnownFailureTypesPage` — the window, plus ``total`` so
+        a caller reading a window knows how much it did not read.
+
+    Raises:
+        ToolError: When ``offset`` or ``limit`` is negative.
+    """
+    try:
+        return known_failure_types_page(offset=offset, limit=limit)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc
