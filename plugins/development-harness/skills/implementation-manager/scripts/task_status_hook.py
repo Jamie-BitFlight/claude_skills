@@ -614,25 +614,41 @@ def _call_sam_task_status(plan_id: str, task_id: str, timeout: float = 8) -> Sam
     return None
 
 
-def _cleanup_active_task_context(session_id: str | None, fallback_context_file: Path | None) -> None:
+def _cleanup_active_task_context(session_id: str | None, local_record: Path | None) -> None:
     """Clean up active task context after SubagentStop completes.
 
     Primary path: call the SAM CLI's ``active-task clear`` subcommand.
     Fallback: delete the filesystem context file if the CLI clear fails or is unavailable.
 
+    Short-circuits when *local_record* names a file that is not there. On the ``local``
+    context backend ``active-task clear`` deletes exactly that path and touches nothing
+    else (``LocalContextBackend.clear_active_task`` unlinks
+    ``context_dir()/active-task-{session_id}.json`` and returns whether it existed), so
+    for an absent record the ``uv run`` subprocess can only report ``cleared: false``.
+    This hook fires on every sub-agent stop in every installed plugin and most stopping
+    agents hold no task, so that is the common path — the subprocess cost it avoids was
+    measured at ~1.3s of a ~1.75s total. A ``None`` *local_record* is not a short
+    circuit: it means the backend keeps the record where this process cannot see it, so
+    the CLI is the only way to know.
+
     Args:
         session_id: Sub-agent session identifier for the CLI clear call. ``None``
             skips that path entirely.
-        fallback_context_file: Filesystem context file to delete if the CLI
-            clear fails or session_id is ``None``.
+        local_record: The ``local``-backend record for this session, as resolved by
+            :func:`_local_active_task_file`, or ``None`` when the backend keeps it out
+            of this process's reach. Also the file deleted if the CLI clear fails or
+            *session_id* is ``None``.
     """
+    if local_record is not None and not local_record.exists():
+        return
+
     cli_cleared = False
     if session_id:
         cli_cleared = _call_sam_active_task_clear(session_id)
 
-    if not cli_cleared and fallback_context_file is not None:
+    if not cli_cleared and local_record is not None:
         with contextlib.suppress(FileNotFoundError):
-            fallback_context_file.unlink()
+            local_record.unlink()
 
 
 def get_iso_timestamp() -> str:
@@ -776,9 +792,8 @@ def _local_active_task_file(session_id: str) -> Path | None:
 
     The default ``local`` context backend stores each record at
     ``context_dir()/active-task-{session_id}.json``, so this hook can stat the exact
-    file the SAM CLI would read. That matters for cost: this hook runs on every
-    sub-agent stop in every plugin, and the ``active-task get`` subprocess costs
-    ~1.3s of the ~1.75s total whether or not a task exists.
+    file the SAM CLI would read. :func:`_cleanup_active_task_context` does exactly
+    that, and skips the ``active-task clear`` subprocess when the file is not there.
 
     Returns None — meaning "ask the CLI instead" — when the configured backend is
     anything else, because those keep the record where this process cannot see it.
@@ -918,12 +933,12 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         return
 
     sub_agent_session_id = _extract_session_id_from_transcript(transcript_path)
-    context_file = _local_active_task_file(sub_agent_session_id) if sub_agent_session_id else None
+    local_record = _local_active_task_file(sub_agent_session_id) if sub_agent_session_id else None
 
     launch = _resolve_launch(transcript_path)
     if launch is not None:
         _call_sam_plan_settle(launch, _resolve_return_text(hook_input, transcript_path))
-    _cleanup_active_task_context(sub_agent_session_id, context_file)
+    _cleanup_active_task_context(sub_agent_session_id, local_record)
 
 
 def _resolve_launch(transcript_path: Path) -> Launch | None:

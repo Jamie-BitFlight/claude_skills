@@ -397,28 +397,83 @@ def test_cleanup_active_task_context_propagates_permission_error(mocker: MockerF
     failure that must be observable, not silently discarded.
     """
     # Arrange — session_id=None forces the fallback filesystem path (skips the SAM CLI clear)
-    fallback_file = tmp_path / "active-task-sess.json"
-    fallback_file.write_text("{}")
+    local_record = tmp_path / "active-task-sess.json"
+    local_record.write_text("{}")
     mocker.patch.object(Path, "unlink", side_effect=PermissionError("read-only filesystem"))
 
     # Act & Assert — PermissionError must propagate; suppress(FileNotFoundError) does not catch it
     with pytest.raises(PermissionError):
-        _hook_mod._cleanup_active_task_context(session_id=None, fallback_context_file=fallback_file)
+        _hook_mod._cleanup_active_task_context(session_id=None, local_record=local_record)
 
 
 def test_cleanup_active_task_context_suppresses_file_not_found(mocker: MockerFixture, tmp_path: Path) -> None:
     """_cleanup_active_task_context silently ignores FileNotFoundError during fallback unlink.
 
-    FileNotFoundError means the context file was already removed by a concurrent
-    process — this is expected during parallel agent teardown and should not fail.
+    FileNotFoundError means the context file was removed by a concurrent process
+    between the existence check and the unlink — expected during parallel agent
+    teardown, and not a failure.
     """
-    # Arrange — session_id=None forces the fallback filesystem path
-    fallback_file = tmp_path / "active-task-sess.json"
-    # File does not need to exist; suppress(FileNotFoundError) should absorb the error
+    # Arrange — the record exists at check time (otherwise cleanup short-circuits before
+    # the unlink), and session_id=None forces the fallback filesystem path.
+    local_record = tmp_path / "active-task-sess.json"
+    local_record.write_text("{}")
     mocker.patch.object(Path, "unlink", side_effect=FileNotFoundError("already gone"))
 
     # Act — must not raise; FileNotFoundError is a legitimate concurrent-removal scenario
-    _hook_mod._cleanup_active_task_context(session_id=None, fallback_context_file=fallback_file)
+    _hook_mod._cleanup_active_task_context(session_id=None, local_record=local_record)
+
+
+# ---------------------------------------------------------------------------
+# _cleanup_active_task_context — no subprocess when the local record is absent
+#
+# This hook fires on every sub-agent stop in every installed plugin, and most
+# stopping agents hold no task at all. On the local backend `active-task clear`
+# unlinks exactly `active-task-{session_id}.json` and touches nothing else, so
+# for an absent record the `uv run` subprocess can only answer `cleared: false`.
+# ---------------------------------------------------------------------------
+
+
+def test_cleanup_spawns_no_subprocess_when_the_local_record_is_absent(mocker: MockerFixture, tmp_path: Path) -> None:
+    """An absent local record means there is nothing to clear, so nothing is spawned."""
+    mock_popen = mocker.patch("subprocess.Popen")
+
+    _hook_mod._cleanup_active_task_context(
+        session_id="sub-agent-session", local_record=tmp_path / "active-task-sub-agent-session.json"
+    )
+
+    mock_popen.assert_not_called()
+
+
+def test_cleanup_clears_through_the_cli_when_the_local_record_exists(mocker: MockerFixture, tmp_path: Path) -> None:
+    """A record that is there is cleared through the CLI, not unlinked behind its back."""
+    local_record = tmp_path / "active-task-sub-agent-session.json"
+    local_record.write_text("{}", encoding="utf-8")
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps({"cleared": True}), stderr="")
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
+
+    _hook_mod._cleanup_active_task_context(session_id="sub-agent-session", local_record=local_record)
+
+    cmd: list[str] = mock_popen.call_args[0][0]
+    assert _argv_after(cmd, "active-task") == ["active-task", "clear", "--session-id", "sub-agent-session"]
+
+
+def test_cleanup_asks_the_cli_when_the_backend_keeps_the_record_out_of_reach(mocker: MockerFixture) -> None:
+    """A None local record is not an absent record — the CLI is the only way to know.
+
+    _local_active_task_file returns None for every context backend other than ``local``,
+    which is a statement about reachability, not about whether a task is active. Treating
+    it as "nothing to clear" would leave stale context on every non-local backend.
+    """
+    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps({"cleared": True}), stderr="")
+    mocker.patch("shutil.which", return_value="/usr/bin/uv")
+    mocker.patch.object(Path, "exists", return_value=True)
+    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
+
+    _hook_mod._cleanup_active_task_context(session_id="sub-agent-session", local_record=None)
+
+    mock_popen.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
