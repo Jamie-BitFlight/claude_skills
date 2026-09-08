@@ -77,16 +77,27 @@ Worktree workers cannot message the orchestrator mid-flight. When a blocker is e
 
 1. Complete as many tasks as possible, skipping only the blocked task
 2. Commit all completed work with conventional commit messages
-3. Output a `STATUS: PARTIAL` completion report (see format below)
+3. Close the blocked task on the ledger — `plan finish --address P{N}/T{M} --attempt {n} --result
+   blocked --note "<what blocks it, and what would unblock it>"`, or `--result needs-input` when
+   what you need is an answer rather than a change
+4. Report as below
 
-The orchestrator handles partial completions by creating new backlog items for the remaining blocked tasks and adding them to the milestone for a later wave.
+A mixed outcome needs no token of its own. Each task carries its own `finish --result`, so "three
+complete, one blocked" is already recorded, one row per task, and the orchestrator reads it from
+the ledger rather than parsing a count out of your prose. There is no `--result partial` — see
+`dh_core/ledger_spec.py` for the values `finish --result` accepts — and inventing a `STATUS:`
+token for a state the ledger cannot hold would put the outcome somewhere no later session can
+query.
 
-Do not wait for resolution. Do not stop all work because one task is blocked — complete everything else and report.
+Do not wait for resolution. Do not stop all work because one task is blocked — complete everything
+else and report.
 
 ## Completion Report Format
 
-Output one of these structured reports as the final response. The orchestrator parses this output
-to determine merge actions and relay content for subsequent waves.
+The `STATUS:` line follows `/dh:subagent-contract` unchanged: `STATUS: DONE` once `finish` was
+recorded, whatever its `--result`, and `STATUS: BLOCKED` when no `finish` was possible at all — a
+setup failure, an unreachable ledger, a worktree that never came up. It reports whether you closed
+your attempts, not how they turned out.
 
 This report and the ledger carry different things, and each needs the other. The report is what the
 orchestrator reads the moment your launch returns, and it records it against your attempt as the
@@ -95,43 +106,18 @@ the only thing that moves the task. Send both: `finish` as your last ledger comm
 as your response. Where a plan exists, append the same body as this attempt's `Completion Report`
 section before you finish, since `finish --result complete` requires it.
 
-### COMPLETE report
-
-All tasks finished and quality gates pass:
+Output this as the final response. Everything below the `STATUS:` line is report body — field
+names, not status tokens:
 
 ```text
-STATUS: COMPLETE
-BRANCH: {worktree branch name — from git branch --show-current}
-TASKS_COMPLETED: {count}
+STATUS: DONE
+BRANCH: {worktree branch name — from git branch --show-current, or 'none' if no commits exist}
+TASKS_COMPLETED: {count, and the IDs finished with --result complete}
+TASKS_BLOCKED: {count and IDs closed with --result blocked or needs-input, or 'none'}
+BLOCKER: {what blocked each one — omit the field when TASKS_BLOCKED is none}
 FILES_CHANGED: {list of files modified, one per line}
 COMMITS: {list of commit hashes and messages, one per line}
 NOTES: {any design decisions, deviations from spec, or domain observations}
-```
-
-### PARTIAL report
-
-Some tasks completed, one or more blocked:
-
-```text
-STATUS: PARTIAL
-BRANCH: {worktree branch name}
-TASKS_COMPLETED: {count of completed tasks}
-TASKS_BLOCKED: {count and IDs of blocked tasks — e.g., "2 blocked: T03, T05"}
-BLOCKER: {description of what blocked progress — be specific}
-FILES_CHANGED: {list of files modified}
-COMMITS: {list of commit hashes and messages}
-NOTES: {design decisions or observations from completed work}
-```
-
-### FAILED report
-
-No useful work completed (setup failure, environment issue, or catastrophic blocker):
-
-```text
-STATUS: FAILED
-BRANCH: {worktree branch name if any commits exist, else 'none'}
-TASKS_COMPLETED: 0
-BLOCKER: {description of the failure — be specific}
 ```
 
 ## SAM Task Status Tracking

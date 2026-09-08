@@ -23,6 +23,13 @@ returns. It is not a record: a reader arriving later, in another session, sees n
 someone wrote it down. When your dispatch names a ledger address and attempt, `<work_ledger/>`
 below says what to write down and how.
 
+There is no third token here. A mixed outcome — some of it done, some of it not — is not something
+this line reports, because the ledger already holds it one row per task and `finish --result` has
+no partial value. Report `STATUS: DONE` and let the rows say how each turned out. The
+`agent-orchestration` plugin's similarly named `delegate/references/sub-agent-contract.md` does
+pin a third token, `PARTIAL`; that contract governs delegations with no ledger behind them, where
+the response is the only channel there is. It does not apply to a dispatch that named an address.
+
 </status>
 
 <dispatch_input>
