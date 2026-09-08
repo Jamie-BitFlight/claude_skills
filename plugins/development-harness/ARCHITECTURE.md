@@ -379,6 +379,127 @@ coverage; evidence-to-claim trace coverage; snapshot and fingerprint consistency
 Do not declare semantic quality from a universal best-practice score. Semantic conformance stays a
 bounded judgment or an empirical evaluation until a property is made precise enough to test.
 
+## The orchestration loop
+
+The work graph above says what the structure is and what may be claimed from it. This says what
+runs over it, as invariants and the events that reach it. The commands, the judgement table and the
+refusal codes are the procedure and live in
+[docs/work-ledger/work-loop.md](./docs/work-ledger/work-loop.md); this is the model that procedure
+assumes. Roles are used here exactly as [CONTEXT.md](./CONTEXT.md) defines them — Orchestrator,
+Manager, Worker and Dispatcher, with Load, Dispatch and Delegate as the actions.
+
+There is deliberately no ordering in what follows. A numbered sequence would state an order the
+loop does not have, and that is how earlier descriptions of it drifted into reading as a batch.
+
+### Invariants
+
+**The Orchestrator is the loop.** Not a node in the graph and not a stage the graph reaches: the
+process that runs for as long as any work is outstanding. Nothing in the graph stands for it, and a
+node that did would be a node whose completion the loop is itself waiting on.
+
+**A dispatch returning is the event.** There is no subscription, no queue and no callback — the
+return of something the Orchestrator launched is the whole of the push mechanism. Where it launched
+a command rather than an agent, that command completing is the same event. This is stated at the
+level of the mechanism on purpose. A harness's own function name for dispatching an agent or running
+a command belongs to that harness, and this plugin targets several (see the root
+[AGENTS.md](../../AGENTS.md)); writing one of those names here would bake a single harness into a
+model meant to hold across all of them.
+
+**Notification is individual, never batched.** Many nodes are in flight at once and each returns on
+its own. The loop turns on each return. An Orchestrator that waited for a set of dispatches to
+finish before acting on the first result would serialise work the graph declared parallel. This is
+load-bearing rather than a preference: readiness is a per-task question, so a return that frees one
+task frees it at that moment and not at the end of a round.
+
+**Not every event is pushed.** A return covers only work the Orchestrator launched. A lease running
+out produces no return, and neither does a conflict group freeing, a dependency releasing its
+dependents, or a Worker that recorded a section and then died. What the Orchestrator can learn
+therefore falls into two classes, set out in the table below: **returns it observes**, and
+**derived state it discovers by asking**.
+
+**The asking is unconditional.** The Orchestrator queries the ledger on every turn, whatever woke
+it. Asking only after a return would make "a dispatch returning is the event" true of everything the
+Orchestrator ever saw, and staleness would then be invisible rather than detected — an abandoned
+attempt is distinguishable from a slow one only because a live Worker renews its lease and an
+abandoned one stops, and only a query reads that difference.
+
+**The Orchestrator holds no scheduling state.** Every scheduling answer — what may start, what is
+blocked, what has been abandoned, whether the plan can still finish — comes from the ledger through
+the CLI. Anything the Orchestrator caches beside it is a second copy that can disagree with the
+store that gates the writes.
+
+**The loop nests.** A loop's concurrent unit may be a whole loop rather than a single unit of work.
+That is what a wave is, and it is set out below.
+
+### What reaches the Orchestrator
+
+| what it learns | how it reaches it | where it is read |
+|---|---|---|
+| a dispatched Worker's run ended, and what it returned | a return it observes | the return itself, recorded against the attempt by `settle --return-text` |
+| a launched command finished, and what it printed | a return it observes | the return itself |
+| a task may be started now | derived state, only by asking | `tasks.ready` |
+| a dependency's completion has released its dependents | derived state, only by asking | `tasks.ready` |
+| a conflict group has freed | derived state, only by asking | `tasks.ready` |
+| a lease deadline has passed | derived state, only by asking | `tasks.expired` |
+| an attempt was abandoned rather than merely slow | derived state, only by asking | `tasks.stale` |
+| an attempt's run ended without its Worker finishing it | derived state, only by asking | `tasks.returned` |
+| when a live attempt's lease next runs out | derived state, only by asking | `tasks.renew_by` |
+| the plan has no work left, or can no longer finish | derived state, only by asking | `plans.progress` |
+| what a Worker recorded before it stopped | stored state, only by asking | the attempt's sections, through `read --address P/T` |
+
+The derived facts are not a list this document keeps. They are the columns `dh_core/ledger_spec.py`
+declares with `DERIVED` provenance, each carrying its rule as a sentence, computed in
+`dh_core/ledger/derive.py`; adding one there adds it to the model. One query returns all of them —
+`plan status --plan-address P` merges every derived column into each task row and reports the plan's
+progress alongside — which is what makes the unconditional asking one call rather than a sweep.
+
+**Readiness has two thresholds, and they are not the same one.** A dependent unblocks when its
+dependency reaches a successful status, with no acceptance term; a peer sharing a conflict group
+waits for that same task to be *accepted*, because a completion not yet accepted can still be
+reclaimed — `reclaim` refuses a task that has been accepted and permits one that has not — which
+would reopen the exclusion. Both clauses sit in the one `tasks.ready` rule, so one query answers
+both and neither is announced.
+
+**Nothing in the ledger emits.** Its writes are commands an Orchestrator, a Worker or a hook runs,
+and its event kinds are rows appended to a log that is read, not delivered. Searching
+`dh_core/ledger/` and `dh_core/ledger_spec.py` case-insensitively for
+`publish|subscri|notify|watch|callback|emit|listener|poll` returns two docstring uses of "emitted",
+both describing those appended rows, and no push surface. A fact no return carries is therefore a
+fact nobody will tell the Orchestrator.
+
+### The loop nests, and that is what a wave is
+
+At the inner level the loop's concurrent unit is one Worker's attempt at one task: the Orchestrator
+dispatches against claimable tasks of a plan and judges what returns.
+
+At the outer level the concurrent unit is a whole loop. `skills/kage-bunshin` launches independent
+sessions, each in its own worktree, each an independent process inheriting the project's MCP servers,
+skills, plugins and agents, and each therefore able to dispatch Workers of its own;
+`skills/work-milestone` uses it that way, launching one session per item.
+
+The agent holding a launched session's loop is a **Manager**, not a second Orchestrator. Running a
+loop is what an Orchestrator does, not what makes an agent one: an Orchestrator is defined by having
+received the request from the human, and a launched session received its scope from another agent.
+So a fleet is one Orchestrator and a Manager per session, each Manager running its own loop over the
+scope it was handed, and the Orchestrator standing as Dispatcher to every one of them. Naming a
+launched session's holder an orchestrator is the usage [CONTEXT.md](./CONTEXT.md) warns against, and
+it is what makes the two levels indistinguishable in prose.
+
+**A wave is that outer set: loops running concurrently, not tasks running concurrently inside one.**
+The set of tasks a plan is willing to start at a given instant is not a wave. It is the answer to a
+readiness query, and that answer changes as each return lands, which is exactly what stops it being
+a batch.
+
+Both levels are the same shape — one agent over concurrent work, notified as each unit returns,
+holding no scheduling state of its own — and they differ only in what a unit is and which role holds
+it. Nesting therefore needs no second model, and the invariants above are stated once for both.
+
+Where a procedure does join on a whole set — `skills/work-milestone` merges branches and relays
+discoveries only once every session of a wave has exited — that barrier belongs to merging and
+relaying, not to the loop. The outer loop is specified to turn on each session's return as the
+inner one turns on each dispatch's; where a procedure waits for the whole set instead, that is an
+unfilled gap against this model, not a second model.
+
 ## Automation Boundary
 
 The harness exists to turn repeatable agent instructions into reliable workflow
@@ -423,13 +544,14 @@ command, on that basis:
 |---|---|---|
 | runner | `plan finish --result` | whether the work was done |
 | judge | `plan accept` / `plan reclaim` | whether what was done meets the criteria |
-| supervisor | `plan settle --attempt N --return-text` | that the launch ended at all, and what came back |
+| orchestrator | `plan settle --attempt N --return-text` | that the dispatch returned at all, and what came back |
 
 `plan state --new-status X --reason Y` sits outside that table: it is the status move no attempt
 is responsible for, which is why the ledger refuses it without a reason.
 
-A sub-agent-stop hook is the supervisor's observation point — it fires in the orchestrator's
-session at the moment a launch ends — so `settle` is its command and the whole of it. It does
+A sub-agent-stop hook is where that observation is made mechanically — it fires in the
+orchestrator's own session at the moment a dispatch returns — so `settle` is its command and the
+whole of it. It does
 not write status: the runner's `finish` and the judge's verdict already encode that, and the
 runner contract has a worker return `STATUS: DONE` once `finish` was recorded whatever its
 `--result`, so a hook reading that token would contradict them by construction. The final
