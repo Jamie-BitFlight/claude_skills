@@ -105,6 +105,13 @@ _GUARD_WORDS = ("if ", "when ", "available", "installed", "optional", "present",
 # skills/<name>/references/ needs three to climb past the plugin root.
 _PLUGIN_ESCAPE_DEPTH = 3
 
+# Characters that continue a path token. Used to widen a repo-root match leftwards to the
+# whole path it sits in, so the decision is made on that one token rather than on a search
+# of the surrounding line. `$`, `{` and `}` are included so a `${CLAUDE_PLUGIN_ROOT}/` prefix
+# widens into the token and reaches the portable-prefix exemption; `<` and `>` so a
+# `<plugin>/` prefix reaches the placeholder exemption.
+_PATH_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-~/\\${}<>")
+
 
 def _is_placeholder(token: str) -> bool:
     """Return True when a token names a shape rather than a location.
@@ -198,6 +205,46 @@ def sibling_plugin_names(plugin_dir: Path) -> frozenset[str]:
     )
 
 
+def repo_rooted_token(line: str, match: re.Match[str]) -> str | None:
+    """Widen a repo-root match to its whole path token and return it when it is an escape.
+
+    ``_REPO_PATH_RE`` matches a repo-root directory segment wherever it appears, including
+    partway through a longer path (``plugins/other/rules/x.md``, ``docs/rules/x.md``). Which
+    of those is an escape depends on what precedes *this* match, so the surrounding path is
+    read positionally from ``match.start()`` and every decision — the portable-prefix and
+    placeholder exemptions, and the relative-climb depth — is made against that one widened
+    token. Deriving it here keeps the token that is tested identical to the token that is
+    reported.
+
+    Args:
+        line: The raw source line.
+        match: A ``_REPO_PATH_RE`` match within *line*.
+
+    Returns:
+        The full path token when it is a repo-rooted escape, otherwise None.
+    """
+    left = match.start()
+    while left > 0 and line[left - 1] in _PATH_CHARS:
+        left -= 1
+    prefix = line[left : match.start()]
+    token = line[left : match.end()]
+
+    if token.startswith(_PORTABLE_PREFIXES) or _is_placeholder(token):
+        return None
+    if not prefix:
+        # A bare repo-root path: `rules/style.md`.
+        return token
+    if prefix in {"/", "\\"}:
+        # An absolute path: `/rules/style.md`. Repo-rooted, and resolves for nobody.
+        return token
+    if all(segment in {"", ".", ".."} for segment in prefix.split("/")):
+        # A relative climb. `_escapes_plugin` already owns the depth rule; reuse it.
+        return token if _escapes_plugin(token) else None
+    # A directory precedes the match, so this is a tail of a longer path — reported by the
+    # cross-plugin check when it is one, and internal to the plugin when it is not.
+    return None
+
+
 def _scan_line(
     rel_path: str, line_no: int, line: str, sibling_plugins: frozenset[str], own_plugin: str
 ) -> list[Escape]:
@@ -231,8 +278,8 @@ def _scan_line(
     )
 
     for match in _REPO_PATH_RE.finditer(line):
-        token = match.group(0)
-        if token.startswith(_PORTABLE_PREFIXES) or _is_placeholder(token) or f"/{token}" in line:
+        token = repo_rooted_token(line, match)
+        if token is None:
             continue
         found.append(Escape(rel_path, line_no, "repo-path", token, stripped))
 
@@ -344,8 +391,10 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
             f"({', '.join(repr(w.strip()) for w in _GUARD_WORDS)}). It triages; it does not decide."
         ),
         "- Fenced code blocks are skipped, so illustrative paths inside examples are not counted.",
-        "- A relative link is reported when it carries three or more leading `../` segments, the",
+        "- A relative path is reported when it carries three or more leading `../` segments, the",
         "  depth at which a skill reference leaves `skills/`. Shallower climbs stay inside the plugin.",
+        "- Repo-root paths are matched lowercase and forward-slash-separated, so a backslash separator,",
+        "  an uppercase directory, or a URL-encoded separator is not detected.",
         "- Same-plugin (`dh:`) references are never reported. Paths built on `${CLAUDE_PLUGIN_ROOT}` or",
         "  `${CLAUDE_SKILL_DIR}` are skipped, not verified (exemption 3, issue #3445).",
         "",
