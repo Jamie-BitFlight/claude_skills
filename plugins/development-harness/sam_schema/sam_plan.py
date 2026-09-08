@@ -41,6 +41,11 @@ behaviour moves. Naming the content store keeps the old path and the old output 
 invocation reaches the content store exactly as it did, because it either carries one of those
 flags or names a plan the ledger does not hold.
 
+Rule 1 asks which flags a caller passed, and :func:`named` answers it from the value the parser
+produced, so every optional flag of a routing command must default to a value no caller can supply
+-- see :func:`absent` for those and :func:`check_routing_defaults`, which holds the group to it at
+import. A flag defaulted to a real value would make its own value pick the store instead.
+
 The legacy branch goes when Slice 6 of ``docs/work-ledger/plan.md`` retires the content record as
 a store: :data:`LEGACY_FLAGS`, :func:`store_for` and every function below marked as the content
 path are deleted with it, leaving one command per ``ledger_spec.COMMANDS`` entry.
@@ -278,12 +283,28 @@ command it belonged to is as loud as a missing one. Passing any of them selects
 """
 
 
+def absent(value: object) -> bool:
+    """Report whether a value is the one the parser leaves for a flag nobody passed.
+
+    An absent value option is ``None``, an absent switch is ``False``, and an absent repeatable
+    option is empty. The comparisons are by identity rather than equality because ``0 == False``
+    and ``0 == 0``: an int flag given a real ``0`` must read as passed, not as its own default.
+    :func:`check_routing_defaults` holds every routed flag to declaring one of these, so this
+    answers "was it passed" rather than guessing at it.
+
+    Args:
+        value: The value the parser produced for one flag.
+
+    Returns:
+        Whether the parser produced it because nobody passed the flag.
+    """
+    if value is None or value is False:
+        return True
+    return isinstance(value, (list, tuple)) and not value
+
+
 def named(flags: Mapping[str, object]) -> list[str]:
     """Return the flags of *flags* the caller actually passed.
-
-    A flag counts as passed when its value differs from what the parser leaves for an absent one:
-    ``None`` for a value option, ``False`` for a switch, an empty list for a repeatable option, and
-    ``0`` for ``--offset``, whose default is a number rather than ``None``.
 
     Args:
         flags: Flag name, with its leading dashes, to the value the parser produced.
@@ -291,8 +312,7 @@ def named(flags: Mapping[str, object]) -> list[str]:
     Returns:
         The names that were passed, in the order the mapping declares them.
     """
-    absent: tuple[object, ...] = (None, False, 0, "", (), [])
-    return [name for name, value in flags.items() if value not in absent]
+    return [name for name, value in flags.items() if not absent(value)]
 
 
 def ledger_holds(plan: str) -> bool:
@@ -494,6 +514,43 @@ def check_surface() -> None:
             parts.append(
                 f"{entry.name} offers {sorted(found)} where ledger_spec.COMMANDS and LEGACY_FLAGS "
                 f"name {sorted(expected)}"
+            )
+    if parts:
+        raise ValueError("; ".join(parts))
+
+
+def check_routing_defaults() -> None:
+    """Reject a routed flag whose parser default is a value a caller could pass.
+
+    :func:`store_for` decides which store answers by asking which flags the caller passed, and
+    :func:`named` reads that off the value the parser produced. That only answers the question
+    while every optional flag of a routed command defaults to a value no caller can supply -- the
+    values :func:`absent` names. A flag defaulted to a real one makes its own value choose the
+    store: the default reads as absent and routes one way, and every other value reads as passed
+    and routes the other. ``--offset`` was declared ``= 0`` and did exactly that, so ``plan list
+    --offset 0`` read the ledger and ``plan list --offset 1`` read the content store.
+
+    The commands checked are the keys of :data:`LEGACY_FLAGS`, which are the commands that route.
+    A required option is exempt: the parser never produces a value for it that nobody passed.
+
+    Raises:
+        ValueError: When a routed command offers an optional flag whose declared default is not
+            one :func:`absent` accepts.
+    """
+    group = get_command(app)
+    commands: dict[str, Any] = getattr(group, "commands", {})
+    parts: list[str] = []
+    for name in sorted(LEGACY_FLAGS):
+        command = commands.get(name)
+        if command is None:
+            continue
+        for parameter in command.params:
+            options = [option for option in parameter.opts if option.startswith("--")]
+            if not options or parameter.required or absent(parameter.default):
+                continue
+            parts.append(
+                f"{name} declares {options[0]} with default {parameter.default!r}, which a caller "
+                f"can pass; store_for could not then tell that call from one that omitted it"
             )
     if parts:
         raise ValueError("; ".join(parts))
@@ -1237,7 +1294,7 @@ def validate(
 def list_plans(
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
     search: Annotated[str | None, typer.Option("--search")] = None,
-    offset: Annotated[int, typer.Option("--offset", min=0)] = 0,
+    offset: Annotated[int | None, typer.Option("--offset", min=0)] = None,
     limit: Annotated[int | None, typer.Option("--limit", min=1)] = None,
     filters: Annotated[list[str] | None, typer.Option("--filter")] = None,
 ) -> None:
@@ -1260,7 +1317,9 @@ def list_plans(
             if not separator or not key:
                 _error(f"--filter expects 'key=value', got: {item!r}")
             filter_by_key[key] = value
-    result = operations.list_plans(_backend(), search=search, offset=offset, limit=limit, filter_by_key=filter_by_key)
+    result = operations.list_plans(
+        _backend(), search=search, offset=offset or 0, limit=limit, filter_by_key=filter_by_key
+    )
     _emit({
         "items": [item.model_dump(mode="json", by_alias=True, exclude_none=True) for item in result],
         "count": len(result),
@@ -1982,6 +2041,7 @@ def sam_ready_tasks(
 check_import_sources()
 check_groomed_fields()
 check_surface()
+check_routing_defaults()
 
 __all__ = ["app"]
 
