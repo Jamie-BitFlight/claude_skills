@@ -142,6 +142,23 @@ for already-completed work; close and resolve are now a deliberate, distinct pai
 The structured resolution record Resolve above requires. Only `summary` is enforced today;
 persisting the rest beyond the GitHub-rendered comment is [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
 
+**Failure type**:
+A label a Worker attaches to a failure it reports, drawn from the extensible vocabulary in
+`dh_core/known_failure_types.py` (readable as JSON via `sam known-failure-types` or the
+`sam_known_failure_types` MCP tool). It assists the router's pattern match the way a label on a
+GitHub issue does: it says where the work should go at a glance without dictating what happens to
+it. Biased by construction to what the reporting agent could see and understand — that is a
+property of the report, not a defect in it. An unknown name is accepted, recorded and routed
+rather than refused, because refusing pushes a novel failure into a mislabelled known one.
+Distinct from a `REASONS` code (why a CLI command refused about a ledger row — the ledger's own
+observation, which no agent chooses) and from `reclaim --reason` (what the Orchestrator did about
+it). The three are one direction of flow: the Worker labels, the router maps, the Orchestrator
+records.
+_Avoid_: treating a failure type as a verdict, or as authority over ledger state — where a label
+and the ledger's own observation disagree, the observation is the fact and the label is the
+reporter's reading of it. Also avoid "error code" or "error type": these name why work could not
+proceed, not an exception that was raised.
+
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
 data-providing system, never a call to the MCP tool or CLI — those are Frontend below. Not one
