@@ -6,15 +6,17 @@ hold is everything written *around* the map, and that is what this module falsif
 
 * every ``artifact_register`` call in shipped markdown — MCP tool form and ``artifact register``
   CLI form — names a ``(type, agent)`` pair the registry declares;
-* every gate-read type in the registry has exactly one registering agent;
 * the extraction workers' vocabulary oracle names only types the registry declares.
 
-``artifact_read`` called without an ``artifact_id`` resolves a manifest entry by
-``(item_id, artifact_type)`` alone — it sorts all matching entries by ``created_at`` descending and
-returns the newest one. A type whose read decides a workflow branch can therefore address exactly
-one document that way, and must have exactly one registering agent. Types that are intentionally
-multi-entry, or whose producers all re-register a single shared ``artifact_id``, are safe with
-several registering agents and are marked as not gate-read.
+A gate-read type's agent count is not scanned here: it is a property of a well-formed row, so
+:class:`~dh_core.artifact_registry.ArtifactTypeRow` enforces it with a ``model_validator`` that
+raises at import, the same way an unrecognised ``ArtifactType`` member does. ``artifact_read``
+called without an ``artifact_id`` resolves a manifest entry by ``(item_id, artifact_type)`` alone —
+it sorts all matching entries by ``created_at`` descending and returns the newest one — so a type
+whose read decides a workflow branch can address exactly one document that way, and a row
+declaring more than one registering agent for such a type could never be well-formed. Types that
+are intentionally multi-entry, or whose producers all re-register a single shared ``artifact_id``,
+are safe with several registering agents and are marked as not gate-read.
 
 One registering agent is not one entry, and this guard does not claim otherwise. A single producer
 that registers one entry per unit reviewed leaves several under its own type; its consumers pass an
@@ -405,22 +407,6 @@ def test_every_registration_is_declared_in_the_owner_map() -> None:
         "stale — resolve it in dh_core/artifact_registry.py before the call ships, because a read by "
         "type alone returns only the newest entry and cannot tell two writers apart. Each entry is "
         "(artifact_type, agent, source): " + repr(undeclared)
-    )
-
-
-def test_gate_read_types_have_exactly_one_registering_agent() -> None:
-    """A type whose read drives a workflow branch is declared with a single registering agent."""
-    owners = owner_map()
-    shared = {
-        row.artifact_type: sorted(row.agents) for row in owners.values() if row.gate_read and len(row.agents) != 1
-    }
-
-    assert not shared, (
-        "gate-read artifact type(s) declare other than exactly one registering agent. artifact_read "
-        "returns only the most recently created entry for a given (item_id, artifact_type), so a "
-        "second writer under a gate-read type silently displaces the document the gate branches on. "
-        "Split the second writer onto its own type. Each entry is "
-        "(artifact_type, [registering_agents]): " + repr(shared)
     )
 
 

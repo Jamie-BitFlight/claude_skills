@@ -21,12 +21,18 @@ than a string, and two rules follow from that type alone, needing no test to hol
 * the enum is the wider vocabulary and the registry is the subset an agent may register, so a
   member absent from :data:`REGISTRY` is written by the harness rather than by an agent -- today
   ``task-plan``, written by SAM's plan store.
+
+A third rule holds the same way, over :attr:`ArtifactTypeRow.gate_read` rather than over
+``artifact_type``: a row with `gate_read=True` naming other than exactly one registering agent
+fails at import, because ``artifact_read`` without an ``artifact_id`` resolves the newest entry for
+a type and a second writer would silently win the read a gate branches on. See
+:meth:`ArtifactTypeRow._gate_read_type_has_exactly_one_agent` for the check and its rationale.
 """
 
 from __future__ import annotations
 
 from backlog_core.models import ArtifactType
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ArtifactTypeRow(BaseModel):
@@ -40,6 +46,42 @@ class ArtifactTypeRow(BaseModel):
     )
     gate_read: bool = Field(default=False, description="Whether a read of this type decides a workflow branch.")
     notes: str = Field(default="", description="What the type holds, and how many entries one work item carries.")
+    producer_skills: frozenset[str] = Field(
+        default_factory=frozenset,
+        description="The skills (with the agent that does the writing, in parentheses, where a skill delegates "
+        "to one) whose workflow registers this type.",
+    )
+    consumer_skills: frozenset[str] = Field(
+        default_factory=frozenset,
+        description="The skills (with the agent that does the reading, in parentheses, where a skill delegates "
+        "to one) whose workflow reads this type back.",
+    )
+
+    @model_validator(mode="after")
+    def _gate_read_type_has_exactly_one_agent(self) -> ArtifactTypeRow:
+        """Reject a gate-read row that names other than exactly one registering agent.
+
+        `artifact_read` called with no `artifact_id` resolves a manifest entry by
+        `(item_id, artifact_type)` alone: it sorts every matching entry by `created_at` descending
+        and returns only the newest. A second writer under a gate-read type therefore wins the read
+        the moment it registers later, and the gate branches on whichever document happened to
+        register last, with no error raised anywhere.
+
+        Returns:
+            This row, unchanged, once the check passes.
+
+        Raises:
+            ValueError: `gate_read` is `True` and `agents` does not name exactly one agent.
+        """
+        if self.gate_read and len(self.agents) != 1:
+            msg = (
+                f"{self.artifact_type.value!r} is gate_read but names {len(self.agents)} registering "
+                f"agent(s) {sorted(self.agents)!r}; a gate-read type must name exactly one, because "
+                "artifact_read by type alone returns only the newest entry and a second writer would "
+                "silently win the read a gate branches on."
+            )
+            raise ValueError(msg)
+        return self
 
 
 REGISTRY: tuple[ArtifactTypeRow, ...] = (
