@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from dh_core.known_failure_types import KNOWN_FAILURE_TYPES
 from ruamel.yaml import YAML
 from sam_schema.cli import app
 from sam_schema.core.backends.content import ContentTaskProvider
@@ -43,7 +44,7 @@ def test_help_shows_all_commands() -> None:
     """--help output lists the grouped command domains."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for cmd in ("plan", "backlog", "dispatch", "artifact", "active-task"):
+    for cmd in ("plan", "backlog", "dispatch", "artifact", "active-task", "known-failure-types"):
         assert cmd in result.stdout
 
 
@@ -571,3 +572,35 @@ def test_success_output_is_compact_json(plan_dir: Path) -> None:
     json.loads(result.stdout)
     assert '": "' not in result.stdout
     assert '", "' not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# sam known-failure-types
+# ---------------------------------------------------------------------------
+
+
+def test_known_failure_types_prints_the_whole_table_as_compact_json() -> None:
+    """The default is every row, emitted as one line of compact JSON."""
+    result = runner.invoke(app, ["known-failure-types"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["total"] == len(KNOWN_FAILURE_TYPES)
+    assert payload["returned"] == len(KNOWN_FAILURE_TYPES)
+    assert result.stdout.strip().count("\n") == 0
+
+
+def test_known_failure_types_honours_offset_and_limit() -> None:
+    """A caller that wants a window chooses it; the result still reports the total."""
+    result = runner.invoke(app, ["known-failure-types", "--offset", "1", "--limit", "2"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["offset"] == 1
+    assert payload["returned"] == 2
+    assert payload["total"] == len(KNOWN_FAILURE_TYPES)
+
+
+def test_known_failure_types_rejects_a_negative_offset() -> None:
+    """A negative window is an error, not a silently clamped one."""
+    result = runner.invoke(app, ["known-failure-types", "--offset", "-1"])
+    assert result.exit_code == 1
+    assert "must not be negative" in result.output
