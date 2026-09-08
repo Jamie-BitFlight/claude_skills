@@ -1,56 +1,55 @@
 # Shared Agent Process Belongs in a Skill
 
-Process or information that more than one agent follows lives in a skill those agents load. It is
-never copied into each agent that needs it.
-
-This covers anything an agent follows rather than decides: output formats, status messaging,
-expected inputs, ways-of-working, definition-of-done, and procedures for resolving the
-environment or configuration an agent runs against.
+Process or information that more than one agent follows lives in one skill, and each agent that
+needs it reaches that skill through its `skills:` frontmatter list. This covers anything an agent
+follows rather than decides: output formats, status messaging, expected inputs, ways-of-working,
+definition-of-done, and procedures for resolving the environment or configuration an agent runs
+against.
 
 **Trigger**: writing into an agent file something another agent also needs, or noticing two agent
 files say the same thing.
 
-**Action**: create or extend a skill that owns it, delete the text from every agent carrying a
-copy, and add the skill to each agent's `skills:` frontmatter list.
+**Action**: create or extend the skill that owns the process, list it in the `skills:` frontmatter
+of every agent that needs it, and cut the process text out of each of those agents. Done when a
+grep for a distinctive phrase of the process returns the skill alone.
 
-## The medium does not matter
+## A copy is any second rendering
 
-A duplicated shell block and a duplicated paragraph are the same defect. Replacing copied code
-with copied prose that points at the canonical source is not the fix — it is the same two copies,
-free to drift, in a form that is harder to grep for.
+A *copy* is the process appearing a second time anywhere, in any medium: a pasted shell block, a
+paragraph paraphrasing it, a one-line summary, a sentence that restates what the skill says before
+pointing at it. The question that settles each case is whether more than one agent needs to follow
+the text, not whether the text is executable.
 
-The test is not "is this text executable". It is "does more than one agent need to follow this".
+A summary is the copy that hides best: shorter than the original, and already drifted the moment
+the original changes.
 
 ## Why
 
-An agent file is reloaded on every dispatch, so a stale copy is not a one-time error — it is
-wrong on every run until someone notices. Two copies of a procedure drift silently because
-neither one is wrong on its own, and nothing compares them. A skill has one body, so correcting
-it corrects every consumer at once, and adding a consumer costs a frontmatter line rather than a
-paste.
+An agent file is reloaded on every dispatch, so a stale copy is wrong on every run until someone
+notices. Two copies drift silently — neither is wrong on its own, and nothing compares them. A
+skill has one body, so correcting it corrects every consumer at once, and adding a consumer costs
+a frontmatter line.
 
 ## What stays in the agent
 
 The agent keeps what is specific to its own assignment: what it is for, what it reads, what it
-produces, and the judgement it applies. It loads the shared process rather than restating any part
-of it — including a summary of it. A summary is a copy that has already begun to drift.
+produces, and the judgement it applies. For everything shared, it names the skill and lets the
+skill speak.
 
 ## Worked example: backend resolution
 
-**What it was**: `agents/alignment-analyst.md` and `agents/impact-analyst.md` each carried the
-same four-line shell heuristic for deciding which backlog backend was active. Both stopped at the
-`BACKLOG_BACKEND` environment variable and a `.beads` directory, so both missed the configured
-value in `.dh/config.yaml`, and both read a project that keeps a `.beads` directory for some other
-purpose as a Beads backlog.
+[`alignment-analyst.md`](plugins/development-harness/agents/alignment-analyst.md) and
+[`impact-analyst.md`](plugins/development-harness/agents/impact-analyst.md) each carried the same
+four-line shell heuristic for deciding which backlog backend was active, and both were wrong in
+the same two ways.
 
-**The near-miss**: the first fix replaced the shell block in one agent with a paragraph naming the
-canonical chain, then prepared to put the same paragraph in the other. That is two copies again.
+The first fix replaced the shell block in one agent with a paragraph naming the canonical chain,
+and prepared to put that paragraph in the other — two copies again, in a form harder to grep for.
 
-**What it became**: a skill owning the resolution procedure, listed in the `skills:` frontmatter of
-each agent that needs it. `docs/backend-providers.md` remains the canonical description of the
-chain; the skill is the agent-facing procedure for following it.
+Both agents now list `dh:backend-resolution` in `skills:`, and each body says one sentence — resolve
+the backend by following that skill — at the point where it matters.
+[`backend-resolution/SKILL.md`](plugins/development-harness/skills/backend-resolution/SKILL.md)
+holds the chain, the two heuristics that got it wrong, and what to do with the answer.
 
-## Precedent
-
-`dh:subagent-contract` is listed in the `skills:` frontmatter of 27 of the development-harness
-plugin's 29 agents. That is the shape: one body, many consumers, no copies.
+That shape is already the norm here: `grep -l subagent-contract plugins/development-harness/agents/*.md`
+shows one skill body serving nearly every agent in that plugin.

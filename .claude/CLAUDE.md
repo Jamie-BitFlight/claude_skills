@@ -374,7 +374,7 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
-- Shared Agent Process (process more than one agent follows lives in a skill they load): [Shared Process Extraction](../rules/shared-process-extraction.md)
+- Shared Agent Process (about to write into one agent what another already says — output format, status messaging, definition-of-done, environment resolution: one skill holds it, each agent loads it): [Shared Process Extraction](../rules/shared-process-extraction.md)
 
 ---
 
