@@ -119,7 +119,15 @@ Conditions:
 AVAILABLE count: {N}
 DERIVABLE count: {N}
 MISSING count: {N}
+Decision: {APPROVED-FOR-PLANNING|APPROVED-WITH-GAPS|BLOCKED-FOR-PLANNING}
 ```
+
+`Decision:` carries one token from the vocabulary `dh:planner-rt-ica` owns, on a plain unbolded
+line with the token alone. Pick it with the same rule the rest of the groom uses: no MISSING →
+`APPROVED-FOR-PLANNING`; a data-deletion hard block, or every condition MISSING so there is nothing
+to plan against → `BLOCKED-FOR-PLANNING`; otherwise → `APPROVED-WITH-GAPS`. The snapshot is a
+baseline for scope sizing and nothing gates on it, but it is written into the same `RT-ICA` section
+the later gates read, so it must be well-formed if the run stops before the final pass replaces it.
 
 **Write**:
 

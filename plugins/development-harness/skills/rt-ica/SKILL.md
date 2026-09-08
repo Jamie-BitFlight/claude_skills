@@ -322,6 +322,29 @@ ELSE:
 
 `SAFE-DEFAULTABLE` does **not** mean "fact known." It means the agent may choose a local default and must record that choice explicitly as `SAFE-DEFAULTED`.
 
+#### Verdict vocabulary
+
+This skill owns the implementation-gate RT-ICA verdict vocabulary. It has exactly two values,
+`APPROVED` and `BLOCKED`, and it is deliberately binary: at this gate there is no "proceed with
+gaps" outcome, because proceeding on an unresolved condition is the failure the gate exists to
+prevent.
+
+Emit it as a single unbolded line carrying the token alone, so a literal-substring consumer can
+read it:
+
+```text
+Decision: APPROVED
+```
+
+A consumer gating on this line treats any other token — and an absent `Decision:` line — as an
+error and routes it to its error path, never as approval and never as a block.
+
+The planning and grooming sister `dh:planner-rt-ica` owns a separate three-value set
+(`APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING`) whose middle value has no
+counterpart here. The two sets are disjoint on purpose, so a reader of a persisted RT-ICA section
+can tell which stage wrote it. Never emit a `-FOR-PLANNING` or `-WITH-GAPS` token from this gate,
+and never emit a bare `APPROVED` or `BLOCKED` from a planning or grooming producer.
+
 ### Step 5: Action Based on Decision
 
 <decision_actions>
@@ -383,8 +406,7 @@ Verification:
 - [Condition 2]: Evidence=[AVAILABLE|EVIDENCE-DERIVED|UNRESOLVED] | Disposition=[N/A|SAFE-DEFAULTABLE|REQUIRES-DISCOVERY|REQUIRES-USER|HARD-BLOCK] | Basis: [citation/inference/check]
 ...
 
-Decision:
-- [APPROVED|BLOCKED]
+Decision: [APPROVED|BLOCKED]
 
 --- IF BLOCKED ---
 Missing Inputs Requested:
@@ -556,8 +578,7 @@ Verification:
 - Security requirements: Evidence=UNRESOLVED | Disposition=REQUIRES-USER | Basis: Compliance obligations are not derivable from the request and affect policy and controls
 - Deployment target: Evidence=AVAILABLE | Disposition=N/A | Basis: README specifies AWS us-east-1
 
-Decision:
-- BLOCKED
+Decision: BLOCKED
 
 Missing Inputs Requested:
 

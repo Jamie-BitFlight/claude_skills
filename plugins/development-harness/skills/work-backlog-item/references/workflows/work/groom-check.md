@@ -6,7 +6,7 @@ If the `groomed` field in the `backlog_list` output is absent or empty (item not
 
 Run the grooming workflow via `references/workflows/groom/start.md`.
 
-The groom workflow writes groomed content via the backlog MCP server. After grooming completes — including any BLOCKED/resolution cycles during the RT-ICA assessment — call `backlog_view` again to retrieve the groomed sections and proceed immediately to [rt-ica-gate.md](./rt-ica-gate.md). Do not stop or wait for re-invocation.
+The groom workflow writes groomed content via the backlog MCP server. After grooming completes — including any clarification/resolution cycles during the RT-ICA assessment — call `backlog_view` again to retrieve the groomed sections and proceed immediately to [rt-ica-gate.md](./rt-ica-gate.md). Do not stop or wait for re-invocation.
 
 ## Groomed items — staleness check
 
