@@ -39,7 +39,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from dh_core.artifact_registry import REPO_RELATIVE_REGISTRY_DOC, artifact_types
+from dh_core.artifact_registry import ARTIFACT_TYPES
 from dh_core.workflow_multigraph.descriptors import SourceSpan
 from dh_core.workflow_multigraph.findings import ContractBasis, Finding, Predicate, Severity
 from dh_core.workflow_multigraph.instructions import Instruction, InstructionKind, Referent, ReferentKind
@@ -192,9 +192,9 @@ class RepoResolver:
     def resolve_artifact(self, target: str) -> str | None:
         """Resolve an ``ARTIFACT`` referent: a ``type#id`` pair against the artifact registry.
 
-        The registry is the "Artifact types and registering agents" table in the plugin's
-        ``docs/artifact-registry.md``, located and parsed by :mod:`dh_core.artifact_registry` --
-        the one locator this gate and both of its tests read it through.
+        The registry is :data:`dh_core.artifact_registry.REGISTRY`, and its type set reaches this
+        gate by import rather than by reading anything out of the checkout -- so an ``ARTIFACT``
+        referent resolves against the same map wherever this plugin runs.
 
         Args:
             target: A ``'<type>#<id>'`` string.
@@ -202,19 +202,11 @@ class RepoResolver:
         Returns:
             ``target`` unchanged when its type is in the registry and it carries an id; ``None``
             when it carries no id, or names a type the registry does not declare.
-
-        Raises:
-            ~dh_core.artifact_registry.ArtifactRegistryError: If the checkout ships a registry
-                document whose registry is not where :mod:`dh_core.artifact_registry` declares it. A
-                checkout with no such file ships no registry, and every ``ARTIFACT`` referent then
-                fails to resolve and is reported as a finding, which is this gate's own job.
         """
         artifact_type, sep, artifact_id = target.partition("#")
         if not sep or not artifact_id:
             return None
-        if artifact_type in artifact_types(self._repo_root / REPO_RELATIVE_REGISTRY_DOC):
-            return target
-        return None
+        return target if artifact_type in ARTIFACT_TYPES else None
 
 
 class RepoSourceReader:
