@@ -54,7 +54,7 @@ Four capabilities in the explored design are not provided today:
 - **A DATA relation** from a producing unit to a consuming one. `Task.handoff` and
   `Task.expected_outputs` are serialised by models, writers, backends and readers, and resolved by
   no consumer. This is the absence recorded independently by hand in
-  [docs/graph-ir/findings/data-flow-gaps.md](../graph-ir/findings/data-flow-gaps.md).
+  [docs/workflow-multigraph/findings/data-flow-gaps.md](../workflow-multigraph/findings/data-flow-gaps.md).
 - **An actor attached to an effect**, so authority is checkable. Effects are gated by command and
   by row state, never by who is calling; `dh_core/ledger_spec.py` states that absence itself.
 - **Referent and quote resolution at decomposition exit** — partly built on this branch.

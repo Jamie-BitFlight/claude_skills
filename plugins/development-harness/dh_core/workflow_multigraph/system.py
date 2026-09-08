@@ -2,12 +2,12 @@
 
 This module implements a three-layer split -- a task-lifecycle layer, a work-graph layer, and a
 workflow layer, joined by cross-layer references -- that is superseded design:
-``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
 types and executed as instances, with no separate layer graphs to join. This module has not yet
 been migrated to that shape. :class:`LayeredGraph` is the "all of them exist together" object: it holds a
-:class:`~dh_core.graph_ir.ledger_layer.LedgerGraph`, a :class:`~dh_core.graph_ir.work_layer.WorkGraph`,
-a :class:`~dh_core.graph_ir.model.Graph` (workflow, layer 3), and the
-:class:`~dh_core.graph_ir.decomposition.DecompositionInput` layer 3 consumed -- and nothing more. It
+:class:`~dh_core.workflow_multigraph.ledger_layer.LedgerGraph`, a :class:`~dh_core.workflow_multigraph.work_layer.WorkGraph`,
+a :class:`~dh_core.workflow_multigraph.model.Graph` (workflow, layer 3), and the
+:class:`~dh_core.workflow_multigraph.decomposition.DecompositionInput` layer 3 consumed -- and nothing more. It
 adds no new node or edge type; it only makes cross-layer references resolvable.
 
 Some checks belong here rather than on a single layer, because each is a claim one layer's element
@@ -24,10 +24,10 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from dh_core.graph_ir.decomposition import DecompositionInput
-from dh_core.graph_ir.ledger_layer import LedgerGraph
-from dh_core.graph_ir.model import Graph, Observation
-from dh_core.graph_ir.work_layer import WorkGraph
+from dh_core.workflow_multigraph.decomposition import DecompositionInput
+from dh_core.workflow_multigraph.ledger_layer import LedgerGraph
+from dh_core.workflow_multigraph.model import Graph, Observation
+from dh_core.workflow_multigraph.work_layer import WorkGraph
 
 
 class LayeredGraph(BaseModel):
@@ -45,7 +45,7 @@ class LayeredGraph(BaseModel):
     def unresolved_projections(self) -> list[Observation]:
         """Find layer-1 edges whose ``projects_from`` names no node in the workflow graph.
 
-        Complements :meth:`~dh_core.graph_ir.ledger_layer.LedgerGraph.edges_without_workflow_origin`,
+        Complements :meth:`~dh_core.workflow_multigraph.ledger_layer.LedgerGraph.edges_without_workflow_origin`,
         which finds edges with no stated origin at all; this finds edges that state one and it does
         not resolve. Neither case is refused at construction -- a ledger edge can be built and
         checked without the workflow graph it claims to project from being present yet.
@@ -87,7 +87,7 @@ class LayeredGraph(BaseModel):
     def unresolved_extension_performers(self) -> list[Observation]:
         """Find layer-2 extension operations whose ``performed_by`` names no workflow node.
 
-        :class:`~dh_core.graph_ir.work_layer.ExtensionOperation` and :class:`WorkNode` already
+        :class:`~dh_core.workflow_multigraph.work_layer.ExtensionOperation` and :class:`WorkNode` already
         cross-check each other for internal consistency (a split's product must carry the split's
         ``performed_by`` as its ``inserted_by``); what neither can check alone is whether the
         performer itself is a real layer-3 node, which needs the workflow graph.

@@ -1,6 +1,6 @@
 """Falsification of the decomposition-exit gate's honest-absence exit.
 
-:class:`~dh_core.graph_ir.decomposition_gate.DecompositionGate` checks a task's instructions
+:class:`~dh_core.workflow_multigraph.decomposition_gate.DecompositionGate` checks a task's instructions
 against the referents and quotes they cite. What this module falsifies is the one behaviour that
 does not depend on any document's wording or a real referent existing in this checkout: an
 ``ASSERTING`` instruction that honestly records a gap (``ASSUMED``/``ABSENT`` plus a stated
@@ -10,19 +10,19 @@ with no stated gap still blocks. Tier-1 referent resolution (``FILE``, ``RULE``,
 by any test as of this writing -- a gap, not a decision.
 
 The gate is exercised against this actual repository checkout through
-:class:`~dh_core.graph_ir.decomposition_gate.RepoResolver` and
-:class:`~dh_core.graph_ir.decomposition_gate.RepoSourceReader` -- not stubs.
+:class:`~dh_core.workflow_multigraph.decomposition_gate.RepoResolver` and
+:class:`~dh_core.workflow_multigraph.decomposition_gate.RepoSourceReader` -- not stubs.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from dh_core.graph_ir.decomposition_gate import DecompositionGate, RepoResolver, RepoSourceReader
-from dh_core.graph_ir.findings import Predicate, Severity
-from dh_core.graph_ir.instructions import Instruction, InstructionKind
-from dh_core.graph_ir.vocabulary import ExtractionStatus
-from dh_core.graph_ir.work_layer import WorkGraph
+from dh_core.workflow_multigraph.decomposition_gate import DecompositionGate, RepoResolver, RepoSourceReader
+from dh_core.workflow_multigraph.findings import Predicate, Severity
+from dh_core.workflow_multigraph.instructions import Instruction, InstructionKind
+from dh_core.workflow_multigraph.vocabulary import ExtractionStatus
+from dh_core.workflow_multigraph.work_layer import WorkGraph
 
 PLUGIN_ROOT: Path = Path(__file__).resolve().parents[1]
 REPO_ROOT: Path = PLUGIN_ROOT.parents[1]

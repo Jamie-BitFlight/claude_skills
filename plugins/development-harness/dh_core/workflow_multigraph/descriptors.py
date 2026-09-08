@@ -1,8 +1,8 @@
 """Source anchors and the descriptor: the facets an input or output must carry.
 
-Split out of :mod:`dh_core.graph_ir.model` for the same reason as :mod:`dh_core.graph_ir.vocabulary`
--- these types are not layer-specific. A layer-3 :class:`~dh_core.graph_ir.model.Node` and a
-layer-2 :class:`~dh_core.graph_ir.work_layer.WorkEdge` can both cite a :class:`SourceSpan`; only
+Split out of :mod:`dh_core.workflow_multigraph.model` for the same reason as :mod:`dh_core.workflow_multigraph.vocabulary`
+-- these types are not layer-specific. A layer-3 :class:`~dh_core.workflow_multigraph.model.Node` and a
+layer-2 :class:`~dh_core.workflow_multigraph.work_layer.WorkEdge` can both cite a :class:`SourceSpan`; only
 layer 3 currently declares :class:`Descriptor`-typed inputs and outputs, but nothing here assumes
 that.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dh_core.graph_ir.vocabulary import Cardinality, Completeness, ExtractionStatus, Trust
+from dh_core.workflow_multigraph.vocabulary import Cardinality, Completeness, ExtractionStatus, Trust
 
 
 class SourceSpan(BaseModel):

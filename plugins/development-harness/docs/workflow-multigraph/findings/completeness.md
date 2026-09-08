@@ -11,11 +11,11 @@ rewrites it.
 
 Read: the assessor contract (since deleted; its architecture content now lives in
 `plugins/development-harness/ARCHITECTURE.md` under "The work graph"); `dh_core/ledger_spec.py`;
-`sam_schema/core/models.py`; `dh_core/graph_ir/model.py`; `dh_core/graph_ir/findings.py`;
-`dh_core/graph_ir/__init__.py`; `tests_sam/test_graph_ir_defects.py`.
+`sam_schema/core/models.py`; `dh_core/workflow_multigraph/model.py`; `dh_core/workflow_multigraph/findings.py`;
+`dh_core/workflow_multigraph/__init__.py`; `tests_sam/test_workflow_multigraph_defects.py`.
 
-Not read, deliberately: `docs/graph-ir/findings/fidelity.md` and
-`docs/graph-ir/findings/predicates.md`. The audit is blind by construction. Any overlap with what
+Not read, deliberately: `docs/workflow-multigraph/findings/fidelity.md` and
+`docs/workflow-multigraph/findings/predicates.md`. The audit is blind by construction. Any overlap with what
 those documents already say is convergence, not corroboration, and a reducer should treat it as two
 independent observations of the same gap rather than as one finding confirmed twice.
 
@@ -75,7 +75,7 @@ at least one implementing path" and "every material behaviour has an authoritati
 
 **Observed**:
 
-- `Projection.INTENT_AND_REQUIREMENTS` is declared at `dh_core/graph_ir/findings.py#L35` and is
+- `Projection.INTENT_AND_REQUIREMENTS` is declared at `dh_core/workflow_multigraph/findings.py#L35` and is
   named by no `PredicateDefinition`. Searching `findings.py` for `projection=Projection.` returns
   only `CONTROL_FLOW`, `DATA_AND_STATE`, `EVIDENCE_AND_PROVENANCE` and `AUTHORITY_AND_EFFECTS`
   (`PREDICATES`, `findings.py#L68-L104`). The projection is a name with nothing behind it.
@@ -138,7 +138,7 @@ there is no longer a document to cite them from.
 branch grouping, no domain and no relation to the other guards it must partition.
 
 **Severity**: BROKEN. Basis: DECLARED. `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING`
-(`dh_core/graph_ir/findings.py`) is a falsified predicate to report — "a branch guard is
+(`dh_core/workflow_multigraph/findings.py`) is a falsified predicate to report — "a branch guard is
 incomplete, or overlaps another guard"; `guard totality and exclusivity` is a named mechanical
 check (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and
 the contract required the IR to represent "environment-dependent activation" among the system's
@@ -180,7 +180,7 @@ disjunctively, so join requirements and cardinality-against-join conflicts are u
 **Severity**: BROKEN. Basis: DECLARED. The contract required the IR to represent "parallel branches
 and joins" among the system's other structural properties — a requirements list dropped rather than
 carried forward when the contract's content moved into `ARCHITECTURE.md` (see `AMENDMENTS.md` entry
-A-5); `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/graph_ir/findings.py`) — "output
+A-5); `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN` (`dh_core/workflow_multigraph/findings.py`) — "output
 cardinality conflicts with the join" — is a falsified predicate to report; `required join inputs`
 is a named mechanical check and `joins` a mechanical question of the Control-flow projection
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" and →
@@ -256,11 +256,11 @@ predicate set is declared closed and contains no member covering it.
   (`findings.py#L158`), so every reportable finding must claim one of those eleven statements, and
   `Finding.statement` (`findings.py#L177-L180`) renders it into the report.
 - The set is not open. `test_severity_taxonomy_is_closed`
-  (`tests_sam/test_graph_ir_defects.py#L463-L474`) asserts `set(PREDICATES) == set(Predicate)`, and
+  (`tests_sam/test_workflow_multigraph_defects.py#L463-L474`) asserts `set(PREDICATES) == set(Predicate)`, and
   `findings.py`'s module docstring states "the predicates worth reporting are an enumerated list,
   not free prose".
 - The consequence is visible in the defect test itself. `test_d4_replace_revokes_state_no_event_accounts_for`
-  (`test_graph_ir_defects.py#L396-L445`) calls `unrecorded_invalidations()` at L406, asserts both
+  (`test_workflow_multigraph_defects.py#L396-L445`) calls `unrecorded_invalidations()` at L406, asserts both
   subjects at L407, and then constructs its two findings from
   `REQUIRED_INPUT_HAS_NO_PRODUCER` and `REVISION_MISMATCH`. D4's own signature detection — the
   INVALIDATES relation the control-flow-only spec could not express, which is the reason D4 is in
@@ -299,7 +299,7 @@ work remains active".
   versioned and invalidated" has nowhere to be recorded for state that outlives an edge.
 - Mutual exclusion is a symmetric relation over a *named* resource. With no resource identity and
   no query over STATE edges, it cannot be expressed, and no test in
-  `test_graph_ir_defects.py` constructs a STATE edge at all.
+  `test_workflow_multigraph_defects.py` constructs a STATE edge at all.
 - The system under assessment has both. `tasks.conflict_group` is a column
   (`ledger_spec.py#L233`) and the `ready` rule at `ledger_spec.py#L297-L299` enforces "no other task
   with the same non-null conflict_group is in-progress or complete-unaccepted". The lease is a
@@ -333,11 +333,11 @@ failed terminals preserve enough evidence for recovery.
   representable and undetectable.
 - `EdgeType.EVIDENCE` is read by no query (see the `EdgeType.` search in COMPLETENESS-7), and
   `_pairs()` treats it exactly as a DATA edge. The D3 test relies on this: it builds an
-  `EdgeType.EVIDENCE` edge (`test_graph_ir_defects.py#L286-L296`) and detects the defect with
+  `EdgeType.EVIDENCE` edge (`test_workflow_multigraph_defects.py#L286-L296`) and detects the defect with
   `type_incompatible_edges`, a descriptor-type query. Retyping that edge `DATA` would change no
   result.
-- No test in `test_graph_ir_defects.py` populates `evidence_requirements` — the four defect graphs
-  construct nodes through the `node()` helper (`test_graph_ir_defects.py#L77-L80`) and never pass
+- No test in `test_workflow_multigraph_defects.py` populates `evidence_requirements` — the four defect graphs
+  construct nodes through the `node()` helper (`test_workflow_multigraph_defects.py#L77-L80`) and never pass
   it.
 - The system under assessment has the evidence entities the IR omits. `BookendResult`
   (`sam_schema/core/models.py#L403-L420`) records `criterion_id`, `check_command`, `exit_code`,
@@ -378,10 +378,10 @@ the correct authority.
 - `EdgeType.AUTHORITY` is read by no query, and `Edge` carries no `Effect` field
   (`model.py#L235-L250`), so an AUTHORITY edge cannot state *which* effect one node grants another.
   The two AUTHORITY defects this IR was built against (D1, D2) are both caught by descriptor fields
-  on DATA edges (`test_graph_ir_defects.py#L120-L124`, `#L216-L221`); no AUTHORITY edge appears in
+  on DATA edges (`test_workflow_multigraph_defects.py#L120-L124`, `#L216-L221`); no AUTHORITY edge appears in
   any test graph.
 - The load-bearing consequence: D2 is detected only because the modeller wrote
-  `grants=[Effect.MUTATE]` on the `update_set_status` node (`test_graph_ir_defects.py#L175`).
+  `grants=[Effect.MUTATE]` on the `update_set_status` node (`test_workflow_multigraph_defects.py#L175`).
   Writing `grants=[Effect.MUTATE, Effect.DECIDE]` there removes the finding and contradicts nothing
   the IR can check. The defect's detection rests on the extractor's discretion, which is the
   condition activity 1 exists to rule out.
@@ -431,7 +431,7 @@ declared predicate "a node **or output** is unreachable" is implemented for node
 
 **Severity**: BROKEN. Basis: DECLARED. `entry and terminal existence` and `dead nodes and unused
 outputs` are named mechanical checks (`plugins/development-harness/ARCHITECTURE.md`, "The work
-graph" → "Mechanical checks"); `Predicate.UNREACHABLE` (`dh_core/graph_ir/findings.py`) — "a node
+graph" → "Mechanical checks"); `Predicate.UNREACHABLE` (`dh_core/workflow_multigraph/findings.py`) — "a node
 or output is unreachable" — is a falsified predicate to report. The contract's holistic evaluation
 list — dropped rather than carried forward, see `AMENDMENTS.md` entry A-5 — additionally required
 that successful terminals satisfy the goal and that failed terminals preserve enough evidence for
@@ -475,7 +475,7 @@ optimisation finding, so that 'could be shorter' is never reported as 'does not 
   `CONTRACT_UNSPECIFIED`, `AMBIGUOUS` — all of them conformance verdicts, and its docstring states
   "There is no fourth, and none is reachable except through the rule".
 - `SEVERITY_BY_BASIS` (`findings.py#L139-L144`) is total over `ContractBasis`, and
-  `test_severity_taxonomy_is_closed` (`test_graph_ir_defects.py#L463-L474`) asserts
+  `test_severity_taxonomy_is_closed` (`test_workflow_multigraph_defects.py#L463-L474`) asserts
   `set(SEVERITY_BY_BASIS.values()) == set(Severity)`, closing the taxonomy in both directions.
 - `Finding` (`findings.py#L147-L199`) is the only report record, it is `extra="forbid"`, and its
   `predicate` must be one of the enumerated `Predicate` members — none of which concerns length.
@@ -510,7 +510,7 @@ ambiguity or dropped an inconvenient branch. `source-span coverage` is a named m
 - `source_refs: list[SourceSpan] = Field(min_length=1)` is required on `Node`
   (`model.py#L194`), `Edge` (`model.py#L248`) and `Descriptor` (`model.py#L134`). The refusal is
   asserted as intended behaviour by `test_every_element_carries_its_provenance`
-  (`test_graph_ir_defects.py#L487-L489`).
+  (`test_workflow_multigraph_defects.py#L487-L489`).
 - Recording an ASSUMED element therefore requires citing a place it was read from, when by
   definition there is none. The extractor must either fabricate a span or downgrade the honest
   status to `OBSERVED`/`INFERRED` — and the second is the silent repair that activity 1 exists to
@@ -524,7 +524,7 @@ ambiguity or dropped an inconvenient branch. `source-span coverage` is a named m
 revision". `revision_mismatches` fires only when *both* descriptors name a version, so a consumer
 that expects a revision and a producer that names none is reported as consistent.
 
-**Severity**: BROKEN. Basis: DECLARED. `Predicate.REVISION_MISMATCH` (`dh_core/graph_ir/findings.py`)
+**Severity**: BROKEN. Basis: DECLARED. `Predicate.REVISION_MISMATCH` (`dh_core/workflow_multigraph/findings.py`)
 is the predicate; `snapshot and fingerprint consistency` is a named mechanical check
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); a trace —
 per the contract's Traces section, dropped rather than carried forward, see `AMENDMENTS.md` entry
@@ -554,7 +554,7 @@ A-5 — was additionally required to bind "target and artifact fingerprints".
 computed as though there were.
 
 **Severity**: BROKEN. Basis: DECLARED. `Predicate.FAILURE_OUTPUT_UNCONSUMED`
-(`dh_core/graph_ir/findings.py`) — "a failure output has no consuming edge" — is a falsified
+(`dh_core/workflow_multigraph/findings.py`) — "a failure output has no consuming edge" — is a falsified
 predicate to report; `unhandled failure signals` is a named mechanical check
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks"); and the
 contract required the IR to represent "error/recovery/rollback/retry paths" among the system's
@@ -571,7 +571,7 @@ other structural properties — a requirements list dropped rather than carried 
   output descriptor. So a signal counts as routed only when the node happens to declare an output
   descriptor of the same name — a coincidence of naming, not a modelled relation.
 - The direct consequence: an ERROR edge written the way the defect tests write edges — with no
-  `source_output`, as at `test_graph_ir_defects.py#L383-L385` — never marks anything routed, so a
+  `source_output`, as at `test_workflow_multigraph_defects.py#L383-L385` — never marks anything routed, so a
   genuinely handled failure is still reported as unhandled. The predicate is falsely claimed.
 - `ErrorRoute.handled_by` is the other half and is a node id resolved by nothing (see
   COMPLETENESS-10), so the alternative route to "this signal is handled" is also unchecked.
@@ -620,7 +620,7 @@ to make the property precise.
 **Severity**: CONTRACT_UNSPECIFIED. Basis: UNSPECIFIED. The contract required "completeness
 expectations" as a declared facet of every input and output
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"), and the IR
-declares it. It names no completeness predicate in `dh_core/graph_ir/findings.py`'s `Predicate`
+declares it. It names no completeness predicate in `dh_core/workflow_multigraph/findings.py`'s `Predicate`
 enum, nor a completeness check in that same document's "Mechanical checks". Whether the facet must
 also be *decided* is not stated, so the severity rule forbids `BROKEN`. Recording it because the
 gap sits directly on the defect set.
@@ -632,7 +632,7 @@ gap sits directly on the defect set.
 - `Descriptor.confidentiality` (`model.py#L131`) is in the same position: declared per the
   contract's facet list, read by nothing.
 - The D3 graph makes the gap concrete. `files_changed` is built with
-  `completeness=Completeness.UNSPECIFIED` (`test_graph_ir_defects.py#L262`) and `changed_files`
+  `completeness=Completeness.UNSPECIFIED` (`test_workflow_multigraph_defects.py#L262`) and `changed_files`
   with `completeness=Completeness.TOTAL` (`#L279`), whose semantic meaning is "**every** file the
   attempt wrote" (`#L275`). The shortfall is exactly the defect — a partial or unspecified set
   offered where a total one is required — and it is detected only incidentally, by the syntactic
@@ -650,7 +650,7 @@ gap sits directly on the defect set.
 | 3 | Guards unstructured; no guard query | BROKEN | `Predicate` table, Mechanical checks; requirements list (dropped) |
 | 4 | No join semantics; `Cardinality` inert | BROKEN | `Predicate` table, Mechanical checks, Projections; requirements list (dropped) |
 | 5 | No loop or cycle representation | BROKEN | Mechanical checks, Projections; requirements list and holistic list (both dropped) |
-| 6 | Unrecorded invalidations unreportable | BROKEN | self-contradiction within `dh_core/graph_ir/findings.py` and `model.py` |
+| 6 | Unrecorded invalidations unreportable | BROKEN | self-contradiction within `dh_core/workflow_multigraph/findings.py` and `model.py` |
 | 7 | No state resource; STATE inert | BROKEN | Edge types, Mechanical checks, Projections; holistic list (dropped) |
 | 8 | Evidence declared, never checked | BROKEN | Mechanical checks, Projections; holistic list (dropped) |
 | 9 | Authority is per-node self-assertion | BROKEN | Mechanical checks, Projections, Edge types; holistic list (dropped) |
