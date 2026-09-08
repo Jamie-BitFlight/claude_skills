@@ -73,7 +73,7 @@ For each entry in `plan.acceptance-criteria-structured`:
 ```bash
 # Run each check command. Non-zero exit is expected and normal.
 # Example:
-Bash("uv run pytest plugins/development-harness/tests/<test_file>.py -k <selector> -v")
+Bash("uv run pytest tests/<test_file>.py -k <selector> -v")
 ```
 
 Capture:
