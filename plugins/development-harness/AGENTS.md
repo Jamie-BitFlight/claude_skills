@@ -106,7 +106,12 @@ discovered via `artifact_list`/`artifact_read` rather than filesystem access.
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-**Artifact types and registering agents:**
+### Artifact types and registering agents
+
+This heading and the table under it are located by `dh_core/artifact_registry.py`, the single
+locator both the decomposition-exit gate and `tests/test_artifact_type_ownership_drift.py` read the
+registry through. Renaming the heading, or renaming a column of the table below, fails those
+readers loudly — change `REGISTRY_HEADING` or `REQUIRED_COLUMNS` in the same edit.
 
 This table is the complete registry of document-artifact types. Every `artifact_register` call — MCP
 tool or `artifact register` CLI — must match a `(Type, Registering agents)` pair listed here. Add the
