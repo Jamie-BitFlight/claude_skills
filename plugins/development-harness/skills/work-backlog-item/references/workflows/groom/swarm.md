@@ -31,9 +31,11 @@ Each agent's section is how the others reach its findings — an agent that must
    Behavior, Acceptance Criteria, Files, Resources, Dependencies, Effort. Runs AFTER all
    other agents complete. Write each via `section="{name}"`.
 
-6. **alignment-analyst** — Compare existing implementation against item design intent.
-   Depends on impact-analyst (uses affected systems list). Write to section="Design Intent Alignment",
-   leading the section with a MISSION_ALIGNED or MISSION_DIVERGENT verdict line.
+6. **alignment-analyst** — Compare the item's proposed change against the mission and historical
+   direction governing the paths it touches. Depends on impact-analyst: it reads the affected-path
+   list to resolve the governing docs nearest-first, and does not read the implementation files
+   themselves. Write to section="Design Intent Alignment", leading the section with a
+   MISSION_ALIGNED, MISSION_DIVERGENT, or MISSION_UNASSESSED verdict line.
 
 ## Dispatch sequence
 
@@ -107,7 +109,7 @@ sequenceDiagram
     RT->>RT: assess completeness using Impact Radius + Fact-Check
     RT-->>O: STATUS: DONE — RT-ICA written, carrying its Decision: line
 
-    AA->>AA: compare design intent vs implementation
+    AA->>AA: compare proposed change vs governing mission
     AA-->>O: STATUS: DONE — Design Intent Alignment written
 ```
 
