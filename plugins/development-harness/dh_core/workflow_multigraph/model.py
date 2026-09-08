@@ -4,9 +4,9 @@ The system under assessment is a typed, hierarchical, directed multigraph
 (``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "The model"). This module
 holds what was implemented as **layer 3**, the workflow: nodes are process steps with an actor, a
 guard and source refs into a ``SKILL.md``. Layer 1 (task lifecycle) lives in
-:mod:`dh_core.graph_ir.ledger_layer`; layer 2 (the work graph) lives in
-:mod:`dh_core.graph_ir.work_layer`; the layers tied together live in :mod:`dh_core.graph_ir.system`.
-That three-layer split is superseded design: ``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4)
+:mod:`dh_core.workflow_multigraph.ledger_layer`; layer 2 (the work graph) lives in
+:mod:`dh_core.workflow_multigraph.work_layer`; the layers tied together live in :mod:`dh_core.workflow_multigraph.system`.
+That three-layer split is superseded design: ``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4)
 records the move to one graph, described as types and executed as instances, with no separate
 layer graphs; this module has not yet been migrated to that shape. One pair of nodes may carry
 several edges at once, and collapsing them into a single ``then`` arrow is what hides the defects
@@ -17,18 +17,18 @@ first, and a sound graph proves nothing if the extractor silently repaired an am
 models refuse only what makes the *graph* incoherent -- an edge naming a node that does not exist,
 or a descriptor its endpoint does not declare. Unsoundness is reported by the queries, never by a
 constructor. **Every claim is anchored**: :class:`Node` and :class:`Edge` each require a
-``SourceSpan`` and an ``ExtractionStatus`` (:mod:`dh_core.graph_ir.descriptors`,
-:mod:`dh_core.graph_ir.vocabulary`), so a fidelity reviewer can ask of any element which source it
+``SourceSpan`` and an ``ExtractionStatus`` (:mod:`dh_core.workflow_multigraph.descriptors`,
+:mod:`dh_core.workflow_multigraph.vocabulary`), so a fidelity reviewer can ask of any element which source it
 came from and whether the extractor observed or supplied it. Queries return :class:`Observation`
 records, not findings -- turning one into a finding needs the severity rule, which must know
-whether the predicate was declared (:mod:`dh_core.graph_ir.findings`).
+whether the predicate was declared (:mod:`dh_core.workflow_multigraph.findings`).
 
 The vocabulary and descriptor types that used to live in this module -- ``EdgeType``, ``Effect``,
 ``Cardinality``, ``Trust``, ``Completeness``, ``ExtractionStatus``, ``SourceSpan``, ``Freshness``,
 ``Descriptor``, ``Authority``, ``SideEffect``, ``ErrorRoute``, ``EvidenceRequirement``,
-``Operation``, ``Termination`` -- moved to :mod:`dh_core.graph_ir.vocabulary`,
-:mod:`dh_core.graph_ir.descriptors` and :mod:`dh_core.graph_ir.node_parts` as the package grew a
-second and third layer, and are re-exported here so existing imports of ``dh_core.graph_ir.model``
+``Operation``, ``Termination`` -- moved to :mod:`dh_core.workflow_multigraph.vocabulary`,
+:mod:`dh_core.workflow_multigraph.descriptors` and :mod:`dh_core.workflow_multigraph.node_parts` as the package grew a
+second and third layer, and are re-exported here so existing imports of ``dh_core.workflow_multigraph.model``
 keep working unchanged.
 """
 
@@ -40,10 +40,17 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dh_core.graph_ir.descriptors import Descriptor, Freshness, SourceSpan
-from dh_core.graph_ir.layer import Layer
-from dh_core.graph_ir.node_parts import Authority, ErrorRoute, EvidenceRequirement, Operation, SideEffect, Termination
-from dh_core.graph_ir.vocabulary import (
+from dh_core.workflow_multigraph.descriptors import Descriptor, Freshness, SourceSpan
+from dh_core.workflow_multigraph.layer import Layer
+from dh_core.workflow_multigraph.node_parts import (
+    Authority,
+    ErrorRoute,
+    EvidenceRequirement,
+    Operation,
+    SideEffect,
+    Termination,
+)
+from dh_core.workflow_multigraph.vocabulary import (
     TRUST_ORDER,
     Cardinality,
     Completeness,

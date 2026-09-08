@@ -9,7 +9,7 @@ the tiers below." This module holds the two shapes of instruction that section n
   :class:`Referent` the agent must go resolve, drawn from the contract's tier-1 table
   (:class:`ReferentKind`).
 * a :attr:`InstructionKind.ASSERTING` instruction "stat[es] how a system behaves" -- it must carry a
-  :class:`~dh_core.graph_ir.descriptors.SourceSpan` whose ``quote`` is found verbatim in the text at
+  :class:`~dh_core.workflow_multigraph.descriptors.SourceSpan` whose ``quote`` is found verbatim in the text at
   its ``ref``, or record the absence honestly: an ``extraction_status`` of ``ASSUMED``/``ABSENT``
   plus a non-empty ``absence_note`` ("no source establishes this; falsify it before relying on it").
 
@@ -20,7 +20,7 @@ mirror case of an ``ASSERTING`` instruction carrying referents (a ``DELEGATING``
 absence, nor a referent whose target does not resolve, nor a span whose quote is not actually in the
 text at its ref: this package's standing rule (``work_layer.py``'s module docstring) is that the IR
 must be able to hold the unsound graph so its unsoundness can be reported, and those three failures
-are exactly what :mod:`dh_core.graph_ir.decomposition_gate` exists to detect and report as findings.
+are exactly what :mod:`dh_core.workflow_multigraph.decomposition_gate` exists to detect and report as findings.
 Refusing to construct them would make the defect invisible instead of reported.
 """
 
@@ -30,8 +30,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dh_core.graph_ir.descriptors import SourceSpan
-from dh_core.graph_ir.vocabulary import ExtractionStatus
+from dh_core.workflow_multigraph.descriptors import SourceSpan
+from dh_core.workflow_multigraph.vocabulary import ExtractionStatus
 
 
 class InstructionKind(StrEnum):
@@ -94,7 +94,7 @@ class Instruction(BaseModel):
     exists, and an ``ASSERTING`` one declares its quote is there to be read -- "the instruction is the
     declaration" (``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §
     "The decomposition-exit gate", Tier 1). Whether the declaration holds is
-    :mod:`~dh_core.graph_ir.decomposition_gate`'s question, not this model's; this model's own
+    :mod:`~dh_core.workflow_multigraph.decomposition_gate`'s question, not this model's; this model's own
     :meth:`check_kind_matches_payload` refuses only a payload shaped for the wrong kind.
     """
 

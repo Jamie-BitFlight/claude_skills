@@ -35,8 +35,15 @@ edge, an undeclared descriptor, an element with no source span -- and an invente
 from __future__ import annotations
 
 import pytest
-from dh_core.graph_ir.findings import PREDICATES, SEVERITY_BY_BASIS, ContractBasis, Finding, Predicate, Severity
-from dh_core.graph_ir.model import (
+from dh_core.workflow_multigraph.findings import (
+    PREDICATES,
+    SEVERITY_BY_BASIS,
+    ContractBasis,
+    Finding,
+    Predicate,
+    Severity,
+)
+from dh_core.workflow_multigraph.model import (
     TRUST_ORDER,
     Authority,
     Cardinality,

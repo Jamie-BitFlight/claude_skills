@@ -40,7 +40,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from dh_core.graph_ir.model import Observation, SourceSpan
+from dh_core.workflow_multigraph.model import Observation, SourceSpan
 
 
 class Projection(StrEnum):

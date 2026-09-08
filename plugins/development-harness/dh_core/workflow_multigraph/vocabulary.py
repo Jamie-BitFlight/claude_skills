@@ -1,6 +1,6 @@
 """The layer-agnostic vocabulary: edge types, effects, and the facet enums a descriptor carries.
 
-Split out of :mod:`dh_core.graph_ir.model` so that module stays under the file-size policy as the
+Split out of :mod:`dh_core.workflow_multigraph.model` so that module stays under the file-size policy as the
 package grows a layer at a time. Nothing here is layer-specific -- ``EdgeType`` is the set of
 types both layer 2 and layer 3 draw edges from (``plugins/development-harness/ARCHITECTURE.md``,
 "The work graph" § "Edge types"), and the facet enums describe a value regardless of which layer's

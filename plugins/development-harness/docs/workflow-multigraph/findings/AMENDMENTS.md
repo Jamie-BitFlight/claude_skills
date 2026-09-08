@@ -1,6 +1,6 @@
 # Amendments to the findings files
 
-The findings files in this directory are immutable — the same rule `dh_core/graph_ir/findings.py`'s
+The findings files in this directory are immutable — the same rule `dh_core/workflow_multigraph/findings.py`'s
 module docstring states of a `Finding`: "the findings document is untrusted and immutable: a
 verifier issues amendments or counter-findings and never silently rewrites it." So a finding that
 has since gone stale is superseded here, not edited there.
@@ -20,7 +20,7 @@ about 2026-09-06.
 
 Superseded, in `completeness.md`: the tally of predicates carrying a `Graph` method.
 
-Also superseded, in `predicates.md`: the observation that `docs/graph-ir/` contains exactly one
+Also superseded, in `predicates.md`: the observation that `docs/workflow-multigraph/` contains exactly one
 file. That was a fact about a `find` run on 2026-09-06 and the directory has since gained
 `STAGE-INTENT.md` and this `findings/` subtree. The search was stated, which is what makes the
 supersession checkable rather than a contradiction.
@@ -32,7 +32,7 @@ which is why none of it should have been written as a number in the first place 
 **Recompute rather than reading a number from prose:**
 
 ```bash
-uv run python -c "from dh_core.graph_ir.findings import PREDICATES; print(len(PREDICATES))"
+uv run python -c "from dh_core.workflow_multigraph.findings import PREDICATES; print(len(PREDICATES))"
 uv run pytest plugins/development-harness/tests_sam/test_adr_3460_migration_trigger.py -q
 ```
 
@@ -108,12 +108,12 @@ worth keeping — that the IR must catch a defect nobody had already found — i
 anywhere as a marker a findings file carries: the "Markers a findings file carries" table
 (`Found-by:` / `Previously-known:`) was scaffolding for the one-off exercise and was dropped, not
 moved, when `ASSESSOR-CONTRACT.md` was deleted (see A-5 below). It remains unstated until it is
-re-recorded against structured data (`Finding` in `dh_core/graph_ir/findings.py`) that a test can
+re-recorded against structured data (`Finding` in `dh_core/workflow_multigraph/findings.py`) that a test can
 assert on directly.
 
 **Re-read rather than trusting a citation in prose:** see the commit or PR history for this branch,
 not an ADR file, for the currently intended graph model and its rationale; and
-`dh_core/graph_ir/findings.py` for the structured form the deleted test's markers are meant to be
+`dh_core/workflow_multigraph/findings.py` for the structured form the deleted test's markers are meant to be
 replaced by.
 
 ## A-4 — the findings assess a three-layer model the design has replaced
@@ -145,7 +145,7 @@ What replaced it, and what a re-run would be scored against:
 Two things these findings rest on are also gone. The `Found-by: IR` and `Previously-known: no`
 markers satisfied a readiness criterion that no longer exists — it was invented during this work
 rather than required, the ADR carrying it was withdrawn, and the test reading it is deleted. And the
-package name `graph_ir` is a misnomer: an intermediate representation is a form between a source and
+package name `workflow_multigraph` is a misnomer: an intermediate representation is a form between a source and
 a target, and this is the structure itself. A rename is pending and no target name is settled.
 
 **Re-read rather than trusting the frame:** `plugins/development-harness/ARCHITECTURE.md`, "The
@@ -181,13 +181,13 @@ read as citing the matching subsection of "The work graph" instead.
   exercise the document was written for, not a statement about the system under assessment, and
   ARCHITECTURE.md carries no equivalent of it.
 - The document's own bullet list of falsified predicates. It was a second encoding of
-  `Predicate` and `PREDICATES` in `dh_core/graph_ir/findings.py`, kept in sync by hand against the
+  `Predicate` and `PREDICATES` in `dh_core/workflow_multigraph/findings.py`, kept in sync by hand against the
   enum; `tests_sam/test_decomposition_gate.py` used to assert the two matched, which is the closure
   A-1 above concerns. That test and its parsing helper are deleted along with the list itself:
-  `dh_core/graph_ir/findings.py` is now the only place the predicates are named.
+  `dh_core/workflow_multigraph/findings.py` is now the only place the predicates are named.
 
 **Re-read rather than trusting a citation in prose:** `plugins/development-harness/ARCHITECTURE.md`,
-"The work graph" heading, for the current model; `dh_core/graph_ir/findings.py` for the predicates
+"The work graph" heading, for the current model; `dh_core/workflow_multigraph/findings.py` for the predicates
 a check may report.
 
 ## A-6 — the citations named in A-5 have now been repointed, not merely documented as broken
@@ -197,7 +197,7 @@ a check may report.
 resolves, and where the content went, but left the citations themselves unedited on the reasoning
 that findings files are immutable. That reasoning rested on a rule `ASSESSOR-CONTRACT.md` itself
 declared ("Validating the report": findings are untrusted and immutable); with that document
-deleted, the rule survives only where a successor states it — `dh_core/graph_ir/findings.py`'s
+deleted, the rule survives only where a successor states it — `dh_core/workflow_multigraph/findings.py`'s
 module docstring, quoted at the top of this file — and nothing there extends immutability to a
 citation's *target* once that target stops existing. A citation is a pointer, not a finding; fixing
 where it points changes no observation, no basis, and no severity.
@@ -206,11 +206,11 @@ where it points changes no observation, no basis, and no severity.
 edited directly, following the routing A-5 already set out: a citation of moved content now names
 the matching subsection of `plugins/development-harness/ARCHITECTURE.md`'s "The work graph" by
 heading, never by line number; a citation of a specific falsified predicate now names the
-`Predicate` member in `dh_core/graph_ir/findings.py`; a citation of dropped content (traces,
+`Predicate` member in `dh_core/workflow_multigraph/findings.py`; a citation of dropped content (traces,
 holistic evaluation, the report-validation activities, the findings-marker table) has been replaced
 by the substance stated inline, so the finding stands on its own without a file to point at. No
 finding's observation, basis, or severity was changed in the process. Two findings whose citation
 could not be repointed without changing what they claim were left as A-5 found them and are noted
-in place: PREDICATES-1's `find docs/graph-ir -type f` result (already separately superseded by
+in place: PREDICATES-1's `find docs/workflow-multigraph -type f` result (already separately superseded by
 A-1's note that the directory has since gained files) and any citation naming the withdrawn
 edge-ownership draft, which A-3 already covers and this entry does not reopen.

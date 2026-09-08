@@ -1,8 +1,8 @@
 """The parts a layer-3 node record is built from: authority, side effects, error routing, and so on.
 
-Split out of :mod:`dh_core.graph_ir.model` for the same file-size reason as
-:mod:`dh_core.graph_ir.vocabulary` and :mod:`dh_core.graph_ir.descriptors`. These types are read by
-:class:`~dh_core.graph_ir.model.Node`, the layer-3 (workflow) node -- the contract's node record is
+Split out of :mod:`dh_core.workflow_multigraph.model` for the same file-size reason as
+:mod:`dh_core.workflow_multigraph.vocabulary` and :mod:`dh_core.workflow_multigraph.descriptors`. These types are read by
+:class:`~dh_core.workflow_multigraph.model.Node`, the layer-3 (workflow) node -- the contract's node record is
 shaped for that layer specifically ("Layer 3 ... the node record below is shaped for these").
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from dh_core.graph_ir.vocabulary import Effect
+from dh_core.workflow_multigraph.vocabulary import Effect
 
 
 class Authority(BaseModel):

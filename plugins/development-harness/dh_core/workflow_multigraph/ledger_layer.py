@@ -2,18 +2,18 @@
 
 One uniform machine, instantiated per task, tracks where each task's progress is:
 ``dh_core/ledger_spec.py:TRANSITIONS`` is that machine. This module gives it a graph shape distinct
-from :mod:`dh_core.graph_ir.model` (layer 3): a :class:`LedgerNode` is a bare status, not a process
+from :mod:`dh_core.workflow_multigraph.model` (layer 3): a :class:`LedgerNode` is a bare status, not a process
 step, and it carries no actor.
 
 This module's premise -- a separate layer-1 graph, projected from layer 3 -- is superseded design.
 Per ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" § "What belongs to a node":
 "Execution state -- the lifecycle a node runs through while working -- is a property of the node,
 not a graph of its own. `dh_core/ledger_spec.py`'s transitions are that lifecycle, and a status is
-not a thing on the path from grooming to closure." ``docs/graph-ir/findings/AMENDMENTS.md`` (entry
+not a thing on the path from grooming to closure." ``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry
 A-4) records this explicitly: no projection derives the ledger's transitions from a work graph, and
 a criterion asking for one is ill-posed. :attr:`LedgerEdge.projects_from` and
 :meth:`LedgerGraph.edges_without_workflow_origin`, joined with the layer-3 graph
-(:mod:`dh_core.graph_ir.system`), implement the now-superseded projection relationship; this module
+(:mod:`dh_core.workflow_multigraph.system`), implement the now-superseded projection relationship; this module
 has not yet been migrated to the one-graph shape.
 """
 
@@ -24,10 +24,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from dh_core.graph_ir.descriptors import SourceSpan
-from dh_core.graph_ir.layer import Layer
-from dh_core.graph_ir.model import Observation
-from dh_core.graph_ir.vocabulary import ExtractionStatus
+from dh_core.workflow_multigraph.descriptors import SourceSpan
+from dh_core.workflow_multigraph.layer import Layer
+from dh_core.workflow_multigraph.model import Observation
+from dh_core.workflow_multigraph.vocabulary import ExtractionStatus
 
 
 class LedgerStatus(StrEnum):
@@ -93,9 +93,9 @@ class LedgerGraph(BaseModel):
     """A recovered layer-1 graph: the status machine plus the transition instances observed for it.
 
     Construction enforces reference integrity only, matching
-    :class:`~dh_core.graph_ir.model.Graph`: unique node and edge ids, and every edge endpoint
+    :class:`~dh_core.workflow_multigraph.model.Graph`: unique node and edge ids, and every edge endpoint
     resolving. Whether every edge has a layer-3 origin, and whether that origin exists, are
-    questions for the queries below and for :class:`dh_core.graph_ir.system.LayeredGraph`
+    questions for the queries below and for :class:`dh_core.workflow_multigraph.system.LayeredGraph`
     respectively -- an edge with no origin is a well-formed graph that has lost its authority, not
     an incoherent one, and the contract requires the IR to be able to hold that.
     """

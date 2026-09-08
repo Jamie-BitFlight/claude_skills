@@ -4,16 +4,16 @@ Lens: the assessor contract's list of falsified predicates. For each, can the sc
 and would the falsification test catch a violation? Then: is the severity rule enforced
 mechanically, or can a checker report `BROKEN` where the contract requires `CONTRACT_UNSPECIFIED`?
 
-Authority: `dh_core/graph_ir/findings.py`'s `Predicate`/`PREDICATES` and
+Authority: `dh_core/workflow_multigraph/findings.py`'s `Predicate`/`PREDICATES` and
 `plugins/development-harness/ARCHITECTURE.md`'s "The work graph" (the model this IR implements),
-and `docs/adrs/ADR-3460-1-graph-ir-owns-the-unowned-edges-first.md` criterion 2, which declares the
+and `docs/adrs/ADR-3460-1-workflow-multigraph-owns-the-unowned-edges-first.md` criterion 2, which declares the
 expressibility obligation these findings are scored against:
 
 > Every falsified predicate in the assessor contract is expressible against the IR, or is recorded
 > there as out of scope with the reason. — ADR-3460-1, "The dual-home period, and how it ends", L62-63
 
-Subject under assessment: `dh_core/graph_ir/model.py` (494 lines), `dh_core/graph_ir/findings.py`
-(199), `dh_core/graph_ir/__init__.py` (72), `tests_sam/test_graph_ir_defects.py` (499), all as of
+Subject under assessment: `dh_core/workflow_multigraph/model.py` (494 lines), `dh_core/workflow_multigraph/findings.py`
+(199), `dh_core/workflow_multigraph/__init__.py` (72), `tests_sam/test_workflow_multigraph_defects.py` (499), all as of
 2026-09-07 on this branch, untracked in git. Severity uses the contract's rule
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity rule"): `BROKEN` only
 where a declared or necessarily implied predicate is demonstrably false; otherwise
@@ -63,9 +63,9 @@ against the IR or recorded as out of scope with a reason. `REQUIRED_FIELD_ABSENT
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 L62-63, quoted above.
 
-**Source spans.** `docs/adrs/ADR-3460-1-...md#L58-L69`; `dh_core/graph_ir/findings.py#L47-L54`
-(the three enum members); `dh_core/graph_ir/findings.py#L75-L80,L98-L100` (their table entries);
-`dh_core/graph_ir/model.py#L323-L494` (the query block, which contains no query for them).
+**Source spans.** `docs/adrs/ADR-3460-1-...md#L58-L69`; `dh_core/workflow_multigraph/findings.py#L47-L54`
+(the three enum members); `dh_core/workflow_multigraph/findings.py#L75-L80,L98-L100` (their table entries);
+`dh_core/workflow_multigraph/model.py#L323-L494` (the query block, which contains no query for them).
 
 **Observed.** A taxonomy entry is not an out-of-scope record: `PredicateDefinition` carries
 `statement` and `projection` and no field in which a reason could be written, so the three are
@@ -74,17 +74,17 @@ indistinguishable in the data from the eight that are implemented. A checker enu
 
 The out-of-scope record is an absence claim, so here is the search that would have found one:
 `grep -rni "out.of.scope|out-of-scope|deferred|not implemented|no query"` across
-`docs/graph-ir/`, `dh_core/graph_ir/`, `tests_sam/test_graph_ir_defects.py` and the ADR returned
+`docs/workflow-multigraph/`, `dh_core/workflow_multigraph/`, `tests_sam/test_workflow_multigraph_defects.py` and the ADR returned
 two hits, both inside the ADR — its own criterion-2 sentence at L63 and "Deferred to A: the
 models, the backends..." at L85, which is about scenario A's blast radius, not about a predicate.
-`docs/graph-ir/` contains exactly one file, `ASSESSOR-CONTRACT.md` (`find docs/graph-ir -type f`
+`docs/workflow-multigraph/` contains exactly one file, `ASSESSOR-CONTRACT.md` (`find docs/workflow-multigraph -type f`
 before this document was written). No record exists in either of the two places the ADR's "there"
 could name.
 
 The builder's report states the three "are listed in `PREDICATES` so a checker can report them,
 and `test_severity_taxonomy_is_closed` asserts the table covers the enum". That is accurate and
 does not satisfy the criterion. Independently, the ADR trigger already scores this criterion
-unmet, for a different reason: `evaluate()` looks for `dh_core/graph_ir/predicates.py`, which does
+unmet, for a different reason: `evaluate()` looks for `dh_core/workflow_multigraph/predicates.py`, which does
 not exist, and prints `contract lists 11 predicates; no predicates.py to answer them`.
 
 ---
@@ -95,8 +95,8 @@ not exist, and prints `contract lists 11 predicates; no predicates.py to answer 
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_FIELD_ABSENT`;
-`dh_core/graph_ir/model.py#L110-L142` (`Descriptor`).
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.REQUIRED_FIELD_ABSENT`;
+`dh_core/workflow_multigraph/model.py#L110-L142` (`Descriptor`).
 
 **Observed.** A field is a member of a schema, and the IR holds no schema members. `Descriptor`
 carries `syntactic_type: str` and `schema_ref: str | None` — a type name and a pointer — and no
@@ -115,9 +115,9 @@ conflicts with the join".
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`;
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.CARDINALITY_CONFLICTS_WITH_JOIN`;
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections" ("joins" as a
-control-flow mechanical question); `dh_core/graph_ir/model.py#L53-L59` (`Cardinality`),
+control-flow mechanical question); `dh_core/workflow_multigraph/model.py#L53-L59` (`Cardinality`),
 `#L190-L232` (`Node`).
 
 **Observed.** Half the predicate is expressible and half has no representation at all. `Cardinality`
@@ -126,7 +126,7 @@ searching the source of `Graph` for `cardinality` returns nothing. The other hal
 representation whatever. A node has no join semantics: nothing distinguishes a node that requires
 every inbound CONTROL edge from one that requires any, there is no `join` field, no fork/join node
 kind, and `Operation.kind` is free text with the examples `'command', 'fold', 'derived-rule'`.
-`grep -n join dh_core/graph_ir/model.py` returns three hits, all in docstring prose describing
+`grep -n join dh_core/workflow_multigraph/model.py` returns three hits, all in docstring prose describing
 edges that *join* an output to an input — a different sense of the word. Without a join, the
 conflict the predicate names has no second term.
 
@@ -139,9 +139,9 @@ incomplete, or overlaps another guard".
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 criterion 2.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING`;
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING`;
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections" ("guard coverage")
-and → "Mechanical checks" ("guard totality and exclusivity"); `dh_core/graph_ir/model.py#L196`
+and → "Mechanical checks" ("guard totality and exclusivity"); `dh_core/workflow_multigraph/model.py#L196`
 (`Node.activation_guard: str | None`), `#L244` (`Edge.guard: str | None`).
 
 **Observed.** Guards are opaque strings. Totality requires a domain to be covered and exclusivity
@@ -165,13 +165,13 @@ as the alternative and that record was not written.
 **Severity: BROKEN.** Basis DECLARED — the contract's predicate names two subjects and the
 implementation answers for one.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.UNREACHABLE`;
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.UNREACHABLE`;
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" ("dead nodes
-and unused outputs"); `dh_core/graph_ir/model.py#L476-L494` (`unreachable_nodes`).
+and unused outputs"); `dh_core/workflow_multigraph/model.py#L476-L494` (`unreachable_nodes`).
 
 **Observed.** Four distinct shortfalls in one query, three of them silent.
 
-1. **Outputs are not covered.** `grep -n "unused|dead" dh_core/graph_ir/*.py` returns nothing. An
+1. **Outputs are not covered.** `grep -n "unused|dead" dh_core/workflow_multigraph/*.py` returns nothing. An
    output descriptor that no edge carries — the contract's "unused outputs" — is reported by
    nothing. The contract states the subject as "a node **or output**".
 2. **The entry is unvalidated.** `unreachable_nodes(entry)` seeds `seen = {entry}` without checking
@@ -190,7 +190,7 @@ and unused outputs"); `dh_core/graph_ir/model.py#L476-L494` (`unreachable_nodes`
    is `Termination.bound`, so the same dropped list's requirement that loops carry progress
    conditions and termination bounds is likewise unanswerable.
 
-No test exercises `unreachable_nodes`: `grep -n unreachable_nodes tests_sam/test_graph_ir_defects.py`
+No test exercises `unreachable_nodes`: `grep -n unreachable_nodes tests_sam/test_workflow_multigraph_defects.py`
 returns nothing. Shortfalls 2 and 3 would each have been caught by a single test.
 
 ---
@@ -202,22 +202,22 @@ freshness check exists".
 
 **Severity: BROKEN.** Basis DECLARED — the contract distinguishes "an input" from "a required
 input", naming `REQUIRED_INPUT_HAS_NO_PRODUCER` and `STALE_INPUT_UNCHECKED` as separate predicates
-in `dh_core/graph_ir/findings.py`'s `Predicate` enum, and the node record
+in `dh_core/workflow_multigraph/findings.py`'s `Predicate` enum, and the node record
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record") separates
 `required_inputs` from `optional_inputs`. The narrowing contradicts a distinction the sources make
 explicitly.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER` and
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER` and
 `Predicate.STALE_INPUT_UNCHECKED`; `plugins/development-harness/ARCHITECTURE.md`, "The work graph"
-→ "Node record"; `dh_core/graph_ir/model.py#L424-L439` (`unchecked_stale_inputs`), `#L436-L438`
+→ "Node record"; `dh_core/workflow_multigraph/model.py#L424-L439` (`unchecked_stale_inputs`), `#L436-L438`
 (the `for needed in node.required_inputs` comprehension).
 
 **Observed.** Probed: a node whose *optional* input carries `Freshness(may_be_stale=True)` and an
 empty `freshness_check` yields an empty result from `unchecked_stale_inputs`. An optional input is
 still read when it is present, and a stale optional input corrupts a decision exactly as a stale
-required one does. `Node.input()` (`dh_core/graph_ir/model.py#L223-232`) already unions both
+required one does. `Node.input()` (`dh_core/workflow_multigraph/model.py#L223-232`) already unions both
 lists — the union the query needs exists and is not used here. No test exercises this query at all
-(`grep -n unchecked_stale_inputs tests_sam/test_graph_ir_defects.py` returns nothing), so the
+(`grep -n unchecked_stale_inputs tests_sam/test_workflow_multigraph_defects.py` returns nothing), so the
 narrowing is not a considered scope decision recorded anywhere; it is unexamined.
 
 ---
@@ -230,9 +230,9 @@ edge".
 **Severity: BROKEN.** Basis DECLARED — the implementation of a declared predicate is demonstrably
 wrong in both directions.
 
-**Source spans.** `dh_core/graph_ir/findings.py`, `Predicate.FAILURE_OUTPUT_UNCONSUMED`;
+**Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.FAILURE_OUTPUT_UNCONSUMED`;
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks" ("unhandled
-failure signals"); `dh_core/graph_ir/model.py#L161-L165` (`ErrorRoute`), `#L458-L474`
+failure signals"); `dh_core/workflow_multigraph/model.py#L161-L165` (`ErrorRoute`), `#L458-L474`
 (`unrouted_failures`), `#L464`
 (the `routed` set), `#L290-L296` (edge reference integrity).
 
@@ -262,7 +262,7 @@ probed:
   unvalidated on the same footing and is read by no query, so "evidence-to-claim trace coverage",
   the same mechanical-checks list's next item, is likewise unanswerable.)
 
-No test exercises this query (`grep -n unrouted_failures tests_sam/test_graph_ir_defects.py`
+No test exercises this query (`grep -n unrouted_failures tests_sam/test_workflow_multigraph_defects.py`
 returns nothing). All three behaviours would have been caught by the first test written against it.
 
 ---
@@ -276,8 +276,8 @@ producer".
 relates, and CONTROL relates "what may run after what", not a produced object.
 
 **Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
-(the edge-type table); `dh_core/graph_ir/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER`;
-`dh_core/graph_ir/model.py#L325-L341` (`inputs_without_producer`), `#L331` (the `filled` set).
+(the edge-type table); `dh_core/workflow_multigraph/findings.py`, `Predicate.REQUIRED_INPUT_HAS_NO_PRODUCER`;
+`dh_core/workflow_multigraph/model.py#L325-L341` (`inputs_without_producer`), `#L331` (the `filled` set).
 
 **Observed.** `filled` is `{(e.target, e.target_input) for e in self.edges if e.target_input is not
 None}` with no filter on `e.type`. Probed: a producer `p` and consumer `c` joined by a single
@@ -305,8 +305,8 @@ answered without it.
 
 **Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Edge types"
 (AUTHORITY) and → "Node record" ("Identical schema, incompatible authority") and → "Projections";
-`dh_core/graph_ir/findings.py`, `Predicate.ACTOR_LACKS_AUTHORITY`;
-`dh_core/graph_ir/model.py#L146-L150` (`Authority`), `#L125-L126` (`required_authority` /
+`dh_core/workflow_multigraph/findings.py`, `Predicate.ACTOR_LACKS_AUTHORITY`;
+`dh_core/workflow_multigraph/model.py#L146-L150` (`Authority`), `#L125-L126` (`required_authority` /
 `granting_authority`), `#L375-L389` (`authority_shortfalls`), `#L391-L406`
 (`effects_without_authority`).
 
@@ -347,7 +347,7 @@ reported. Under the rule this may not be `BROKEN`, and I record it at the lower 
 deliberately: it is the largest silent-false-negative surface in the deliverable, and saying so
 does not license inflating it.
 
-**Source spans.** `dh_core/graph_ir/model.py#L313-L321` (`_pairs`), `#L316-L317` (the `continue`);
+**Source spans.** `dh_core/workflow_multigraph/model.py#L313-L321` (`_pairs`), `#L316-L317` (the `continue`);
 `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks".
 
 **Observed.** `_pairs` skips every edge whose `source_output` or `target_input` is `None`. Four of
@@ -364,7 +364,7 @@ the repair occurred. The builder's model refuses an *incoherent* graph;
 an under-bound graph is coherent and empty of findings.
 
 D2's own graph is an instance: its edge `e1` carries `source_output="changed"` and no
-`target_input` (`tests_sam/test_graph_ir_defects.py#L202`), so all four pairwise queries skip it.
+`target_input` (`tests_sam/test_workflow_multigraph_defects.py#L202`), so all four pairwise queries skip it.
 D2's detection comes from `effects_without_authority` and `inputs_without_producer` instead, which
 is sound, but it means the test suite contains an unbound DATA edge and asserts nothing about it.
 
@@ -373,13 +373,13 @@ is sound, but it means the test suite contains an unbound DATA edge and asserts 
 ## PREDICATES-11 — descriptor facets are marked OBSERVED against spans that do not state them
 
 **Falsified predicate.** `ExtractionStatus.OBSERVED` is declared to mean "stated by a source span"
-(`dh_core/graph_ir/model.py#L86`).
+(`dh_core/workflow_multigraph/model.py#L86`).
 
 **Severity: BROKEN.** Basis DECLARED — the IR defines OBSERVED, and the cited span does not state
 the facets carried under it.
 
-**Source spans.** `dh_core/graph_ir/model.py#L83-L89` (`ExtractionStatus`);
-`tests_sam/test_graph_ir_defects.py#L58` (`SPEC`), `#L67-L74` (the `desc` helper, whose defaults are
+**Source spans.** `dh_core/workflow_multigraph/model.py#L83-L89` (`ExtractionStatus`);
+`tests_sam/test_workflow_multigraph_defects.py#L58` (`SPEC`), `#L67-L74` (the `desc` helper, whose defaults are
 `extraction_status=OBSERVED` and `source_refs=[SPEC]`), `#L92-L128` (D1's descriptors),
 `#L171-L199` (D2's), `#L338-L393` (D4's); `dh_core/ledger_spec.py` in whole.
 
@@ -425,10 +425,10 @@ judgment or an empirical evaluation until a property is made precise enough to t
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Mechanical checks").
 
 **Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity
-rule" and → "Mechanical checks"; `dh_core/graph_ir/findings.py#L108-L135` (`ContractBasis`,
+rule" and → "Mechanical checks"; `dh_core/workflow_multigraph/findings.py#L108-L135` (`ContractBasis`,
 `SEVERITY_BY_BASIS`), `#L145-L160`
 (`Finding` config and computed `severity`), `#L149` (`basis_evidence`);
-`tests_sam/test_graph_ir_defects.py#L329-L332`.
+`tests_sam/test_workflow_multigraph_defects.py#L329-L332`.
 
 **Observed.** Severity is a computed field over `basis` with `extra="forbid"`, so a severity cannot
 be passed in — `test_severity_cannot_be_invented` (`#L447-L460`) asserts this and it holds. But
@@ -453,9 +453,9 @@ judgement, but it would refuse its most obvious abuse.
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Severity rule") is stated, and
 the implementation permits its inversion at runtime while the test that guards it stays green.
 
-**Source spans.** `dh_core/graph_ir/findings.py#L129-L135` (`SEVERITY_BY_BASIS`), `#L67-L105`
-(`PREDICATES`), `dh_core/graph_ir/model.py#L71` (`TRUST_ORDER`);
-`tests_sam/test_graph_ir_defects.py#L463-L473` (`test_severity_taxonomy_is_closed`).
+**Source spans.** `dh_core/workflow_multigraph/findings.py#L129-L135` (`SEVERITY_BY_BASIS`), `#L67-L105`
+(`PREDICATES`), `dh_core/workflow_multigraph/model.py#L71` (`TRUST_ORDER`);
+`tests_sam/test_workflow_multigraph_defects.py#L463-L473` (`test_severity_taxonomy_is_closed`).
 
 **Observed.** The models are frozen (`ConfigDict(frozen=True)` on `Finding`, `Observation`,
 `SourceSpan`, `PredicateDefinition`); the three tables that carry the rule are plain `dict`s and
@@ -485,8 +485,8 @@ the binding be mechanical (that activity's own definition was scaffolding for a 
 and was dropped rather than carried into `ARCHITECTURE.md`; see this directory's `AMENDMENTS.md`
 entry A-5).
 
-**Source spans.** `dh_core/graph_ir/findings.py#L138-L199`
-(`Finding`), `#L154` (`graph_refs`, defaulting to `()`); `dh_core/graph_ir/__init__.py#L43-L72`
+**Source spans.** `dh_core/workflow_multigraph/findings.py#L138-L199`
+(`Finding`), `#L154` (`graph_refs`, defaulting to `()`); `dh_core/workflow_multigraph/__init__.py#L43-L72`
 (`__all__`, which exports no report or finding-set type).
 
 **Observed.** There is no type joining a set of findings to the graph they were computed over. A
@@ -513,9 +513,9 @@ nothing to fingerprint.
 falsification test for each of the four known defects (L60-61), which exists; no source requires a
 test per query, nor a test pinning the taxonomy to the contract text.
 
-**Source spans.** `tests_sam/test_graph_ir_defects.py` in whole;
-`dh_core/graph_ir/model.py#L424-L439,L458-L474,L476-L494`;
-`dh_core/graph_ir/findings.py#L67-L105`; `tests_sam/test_adr_3460_migration_trigger.py#L45-L58`
+**Source spans.** `tests_sam/test_workflow_multigraph_defects.py` in whole;
+`dh_core/workflow_multigraph/model.py#L424-L439,L458-L474,L476-L494`;
+`dh_core/workflow_multigraph/findings.py#L67-L105`; `tests_sam/test_adr_3460_migration_trigger.py#L45-L58`
 (`contract_predicates`, which parses the contract's bullets and is used only for a count).
 
 **Observed.** `grep -n` over the defect test file for each query name: `inputs_without_producer`,
@@ -560,7 +560,7 @@ reading.
 
 **Source spans.** `plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The model" and
 → "Node record" and → "Projections" ("keep the richer property graph for semantics");
-`dh_core/graph_ir/model.py#L209` (`subgraph_ref: str | None`), `#L273-L297`
+`dh_core/workflow_multigraph/model.py#L209` (`subgraph_ref: str | None`), `#L273-L297`
 (`check_reference_integrity`), `#L262-L268` (`Graph`).
 
 **Observed.** `subgraph_ref` is a free string. `Graph` has no id, so there is no namespace a
@@ -580,7 +580,7 @@ Each finding above names the search or the probe that produced it. The cheapest 
 
 - `cd plugins/development-harness && uv run python -c "import sys; sys.path.insert(0,'.'); from tests_sam.test_adr_3460_migration_trigger import evaluate; [print(c.met, c.key, c.evidence) for c in evaluate()]"` — criterion 2's state (PREDICATES-1).
 - `grep -c -i -e authority -e trust -e verified -e proposed dh_core/ledger_spec.py` per word — PREDICATES-11's counts.
-- `grep -n unchecked_stale_inputs -e unrouted_failures -e unreachable_nodes tests_sam/test_graph_ir_defects.py` — PREDICATES-14's absences.
+- `grep -n unchecked_stale_inputs -e unrouted_failures -e unreachable_nodes tests_sam/test_workflow_multigraph_defects.py` — PREDICATES-14's absences.
 - The probe behaviours in PREDICATES-5, -6, -7, -8, -9, -10, -12 and -15 each reduce to constructing
   one small `Graph` against the public API and printing the query result; each finding states the
   construction and the output.

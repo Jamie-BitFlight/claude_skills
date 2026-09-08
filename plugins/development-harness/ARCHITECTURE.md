@@ -336,7 +336,7 @@ wanted the method.
 
 ### Falsified predicates
 
-The predicates a check reports are defined as data in `dh_core/graph_ir/findings.py`: `Predicate`
+The predicates a check reports are defined as data in `dh_core/workflow_multigraph/findings.py`: `Predicate`
 names them and `PREDICATES` carries each one's wording and the projection that decides it. There is
 no second list; a predicate added there is added everywhere.
 

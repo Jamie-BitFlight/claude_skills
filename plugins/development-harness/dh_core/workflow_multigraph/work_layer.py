@@ -12,7 +12,7 @@ decomposition did not account for -- is required, "rather than appended to a not
 later plan."
 
 This layer's own separation from layers 1 and 3 is itself superseded design:
-``docs/graph-ir/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
+``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
 types and executed as instances, with no separate layer graphs. This module has not yet been
 migrated to that shape.
 
@@ -31,7 +31,7 @@ This module makes three things unconstructible rather than merely checkable:
 What stays a query rather than a constructor refusal, per this package's standing rule that the IR
 must hold an *unsound* graph: whether a graph is actually missing a bookend
 (:meth:`WorkGraph.missing_bookends`), and whether a planned node traces back to nothing in the
-decomposition input (:mod:`dh_core.graph_ir.decomposition`) -- both are properties of a graph that
+decomposition input (:mod:`dh_core.workflow_multigraph.decomposition`) -- both are properties of a graph that
 may be malformed, and the contract asks that a malformed graph be representable so its
 malformedness can be reported.
 """
@@ -44,10 +44,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dh_core.graph_ir.descriptors import SourceSpan
-from dh_core.graph_ir.layer import Layer
-from dh_core.graph_ir.model import Observation
-from dh_core.graph_ir.vocabulary import EdgeType, ExtractionStatus
+from dh_core.workflow_multigraph.descriptors import SourceSpan
+from dh_core.workflow_multigraph.layer import Layer
+from dh_core.workflow_multigraph.model import Observation
+from dh_core.workflow_multigraph.vocabulary import EdgeType, ExtractionStatus
 
 
 class BookendKind(StrEnum):
@@ -117,7 +117,8 @@ class WorkNode(BaseModel):
     )
     inserted_reason: str = Field(default="", description="Why layer 3 extended the graph with this node.")
     decomposition_source: str | None = Field(
-        default=None, description="DecompositionItem.id (dh_core.graph_ir.decomposition) this node traces back to."
+        default=None,
+        description="DecompositionItem.id (dh_core.workflow_multigraph.decomposition) this node traces back to.",
     )
     source_refs: list[SourceSpan] = Field(min_length=1)
     extraction_status: ExtractionStatus
@@ -158,7 +159,7 @@ class WorkEdge(BaseModel):
 class WorkGraph(BaseModel):
     """A recovered layer-2 graph: tasks, their ordering and exclusion, and the extensions applied.
 
-    Construction enforces reference integrity, as :class:`~dh_core.graph_ir.model.Graph` does, plus
+    Construction enforces reference integrity, as :class:`~dh_core.workflow_multigraph.model.Graph` does, plus
     the extension-consistency rule described in the module docstring. What it does *not* refuse is a
     graph missing a bookend -- that is a property :meth:`missing_bookends` reports, because a
     malformed graph must still be representable so a check can find the malformation.

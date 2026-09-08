@@ -4,14 +4,14 @@
 decomposition takes the grooming and design output -- research, fact checks, dependencies,
 documentation, concerns -- into work with its concurrency and ordering stated. Each of those nouns
 becomes a :class:`DecompositionItem`
-of the matching :class:`DecompositionSourceKind`, so a :class:`~dh_core.graph_ir.work_layer.WorkNode`
+of the matching :class:`DecompositionSourceKind`, so a :class:`~dh_core.workflow_multigraph.work_layer.WorkNode`
 can name the item it traces back to and a check can ask the traceability question in both
 directions: :meth:`DecompositionInput.untraced_planned_nodes` (a work node tracing to nothing here)
 and :meth:`DecompositionInput.unreached_items` (an item here that reached no work node).
 
 Only *planned* work nodes are checked against the decomposition input. A node with
-:attr:`~dh_core.graph_ir.work_layer.WorkNodeProvenance.SPLIT` or
-:attr:`~dh_core.graph_ir.work_layer.WorkNodeProvenance.INSERTED` provenance was, by the contract's
+:attr:`~dh_core.workflow_multigraph.work_layer.WorkNodeProvenance.SPLIT` or
+:attr:`~dh_core.workflow_multigraph.work_layer.WorkNodeProvenance.INSERTED` provenance was, by the contract's
 own account, added *because* the original decomposition did not account for it -- holding such a
 node to the same traceability standard as a planned one would be asking the extension mechanism to
 justify the very gap it exists to fill.
@@ -23,10 +23,10 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from dh_core.graph_ir.descriptors import SourceSpan
-from dh_core.graph_ir.model import Observation
-from dh_core.graph_ir.vocabulary import ExtractionStatus
-from dh_core.graph_ir.work_layer import WorkGraph, WorkNodeProvenance
+from dh_core.workflow_multigraph.descriptors import SourceSpan
+from dh_core.workflow_multigraph.model import Observation
+from dh_core.workflow_multigraph.vocabulary import ExtractionStatus
+from dh_core.workflow_multigraph.work_layer import WorkGraph, WorkNodeProvenance
 
 
 class DecompositionSourceKind(StrEnum):

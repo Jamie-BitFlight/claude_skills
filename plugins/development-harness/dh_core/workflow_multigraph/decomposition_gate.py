@@ -4,16 +4,16 @@
 "Origin is not measurable from text -- a sentence invented from training reads exactly like one
 recalled from a source. Absence of referent is measurable, and the two coincide." This module is
 that measurement:
-:class:`DecompositionGate` resolves every :class:`~dh_core.graph_ir.instructions.Referent` a
+:class:`DecompositionGate` resolves every :class:`~dh_core.workflow_multigraph.instructions.Referent` a
 ``DELEGATING`` instruction names (Tier 1) and verifies every quote an ``ASSERTING`` instruction
-cites (Tier 2), and reports a :class:`~dh_core.graph_ir.findings.Finding` for each declared
+cites (Tier 2), and reports a :class:`~dh_core.workflow_multigraph.findings.Finding` for each declared
 predicate that does not hold.
 
 Two protocols separate *what the gate checks* from *how referents and sources are read*:
 :class:`ReferentResolver` answers "does this referent exist", :class:`SourceReader` answers "what
 text is at this ref". :class:`RepoResolver` and :class:`RepoSourceReader` are the concrete
 implementations over an actual repo checkout and a
-:class:`~dh_core.graph_ir.work_layer.WorkGraph`, but the gate itself is written against the
+:class:`~dh_core.workflow_multigraph.work_layer.WorkGraph`, but the gate itself is written against the
 protocols so a test can substitute a stub.
 
 The severity mapping is the contract's own, and it is fixed here rather than derived: an
@@ -23,7 +23,7 @@ instruction that honestly records the gap (``ASSUMED``/``ABSENT`` with a non-emp
 ``absence_note``) is reported ``UNSPECIFIED`` -> ``CONTRACT_UNSPECIFIED`` and does not block: "does
 not falsify the predicate ... It is reported at CONTRACT_UNSPECIFIED and does not block." Severity
 itself is never assigned here -- as everywhere in this package, it comes from
-:data:`~dh_core.graph_ir.findings.SEVERITY_BY_BASIS` alone, computed on the :class:`Finding` from
+:data:`~dh_core.workflow_multigraph.findings.SEVERITY_BY_BASIS` alone, computed on the :class:`Finding` from
 the ``basis`` this module chooses.
 
 What this module does not decide: a quote that resolves and verifies but does not support the claim
@@ -44,11 +44,11 @@ from marko.block import Heading
 from marko.ext.gfm.elements import Table
 from marko.inline import CodeSpan, RawText
 
-from dh_core.graph_ir.descriptors import SourceSpan
-from dh_core.graph_ir.findings import ContractBasis, Finding, Predicate, Severity
-from dh_core.graph_ir.instructions import Instruction, InstructionKind, Referent, ReferentKind
-from dh_core.graph_ir.model import Observation
-from dh_core.graph_ir.work_layer import WorkGraph
+from dh_core.workflow_multigraph.descriptors import SourceSpan
+from dh_core.workflow_multigraph.findings import ContractBasis, Finding, Predicate, Severity
+from dh_core.workflow_multigraph.instructions import Instruction, InstructionKind, Referent, ReferentKind
+from dh_core.workflow_multigraph.model import Observation
+from dh_core.workflow_multigraph.work_layer import WorkGraph
 
 CONTRACT_REF = "plugins/development-harness/ARCHITECTURE.md#the-decomposition-exit-gate"
 """Where the decomposition-exit gate itself is declared; cited as every finding's source span."""
@@ -78,13 +78,13 @@ class ReferentResolver(Protocol):
 
 @runtime_checkable
 class SourceReader(Protocol):
-    """Reads the text a :class:`~dh_core.graph_ir.descriptors.SourceSpan` names, or ``None``."""
+    """Reads the text a :class:`~dh_core.workflow_multigraph.descriptors.SourceSpan` names, or ``None``."""
 
     def read(self, ref: str) -> str | None:
         """Return the text at ``ref``, or ``None`` when ``ref`` does not exist.
 
         Args:
-            ref: A :attr:`~dh_core.graph_ir.descriptors.SourceSpan.ref`, e.g. ``'a.py#L10-L20'``.
+            ref: A :attr:`~dh_core.workflow_multigraph.descriptors.SourceSpan.ref`, e.g. ``'a.py#L10-L20'``.
 
         Returns:
             The text at that span, or the whole file for a bare path; ``None`` when the path itself
@@ -276,7 +276,7 @@ class RepoResolver:
 
 
 class RepoSourceReader:
-    """Reads source text at a :class:`~dh_core.graph_ir.descriptors.SourceSpan` ref, for Tier 2."""
+    """Reads source text at a :class:`~dh_core.workflow_multigraph.descriptors.SourceSpan` ref, for Tier 2."""
 
     def __init__(self, repo_root: Path) -> None:
         """Initialize the reader.
