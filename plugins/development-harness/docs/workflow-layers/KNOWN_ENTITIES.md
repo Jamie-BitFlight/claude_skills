@@ -223,8 +223,14 @@ Stored via `artifact_register`, retrieved via `artifact_read`. The `artifact_typ
 is the canonical key. Short-form prose references (e.g. "the architect spec", "the T0
 baseline") must resolve to one of these keys.
 
-SAM plans are not registered artifacts. Create and read their content through `sam_plan`,
-then associate the returned logical plan address with its owner through `backlog_update`.
+The key set is not declared here. [docs/artifact-registry.md](../artifact-registry.md) is the
+artifact-type registry, and the table below maps its types to the skills that produce and consume
+them. A key appearing here and not there is drift, and
+`tests/test_artifact_type_ownership_drift.py` fails on it.
+
+A `task-plan` manifest entry exists and no agent may write or read one, so it has no producer or
+consumer skill and does not appear below. Create and read plan content through `sam_plan`, then
+associate the returned logical plan address with its owner through `backlog_update`.
 
 | artifact_type key | Producer skill/agent | Consumer skill/agent |
 |---|---|---|
@@ -238,8 +244,9 @@ then associate the returned logical plan address with its owner through `backlog
 | `research` | `add-new-feature` (ecosystem-researcher / technical-researcher) | `add-new-feature` |
 | `dispatch-plan` | `groom-milestone` (dispatch_create_plan) | `work-milestone` |
 
-Source: `backlog_core/models.py` ArtifactType enum (L1263–1271), `G2-artifacts.json`,
-`add-new-feature/SKILL.md`, `implement-feature/SKILL.md`, `complete-implementation/SKILL.md`.
+Source: `docs/artifact-registry.md` for the key set, `backlog_core/models.py`'s `ArtifactType`
+for the manifest vocabulary, then `G2-artifacts.json`, `add-new-feature/SKILL.md`,
+`implement-feature/SKILL.md`, `complete-implementation/SKILL.md` for the producer/consumer columns.
 
 ---
 

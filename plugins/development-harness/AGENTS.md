@@ -9,8 +9,7 @@ Language-agnostic development process harness that orchestrates feature developm
 
 ## Plugin Identity
 
-**Name:** `dh`
-**Version:** 0.1.0
+**Name:** `dh` — the version is in `.claude-plugin/plugin.json`, bumped by a pre-commit hook.
 **Purpose:** Provide a reusable, language-independent development workflow based on the Stateless Agent Methodology (SAM) with ARL-derived human touchpoints and Voltron-style language plugin composition.
 
 **Design Principles:**
@@ -58,38 +57,9 @@ Agents address plans and tasks logically (`P{id}/T{M}`) through `sam_plan`, `sam
 grouped DH CLI adapter. Physical paths, cache records, provider IDs, and wire formats are backend
 internals. `sam_active_task` tracks session-scoped execution context.
 
-Load `dh:dh-meta-docs` for the artifact conventions.
-
-**Gotcha — Large plans must use the incremental append workflow:**
-
-For plans with 16+ tasks, use the three-call incremental workflow instead of a single monolithic
-`sam_plan` create action:
-
-1. `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[], "owner_reference":<work_item_reference>})` — creates a drafting plan and returns a UUID-hex plan ID (e.g. `Pa1b2c3d4`)
-2. `sam_plan(plan='Pa1b2c3d4', config={"action":"append_task", "task":<single_task_object>})` × N — appends tasks one at a time (replace `Pa1b2c3d4` with the actual returned ID)
-3. `sam_plan(plan='Pa1b2c3d4', config={"action":"finalize"})` — clears drafting state and makes the plan ready
-
-While a plan is in `state="drafting"`, `sam_plan(plan='<returned-plan-id>', config={"action":"ready"})`
-and `sam_plan(plan='<returned-plan-id>', config={"action":"status"})` return their normal result
-models with `state="drafting"` instead of dispatchable task data — this prevents dispatching a
-partial plan. Only `finalize` makes the plan visible to the dispatch loop.
-
-CLI equivalent: `plan create --slug ... --goal ... --owner-reference <work_item_reference>` (omit
-`--task-id`/`--task-title` to start in `state="drafting"`) → `plan append-task --plan-address
-<plan_id> --task-id ... --task-title ...` × N → `plan finalize --plan-address <plan_id>`.
-
-**Gotcha — `append_task` is single-writer only:**
-
-`append_task` is single-writer for a given plan. Serialize appends through the configured backend;
-concurrent writes are outside the contract. Do NOT call `append_task` for
-the same plan from multiple agents or sessions simultaneously. The content-store `TaskBackend`
-(`ContentTaskProvider`) mutates its in-memory plan copy before writing it through
-`ContentProvider.put_content` with the last-observed revision as `expected_revision`
-([sam_schema/core/backends/content.py](./sam_schema/core/backends/content.py)); a losing
-concurrent write is not merged — it fails the compare-and-swap, raises `ContentConflictError`, and
-is discarded after a refresh from the now-current remote record, so its own append does not apply
-and the caller must retry rather than assume the append succeeded. See
-[dh_core/operations.py](./dh_core/operations.py)'s `append_task` for the operation-level contract.
+Load `dh:dh-meta-docs` for the artifact conventions. Plan drafting for large plans and
+`append_task`'s single-writer contract are in
+[docs/backend-providers.md](./docs/backend-providers.md) under "SAM Storage Model".
 
 Plans, tasks, and artifacts are logical backend records. Their physical representation is private to
 the configured backend; access them through `sam_*` and `artifact_*` operations.
@@ -106,71 +76,11 @@ discovered via `artifact_list`/`artifact_read` rather than filesystem access.
 [docs/backend-providers.md](./docs/backend-providers.md) "CLI vs MCP Capability Surface" for the
 authoritative flag mapping.
 
-### Artifact types and registering agents
-
-This heading and the table under it are located by `dh_core/artifact_registry.py`, the single
-locator both the decomposition-exit gate and `tests/test_artifact_type_ownership_drift.py` read the
-registry through. Renaming the heading, or renaming a column of the table below, fails those
-readers loudly — change `REGISTRY_HEADING` or `REQUIRED_COLUMNS` in the same edit.
-
-This table is the complete registry of document-artifact types. Every `artifact_register` call — MCP
-tool or `artifact register` CLI — must match a `(Type, Registering agents)` pair listed here. Add the
-row before writing the call. The `Registering agents` column holds the value each call passes as
-`agent`; the `Gate-read` column marks the types whose read result decides a workflow branch.
-
-| Type | Registering agents | Gate-read | Notes |
-|---|---|---|---|
-| `feature-context` | `discovery`, `feature-researcher` | no | Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry per item. |
-| `architect` | `planning`, `context-integration`, `context-refinement`, `{resolved_agent}` | no | Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read returned, appending annotations. |
-| `codebase-analysis` | `codebase-analyzer`, `code-review-architecture` | no | Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally multi-entry — one per focus area or diagram. Consumers reach the full set through `artifact_list`. |
-| `code-review` | `code-reviewer` | yes | Code review verdict. One entry per reviewed task, so consumers read it by `artifact_id` (`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. `complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`. |
-| `T0-baseline` | `t0-baseline-capture` | yes | Pre-implementation baseline. `tn-verification-gate` compares final state against it. |
-| `TN-verification` | `tn-verification-gate` | yes | Post-implementation verification. `complete-implementation` branches on the verdict. |
-| `research` | `swarm-task-planner`, `ecosystem-researcher` | no | Investigation findings, coverage analysis, rationale. Multi-entry — one document per investigation. |
-| `audit-report` | `doc-drift-auditor` | no | Documentation drift audit. Never used for a code review verdict. |
-| `dispatch-plan` | `dispatch_create_plan` | no | Milestone dispatch plan, registered by the dispatch tool rather than an agent. |
-
-Task plans are not artifact-manifest entries. Create, read, and update them through `sam_plan`, then
-associate the returned logical address with the owning work item through `backlog_update`.
-
-Ownership rule: `artifact_read(item_id, artifact_type)` with no `artifact_id` sorts every entry of
-that type by creation time and returns only the newest, so a read by type alone can address exactly
-one document. A `Gate-read` type must therefore have exactly one registering agent — a second writer
-wins the read the moment it registers later, and the gate branches on the wrong document with no
-error. Types marked `no` may have several registering agents for one of two reasons: every producer
-re-registers a single shared `artifact_id` and so replaces one entry (`feature-context`,
-`architect`), or the type is intentionally multi-entry, so a read by type alone returns only its
-newest document and no gate branches on the result (`codebase-analysis`, `research`). Never point a
-gate at a multi-entry type, and never add a second registering agent to a `Gate-read` type.
-
-One registering agent is not one entry. `artifact_read` and `artifact_get` both accept an optional
-`artifact_id`, and a single agent that registers one entry per reviewed task leaves several under
-its own type. A `Gate-read` type whose producer emits more than one entry per work item — today,
-`code-review` — must be read by `artifact_id`; the producer names the identifier it used in its
-STATUS output so the consumer can address it. Reading such a type by type alone returns whichever
-task's document registered last.
-
-**Registration:** Producers call `artifact_register` after creating document-artifact content.
-Plans are the exception: `sam_plan` owns plan content and task state, and `backlog_update` stores
-only the logical plan association on the owning work item. Never duplicate plan content through
-`artifact_register`.
-
-**Consumer discovery:** Consumers (including worktree-isolated agents) call `artifact_list` then
-`artifact_read` for document artifacts and `sam_plan` for plans instead of using filesystem access.
-The configured backend resolves content for every worktree.
-
-**MCP-native rule for agents:** Agents store document artifacts via `artifact_register` with
-`content=` and store plans through `sam_plan`. The configured backend owns persistence and retrieval.
-The `Write` tool is permitted only for repo-relative deliverables (source code, tests, documentation
-files committed to the repo).
-
-Load the `dh:create-artifact` skill for worked per-type registration examples.
-
-**Prohibited patterns — do not write these in agent instructions or tool calls:**
-
-- Direct filesystem writes for system artifacts — use `artifact_register(item_id=<owner>, artifact_type=<type>, artifact_id=<logical-id>, content=...)` instead
-- Direct filesystem reads for system artifacts — use `artifact_read(item_id=<owner>, artifact_type="T0-baseline")` instead
-- `artifact_register(...)` without `content=` — identifier-only registration does not persist artifact content
+The artifact types, the agent permitted to register each, which types a gate reads, and the rules
+governing all three are declared in [docs/artifact-registry.md](./docs/artifact-registry.md). That
+document is the registry itself rather than a description of one — the decomposition-exit gate and
+the tests holding shipped registrations against it parse it directly — so read it before writing an
+`artifact_register` call or adding a type. Load `dh:create-artifact` for worked per-type examples.
 
 ## Dispatch Orchestration System
 
@@ -185,8 +95,8 @@ read|validate|stale-check|create-plan|conflicts|wave-start|item-status|wave-stat
 authoritative flag mapping.
 
 The `/dh:groom-milestone` and `/dh:work-milestone` skills own the per-tool call sequence and
-parameters for this workflow; load whichever skill owns the step you're changing rather than
-restating its steps here.
+parameters for this workflow; the skill owning a step is where that step is changed, not this
+file.
 
 ---
 
@@ -332,7 +242,8 @@ Load `dh:dh-meta-docs` for the language-manifest schema.
 
 ## Required Reading by Task Type
 
-Load these documents based on what you are doing. They contain the system design knowledge required for that work to succeed.
+Each entry below routes one kind of change to the documents carrying the system design knowledge
+that change depends on.
 
 **Designing new architecture for a feature (any module, before writing an architect spec):**
 
@@ -367,6 +278,7 @@ Load these documents based on what you are doing. They contain the system design
 
 **Modifying artifact handling, divergence detection, or plan management:**
 
+- Load [Artifact Type Registry](./docs/artifact-registry.md) — the artifact types, the agent permitted to register each, which types a gate reads, and the ownership rules that follow. Parsed by the decomposition-exit gate, so it is where a type is added rather than a description of one
 - Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
 - Load `dh:dh-meta-docs` — routes the artifact storage model, file naming, and cross-reference tokens
 
@@ -385,14 +297,15 @@ Note: The layer-0 design documents artifact-conventions, task-file-format, sam-p
 
 ### Documentation Update Triggers
 
-After completing your work, update the architectural documents above if your changes fall into these categories:
+A completed change in one of these categories carries a documentation obligation:
 
 | Change type | Update required |
 |---|---|
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
 | Data structure change (new field, changed type, new entity) | Yes — update `models.py` first |
 | New or removed MCP tool | Yes — update Workflow Architecture Diagram; run `/dh:meta-workflow-graph-refresh` to update G8 layer |
-| New artifact type or changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
+| New artifact type | Yes — add the `ArtifactType` member in `backlog_core/models.py` and, unless no agent registers it, the row in [docs/artifact-registry.md](./docs/artifact-registry.md); the gate accepts the type only once both exist |
+| Changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
 | New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |
 | Refactoring (same behavior, different code structure) | No |
 | Agent prompt changes (better instructions, same behavior) | No |
@@ -422,34 +335,10 @@ a change to `backlog_core/` or `sam_schema/` without restarting the session, rea
 When discussing, extending, or adding backend providers for the development harness — including
 state management, task management, planning, issues, jobs, milestones, or boards — read
 [docs/backend-providers.md](./docs/backend-providers.md) first. It is the authoritative Protocol
-reference (`WorkItemBackend`/`ContentProvider`), the `github`/`sqlite`/`memory`/`beads` family
-comparison, configuration, and the `profile_load` module boundary. Amend that document, not this
-one, with any new points, references, discoveries, or user inputs that arise during the
-conversation.
-
-### Plan and artifact capability boundary
-
-Backlog items and SAM plans/tasks do NOT share one backend protocol, but this is a distinct-interface
-split, not a distinct-storage one. Backlog operations (`backlog_add`, `backlog_view`, etc.) route
-through `WorkItemBackend` (`./backlog_core/backend_types.py`), which is independently configurable
-across the `github`/`sqlite`/`memory`/`beads` families above. `sam_plan` and `sam_task` route
-through a separate `TaskBackend` protocol — defined in `./sam_schema/core/task_backend.py`,
-re-exported by `./dh_core/protocols.py` — and every plan/task CRUD function in
-`./dh_core/operations.py` (`create_plan`, `read_plan`, `list_plans`, `read_task`, `claim_task`,
-etc.) takes a `TaskBackend` parameter, not a `WorkItemBackend`. Concretely, `TaskBackend` is
-implemented by `ContentTaskProvider` (`./sam_schema/core/backends/content.py`), which is not an
-independently-selected backend the way `WorkItemBackend`'s GitHub/SQLite/Beads/Memory choice is —
-it is an adapter that persists plan/task state through the *same* `ContentProvider`
-(`./backlog_core/backend_types.py`) that `artifact_*` calls use, wrapping `InMemoryTaskProvider`'s
-established in-memory behavior. `sam_active_task` is not a `TaskBackend` consumer in the same way as
-`sam_plan`/`sam_task`: it primarily routes through a third, separate protocol, `ContextBackend`
-(`get_context_config().backend`), for session-scoped active-task state, and only incidentally
-resolves a `TaskBackend` on its `update` action (to cross-validate/append task-section content
-against the plan the active-task address points at). There is no local filesystem fallback or
-per-plan backend selection — each protocol still resolves to exactly one configured backend
-instance per its own selection rules. Remote providers may use a private `FileCache` for stale
-reads and queued writes. Beads, SQLite, and Memory remain native-only and never use YAML or cache
-storage.
+reference (`WorkItemBackend`/`TaskBackend`/`ContentProvider`), the `github`/`sqlite`/`memory`/`beads`
+family comparison, the plan-drafting and single-writer contracts, configuration, and the
+`profile_load` module boundary. Amend that document, not this one, with any new points, references,
+discoveries, or user inputs that arise during the conversation.
 
 ---
 
