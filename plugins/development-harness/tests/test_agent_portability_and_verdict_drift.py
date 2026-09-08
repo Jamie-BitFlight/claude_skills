@@ -15,6 +15,11 @@ it here reveals that. The portability shapes guarded below are the ones that wer
   runs. This is ``rules/markdown-file-references.md``'s Skill Activation References rule. Note it
   is a portability rule and not a gate: ``ARCHITECTURE.md`` states that a skill an instruction
   names is not a Tier-1 decomposition-gate referent, so nothing else checks these citations.
+  A later sweep found the same shape inside ``skills/`` itself — one skill citing a sibling skill
+  by its plugin-rooted path is the identical checkout-binding defect, so the guard now scans
+  ``skills/`` too. ``SKILL_PATH_CITATION_EXCEPTIONS`` names the two files where the matched text is
+  not this defect — a naming-convention table stating a path as data, and a labelled anti-pattern
+  example — each with the reason it is not a citation to fix.
 - ``agents/alignment-analyst.md`` and ``agents/impact-analyst.md`` each carried a byte-identical
   shell snippet that re-derived the active backend inline: ``BACKLOG_BACKEND`` when set, else a
   ``.beads`` *directory*, else ``github``. It skipped ``.dh/config.yaml`` entirely and tested for
@@ -53,6 +58,7 @@ from pathlib import Path
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = PLUGIN_ROOT / "agents"
+SKILLS_DIR = PLUGIN_ROOT / "skills"
 
 ALIGNMENT_ANALYST = AGENTS_DIR / "alignment-analyst.md"
 
@@ -72,6 +78,28 @@ REPO_SLUG_RE = re.compile(r"(?:(?:-R|--repo)[= ]+|github\.com/)(?P<slug>[A-Za-z0
 # A skill cited by its plugin-rooted file path. A wildcard segment is a glob describing a class of
 # files, not a citation of one skill, so it is not matched.
 SKILL_PATH_RE = re.compile(r"plugins/[\w.-]+/skills/[\w.-]+/SKILL\.md")
+
+# Files where matched text is not the citation this guard convicts, each with why. An entry here
+# excuses a file from ``test_no_agent_or_skill_cites_a_skill_by_plugin_rooted_path`` entirely, so
+# every one names the reason the match is not a portability defect — an allowlist with no reason is
+# indistinguishable from an oversight the next person deletes.
+SKILL_PATH_CITATION_EXCEPTIONS: dict[Path, str] = {
+    SKILLS_DIR / "dh-meta-docs" / "references" / "sdlc-stage-taxonomy.md": (
+        "This file's subject is the skill-directory naming convention itself, not a pointer to "
+        "load a skill for its content: each stage row and the Section 2 rule state, as data, the "
+        "literal SKILL.md path a stage's bare directory name produces — the Section 2 example even "
+        "pairs a correct path with a deliberately wrong one that names no real skill. Activation "
+        "syntax names a skill to invoke; it cannot state the directory-naming fact these paths "
+        "exist to specify, so substituting it would delete the information the row carries."
+    ),
+    SKILLS_DIR / "code-review-claude-skills" / "SKILL.md": (
+        "Line 89's plugin-rooted path sits inside a fenced ``<!-- WRONG: cross-skill backtick path "
+        "reference -->`` example, paired with a ``<!-- RIGHT -->`` line showing the activation-"
+        "syntax form directly beneath it. This skill's job is teaching reviewers to catch exactly "
+        "this citation shape in other skills; rewriting the WRONG line to match the RIGHT one "
+        "deletes the contrast the anti-pattern section exists to show."
+    ),
+}
 
 # --- Backend chain re-derived inline, in either medium ------------------------------------------
 #
@@ -135,6 +163,24 @@ def agent_files() -> list[Path]:
     return files
 
 
+def skill_files() -> list[Path]:
+    """Collect every skill definition file in this plugin, recursively.
+
+    A skill's own ``SKILL.md`` and everything under its ``references/`` sit at varying depths under
+    ``skills/<name>/``, so the scan walks the whole subtree rather than one directory level.
+
+    Returns:
+        Sorted list of ``skills/**/*.md`` paths.
+
+    Raises:
+        AssertionError: If the directory holds no skill files, which would make the scan below pass
+            by scanning nothing.
+    """
+    files = sorted(SKILLS_DIR.rglob("*.md"))
+    assert files, f"{SKILLS_DIR.relative_to(PLUGIN_ROOT)} holds no skill files to scan."
+    return files
+
+
 def matching_lines(pattern: re.Pattern[str], paths: list[Path]) -> list[str]:
     """Find every line in *paths* matching *pattern*.
 
@@ -170,19 +216,42 @@ def test_no_agent_names_a_specific_repository() -> None:
     )
 
 
-def test_no_agent_cites_a_skill_by_plugin_rooted_path() -> None:
-    """No agent definition cites a skill as ``plugins/<plugin>/skills/<name>/SKILL.md``.
+def test_no_agent_or_skill_cites_a_skill_by_plugin_rooted_path() -> None:
+    """No agent or skill definition cites a skill as ``plugins/<plugin>/skills/<name>/SKILL.md``.
 
     The path resolves only from a checkout laid out like this one. The skill name resolves in every
-    harness that loads the plugin, which is the whole set of places these agents run.
+    harness that loads the plugin, which is the whole set of places these agents and skills run.
+    One skill citing a sibling skill by path is the same checkout-binding defect as an agent doing
+    it, so this scans ``skills/`` alongside ``agents/`` — minus the files in
+    ``SKILL_PATH_CITATION_EXCEPTIONS``, where the matched text is not this citation.
     """
-    offenders = matching_lines(SKILL_PATH_RE, agent_files())
+    scanned = [path for path in agent_files() + skill_files() if path not in SKILL_PATH_CITATION_EXCEPTIONS]
+    offenders = matching_lines(SKILL_PATH_RE, scanned)
 
     assert not offenders, (
-        "An agent definition cites a skill by filesystem path:\n"
+        "An agent or skill definition cites a skill by filesystem path:\n"
         + "\n".join(offenders)
         + "\nName the skill instead (e.g. `dh:execution`) and, if a specific part is meant, name "
-        "its section in prose. See rules/markdown-file-references.md, Skill Activation References."
+        "its section in prose. See rules/markdown-file-references.md, Skill Activation References. "
+        "If the match is not this citation, add it to SKILL_PATH_CITATION_EXCEPTIONS with the "
+        "reason — never drop it silently by narrowing the scan."
+    )
+
+
+def test_skill_path_citation_exceptions_still_exist() -> None:
+    """Every file named in ``SKILL_PATH_CITATION_EXCEPTIONS`` is still on disk.
+
+    An exception excuses a specific file's content; once that file is renamed, moved, or deleted,
+    the entry excuses nothing and is a stale line no one has a reason to revisit. This fails loudly
+    instead of leaving the exception to rot silently.
+    """
+    missing = [str(path.relative_to(PLUGIN_ROOT)) for path in SKILL_PATH_CITATION_EXCEPTIONS if not path.is_file()]
+
+    assert not missing, (
+        "SKILL_PATH_CITATION_EXCEPTIONS names a file that no longer exists: "
+        + ", ".join(missing)
+        + ". Remove the stale entry — it no longer excuses anything, and the scan should cover "
+        "whatever replaced the file."
     )
 
 
