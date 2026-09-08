@@ -412,8 +412,8 @@ selectable the next time `profile_list()` is called; nothing in this file needs 
 
 If the architecture spec specifies an agent explicitly, use that instead of matching. On no
 clear match, write no `agent` value — the task dispatches to `dh:task-worker` with no specialist
-profile, the documented generic fallback (`plugins/development-harness/skills/execution/SKILL.md`
-Step 2).
+profile, the documented generic fallback. Load the `dh:execution` skill and see its "Step 2 —
+Resolve Role to Agent" section.
 
 `skills:` needs no separate mapping step — the assigned agent's own `skills` (returned by
 `profile_list()`) load automatically when it's dispatched. Only add a skill to the task's

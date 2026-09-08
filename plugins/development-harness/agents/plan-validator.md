@@ -240,8 +240,8 @@ For each task T:
    documentation assigned to an agent whose description is about implementing CLI features is a
    mismatch, regardless of whether the name resolves).
 3. `agent` absent, or explicitly `dh:task-worker`, is always valid — the documented generic
-   fallback when nothing matched at assignment time
-   (`plugins/development-harness/skills/execution/SKILL.md` Step 2).
+   fallback when nothing matched at assignment time. Load the `dh:execution` skill and see its
+   "Step 2 — Resolve Role to Agent" section.
 
 **Red flags:**
 
