@@ -44,7 +44,7 @@ from dh_core.workflow_multigraph.model import Observation, SourceSpan
 
 
 class Projection(StrEnum):
-    """The projection a predicate is checked in; each is derived mechanically from the one IR."""
+    """The projection a predicate is checked in; each is derived mechanically from the one multigraph."""
 
     CONTROL_FLOW = "control-flow"
     DATA_AND_STATE = "data-and-state"

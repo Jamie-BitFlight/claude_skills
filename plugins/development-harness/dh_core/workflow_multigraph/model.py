@@ -12,7 +12,7 @@ layer graphs; this module has not yet been migrated to that shape. One pair of n
 several edges at once, and collapsing them into a single ``then`` arrow is what hides the defects
 worth finding.
 
-Two rules shape it. **The IR must hold a broken system**: report validation puts model fidelity
+Two rules shape it. **The multigraph must hold a broken system**: report validation puts model fidelity
 first, and a sound graph proves nothing if the extractor silently repaired an ambiguity. So the
 models refuse only what makes the *graph* incoherent -- an edge naming a node that does not exist,
 or a descriptor its endpoint does not declare. Unsoundness is reported by the queries, never by a

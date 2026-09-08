@@ -1,7 +1,7 @@
-"""Falsification of the graph IR against the four defects this branch already fixed by hand.
+"""Falsification of the workflow multigraph against the four defects this branch already fixed by hand.
 
-Each defect was a drift the control-flow-only ledger specification could not represent. The IR
-earns its place only if, for each one, it either refuses to construct the situation
+Each defect was a drift the control-flow-only ledger specification could not represent. The
+multigraph earns its place only if, for each one, it either refuses to construct the situation
 (UNREPRESENTABLE) or makes a predicate over the graph demonstrably false (DETECTABLE) at the
 severity the assessor contract's rule assigns.
 
@@ -27,8 +27,8 @@ D4 STATE/INVALIDATES -- DETECTABLE. Deleting rows nothing records is an INVALIDA
    record and a fold input with no producer; the orphaned plan row is a revision mismatch between
    the row written and the row the incoming tasks name.
 
-No defect is UNREPRESENTABLE, and that is the design, not a gap: the IR's first obligation is to
-hold a faithful picture of a broken system. What it refuses is an incoherent *graph* -- a dangling
+No defect is UNREPRESENTABLE, and that is the design, not a gap: the multigraph's first obligation
+is to hold a faithful picture of a broken system. What it refuses is an incoherent *graph* -- a dangling
 edge, an undeclared descriptor, an element with no source span -- and an invented severity.
 """
 
@@ -140,7 +140,7 @@ def test_d1_import_supplies_the_runners_claim_where_a_judges_verdict_is_required
 
     The graph is well formed: one DATA edge, endpoints resolve, and the syntactic types are
     identical -- ``int(0|1)`` on both sides, which is why a schema check sees nothing. Refusing to
-    build it would mean the IR could not hold the system as it actually was, and model fidelity is
+    build it would mean the multigraph could not hold the system as it actually was, and model fidelity is
     the first thing report validation checks. Two facets carry the difference: the authority the
     value was produced under, and its trust classification.
     """
@@ -214,7 +214,7 @@ def test_d2_a_data_edge_performs_a_control_transition():
     """D2 is DETECTABLE.
 
     Nothing about the shape of this graph is malformed -- a node writes fields and touches state --
-    so there is nothing for a constructor to refuse. What the IR separates is the *effect* from the
+    so there is nothing for a constructor to refuse. What the multigraph separates is the *effect* from the
     edge that carries it: the node's authority grants ``mutate`` and the transition it performs is
     ``decide``, and the status node's transition record has no producer at all, so the fold cannot
     restate the column it just changed.
@@ -448,7 +448,7 @@ def test_d4_replace_revokes_state_no_event_accounts_for():
     assert {f.severity for f in findings} == {Severity.BROKEN}
 
 
-# -- What the IR does refuse --------------------------------------------------------
+# -- What the multigraph does refuse -------------------------------------------------
 
 
 def test_severity_cannot_be_invented():

@@ -5,11 +5,11 @@ and would the falsification test catch a violation? Then: is the severity rule e
 mechanically, or can a checker report `BROKEN` where the contract requires `CONTRACT_UNSPECIFIED`?
 
 Authority: `dh_core/workflow_multigraph/findings.py`'s `Predicate`/`PREDICATES` and
-`plugins/development-harness/ARCHITECTURE.md`'s "The work graph" (the model this IR implements),
+`plugins/development-harness/ARCHITECTURE.md`'s "The work graph" (the model this multigraph implements),
 and `docs/adrs/ADR-3460-1-workflow-multigraph-owns-the-unowned-edges-first.md` criterion 2, which declares the
 expressibility obligation these findings are scored against:
 
-> Every falsified predicate in the assessor contract is expressible against the IR, or is recorded
+> Every falsified predicate in the assessor contract is expressible against the multigraph, or is recorded
 > there as out of scope with the reason. — ADR-3460-1, "The dual-home period, and how it ends", L62-63
 
 Subject under assessment: `dh_core/workflow_multigraph/model.py` (494 lines), `dh_core/workflow_multigraph/findings.py`
@@ -27,7 +27,7 @@ have found it is named in the finding. Nothing here was fixed; no builder file w
 This document is immutable. A verifier issues amendments or counter-findings against it and does
 not rewrite it. It deliberately carries neither of the two ADR-3460-1 finding markers
 (`Found-by:` / `Previously-known:`): those attest that the *graph* surfaced a defect in the system
-under assessment, and every finding here is a gap in the IR deliverable itself. Writing them would
+under assessment, and every finding here is a gap in the multigraph deliverable itself. Writing them would
 flip ADR-3460-1 criterion 5 on evidence that does not support it.
 
 ## Coverage at a glance
@@ -58,7 +58,7 @@ entirely in the queries.
 ## PREDICATES-1 — three of eleven predicates have no query and no out-of-scope record
 
 **Omission.** ADR-3460-1 criterion 2 requires each contract predicate to be either expressible
-against the IR or recorded as out of scope with a reason. `REQUIRED_FIELD_ABSENT`,
+against the multigraph or recorded as out of scope with a reason. `REQUIRED_FIELD_ABSENT`,
 `CARDINALITY_CONFLICTS_WITH_JOIN` and `GUARD_INCOMPLETE_OR_OVERLAPPING` have neither.
 
 **Severity: BROKEN.** Basis DECLARED — ADR-3460-1 L62-63, quoted above.
@@ -74,17 +74,17 @@ indistinguishable in the data from the eight that are implemented. A checker enu
 
 The out-of-scope record is an absence claim, so here is the search that would have found one:
 `grep -rni "out.of.scope|out-of-scope|deferred|not implemented|no query"` across
-`docs/workflow-multigraph/`, `dh_core/workflow_multigraph/`, `tests_sam/test_workflow_multigraph_defects.py` and the ADR returned
+`docs/graph-ir/`, `dh_core/graph_ir/`, `tests_sam/test_graph_ir_defects.py` and the ADR returned
 two hits, both inside the ADR — its own criterion-2 sentence at L63 and "Deferred to A: the
 models, the backends..." at L85, which is about scenario A's blast radius, not about a predicate.
-`docs/workflow-multigraph/` contains exactly one file, `ASSESSOR-CONTRACT.md` (`find docs/workflow-multigraph -type f`
+`docs/graph-ir/` contains exactly one file, `ASSESSOR-CONTRACT.md` (`find docs/graph-ir -type f`
 before this document was written). No record exists in either of the two places the ADR's "there"
 could name.
 
 The builder's report states the three "are listed in `PREDICATES` so a checker can report them,
 and `test_severity_taxonomy_is_closed` asserts the table covers the enum". That is accurate and
 does not satisfy the criterion. Independently, the ADR trigger already scores this criterion
-unmet, for a different reason: `evaluate()` looks for `dh_core/workflow_multigraph/predicates.py`, which does
+unmet, for a different reason: `evaluate()` looks for `dh_core/graph_ir/predicates.py`, which does
 not exist, and prints `contract lists 11 predicates; no predicates.py to answer them`.
 
 ---
@@ -98,12 +98,12 @@ not exist, and prints `contract lists 11 predicates; no predicates.py to answer 
 **Source spans.** `dh_core/workflow_multigraph/findings.py`, `Predicate.REQUIRED_FIELD_ABSENT`;
 `dh_core/workflow_multigraph/model.py#L110-L142` (`Descriptor`).
 
-**Observed.** A field is a member of a schema, and the IR holds no schema members. `Descriptor`
+**Observed.** A field is a member of a schema, and the multigraph holds no schema members. `Descriptor`
 carries `syntactic_type: str` and `schema_ref: str | None` — a type name and a pointer — and no
 field list, no required/optional partition over fields, and no instance against which presence
 could be decided. The contract requires an input or output to declare "syntactic type **or
 schema**" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record"); the
-IR implements only the first half. Nothing in the schema can be interrogated for a missing field,
+multigraph implements only the first half. Nothing in the schema can be interrogated for a missing field,
 so the predicate is not merely unqueried, it is unstatable.
 
 ---
@@ -146,10 +146,10 @@ and → "Mechanical checks" ("guard totality and exclusivity"); `dh_core/workflo
 
 **Observed.** Guards are opaque strings. Totality requires a domain to be covered and exclusivity
 requires two guards to be shown disjoint; neither is decidable over free text without a guard
-algebra — a variable, a domain, and a complement operation — and the IR declares none. The contract's
+algebra — a variable, a domain, and a complement operation — and the multigraph declares none. The contract's
 example guard, `"grade >= tighten"` (`plugins/development-harness/ARCHITECTURE.md`, "The work
 graph" → "Node record"), is a relational expression over a named variable, so the sources show the
-shape a structured guard would take and the IR does not adopt it.
+shape a structured guard would take and the multigraph does not adopt it.
 Neither `guard` nor `activation_guard` is read by any query (searched the source of `Graph`; no
 occurrence). This is the one omission the builder's report characterises correctly as needing new
 machinery ("the last needs a guard algebra"), and I concur with the diagnosis; the severity is
@@ -355,11 +355,11 @@ the eight queries — `type_incompatible_edges`, `trust_shortfalls`, `authority_
 `revision_mismatches` — read only `_pairs`. Probed: a DATA edge between a producer supplying
 `'prose'`/`PROPOSED`/`granting_authority=None` and a consumer requiring `'set[path]'`/`VERIFIED`/
 `required_authority='judge'`, with the edge carrying neither binding, returns empty from all four.
-Every semantic defect the IR exists to find disappears if the edge is written without bindings, and
+Every semantic defect the multigraph exists to find disappears if the edge is written without bindings, and
 no query, no validator and no test reports the unbound edge.
 
 This is the mechanism the model-fidelity validation activity is aimed at — a perfectly sound graph
-proves nothing if the extractor silently repaired an ambiguity — and the IR provides no signal that
+proves nothing if the extractor silently repaired an ambiguity — and the multigraph provides no signal that
 the repair occurred. The builder's model refuses an *incoherent* graph;
 an under-bound graph is coherent and empty of findings.
 
@@ -375,7 +375,7 @@ is sound, but it means the test suite contains an unbound DATA edge and asserts 
 **Falsified predicate.** `ExtractionStatus.OBSERVED` is declared to mean "stated by a source span"
 (`dh_core/workflow_multigraph/model.py#L86`).
 
-**Severity: BROKEN.** Basis DECLARED — the IR defines OBSERVED, and the cited span does not state
+**Severity: BROKEN.** Basis DECLARED — the multigraph defines OBSERVED, and the cited span does not state
 the facets carried under it.
 
 **Source spans.** `dh_core/workflow_multigraph/model.py#L83-L89` (`ExtractionStatus`);
@@ -393,7 +393,7 @@ authority.
 Every D1, D2 and D4 descriptor nevertheless carries `trust` and, where present,
 `required_authority` / `granting_authority` under the helper's default
 `extraction_status=OBSERVED`, citing `ledger_spec.py` as the only span. Those facets are INFERRED
-by the IR's own vocabulary — "derived from sources that do not state it outright" (L87). D3 is the
+by the multigraph's own vocabulary — "derived from sources that do not state it outright" (L87). D3 is the
 counter-example that shows the distinction was available: its `changed_files` input explicitly
 overrides to `ExtractionStatus.INFERRED` (`#L280`), and the test asserts that status (`#L315`).
 The other three defect graphs took the default.
@@ -403,7 +403,7 @@ and its basis is genuinely declared at the level of the ledger rule: `SUCCESSFUL
 (`ledger_spec.py#L56`) and the `tasks.ready` rule (`#L295-L299`) declare that only an accepted
 dependency releases a dependent, and `task.accepted` is `written_by=["accept"]` alone (`#L961`).
 What is not stated by any span is the *vocabulary* — the trust classification and the authority
-name — through which the IR makes that defect mechanical. So the finding is not that D1 is wrong;
+name — through which the multigraph makes that defect mechanical. So the finding is not that D1 is wrong;
 it is that the facets that make D1 machine-detectable are extractor-supplied and labelled as
 observed, which is the one signal a fidelity reviewer reads first (`model.py#L84`).
 
@@ -545,7 +545,7 @@ and is maintained by hand; adding a twelfth bullet to the contract would leave e
 
 **Omission.**
 
-**Severity: AMBIGUOUS.** Basis AMBIGUOUS. The IR's own model is "a single typed, hierarchical,
+**Severity: AMBIGUOUS.** Basis AMBIGUOUS. The multigraph's own model is "a single typed, hierarchical,
 directed multigraph" (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "The
 model"); the contract that model was extracted from additionally required the system to represent
 "one node refined into a subgraph" — a requirement dropped rather than carried forward when the

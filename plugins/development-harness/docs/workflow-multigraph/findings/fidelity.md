@@ -1,4 +1,4 @@
-# Model fidelity — the graph IR against `ledger_spec.py` and `sam_schema/core/models.py`
+# Model fidelity — the workflow multigraph against `ledger_spec.py` and `sam_schema/core/models.py`
 
 **Verdict: not-faithful**
 
@@ -14,7 +14,7 @@ states, that one source contradicts, and whose absence-shaped halves are propert
 fragment rather than of the ledger (FIDELITY-1 through FIDELITY-5).
 
 None of these findings carries `Found-by: IR`. Every one was found by reading the sources against
-`model.py`, not by the graph surfacing it. The IR has, at the time of this pass, been run over
+`model.py`, not by the graph surfacing it. The multigraph has, at the time of this pass, been run over
 nothing but the four fragments in its own test file.
 
 ## Scope of this pass, and what it did not cover
@@ -46,7 +46,7 @@ does apply, it is named.
 
 The severity rule is applied as written: `BROKEN` only where a declared or necessarily implied
 predicate is demonstrably false. For a fidelity pass the declaring sources are
-`plugins/development-harness/ARCHITECTURE.md` ("The work graph"), `ADR-3460-1`, and the IR's own
+`plugins/development-harness/ARCHITECTURE.md` ("The work graph"), `ADR-3460-1`, and the multigraph's own
 field definitions in `model.py` — the last
 because `ExtractionStatus.OBSERVED` is *defined* there as "stated by a source span", which makes it
 a declared predicate about every element that carries it.
@@ -79,7 +79,7 @@ faces the judge
 ```
 
 That is the post-fix specification. D1 was fixed by hand before this extraction was written. The
-fragment models the pre-fix behaviour, which is legitimate and necessary — the IR must be able to
+fragment models the pre-fix behaviour, which is legitimate and necessary — the multigraph must be able to
 hold a broken system — but it labels that modelling `OBSERVED` and anchors it at a file that now
 says the reverse. A fidelity reviewer asking "which source states this" gets a file that refutes it.
 
@@ -315,7 +315,7 @@ written as prose in `Edge.guard`, `Operation.summary` or `SideEffect.description
 reads any of the three (`grep -c "\bguard\b" model.py` = 1, the declaration).
 
 This is the edge type the contract names most explicitly, and it is one of the two the ADR's
-Context says the current models *do* own (`conflict_group` is STATE). The IR is meant to take
+Context says the current models *do* own (`conflict_group` is STATE). The multigraph is meant to take
 ownership of it at stage A. It presently cannot hold it.
 
 ---
@@ -326,7 +326,7 @@ ownership of it at stage A. It presently cannot hold it.
 "output cardinality conflicts with the join" — and the control-flow projection's "joins" question
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") — and
 `ADR-3460-1` criterion 2 ("Every falsified predicate in the assessor contract is expressible
-against the IR, or is recorded there as out of scope with the reason").
+against the multigraph, or is recorded there as out of scope with the reason").
 **Basis:** DECLARED. **Severity: BROKEN.**
 
 **Source spans**
@@ -348,7 +348,7 @@ The real system has a non-trivial join. `tasks.ready` is an AND over a dynamical
 set (`every id in dependencies names a task that is accepted or in SUCCESSFUL_DEPENDENCY`)
 conjoined with the exclusion condition of FIDELITY-7. The member condition is not "the predecessor
 finished" but "the predecessor reached one of a named set of statuses" — `SUCCESSFUL_DEPENDENCY`
-(`ledger_spec.py:56`) plus `accepted`. A CONTROL edge in this IR carries only a free-text `guard`,
+(`ledger_spec.py:56`) plus `accepted`. A CONTROL edge in this multigraph carries only a free-text `guard`,
 so the join's arity, its conjunction, and its per-member status predicate all become prose.
 
 ADR criterion 2 permits recording a predicate as out of scope with a reason. `grep -rn "out of
@@ -397,10 +397,10 @@ in no fragment (`grep -n "bookend" tests_sam/test_workflow_multigraph_defects.py
 
 ## FIDELITY-10 — a specification's quantified rules have no representation in a ground graph
 
-**Falsifies:** no listed predicate. The contract required the IR to represent "recursion" among
+**Falsifies:** no listed predicate. The contract required the multigraph to represent "recursion" among
 the system's other structural properties — a requirements list dropped rather than carried forward
 when the contract's architecture content was consolidated into `ARCHITECTURE.md` — but did not say
-whether the IR models a specification or one instance of it.
+whether the multigraph models a specification or one instance of it.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
 **Source spans**
@@ -428,7 +428,7 @@ the specification.
 
 ADR-3460-1's Decision says `ledger_spec.TRANSITIONS` "becomes derived from the IR rather than
 hand-maintained", and criterion 3 requires the derived control-flow projection to reproduce it
-exactly. A ground graph cannot derive a quantified matrix. Either the IR needs a quantification
+exactly. A ground graph cannot derive a quantified matrix. Either the multigraph needs a quantification
 construct, or criterion 3 needs the derivation to run per-plan and the criterion to say so. The
 contract does not settle which, so this is `CONTRACT_UNSPECIFIED` rather than `BROKEN` — but it is
 the finding most likely to block the ADR.
@@ -439,7 +439,7 @@ the finding most likely to block the ADR.
 
 **Falsifies:** no listed predicate. The contract's node record
 (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Node record") shows
-`preconditions` as an untyped list, so the IR is faithful to the *contract* here; the loss is
+`preconditions` as an untyped list, so the multigraph is faithful to the *contract* here; the loss is
 against the *system*.
 **Basis:** UNSPECIFIED. **Severity: CONTRACT_UNSPECIFIED.**
 
@@ -467,7 +467,7 @@ work is not incorrectly repeated"). `Termination` offers `terminal: bool` and a 
 
 Consequence for a checker: `reclaim` from `not-started` is a `NOOP` (`already-open`) while
 `reclaim` from `complete` with `accepted=1` is a `REFUSAL` (`task-accepted`) unless `--force`. In
-the IR both are strings in a list, so a guard-coverage query — the one the control-flow projection
+the multigraph both are strings in a list, so a guard-coverage query — the one the control-flow projection
 names (`plugins/development-harness/ARCHITECTURE.md`, "The work graph" → "Projections") and
 `Predicate.GUARD_INCOMPLETE_OR_OVERLAPPING` names in `findings.py` — has nothing to read.
 
@@ -504,7 +504,7 @@ not a member of `TaskStatus`, of `ledger_spec.Status`, or of the five values `st
 accepts (`ledger_spec.py:549-553`). Producer and consumer would both be labelled `str` or both
 `TaskStatus`, and `type_incompatible_edges()` would return nothing either way.
 
-I am recording this as a property of the IR, not asserting the `wont-fix` mapping is a live defect
+I am recording this as a property of the multigraph, not asserting the `wont-fix` mapping is a live defect
 — I did not trace whether any reader can reach `TaskStatus` construction with that value.
 
 ---
@@ -542,7 +542,7 @@ the extraction sets `holder == actor` (`test_workflow_multigraph_defects.py:80`)
 command the orchestrator authorises" — the shape of D2 — cannot be written as an authority relation
 between two parties. It can only be written as one party whose own grant set is short.
 
-Encoding relationships as node attributes is the flattening ADR-3460-1 was written to end. The IR
+Encoding relationships as node attributes is the flattening ADR-3460-1 was written to end. The multigraph
 reproduces it for four of the eight types, including the one whose absence motivated the ADR.
 
 ---
@@ -638,7 +638,7 @@ consequence (FIDELITY-1). Criterion 2 is not met for
 for it or for `REQUIRED_FIELD_ABSENT` and `GUARD_INCOMPLETE_OR_OVERLAPPING`. Criteria 3 and 5 were
 outside this pass.
 
-Nothing here should be read as a case against the IR's design. The severity taxonomy as computed
+Nothing here should be read as a case against the multigraph's design. The severity taxonomy as computed
 data, the refusal of an invented severity, the mandatory `basis_evidence`, and the decision to let
 the model hold a broken system are all sound, and FIDELITY-3 is only visible *because*
 `basis_evidence` is mandatory. What is missing is a real extraction and five constructs the sources
