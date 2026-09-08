@@ -382,9 +382,14 @@ hard STOP). The gate is skipped entirely for bug/fix items or items with no link
 - **rtica-assessor** (Wave 2) — Assesses information completeness using Wave 1 output; blocked by
   impact-analyst and fact-checker. Re-reads Fact-Check (a `REFUTED` claim marks its condition
   MISSING) and Impact Radius (a `SCOPE_EXPANSION:` line adds conditions). Writes `section="RT-ICA"`.
-- **alignment-analyst** (Wave 2) — Compares existing implementation against the item's design
-  intent, blocked by impact-analyst. Writes `section="Design Intent Alignment"`, leading with a
-  `MISSION_ALIGNED`/`MISSION_DIVERGENT` verdict line.
+- **alignment-analyst** (Wave 2) — Compares the item's proposed change against the mission and
+  historical direction governing the paths it touches; blocked by impact-analyst, whose
+  affected-path list it walks upward from to resolve the nearest governing `CLAUDE.md`,
+  `AGENTS.md`, and `ARCHITECTURE.md`. It does not read the implementation files at those paths.
+  Writes `section="Design Intent Alignment"`, leading with a
+  `MISSION_ALIGNED`/`MISSION_DIVERGENT`/`MISSION_UNASSESSED` verdict line — the third is emitted
+  when a gate fires (no mission source, or history unreadable or empty) so that a skipped check is
+  never reported as a finding.
 - **groomer** (Wave 3, `subagent_type="dh:backlog-item-groomer"`) — Runs after all other agents,
   reading every prior section itself (`item_ref` only is passed in the dispatch prompt). Produces
   Reproducibility, Priority, Impact, Benefits, Expected Behavior, Acceptance Criteria, Files,
