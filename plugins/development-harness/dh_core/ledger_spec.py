@@ -596,12 +596,18 @@ REASONS: list[Reason] = [
     Reason(
         code="cascade:T{n}",
         kind=ReasonKind.OUTCOME,
-        condition="the task became failed and this not-started transitive dependent moved to skipped",
+        condition=(
+            "the task became failed and this transitive dependent was not-started, so it moved to skipped, "
+            "or was already held skipped by another cascade, so it stayed there with one more failure blocking it"
+        ),
     ),
     Reason(
         code="cascade-reversed:T{n}",
         kind=ReasonKind.OUTCOME,
-        condition="the task left failed and this dependent, still skipped with cascade:T{n}, moved to not-started",
+        condition=(
+            "the task left failed and released its cascade's hold on this dependent, which moved to not-started "
+            "when no other cascade still held it and stayed skipped when one did"
+        ),
     ),
     Reason(
         code="returned-complete",
@@ -879,11 +885,19 @@ def _clear_attempt_effects() -> list[Effect]:
 
 CASCADE = Effect(
     column="status",
-    value="skipped, on every transitive dependent that is not-started, each with task.state reason cascade:T{n}",
+    value=(
+        "skipped, on every transitive dependent that is not-started; a dependent another cascade "
+        "already holds skipped stays skipped, and either way takes a task.state row with reason "
+        "cascade:T{n}, so the log carries one row per failure blocking it"
+    ),
 )
 REVERSAL = Effect(
     column="status",
-    value="not-started, on every dependent still skipped with cascade:T{n}, each with task.state reason cascade-reversed:T{n}",
+    value=(
+        "a task.state row with reason cascade-reversed:T{n} on every dependent this task's cascade "
+        "holds skipped, moving it to not-started when no other cascade still holds it and leaving "
+        "it skipped when one does"
+    ),
 )
 
 OPEN_STATUSES = [
