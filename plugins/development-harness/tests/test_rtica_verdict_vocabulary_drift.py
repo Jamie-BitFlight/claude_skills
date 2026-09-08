@@ -21,6 +21,15 @@ the groom before the groomer agent ran. The producer emitted one vocabulary and 
 another, and because the collapsed value was ``BLOCKED``, the split looked exactly like a gate
 working correctly.
 
+The incident's exact line shape is worth naming: the collapsed verdict was computed as
+``verdict = READY`` / ``verdict = BLOCKED`` inside a fenced pseudocode block, a Python-style
+assignment with a lower-case variable name and ``=``, not the ``Decision:``-labelled markdown line
+``_labelled_verdicts`` below detects. A label-only guard would have missed the very lines that
+caused the incident and caught only the unrelated ``**Verdict**: <READY or BLOCKED>`` line in the
+old output-format template. ``_assigned_verdicts`` closes that blind spot by matching the
+assignment form directly, so a pseudocode regression to a wrong or collapsed token is caught even
+before it reaches a labelled line.
+
 Three spellings are therefore retired on the grooming path and this module fails if any returns:
 
 - a ``READY`` verdict in any form — the binary assessor verdict that could not express the middle
@@ -80,6 +89,14 @@ _LABEL_RE = re.compile(r"(?:\*\*|`)?(Decision|Verdict|Status)(?:\*\*|`)?:[ \t]*(
 # An upper-case token, the shape every verdict in either set takes.
 _TOKEN_RE = re.compile(r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*")
 
+# A Python-style pseudocode assignment, e.g. ``    verdict = READY`` or ``decision = BLOCKED``.
+# This is the exact shape the pre-fix ``rtica-assessor.md`` used to compute its collapsed verdict,
+# and ``_LABEL_RE`` cannot see it: the variable name is lower-case, not a capitalised
+# ``Decision|Verdict|Status`` label, and the separator is ``=``, not ``:``. A verdict that is only
+# ever computed this way, never written out as a labelled line, would otherwise regress to a wrong
+# or collapsed token with nothing here to notice.
+_ASSIGNMENT_RE = re.compile(r"\b(decision|verdict|status)\s*=\s*(.*)")
+
 # A markdown ATX heading, captured so its level can be compared.
 _HEADING_RE = re.compile(r"^(#{1,6}) ")
 
@@ -134,6 +151,33 @@ def _labelled_verdicts(path: Path) -> list[tuple[int, str, str]]:
         for match in _LABEL_RE.finditer(line):
             label, rest = match.group(1), match.group(2)
             hits.extend((lineno, label, token) for token in _tokens_after_label(rest) if token in _VERDICT_UNIVERSE)
+    return hits
+
+
+def _assigned_verdicts(path: Path) -> list[tuple[int, str, str]]:
+    """Collect every pseudocode-assignment verdict token in a file.
+
+    Complements ``_labelled_verdicts``: that function finds a verdict written as a markdown label
+    (``Decision: TOKEN``), this one finds a verdict computed as a bare assignment (``verdict =
+    TOKEN``) inside a pseudocode or code block. The two are disjoint by construction — ``_LABEL_RE``
+    requires a capitalised label immediately followed by ``:``, and this pattern requires a
+    lower-case variable name followed by ``=`` — so a verdict spelled either way is caught by
+    exactly one of them, never both.
+
+    Args:
+        path: File to scan.
+
+    Returns:
+        Tuples of (1-based line number, variable name matched, token found), restricted to tokens
+        that are members of the verdict universe.
+    """
+    hits: list[tuple[int, str, str]] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        for match in _ASSIGNMENT_RE.finditer(line):
+            variable, rest = match.group(1), match.group(2).strip()
+            token_match = _TOKEN_RE.match(rest)
+            if token_match and token_match.group(0) in _VERDICT_UNIVERSE:
+                hits.append((lineno, variable, token_match.group(0)))
     return hits
 
 
@@ -235,12 +279,14 @@ def test_the_two_vocabularies_stay_disjoint() -> None:
 
 
 def test_grooming_path_speaks_only_the_planner_vocabulary() -> None:
-    """Every verdict written or gated on along the grooming path is a planner token.
+    """Every verdict written, assigned, or gated on along the grooming path is a planner token.
 
     This is the reintroduction guard. A ``READY`` verdict, or a bare ``APPROVED``/``BLOCKED``,
     appearing in any of these files is the exact split that halted the groom on its own normal
     outcome: the assessor collapsed three states into two, and the swarm gate read the collapsed
-    value as a stop.
+    value as a stop. Both verdict shapes are scanned: ``_labelled_verdicts`` for a markdown
+    ``Decision:`` line, ``_assigned_verdicts`` for a pseudocode ``verdict = TOKEN`` assignment —
+    the incident's own shape, which no labelled-line scan would have caught.
     """
     offenders: list[str] = []
     for relative in _GROOMING_PATH:
@@ -249,6 +295,9 @@ def test_grooming_path_speaks_only_the_planner_vocabulary() -> None:
         for lineno, label, token in _labelled_verdicts(path):
             if token not in _PLANNER_TOKENS:
                 offenders.append(f"  {relative}:{lineno} — {label}: {token}")
+        for lineno, variable, token in _assigned_verdicts(path):
+            if token not in _PLANNER_TOKENS:
+                offenders.append(f"  {relative}:{lineno} — {variable} = {token}")
 
     assert not offenders, (
         "Retired RT-ICA verdict spellings are back on the grooming path:\n"
