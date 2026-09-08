@@ -271,7 +271,7 @@ Disabled hooks exit 0 (Claude Code treats non-zero hook exit as an error that ki
 # Skip PostToolUse activity tracking (reduces I/O during task execution)
 export CLAUDE_SKILLS_HOOK_PROFILE=minimal
 
-# Enable strict pre-completion validation warnings
+# Run every handler — same set as `standard`; no extra validation is performed
 export CLAUDE_SKILLS_HOOK_PROFILE=strict
 
 # Disable a specific hook by ID
