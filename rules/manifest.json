@@ -17,6 +17,10 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
     },
     {
+      "file": "commit-cadence-and-worktrees.md",
+      "match": "*"
+    },
+    {
       "file": "data-format-selection.md",
       "match": "*.py,*.json,*.md,*.sql"
     },
@@ -25,16 +29,44 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
+      "file": "delegation.md",
+      "match": "*"
+    },
+    {
+      "file": "evidence-action-proportionality.md",
+      "match": "*"
+    },
+    {
       "file": "exception-handling.md",
       "match": "*.py,*.ts,*.js"
+    },
+    {
+      "file": "fact-verification-first.md",
+      "match": "*"
+    },
+    {
+      "file": "falsification-requirement.md",
+      "match": "*"
+    },
+    {
+      "file": "fix-delegation-discipline.md",
+      "match": "*"
     },
     {
       "file": "frontmatter-requirements.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
     },
     {
+      "file": "interactive-terminal-workarounds.md",
+      "match": "*"
+    },
+    {
       "file": "language-conventions.md",
       "match": "**/scripts/**,.claude/hooks/**,*.py"
+    },
+    {
+      "file": "large-file-write-strategy.md",
+      "match": "*"
     },
     {
       "file": "linting-exceptions.md",
@@ -45,12 +77,20 @@
       "match": "*.md"
     },
     {
+      "file": "model-selection.md",
+      "match": "*"
+    },
+    {
       "file": "plugin-development.md",
       "match": "plugins/**/*,.claude-plugin/**/*"
     },
     {
       "file": "plugin-json.md",
       "match": ".claude-plugin/plugin.json,plugin.json"
+    },
+    {
+      "file": "proactive-fix-gate.md",
+      "match": "*"
     },
     {
       "file": "prose-file-classification.md",
@@ -61,6 +101,10 @@
       "match": "*.py,pyproject.toml,uv.lock"
     },
     {
+      "file": "reproduction-integrity.md",
+      "match": "*"
+    },
+    {
       "file": "review-and-correction-discipline.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,rules/*.md,CLAUDE.md"
     },
@@ -69,8 +113,16 @@
       "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,rules/*.md,CLAUDE.md,AGENTS.md"
     },
     {
+      "file": "scratch-directory.md",
+      "match": "*"
+    },
+    {
       "file": "script-invocation.md",
       "match": "**/scripts/**,.claude/hooks/**"
+    },
+    {
+      "file": "shared-process-extraction.md",
+      "match": "**/agents/*.md,SKILL.md"
     },
     {
       "file": "silent-failure-prevention.md",
@@ -95,54 +147,6 @@
     {
       "file": "yaml-toml-libraries.md",
       "match": "*.py"
-    },
-    {
-      "file": "commit-cadence-and-worktrees.md",
-      "match": "*"
-    },
-    {
-      "file": "delegation.md",
-      "match": "*"
-    },
-    {
-      "file": "evidence-action-proportionality.md",
-      "match": "*"
-    },
-    {
-      "file": "fact-verification-first.md",
-      "match": "*"
-    },
-    {
-      "file": "falsification-requirement.md",
-      "match": "*"
-    },
-    {
-      "file": "fix-delegation-discipline.md",
-      "match": "*"
-    },
-    {
-      "file": "interactive-terminal-workarounds.md",
-      "match": "*"
-    },
-    {
-      "file": "large-file-write-strategy.md",
-      "match": "*"
-    },
-    {
-      "file": "model-selection.md",
-      "match": "*"
-    },
-    {
-      "file": "proactive-fix-gate.md",
-      "match": "*"
-    },
-    {
-      "file": "reproduction-integrity.md",
-      "match": "*"
-    },
-    {
-      "file": "scratch-directory.md",
-      "match": "*"
     }
   ]
 }

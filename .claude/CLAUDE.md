@@ -374,6 +374,10 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
+- Shared Agent Process (process more than one agent follows lives in a skill they load): [Shared Process Extraction](../rules/shared-process-extraction.md)
+
+---
+
 - Silent Failure Prevention: [Silent Failure Prevention](../rules/silent-failure-prevention.md)
 
 ---
