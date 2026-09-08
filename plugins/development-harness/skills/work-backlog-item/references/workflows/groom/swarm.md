@@ -105,13 +105,35 @@ sequenceDiagram
 
     RT->>RT: re-read Fact-Check, mark condition MISSING if REFUTED
     RT->>RT: assess completeness using Impact Radius + Fact-Check
-    RT-->>O: STATUS: DONE or BLOCKED — RT-ICA written
+    RT-->>O: STATUS: DONE — RT-ICA written, carrying its Decision: line
 
     AA->>AA: compare design intent vs implementation
     AA-->>O: STATUS: DONE — Design Intent Alignment written
 ```
 
-If RT-ICA returns `STATUS: BLOCKED`, stop and present MISSING conditions. Do not proceed to Wave 3.
+#### Wave 2 gate — read the verdict, not the delivery signal
+
+Two different signals come back from `rtica-assessor` and they mean different things:
+
+- Its terminal `STATUS:` line is the `dh:subagent-contract` delivery signal. `STATUS: BLOCKED`
+  means it could not write an assessment at all — its upstream sections never appeared. Route that
+  to [error.md](./error.md) as an agent failure; there is no verdict to read.
+- Its verdict is the `Decision:` line inside the RT-ICA section it wrote. Read it with
+  `backlog_view(selector='{item_ref}', summary=False, section='RT-ICA')` and match the plain
+  `Decision: <TOKEN>` line.
+
+Gate on the `Decision:` token, using the vocabulary `dh:planner-rt-ica` owns:
+
+| `Decision:` token | Action |
+|---|---|
+| `APPROVED-FOR-PLANNING` | Proceed to Wave 3. |
+| `APPROVED-WITH-GAPS` | Proceed to Wave 3. Pass the MISSING rows of the conditions table to the groomer so it can populate Blockers, Human Input, and Questions for Human. This is the expected outcome for a brownfield or refactor item. |
+| `BLOCKED-FOR-PLANNING` | Stop. Present the MISSING conditions. Do not proceed to Wave 3. |
+| anything else, or no `Decision:` line | Route to [error.md](./error.md) naming the token found. Do not guess. |
+
+An unrecognised token is an error, not a block and not a pass. Reading an unknown verdict as
+"blocked" is how a producer and a consumer stay split without anyone noticing: the pipeline halts
+on every run and the halt looks like a correct gate doing its job.
 
 #### Wave 3 — depends on Wave 2
 

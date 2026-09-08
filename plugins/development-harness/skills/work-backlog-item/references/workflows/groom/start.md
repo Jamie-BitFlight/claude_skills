@@ -59,8 +59,11 @@ Track progress using your task list. Check off each step as it completes.
    - Wait for all agents to complete before proceeding
 5. [ ] **Finalize** (`finalize.md`) — run post-swarm gates and write
    - RT-ICA final pass: re-assess conditions, self-resolve DERIVABLE/MISSING, write final report
-     - If BLOCKED: present MISSING conditions to user, wait for answers, re-check
-     - If APPROVED: continue
+     - If `BLOCKED-FOR-PLANNING`: present the MISSING conditions to the user and stop
+     - If `APPROVED-WITH-GAPS`: batch the remaining MISSING conditions to the user, then continue
+       whether or not they are answered — unanswered gaps are recorded on the item
+     - If `APPROVED-FOR-PLANNING`: continue
+     - Any other token, or no `Decision:` line: route to error.md naming the token found
    - Output validation gate: verify all required sections present with minimum content (defined in finalize.md)
      - If missing: retry same model with targeted prompt (up to 3 attempts, then blocked)
      - If pass: continue
@@ -76,7 +79,8 @@ When any step encounters an error, agent failure, or workflow block: route to [e
 | MCP tool returns error dict | System Error |
 | Agent fails to produce expected output | Agent Failure |
 | Discovery gate STOP (artifact not registered) | Agent Failure |
-| RT-ICA BLOCKED (unresolvable MISSING conditions) | Workflow Block |
+| RT-ICA `Decision: BLOCKED-FOR-PLANNING` (no planning signal, or a data-deletion hard block) | Workflow Block |
+| RT-ICA `Decision:` line absent or carrying an unrecognised token | Workflow Block, naming the token found |
 | Output validation fails after 3 attempts | Agent Failure |
 | SKIP (pre-groom check) | Not an error — report reason via [finally.md](./finally.md) |
 | DRIFT (already groomed today) | Not an error — route to [groom-drift.md](./groom-drift.md) then [finally.md](./finally.md) |
