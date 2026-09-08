@@ -181,8 +181,8 @@ Use three calls to avoid large single-call payloads:
 
 **Single-writer constraint**: `append_task` is NOT safe under concurrent writers. Do not
 call `append_task` for the same plan from multiple agents or sessions simultaneously. For
-the full single-writer contract, see the `CLAUDE.md` gotcha note in
-`plugins/development-harness/CLAUDE.md`.
+the full single-writer contract, see "SAM Storage Model" in
+`plugins/development-harness/docs/backend-providers.md`.
 
 Each task definition carries these routing fields. Any key outside the accepted set is
 rejected — do not invent fields:
