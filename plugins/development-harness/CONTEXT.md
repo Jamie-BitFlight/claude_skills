@@ -152,8 +152,10 @@ property of the report, not a defect in it. An unknown name is accepted, recorde
 rather than refused, because refusing pushes a novel failure into a mislabelled known one.
 Distinct from a `REASONS` code (why a CLI command refused about a ledger row — the ledger's own
 observation, which no agent chooses) and from `reclaim --reason` (what the Orchestrator did about
-it). The three are one direction of flow: the Worker labels, the router maps, the Orchestrator
-records.
+it). Two mappings exist because they sit at different layers: the ledger's vocabulary maps status
+in the orchestration layer, while a failure type evaluates the problem met inside the workload
+being executed. The three are one direction of flow: the Worker labels, the router maps, the
+Orchestrator records.
 _Avoid_: treating a failure type as a verdict, or as authority over ledger state — where a label
 and the ledger's own observation disagree, the observation is the fact and the label is the
 reporter's reading of it. Also avoid "error code" or "error type": these name why work could not
