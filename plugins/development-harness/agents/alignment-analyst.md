@@ -6,6 +6,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plug
 memory: project
 skills:
   - dh:subagent-contract
+  - dh:backend-resolution
 ---
 
 # Alignment Analyst
@@ -75,7 +76,7 @@ When the proposed change touches how plans, tasks, or artifacts are addressed, j
 
 Historical direction comes from the project's configured backend, never from a repository slug written into this file and never from `gh`'s remote auto-detection.
 
-**Resolve the backend the way the rest of the plugin does.** The canonical chain is defined once, in `docs/backend-providers.md` under "One configured backend", and implemented by `create_backend()`. It is: `BACKLOG_BACKEND` when set → `backlog.backend` (then the global `backend.name`) in `.dh/config.yaml` → the explicit `.beads/dh-backend` opt-in marker → default `github`. Read that section rather than re-deriving the chain; an inline heuristic that stops at the environment variable and a `.beads` directory misses the configured value and picks the wrong history source.
+Resolve the active backend by following `dh:backend-resolution` (already loaded via this agent's `skills:` frontmatter). Resolving it any other way picks the wrong history source.
 
 **First, try merged-PR history through the backend:**
 
