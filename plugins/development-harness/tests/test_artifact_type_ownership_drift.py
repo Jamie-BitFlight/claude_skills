@@ -12,8 +12,14 @@ that registers one entry per unit reviewed leaves several under its own type; it
 ``artifact_id`` instead of reading by type. The owner map's ``Gate-read`` column bounds who may
 write a type, not how many entries one writer leaves.
 
-AGENTS.md's "Artifact types and registering agents" table is the declared map. These tests hold the
-shipped markdown and that map in agreement:
+AGENTS.md's "Artifact types and registering agents" table is the declared map, and this module does
+not locate it for itself: ``dh_core.artifact_registry`` is the one locator, shared with the
+decomposition-exit gate, which resolves an ``ARTIFACT`` referent against the same table. Two
+locators for one table drifted apart once already — this module anchored on the table's header row
+and passed while the gate anchored on a heading that did not exist, so every ``ARTIFACT`` referent
+resolved to nothing with the suite green.
+
+These tests hold the shipped markdown and that map in agreement:
 
 * every ``artifact_register`` call in shipped markdown — MCP tool form and ``artifact register``
   CLI form — names a ``(type, agent)`` pair the map declares;
@@ -33,12 +39,15 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
-from pydantic import BaseModel, Field
-
-_PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-_AGENTS_MD = _PLUGIN_ROOT / "AGENTS.md"
-
-_OWNER_TABLE_HEADING = "| Type | Registering agents | Gate-read | Notes |"
+from dh_core.artifact_registry import (
+    AGENTS_MD,
+    PLUGIN_ROOT,
+    REPO_RELATIVE_AGENTS_MD,
+    ArtifactRegistryError,
+    ArtifactTypeRow,
+    registry_rows,
+)
+from pydantic import BaseModel
 
 # MCP tool form: artifact_register(item_id=..., artifact_type="x", ..., agent="y"). Only the opening
 # delimiter is matched here — the closing one is found by _iter_tool_call_bodies, because a regex
@@ -243,14 +252,6 @@ def _is_placeholder(value: str) -> bool:
     return bool(_PLACEHOLDER_CHARS & set(value))
 
 
-class ArtifactTypeOwners(BaseModel):
-    """One declared row of the AGENTS.md artifact-type owner map."""
-
-    artifact_type: str
-    agents: frozenset[str] = Field(default_factory=frozenset)
-    gate_read: bool = False
-
-
 class Registration(BaseModel):
     """One ``artifact_register`` call found in shipped markdown."""
 
@@ -259,8 +260,8 @@ class Registration(BaseModel):
     source: str
 
 
-_UNDECLARED = ArtifactTypeOwners(artifact_type="")
-"""Stand-in for a type absent from the map: it owns no agent, so every writer of it is undeclared."""
+_NO_DECLARED_AGENTS: frozenset[str] = frozenset()
+"""What a type absent from the map owns: no agent, so every writer of it is undeclared."""
 
 
 def _resolve_agent(args: Iterable[str], agent_re: re.Pattern[str], present_re: re.Pattern[str]) -> str | None:
@@ -319,42 +320,35 @@ def _find_type_match(args: Iterable[str], type_re: re.Pattern[str]) -> re.Match[
     return None
 
 
-def _strip_cell(cell: str) -> str:
-    return cell.strip().strip("`").strip()
-
-
-def parse_owner_map(text: str) -> dict[str, ArtifactTypeOwners]:
-    """Parse the artifact-type owner map out of AGENTS.md.
-
-    Args:
-        text: Full AGENTS.md contents.
+def owner_map() -> dict[str, ArtifactTypeRow]:
+    """Read the artifact-type owner map through the shared locator.
 
     Returns:
         Mapping of artifact type to its declared owners and gate-read flag.
 
     Raises:
-        AssertionError: If the owner table heading is absent or the table is empty.
+        AssertionError: If the map declares no rows.
+        ~dh_core.artifact_registry.ArtifactRegistryError: If the registry is not where
+            ``dh_core.artifact_registry`` declares it — raised by ``registry_rows``, not caught
+            here, because a map this module cannot find is a repair to make in AGENTS.md.
     """
-    lines = text.splitlines()
-    assert _OWNER_TABLE_HEADING in lines, (
-        f"AGENTS.md is missing the artifact-type owner map. Expected a table headed "
-        f"{_OWNER_TABLE_HEADING!r} under 'Artifact types and registering agents'."
-    )
-    start = lines.index(_OWNER_TABLE_HEADING) + 2  # skip the header and its separator row
-    owners: dict[str, ArtifactTypeOwners] = {}
-    for line in lines[start:]:
-        if not line.startswith("|"):
-            break
-        cells = list(line.split("|")[1:-1])
-        if len(cells) < 3:
-            continue
-        artifact_type = _strip_cell(cells[0])
-        agents = frozenset(_strip_cell(a) for a in cells[1].split(",") if _strip_cell(a))
-        owners[artifact_type] = ArtifactTypeOwners(
-            artifact_type=artifact_type, agents=agents, gate_read=_strip_cell(cells[2]).lower() == "yes"
-        )
+    owners = {row.artifact_type: row for row in registry_rows(AGENTS_MD)}
     assert owners, "The artifact-type owner map in AGENTS.md declares no rows."
     return owners
+
+
+def declared_agents(owners: dict[str, ArtifactTypeRow], artifact_type: str) -> frozenset[str]:
+    """Return the agents the map permits to write ``artifact_type``.
+
+    Args:
+        owners: The parsed owner map.
+        artifact_type: The type a scanned registration names.
+
+    Returns:
+        The row's declared agents, or ``_NO_DECLARED_AGENTS`` when the map declares no such type.
+    """
+    row = owners.get(artifact_type)
+    return row.agents if row is not None else _NO_DECLARED_AGENTS
 
 
 def parse_registrations(text: str, source: str) -> list[Registration]:
@@ -405,18 +399,18 @@ def scan_registrations() -> list[Registration]:
         The concatenated result of ``parse_registrations`` over every shipped ``*.md``.
     """
     found: list[Registration] = []
-    for path in sorted(_PLUGIN_ROOT.rglob("*.md")):
-        found += parse_registrations(path.read_text(encoding="utf-8"), str(path.relative_to(_PLUGIN_ROOT)))
+    for path in sorted(PLUGIN_ROOT.rglob("*.md")):
+        found += parse_registrations(path.read_text(encoding="utf-8"), str(path.relative_to(PLUGIN_ROOT)))
     return found
 
 
 def test_every_registration_is_declared_in_the_owner_map() -> None:
     """Every scanned ``(artifact_type, agent)`` pair appears in the AGENTS.md owner map."""
-    owners = parse_owner_map(_AGENTS_MD.read_text(encoding="utf-8"))
+    owners = owner_map()
     undeclared = sorted({
         (r.artifact_type, r.agent, r.source)
         for r in scan_registrations()
-        if r.agent not in owners.get(r.artifact_type, _UNDECLARED).agents
+        if r.agent not in declared_agents(owners, r.artifact_type)
     })
 
     assert not undeclared, (
@@ -430,7 +424,7 @@ def test_every_registration_is_declared_in_the_owner_map() -> None:
 
 def test_gate_read_types_have_exactly_one_registering_agent() -> None:
     """A type whose read drives a workflow branch is declared with a single registering agent."""
-    owners = parse_owner_map(_AGENTS_MD.read_text(encoding="utf-8"))
+    owners = owner_map()
     shared = {
         row.artifact_type: sorted(row.agents) for row in owners.values() if row.gate_read and len(row.agents) != 1
     }
@@ -625,6 +619,125 @@ def test_parse_registrations_ignores_ownership_text_inside_an_earlier_cli_flag_v
     call = 'artifact register --content "--artifact-type research" --artifact-type new-type --agent new-writer\n'
 
     assert [(r.artifact_type, r.agent) for r in parse_registrations(call, "doc.md")] == [("new-type", "new-writer")]
+
+
+_REGISTRY_FIXTURE = """# Doc
+
+### Artifact types and registering agents
+
+| Type | Registering agents | Gate-read | Notes |
+|---|---|---|---|
+| `code-review` | `code-reviewer` | yes | One entry per reviewed task. |
+| `research` | `swarm-task-planner`, `ecosystem-researcher` | no | Multi-entry. |
+"""
+
+
+def _write(tmp_path: Path, text: str) -> Path:
+    """Write ``text`` as an AGENTS.md under ``tmp_path``.
+
+    Args:
+        tmp_path: The pytest temporary directory.
+        text: The markdown to write.
+
+    Returns:
+        The path written.
+    """
+    path = tmp_path / "AGENTS.md"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_registry_rows_reads_types_agents_and_gate_read_from_the_table(tmp_path: Path) -> None:
+    """The shared locator returns each row's type, its agents, and its gate-read flag.
+
+    Tests: dh_core.artifact_registry.registry_rows
+    How: Parse a fixture holding the registry heading and a two-row table.
+    Why: Both readers consume these three columns; a locator that finds the table but reads a
+         column wrong is the same silent defect as one that finds no table at all.
+    """
+    rows = {row.artifact_type: row for row in registry_rows(_write(tmp_path, _REGISTRY_FIXTURE))}
+
+    assert rows["code-review"].agents == frozenset({"code-reviewer"})
+    assert rows["code-review"].gate_read is True
+    assert rows["research"].agents == frozenset({"swarm-task-planner", "ecosystem-researcher"})
+    assert rows["research"].gate_read is False
+
+
+def test_registry_rows_raises_when_the_heading_is_not_a_heading(tmp_path: Path) -> None:
+    """A registry written under bold text rather than a heading raises instead of reading empty.
+
+    Tests: dh_core.artifact_registry.registry_rows heading anchor
+    How: Parse a document whose registry sits under ``**Artifact types and registering agents:**``.
+    Why: This is the shipped defect. The gate read the registry by heading, AGENTS.md carried the
+         same words as a bold paragraph, and the parse returned an empty registry — so every
+         ARTIFACT referent failed to resolve and the gate blocked every valid one, reporting
+         nothing about why. An empty result cannot be told apart from a registry naming no types;
+         raising can.
+    """
+    text = _REGISTRY_FIXTURE.replace(
+        "### Artifact types and registering agents", "**Artifact types and registering agents:**"
+    )
+
+    with pytest.raises(ArtifactRegistryError, match="no artifact-type registry under heading"):
+        registry_rows(_write(tmp_path, text))
+
+
+def test_registry_rows_raises_when_a_required_column_is_renamed(tmp_path: Path) -> None:
+    """A renamed column raises rather than reading the wrong column's values.
+
+    Tests: dh_core.artifact_registry.column_indices
+    How: Rename the ``Gate-read`` column in the fixture's header row.
+    Why: Columns are read by name, not position, so a rename must fail loudly. Reading by position
+         would silently take the notes column as the gate-read flag once a column moves.
+    """
+    text = _REGISTRY_FIXTURE.replace(
+        "| Type | Registering agents | Gate-read | Notes |", "| Type | Owners | Gate | X |"
+    )
+
+    with pytest.raises(ArtifactRegistryError, match="omits column"):
+        registry_rows(_write(tmp_path, text))
+
+
+def test_registry_rows_raises_on_an_undeclared_gate_read_value(tmp_path: Path) -> None:
+    """A ``Gate-read`` cell outside the declared values raises rather than defaulting to false.
+
+    Tests: dh_core.artifact_registry.parse_row
+    How: Set one row's ``Gate-read`` cell to a value the registry does not declare.
+    Why: Falling through to False would quietly drop a gate-read type out of the guard that holds
+         gate-read types to a single registering agent — rules/silent-failure-prevention.md's
+         "Branching on Input Values Requires an Explicit Fallback".
+    """
+    text = _REGISTRY_FIXTURE.replace(
+        "| `code-review` | `code-reviewer` | yes |", "| `code-review` | `code-reviewer` | ? |"
+    )
+
+    with pytest.raises(ArtifactRegistryError, match="which is not one of"):
+        registry_rows(_write(tmp_path, text))
+
+
+def test_registry_rows_raises_when_the_file_does_not_exist(tmp_path: Path) -> None:
+    """A path that does not exist raises rather than reporting a registry with no rows.
+
+    Tests: dh_core.artifact_registry.registry_rows missing-file branch
+    How: Parse a path under an empty temporary directory.
+    Why: A caller handed the wrong path must learn that, not that the registry is empty.
+    """
+    with pytest.raises(ArtifactRegistryError, match="no such file"):
+        registry_rows(tmp_path / "AGENTS.md")
+
+
+def test_the_locator_names_one_file_by_two_paths_that_agree() -> None:
+    """``AGENTS_MD`` and ``REPO_RELATIVE_AGENTS_MD`` address the same shipped file.
+
+    Tests: dh_core.artifact_registry path constants
+    How: Resolve the repo-relative path against the repository root this checkout sits in and
+         compare it with the absolute constant, then confirm the file exists.
+    Why: The gate resolves the registry against a given checkout root while a reader running inside
+         this one uses the absolute path. Two spellings of one location is the drift shape this
+         module exists to remove, so they are held in agreement rather than trusted.
+    """
+    assert PLUGIN_ROOT.parents[1] / REPO_RELATIVE_AGENTS_MD == AGENTS_MD
+    assert AGENTS_MD.is_file()
 
 
 def test_iter_tool_call_bodies_ignores_an_unclosed_call() -> None:
