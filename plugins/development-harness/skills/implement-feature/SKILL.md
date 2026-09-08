@@ -57,16 +57,24 @@ This is safe to run when you are unsure: a plan the ledger already holds answers
 changes nothing. Once it has run, every `plan` command naming this address reads and writes the
 ledger — including the `status` command above, which then reports the ledger's own columns.
 
+The two stores answer `status` in shapes that share field names while disagreeing about where
+those fields sit, so the import above changes how every later status read is addressed: plan-level
+fields move inside a top-level `row` key, and `tasks` becomes an array of task rows. Read
+[./references/plan-status-shapes.md](./references/plan-status-shapes.md) before reading any field
+off a status response. The short of it: a key absent from the shape that answered reads as a
+default, and where that key gates a confirmation the gate never fires.
+
 ## Record the Implementation Base SHA
 
 The judge diffs a worker's `FILES_CHANGED` against the commit the plan started from, so that commit
 has to be recorded before the first one lands.
 
-Read the status output above. When its plan row carries a `base_sha`, the plan already records it
-and this step is done — a plan created in the ledger sets it at creation, and re-recording it now
-would capture a later commit instead of the true starting point.
+Re-run the status command now that the import has run, and read `row.base_sha`. When it carries a
+value the plan already records it and this step is done — a plan created in the ledger sets it at
+creation, and re-recording it now would capture a later commit instead of the true starting point.
+The pre-import status cannot answer this: the content shape has no `base_sha` field at all.
 
-Otherwise read the plan's `context`. If it already contains a line matching
+Otherwise read the plan's `row.context`. If it already contains a line matching
 `**Implementation base SHA**: <sha>`, a prior run recorded it; skip this step for the same reason.
 
 Otherwise, before the Progress Loop makes its first commit: run `git rev-parse HEAD` and prepend
@@ -88,12 +96,28 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
 ```
 
-After receiving the status response, extract and store the autonomy mode:
+After receiving the status response, extract and store the autonomy mode. This loop runs after the
+import, so the ledger is what answered and the mode is a column of its plan row:
 
-`autonomy_mode = status["autonomy"]`
+`autonomy_mode = status["row"]["autonomy"]`
 
 This value governs gate behavior throughout the remainder of the Progress Loop for this plan.
-Pre-existing plans that omit the `autonomy` field return `"full_auto"` (the Pydantic default).
+
+A resolved mode is what a working read looks like: the ledger writes its `plans.autonomy` column
+when the plan is created, and `plan import` carries the authored value across. Supplying a default
+yourself is never part of this read.
+
+**If `autonomy_mode` does not resolve to `full_auto`, `checkpoint` or `per_task`** — the response
+carries no `row`, the column is empty, or it holds something else — STOP the Progress Loop before
+dispatching anything. Report the plan address, the status response's top-level keys, and that
+autonomy could not be determined; ask the user which mode to run under, and use the mode they name.
+
+Do not fall back to `full_auto`. The modes differ only in which confirmations reach the user and
+`full_auto` is the one that asks for none, so reading an unresolved value as `full_auto` turns
+every failure of this read into an unattended run the user did not choose — and does it silently,
+because a run that asks for nothing looks exactly like a run the user asked not to be asked about.
+A halt costs one question; work committed by agents the user meant to approve one at a time cannot
+be taken back.
 
 2. If tasks remain, query ready tasks **once** and store the result as the current batch:
 
@@ -308,18 +332,22 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
 
 5. After all tasks in the current batch complete, call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to
-   check plan progress. If tasks remain, return to step 2 to fetch the next batch of ready
-   tasks. Do not fetch another ready batch until the previous batch is fully dispatched.
+   check plan progress. Tasks remain while the plan-level `progress` is `open`; return to step 2
+   then to fetch the next batch of ready tasks. Do not fetch another ready batch until the previous
+   batch is fully dispatched.
 
 **5a. Wave-Completion Confirmation Gate** (active when `autonomy_mode == "checkpoint"` only):
 
 After all tasks in the current batch complete and the status response from step 5 confirms that tasks remain:
 
-1. Display a compact wave-completion summary:
+1. Display a compact wave-completion summary from the step 5 status response. The ledger reports
+   no completion percentage and no top-level ready list; derive both from its `tasks` array, where
+   a row counts as done when `accepted` is 1 or `status` is `deferred` or `skipped`:
    - Number of tasks completed in this wave
-   - Current plan completion percentage (from `status["completion_pct"]`)
-   - Number of tasks remaining
-   - Next ready tasks (from `status["ready_tasks"]` list — task IDs only)
+   - Plan progress: how many rows are done out of how many `tasks` holds, with the plan-level
+     `progress` word beside it
+   - Number of tasks remaining: the rows that are not done
+   - Next ready tasks: the rows whose `ready` is true — task IDs only
 
 2. Present a confirmation prompt to the user. The exact wording is implementation-defined;
    examples include "Wave complete. Proceed with the next wave? (yes/no)".
