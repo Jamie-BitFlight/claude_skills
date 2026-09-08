@@ -1,12 +1,11 @@
-"""Guards the artifact-type registry against the prose and the vocabulary oracle around it.
+"""Guards the artifact-type registry against the prose written around it.
 
 :data:`dh_core.artifact_registry.REGISTRY` is the map, and its shape is held by the type system:
 a row naming a type with no ``ArtifactType`` member fails at import. What the type system does not
 hold is everything written *around* the map, and that is what this module falsifies:
 
 * every ``artifact_register`` call in shipped markdown — MCP tool form and ``artifact register``
-  CLI form — names a ``(type, agent)`` pair the registry declares;
-* the extraction workers' vocabulary oracle names only types the registry declares.
+  CLI form — names a ``(type, agent)`` pair the registry declares.
 
 A gate-read type's agent count is not scanned here: it is a property of a well-formed row, so
 :class:`~dh_core.artifact_registry.ArtifactTypeRow` enforces it with a ``model_validator`` that
@@ -407,45 +406,6 @@ def test_every_registration_is_declared_in_the_owner_map() -> None:
         "stale — resolve it in dh_core/artifact_registry.py before the call ships, because a read by "
         "type alone returns only the newest entry and cannot tell two writers apart. Each entry is "
         "(artifact_type, agent, source): " + repr(undeclared)
-    )
-
-
-KNOWN_ENTITIES = PLUGIN_ROOT / "docs" / "workflow-layers" / "KNOWN_ENTITIES.md"
-"""The extraction workers' vocabulary oracle, which maps registry types to producer/consumer skills."""
-
-_KNOWN_ENTITIES_KEY_RE = re.compile(r"^\|\s*`([^`]+)`\s*\|", re.MULTILINE)
-"""A leading table cell holding one backtick-quoted key, as the oracle's tables write their first column."""
-
-
-def known_entities_artifact_keys() -> frozenset[str]:
-    """Return the artifact-type keys the vocabulary oracle's Registered Artifacts table names.
-
-    Returns:
-        Every first-column key of the table under the oracle's "Registered Artifacts" heading.
-    """
-    text = KNOWN_ENTITIES.read_text(encoding="utf-8")
-    start = text.index("## Registered Artifacts")
-    end = text.index("\n## ", start)
-    return frozenset(_KNOWN_ENTITIES_KEY_RE.findall(text[start:end]))
-
-
-def test_the_vocabulary_oracle_names_only_registered_artifact_types() -> None:
-    """Every artifact key the extraction oracle lists is a type the registry declares.
-
-    Tests: docs/workflow-layers/KNOWN_ENTITIES.md's Registered Artifacts keys against REGISTRY
-    How: Read the oracle's first column and subtract the registry's types.
-    Why: The oracle restates the registry's key set to map each type onto the skills that produce
-         and consume it, and extraction workers reject any reference outside it. A key the registry
-         no longer declares makes the oracle authorise a type nothing can register; the oracle
-         cannot detect that itself, because it is the thing being checked.
-    """
-    registered = {row.artifact_type.value for row in REGISTRY}
-    stale = sorted(known_entities_artifact_keys() - registered)
-
-    assert not stale, (
-        "the vocabulary oracle's Registered Artifacts table names artifact type(s) the registry "
-        "does not declare. dh_core/artifact_registry.py is the key set; the oracle maps those keys "
-        "onto producer and consumer skills and adds none of its own. Stale key(s): " + repr(stale)
     )
 
 

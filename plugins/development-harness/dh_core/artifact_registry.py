@@ -93,6 +93,15 @@ REGISTRY: tuple[ArtifactTypeRow, ...] = (
             "Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry "
             "per item."
         ),
+        producer_skills=frozenset({"discovery", "work-backlog-item", "add-new-feature (feature-researcher)"}),
+        consumer_skills=frozenset({
+            "planning",
+            "add-new-feature",
+            "final-verification",
+            "start-task",
+            "work-backlog-item",
+            "complete-implementation (context-refinement)",
+        }),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.ARCHITECT,
@@ -103,6 +112,21 @@ REGISTRY: tuple[ArtifactTypeRow, ...] = (
             "rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read "
             "returned, appending annotations."
         ),
+        producer_skills=frozenset({
+            "planning",
+            "context-integration",
+            "complete-implementation (context-refinement)",
+            "add-new-feature ({resolved_agent})",
+        }),
+        consumer_skills=frozenset({
+            "context-integration",
+            "task-decomposition",
+            "implement-feature",
+            "add-new-feature",
+            "final-verification",
+            "start-task",
+            "complete-implementation (feature-verifier)",
+        }),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.CODEBASE_ANALYSIS,
@@ -112,6 +136,8 @@ REGISTRY: tuple[ArtifactTypeRow, ...] = (
             "Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally "
             "multi-entry -- one per focus area or diagram. Consumers reach the full set through `artifact_list`."
         ),
+        producer_skills=frozenset({"add-new-feature (codebase-analyzer)", "code-review-architecture"}),
+        consumer_skills=frozenset({"add-new-feature", "complete-implementation"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.CODE_REVIEW,
@@ -122,36 +148,48 @@ REGISTRY: tuple[ArtifactTypeRow, ...] = (
             "(`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. "
             "`complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`."
         ),
+        producer_skills=frozenset({"complete-implementation (code-reviewer)", "forensic-review (code-reviewer)"}),
+        consumer_skills=frozenset({"complete-implementation", "forensic-review"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.T0_BASELINE,
         agents=frozenset({"t0-baseline-capture"}),
         gate_read=True,
         notes="Pre-implementation baseline. `tn-verification-gate` compares final state against it.",
+        producer_skills=frozenset({"implement-feature (t0-baseline-capture)"}),
+        consumer_skills=frozenset({"implement-feature (tn-verification-gate)"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.TN_VERIFICATION,
         agents=frozenset({"tn-verification-gate"}),
         gate_read=True,
         notes="Post-implementation verification. `complete-implementation` branches on the verdict.",
+        producer_skills=frozenset({"implement-feature (tn-verification-gate)"}),
+        consumer_skills=frozenset({"complete-implementation"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.RESEARCH,
         agents=frozenset({"swarm-task-planner", "ecosystem-researcher"}),
         gate_read=False,
         notes=("Investigation findings, coverage analysis, rationale. Multi-entry -- one document per investigation."),
+        producer_skills=frozenset({"ecosystem-researcher"}),
+        consumer_skills=frozenset({"add-new-feature"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.AUDIT_REPORT,
         agents=frozenset({"doc-drift-auditor"}),
         gate_read=False,
         notes="Documentation drift audit. Never used for a code review verdict.",
+        producer_skills=frozenset({"complete-implementation (doc-drift-auditor)"}),
+        consumer_skills=frozenset({"complete-implementation"}),
     ),
     ArtifactTypeRow(
         artifact_type=ArtifactType.DISPATCH_PLAN,
         agents=frozenset({"dispatch_create_plan"}),
         gate_read=False,
         notes="Milestone dispatch plan, registered by the dispatch tool rather than an agent.",
+        producer_skills=frozenset({"groom-milestone"}),
+        consumer_skills=frozenset({"work-milestone"}),
     ),
 )
 """The registry: one row per artifact type an agent may register, in declaration order."""
