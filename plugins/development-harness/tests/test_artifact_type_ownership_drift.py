@@ -39,12 +39,14 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
+from backlog_core.models import ArtifactType
 from dh_core.artifact_registry import (
     AGENTS_MD,
     PLUGIN_ROOT,
     REPO_RELATIVE_AGENTS_MD,
     ArtifactRegistryError,
     ArtifactTypeRow,
+    artifact_types,
     registry_rows,
 )
 from pydantic import BaseModel
@@ -436,6 +438,68 @@ def test_gate_read_types_have_exactly_one_registering_agent() -> None:
         "Split the second writer onto its own type. Each entry is "
         "(artifact_type, [registering_agents]): " + repr(shared)
     )
+
+
+def types_absent_from_the_enum(registry: Path) -> list[str]:
+    """Return the registry types that name no ``ArtifactType`` member, in sorted order.
+
+    Args:
+        registry: Path to the document declaring the artifact-type registry.
+
+    Returns:
+        Every registry type with no matching enum value; empty when containment holds.
+    """
+    declared = {member.value for member in ArtifactType}
+    return sorted({row.artifact_type for row in registry_rows(registry)} - declared)
+
+
+def test_every_registry_type_is_an_artifact_type_member() -> None:
+    """Every type the registry declares is a member of the ``ArtifactType`` enum.
+
+    Tests: registry containment in backlog_core.models.ArtifactType
+    How: Read the shipped registry through the shared locator and subtract the enum's values.
+    Why: ``backlog_core/artifact_registry.py``'s manifest parse resolves a row's stored type through
+         ``ArtifactType(...)`` and returns ``None`` when that raises, dropping the row. A registry
+         type with no enum member is therefore registrable in prose and unreadable at runtime, with
+         nothing reported. Containment one way is mandatory; the reverse is not — a type in the enum
+         and absent from the registry is written by the harness rather than by an agent.
+    """
+    assert types_absent_from_the_enum(AGENTS_MD) == [], (
+        "artifact-type registry row(s) name a type that is not an ArtifactType member. A manifest "
+        "row stored under such a type is silently dropped when the manifest is parsed, so the "
+        "artifact reads as absent rather than as unreadable. Add the member to "
+        "backlog_core/models.py's ArtifactType, or remove the row."
+    )
+
+
+def test_a_registry_type_outside_the_enum_is_reported(tmp_path: Path) -> None:
+    """A registry row naming no enum member is reported rather than passing unnoticed.
+
+    Tests: types_absent_from_the_enum, the sensitivity of the containment assertion above
+    How: Append a row whose type is not an ``ArtifactType`` value to a fixture registry.
+    Why: A containment assertion over a set that happens to be contained passes whether or not it
+         can detect a violation. Holding it against a known-bad registry is what makes the passing
+         assertion above evidence of anything.
+    """
+    bogus = _REGISTRY_FIXTURE + "| `not-an-enum-member` | `nobody` | no | Bogus. |\n"
+
+    assert types_absent_from_the_enum(_write(tmp_path, bogus)) == ["not-an-enum-member"]
+
+
+def test_the_shipped_registry_declares_types() -> None:
+    """The registry document this checkout ships exists and declares at least one type.
+
+    Tests: dh_core.artifact_registry.artifact_types over the shipped registry path
+    How: Assert the located file exists and that the type set read from it is non-empty.
+    Why: ``artifact_types`` returns an empty frozenset for a path that does not exist, which is the
+         checkout-ships-no-registry case rather than an error. Nothing else distinguishes that from
+         a locator pointed at the wrong file: the decomposition-exit gate would report every
+         ``ARTIFACT`` referent BROKEN, and ``tests_sam/test_decomposition_gate.py``'s parametrize
+         over the same set would generate zero test items and vanish rather than fail. This is the
+         only assertion that catches a locator constant pointed somewhere the registry is not.
+    """
+    assert AGENTS_MD.is_file(), f"{AGENTS_MD}: the shipped artifact-type registry is not at its locator's path"
+    assert artifact_types(AGENTS_MD), f"{AGENTS_MD}: the shipped artifact-type registry declares no types"
 
 
 @pytest.mark.parametrize(
