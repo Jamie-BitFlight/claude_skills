@@ -370,6 +370,10 @@ Do not embed counts, totals, or other values derived from a list or table define
 
 ---
 
+- Data Format Selection (format closest to the consumer; never parse prose for your own data): [Data Format Selection](../rules/data-format-selection.md)
+
+---
+
 - Silent Failure Prevention: [Silent Failure Prevention](../rules/silent-failure-prevention.md)
 
 ---
