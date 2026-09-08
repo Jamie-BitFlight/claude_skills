@@ -74,6 +74,36 @@ is session state and the session stopped.
 When the prompt names no attempt, no settle is possible and the hook says so on stderr rather
 than absorbing it.
 
+No dispatcher-owned channel exists, so the prompt is read as a delimited field
+----------------------------------------------------------------------------
+The prompt is not a channel only the dispatcher writes — it is one field of a document whose
+other fields the launched agent's own content fills. Looked for a channel that is: read the
+SubagentStop input roster in ``docs/work-ledger/measurements/harness-claude-code.md`` §§ 2 and 6
+(taken 2026-09-06 from the cached ``code.claude.com/docs/en/hooks`` page) and found only
+``session_id``, ``prompt_id``, ``transcript_path``, ``cwd``, ``permission_mode``, ``effort``,
+``hook_event_name``, ``stop_hook_active``, ``agent_id``, ``agent_type``, ``agent_transcript_path``
+and ``last_assistant_message``. Every one is harness-assigned; none carries a value the
+dispatcher chose, and § 6 records that no per-subagent environment variable was found either.
+``SubagentStart`` cannot bridge the gap: its own input schema
+(``plugin-creator/skills/claude-subagent-reference/references/hooks-for-subagents.md``, accessed
+2026-05-28) carries ``agent_id`` and ``agent_type`` but neither the prompt nor a transcript path,
+so it cannot bind a harness-assigned ``agent_id`` to a launch either. That is a statement about
+those two documents, not a proof that no such channel can exist.
+
+So this is containment, not a fix for the root cause. What it does: the launch reference must be
+the *whole* of the prompt's first line. That is where the dispatch contract puts it and nothing
+follows it — ``implement-feature/SKILL.md`` makes the reference the agent's "entire prompt", and
+``dispatch/SKILL.md`` wraps it in one sentence ending at the attempt. Prose that mentions an
+attempt in passing keeps going after it, so requiring the line to end there is what separates a
+launch from a mention.
+
+Residual exposure, unclosed: a sub-agent of any plugin whose prompt's *first line* both ends at
+an attempt clause and reaches it through the words "working on" is still read as a launch — a
+prompt quoting a dispatch sentence verbatim on its opening line is the realistic shape. Such a
+settle is harmless against an attempt already settled (``settle`` answers ``already-settled``)
+but wrong against a live one. Closing it needs a launch identity the sub-agent's content cannot
+imitate, which needs a channel the harness does not currently offer.
+
 Usage:
     Called automatically via hooks configuration.
     Receives JSON via stdin with hook context.
@@ -132,9 +162,20 @@ _TASK_ID_RE = r"[A-Za-z0-9]+(?:[-.][\dA-Za-z]+)*"
 # re.IGNORECASE: plan address prefix P is case-insensitive (e.g. PDEADBEef).
 _PLAN_ARG_RE = r"(?P<plan>(?:[^\s\"']+\.(?:md|yaml))|(?:P[0-9a-f]+))"
 
-# The ledger address form alone. Pattern 1 below searches for this inside a longer prompt, so it
-# excludes the file-path form: a bare path followed by the word "attempt" is not a dispatch.
+# The ledger address form alone. The dispatch pattern below matches this against a whole line
+# rather than a whole prompt, so it excludes the file-path form: a bare path followed by the word
+# "attempt" is not a dispatch.
 _PLAN_ADDRESS_RE = r"(?P<plan>P[0-9a-f]+)"
+
+# The dispatch contract's sentence lead-in, as written by dispatch/SKILL.md: "Your ROLE_TYPE is
+# sub-agent. You are working on {plan}/{task}, attempt {n}." Optional, because
+# implement-feature/SKILL.md launches with the reference alone.
+_LAUNCH_LEAD_IN_RE = r"(?:.*?\bworking on\s+)?"
+
+# Trailing punctuation a launch line may carry: the dispatch sentence's full stop, the closing
+# paren of a Skill() call. It admits no further words, which is what keeps the whole-line match
+# from degenerating back into a search of free text.
+_LAUNCH_TAIL_RE = r"[\s.)\"']*"
 
 # The attempt clause the dispatch contract writes after the address, as an optional suffix.
 # implement-feature/SKILL.md launches with "{plan_ref}/{task_id}, attempt {attempt}" and
@@ -282,16 +323,19 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
     active-task record is keyed by the parent session's id and holds no attempt number, so it
     cannot name the attempt a settle must record against — see the module docstring.
 
-    Four prompt shapes are recognised, in this order:
+    Every shape is matched against a *delimited position* rather than searched for in free text:
+    the first three against the whole of the prompt's first line, the fourth against the whole
+    prompt. See the module docstring for why the prompt is read this way and what that does not
+    close. Four shapes are recognised, in this order:
 
     1. ``/start-task <plan> [--task <id>] [--attempt <n>]`` — the literal slash command.
     2. ``Skill(skill="start-task", args="<plan> [--task <id>] [--attempt <n>]")``.
-    3. ``<plan-address>/<task-id>[,] attempt <n>`` anywhere in the prompt — the shape
-       ``implement-feature/SKILL.md`` and ``dispatch/SKILL.md`` launch with. Searched rather
-       than full-matched because ``dispatch`` wraps it in a sentence; the required ``attempt
-       <n>`` suffix is what keeps the search from matching an address mentioned in passing.
-    4. ``<plan>/<task-id>`` as the whole prompt, full-matched. This form names no attempt, so it
-       identifies the task without enabling a settle.
+    3. ``[<lead-in> working on ]<plan-address>/<task-id>[,] attempt <n>`` — the shape
+       ``implement-feature/SKILL.md`` and ``dispatch/SKILL.md`` launch with, the latter inside a
+       sentence that ends at the attempt. The line must end there; prose that mentions an
+       attempt in passing carries on past it.
+    4. ``<plan>/<task-id>`` as the whole prompt. This form names no attempt, so it identifies the
+       task without enabling a settle.
 
     Args:
         prompt: The sub-agent's initial prompt string.
@@ -300,6 +344,10 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
         The :class:`Launch` the prompt names, or ``None`` when it names none.
     """
     if not prompt:
+        return None
+
+    line = _first_nonempty_line(prompt)
+    if not line:
         return None
 
     command_forms = (
@@ -311,12 +359,14 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
         ),
     )
     for pattern in command_forms:
-        match = re.search(pattern, prompt, re.IGNORECASE)
+        match = re.fullmatch(rf"{pattern}{_LAUNCH_TAIL_RE}", line, re.IGNORECASE)
         if match and match.group("task_id"):
             return _launch_of(match)
 
-    dispatch_match = re.search(
-        rf"{_PLAN_ADDRESS_RE}/(?P<task_id>{_TASK_ID_RE}){_ATTEMPT_CLAUSE_RE}", prompt, re.IGNORECASE
+    dispatch_match = re.fullmatch(
+        rf"{_LAUNCH_LEAD_IN_RE}{_PLAN_ADDRESS_RE}/(?P<task_id>{_TASK_ID_RE}){_ATTEMPT_CLAUSE_RE}{_LAUNCH_TAIL_RE}",
+        line,
+        re.IGNORECASE,
     )
     if dispatch_match:
         return _launch_of(dispatch_match)
@@ -326,6 +376,22 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
         return _launch_of(bare_match)
 
     return None
+
+
+def _first_nonempty_line(prompt: str) -> str:
+    """Return the first line of *prompt* carrying anything but whitespace.
+
+    Args:
+        prompt: The sub-agent's initial prompt string.
+
+    Returns:
+        The stripped first non-empty line, or ``""`` when the prompt is all whitespace.
+    """
+    for raw_line in prompt.splitlines():
+        line = raw_line.strip()
+        if line:
+            return line
+    return ""
 
 
 def _launch_of(match: re.Match[str]) -> Launch:
