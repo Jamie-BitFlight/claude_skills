@@ -1,8 +1,6 @@
-"""Tests for task_status_hook.py beads integration — T19.
+"""Tests for beads task routing — T19.
 
 Covers:
-- _read_context_file: beads nanoid parent_issue_number does NOT raise ValueError (T12 fix)
-- _read_context_file: integer parent_issue_number regression
 - fetch_tasks_from_backend: routes "bd-a3f8" → beads subprocess (mocked)
 - fetch_tasks_from_backend: routes int → fetch_tasks_from_github (mocked)
 - PEP 723 metadata validity for task_status_hook.py
@@ -19,11 +17,15 @@ the ``implementation_manager`` namespace per the actual implementation.
 Divergence Note DN-2
 --------------------
 Requirements implied ``handle_subagent_stop`` routes through
-``fetch_tasks_from_backend`` at runtime.  The actual hook receives
-``_parent_issue_number`` (underscore-prefixed: intentionally unused) with
-an inline comment reserving the call for a future version.  End-to-end
-routing through the hook is therefore not testable at present; tests cover
-``_read_context_file`` and the ``fetch_tasks_from_backend`` router directly.
+``fetch_tasks_from_backend`` at runtime.  It never did, and since the hook was
+rewritten to settle the attempt named by the stopping sub-agent's own prompt it
+reads no ``parent_issue_number`` at all — ``task_status_hook.read_task_context``
+returns ``(plan, task_id)`` and nothing else.  The three tests that exercised the
+hook's former ``_read_context_file`` reader for beads-nanoid, integer and absent
+``parent_issue_number`` values were removed with it: the field is no longer read
+by the hook, so the ``int()`` cast those tests guarded against cannot recur there.
+The router's own type handling is still covered below, and
+``tests/test_task_status_hook.py`` covers what survives of the context reader.
 """
 
 from __future__ import annotations
@@ -38,7 +40,6 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from implementation_manager import Task, TaskPriority, fetch_tasks_from_backend
-from task_status_hook import _read_context_file
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -51,12 +52,6 @@ _FAKE_BD = "/usr/local/bin/bd"
 _HOOK_SCRIPT = (
     Path(__file__).resolve().parents[1] / "skills" / "implementation-manager" / "scripts" / "task_status_hook.py"
 )
-
-
-def _context_json(plan: str, task_id: str, parent_issue_number: int | str | None) -> str:
-    """Serialise a minimal active-task context JSON payload."""
-    payload: dict[str, object] = {"plan": plan, "task_id": task_id, "parent_issue_number": parent_issue_number}
-    return json.dumps(payload)
 
 
 def _proc(returncode: int = 0, stdout: str = "[]", stderr: str = "") -> subprocess.CompletedProcess[str]:
@@ -78,70 +73,6 @@ def _beads_issues_json(ids: list[str] | None = None) -> str:
         }
         for issue_id in issues
     ])
-
-
-# ---------------------------------------------------------------------------
-# _read_context_file — beads nanoid does NOT raise ValueError (T12 fix)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_read_context_file_beads_id_no_valueerror(tmp_path: Path) -> None:
-    """T12 fix: _read_context_file returns beads nanoid str, never raises ValueError.
-
-    Prior to T12 the function performed ``int(data.get("parent_issue_number"))``
-    which raises ``ValueError`` for "bd-a3f8".  The fix widened the type to
-    ``str | int | None`` and removed the cast.
-    """
-    ctx = tmp_path / "active-task-test.json"
-    ctx.write_text(_context_json(plan="P001", task_id="T1", parent_issue_number="bd-a3f8"), encoding="utf-8")
-
-    plan_addr, task_id, parent = _read_context_file(ctx)
-
-    assert parent == "bd-a3f8", "beads nanoid must be returned as-is (str), not int-cast"
-    assert isinstance(parent, str), "type must be str, not int"
-    assert task_id == "T1"
-    assert plan_addr == "P001"
-
-
-@pytest.mark.unit
-def test_read_context_file_beads_id_type_is_str(tmp_path: Path) -> None:
-    """Explicit type check: parent_issue_number for beads ID is str, not None or int."""
-    ctx = tmp_path / "active-task-test.json"
-    ctx.write_text(_context_json("P001", "T2", "bd-a3f8"), encoding="utf-8")
-
-    _, _, parent = _read_context_file(ctx)
-
-    assert type(parent) is str
-
-
-# ---------------------------------------------------------------------------
-# _read_context_file — integer parent_issue_number regression (GitHub path)
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_read_context_file_integer_parent_issue_number(tmp_path: Path) -> None:
-    """Regression: integer parent_issue_number (GitHub) is returned unchanged as int."""
-    ctx = tmp_path / "active-task-42.json"
-    ctx.write_text(_context_json("P042", "T3", 42), encoding="utf-8")
-
-    _plan_addr, task_id, parent = _read_context_file(ctx)
-
-    assert parent == 42
-    assert isinstance(parent, int)
-    assert task_id == "T3"
-
-
-@pytest.mark.unit
-def test_read_context_file_none_parent_issue_number(tmp_path: Path) -> None:
-    """parent_issue_number absent from context file is returned as None."""
-    ctx = tmp_path / "active-task-none.json"
-    ctx.write_text(_context_json("P001", "T4", None), encoding="utf-8")
-
-    _, _, parent = _read_context_file(ctx)
-
-    assert parent is None
 
 
 # ---------------------------------------------------------------------------
