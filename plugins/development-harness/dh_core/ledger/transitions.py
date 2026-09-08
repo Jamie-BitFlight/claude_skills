@@ -42,7 +42,9 @@ Collaborating modules, written alongside this one:
 
 The ``events`` table is read directly for one purpose: the cascade reason lives only in the
 ``task.state`` payload, because ``ledger_spec.COLUMNS`` does not fold it into ``tasks.reason``.
-That read assumes the columns ``seq``, ``kind``, ``plan``, ``task`` and a JSON ``payload``.
+That read assumes the columns ``seq``, ``kind``, ``plan``, ``task`` and a JSON ``payload``. It is
+also the only place the set of failures holding one dependent skipped exists -- see
+:func:`holding_cascades` -- so the log is folded rather than the newest row taken.
 """
 
 from __future__ import annotations
@@ -187,7 +189,10 @@ class TransitionResult(BaseModel):
     A ``noop`` code means the transition declined without appending anything. ``status`` is the
     resulting task status when the transition changed it, and ``None`` when it did not.
     ``changed`` carries what the transition actually wrote, and ``unsettable`` the ``--set`` names
-    it declined to write because no event it appends sets that column.
+    it declined to write because no event it appends sets that column. ``cascaded`` names every
+    dependent a failure now blocks and ``reversed_tasks`` every one whose hold a reclaim released;
+    a dependent two failures blocked appears in both while staying skipped, because the entry is
+    the hold rather than the status.
     """
 
     command: str
@@ -426,6 +431,20 @@ def report_complete(conn: sqlite3.Connection, plan: str, task: str, attempt: int
     return set(ledger_spec.REPORT_SECTIONS) <= present
 
 
+def payload_reason(payload: object) -> str | None:
+    """Read the ``reason`` out of one event payload as it comes back from the database.
+
+    Args:
+        payload: The ``events.payload`` value, JSON text or an already-decoded mapping.
+
+    Returns:
+        The reason string, or None when the payload carries none.
+    """
+    decoded = json.loads(payload) if isinstance(payload, str) else payload
+    reason = decoded.get("reason") if isinstance(decoded, dict) else None
+    return str(reason) if reason is not None else None
+
+
 def latest_state_reason(conn: sqlite3.Connection, plan: str, task: str) -> str | None:
     """Return the ``reason`` of the newest ``task.state`` event for a task.
 
@@ -449,10 +468,7 @@ def latest_state_reason(conn: sqlite3.Connection, plan: str, task: str) -> str |
     )
     if not found:
         return None
-    payload = found[0]["payload"]
-    decoded = json.loads(payload) if isinstance(payload, str) else payload
-    reason = decoded.get("reason") if isinstance(decoded, dict) else None
-    return str(reason) if reason is not None else None
+    return payload_reason(found[0]["payload"])
 
 
 # ---------------------------------------------------------------------------
@@ -484,6 +500,53 @@ def reversal_code(task: str) -> str:
     """
     template = next(r.code for r in ledger_spec.REASONS if r.code.startswith("cascade-reversed:"))
     return template.replace("T{n}", task)
+
+
+CASCADE_PREFIX = cascade_code("")
+"""The literal head of ``cascade:T{n}``, so a recorded reason reads back as the task that caused it."""
+
+REVERSAL_PREFIX = reversal_code("")
+"""The literal head of ``cascade-reversed:T{n}``, read back the same way."""
+
+
+def holding_cascades(conn: sqlite3.Connection, plan: str, task: str) -> list[str]:
+    """Return the failed tasks whose cascade currently holds one dependent skipped.
+
+    A dependent blocked by two failures is in a different state from one blocked by one, and no
+    column says so: ``ledger_spec.COLUMNS`` folds no ``task.state`` reason into ``tasks``. The set
+    lives in the event log instead, one ``task.state`` row per blocking ancestor. This folds those
+    rows in order: a ``cascade:T{n}`` reason adds an ancestor, a ``cascade-reversed:T{n}`` reason
+    releases the one it names, and anything else -- another ``task.state`` reason, or a ``reclaim``
+    -- is the task moving for a reason of its own, which ends every hold on it.
+
+    Args:
+        conn: An open ledger connection.
+        plan: The plan id.
+        task: The dependent's task id.
+
+    Returns:
+        The ids of the tasks still holding it, oldest hold first.
+    """
+    holders: list[str] = []
+    for event in rows_of(
+        conn.execute(
+            "SELECT kind, payload FROM events WHERE plan = :plan AND task = :task "
+            "AND kind IN ('task.state', 'task.reclaimed') ORDER BY seq",
+            {"plan": plan, "task": task},
+        )
+    ):
+        reason = payload_reason(event["payload"]) or ""
+        if event["kind"] == "task.state" and reason.startswith(CASCADE_PREFIX):
+            holder = reason[len(CASCADE_PREFIX) :]
+            if holder not in holders:
+                holders.append(holder)
+        elif event["kind"] == "task.state" and reason.startswith(REVERSAL_PREFIX):
+            holder = reason[len(REVERSAL_PREFIX) :]
+            if holder in holders:
+                holders.remove(holder)
+        else:
+            holders.clear()
+    return holders
 
 
 def dependents_of(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
@@ -528,7 +591,13 @@ def transitive_dependents(rows: Sequence[Mapping[str, Any]], task: str) -> list[
 
 
 def cascade(conn: sqlite3.Connection, plan: str, task: str, moment: datetime) -> list[str]:
-    """Skip every not-started transitive dependent of a task that has become failed.
+    """Record one task's failure against every transitive dependent it blocks.
+
+    A not-started dependent moves to skipped. One another failure already holds skipped stays
+    skipped and takes a second ``task.state`` row, so the log carries one entry per blocking
+    ancestor and :func:`reverse_cascade` can tell a dependent blocked by two from one blocked by
+    one. Any other status is the dependent's own and is left alone, as is a skipped one no cascade
+    holds -- a task a person skipped is not this failure's to claim.
 
     Args:
         conn: An open ledger connection, inside the caller's transaction.
@@ -537,20 +606,25 @@ def cascade(conn: sqlite3.Connection, plan: str, task: str, moment: datetime) ->
         moment: The instant the caller sampled for this transition.
 
     Returns:
-        The ids moved to skipped, sorted.
+        The ids this failure now blocks, sorted; each took a ``task.state`` row, and those that
+        were not already skipped moved there.
     """
     rows = plan_tasks(conn, plan)
     by_id = {str(row["id"]): row for row in rows}
     code = cascade_code(task)
-    moved: list[str] = []
+    blocked: list[str] = []
     for dependent in transitive_dependents(rows, task):
         row = by_id.get(dependent)
-        if row is None or row["status"] != NOT_STARTED:
+        if row is None:
             continue
-        conn.execute(
-            "UPDATE tasks SET status = :status WHERE plan = :plan AND id = :task",
-            {"status": SKIPPED, "plan": plan, "task": dependent},
-        )
+        status = str(row["status"])
+        if status == NOT_STARTED:
+            conn.execute(
+                "UPDATE tasks SET status = :status WHERE plan = :plan AND id = :task",
+                {"status": SKIPPED, "plan": plan, "task": dependent},
+            )
+        elif not (status == SKIPPED and holding_cascades(conn, plan, dependent)):
+            continue
         append(
             conn,
             kind="task.state",
@@ -564,12 +638,17 @@ def cascade(conn: sqlite3.Connection, plan: str, task: str, moment: datetime) ->
             },
             at=moment,
         )
-        moved.append(dependent)
-    return moved
+        blocked.append(dependent)
+    return blocked
 
 
 def reverse_cascade(conn: sqlite3.Connection, plan: str, task: str, moment: datetime) -> list[str]:
-    """Return every dependent still skipped by one task's cascade to not-started.
+    """Release one task's cascade hold on every dependent it is holding skipped.
+
+    A dependent no other failure still holds returns to not-started. One that two failures blocked
+    stays skipped and records that this task no longer blocks it, so reclaiming the second ancestor
+    later releases the last hold and returns it. The two ancestors may be reclaimed in either
+    order and reach the same state.
 
     Args:
         conn: An open ledger connection, inside the caller's transaction.
@@ -578,33 +657,39 @@ def reverse_cascade(conn: sqlite3.Connection, plan: str, task: str, moment: date
         moment: The instant the caller sampled for this transition.
 
     Returns:
-        The ids moved back to not-started, sorted.
+        The ids whose hold was released, sorted; each took a ``task.state`` row, and those no other
+        cascade still held moved back to not-started.
     """
-    code = cascade_code(task)
-    restored: list[str] = []
+    released: list[str] = []
     for row in plan_tasks(conn, plan):
         dependent = str(row["id"])
-        if row["status"] != SKIPPED or latest_state_reason(conn, plan, dependent) != code:
+        if str(row["status"]) != SKIPPED:
             continue
-        conn.execute(
-            "UPDATE tasks SET status = :status WHERE plan = :plan AND id = :task",
-            {"status": NOT_STARTED, "plan": plan, "task": dependent},
-        )
+        holders = holding_cascades(conn, plan, dependent)
+        if task not in holders:
+            continue
+        remaining = [holder for holder in holders if holder != task]
+        status = SKIPPED if remaining else NOT_STARTED
+        if not remaining:
+            conn.execute(
+                "UPDATE tasks SET status = :status WHERE plan = :plan AND id = :task",
+                {"status": NOT_STARTED, "plan": plan, "task": dependent},
+            )
         append(
             conn,
             kind="task.state",
             plan=plan,
             task=dependent,
             payload={
-                "status": NOT_STARTED,
+                "status": status,
                 "reason": reversal_code(task),
                 "accepted": int(row["accepted"] or 0),
                 "attempt_open": int(row["attempt_open"] or 0),
             },
             at=moment,
         )
-        restored.append(dependent)
-    return sorted(restored)
+        released.append(dependent)
+    return sorted(released)
 
 
 def cascade_skipped(conn: sqlite3.Connection, plan: str, row: Mapping[str, Any], task: str) -> bool:
@@ -617,11 +702,12 @@ def cascade_skipped(conn: sqlite3.Connection, plan: str, row: Mapping[str, Any],
         task: The task whose cascade is in question.
 
     Returns:
-        True when the row is skipped and its newest ``task.state`` reason is that cascade's code.
+        True when the row is skipped and that task is one of the cascades holding it there. A
+        dependent two failures blocked answers True for each of them.
     """
-    if row["status"] != SKIPPED:
+    if str(row["status"]) != SKIPPED:
         return False
-    return latest_state_reason(conn, plan, str(row["id"])) == cascade_code(task)
+    return task in holding_cascades(conn, plan, str(row["id"]))
 
 
 def dependents_started(conn: sqlite3.Connection, plan: str, task: str) -> bool:
@@ -1459,8 +1545,8 @@ def reclaim(
         max_attempts: The ``loop.max_attempts`` value; the specification default when absent.
 
     Returns:
-        A result naming every dependent whose cascade skip was reversed, or an ``already-open``
-        no-op.
+        A result naming every dependent this task's cascade no longer holds, or an ``already-open``
+        no-op. One of those is back at not-started unless another failure still holds it skipped.
     """
     budget = DEFAULT_MAX_ATTEMPTS if max_attempts is None else max_attempts
     restored: list[str] = []
