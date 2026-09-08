@@ -1,241 +1,118 @@
-"""The artifact-type registry this plugin declares, and the one locator for it.
+"""The artifact-type registry this plugin declares: which agent may register which artifact type.
 
-``docs/artifact-registry.md``'s "Artifact types and registering agents" section holds the complete
-registry of document-artifact types: every ``artifact_register`` call must match a ``(Type,
-Registering agents)`` pair it lists, and its ``Gate-read`` column marks the types whose read decides
-a workflow branch. Three readers consume that one table and they must not encode where it is three
-times:
+:data:`REGISTRY` is the registry. It is the single source of truth for the map, and every consumer
+of the map is Python, so the map is Python: a literal tuple of :class:`ArtifactTypeRow`, read by
+import rather than parsed out of a document. ``docs/artifact-registry.md`` states the rules that
+govern the map and names this module as where the map lives; it holds no copy of it.
 
-* :mod:`dh_core.workflow_multigraph.decomposition_gate` resolves an ``ARTIFACT`` referent against
-  the ``Type`` column -- ``plugins/development-harness/ARCHITECTURE.md``, "The work graph" §
-  "The decomposition-exit gate", Tier 1: an ``ARTIFACT`` referent resolves to "a type in the
-  artifact registry, with its id";
-* ``tests/test_artifact_type_ownership_drift.py`` holds the shipped markdown's registrations
-  against the same table's ownership and gate-read columns, and holds every row's type inside
-  :class:`backlog_core.models.ArtifactType`;
-* ``tests_sam/test_decomposition_gate.py`` falsifies the gate's own ``ARTIFACT`` resolution over
-  every type the same table declares.
+Every ``artifact_register`` call -- MCP tool or ``artifact register`` CLI -- must match a row's
+``(artifact_type, agents)`` pair, and :attr:`ArtifactTypeRow.gate_read` marks the types whose read
+decides a workflow branch. :mod:`dh_core.workflow_multigraph.decomposition_gate` resolves an
+``ARTIFACT`` referent against :data:`ARTIFACT_TYPES` -- ``plugins/development-harness/ARCHITECTURE.md``,
+"The work graph" § "The decomposition-exit gate", Tier 1: an ``ARTIFACT`` referent resolves to "a
+type in the artifact registry, with its id".
 
-All three call :func:`registry_rows` here. A locator each reader spells for itself is one encoding
-of one fact per reader: the heading anchor and the header-row anchor drifted apart once already, and
-only the reader that was not a test noticed.
+:attr:`ArtifactTypeRow.artifact_type` is a :class:`~backlog_core.models.ArtifactType` member rather
+than a string, and two rules follow from that type alone, needing no test to hold them:
 
-The registry lives in ``docs/`` rather than in this plugin's ``AGENTS.md`` because ``AGENTS.md`` is
-a contributor document, loaded into the context of agents working in this repository and invisible
-to an agent that merely uses the installed plugin. Nothing a reader parses at runtime may live
-there.
-
-The locator is loud on purpose. A registry that cannot be found in a file that exists raises
-:class:`ArtifactRegistryError` rather than reporting an empty registry, because an empty registry
-is indistinguishable from a real one holding no types: it reads as "no artifact type exists", and
-every ``ARTIFACT`` referent then fails to resolve with nothing reported about why. That is the
-failure this module exists to make impossible, per ``rules/silent-failure-prevention.md``'s
-"If no fallback action is possible, raise or warn".
-
-Markdown structure is read through the marko GFM AST, per this repo's rule against regex parsers
-for markdown structure.
+* a row naming a type with no enum member fails at import, so the registry can never declare a type
+  the manifest parse would silently drop (``backlog_core/artifact_registry.py`` resolves a stored
+  type through ``ArtifactType(...)`` and drops the row when that raises);
+* the enum is the wider vocabulary and the registry is the subset an agent may register, so a
+  member absent from :data:`REGISTRY` is written by the harness rather than by an agent -- today
+  ``task-plan``, written by SAM's plan store.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from marko import Markdown
-from marko.block import Heading
-from marko.ext.gfm.elements import Table
+from backlog_core.models import ArtifactType
 from pydantic import BaseModel, ConfigDict, Field
-
-REGISTRY_HEADING = "Artifact types and registering agents"
-"""The heading in the registry document whose table is the artifact-type registry."""
-
-TYPE_COLUMN = "Type"
-"""The registry column naming the artifact type an ``artifact_register`` call passes."""
-
-AGENTS_COLUMN = "Registering agents"
-"""The registry column naming the writers permitted to register that type."""
-
-GATE_READ_COLUMN = "Gate-read"
-"""The registry column marking the types whose read result decides a workflow branch."""
-
-REQUIRED_COLUMNS = (TYPE_COLUMN, AGENTS_COLUMN, GATE_READ_COLUMN)
-"""The columns both readers consume; the table's remaining columns are prose for humans."""
-
-GATE_READ_VALUES = {"yes": True, "no": False}
-"""The ``Gate-read`` cell values the registry declares, and what each means."""
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-"""This plugin's root -- the directory holding the document that declares the registry."""
-
-REGISTRY_DOC = PLUGIN_ROOT / "docs" / "artifact-registry.md"
-"""The registry's own file, for a reader that already runs inside this checkout."""
-
-REPO_RELATIVE_REGISTRY_DOC = Path("plugins/development-harness/docs/artifact-registry.md")
-"""The same file, relative to a repository root, for a reader resolving against a given checkout."""
-
-
-class ArtifactRegistryError(LookupError):
-    """Raised when a file exists but its artifact-type registry is not what this module declares.
-
-    Carries the path, so a caller reporting the failure names the file that must be repaired.
-    """
 
 
 class ArtifactTypeRow(BaseModel):
-    """One row of the artifact-type registry, as both readers consume it."""
+    """One artifact type, the writers permitted to register it, and whether a gate reads it."""
 
     model_config = ConfigDict(frozen=True)
 
-    artifact_type: str = Field(min_length=1, description="The value an artifact_register call passes as the type.")
+    artifact_type: ArtifactType = Field(description="The type an artifact_register call passes, as its enum member.")
     agents: frozenset[str] = Field(
         default_factory=frozenset, description="The writers this row permits, as the `agent` argument's values."
     )
     gate_read: bool = Field(default=False, description="Whether a read of this type decides a workflow branch.")
+    notes: str = Field(default="", description="What the type holds, and how many entries one work item carries.")
 
 
-def inline_text(node: object) -> str:
-    """Reconstruct a marko node's plain text from its children, at any nesting depth.
+REGISTRY: tuple[ArtifactTypeRow, ...] = (
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.FEATURE_CONTEXT,
+        agents=frozenset({"discovery", "feature-researcher"}),
+        gate_read=False,
+        notes=(
+            "Discovery document. Each producer re-registers the same `artifact_id`, so the type holds one entry "
+            "per item."
+        ),
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.ARCHITECT,
+        agents=frozenset({"planning", "context-integration", "context-refinement", "{resolved_agent}"}),
+        gate_read=False,
+        notes=(
+            "Architecture spec. Later stages re-register the same `artifact_id`, replacing the earlier revision "
+            "rather than adding a sibling; `context-refinement` re-registers under the `artifact_id` its own read "
+            "returned, appending annotations."
+        ),
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.CODEBASE_ANALYSIS,
+        agents=frozenset({"codebase-analyzer", "code-review-architecture"}),
+        gate_read=False,
+        notes=(
+            "Codebase pattern, architecture, testing, convention, and dependency-graph documents. Intentionally "
+            "multi-entry -- one per focus area or diagram. Consumers reach the full set through `artifact_list`."
+        ),
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.CODE_REVIEW,
+        agents=frozenset({"code-reviewer"}),
+        gate_read=True,
+        notes=(
+            "Code review verdict. One entry per reviewed task, so consumers read it by `artifact_id` "
+            "(`code-review-{task_id}-{slug}`), reported in the reviewer's STATUS output. "
+            "`complete-implementation` and `forensic-review` branch on `PASS` / `NEEDS-WORK` / `FAIL`."
+        ),
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.T0_BASELINE,
+        agents=frozenset({"t0-baseline-capture"}),
+        gate_read=True,
+        notes="Pre-implementation baseline. `tn-verification-gate` compares final state against it.",
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.TN_VERIFICATION,
+        agents=frozenset({"tn-verification-gate"}),
+        gate_read=True,
+        notes="Post-implementation verification. `complete-implementation` branches on the verdict.",
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.RESEARCH,
+        agents=frozenset({"swarm-task-planner", "ecosystem-researcher"}),
+        gate_read=False,
+        notes=("Investigation findings, coverage analysis, rationale. Multi-entry -- one document per investigation."),
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.AUDIT_REPORT,
+        agents=frozenset({"doc-drift-auditor"}),
+        gate_read=False,
+        notes="Documentation drift audit. Never used for a code review verdict.",
+    ),
+    ArtifactTypeRow(
+        artifact_type=ArtifactType.DISPATCH_PLAN,
+        agents=frozenset({"dispatch_create_plan"}),
+        gate_read=False,
+        notes="Milestone dispatch plan, registered by the dispatch tool rather than an agent.",
+    ),
+)
+"""The registry: one row per artifact type an agent may register, in declaration order."""
 
-    Walks the node's children recursively, so text inside a code span, emphasis, or a link's label
-    is kept and the markers around it are dropped. A node whose ``children`` is already a string is
-    a leaf and yields that string.
-
-    Args:
-        node: A parsed marko element, or any object exposing marko's ``children`` attribute.
-
-    Returns:
-        The node's text with inline formatting stripped; the empty string for a node holding none.
-    """
-    children = getattr(node, "children", None)
-    if isinstance(children, str):
-        return children
-    if children is None:
-        return ""
-    return "".join(inline_text(child) for child in children)
-
-
-def registry_rows(registry: Path) -> tuple[ArtifactTypeRow, ...]:
-    """Parse the artifact-type registry table out of the document declaring it.
-
-    Locates the table by the :data:`REGISTRY_HEADING` section it lives under, then reads its
-    columns by the names in :data:`REQUIRED_COLUMNS` rather than by position, so a column added or
-    reordered does not silently shift what each reader reads.
-
-    Args:
-        registry: Path to the document declaring the registry.
-
-    Returns:
-        One :class:`ArtifactTypeRow` per body row of the registry table, in document order.
-
-    Raises:
-        ArtifactRegistryError: If the file does not exist, the section is absent, the section holds
-            no table, the table omits a required column, or a row carries an empty type or a
-            ``Gate-read`` value the registry does not declare. Each of those is the registry being
-            somewhere other than where this module says it is, which no caller can detect from an
-            empty result.
-    """
-    if not registry.is_file():
-        raise ArtifactRegistryError(f"{registry}: no such file, so it declares no artifact-type registry")
-    document = Markdown(extensions=["gfm"]).parse(registry.read_text(encoding="utf-8"))
-    table = find_registry_table(document, registry)
-    header, *body = table.children
-    columns = column_indices(header, registry)
-    return tuple(parse_row(row, columns, registry) for row in body)
-
-
-def find_registry_table(document: object, registry: Path) -> Table:
-    """Return the GFM table under the registry's heading.
-
-    Args:
-        document: The parsed marko document.
-        registry: The file it was parsed from, named in the raised error.
-
-    Returns:
-        The first table appearing under the :data:`REGISTRY_HEADING` section.
-
-    Raises:
-        ArtifactRegistryError: If no heading matches, or the section ends before a table appears.
-    """
-    in_section = False
-    for child in getattr(document, "children", []):
-        if isinstance(child, Heading):
-            if in_section:
-                break
-            in_section = inline_text(child).strip() == REGISTRY_HEADING
-            continue
-        if in_section and isinstance(child, Table):
-            return child
-    found = "the section holds no table" if in_section else "no heading matches"
-    raise ArtifactRegistryError(f"{registry}: no artifact-type registry under heading {REGISTRY_HEADING!r} -- {found}")
-
-
-def column_indices(header: object, registry: Path) -> dict[str, int]:
-    """Map each required column name to its position in the registry table's header row.
-
-    Args:
-        header: The table's header row.
-        registry: The file it was parsed from, named in the raised error.
-
-    Returns:
-        One entry per name in :data:`REQUIRED_COLUMNS`.
-
-    Raises:
-        ArtifactRegistryError: If the header row omits a required column.
-    """
-    names = [inline_text(cell).strip() for cell in getattr(header, "children", [])]
-    missing = [column for column in REQUIRED_COLUMNS if column not in names]
-    if missing:
-        raise ArtifactRegistryError(
-            f"{registry}: the artifact-type registry table omits column(s) {missing!r}; its header row names {names!r}"
-        )
-    return {column: names.index(column) for column in REQUIRED_COLUMNS}
-
-
-def parse_row(row: object, columns: dict[str, int], registry: Path) -> ArtifactTypeRow:
-    """Read one body row of the registry table into an :class:`ArtifactTypeRow`.
-
-    Args:
-        row: The table body row.
-        columns: Column-name to position map, from :func:`column_indices`.
-        registry: The file it was parsed from, named in the raised error.
-
-    Returns:
-        The row's declared type, its registering agents, and its gate-read flag.
-
-    Raises:
-        ArtifactRegistryError: If the row is short of the required columns, names an empty type, or
-            carries a ``Gate-read`` value outside :data:`GATE_READ_VALUES`.
-    """
-    cells = [inline_text(cell).strip() for cell in getattr(row, "children", [])]
-    if len(cells) <= max(columns.values()):
-        raise ArtifactRegistryError(f"{registry}: artifact-type registry row {cells!r} is short of its columns")
-    artifact_type = cells[columns[TYPE_COLUMN]]
-    if not artifact_type:
-        raise ArtifactRegistryError(f"{registry}: artifact-type registry row {cells!r} names no type")
-    gate_read = cells[columns[GATE_READ_COLUMN]].lower()
-    if gate_read not in GATE_READ_VALUES:
-        raise ArtifactRegistryError(
-            f"{registry}: artifact type {artifact_type!r} declares {GATE_READ_COLUMN} {gate_read!r}, "
-            f"which is not one of {sorted(GATE_READ_VALUES)}"
-        )
-    agents = frozenset(agent.strip() for agent in cells[columns[AGENTS_COLUMN]].split(",") if agent.strip())
-    return ArtifactTypeRow(artifact_type=artifact_type, agents=agents, gate_read=GATE_READ_VALUES[gate_read])
-
-
-def artifact_types(registry: Path) -> frozenset[str]:
-    """Return the artifact types the registry names.
-
-    Args:
-        registry: Path to the document declaring the registry.
-
-    Returns:
-        Every value in the registry's :data:`TYPE_COLUMN`; the empty set when ``registry`` itself
-        does not exist, which is the case of a checkout that ships no such registry rather than one
-        whose registry moved.
-
-    Raises:
-        ArtifactRegistryError: If the file exists but its registry is not where this module says it
-            is -- see :func:`registry_rows`.
-    """
-    if not registry.is_file():
-        return frozenset()
-    return frozenset(row.artifact_type for row in registry_rows(registry))
+ARTIFACT_TYPES: frozenset[str] = frozenset(row.artifact_type.value for row in REGISTRY)
+"""Every type :data:`REGISTRY` declares, as the string an ``ARTIFACT`` referent and a tool call spell."""
