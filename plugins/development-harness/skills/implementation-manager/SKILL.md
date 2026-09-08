@@ -197,7 +197,7 @@ The `task_status_hook.py` script provides automated task status tracking via Cla
 **SubagentStop (settle)**:
 
 A SubagentStop hook registered in `hooks/hooks.json` runs in the orchestrator's session when a
-sub-agent it launched stops, so it is the supervisor's observation point. It records that the
+sub-agent it launched stops, so it is the orchestrator's observation point. It records that the
 launch ended, and nothing else:
 
 1. Reads the sub-agent's own initial prompt from `agent_transcript_path` and takes the plan
