@@ -1,11 +1,18 @@
-"""The graph IR: the layers of a workflow, and findings over them.
+"""The workflow multigraph: the workflow held as one graph, and findings over it.
 
-This package implements a three-layer split -- several graphs, each describable on its own and
-drawn together only in :class:`~dh_core.workflow_multigraph.system.LayeredGraph` -- that is superseded design:
-``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4) records the move to one graph, described as
-types and executed as instances, with no separate layer graphs. This package has not yet been
-migrated to that shape; ``plugins/development-harness/ARCHITECTURE.md``'s "The work graph" section
-is the current authority.
+The workflow is one typed, hierarchical, directed multigraph, traceable from entry to terminal and
+spanning grooming through closure. It is described as **types** -- node types, their permitted
+relations, and what each consumes and produces -- and executed as **instances** of those types,
+created while a run is in flight. It is the structure itself rather than a form standing between a
+source and a target: nothing here is compiled above the ``Task`` and ``Plan`` records, and no part
+of it is derived from them by projection. ``plugins/development-harness/ARCHITECTURE.md``'s "The
+work graph" section is the authority for that model.
+
+The code below still implements a three-layer split -- several graphs, each describable on its own
+and drawn together only in :class:`~dh_core.workflow_multigraph.system.LayeredGraph` -- which is
+superseded design: ``docs/workflow-multigraph/findings/AMENDMENTS.md`` (entry A-4) records the move
+to one graph, described as types and executed as instances, with no separate layer graphs. This
+package has not yet been migrated to that shape.
 
 * :mod:`~dh_core.workflow_multigraph.ledger_layer` -- layer 1, task lifecycle: statuses and the commands
   between them, plus the projection each transition may name back to layer 3.

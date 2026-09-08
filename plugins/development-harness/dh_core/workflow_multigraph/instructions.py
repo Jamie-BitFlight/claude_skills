@@ -18,8 +18,8 @@ contract names outright -- a ``DELEGATING`` instruction with no :class:`Referent
 mirror case of an ``ASSERTING`` instruction carrying referents (a ``DELEGATING`` payload under an
 ``ASSERTING`` kind). It does **not** refuse an ``ASSERTING`` instruction with no span and no recorded
 absence, nor a referent whose target does not resolve, nor a span whose quote is not actually in the
-text at its ref: this package's standing rule (``work_layer.py``'s module docstring) is that the IR
-must be able to hold the unsound graph so its unsoundness can be reported, and those three failures
+text at its ref: this package's standing rule (``work_layer.py``'s module docstring) is that the
+multigraph must be able to hold the unsound graph so its unsoundness can be reported, and those three failures
 are exactly what :mod:`dh_core.workflow_multigraph.decomposition_gate` exists to detect and report as findings.
 Refusing to construct them would make the defect invisible instead of reported.
 """

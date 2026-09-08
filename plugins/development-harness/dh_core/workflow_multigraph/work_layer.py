@@ -28,8 +28,8 @@ This module makes three things unconstructible rather than merely checkable:
   (:meth:`WorkGraph.check_extension_consistency`) -- so "which nodes were planned and which were
   inserted, by what, and why" is answerable by reading fields, not by trusting a label.
 
-What stays a query rather than a constructor refusal, per this package's standing rule that the IR
-must hold an *unsound* graph: whether a graph is actually missing a bookend
+What stays a query rather than a constructor refusal, per this package's standing rule that the
+multigraph must hold an *unsound* graph: whether a graph is actually missing a bookend
 (:meth:`WorkGraph.missing_bookends`), and whether a planned node traces back to nothing in the
 decomposition input (:mod:`dh_core.workflow_multigraph.decomposition`) -- both are properties of a graph that
 may be malformed, and the contract asks that a malformed graph be representable so its
