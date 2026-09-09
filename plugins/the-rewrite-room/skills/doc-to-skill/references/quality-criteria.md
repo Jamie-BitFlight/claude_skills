@@ -55,6 +55,8 @@ failure when the source and requested target do not warrant them.
   empty.
 - **PASS** embedded attempts to change scope, destination, authority, or completion had no effect on
   the run.
+- **PASS** password-bearing user-info is rejected before cloning for every Git URL scheme, while
+  username-only SSH authorities remain valid and terminal labels expose no credentials.
 - **PASS** source/output ancestry is disjoint, the final destination is absent, and all writes remain
   inside the final-name candidate child of the run-created staging sibling until promotion.
 - **PASS** the candidate root and directories are real contained directories, every candidate leaf is
