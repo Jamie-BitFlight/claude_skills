@@ -2,13 +2,11 @@ name: Bump Plugin and Marketplace Versions
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'plugins/**'
   workflow_dispatch: {}
 
-# Only one run at a time — sequential bumps, not concurrent
 concurrency:
   group: bump-marketplace
   cancel-in-progress: false
@@ -19,78 +17,50 @@ jobs:
   bump:
     name: Repair plugin versions and sync marketplace.json
     runs-on: ubuntu-latest
-    # Skip commits from this action to avoid infinite loop. workflow_dispatch runs have no
-    # head_commit, so short-circuit on event type before evaluating contains() against it.
-    if: "github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')"
+    # This workflow owns the repair title below; preserve it when merging to prevent another repair.
+    if: "github.event_name != 'push' || !contains(github.event.head_commit.message, 'chore(marketplace): repair versions and synchronize catalog')"
     permissions:
-      contents: write
+      contents: read
     steps:
+      - name: Require repair PR credential
+        env:
+          VERSIONER_PR_TOKEN: ${{ secrets.VERSIONER_PR_TOKEN }}
+        run: |
+          if [[ -z "$VERSIONER_PR_TOKEN" ]]; then
+            echo "::error::Set VERSIONER_PR_TOKEN with contents:write and pull-requests:write; see docs/marketplace-versioning.md"
+            exit 1
+          fi
+
       - uses: actions/checkout@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          persist-credentials: false
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v7
+      - name: Repair version collisions
+        uses: Jamie-BitFlight/agent-marketplace-versioner@6699fa049c8784e7aecd2426d0ee81e0055e8ff1
         with:
-          python-version: "3.11"
-          enable-cache: true
-          cache-dependency-glob: "**/uv.lock"
-          cache-python: true
+          command: repair
 
-      - name: Repair, sync, and push plugin version drift
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Synchronize marketplace
+        uses: Jamie-BitFlight/agent-marketplace-versioner@6699fa049c8784e7aecd2426d0ee81e0055e8ff1
+        with:
+          command: sync
+          marketplace: 'true'
 
-          # Repair + sync run fresh on every attempt, not just once before the
-          # push retry loop. The previous design computed the repair/sync
-          # commit ONCE, then retried only the push+rebase of that single,
-          # now-stale commit. If a concurrent writer advanced main and edited
-          # the same generated manifest, the rebase conflicted; `git rebase
-          # --abort` restored the same stale commit onto the same stale base;
-          # the very next attempt recomputed an identical rebase against the
-          # identical new tip and hit the identical conflict -- all 3
-          # attempts failed identically and the authoritative repair never
-          # reached main (issue #3027 follow-up). check_plugin_version_bump.py
-          # --repair and auto_sync_manifests.py --sync-marketplace are
-          # idempotent and deterministic given repo state (confirmed for
-          # --repair in this PR's T1 evidence), so on a rejected push this
-          # loop discards the stale commit outright (git reset --hard onto
-          # the newly-fetched tip) and regenerates it from current state --
-          # a fresh computation with nothing to reconcile, correct by
-          # construction, instead of a text-merge of two conflicting diffs.
-          for attempt in 1 2 3; do
-            uv run -q --no-sync \
-              plugins/plugin-creator/scripts/check_plugin_version_bump.py \
-              --repair
-
-            uv run -q --no-sync \
-              plugins/plugin-creator/scripts/auto_sync_manifests.py \
-              --sync-marketplace
-
-            if git diff --quiet .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'; then
-              echo "No plugin or marketplace changes to commit"
-              exit 0
-            fi
-
-            git add .claude-plugin/marketplace.json 'plugins/*/.claude-plugin/plugin.json'
-            git commit -m "chore: repair plugin version drift and sync marketplace [skip ci]"
-
-            push_output=$(git push 2>&1) && exit 0
-            echo "$push_output"
-            # Only a non-fast-forward rejection is retried -- any other push
-            # failure (auth, branch protection, network) fails fast with the
-            # real error surfaced instead of masking it behind pointless
-            # retries.
-            if ! grep -qE "(non-fast-forward|fetch first|rejected)" <<<"$push_output"; then
-              echo "::error::git push failed for a reason other than a non-fast-forward rejection -- see output above"
-              exit 1
-            fi
-
-            echo "Push rejected (attempt $attempt/3) -- discarding the stale commit and regenerating from the new tip"
-            git fetch origin main
-            git reset --hard origin/main
-          done
-
-          echo "::error::Failed to push repair commit after 3 attempts"
-          exit 1
+      - name: Open or update repair PR
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ secrets.VERSIONER_PR_TOKEN }}
+          branch: automation/marketplace-version-repair
+          base: main
+          add-paths: |
+            .claude-plugin/marketplace.json
+            plugins/*/.claude-plugin/plugin.json
+            plugins/*/.codex-plugin/plugin.json
+            plugins/*/.cursor-plugin/plugin.json
+          commit-message: 'chore(marketplace): repair versions and synchronize catalog'
+          title: 'chore(marketplace): repair versions and synchronize catalog'
+          body: |
+            Repair plugin version collisions and synchronize the marketplace using the shared versioner.
+            Generated from current main; normal review and required checks apply before merge.

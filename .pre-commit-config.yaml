@@ -154,17 +154,14 @@ repos:
         additional_dependencies: ["shellcheck-py==0.11.0.1"]
         types: [shell]
 
+  - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
+    rev: 6699fa049c8784e7aecd2426d0ee81e0055e8ff1
+    hooks:
+      - id: agent-marketplace-versioner
+
   # Local hooks for type checking
   - repo: local
     hooks:
-      - id: auto-sync-manifests
-        name: Auto-sync plugin and marketplace manifests
-        entry: uv run -q --no-sync plugins/plugin-creator/scripts/auto_sync_manifests.py
-        language: system
-        stages: [pre-commit]
-        pass_filenames: false
-        files: ^plugins/
-
       - id: check-agent-auto-discovery
         name: Guard against plugin.json masking auto-discovered agents/commands
         entry: uv run -q --no-sync plugins/plugin-creator/scripts/check_agent_auto_discovery.py

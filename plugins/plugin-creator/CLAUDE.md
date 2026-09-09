@@ -106,7 +106,7 @@ flowchart TD
 |--------|---------|
 | `create_plugin.py` | Interactive plugin scaffolding — creates `.claude-plugin/`, `plugin.json` |
 | `plugin_validator.py` | Removed — replaced by `uvx skilllint@latest check` |
-| `auto_sync_manifests.py` | Pre-commit hook — syncs plugin.json component arrays, bumps semver |
+| `auto_sync_manifests.py` | Legacy compatibility script; the shared `agent-marketplace-versioner` hook owns active synchronization |
 | `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |
 
@@ -352,26 +352,26 @@ Scripts expect to be run from repository root or use `${CLAUDE_PLUGIN_ROOT}`.
 
 ---
 
-## Automated Version Bumping (Implemented 2026-01-29)
+## Automated Version Bumping
 
-The pre-commit hook `auto-sync-manifests` runs automatically on `git commit`:
+The shared `agent-marketplace-versioner` pre-commit hook runs automatically on `git commit`:
 
 1. Detects CRUD operations on plugins and components from git staged changes
 2. Updates `plugin.json` component arrays (skills, agents, commands) with `./` paths
 3. Bumps plugin versions — Major: component deleted; Minor: component added; Patch: component modified
-4. Updates `marketplace.json` plugin registry
+4. Reconciles local `marketplace.json` plugin membership without bumping its version
 5. Stages updated manifest files automatically
 
 ```
 Component Change → Plugin Version     → Marketplace Version
-+ New skill      → Minor (0.1.0→0.2.0) → Patch (1.0.0→1.0.1)
-- Delete agent   → Major (0.1.0→1.0.0) → Patch (1.0.0→1.0.1)
-~ Modify command → Patch (0.1.0→0.1.1) → Patch (1.0.0→1.0.1)
-+ New plugin     → N/A                  → Minor (1.0.0→1.1.0)
-- Delete plugin  → N/A                  → Major (1.0.0→2.0.0)
++ New skill      → Minor (0.1.0→0.2.0) → Deferred to post-merge repair PR
+- Delete agent   → Major (0.1.0→1.0.0) → Deferred to post-merge repair PR
+~ Modify command → Patch (0.1.0→0.1.1) → Deferred to post-merge repair PR
++ New plugin     → N/A                  → Deferred to post-merge repair PR
+- Delete plugin  → N/A                  → Deferred to post-merge repair PR
 ```
 
-Manual execution: `uv run -q --no-sync plugins/plugin-creator/scripts/auto_sync_manifests.py`
+For the current hook, CI, repair delivery, and compatibility-tool boundary, see [Marketplace versioning](../../docs/marketplace-versioning.md).
 
 ---
 

@@ -14,7 +14,7 @@ The `quality-gate` summary job requires ALL of these to pass:
 | `lint-markdown` | markdownlint-cli2 |
 | `lint-shell` | shellcheck + shfmt |
 | `validate-plugins` | skilllint (plugin/skill structure) |
-| `manifest-sync` | Auto-sync plugin manifests; the per-PR plugin.json version-bump check is advisory (`continue-on-error`) — `bump-marketplace.yml` on main is the backstop |
+| `manifest-sync` | Shared marketplace hook plus blocking PR version check; `bump-marketplace.yml` proposes historical collision repairs through a reviewed PR |
 | `file-hygiene` | trailing whitespace, line endings, large files, merge conflicts |
 | `test-python` | pytest fast suite (default addopts filter) |
 | `test-cross-backend` | pytest `-m cross_backend` on a memory/sqlite matrix (`BACKLOG_BACKEND` env) |

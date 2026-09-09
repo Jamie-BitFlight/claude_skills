@@ -6,9 +6,9 @@ This directory contains executable scripts for plugin development, validation, a
 
 ## Scripts Overview
 
-### auto_sync_manifests.py
+### auto_sync_manifests.py (legacy compatibility)
 
-Automatically maintains `plugin.json` and `marketplace.json` during pre-commit. Detects CRUD operations on plugins/components and bumps semantic versions.
+This retained compatibility script is not the repository's active pre-commit hook. The shared `agent-marketplace-versioner` hook synchronizes plugin manifests and versions; marketplace version repair is deferred to the post-merge PR flow.
 
 **Complete documentation:** [README-auto-sync.md](./README-auto-sync.md)
 
@@ -112,7 +112,7 @@ Scripts integrated into `.pre-commit-config.yaml`:
 
 | Hook ID                | Script                    | Trigger Pattern                                           | Purpose                                 |
 | ---------------------- | ------------------------- | --------------------------------------------------------- | --------------------------------------- |
-| `auto-sync-manifests`  | `auto_sync_manifests.py`  | `^plugins/`                                               | Auto-bump versions and update manifests |
+| `agent-marketplace-versioner` | Shared hook | `^plugins/` | Synchronize plugin manifests and versions; defer marketplace repair |
 | `skilllint`            | `skilllint`               | `^plugins/.*(SKILL\.md\|agents/.*\.md\|commands/.*\.md\|plugin\.json)$` | Comprehensive plugin validation with token metrics |
 
 ## Execution Requirements
@@ -170,7 +170,7 @@ Before referencing script behavior, the model MUST:
 
 **Example citation:**
 
-> "The script protects against double-bumping (lines 276-280 of auto_sync_manifests.py) by checking if plugin.json is already staged."
+> "The shared versioner synchronizes staged plugin manifests; marketplace version repair is proposed after merge."
 
 ### Verification Protocol
 
