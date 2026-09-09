@@ -15,10 +15,12 @@ different requested name with the user before creating a candidate.
 
 ### Local file or directory
 
-Resolve the path without modifying it. A file is the entire source boundary. A directory includes
-every descendant file except exclusions the user names explicitly. Inventory symlinks as source
-units; treat a target outside the boundary as `UNRESOLVED` unless the user separately places that
-target in scope.
+Resolve the path without modifying it. A file is the entire source boundary. A non-Git directory
+includes every descendant file except exclusions the user names explicitly. For a local Git checkout,
+the documentation source boundary is its checked-out working tree: exclude `.git/` and Git
+administrative metadata before exhaustive inventory, with no `SOURCE_ID` or `UNRESOLVED` row for that
+transport metadata. Inventory symlinks as source units; treat a target outside the boundary as
+`UNRESOLVED` unless the user separately places that target in scope.
 
 ### Git URL
 

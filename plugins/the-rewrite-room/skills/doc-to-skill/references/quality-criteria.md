@@ -7,8 +7,8 @@ summary or specialist success message is not evidence that a check passed.
 
 - **PASS** every inventoried file has at least one source-ledger row, including excluded,
   unsupported, empty, and inaccessible files.
-- **PASS** a Git source inventories its checked-out working tree, excluding `.git/` and other Git
-  administrative metadata while retaining every declared source file.
+- **PASS** a URL-cloned or local Git source inventories its checked-out working tree, excluding
+  `.git/` and other Git administrative metadata while retaining every declared source file.
 - **PASS** every included source unit has an `ATOM_ID` or exact `UNRESOLVED` record.
 - **PASS** every operational statement, constraint, parameter, command, error, example, and workflow
   transition has one atom disposition.
