@@ -38,12 +38,12 @@ jobs:
           fetch-depth: 0
 
       - name: Repair version collisions
-        uses: Jamie-BitFlight/agent-marketplace-versioner@820be3e9378667d5fb1b9d74bd16f0384a4360a2
+        uses: Jamie-BitFlight/agent-marketplace-versioner@0d1faec3eb8f19e3c9a5186e4edcba1fad8ec0f5
         with:
           command: repair
 
       - name: Synchronize marketplace
-        uses: Jamie-BitFlight/agent-marketplace-versioner@820be3e9378667d5fb1b9d74bd16f0384a4360a2
+        uses: Jamie-BitFlight/agent-marketplace-versioner@0d1faec3eb8f19e3c9a5186e4edcba1fad8ec0f5
         with:
           command: sync
           marketplace: 'true'
