@@ -72,8 +72,8 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
     catalog.write_text(
         json.dumps({
             "name": "fixture",
-            "version": "1.0.0",
-            "plugins": [{"name": "tool", "source": "./plugins/tool", "version": "1.0.0"}],
+            "metadata": {"version": "1.0.0"},
+            "plugins": [{"name": "tool", "source": "./plugins/tool"}],
         })
     )
     with (consumer / ".pre-commit-config.yaml").open("w") as stream:
@@ -90,7 +90,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
 
     # Then plugin versions advance, marketplace sync stays deferred, and reruns are idempotent.
     assert json.loads(plugin.read_text())["version"] == "1.0.1"
-    assert json.loads(catalog.read_text())["plugins"][0]["version"] == "1.0.0"
+    assert json.loads(catalog.read_text())["metadata"]["version"] == "1.0.0"
     staged = run(consumer, "git", "diff", "--cached").stdout
     run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
     assert run(consumer, "git", "diff", "--cached").stdout == staged
@@ -139,7 +139,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
         [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert synchronized.returncode == 0, synchronized.stdout + synchronized.stderr
-    assert json.loads(catalog.read_text())["version"] == "1.0.0"
+    assert json.loads(catalog.read_text())["metadata"]["version"] == "1.0.1"
 
     # Plugin CRUD updates local catalog membership without taking the post-merge version bump.
     run(consumer, "git", "add", ".")
@@ -150,7 +150,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
     run(consumer, "git", "add", str(added))
     run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
     assert {entry["name"] for entry in json.loads(catalog.read_text())["plugins"]} == {"tool", "added"}
-    assert json.loads(catalog.read_text())["version"] == "1.0.0"
+    assert json.loads(catalog.read_text())["metadata"]["version"] == "1.0.1"
     run(consumer, "git", "commit", "-m", "Add plugin")
     run(consumer, "git", "rm", str(added))
     run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
