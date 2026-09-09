@@ -12,6 +12,7 @@ import pytest
 from ruamel.yaml import YAML
 
 ROOT: Final = Path(__file__).resolve().parents[1]
+BOUNDED: Final = ("uv", "run", "--script", str(ROOT / "scripts/run_bounded.py"), "--timeout-seconds", "120", "--")
 
 
 def test_workflows_use_hook_revision_and_protected_repair_delivery() -> None:
@@ -43,7 +44,7 @@ def test_workflows_use_hook_revision_and_protected_repair_delivery() -> None:
 
 def run(directory: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run a bounded fixture command with its diagnostics retained."""
-    result = subprocess.run(args, cwd=directory, check=False, capture_output=True, text=True, timeout=120)
+    result = subprocess.run([*BOUNDED, *args], cwd=directory, check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
     return result
 
@@ -113,12 +114,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
         "SETUPTOOLS_SCM_PRETEND_VERSION": "0+action",
     }
     result = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", command],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
+        [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -128,34 +124,19 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
     run(consumer, "git", "commit", "-m", "Missed hook")
     env["VERSIONER_BASE"] = "HEAD~1"
     rejected = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", command],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
+        [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert rejected.returncode == 1, rejected.stdout + rejected.stderr
     env["VERSIONER_COMMAND"] = "repair"
     repaired = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", command],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
+        [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert repaired.returncode == 0, repaired.stdout + repaired.stderr
     assert json.loads(plugin.read_text())["version"] == "1.0.2"
     env["VERSIONER_COMMAND"] = "sync"
     env["VERSIONER_MARKETPLACE"] = "true"
     synchronized = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", command],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=120,
+        [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert synchronized.returncode == 0, synchronized.stdout + synchronized.stderr
     assert json.loads(catalog.read_text())["version"] == "1.0.1"
