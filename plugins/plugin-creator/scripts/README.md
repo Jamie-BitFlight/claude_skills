@@ -6,9 +6,9 @@ Utility scripts for maintaining Claude Code plugins, skills, agents, and command
 
 ## auto_sync_manifests.py
 
-Automatically maintains `plugin.json` and `marketplace.json` during `git commit`. This is the pre-commit hook that runs silently on every commit — you generally do not need to run it manually.
+Legacy compatibility script for existing plugin users. It is not this repository's pre-commit hook or CI implementation; those use the shared `agent-marketplace-versioner` distribution. See [Marketplace versioning](../../../docs/marketplace-versioning.md) for the active workflow.
 
-### What it does
+### What it does when explicitly invoked
 
 Detects CRUD operations on plugin components (skills, agents, commands) from staged git changes, then:
 
@@ -25,8 +25,6 @@ Double-bump protection prevents version inflation when a commit fails and is ret
 ### Usage
 
 ```bash
-# Runs automatically as a pre-commit hook — no manual invocation needed
-
 # Full reconcile: fix drift between filesystem and manifests
 ./plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile
 
@@ -252,11 +250,11 @@ These modules are not standalone scripts. They are imported by the scripts above
 
 ## Pre-Commit Integration
 
-Two scripts run automatically via `.pre-commit-config.yaml`:
+The shared versioner and one local guard run automatically via `.pre-commit-config.yaml`:
 
 | Hook ID | Script | Trigger pattern | Purpose |
 |---|---|---|---|
-| `auto-sync-manifests` | `auto_sync_manifests.py` | `^plugins/` | Version bumping and manifest maintenance |
+| `agent-marketplace-versioner` | Shared `agent-marketplace-versioner` distribution | all conventional manifests | Plugin versioning and marketplace membership reconciliation |
 | `check-agent-auto-discovery` | `check_agent_auto_discovery.py` | `^plugins/.*plugin\.json$` | Guard against silent component masking |
 
 ---

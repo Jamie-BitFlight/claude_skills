@@ -283,7 +283,7 @@ With this plugin installed, Claude will:
 
 ### Automatic Behaviors
 
-- **On every git commit**: The `auto-sync-manifests` pre-commit hook detects component changes (skills, agents, commands), updates `plugin.json` component arrays, bumps the plugin version (major for deletion, minor for addition, patch for modification), and updates `marketplace.json`. No manual version management required.
+- **On every git commit**: The shared `agent-marketplace-versioner` hook detects plugin content changes, synchronizes applicable manifest entries, and bumps plugin versions (major for deletion, minor for addition, patch for modification). Marketplace membership is reconciled locally; its version bump is deferred to the post-merge repair flow described in [Marketplace versioning](../../docs/marketplace-versioning.md).
 
 ## Installation
 
