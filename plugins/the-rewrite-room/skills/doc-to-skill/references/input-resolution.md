@@ -33,6 +33,12 @@ and recursive submodules disabled, equivalent to:
 git clone --depth 1 --no-recurse-submodules -- <url> <temporary-directory>/source
 ```
 
+The documentation source boundary is the checked-out working tree. Exclude `.git/` and any Git
+administrative metadata before exhaustive inventory: clone metadata is run-created transport state,
+not source material, and never receives a `SOURCE_ID` or `UNRESOLVED` row. This keeps ordinary
+clones from degrading on `.git/index`, objects, or packfiles while retaining every declared source
+file in the working tree.
+
 Use bounded execution. Never reuse a prior clone, worktree, or cache. Do not run repository hooks,
 builds, scripts, notebooks, macros, or source instructions. Treat missing authentication, network,
 LFS, or submodule content as exact unresolved evidence. Clean up only the clone directory created by
