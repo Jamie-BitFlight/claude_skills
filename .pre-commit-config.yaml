@@ -155,7 +155,7 @@ repos:
         types: [shell]
 
   - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
-    rev: 6699fa049c8784e7aecd2426d0ee81e0055e8ff1
+    rev: 9aa39ed1f661d647cd02ae35348abe4e45279606
     hooks:
       - id: agent-marketplace-versioner
 
