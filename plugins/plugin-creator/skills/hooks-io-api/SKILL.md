@@ -306,7 +306,7 @@ Fires instead of Stop when the turn ends due to an API error. Output and exit co
   "hook_event_name": "SubagentStop",
   "stop_hook_active": false,
   "agent_id": "def456",
-  "agent_type": "rewrite-room-auditor",
+  "agent_type": "docs-review-agent",
   "agent_transcript_path": "~/.claude/projects/.../abc123/subagents/agent-def456.jsonl",
   "last_assistant_message": "Analysis complete. Found 3 potential issues...",
   "background_tasks": [],

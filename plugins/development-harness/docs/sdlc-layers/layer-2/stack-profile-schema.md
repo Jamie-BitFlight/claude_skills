@@ -60,6 +60,6 @@ For workflow definitions within stack profiles:
 - `python-tornado` — Python async web
 - `python-cli` — Python CLI tool
 - `typescript-react` — TypeScript frontend
-- `documentation-authoring` — Doc workflows (the-rewrite-room)
+- `documentation-authoring` — Portable documentation workflows (rwr)
 - `changelog_generation` — Changelog workflows
 - `daily_releases` — Extends changelog_generation

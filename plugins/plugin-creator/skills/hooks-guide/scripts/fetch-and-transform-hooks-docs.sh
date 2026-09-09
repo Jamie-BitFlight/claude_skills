@@ -2,7 +2,7 @@
 # fetch-and-transform-hooks-docs.sh
 #
 # Fetches AI assistant hook documentation from official sources and transforms
-# each into an AI-facing reference file using the rwr:doc-to-skill pipeline.
+# each into one existing AI-facing reference file with a focused prompt.
 #
 # Usage: bash plugins/plugin-creator/skills/hooks-guide/scripts/fetch-and-transform-hooks-docs.sh
 #
@@ -66,9 +66,8 @@ for entry in "${PLATFORMS[@]}"; do
         continue
     fi
 
-    # --- Step d: Run rwr:doc-to-skill transformation via claude ---
     CLAUDECODE='' claude -p \
-        "You are running rwr:doc-to-skill. Convert the human-facing documentation in the file at ${tmp_file} into an AI-facing reference file at ${output_path}. Rules: remove UX prose, preserve all code examples verbatim, add ToC, use imperative headings, group by concept." \
+        "Convert the human-facing documentation in the file at ${tmp_file} into one AI-facing reference file at ${output_path}. Rules: remove UX prose, preserve all code examples verbatim, add ToC, use imperative headings, group by concept." \
         2>&1
     claude_exit=$?
 

@@ -108,6 +108,20 @@ def test_rerunning_sync_is_idempotent(tmp_path: Path) -> None:
     assert second_pass_changed is False
 
 
+def test_sync_manifest_preserves_claude_declared_write_capability(tmp_path: Path) -> None:
+    plugin_dir = _build_plugin_dir(tmp_path, "writer", description="Writes user-authorized files.", mcp_servers=None)
+    (plugin_dir / "commands").rmdir()
+    claude_manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
+    claude_manifest = json.loads(claude_manifest_path.read_text(encoding="utf-8"))
+    claude_manifest["capabilities"] = ["Write"]
+    _write_json(claude_manifest_path, claude_manifest)
+
+    sync_module.sync_manifest(plugin_dir)
+
+    manifest = json.loads((plugin_dir / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    assert set(manifest["interface"]["capabilities"]) == {"Interactive", "Read", "Write"}
+
+
 def test_sync_mcp_file_rejects_placeholder_codex_cannot_expand(tmp_path: Path) -> None:
     """A Claude-only placeholder with no Codex expansion fails sync instead of copying verbatim."""
     plugin_dir = _build_plugin_dir(

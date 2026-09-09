@@ -153,7 +153,6 @@ Nielsen 10 = 10 ready-made overlapping jobs. Near-zero partition design cost.
 - `.claude/skills/design-anti-patterns/references/uncodixfy-rules.md` — 50+ rules — fit5
 - `gitlab-skill/SKILL.md` — 24 checklist across 3 gates — fit5
 - `fastmcp-creator/.../typescript-mcp-server.md` — 12 RULE statements — fit5
-- `the-rewrite-room/.../quality-criteria.md` — 40 items / 8 categories — fit5
 - `.claude/skills/evaluate-sdlc-layers` — 29 items / 6 sub-checklists — fit5
 
 Each names its own categories → those categories ARE the worker boundaries.
