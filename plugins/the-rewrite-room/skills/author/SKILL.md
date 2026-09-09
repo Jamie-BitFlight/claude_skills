@@ -28,6 +28,7 @@ An already available specialist may improve a branch. Its response is supporting
 
 ## Output
 
+- Terminal line: `STATUS: DONE|BLOCKED`
 - Authored or summarized content, changed file, or validation report
 - Source-preservation record
 - Checks performed and checks unavailable

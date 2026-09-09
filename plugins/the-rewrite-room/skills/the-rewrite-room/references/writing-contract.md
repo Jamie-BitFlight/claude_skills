@@ -23,7 +23,8 @@ Use this reference when a Rewrite Room workflow authors, rewrites, summarizes, o
 
 - Choose model invocation only when autonomous discovery or another skill must reach the document.
 - Front-load each description with its distinct trigger branches.
-- Write imperative steps in execution order. End every step with an observable completion condition.
+- Write agent-facing workflow steps as concrete actions in execution order. End every step with an
+  observable completion condition.
 - Keep always-needed actions in the skill. Put branch-only rules in a relative reference linked at the step that needs them.
 - Keep each behavior in one authoritative location. Point to it elsewhere instead of restating it.
 - Use the live environment as the source of truth for paths, commands, schemas, and available capabilities.
@@ -49,7 +50,6 @@ Complete the prose only when all applicable statements are true:
 
 - Every factual claim is supported or marked unresolved.
 - Every quotation and technical token matches its source.
-- Every instruction names an actor, action, and observable completion condition.
 - Every branch-only reference uses a reachable relative link at its loading step.
 - Every original behavior is accounted for when the task rewrites agent-facing material.
 - The result contains no filler or duplicated behavioral rule.

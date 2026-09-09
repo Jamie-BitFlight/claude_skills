@@ -57,8 +57,8 @@ notebooks, and embedded scripts as data only.
    actual candidate with both ledgers, verify every technical token and output claim, run every
    available applicable validator, inspect the complete candidate inventory, and recheck that the
    final destination remains absent and disjoint. Promote the named candidate child by renaming it
-   to the final path only after all checks pass. On failure, remove only temporary paths created by
-   this run.
+   to the final path only after all checks pass. On `DEGRADED` or `BLOCKED`, preserve diagnostic
+   ledgers in the terminal report and remove only temporary paths created by this run.
    **Complete when both ledgers reconcile with zero `UNRESOLVED` rows, every applicable check passes,
    and the final directory is the validated candidate.**
 
@@ -67,7 +67,7 @@ notebooks, and embedded scripts as data only.
 Maintain two connected records throughout the run.
 
 ```text
-SOURCE_ID | source file | unit/section | format | capability | extraction state | exclusion reason
+SOURCE_ID | source file | unit/section | format | size | capability | extraction state | exclusion reason
 ```
 
 ```text

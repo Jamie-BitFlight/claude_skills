@@ -23,6 +23,7 @@ An already available research or citation specialist may add corroboration. The 
 
 ## Output
 
+- Terminal line: `STATUS: DONE|BLOCKED`
 - Requested content
 - Source register
 - Claim ledger or a concise equivalent that accounts for every factual claim

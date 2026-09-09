@@ -28,6 +28,7 @@ An already available specialist may provide additional evidence. The baseline in
 
 ## Output
 
+- Terminal line: `STATUS: DONE|BLOCKED`
 - Mode and scoped files
 - Evidence ledger with source locations
 - Findings ordered by impact

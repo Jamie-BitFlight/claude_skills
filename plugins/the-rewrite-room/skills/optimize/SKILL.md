@@ -25,6 +25,7 @@ The optional `skill-lapidary` result is supporting evidence. The local ledger an
 
 ## Output
 
+- Terminal line: `STATUS: DONE|BLOCKED`
 - Optimized content, changed files, or proposed diff
 - Whole-behavior ledger with original and resulting locations
 - Before-and-after summary

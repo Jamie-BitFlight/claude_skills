@@ -31,7 +31,8 @@ description: Use when routing documentation work to one Rewrite Room workflow, i
 
 - The selected workflow name
 - The selected workflow's complete terminal result and validation evidence, unchanged
-- Any route ambiguity or dispatch failure that prevented a leaf terminal report
+- On route ambiguity or dispatch failure, `STATUS: BLOCKED` and the failure that prevented a leaf
+  terminal report
 
 ## Completion
 
