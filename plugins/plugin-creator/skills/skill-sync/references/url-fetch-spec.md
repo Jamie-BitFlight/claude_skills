@@ -65,17 +65,10 @@ Detection heuristic:
 1. Search for the project's GitHub repo: `mcp__exa__web_search_exa(query: "<project-name> site:github.com docs")`
 2. Confirm the repo has a `docs/` or similar directory that matches the URL structure
 
-If confirmed, clone and mine:
-
-```bash
-git clone <repo-url> .claude/worktrees/<project-name>/
-```
-
-Then invoke `Skill(skill: "rwr:user-docs-to-ai-skill")` with the cloned path as the docs source. The skill inventories files by format; when no `docs/` subdirectory is found, it dispatches an Explore subagent running `Glob("**/*", docs_path)` to discover content, then maps the content into up to 6 themes and builds reference files.
-
-SOURCE: `plugins/the-rewrite-room/skills/user-docs-to-ai-skill/SKILL.md` lines 35–37, 77–81, 91 (accessed 2026-05-23)
-
-**SOURCE:** `plugins/the-rewrite-room/skills/user-docs-to-ai-skill/SKILL.md` lines 35–37, 77–81, 91 (accessed 2026-05-23)
+If confirmed, activate `rwr:doc-to-skill` with the repository URL as `source` and an explicit absent
+`output_skill_directory`. Pass the complete source boundary rather than a summary. The conversion
+workflow creates a fresh temporary clone, inventories every source file by format and capability,
+and promotes a portable skill only after its source-to-output ledger reconciles.
 
 Apply Tier 4 when **3 or more** URLs from the same domain fail — not for a single 404 (which is more likely a moved page than a block).
 

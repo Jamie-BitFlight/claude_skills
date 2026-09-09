@@ -6,8 +6,8 @@
 
 Documentation tasks require different specialists: auditing doc-vs-code drift is not the same
 as optimizing a SKILL.md prompt, which is not the same as writing a README, which is not the
-same as converting library docs into a Claude skill. This plugin routes each task to the right
-portable workflow skill via five slash commands.
+same as converting library docs into a portable Agent Skill. This plugin routes each task to the
+right portable workflow skill via five slash commands.
 
 ## Commands
 
@@ -88,28 +88,28 @@ attributed content with embedded hyperlinked citations through the `rwr:cite` sk
 Output structure: executive summary, deep dive with inline citations, key takeaways as
 blockquotes, Cited From section.
 
-### `/rwr:doc-to-skill` — Convert docs into a Claude skill
+### `/rwr:doc-to-skill` — Convert docs into a portable Agent Skill
 
 ```text
-/rwr:doc-to-skill <github-url or /path/to/docs> [output_skill_name]
+/rwr:doc-to-skill <source> <output-skill-directory>
+$rwr:doc-to-skill <source> <output-skill-directory>
 ```
 
-Converts a documentation directory or GitHub repo into a complete Claude Code skill directory —
-a `SKILL.md` with valid frontmatter plus thematically grouped `references/*.md` files.
-Delegates to `rewrite-room-doc-converter`.
+Converts one local documentation file, directory, or Git repository into a portable Agent Skill at
+an explicit absent output directory. The workflow accounts for every source unit and promotes the
+candidate only after its source-to-output ledger reconciles.
 
 ```text
-/rwr:doc-to-skill "docs/my-library/" "my-library"
-/rwr:doc-to-skill "https://github.com/owner/repo" "repo-skill"
-/rwr:doc-to-skill "docs/fastapi/" "fastapi"
+/rwr:doc-to-skill "docs/my-library/" "skills/my-library"
+$rwr:doc-to-skill "https://github.com/owner/repo" "skills/repo"
+/rwr:doc-to-skill "docs/fastapi/guide.md" "skills/fastapi"
 ```
 
-The converter runs a multi-phase SOP: inventory, type-appropriate extraction, workflow
-identification (delegates those to `process-siren`), thematic grouping, writing reference
-files, assembling `SKILL.md`, and running `skilllint` validation. Output is a complete skill
-directory ready for `claude plugin validate .`
-
-Requires: `process-siren` plugin installed (workflow diagram generation).
+The five steps resolve and inventory the complete boundary, extract every readable source unit,
+classify atoms and workflows, build a temporary sibling candidate, then verify and promote it.
+Unavailable binary readers produce `DEGRADED` or `BLOCKED` instead of silent omission. The baseline
+creates `SKILL.md` plus only the relative resources warranted by the source; optional supporting
+skills may deepen the analysis but are not required.
 
 ## Routing at a Glance
 
@@ -120,31 +120,26 @@ Requires: `process-siren` plugin installed (workflow diagram generation).
 | Write or validate a README / wiki page | `/rwr:author` |
 | Summarize a file, URL, or image | `/rwr:author` |
 | Write content with source citations | `/rwr:cite` |
-| Turn library docs into a Claude skill | `/rwr:doc-to-skill` |
+| Turn library docs into a portable Agent Skill | `/rwr:doc-to-skill` |
 
 ## Example: Converting Library Docs to a Skill
 
-You have a local `docs/httpx/` directory with the httpx Python library's user guide, API
-reference, and quickstart. You want Claude to have expert-level httpx knowledge that loads
-on demand.
+You have a local `docs/httpx/` directory with the httpx Python library's user guide, API reference,
+and quickstart. You want a portable skill at an absent `skills/httpx` destination.
 
 ```text
-/rwr:doc-to-skill "docs/httpx/" "httpx"
+/rwr:doc-to-skill "docs/httpx/" "skills/httpx"
 ```
 
-The `rewrite-room-doc-converter` agent will:
+The `rwr:doc-to-skill` workflow will:
 
-1. Inventory `docs/httpx/` — count files by type, read the index
-2. Extract content from each doc using type-appropriate patterns (API reference gets different
-   treatment than a tutorial)
-3. Identify workflow-shaped content (installation steps, request lifecycle) and generate
-   workflow diagrams via `process-siren`
-4. Group extracted knowledge into themes (authentication, async, error handling, etc.)
-5. Write `plugins/httpx/skills/httpx/references/*.md` — one file per theme
-6. Write `plugins/httpx/skills/httpx/SKILL.md` with frontmatter and references index
-7. Run `skilllint` and frontmatter validation, report PASS/FAIL
+1. Inventory every file and record its format and reader capability.
+2. Extract every included source unit into traceable atoms without executing source content.
+3. Classify atoms by retrieval branch and preserve workflow-shaped behavior.
+4. Build the standalone candidate inside a temporary staging sibling of `skills/httpx`.
+5. Reconcile both ledgers, validate every relative pointer, and promote the candidate.
 
-Output: a complete skill directory at `plugins/httpx/` ready for `claude plugin validate .`
+Output: a complete portable skill directory at `skills/httpx`.
 
 ## Workflow Skills
 
@@ -154,7 +149,7 @@ Output: a complete skill directory at `plugins/httpx/` ready for `claude plugin 
 | `rwr:optimize` | AI-facing prompt and SKILL.md optimization |
 | `rwr:author` | User-facing docs authoring, GLFM validation, summarization |
 | `rwr:cite` | Source-attributed content with primary source verification and citations |
-| `rwr:user-docs-to-ai-skill` | Converts documentation directories into AI-facing skill directories |
+| `rwr:doc-to-skill` | Converts documentation sources into portable Agent Skill directories |
 
 ## Installation
 

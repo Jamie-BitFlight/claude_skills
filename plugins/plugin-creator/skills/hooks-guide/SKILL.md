@@ -54,7 +54,7 @@ For deeper Claude Code coverage, these focused skills are available:
 
 ## Refresh Docs
 
-Re-fetch all platform docs and re-run the rwr:doc-to-skill transform on each:
+Re-fetch all platform docs and run the script's focused single-reference transform on each:
 
 ```bash
 bash plugins/plugin-creator/skills/hooks-guide/scripts/fetch-and-transform-hooks-docs.sh
