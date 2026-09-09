@@ -510,26 +510,6 @@ function buildAgentList() {
       agentFile: 'python-pytest-architect.md',
     },
     {
-      key: 'rwr:rewrite-room-auditor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/rwr'),
-      agentFile: 'rewrite-room-auditor.md',
-    },
-    {
-      key: 'rwr:rewrite-room-author',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/rwr'),
-      agentFile: 'rewrite-room-author.md',
-    },
-    {
-      key: 'rwr:rewrite-room-doc-converter',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/rwr'),
-      agentFile: 'rewrite-room-doc-converter.md',
-    },
-    {
-      key: 'rwr:rewrite-room-optimizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/rwr'),
-      agentFile: 'rewrite-room-optimizer.md',
-    },
-    {
       key: 'summarizer:file-summarizer',
       pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/summarizer'),
       agentFile: 'file-summarizer.md',

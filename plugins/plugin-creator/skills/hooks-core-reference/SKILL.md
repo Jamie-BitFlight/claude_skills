@@ -174,7 +174,7 @@ Matched against `agent_type`. For custom subagents, `agent_type` is the **`name`
 | `Explore` | Built-in Explore agent |
 | `Plan` | Built-in Plan agent |
 | `^my-agent-name$` | Custom agent with `name: my-agent-name` in frontmatter |
-| (regex supported) | `^rewrite-room-` matches all agents starting with that prefix |
+| (regex supported) | `^docs-review-` matches all agents starting with that prefix |
 
 ### SessionStart
 

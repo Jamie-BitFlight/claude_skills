@@ -7,7 +7,7 @@
 Documentation tasks require different specialists: auditing doc-vs-code drift is not the same
 as optimizing a SKILL.md prompt, which is not the same as writing a README, which is not the
 same as converting library docs into a Claude skill. This plugin routes each task to the right
-specialist agent via five slash commands.
+portable workflow skill via five slash commands.
 
 ## Commands
 
@@ -18,9 +18,9 @@ specialist agent via five slash commands.
 ```
 
 Audits documentation accuracy against code, syncs docs after code changes, and tracks doc
-freshness. Delegates to `rewrite-room-auditor`, which uses the `development-harness`
-doc-drift-auditor and service-docs-maintainer agents to produce evidence-based findings with
-file:line citations and severity categorization.
+freshness. The `rwr:audit` skill inventories the requested scope, treats documentation and
+implementation as evidence, and reports findings with file:line citations and explicit
+verification states.
 
 ```text
 /rwr:audit "check if kaizen plugin docs match the code"
@@ -28,7 +28,7 @@ file:line citations and severity categorization.
 /rwr:audit "add freshness tracking to the plugin-creator docs"
 ```
 
-Requires: `development-harness` plugin installed.
+The workflow runs from built-in guidance; installed supporting skills may enhance its analysis.
 
 ### `/rwr:optimize` — AI-facing prompt improvement
 
@@ -36,9 +36,9 @@ Requires: `development-harness` plugin installed.
 /rwr:optimize <file>
 ```
 
-Optimizes CLAUDE.md files, SKILL.md files, and agent definitions using Anthropic prompt
-engineering best practices. Delegates to `rewrite-room-optimizer`, which runs the RT-ICA
-pre-check gate, applies a 6-step optimization, and produces a token impact report.
+Optimizes CLAUDE.md files, SKILL.md files, and agent definitions without dropping existing
+behavior. The `rwr:optimize` skill inventories the complete target, keeps a whole-behavior ledger,
+and validates the resulting artifact or analysis.
 
 ```text
 /rwr:optimize "plugins/plugin-creator/skills/add-doc-updater/SKILL.md"
@@ -48,7 +48,7 @@ pre-check gate, applies a 6-step optimization, and produces a token impact repor
 
 Not for user-facing docs — use `/rwr:author` for those.
 
-Requires: `plugin-creator` plugin installed.
+The workflow runs from built-in guidance; installed supporting skills may enhance its analysis.
 
 ### `/rwr:author` — User-facing docs and summarization
 
@@ -78,7 +78,7 @@ wiki targets), `GITLAB_TOKEN` env var (GLFM validation).
 ```
 
 Fetches a source URL, cross-references every claim against the source material, and produces
-attributed content with embedded hyperlinked citations. Delegates to `rewrite-room-cite`.
+attributed content with embedded hyperlinked citations through the `rwr:cite` skill.
 
 ```text
 /rwr:cite "https://docs.anthropic.com/en/docs/claude-code" "blog post about Claude Code"
@@ -146,18 +146,15 @@ The `rewrite-room-doc-converter` agent will:
 
 Output: a complete skill directory at `plugins/httpx/` ready for `claude plugin validate .`
 
-## Agents
+## Workflow Skills
 
-All five agents share a canonical STATUS block output contract — every response includes
-`STATUS`, `SUMMARY`, `ARTIFACTS`, and `VALIDATION` fields.
-
-| Agent | Role |
+| Skill | Role |
 |-------|------|
-| `rewrite-room-auditor` | Docs vs code drift detection, post-change sync, freshness tracking |
-| `rewrite-room-optimizer` | AI-facing prompt and SKILL.md optimization |
-| `rewrite-room-author` | User-facing docs authoring, GLFM validation, summarization |
-| `rewrite-room-cite` | Source-attributed content with primary source verification and citations |
-| `rewrite-room-doc-converter` | Converts documentation directories into Claude Code skill directories |
+| `rwr:audit` | Docs vs code drift detection, post-change sync, freshness tracking |
+| `rwr:optimize` | AI-facing prompt and SKILL.md optimization |
+| `rwr:author` | User-facing docs authoring, GLFM validation, summarization |
+| `rwr:cite` | Source-attributed content with primary source verification and citations |
+| `rwr:user-docs-to-ai-skill` | Converts documentation directories into AI-facing skill directories |
 
 ## Installation
 
@@ -173,14 +170,11 @@ Install the plugin:
 /plugin install rwr@jamie-bitflight-skills
 ```
 
-## Requirements
+## Optional Enhancements
 
-- Claude Code v2.0+
-- `/rwr:audit`: `development-harness` plugin installed
-- `/rwr:optimize`: `plugin-creator` plugin installed
-- `/rwr:author` (summarization): `summarizer` plugin installed
-- `/rwr:author` (GitLab targets): `gitlab-skill` plugin installed + `GITLAB_TOKEN` env var
-- `/rwr:doc-to-skill` (workflow diagrams): `process-siren` plugin installed
+The workflows run from built-in guidance. When relevant supporting skills are installed, Rewrite
+Room may use them for deeper analysis, specialized formatting, summarization, or workflow
+extraction; their absence does not block the baseline workflow.
 
 ---
 
