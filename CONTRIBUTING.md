@@ -51,7 +51,7 @@ All validation checks must pass with no errors.
 
 The `name` field is the install name users will use (`/plugin install your-plugin-name@jamie-bitflight-skills`). It can differ from the directory name — for example, `development-harness` installs as `dh` and `the-rewrite-room` installs as `rwr`.
 
-**Note:** Plugin and marketplace versions are bumped automatically by the `auto_sync_manifests.py` pre-commit hook when you commit any change under `plugins/`. Do not manually edit version fields in `plugin.json` or `marketplace.json` — the hook handles this.
+**Note:** The shared `agent-marketplace-versioner` pre-commit hook bumps plugin versions and synchronizes manifest entries for staged plugin changes. Marketplace version repair is proposed after merge in a normal PR. Do not manually edit version fields for the normal local workflow; see [marketplace versioning](docs/marketplace-versioning.md).
 
 #### Validate Marketplace JSON
 
@@ -101,11 +101,11 @@ Version bumping happens automatically on commit via the pre-commit hook.
 
 ## Updating an Existing Plugin
 
-Make your changes and commit. The `auto_sync_manifests.py` pre-commit hook runs on every commit that touches files under `plugins/` and:
+Make your changes and commit. The shared `agent-marketplace-versioner` pre-commit hook:
 
 - Bumps the plugin version in `.claude-plugin/plugin.json`
 - Syncs the component arrays (skills, agents, commands) in `plugin.json`
-- Bumps `metadata.version` in `.claude-plugin/marketplace.json` when the set of plugins changes
+- Reconciles local marketplace membership; marketplace version repair is deferred to the post-merge repair PR
 
 You do not need to manually bump any version field.
 
