@@ -22,11 +22,11 @@ target in scope.
 
 ### Git URL
 
-Before cloning, reject password-bearing user-info in a Git URL authority regardless of scheme, such
-as `ssh://user:password@host/repository`. Allow username-only SSH authorities such as
-`ssh://git@host/repository` and `git@host:repository`. Do not create a temporary directory, invoke
-Git, or repeat a rejected URL in a status or terminal report. Record a credential-free source boundary
-label instead.
+Before cloning, reject all user-info in HTTP(S) URLs and password-bearing user-info in every Git URL
+scheme, such as `https://TOKEN@host/repository` or `ssh://user:password@host/repository`. Allow
+username-only SSH authorities such as `ssh://git@host/repository` and `git@host:repository`. Do not
+create a temporary directory, invoke Git, or repeat a credential-bearing URL in a status or terminal
+report. Record a credential-free source boundary label instead.
 
 Create a fresh temporary directory and clone into its explicit `source/` child with shallow history
 and recursive submodules disabled, equivalent to:
