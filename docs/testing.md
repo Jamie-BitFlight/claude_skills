@@ -22,6 +22,11 @@ claude --plugin-dir ./plugins/holistic-linting          # Load multiple plugins
 /plugin validate ./plugins/plugin-name                  # Validate plugin structure
 ```
 
+## Codex activation matrix
+
+`MAPPED` means an unexecuted task mapping with no activation evidence; its `evidence` fields remain
+null until the validation runner records an observed result. It is not a passing activation status.
+
 ## Patterns and conventions
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`

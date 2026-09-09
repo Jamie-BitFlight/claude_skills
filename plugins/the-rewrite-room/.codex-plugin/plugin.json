@@ -26,7 +26,8 @@
     "category": "Developer Tools",
     "capabilities": [
       "Interactive",
-      "Read"
+      "Read",
+      "Write"
     ],
     "defaultPrompt": [
       "Use $rwr:the-rewrite-room to route this documentation request to exactly one workflow."

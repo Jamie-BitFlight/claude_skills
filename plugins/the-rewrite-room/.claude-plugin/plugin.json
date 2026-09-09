@@ -16,5 +16,8 @@
     "citations",
     "skill-conversion",
     "prompt-optimization"
+  ],
+  "capabilities": [
+    "Write"
   ]
 }

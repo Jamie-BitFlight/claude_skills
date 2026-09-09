@@ -48,7 +48,7 @@ def _short_description(description: str) -> str:
     return f"{description[:237].rsplit(' ', 1)[0]}..."
 
 
-def detect_capabilities(plugin_dir: Path) -> list[str]:
+def detect_capabilities(plugin_dir: Path, declared_capabilities: list[str]) -> list[str]:
     """Return interface capabilities implied by plugin components."""
     capabilities = ["Interactive"]
     if (plugin_dir / "skills").is_dir():
@@ -61,6 +61,7 @@ def detect_capabilities(plugin_dir: Path) -> list[str]:
         (plugin_dir / ".app.json").is_file(),
     )):
         capabilities.append("Write")
+    capabilities.extend(declared_capabilities)
     return list(dict.fromkeys(capabilities))
 
 
@@ -239,6 +240,14 @@ def sync_manifest(plugin_dir: Path, *, check_only: bool = False) -> bool:
     description = manifest.get("description") or f"{display_name} plugin"
     author = manifest.get("author")
     developer_name = author.get("name") if isinstance(author, dict) and author.get("name") else "Unknown"
+    claude_manifest_path = plugin_dir / ".claude-plugin" / "plugin.json"
+    declared_capabilities: list[str] = []
+    if claude_manifest_path.is_file():
+        source_capabilities = load_json(claude_manifest_path).get("capabilities")
+        if isinstance(source_capabilities, list):
+            declared_capabilities = [
+                capability for capability in source_capabilities if capability in {"Read", "Write"}
+            ]
 
     computed_interface = {
         "displayName": display_name,
@@ -246,7 +255,7 @@ def sync_manifest(plugin_dir: Path, *, check_only: bool = False) -> bool:
         "longDescription": description,
         "developerName": developer_name,
         "category": "Developer Tools",
-        "capabilities": detect_capabilities(plugin_dir),
+        "capabilities": detect_capabilities(plugin_dir, declared_capabilities),
     }
     interface = _merge_interface(manifest.get("interface"), computed_interface)
 

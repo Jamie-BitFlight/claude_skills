@@ -22,6 +22,10 @@ target in scope.
 
 ### Git URL
 
+Before cloning, reject an HTTP(S) URL with a user-info component. Do not create a temporary directory,
+invoke Git, or repeat the supplied URL in a status or terminal report. Record a credential-free source
+boundary label instead. SSH Git URLs may identify an SSH user but must never include a secret in a report.
+
 Create a fresh temporary directory and clone into its explicit `source/` child with shallow history
 and recursive submodules disabled, equivalent to:
 
@@ -68,9 +72,11 @@ links, and inaccessible content remain visible as rows; none disappear from the 
 ## Candidate Promotion and Cleanup
 
 Write only inside the named candidate child of the run-created staging sibling. Immediately before
-promotion, verify that the final path is still absent and disjoint from the source. Rename the
-validated candidate child to the final path without crossing filesystems, then remove the empty
-staging directory.
+promotion, inspect the candidate without following links: its root and every directory must be real,
+contained directories; every leaf must be a regular contained file; and any symlink, special file, or
+escaping path is `BLOCKED`. Recheck that the final path is still absent and disjoint from the source,
+then rename the validated candidate child to the final path without crossing filesystems and remove the
+empty staging directory.
 
 After success, remove only run-created clone or staging parents that are no longer needed. After
 failure, remove only run-created candidate and clone paths. Preserve every caller-owned source,
