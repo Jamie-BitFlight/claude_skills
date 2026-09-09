@@ -1,6 +1,6 @@
 ---
 name: doc-to-skill
-description: Use when converting a local documentation file, documentation directory, or Git repository into a portable Agent Skill, including mixed text and capability-gated binary sources that require exhaustive source-to-output accounting.
+description: Use when the primary outcome is creating a new portable Agent Skill directory from one local documentation file, documentation directory, or Git repository, including mixed text and capability-gated binary sources that require exhaustive source-to-output accounting.
 ---
 
 # Doc to Skill

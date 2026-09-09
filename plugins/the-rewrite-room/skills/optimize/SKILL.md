@@ -1,6 +1,6 @@
 ---
 name: optimize
-description: Use when refining an existing AI-facing artifact without dropping behavior, including SKILL.md, AGENTS.md, CLAUDE.md, rules, prompts, and agent definitions that need sharper invocation, structure, or completion criteria.
+description: Use when the primary outcome is refining an existing AI-facing artifact without dropping behavior, including SKILL.md, AGENTS.md, CLAUDE.md, rules, prompts, and agent definitions that need sharper invocation, structure, or completion criteria.
 ---
 
 # AI Instruction Optimization

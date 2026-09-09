@@ -51,9 +51,7 @@ If Exa returns a new URL for the same content, fetch that URL via `ctx_fetch_and
 
 For JavaScript-rendered sites that return 403 to headless clients:
 
-```
-Skill(skill: "agent-browser")
-```
+Activate `agent-browser` and follow its browser workflow.
 
 or use `mcp__claude-in-chrome__*` tools if a browser session is active. Extract the rendered text content.
 
@@ -69,6 +67,9 @@ If confirmed, activate `rwr:doc-to-skill` with the repository URL as `source` an
 `output_skill_directory`. Pass the complete source boundary rather than a summary. The conversion
 workflow creates a fresh temporary clone, inventories every source file by format and capability,
 and promotes a portable skill only after its source-to-output ledger reconciles.
+Retain the source/atom coverage ledgers and the complete leaf terminal report, including `STATUS`,
+`OUTPUT`, `COVERAGE`, `UNRESOLVED`, `VALIDATION`, `SUPPORT`, and `GUIDANCE`. Proceed with the converted
+skill only on `STATUS: DONE`; preserve `DEGRADED` or `BLOCKED` diagnostics as evidence.
 
 Apply Tier 4 when **3 or more** URLs from the same domain fail — not for a single 404 (which is more likely a moved page than a block).
 

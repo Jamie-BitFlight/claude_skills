@@ -1,6 +1,6 @@
 ---
 name: author
-description: Use when authoring, rewriting, summarizing, or validating user-facing documentation, including READMEs, tutorials, API docs, GitLab Markdown, source-faithful summaries, and audience-specific prose.
+description: Use when the primary outcome is authoring, rewriting, summarizing, or validating user-facing documentation without implementation comparison or required source attribution, including READMEs, tutorials, API docs, GitLab Markdown, source-faithful summaries, and audience-specific prose.
 ---
 
 # Documentation Authoring

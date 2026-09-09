@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Use when auditing documentation against implementation evidence or synchronizing docs after verified changes, including drift, missing documentation, stale claims, freshness review, and post-change updates.
+description: Use when the primary outcome is comparing documentation claims with implementation evidence, synchronizing docs from verified changes, or freshness review, including drift, missing coverage, stale claims, and post-change updates.
 ---
 
 # Documentation Audit

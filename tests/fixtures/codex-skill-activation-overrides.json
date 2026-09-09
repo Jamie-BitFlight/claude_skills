@@ -1,0 +1,50 @@
+{
+  "rwr:audit": {
+    "chain": [],
+    "expected_outcome": "The explicitly selected audit skill uses compare mode and returns a read-only evidence ledger whose conflicting claim is STALE and whose implementation value is 60 seconds.",
+    "safety_class": "READ_ONLY",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Compare mode, read-only. Documentation claim at docs/config.md:12: request_timeout defaults to 30 seconds. Implementation evidence at src/config.py:7: DEFAULT_REQUEST_TIMEOUT = 60. Report the drift with an evidence ledger; do not rewrite prose."
+  },
+  "rwr:author": {
+    "chain": [],
+    "expected_outcome": "The explicitly selected author skill rewrites the supplied sentence for a beginner, preserves the literal command acme check --dry-run, and returns a source-preservation record.",
+    "safety_class": "CONTENT_GENERATION",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Rewrite this user-facing README sentence for a beginner and preserve the literal command acme check --dry-run: Operators should utilize the dry run facility before deployment."
+  },
+  "rwr:cite": {
+    "chain": [],
+    "expected_outcome": "The explicitly selected cite skill returns a two-sentence source-attributed brief whose factual claims cite Source A, plus a source register and claim ledger.",
+    "safety_class": "CONTENT_GENERATION",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Using only supplied Source A, write a two-sentence source-attributed brief for maintainers. Cite every factual claim and include a source register and claim ledger. Source A title: Release note. Source A text: Release 4.2 adds dry-run deployment and requires Python 3.13."
+  },
+  "rwr:doc-to-skill": {
+    "chain": [],
+    "expected_outcome": "The explicitly selected doc-to-skill workflow returns STATUS: BLOCKED and OUTPUT: none, names source and output_skill_directory as missing, and performs no filesystem read or write.",
+    "safety_class": "READ_ONLY",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Run the documentation-to-skill workflow, but no source or output_skill_directory was supplied. Return the terminal report for the missing inputs without inspecting or writing the filesystem."
+  },
+  "rwr:optimize": {
+    "chain": [],
+    "expected_outcome": "The explicitly selected optimize skill analyzes the complete supplied AGENTS.md, preserves its release-check behavior in a whole-behavior ledger, and returns a proposed diff without writing.",
+    "safety_class": "READ_ONLY",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Analyze only; do not write. Refine this complete existing AGENTS.md without changing behavior: Before release, run acme check. Verification is complete when things look good. Return a proposed diff and whole-behavior ledger."
+  },
+  "rwr:the-rewrite-room": {
+    "chain": ["rwr:audit"],
+    "expected_outcome": "The explicitly selected Rewrite Room router chooses exactly rwr:audit, passes the original comparison request unchanged, and returns the audit terminal result unchanged.",
+    "safety_class": "READ_ONLY",
+    "status": "MAPPED",
+    "task_source": "plugins/the-rewrite-room/README.md",
+    "task_text": "Use the Rewrite Room router to choose and dispatch exactly one workflow for this request, preserving it unchanged: compare docs/config.md with src/config.py in read-only mode and report drift."
+  }
+}

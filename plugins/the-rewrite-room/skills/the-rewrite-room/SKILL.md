@@ -1,6 +1,6 @@
 ---
 name: the-rewrite-room
-description: Use when routing documentation work to one Rewrite Room workflow, including documentation audit or synchronization, user-facing authoring or summaries, citation-driven writing, docs-to-skill conversion, and AI-instruction optimization.
+description: Use when the user explicitly asks Rewrite Room to route documentation work, or when audit/sync/freshness, user-facing authoring, citation-driven writing, docs-to-skill conversion, and AI-instruction optimization overlap and exactly one workflow must be chosen.
 ---
 
 # The Rewrite Room
@@ -12,7 +12,8 @@ description: Use when routing documentation work to one Rewrite Room workflow, i
 
 ## Route
 
-1. Identify the request's primary outcome.
+1. Identify the request's primary outcome. This step is complete when the requested outcome and any
+   overlap among the five route classes are named.
 2. Select exactly one workflow:
 
 | Primary outcome | Workflow |
@@ -23,9 +24,14 @@ description: Use when routing documentation work to one Rewrite Room workflow, i
 | Convert source documentation into an AI-facing skill | `rwr:doc-to-skill` |
 | Analyze or refine an existing AI-facing artifact without dropping behavior | `rwr:optimize` |
 
-3. Activate the selected workflow by its exact name and pass the original request unchanged.
+   This step is complete when exactly one row matches. When no unique row matches, return router-level
+   `STATUS: BLOCKED` with the unresolved route decision and stop.
+3. Activate the selected workflow by its exact name and pass the original request unchanged. This
+   step is complete when dispatch starts with that exact workflow name and unchanged request, or a
+   pre-leaf dispatch failure is named.
 4. Return the selected workflow's terminal output unchanged when it reaches any terminal state
-   defined by that workflow.
+   defined by that workflow. This step is complete when the caller receives every terminal field and
+   validation result exactly as the leaf returned it.
 
 ## Output
 

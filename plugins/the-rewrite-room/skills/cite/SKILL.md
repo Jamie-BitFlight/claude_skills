@@ -1,6 +1,6 @@
 ---
 name: cite
-description: Use when creating source-attributed content from URLs or supplied material, including research summaries, articles, briefs, and posts whose factual claims and quotations need verifiable citations.
+description: Use when the primary outcome is creating publishable source-attributed content from URLs or supplied material, including research summaries, articles, briefs, and posts whose factual claims and quotations need reader-visible, verifiable citations.
 ---
 
 # Citation-driven Writing

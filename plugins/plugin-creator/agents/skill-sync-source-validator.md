@@ -89,6 +89,9 @@ curl -s -L --max-time 15 -A "Mozilla/5.0" "{url}"
 3. Activate `rwr:doc-to-skill` with the repository URL as `source` and one explicit absent directory
    as `output_skill_directory`. Pass the complete source boundary, not a summary; the workflow uses
    a fresh temporary clone, inventories every source unit, and promotes only a reconciled skill.
+   Retain the source/atom coverage ledgers and the complete leaf terminal report, including `STATUS`,
+   `OUTPUT`, `COVERAGE`, `UNRESOLVED`, `VALIDATION`, `SUPPORT`, and `GUIDANCE`. Proceed with the
+   converted skill only on `STATUS: DONE`; preserve `DEGRADED` or `BLOCKED` diagnostics as evidence.
 
 **Tier 7 — WebFetch** (last resort — use only after all other tiers are exhausted):
 ```

@@ -163,7 +163,7 @@ These plugins primarily provide knowledge (skills) rather than runtime tooling. 
 - **orchestrator-discipline** - Orchestration patterns (knowledge-based)
 - **perl-development** - Perl patterns (knowledge-based)
 - **prompt-optimization-claude-45** - Prompt optimization (knowledge-based)
-- **the-rewrite-room** - Content rewriting (knowledge-based)
+- **the-rewrite-room** - Portable documentation workflow skills; no bundled MCP server
 - **uv** - uv package manager knowledge (knowledge-based)
 - **verification-gate** - Verification patterns (knowledge-based)
 - **xdg-base-directory** - XDG spec knowledge (knowledge-based)
