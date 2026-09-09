@@ -160,7 +160,7 @@ jobs:
 
       - name: Require plugin.json version bump for every changed plugin
         if: github.event_name == 'pull_request'
-        uses: Jamie-BitFlight/agent-marketplace-versioner@7d2aacc06b428227ea37568cf3762d9956a7ea99
+        uses: Jamie-BitFlight/agent-marketplace-versioner@05e3d8dc36bef9ac0d6a33480d21c83a4bcfc901
         with:
           command: check
 
