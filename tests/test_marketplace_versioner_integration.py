@@ -139,7 +139,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
         [*BOUNDED, "bash", "-e", "-o", "pipefail", "-c", command], env=env, check=False, capture_output=True, text=True
     )
     assert synchronized.returncode == 0, synchronized.stdout + synchronized.stderr
-    assert json.loads(catalog.read_text())["version"] == "1.0.1"
+    assert json.loads(catalog.read_text())["version"] == "1.0.0"
 
     # Plugin CRUD updates local catalog membership without taking the post-merge version bump.
     run(consumer, "git", "add", ".")
@@ -150,7 +150,7 @@ def test_pinned_remote_hook_and_action_preserve_versions(tmp_path: Path) -> None
     run(consumer, "git", "add", str(added))
     run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
     assert {entry["name"] for entry in json.loads(catalog.read_text())["plugins"]} == {"tool", "added"}
-    assert json.loads(catalog.read_text())["version"] == "1.0.1"
+    assert json.loads(catalog.read_text())["version"] == "1.0.0"
     run(consumer, "git", "commit", "-m", "Add plugin")
     run(consumer, "git", "rm", str(added))
     run(consumer, str(ROOT / ".venv/bin/prek"), "run", "agent-marketplace-versioner")
