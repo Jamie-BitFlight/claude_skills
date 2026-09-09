@@ -11,6 +11,10 @@ Use this reference when a Rewrite Room workflow authors, rewrites, summarizes, o
 
 ## User-facing prose
 
+When authoring, rewriting, or substantially restructuring prose that is free to receive stylistic edits, read the
+[prose-style reference](prose-style.md) before drafting and again for the return-time check. Direct quotations and
+source-preserving extractive summaries keep the source-fidelity rules above instead.
+
 - Lead with the point.
 - Name the actor and use active voice.
 - Replace abstract importance claims with concrete facts.
