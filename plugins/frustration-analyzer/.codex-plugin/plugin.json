@@ -1,6 +1,6 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Find the strongest user reaction to an AI instruction-following failure in a Claude or Codex session or selected session range, then render a shareable terminal-style PNG.",
   "author": {
     "name": "Jamie-BitFlight"
@@ -16,7 +16,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Frustration Analyzer",
-    "shortDescription": "Find the strongest reaction in a Claude or Codex session or selected session range, then render a terminal-style PNG.",
+    "shortDescription": "Find the strongest user reaction to an AI instruction-following failure in a Claude or Codex session or selected session range, then render a shareable terminal-style PNG.",
     "longDescription": "Find the strongest user reaction to an AI instruction-following failure in a Claude or Codex session or selected session range, then render a shareable terminal-style PNG.",
     "developerName": "Jamie-BitFlight",
     "category": "Developer Tools",
