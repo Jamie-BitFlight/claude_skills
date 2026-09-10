@@ -1,7 +1,7 @@
 {
   "name": "frustration-analyzer",
-  "version": "0.2.33",
-  "description": "Read The Fucking Prompt \u2014 finds the strongest user reaction to an AI instruction-following failure in a chosen session, reconstructs the triggering assistant output, and renders a shareable terminal-style PNG.",
+  "version": "0.3.0",
+  "description": "Find the strongest user reaction to an AI instruction-following failure in a Claude or Codex session or selected session range, then render a shareable terminal-style PNG.",
   "author": {
     "name": "Jamie-BitFlight"
   },
@@ -9,7 +9,6 @@
     "transcripts",
     "frustration",
     "rage-receipt",
-    "duckdb",
     "session-analysis",
     "png"
   ],

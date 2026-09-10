@@ -3,30 +3,16 @@
 # requires-python = ">=3.11,<3.15"
 # dependencies = [
 #     "fastmcp>=3.0.0rc1,<4",
-#     "duckdb>=0.10.0",
+#     "pydantic>=2.0",
 #     "rich>=13.0",
 #     "cairosvg>=2.7.0",
 #     "tiktoken>=0.7.0",
 # ]
 # ///
-"""RTFP (Read The Fucking Prompt) MCP Server.
+"""Mine Claude and Codex sessions for instruction-following failures.
 
-Finds the single strongest user reaction to an instruction-following failure
-in a selected Claude Code session, reconstructs the triggering assistant
-output, and renders the exchange as a terminal-style PNG.
-
-Uses DuckDB as the query layer against existing JSONL session log files.
-No persistent database file is created -- every query runs in-memory via
-``read_ndjson_auto()``.
-
-Tools:
-    list_sessions         - Scan ~/.claude/projects/ for JSONL session files
-    extract_user_messages - Write user-only batch JSONL for a single session
-    get_context_window    - Return N messages before/after a target line_index
-    scan_transcripts      - Extract raw user messages with context (Stage 1)
-    get_scenario          - Get full message context for a specific file+line
-    generate_social_post  - Generate social media content for a user message
-    render_rage_receipt   - Render terminal-style SVG/PNG card and return image inline
+Provides session discovery, user-message batching, conversational context,
+receipt rendering, and provider-tagged social post copy.
 """
 
 from __future__ import annotations
@@ -34,13 +20,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import pathlib
 import re
 import sys
 import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
+from collections.abc import Iterator
 from datetime import UTC, datetime
-from io import TextIOWrapper
-from typing import TYPE_CHECKING, Any
+from io import StringIO, TextIOWrapper
+from typing import TYPE_CHECKING, Any, Literal
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -52,12 +40,12 @@ if isinstance(sys.stderr, TextIOWrapper):
 if TYPE_CHECKING:
     from xml.etree.ElementTree import Element as _Element
 
-import duckdb
 import tiktoken
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
+from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -69,6 +57,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _DEFAULT_CONTEXT_WINDOW: int = 5
+_MAX_SESSION_LIMIT: int = 1000
+_SUMMARY_RECORD_LIMIT: int = 200
 
 _READONLY_ANNOTATIONS: dict[str, bool] = {
     "readOnlyHint": True,
@@ -102,27 +92,12 @@ class _EncoderCache:
 
 
 def _count_tokens(text: str) -> int:
-    """Count tokens using tiktoken p50k_base encoding (Claude approximation).
-
-    Args:
-        text: The string to tokenise.
-
-    Returns:
-        Number of tokens in the text.
-    """
+    """Return the token count from the configured batch encoding."""
     return len(_EncoderCache.get().encode(text))
 
 
 def _split_into_batches(messages: list[dict[str, Any]], batch_tokens: int) -> list[list[dict[str, Any]]]:
-    """Split messages into token-bounded batches.
-
-    Args:
-        messages: List of message dicts, each with a ``token_count`` key.
-        batch_tokens: Maximum token budget per batch.
-
-    Returns:
-        List of batch lists. Each batch stays within the token budget.
-    """
+    """Return messages split into token-bounded batches."""
     batches: list[list[dict[str, Any]]] = []
     current_batch: list[dict[str, Any]] = []
     current_tokens = 0
@@ -140,20 +115,7 @@ def _split_into_batches(messages: list[dict[str, Any]], batch_tokens: int) -> li
 
 
 def _write_batches(messages: list[dict[str, Any]], output_path: str, batch_tokens: int) -> list[str]:
-    """Write messages to one or more batch JSONL files.
-
-    When total tokens fit within ``batch_tokens``, writes a single file at
-    ``output_path`` for backward compatibility.  Otherwise splits into
-    multiple files in a directory derived from ``output_path``.
-
-    Args:
-        messages: User message dicts to write.
-        output_path: Base output file path.
-        batch_tokens: Token budget per batch.
-
-    Returns:
-        List of written file paths.
-    """
+    """Return paths written as one JSONL file or numbered batch files."""
     total_tokens = sum(m["token_count"] for m in messages)
 
     if total_tokens <= batch_tokens:
@@ -186,80 +148,50 @@ def _write_batches(messages: list[dict[str, Any]], output_path: str, batch_token
 mcp = FastMCP("frustration-analyzer", mask_error_details=False)
 
 # ---------------------------------------------------------------------------
-# SQL Templates
+# Session reader
 # ---------------------------------------------------------------------------
 
-_SQL_COUNT_USER_MESSAGES: str = (
-    "WITH numbered AS ("
-    " SELECT filename AS file,"
-    "        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
-    '        message, uuid, "timestamp", sessionId AS session_id,'
-    "        type, toolUseResult"
-    " FROM read_ndjson_auto($1::VARCHAR[], union_by_name:=true, filename:=true)"
-    ")"
-    " SELECT count(*) FROM numbered WHERE type = 'user' AND toolUseResult IS NULL"
-)
 
-_SQL_QUERY_USER_MESSAGES: str = (
-    "WITH numbered AS ("
-    " SELECT filename AS file,"
-    "        (row_number() OVER (PARTITION BY filename ORDER BY (SELECT NULL)) - 1) AS line_index,"
-    '        message, uuid, "timestamp", sessionId AS session_id,'
-    "        type, toolUseResult"
-    " FROM read_ndjson_auto($1::VARCHAR[], union_by_name:=true, filename:=true)"
-    ")"
-    ' SELECT file, line_index, message, uuid, "timestamp", session_id'
-    " FROM numbered"
-    " WHERE type = 'user' AND toolUseResult IS NULL"
-    " LIMIT $2 OFFSET $3"
-)
+class SessionMessage(BaseModel):
+    """One user-visible conversational message from a session transcript."""
 
-_SQL_CONTEXT_MESSAGES: str = (
-    "WITH indexed AS ("
-    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
-    " FROM read_ndjson_auto($1, union_by_name:=true)"
-    ")"
-    ' SELECT type AS role, "timestamp", uuid, message, toolUseResult'
-    " FROM indexed WHERE rn >= $2 AND rn < $3"
-)
+    model_config = ConfigDict(frozen=True, strict=True)
 
-_SQL_GET_SCENARIO: str = (
-    "WITH indexed AS ("
-    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
-    " FROM read_ndjson_auto($1, union_by_name:=true)"
-    ")"
-    ' SELECT type, message, uuid, "timestamp", sessionId AS session_id'
-    " FROM indexed WHERE rn = $2"
-)
+    source_line: int
+    role: Literal["user", "assistant"]
+    text: str
+    timestamp: str = ""
+    uuid: str = ""
 
-_SQL_GET_MESSAGE: str = (
-    "WITH indexed AS ("
-    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
-    " FROM read_ndjson_auto($1, union_by_name:=true)"
-    ")"
-    ' SELECT message, uuid, "timestamp"'
-    " FROM indexed WHERE rn = $2"
-)
 
-_SQL_ALL_MESSAGES_IN_FILE: str = (
-    "WITH indexed AS ("
-    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
-    " FROM read_ndjson_auto($1, union_by_name:=true)"
-    ")"
-    ' SELECT rn AS line_index, type, "timestamp", message, toolUseResult'
-    " FROM indexed ORDER BY rn"
-)
+class SessionTranscript(BaseModel):
+    """Provider-neutral transcript metadata and messages."""
 
-_SQL_FIRST_USER_MESSAGES: str = (
-    "WITH indexed AS ("
-    " SELECT (row_number() OVER (ORDER BY (SELECT NULL)) - 1) AS rn, *"
-    " FROM read_ndjson_auto($1, union_by_name:=true)"
-    ")"
-    ' SELECT rn AS line_index, type, "timestamp", message, toolUseResult'
-    " FROM indexed"
-    " WHERE type = 'user' AND toolUseResult IS NULL"
-    " ORDER BY rn LIMIT 20"
-)
+    model_config = ConfigDict(frozen=True, strict=True)
+
+    provider: Literal["claude", "codex"]
+    session_id: str
+    project: str
+    messages: list[SessionMessage]
+
+
+class SessionSummary(BaseModel):
+    """Metadata returned by session discovery."""
+
+    model_config = ConfigDict(frozen=True, strict=True)
+
+    file: str
+    project: str
+    modified: str
+    size_bytes: int
+    title: str
+    provider: Literal["claude", "codex"]
+    session_id: str
+
+
+SessionMessage.model_rebuild(_types_namespace={"Literal": Literal})
+SessionTranscript.model_rebuild(_types_namespace={"Literal": Literal, "SessionMessage": SessionMessage})
+SessionSummary.model_rebuild(_types_namespace={"Literal": Literal})
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -267,14 +199,7 @@ _SQL_FIRST_USER_MESSAGES: str = (
 
 
 def _resolve_glob(glob_path: str) -> list[str]:
-    """Resolve a glob pattern to a sorted list of file paths.
-
-    Args:
-        glob_path: Glob pattern (e.g. ``~/.claude/projects/**/*.jsonl``).
-
-    Returns:
-        Sorted list of matching absolute file path strings.
-    """
+    """Return sorted paths resolved from a glob pattern."""
     expanded = str(pathlib.Path(glob_path).expanduser()) if "~" in glob_path else glob_path
     glob_chars = {"*", "?", "["}
 
@@ -300,30 +225,14 @@ def _resolve_glob(glob_path: str) -> list[str]:
 
 
 def _resolve_path(file: str) -> str:
-    """Expand ~ and return absolute path string.
-
-    Returns:
-        Absolute path string with home directory expanded.
-    """
+    """Return a path with its home directory expanded."""
     return str(pathlib.Path(file).expanduser()) if "~" in file else file
 
 
 def _extract_user_text_from_value(
-    content: str | list[str | dict[str, str]] | dict[str, str | list[str | dict[str, str]]],
+    content: str | list[str | dict[str, str]] | dict[str, str | list[str | dict[str, str]]] | None,
 ) -> str:
-    """Extract plain text from a user message content field.
-
-    Handles both string content and list-of-blocks content formats,
-    as well as the ``{"content": ...}`` wrapper dict that DuckDB may
-    return from JSON columns.
-
-    Args:
-        content: The content value -- may be a string, list, or dict
-            with a ``content`` key.
-
-    Returns:
-        Extracted text, or empty string if no text found.
-    """
+    """Return text from supported user-message content shapes."""
     unwrapped = content.get("content", content) if isinstance(content, dict) else content
 
     if isinstance(unwrapped, str):
@@ -331,7 +240,7 @@ def _extract_user_text_from_value(
     if isinstance(unwrapped, list):
         parts: list[str] = []
         for block in unwrapped:
-            if isinstance(block, dict) and block.get("type") == "text":
+            if isinstance(block, dict) and str(block.get("type", "")).lower() == "text":
                 text = block.get("text", "")
                 if isinstance(text, str):
                     parts.append(text)
@@ -342,22 +251,7 @@ def _extract_user_text_from_value(
 
 
 def _is_human_plaintext(text: str) -> bool:
-    """Check whether extracted text is genuine human-typed content.
-
-    Filters out skill/command injection payloads, tool result blocks,
-    and empty/whitespace-only strings that leak through the DuckDB
-    ``type='user' AND toolUseResult IS NULL`` filter.
-
-    The content field in Claude Code JSONL may wrap the actual text in
-    surrounding double-quote characters, so those are stripped before
-    pattern matching.
-
-    Args:
-        text: The extracted text string to validate.
-
-    Returns:
-        True if the text appears to be genuine human input.
-    """
+    """Return whether text is genuine human input."""
     stripped = text.strip()
     # Remove exactly one wrapping pair of double-quotes if present
     if stripped.startswith('"') and stripped.endswith('"') and len(stripped) > 1:
@@ -381,14 +275,7 @@ def _is_human_plaintext(text: str) -> bool:
 
 
 def _extract_assistant_text(message: str | dict[str, Any] | None) -> str:
-    """Extract plain text from an assistant message content array.
-
-    Args:
-        message: The assistant message value from DuckDB.
-
-    Returns:
-        Joined text from all text-type content blocks, or empty string.
-    """
+    """Return text blocks from a Claude assistant message."""
     if not isinstance(message, dict):
         return ""
     content = message.get("content")
@@ -405,144 +292,263 @@ def _extract_assistant_text(message: str | dict[str, Any] | None) -> str:
     return " ".join(parts)
 
 
-def _extract_assistant_context(message: str | dict[str, Any] | None, entry: dict[str, Any]) -> None:
-    """Extract text and tool info from an assistant message into an entry dict.
+def _iter_jsonl(file_path: str) -> Iterator[tuple[int, dict[str, Any]]]:
+    try:
+        with pathlib.Path(file_path).open(encoding="utf-8") as handle:
+            for line_index, line in enumerate(handle):
+                if not line.strip():
+                    continue
+                value = json.loads(line)
+                if isinstance(value, dict):
+                    yield line_index, value
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ToolError(f"Could not read session file {file_path}: {exc}") from exc
+
+
+def _read_jsonl(file_path: str) -> list[tuple[int, dict[str, Any]]]:
+    return list(_iter_jsonl(file_path))
+
+
+def _codex_text(value: str | list[dict[str, str]] | None) -> str:
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, list):
+        return ""
+    parts = [
+        block.get("text", "")
+        for block in value
+        if isinstance(block, dict) and str(block.get("type", "")).lower() == "text"
+    ]
+    return " ".join(text for text in parts if isinstance(text, str))
+
+
+def _claude_message(line_index: int, record: dict[str, Any]) -> SessionMessage | None:
+    role = record.get("type")
+    if role not in {"user", "assistant"}:
+        return None
+    if role == "user":
+        if record.get("toolUseResult") is not None:
+            return None
+        text = _extract_user_text_from_value(record.get("message"))
+        if not _is_human_plaintext(text):
+            return None
+    else:
+        text = _extract_assistant_text(record.get("message"))
+        if not text:
+            return None
+    return SessionMessage(
+        source_line=line_index,
+        role=role,
+        text=text,
+        timestamp=str(record.get("timestamp") or ""),
+        uuid=str(record.get("uuid") or ""),
+    )
+
+
+def _codex_message(line_index: int, record: dict[str, Any]) -> SessionMessage | None:
+    if record.get("type") != "event_msg" or not isinstance(record.get("payload"), dict):
+        return None
+    payload = record["payload"]
+    event_type = payload.get("type")
+    role: Literal["user", "assistant"] | None = None
+    text = ""
+    uuid = ""
+    if event_type in {"user_message", "agent_message"}:
+        role = "user" if event_type == "user_message" else "assistant"
+        text = _codex_text(payload.get("message"))
+        uuid = str(payload.get("client_id") or "")
+    elif event_type == "item_completed" and isinstance(payload.get("item"), dict):
+        item = payload["item"]
+        item_type = str(item.get("type", "")).lower()
+        if item_type in {"usermessage", "agentmessage"}:
+            role = "user" if item_type == "usermessage" else "assistant"
+            text = _codex_text(item.get("content"))
+            uuid = str(item.get("id") or payload.get("client_id") or "")
+    if role is None or not text.strip():
+        return None
+    return SessionMessage(
+        source_line=line_index, role=role, text=text, timestamp=str(record.get("timestamp") or ""), uuid=uuid
+    )
+
+
+def read_session(file_path: str) -> SessionTranscript:
+    """Read a Claude or Codex JSONL session into one message model.
 
     Args:
-        message: The assistant message value from DuckDB (may be dict or None).
-        entry: Mutable entry dict to populate with text and tool_name.
-    """
-    if not isinstance(message, dict):
-        return
-    content = message.get("content")
-    if not isinstance(content, list):
-        return
-    text_parts: list[str] = []
-    for block in content:
-        if not isinstance(block, dict):
-            continue
-        match block.get("type"):
-            case "text":
-                t = block.get("text", "")
-                if isinstance(t, str):
-                    text_parts.append(t)
-            case "tool_use":
-                entry["tool_name"] = str(block.get("name", "unknown"))
-    entry["text"] = " ".join(text_parts)
-
-
-def _query_user_messages(glob_path: str, offset: int = 0, limit: int = 100) -> tuple[list[dict[str, Any]], int, int]:
-    """Query user messages from JSONL files using DuckDB.
-
-    Args:
-        glob_path: Glob pattern pointing to JSONL transcript files.
-        offset: Number of messages to skip (pagination).
-        limit: Maximum number of messages to return.
+        file_path: Session JSONL path.
 
     Returns:
-        Tuple of (messages list, total count, files_scanned count).
+        Provider-neutral transcript.
 
     Raises:
-        ToolError: If no files match the glob pattern.
+        ToolError: If the file is missing, malformed, or unsupported.
     """
+    resolved = _resolve_path(file_path)
+    if not pathlib.Path(resolved).is_file():
+        raise ToolError(f"Session file not found: {resolved}")
+    records = _read_jsonl(resolved)
+    codex_meta = next(
+        (
+            record["payload"]
+            for _line_index, record in records
+            if record.get("type") == "session_meta" and isinstance(record.get("payload"), dict)
+        ),
+        None,
+    )
+    is_codex = codex_meta is not None or any(record.get("type") == "event_msg" for _index, record in records)
+    is_claude = any(record.get("type") in {"user", "assistant"} for _index, record in records)
+    if not is_codex and not is_claude:
+        raise ToolError(f"Unsupported session format: {resolved}")
+
+    if is_codex:
+        messages = [message for index, record in records if (message := _codex_message(index, record)) is not None]
+        metadata = codex_meta or {}
+        cwd = str(metadata.get("cwd") or "")
+        return SessionTranscript(
+            provider="codex",
+            session_id=str(metadata.get("id") or pathlib.Path(resolved).stem),
+            project=pathlib.Path(cwd).name if cwd else pathlib.Path(resolved).parent.name,
+            messages=messages,
+        )
+
+    messages = [message for index, record in records if (message := _claude_message(index, record)) is not None]
+    session_id = next(
+        (str(record.get("sessionId")) for _index, record in records if record.get("sessionId")),
+        pathlib.Path(resolved).stem,
+    )
+    return SessionTranscript(
+        provider="claude", session_id=session_id, project=pathlib.Path(resolved).parent.name, messages=messages
+    )
+
+
+def _message_entry(message: SessionMessage) -> dict[str, Any]:
+    return {
+        "role": message.role,
+        "line_index": message.source_line,
+        "text": message.text,
+        "timestamp": message.timestamp,
+    }
+
+
+def _query_user_messages(
+    glob_path: str, context_window: int, offset: int = 0, limit: int = 100
+) -> tuple[list[dict[str, Any]], int, int]:
     files = _resolve_glob(glob_path)
     if not files:
         raise ToolError(f"No files matched glob pattern: {glob_path}")
 
-    conn = duckdb.connect()
-
-    total_row = conn.execute(_SQL_COUNT_USER_MESSAGES, [files]).fetchone()
-    total = total_row[0] if total_row else 0
-
-    rows = conn.execute(_SQL_QUERY_USER_MESSAGES, [files, limit, offset]).fetchall()
-    columns = ["file", "line_index", "message", "uuid", "timestamp", "session_id"]
-    conn.close()
-
     messages: list[dict[str, Any]] = []
-    for row in rows:
-        record = dict(zip(columns, row, strict=False))
-        text = _extract_user_text_from_value(record.pop("message"))
-        if text and _is_human_plaintext(text):
-            record["text"] = text
-            messages.append(record)
-
-    return messages, total, len(files)
-
-
-def _get_context_messages(file_path: str, line_index: int, context_window: int) -> list[dict[str, Any]]:
-    """Get surrounding context messages for a specific position in a JSONL file.
-
-    Args:
-        file_path: Path to the JSONL file.
-        line_index: Row index of the target message.
-        context_window: Number of preceding messages to capture.
-
-    Returns:
-        List of context message dicts with role, timestamp, uuid, and text.
-    """
-    start = max(0, line_index - context_window)
-    conn = duckdb.connect()
-
-    rows = conn.execute(_SQL_CONTEXT_MESSAGES, [file_path, start, line_index]).fetchall()
-    conn.close()
-
-    context: list[dict[str, Any]] = []
-    for row in rows:
-        role, timestamp, uuid_val, message, tool_use_result = row
-        if role == "user" and tool_use_result is None:
-            text = _extract_user_text_from_value(message)
-            if text:
-                context.append({
-                    "role": role,
-                    "timestamp": str(timestamp or ""),
-                    "uuid": str(uuid_val or ""),
-                    "text": text,
-                })
-        elif role == "assistant":
-            entry: dict[str, Any] = {"role": role, "timestamp": str(timestamp or ""), "uuid": str(uuid_val or "")}
-            _extract_assistant_context(message, entry)
-            context.append(entry)
-
-    return context
-
-
-def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None = None) -> str:
-    """Derive a human-readable title from the first genuine user message in a session file.
-
-    Scans through user messages, skipping skill/command injection payloads
-    and tool result blocks, until a real human-typed message is found.
-
-    Args:
-        file_path: Absolute path to a JSONL session file.
-        conn: Optional shared DuckDB connection. When provided the caller
-            owns the connection lifecycle; when ``None`` a temporary
-            connection is created and closed internally.
-
-    Returns:
-        First 80 characters of the first human-typed user message,
-        or the filename stem as fallback.
-    """
-    try:
-        if conn is None:
-            db = duckdb.connect()
-            own_conn = True
-        else:
-            db = conn
-            own_conn = False
-        try:
-            rows = db.execute(_SQL_FIRST_USER_MESSAGES, [file_path]).fetchall()
-        finally:
-            if own_conn:
-                db.close()
-        for _line_index, msg_type, _timestamp, message, tool_use_result in rows:
-            if msg_type != "user" or tool_use_result is not None:
+    for file_path in files:
+        transcript = read_session(file_path)
+        for message in transcript.messages:
+            if message.role != "user":
                 continue
-            text = _extract_user_text_from_value(message)
-            if text and _is_human_plaintext(text):
-                return text[:80].replace("\n", " ").strip()
-    except (duckdb.Error, ValueError, KeyError, TypeError) as exc:
-        logger.debug("Could not derive session title from %s: %s", file_path, exc)
-    return pathlib.Path(file_path).stem
+            messages.append({
+                "file": file_path,
+                "line_index": message.source_line,
+                "uuid": message.uuid,
+                "timestamp": message.timestamp,
+                "session_id": transcript.session_id,
+                "text": message.text,
+                "context": _context_messages(transcript, message.source_line, context_window),
+            })
+    return messages[offset : offset + limit], len(messages), len(files)
+
+
+def _context_messages(transcript: SessionTranscript, line_index: int, context_window: int) -> list[dict[str, Any]]:
+    if context_window <= 0:
+        return []
+    preceding = [message for message in transcript.messages if message.source_line < line_index]
+    return [
+        {"role": message.role, "timestamp": message.timestamp, "uuid": message.uuid, "text": message.text}
+        for message in preceding[-context_window:]
+    ]
+
+
+def _session_summary(path: pathlib.Path, stat: os.stat_result) -> SessionSummary:
+    provider: Literal["claude", "codex"] | None = None
+    session_id = ""
+    project = path.parent.name
+    title = ""
+    codex_metadata_seen = False
+
+    for record_number, (line_index, record) in enumerate(_iter_jsonl(str(path)), start=1):
+        record_type = record.get("type")
+        if record_type == "session_meta" and isinstance(record.get("payload"), dict):
+            provider = "codex"
+            codex_metadata_seen = True
+            metadata = record["payload"]
+            session_id = str(metadata.get("id") or "")
+            cwd = str(metadata.get("cwd") or "")
+            project = pathlib.Path(cwd).name or project
+        elif record_type == "event_msg":
+            provider = "codex"
+            message = _codex_message(line_index, record)
+            if message is not None and message.role == "user" and not title:
+                title = message.text[:80].replace("\n", " ").strip()
+        elif record_type in {"user", "assistant"} and provider is None:
+            provider = "claude"
+            session_id = session_id or str(record.get("sessionId") or "")
+            message = _claude_message(line_index, record)
+            if message is not None and message.role == "user" and not title:
+                title = message.text[:80].replace("\n", " ").strip()
+
+        if provider == "claude" and title and session_id:
+            break
+        if provider == "codex" and title and codex_metadata_seen:
+            break
+        if record_number >= _SUMMARY_RECORD_LIMIT:
+            break
+
+    if provider is None:
+        raise ToolError(f"Unsupported session format: {path}")
+    return SessionSummary(
+        file=str(path),
+        project=project,
+        modified=datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
+        size_bytes=stat.st_size,
+        title=title or path.stem,
+        provider=provider,
+        session_id=session_id or path.stem,
+    )
+
+
+def _parse_time_bound(value: str | None, name: str) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ToolError(f"{name} must be a valid timezone-aware ISO timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ToolError(f"{name} must include a timezone offset")
+    return parsed.astimezone(UTC)
+
+
+def _message_at_line(transcript: SessionTranscript, line_index: int, file_path: str) -> SessionMessage:
+    message = next((item for item in transcript.messages if item.source_line == line_index), None)
+    if message is None:
+        raise ToolError(f"line_index {line_index} not found in {file_path}")
+    return message
+
+
+def _session_files(project_path: str | None) -> list[pathlib.Path]:
+    if project_path is not None:
+        root = pathlib.Path(project_path).expanduser()
+        if not root.exists():
+            raise ToolError(f"Project path does not exist: {root}")
+        return list(root.rglob("*.jsonl"))
+
+    claude_root = pathlib.Path("~/.claude/projects").expanduser()
+    codex_root = pathlib.Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
+    files = list(claude_root.rglob("*.jsonl")) if claude_root.exists() else []
+    sessions_root = codex_root / "sessions"
+    archived_root = codex_root / "archived_sessions"
+    if sessions_root.exists():
+        files.extend(sessions_root.rglob("rollout-*.jsonl"))
+    if archived_root.exists():
+        files.extend(archived_root.glob("rollout-*.jsonl"))
+    return files
 
 
 # ---------------------------------------------------------------------------
@@ -551,19 +557,7 @@ def _derive_session_title(file_path: str, conn: duckdb.DuckDBPyConnection | None
 
 
 def _build_card_content(task_summary: str, assistant_excerpt: str, user_reply: str) -> Text:
-    """Build the Rich Text content for the RTFP card.
-
-    Creates a styled text block with three labelled sections (task,
-    assistant, user) separated by blank lines.
-
-    Args:
-        task_summary: Short description of the task context.
-        assistant_excerpt: The offending assistant response excerpt.
-        user_reply: The user's frustrated reply.
-
-    Returns:
-        Rich Text object with all sections styled.
-    """
+    """Return styled task, assistant, and user sections."""
     content = Text()
 
     sections: list[tuple[str, str, str]] = [
@@ -596,14 +590,7 @@ _RE_TRANSLATE_COORDS = re.compile(r"translate\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)")
 
 
 def _find_content_group(root: _Element) -> _Element | None:
-    """Find the outermost ``<g transform="translate(...)">`` containing text.
-
-    Args:
-        root: Parsed SVG ``Element`` root.
-
-    Returns:
-        The ``<g>`` element, or ``None`` if the expected structure is absent.
-    """
+    """Return the translated SVG group containing text."""
     for g in root.iter(_G_TAG):
         if _RE_TRANSLATE.search(g.get("transform", "")) and any(True for _ in g.iter(_TEXT_TAG)):
             return g
@@ -611,27 +598,13 @@ def _find_content_group(root: _Element) -> _Element | None:
 
 
 def _parse_translate(g: _Element) -> tuple[float, float]:
-    """Extract ``(tx, ty)`` from a ``translate()`` transform attribute.
-
-    Args:
-        g: An SVG ``<g>`` element.
-
-    Returns:
-        Tuple of ``(tx, ty)`` floats, defaulting to ``(9.0, 41.0)``.
-    """
+    """Return translation coordinates with renderer defaults."""
     m = _RE_TRANSLATE_COORDS.search(g.get("transform", ""))
     return (float(m.group(1)), float(m.group(2))) if m else (9.0, 41.0)
 
 
 def _extract_line_height(root: _Element) -> float:
-    """Read ``line-height`` from the embedded ``<style>`` element.
-
-    Args:
-        root: Parsed SVG ``Element`` root.
-
-    Returns:
-        Line height in pixels (defaults to ``24.4``).
-    """
+    """Return the SVG line height with its renderer default."""
     style_el = root.find(f"{{{_SVG_NS}}}style")
     if style_el is not None and style_el.text and (m := re.search(r"line-height:\s*([\d.]+)px", style_el.text)):
         return float(m.group(1))
@@ -639,14 +612,7 @@ def _extract_line_height(root: _Element) -> float:
 
 
 def _count_line_clips(root: _Element) -> tuple[int, float]:
-    """Count content line clip-paths and find the first line's y-offset.
-
-    Args:
-        root: Parsed SVG ``Element`` root.
-
-    Returns:
-        Tuple of ``(num_lines, first_line_y)``.
-    """
+    """Return the content-line count and first vertical offset."""
     clips = root.findall(".//svg:defs/svg:clipPath", _SVG_NS_MAP)
     num_lines = 0
     first_line_y = 1.5
@@ -663,14 +629,7 @@ def _count_line_clips(root: _Element) -> tuple[int, float]:
 
 
 def _find_matrix_group(outer_g: _Element) -> _Element:
-    """Locate the ``<g class="...-matrix">`` inside the content group.
-
-    Args:
-        outer_g: The translated content ``<g>`` element.
-
-    Returns:
-        The matrix ``<g>``, or *outer_g* as fallback.
-    """
+    """Return the matrix group, falling back to its parent."""
     for g in outer_g.iter(_G_TAG):
         if "matrix" in g.get("class", ""):
             return g
@@ -678,27 +637,13 @@ def _find_matrix_group(outer_g: _Element) -> _Element:
 
 
 def _is_box_drawing_only(text: str) -> bool:
-    """Return True if *text* contains only box-drawing and whitespace chars.
-
-    Args:
-        text: Normalised text content of an SVG ``<text>`` element.
-
-    Returns:
-        True when all visible characters are box-drawing glyphs.
-    """
+    """Return whether visible text consists only of box-drawing glyphs."""
     non_ws = text.replace(" ", "").replace("\n", "").replace("\r", "")
     return bool(non_ws) and all(c in _BOX_DRAWING_CHARS for c in non_ws)
 
 
 def _hide_box_drawing_glyphs(matrix_g: _Element) -> None:
-    """Set ``fill-opacity="0"`` on text elements that contain only box-drawing chars.
-
-    After hiding, any element whose non-box-drawing content equals the
-    panel title ``"RTFP"`` is re-shown so the title remains visible.
-
-    Args:
-        matrix_g: The matrix ``<g>`` element containing rendered text.
-    """
+    """Hide box-drawing glyphs while preserving the RTFP title."""
     # Single pass: hide box-drawing elements and find the title candidate
     title_candidate: _Element | None = None
     longest_non_box = 0
@@ -718,20 +663,7 @@ def _hide_box_drawing_glyphs(matrix_g: _Element) -> None:
 
 
 def _inject_border_rect(svg_text: str) -> str:
-    """Replace Rich's box-drawing character border with a continuous SVG rect.
-
-    Rich renders Panel borders using individual box-drawing glyphs
-    (``╭╮╰╯│─``).  When cairosvg rasterises these, sub-pixel gaps appear
-    between glyphs -- especially at the corners.  This function hides the
-    glyph-based border and injects an SVG ``<rect>`` with a solid stroke
-    that traces the same boundary as a single continuous path.
-
-    Args:
-        svg_text: The raw SVG string produced by ``console.export_svg()``.
-
-    Returns:
-        Modified SVG string with gapless border rect and hidden box glyphs.
-    """
+    """Return SVG with one gapless rectangle replacing glyph borders."""
     ET.register_namespace("", _SVG_NS)
     root = ET.fromstring(svg_text)  # ruff: ignore[suspicious-xml-element-tree-usage]
 
@@ -771,21 +703,7 @@ _DEFAULT_FONT_SIZE: int = 15
 
 
 def _apply_svg_dimensions(svg_text: str, *, width: int, font_size: int) -> str:
-    """Apply configurable width and font-size to an SVG string.
-
-    Rewrites the root ``<svg>`` element's ``width`` attribute and
-    updates ``font-size`` declarations in the embedded ``<style>``
-    element.  The aspect ratio is preserved by scaling ``height``
-    proportionally.
-
-    Args:
-        svg_text: Raw SVG XML string.
-        width: Desired image width in pixels.
-        font_size: Desired font size in points.
-
-    Returns:
-        Modified SVG string with updated dimensions.
-    """
+    """Return resized SVG with its aspect ratio preserved."""
     ET.register_namespace("", _SVG_NS)
     root = ET.fromstring(svg_text)  # ruff: ignore[suspicious-xml-element-tree-usage]
 
@@ -817,41 +735,11 @@ def _render_card(
     width: int = _DEFAULT_WIDTH,
     font_size: int = _DEFAULT_FONT_SIZE,
 ) -> list[TextContent | Image]:
-    """Render a terminal-style card as SVG or PNG.
-
-    Uses Rich ``Console(record=True)`` to render a styled Panel, then
-    exports as SVG.  The Rich box-drawing character border is replaced
-    with a continuous SVG ``<rect>`` stroke to eliminate sub-pixel gaps
-    that appear when cairosvg rasterises individual glyphs.
-
-    If ``output_path`` ends with ``.png``, the patched SVG is converted
-    to PNG via ``cairosvg.svg2png()``.
-
-    The rendered asset is saved to *output_path* **and** returned inline
-    so MCP clients receive the content directly:
-
-    * SVG  -- returned as ``TextContent`` (the SVG XML string).
-    * PNG  -- returned as a FastMCP ``Image`` (base64-encoded PNG bytes).
-
-    A leading ``TextContent`` always carries JSON metadata (``output_path``,
-    ``format``) for callers that also need the filesystem path.
-
-    Args:
-        task_summary: Short description of the task context.
-        assistant_excerpt: The offending assistant response excerpt.
-        user_reply: The user's frustrated reply.
-        output_path: File path to write (``.svg`` or ``.png``).
-        width: Image width in pixels for the output. Default 900.
-        font_size: Font size in points for the SVG/PNG text. Default 15.
-
-    Returns:
-        List of MCP content blocks: metadata ``TextContent`` followed by
-        either an SVG ``TextContent`` or a PNG ``Image``.
-    """
+    """Return the saved SVG or PNG receipt card."""
     content = _build_card_content(task_summary, assistant_excerpt, user_reply)
     panel = Panel(content, title="RTFP", title_align="left", border_style="bright_blue", padding=(1, 2))
 
-    console = Console(record=True, width=_CONSOLE_WIDTH, force_terminal=True, color_system="truecolor")
+    console = Console(file=StringIO(), record=True, width=_CONSOLE_WIDTH, force_terminal=True, color_system="truecolor")
     panel.width = console.width
     console.print(panel)
 
@@ -887,54 +775,93 @@ def _render_card(
 
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
-async def list_sessions(project_path: str = "~/.claude/projects/") -> dict[str, Any]:
-    """Scan for JSONL session files and return them grouped by project.
+async def list_sessions(
+    project_path: str | None = None,
+    modified_after: str | None = None,
+    modified_before: str | None = None,
+    provider: Literal["all", "claude", "codex"] = "all",
+    limit: int = 100,
+) -> dict[str, Any]:
+    """List recent Claude and Codex sessions for selection.
 
-    Scans ``~/.claude/projects/`` (or a provided path) for JSONL session
-    files.  Sessions are sorted by modification time descending.  A title
-    is derived from the first user message in each file (first 80 chars),
-    with filename stem as fallback.
-
-    Uses DuckDB ``read_ndjson_auto()`` for title extraction -- no persistent
-    database is created.
+    Without ``project_path``, searches the default session locations for both
+    providers. An explicit path searches all JSONL files beneath that directory,
+    such as ``~/.claude/projects/my-project`` or ``~/.codex/sessions/2026/09``.
+    Results are newest first, with paths breaking
+    modification-time ties. ``modified_after`` is inclusive and
+    ``modified_before`` is exclusive; both require a timezone. The response
+    distinguishes returned ``count`` from pre-limit ``matched_count``, includes
+    provider counts and the applied limit, and reports truncation. Each summary
+    exposes its UTC ``modified`` time. Unsupported files are omitted.
 
     Args:
-        project_path: Root directory to scan for JSONL files.
-            Defaults to ``~/.claude/projects/``.
+        project_path: Optional directory to search recursively.
+        modified_after: Inclusive lower bound for file modification time as a
+            timezone-aware ISO timestamp.
+        modified_before: Exclusive upper bound for file modification time as a
+            timezone-aware ISO timestamp.
+        provider: Return ``all``, ``claude``, or ``codex`` sessions.
+        limit: Maximum number of sessions to return; valid range is 1 to 1000.
 
     Returns:
-        Dict with ``sessions`` (list of session dicts) and ``count``.
-        Each session: ``{file, project, modified, size_bytes, title}``.
+        ``sessions`` contains ``file``, ``project``, ``modified`` (UTC ISO),
+        ``size_bytes``, ``title``, ``provider``, and ``session_id``. ``count``
+        is the returned size; ``matched_count`` and ``provider_counts`` describe
+        all matches before ``limit``. ``limit`` echoes the applied cap and
+        ``truncated`` reports omitted matches. A title uses early user text or
+        falls back to the filename stem.
+
+    Raises:
+        ToolError: If a filter is invalid.
     """
+    after = _parse_time_bound(modified_after, "modified_after")
+    before = _parse_time_bound(modified_before, "modified_before")
+    if after is not None and before is not None and after > before:
+        raise ToolError("modified_after must not be later than modified_before")
+    if provider not in {"all", "claude", "codex"}:
+        raise ToolError("provider must be one of: all, claude, codex")
+    if not 1 <= limit <= _MAX_SESSION_LIMIT:
+        raise ToolError("limit must be between 1 and 1000")
 
     def _scan() -> dict[str, Any]:
-        root = pathlib.Path(project_path).expanduser()
-        if not root.exists():
-            raise ToolError(f"Project path does not exist: {root}")
+        file_stats: list[tuple[pathlib.Path, os.stat_result]] = []
+        for path in _session_files(project_path):
+            try:
+                stat = path.stat()
+            except OSError as exc:
+                logger.debug("Skipping unreadable session file %s: %s", path, exc)
+                continue
+            modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+            if after is not None and modified < after:
+                continue
+            if before is not None and modified >= before:
+                continue
+            file_stats.append((path, stat))
+        file_stats.sort(key=lambda pair: (-pair[1].st_mtime, str(pair[0])))
 
-        # Pre-compute stat() per file to avoid calling it twice (once for
-        # sort key, once inside the loop).
-        file_stats = [(f, f.stat()) for f in root.rglob("*.jsonl")]
-        file_stats.sort(key=lambda pair: pair[1].st_mtime, reverse=True)
+        matches: list[SessionSummary] = []
+        provider_counts = {"claude": 0, "codex": 0}
+        for path, stat in file_stats:
+            try:
+                summary = _session_summary(path, stat)
+            except ToolError as exc:
+                logger.debug("Skipping unsupported session file %s: %s", path, exc)
+                continue
+            if provider not in {"all", summary.provider}:
+                continue
+            matches.append(summary)
+            provider_counts[summary.provider] += 1
 
-        sessions: list[dict[str, Any]] = []
-        conn = duckdb.connect()
-        try:
-            for f, stat in file_stats:
-                project = f.parent.name
-                modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
-                title = _derive_session_title(str(f), conn=conn)
-                sessions.append({
-                    "file": str(f),
-                    "project": project,
-                    "modified": modified,
-                    "size_bytes": stat.st_size,
-                    "title": title,
-                })
-        finally:
-            conn.close()
-
-        return {"sessions": sessions, "count": len(sessions)}
+        sessions = [summary.model_dump() for summary in matches[:limit]]
+        matched_count = len(matches)
+        return {
+            "sessions": sessions,
+            "count": len(sessions),
+            "matched_count": matched_count,
+            "provider_counts": provider_counts,
+            "limit": limit,
+            "truncated": matched_count > limit,
+        }
 
     return await asyncio.to_thread(_scan)
 
@@ -943,69 +870,44 @@ async def list_sessions(project_path: str = "~/.claude/projects/") -> dict[str, 
 async def extract_user_messages(
     file: str, output_path: str, batch_tokens: int = _DEFAULT_BATCH_TOKENS
 ) -> dict[str, Any]:
-    """Extract user-only messages from a session file to batch JSONL file(s).
+    """Write genuine user messages from one session to JSONL batch files.
 
-    Reads the given JSONL session file via DuckDB and filters to ONLY
-    user-authored messages (type='user', toolUseResult IS NULL).
-
-    **Token-aware batch splitting**: Uses tiktoken (p50k_base) to count
-    tokens per message.  When the session's total token count exceeds
-    ``batch_tokens``, the output is split into multiple batch files inside
-    a directory derived from ``output_path`` (e.g. for ``/tmp/batch.jsonl``
-    the directory ``/tmp/rtfp-batches-batch/batch_001.jsonl``, etc.).
-    When the session fits in a single batch, a single file is written at
-    ``output_path`` for backward compatibility.
-
-    Each output JSONL entry:
-    ``{"file": str, "line_index": int, "text": str, "token_count": int}``.
-
-    No assistant messages, tool outputs, or context is included.
-    The output is suitable as input to a Stage 2 batch-detector subagent.
+    Each compact JSONL entry contains ``file``, ``line_index``, ``text``, and
+    ``token_count``. ``line_index`` is the raw zero-based source-file line used
+    by context tools. Assistant messages, tool traffic, and injected content
+    are excluded. A session within budget writes exactly ``output_path``;
+    larger sessions write numbered files under
+    ``rtfp-batches-{output_stem}/``. One oversized message occupies one batch.
 
     Args:
-        file: Path to the source JSONL session file.
-        output_path: Path to write the output batch JSONL file.
-        batch_tokens: Target token budget per batch file.  When total
-            tokens exceed this value the output is split into multiple
-            files.  Default 100 000.
+        file: Claude or Codex session JSONL file.
+        output_path: Destination for a single batch and naming base for split
+            batches. Home-relative paths are accepted.
+        batch_tokens: Maximum encoded tokens per batch where possible.
 
     Returns:
-        Dict with ``output_paths`` (list of written file paths),
-        ``batch_count``, ``message_count``, ``total_tokens``, and
-        ``source_file``.  For single-batch output ``output_paths``
-        contains one entry identical to the legacy ``output_path``.
+        Written ``output_paths``, ``batch_count``, ``message_count``,
+        ``total_tokens``, and resolved ``source_file``.
 
     Raises:
-        ToolError: If the source file cannot be read.
+        ToolError: If the session is missing, unreadable, malformed, or unsupported.
     """
 
     def _extract() -> dict[str, Any]:
         resolved = _resolve_path(file)
-        if not pathlib.Path(resolved).is_file():
-            raise ToolError(f"Source file not found: {resolved}")
-
-        conn = duckdb.connect()
-        rows = conn.execute(_SQL_ALL_MESSAGES_IN_FILE, [resolved]).fetchall()
-        conn.close()
-
-        # -- Collect user messages with token counts -------------------------
-        user_messages: list[dict[str, Any]] = []
-        for line_index, msg_type, _timestamp, message, tool_use_result in rows:
-            if msg_type != "user" or tool_use_result is not None:
-                continue
-            text = _extract_user_text_from_value(message)
-            if not text or not _is_human_plaintext(text):
-                continue
-            token_count = _count_tokens(text)
-            user_messages.append({
+        transcript = read_session(resolved)
+        user_messages: list[dict[str, Any]] = [
+            {
                 "file": resolved,
-                "line_index": int(line_index),
-                "text": text,
-                "token_count": token_count,
-            })
+                "line_index": message.source_line,
+                "text": message.text,
+                "token_count": _count_tokens(message.text),
+            }
+            for message in transcript.messages
+            if message.role == "user"
+        ]
 
         total_tokens = sum(m["token_count"] for m in user_messages)
-
         written_paths = _write_batches(user_messages, output_path, batch_tokens)
 
         return {
@@ -1021,71 +923,48 @@ async def extract_user_messages(
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def get_context_window(file: str, line_index: int, before: int = 10, after: int = 3) -> dict[str, Any]:
-    """Return full context around a target message for reconstruction.
+    """Return a conversational message with adjacent context.
 
-    Reads the full JSONL session file via DuckDB and returns N messages
-    before and M messages after the target line_index.  Includes ALL
-    message types (user, assistant, tool results) -- this is full context
-    reconstruction, not a user-only view.
-
-    Each message in the result:
-    ``{"role": str, "line_index": int, "text": str, "timestamp": str}``
-
-    For assistant messages, text is extracted from the message.content array.
+    ``line_index`` addresses the raw zero-based JSONL line, while ``before``
+    and ``after`` count visible user or assistant messages. Tool traffic,
+    reasoning, and injected records do not occupy context slots. Every returned
+    entry contains ``role``, ``line_index``, ``text``, and ``timestamp``; the
+    response separates ``target``, ``before``, and ``after``.
 
     Args:
-        file: Path to the JSONL session file.
-        line_index: 0-based row index of the target message.
-        before: Number of messages to include before the target. Default 10.
-        after: Number of messages to include after the target. Default 3.
+        file: Claude or Codex session JSONL file.
+        line_index: Raw zero-based line containing the target message.
+        before: Maximum visible messages before the target.
+        after: Maximum visible messages after the target.
 
     Returns:
-        Dict with ``target``, ``before`` (list), and ``after`` (list).
+        ``target`` plus ordered ``before`` and ``after`` message lists.
 
     Raises:
-        ToolError: If the file cannot be read or line_index is out of range.
+        ToolError: If the session cannot be read or the line is not a visible message.
     """
 
     def _query() -> dict[str, Any]:
         resolved = _resolve_path(file)
-        if not pathlib.Path(resolved).is_file():
-            raise ToolError(f"File not found: {resolved}")
-
-        conn = duckdb.connect()
-        rows = conn.execute(_SQL_ALL_MESSAGES_IN_FILE, [resolved]).fetchall()
-        conn.close()
-
-        if not rows:
+        transcript = read_session(resolved)
+        if not transcript.messages:
             raise ToolError(f"No messages found in {resolved}")
-
-        max_idx = rows[-1][0]
-        if line_index < 0 or line_index > max_idx:
-            raise ToolError(f"line_index {line_index} out of range 0-{max_idx} in {resolved}")
-
-        def _to_entry(row: tuple) -> dict[str, Any]:
-            idx, msg_type, timestamp, message, tool_use_result = row
-            role = str(msg_type or "unknown")
-            ts = str(timestamp or "")
-            if role == "user" and tool_use_result is None:
-                text = _extract_user_text_from_value(message)
-            elif role == "assistant":
-                text = _extract_assistant_text(message)
-            else:
-                # tool result or other
-                text = str(message) if message is not None else ""
-            return {"role": role, "line_index": int(idx), "text": text, "timestamp": ts}
-
-        target_row = next((r for r in rows if r[0] == line_index), None)
-        if target_row is None:
-            raise ToolError(f"line_index {line_index} not found in {resolved}")
-
-        before_rows = [r for r in rows if r[0] < line_index][-before:] if before > 0 else []
-        after_rows = [r for r in rows if r[0] > line_index][:after] if after > 0 else []
+        target = _message_at_line(transcript, line_index, resolved)
+        before_messages = (
+            [message for message in transcript.messages if message.source_line < line_index][-before:]
+            if before > 0
+            else []
+        )
+        after_messages = (
+            [message for message in transcript.messages if message.source_line > line_index][:after]
+            if after > 0
+            else []
+        )
 
         return {
-            "target": _to_entry(target_row),
-            "before": [_to_entry(r) for r in before_rows],
-            "after": [_to_entry(r) for r in after_rows],
+            "target": _message_entry(target),
+            "before": [_message_entry(message) for message in before_messages],
+            "after": [_message_entry(message) for message in after_messages],
         }
 
     return await asyncio.to_thread(_query)
@@ -1100,40 +979,23 @@ async def render_rage_receipt(
     width: int = _DEFAULT_WIDTH,
     font_size: int = _DEFAULT_FONT_SIZE,
 ) -> list[TextContent | Image]:
-    """Render a terminal-style card from the 3-field RTFP artifact.
+    """Save and return a receipt containing task, assistant, and user text.
 
-    Produces a styled Rich Panel rendered as SVG (default) or PNG.
-    Sections are colour-coded:
-
-    - ``task:`` label in cyan (#4ec9b0), body in dim white
-    - ``assistant:`` label in yellow (#dcdcaa), body in dim white
-    - ``user:`` label in red (#f44747), body in dim white
-
-    Output format is determined by ``output_path`` extension:
-
-    - ``.svg`` — direct SVG export (primary)
-    - ``.png`` — SVG rendered then converted via ``cairosvg``
-
-    The rendered asset is saved to ``output_path`` AND returned inline
-    in the MCP response so agents can view the content directly:
-
-    - SVG is returned as text content (the SVG XML string).
-    - PNG is returned as an MCP ``ImageContent`` (base64-encoded bytes).
-
-    A leading text content block always carries JSON metadata with
-    ``output_path`` and ``format`` for callers with filesystem access.
+    A ``.png`` output path selects PNG; every other suffix produces SVG. The
+    asset is written to disk and returned inline. The first content block is
+    compact JSON metadata with ``output_path`` and ``format``; the second is
+    SVG text or PNG image content.
 
     Args:
-        task_summary: Short description of the task context.
-        assistant_excerpt: The offending assistant response excerpt.
-        user_reply: The user's frustrated reply.
-        output_path: File path to write (``.svg`` or ``.png``).
-        width: Image width in pixels. Default 900.
-        font_size: Font size in points. Default 15.
+        task_summary: Task text shown on the receipt.
+        assistant_excerpt: Assistant text shown on the receipt.
+        user_reply: User text shown on the receipt.
+        output_path: Destination path; ``.png`` selects PNG, otherwise SVG.
+        width: Output width in pixels.
+        font_size: Text size in pixels.
 
     Returns:
-        List of MCP content blocks: metadata text followed by either
-        SVG text or PNG image content.
+        Metadata text followed by the inline SVG or PNG content.
 
     Raises:
         ToolError: If the file cannot be written.
@@ -1154,33 +1016,31 @@ async def render_rage_receipt(
 async def scan_transcripts(
     glob_path: str, context_window: int = _DEFAULT_CONTEXT_WINDOW, offset: int = 0, limit: int = 100
 ) -> dict[str, Any]:
-    """Extract raw user messages from JSONL transcript files for classification.
+    """Return paginated user messages with preceding conversation context.
 
-    Returns a paginated list of user messages with surrounding context.
-    The caller (Claude) is responsible for classifying each message and
-    deciding what to do with it.
-
-    Uses DuckDB ``read_ndjson_auto()`` to query JSONL files directly --
-    no persistent database is created.
+    Matches Claude or Codex JSONL files, then returns genuine user messages for
+    caller-side classification. Each message contains ``file``, raw zero-based
+    ``line_index``, ``uuid``, ``timestamp``, ``session_id``, ``text``, and
+    preceding visible ``context``. ``total`` is computed before pagination.
 
     Args:
-        glob_path: Glob pattern pointing to JSONL transcript files,
-            e.g. ``~/.claude/projects/-my-project/*.jsonl``
-        context_window: Number of preceding messages to include as
-            context for each user message. Default 5.
-        offset: Number of messages to skip for pagination. Default 0.
-        limit: Maximum number of messages to return. Default 100.
+        glob_path: Session file or glob, such as
+            ``~/.claude/projects/-my-project/*.jsonl`` or
+            ``~/.codex/sessions/2026/09/**/rollout-*.jsonl``.
+        context_window: Maximum preceding visible messages per result.
+        offset: Number of matched user messages to skip.
+        limit: Maximum matched user messages to return.
 
     Returns:
-        Dict with messages (list of {file, line_index, text, context}),
-        total message count, offset, limit, and files_scanned.
+        ``messages``, pre-pagination ``total``, ``offset``, ``limit``, and
+        ``files_scanned``.
+
+    Raises:
+        ToolError: If no files match or a matched session cannot be read.
     """
 
     def _scan() -> dict[str, Any]:
-        messages, total, files_scanned = _query_user_messages(glob_path, offset, limit)
-
-        for msg in messages:
-            msg["context"] = _get_context_messages(msg["file"], msg["line_index"], context_window)
+        messages, total, files_scanned = _query_user_messages(glob_path, context_window, offset, limit)
 
         return {"messages": messages, "total": total, "offset": offset, "limit": limit, "files_scanned": files_scanned}
 
@@ -1189,45 +1049,40 @@ async def scan_transcripts(
 
 @mcp.tool(annotations=_READONLY_ANNOTATIONS)
 async def get_scenario(file: str, line_index: int, context_window: int = _DEFAULT_CONTEXT_WINDOW) -> dict[str, Any]:
-    """Get the full message context for a specific file and line position.
+    """Return one message and its preceding conversation for reconstruction.
 
-    Reads the target JSONL file via DuckDB and returns the message at
-    the given line index along with surrounding context messages.
+    ``line_index`` is the raw zero-based JSONL line retained by extraction and
+    scan results. Context contains visible user and assistant messages only.
+    The response identifies the session and target role, text, UUID, timestamp,
+    and ordered preceding context.
 
     Args:
-        file: Path to the JSONL transcript file.
-        line_index: Row index (0-based) of the target message.
-        context_window: Number of preceding messages to capture.
+        file: Claude or Codex session JSONL file.
+        line_index: Raw zero-based line containing the target message.
+        context_window: Maximum preceding visible messages to return.
 
     Returns:
-        Dict with the target message text, file, line_index, and
-        preceding context messages.
+        ``file``, ``line_index``, ``type``, ``text``, ``uuid``, ``timestamp``,
+        ``session_id``, and ordered preceding ``context``.
 
     Raises:
-        ToolError: If the file cannot be read or line_index is out of range.
+        ToolError: If the session cannot be read or the line is not a visible message.
     """
 
     def _query() -> dict[str, Any]:
         resolved = _resolve_path(file)
-        conn = duckdb.connect()
-        row = conn.execute(_SQL_GET_SCENARIO, [resolved, line_index]).fetchone()
-        conn.close()
-
-        if not row:
-            raise ToolError(f"line_index {line_index} not found in {resolved}")
-
-        msg_type, message, uuid_val, timestamp, session_id = row
-        text = _extract_user_text_from_value(message) if msg_type == "user" else ""
-        context = _get_context_messages(resolved, line_index, context_window)
+        transcript = read_session(resolved)
+        message = _message_at_line(transcript, line_index, resolved)
+        context = _context_messages(transcript, line_index, context_window)
 
         return {
             "file": resolved,
             "line_index": line_index,
-            "type": msg_type,
-            "text": text,
-            "uuid": str(uuid_val or ""),
-            "timestamp": str(timestamp or ""),
-            "session_id": str(session_id or ""),
+            "type": message.role,
+            "text": message.text,
+            "uuid": message.uuid,
+            "timestamp": message.timestamp,
+            "session_id": transcript.session_id,
             "context": context,
         }
 
@@ -1238,41 +1093,37 @@ async def get_scenario(file: str, line_index: int, context_window: int = _DEFAUL
 async def generate_social_post(
     file: str, line_index: int, context_window: int = _DEFAULT_CONTEXT_WINDOW
 ) -> dict[str, Any]:
-    """Generate social media content for a user message from a JSONL file.
+    """Create provider-tagged social post copy from one user message.
 
-    Reads the message directly from the JSONL file via DuckDB and formats
-    it as a social media post.  Content is always returned raw so the
-    caller (agent) can present it to the user and ask whether any personal
-    or business details should be replaced with placeholders before sharing.
+    The target text is inserted verbatim and is not posted anywhere. The result
+    includes a privacy reminder so the caller can review identifying details
+    with the user before sharing. Claude sessions receive ``#ClaudeCode``;
+    Codex sessions receive ``#Codex``. The response contains ``post``,
+    ``hashtags``, and ``privacy_reminder``.
 
     Args:
-        file: Path to the JSONL transcript file.
-        line_index: Row index (0-based) of the target message.
-        context_window: Number of preceding messages for context summary.
+        file: Claude or Codex session JSONL file.
+        line_index: Raw zero-based line containing a user message.
+        context_window: Accepted for interface consistency; the post currently
+            uses only the target message.
 
     Returns:
-        Dict with post, hashtags, and privacy_reminder.
+        ``post``, provider-aware ``hashtags``, and ``privacy_reminder``.
 
     Raises:
-        ToolError: If the message is not found.
+        ToolError: If the session cannot be read or the line is not a user message.
     """
 
     def _generate() -> dict[str, Any]:
         resolved = _resolve_path(file)
-        conn = duckdb.connect()
+        transcript = read_session(resolved)
+        message = _message_at_line(transcript, line_index, resolved)
+        if message.role != "user":
+            raise ToolError(f"line_index {line_index} is not a user message in {resolved}")
+        text = message.text
 
-        row = conn.execute(_SQL_GET_MESSAGE, [resolved, line_index]).fetchone()
-        conn.close()
-
-        if not row:
-            raise ToolError(f"line_index {line_index} not found in {resolved}")
-
-        message_val, _uuid_val, _timestamp = row
-        text = _extract_user_text_from_value(message_val)
-        if not text:
-            raise ToolError(f"No text content at line_index {line_index} in {resolved}")
-
-        hashtags = ["#AIFrustration", "#RTFP", "#ClaudeCode"]
+        provider_hashtag = "#Codex" if transcript.provider == "codex" else "#ClaudeCode"
+        hashtags = ["#AIFrustration", "#RTFP", provider_hashtag]
         post_text = f'\U0001f525 RTFP — Read The Fucking Prompt\n\nWhat the user said: "{text}"\n\n{" ".join(hashtags)}'
 
         return {
