@@ -30,6 +30,12 @@ repo root.** If a Beads integration block reappears in this file, delete it — 
 this checkout. See `plugins/development-harness/AGENTS.md`'s "Backend Providers" section for the
 backend abstraction's Protocol architecture when extending or modifying `dh`'s backend code.
 
+Plugins are expected to be developed cross-harness compatible (claude-code, codex, hermes, kimi).
+Check `harness_compatibility.json` for each plugin's current manifests, blockers, and verification
+state, and update its `verification` entries after compatibility work — objective fields are
+regenerated with `uv run --script scripts/generate_harness_compatibility.py`, smoke-test procedure
+in `docs/cross-harness-smoke-tests.md`.
+
 ## Environment Setup (Required First)
 
 ```bash
