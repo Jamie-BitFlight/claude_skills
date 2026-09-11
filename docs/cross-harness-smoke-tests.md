@@ -6,16 +6,18 @@ Run these when a plugin's cross-harness configuration changes, and when recordin
 substitutes, where it discovers plugins, which env vars it exports) live in
 `plugins/development-harness/docs/work-ledger/measurements/harness-*.md` — on PR #3427's
 branch until it merges. Read the matching file before interpreting a failure; this doc
-deliberately does not restate them. Each measurement file cites its sources; the
-authoritative upstreams for a quick re-check:
+deliberately does not restate them. Each measurement file carries per-claim citations to
+source files at a pinned HEAD; these URLs are the exact upstream locations behind the
+specific facts this doc relies on:
 
-| Harness | Docs | Source repo |
-|---|---|---|
-| claude-code | <https://code.claude.com/docs/en/> | <https://github.com/anthropics/claude-code> |
-| codex | <https://developers.openai.com/codex/> | <https://github.com/openai/codex> |
-| hermes | <https://hermes-agent.nousresearch.com/docs/> | <https://github.com/NousResearch/hermes-agent> |
-| kimi | <https://github.com/MoonshotAI/kimi-code/tree/main/docs/en> | <https://github.com/MoonshotAI/kimi-code> |
-| (packaging spec) | <https://agent-plugins.org/specification> | <https://github.com/agentplugins/agent-plugins-spec> |
+| Fact used here | Exact source |
+|---|---|
+| `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` expansion in portable `mcp.json` only | Agent Plugins spec §9: <https://github.com/agentplugins/agent-plugins-spec/blob/main/spec/1.0.0.md#9-environment-variables-and-placeholder-expansion> |
+| Claude Code substitution scope (and the two-docs-page disagreement) | <https://code.claude.com/docs/en/skills> and <https://code.claude.com/docs/en/plugins-reference> — see `rules/skill-substitution.md` for the canary result this repo relies on |
+| Codex performs no inline substitution | `harness-codex.md` measurements (codex-rs source citations) + issue #3445 |
+| Hermes substitution/namespace facts | `harness-hermes.md` measurements, citing <https://github.com/NousResearch/hermes-agent> (`agent/skill_preprocessing.py`, `hermes_cli/agent_plugins.py`) |
+| Hermes install forms (no `--local` flag) | live `hermes plugins install --help` — the CLI is the source of truth |
+| Kimi discovery roots and `${KIMI_SKILL_DIR}` | `harness-kimi.md` measurements, citing <https://github.com/MoonshotAI/kimi-code/tree/main/docs/en> |
 
 ## Common to every harness
 
