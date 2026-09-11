@@ -611,11 +611,11 @@ def _extract_line_height(root: _Element) -> float:
     return 24.4
 
 
-def _count_line_clips(root: _Element) -> tuple[int, float]:
-    """Return the content-line count and first vertical offset."""
+def _count_line_clips(root: _Element) -> tuple[int, float, float | None]:
     clips = root.findall(".//svg:defs/svg:clipPath", _SVG_NS_MAP)
     num_lines = 0
     first_line_y = 1.5
+    cell_width: float | None = None
     for cp in clips:
         cp_id = cp.get("id") or ""
         if _CLIP_LINE_MARKER not in cp_id:
@@ -625,7 +625,10 @@ def _count_line_clips(root: _Element) -> tuple[int, float]:
             rect_el = cp.find(f"{{{_SVG_NS}}}rect")
             if rect_el is not None:
                 first_line_y = float(rect_el.get("y", "1.5"))
-    return num_lines, first_line_y
+                clip_width = float(rect_el.get("width", "0"))
+                if clip_width > 0:
+                    cell_width = clip_width / _CONSOLE_WIDTH
+    return num_lines, first_line_y, cell_width
 
 
 def _find_matrix_group(outer_g: _Element) -> _Element:
@@ -673,8 +676,9 @@ def _inject_border_rect(svg_text: str) -> str:
 
     tx, ty = _parse_translate(outer_g)
     line_height = _extract_line_height(root)
-    char_width = line_height / 2.0
-    num_lines, first_line_y = _count_line_clips(root)
+    num_lines, first_line_y, char_width = _count_line_clips(root)
+    if char_width is None:
+        return svg_text
 
     _hide_box_drawing_glyphs(_find_matrix_group(outer_g))
 
