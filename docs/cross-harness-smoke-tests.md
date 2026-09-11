@@ -2,11 +2,11 @@
 
 The four harnesses installed on the maintainer's host: claude-code, codex, hermes, kimi.
 Run these when a plugin's cross-harness configuration changes, and when recording a
-`verified` status in `harness_compatibility.json`. Harness capability facts (what each
-product substitutes, where it discovers plugins, which env vars it exports) are recorded
-per-harness in `plugins/development-harness/docs/work-ledger/measurements/harness-*.md` —
-introduced on PR #3427 (not yet on `main` at the time of writing); until it merges, read
-them on that branch. Consult the matching file before interpreting a failure.
+`verified` status in `harness_compatibility.json`. Capability facts per harness (what it
+substitutes, where it discovers plugins, which env vars it exports) live in
+`plugins/development-harness/docs/work-ledger/measurements/harness-*.md` — on PR #3427's
+branch until it merges. Read the matching file before interpreting a failure; this doc
+deliberately does not restate them.
 
 ## Common to every harness
 
@@ -16,8 +16,8 @@ them on that branch. Consult the matching file before interpreting a failure.
    connected, no silent skips.
 3. Activate one representative skill and confirm it renders and executes: any path,
    script, or command the skill body instructs the agent to run resolves against the
-   *installed* location. A literal unresolved `${CLAUDE_PLUGIN_ROOT}` reaching a shell is
-   a failure.
+   *installed* location. A literal unresolved substitution token reaching a shell is a
+   failure.
 4. For plugins with MCP servers: call one read-only tool through the harness's MCP
    client and confirm a well-formed response.
 
@@ -26,11 +26,9 @@ them on that branch. Consult the matching file before interpreting a failure.
 ```bash
 claude --plugin-dir ./plugins/<name>        # or install from the local marketplace
 /plugin validate ./plugins/<name>
-# activate a skill, run one instructed command
 ```
 
-`${CLAUDE_PLUGIN_ROOT}`/`${CLAUDE_SKILL_DIR}` substitute at load time here — this is the
-only harness where they do (see `rules/skill-substitution.md`).
+Substitution behavior: `rules/skill-substitution.md` (repo-local, canary-tested).
 
 ## codex
 
@@ -39,29 +37,28 @@ uv run --script scripts/sync_codex_plugin_manifests.py --check   # .codex-plugin
 uv run --script scripts/validate_codex_skill_activation.py       # activation matrix
 ```
 
-Codex performs no inline substitution. Runtime text containing `${CLAUDE_PLUGIN_ROOT}`
-reaches the model literal — any such occurrence in a codex-targeted surface is a blocker
-(tracked per-plugin in `harness_compatibility.json` and issue #3445).
+No inline substitution — blocker counts are tracked in `harness_compatibility.json`
+(`blockers`) and issue #3445.
 
 ## hermes
 
 ```bash
-hermes plugins install --local ./plugins/<name>   # or portable plugin.json discovery
+# local test: copy or symlink the plugin dir into ~/.hermes/plugins/<name>, then
 hermes plugins enable <name>
+# or from a pushed branch:
+hermes plugins install <git-url> --ref <40-char-sha> --enable
 # in a session: skills_list shows the plugin's skills; skill_view + activate one
 ```
 
-Hermes substitutes only `${HERMES_SKILL_DIR}`/`${HERMES_SESSION_ID}` in skill bodies;
-`${PLUGIN_ROOT}`/`${PLUGIN_DATA}` expand only in portable `mcp.json` values. Loaded-skill
-output includes `[Skill directory: <abs path>]` — skills should resolve relative paths
-against it. Portable packages namespace skills as `agent-plugin-<slug>-<hash>`.
+There is no `--local` flag; `hermes plugins install` takes a catalog name, Git URL, or
+`owner/repo`. Portable `plugin.json` packages install disabled — enable explicitly.
+Substitution and namespacing facts: `harness-hermes.md` (work-ledger measurements).
 
 ## kimi
 
-Kimi substitutes `${KIMI_SKILL_DIR}`, not the Claude Code variables. Install the skill
-directory through Kimi's skill mechanism, activate one skill, and confirm instructed
-paths resolve. Consult `harness-kimi.md` in the work-ledger measurements location named
-above (PR #3427 branch until merged) for discovery roots and substitution facts.
+Install the skill directory through Kimi's skill mechanism, activate one skill, confirm
+instructed paths resolve. Discovery roots and substitution facts: `harness-kimi.md`
+(work-ledger measurements).
 
 ## Recording results
 
