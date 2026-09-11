@@ -4,9 +4,9 @@ The four harnesses installed on the maintainer's host: claude-code, codex, herme
 Run these when a plugin's cross-harness configuration changes, and when recording a
 `verified` status in `harness_compatibility.json`. Harness capability facts (what each
 product substitutes, where it discovers plugins, which env vars it exports) are recorded
-per-harness in
-`plugins/development-harness/docs/work-ledger/measurements/harness-*.md` — consult the
-matching file before interpreting a failure.
+per-harness in `plugins/development-harness/docs/work-ledger/measurements/harness-*.md` —
+introduced on PR #3427 (not yet on `main` at the time of writing); until it merges, read
+them on that branch. Consult the matching file before interpreting a failure.
 
 ## Common to every harness
 
@@ -60,9 +60,8 @@ against it. Portable packages namespace skills as `agent-plugin-<slug>-<hash>`.
 
 Kimi substitutes `${KIMI_SKILL_DIR}`, not the Claude Code variables. Install the skill
 directory through Kimi's skill mechanism, activate one skill, and confirm instructed
-paths resolve. Consult
-`plugins/development-harness/docs/work-ledger/measurements/harness-kimi.md` for discovery
-roots and substitution facts.
+paths resolve. Consult `harness-kimi.md` in the work-ledger measurements location named
+above (PR #3427 branch until merged) for discovery roots and substitution facts.
 
 ## Recording results
 

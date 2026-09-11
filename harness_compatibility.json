@@ -52,7 +52,7 @@
       "components": {
         "skills": 4,
         "agents": 2,
-        "mcp_servers": 1,
+        "mcp_servers": 2,
         "hooks": false
       },
       "blockers": {
@@ -332,7 +332,7 @@
       "components": {
         "skills": 60,
         "agents": 29,
-        "mcp_servers": 1,
+        "mcp_servers": 3,
         "hooks": true
       },
       "blockers": {
@@ -852,7 +852,7 @@
       "components": {
         "skills": 32,
         "agents": 5,
-        "mcp_servers": 1,
+        "mcp_servers": 2,
         "hooks": false
       },
       "blockers": {

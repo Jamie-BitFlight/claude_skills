@@ -59,7 +59,11 @@ def scan_plugin(plugin_dir: Path) -> dict:
     Returns:
         Mapping with ``manifests``, ``components``, and ``blockers`` sections.
     """
-    mcp_files = [p for p in (plugin_dir / ".mcp.json", plugin_dir / "mcp.json") if p.exists()]
+    mcp_server_count = 0
+    for p in (plugin_dir / ".mcp.json", plugin_dir / "mcp.json"):
+        if p.exists():
+            with contextlib.suppress(json.JSONDecodeError, OSError):
+                mcp_server_count += len(json.loads(p.read_text(encoding="utf-8")).get("mcpServers", {}))
     return {
         "manifests": {
             "claude": (plugin_dir / ".claude-plugin" / "plugin.json").exists(),
@@ -70,7 +74,7 @@ def scan_plugin(plugin_dir: Path) -> dict:
         "components": {
             "skills": len(list((plugin_dir / "skills").glob("*/SKILL.md"))) if (plugin_dir / "skills").is_dir() else 0,
             "agents": len(list((plugin_dir / "agents").glob("*.md"))) if (plugin_dir / "agents").is_dir() else 0,
-            "mcp_servers": len(mcp_files),
+            "mcp_servers": mcp_server_count,
             "hooks": (plugin_dir / "hooks").is_dir() and any((plugin_dir / "hooks").iterdir()),
         },
         "blockers": {
