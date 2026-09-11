@@ -45,11 +45,17 @@ Substitution behavior: `rules/skill-substitution.md` (repo-local, canary-tested)
 
 ```bash
 uv run --script scripts/sync_codex_plugin_manifests.py --check   # .codex-plugin/ manifest current
-uv run --script scripts/validate_codex_skill_activation.py       # activation matrix
+# per-skill activation evidence (--target and --evidence-file are required):
+uv run --script scripts/validate_codex_skill_activation.py \
+  --target <plugin-id>:<skill> --evidence-file <evidence.json>
 ```
 
 No inline substitution — blocker counts are tracked in `harness_compatibility.json`
-(`blockers`) and issue #3445.
+(`blockers`) and issue #3445. Codex reads a root `plugin.json` as an Agent Plugins v1
+manifest when its `$schema` starts `https://agent-plugins.org/schemas/`, else falls back
+to `.codex-plugin/plugin.json` — one portable manifest can serve both codex and hermes.
+Substitution exists only in plugin hooks: hook processes get `PLUGIN_ROOT` +
+`CLAUDE_PLUGIN_ROOT` env vars and `${KEY}` replacement in hook command strings.
 
 ## hermes
 
