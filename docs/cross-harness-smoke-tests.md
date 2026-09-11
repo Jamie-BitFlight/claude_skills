@@ -35,9 +35,19 @@ specific facts this doc relies on:
 ## claude-code
 
 ```bash
-claude --plugin-dir ./plugins/<name>        # or install from the local marketplace
-/plugin validate ./plugins/<name>
+claude --plugin-dir ./plugins/<name>        # official "Test your plugin" flow
+/plugin validate ./plugins/<name>           # or: claude plugin validate ./plugins/<name>
+claude plugin validate .                    # from the marketplace root: checks marketplace.json
+                                            # schema, duplicate names, source path traversal
+claude --debug                              # plugin loading details: manifest errors,
+                                            # skill/agent/hook registration, MCP init
 ```
+
+Mid-session: `/reload-plugins` picks up changes without a restart; the `/plugin`
+manager's Errors tab surfaces load failures. Zip/CI artifact testing:
+`claude --plugin-url <url>`. Consumer-path test: `/plugin marketplace add
+./.claude-plugin/marketplace.json` → `/plugin install <plugin>@jamie-bitflight-skills`.
+Official guidance: <https://code.claude.com/docs/en/plugins>.
 
 Substitution behavior: `rules/skill-substitution.md` (repo-local, canary-tested).
 
@@ -48,34 +58,66 @@ uv run --script scripts/sync_codex_plugin_manifests.py --check   # .codex-plugin
 # per-skill activation evidence (--target and --evidence-file are required):
 uv run --script scripts/validate_codex_skill_activation.py \
   --target <plugin-id>:<skill> --evidence-file <evidence.json>
+# official discovery checks (no CLI validate command exists in Codex):
+codex plugin marketplace add owner/repo        # or ./local-root
+codex plugin marketplace list                  # prints each marketplace + resolved root path
 ```
+
+Post-install: browse `/plugins`, install, then **start a new session** before using
+bundled skills/tools. Enablement check: `.codex/config.toml`
+`[plugins."<name>@local-repo"] enabled = true`. Skill discovery: `/skills` or
+`$`-mention; skill changes are detected automatically — restart if an update doesn't
+appear. Official guidance: <https://developers.openai.com/codex/skills> and
+<https://developers.openai.com/codex/plugins/build/plugins>.
 
 No inline substitution — blocker counts are tracked in `harness_compatibility.json`
 (`blockers`) and issue #3445. Codex reads a root `plugin.json` as an Agent Plugins v1
 manifest when its `$schema` starts `https://agent-plugins.org/schemas/`, else falls back
 to `.codex-plugin/plugin.json` — one portable manifest can serve both codex and hermes.
 Substitution exists only in plugin hooks: hook processes get `PLUGIN_ROOT` +
-`CLAUDE_PLUGIN_ROOT` env vars and `${KEY}` replacement in hook command strings.
+`CLAUDE_PLUGIN_ROOT` (plus `PLUGIN_DATA`/`CLAUDE_PLUGIN_DATA`) env vars and `${KEY}`
+replacement in hook command strings.
 
 ## hermes
 
 ```bash
+# official pre-install gates:
+hermes plugins validate ./plugins/<name>     # catalog-admission validation (--json for CI)
+hermes plugins doctor ./plugins/<name> --ci  # runs real discovery/manifest/register(ctx)/hook/tool
+                                             # registry paths; exits non-zero on error
 # local test: copy or symlink the plugin dir into ~/.hermes/plugins/<name>, then
 hermes plugins enable <name>
 # or from a pushed branch:
 hermes plugins install <git-url> --ref <40-char-sha> --enable
 # in a session: skills_list shows the plugin's skills; skill_view + activate one
+HERMES_PLUGINS_DEBUG=1 hermes plugins list   # loading diagnostics
 ```
 
 There is no `--local` flag; `hermes plugins install` takes a catalog name, Git URL, or
 `owner/repo`. Portable `plugin.json` packages install disabled — enable explicitly.
+`hermes plugins compat <path>` applies only to native-Python plugins (portable v1
+packages import no Python). Official guidance: the developer guide's "Step 6: Test it"
+(<https://hermes-agent.nousresearch.com/docs/developer-guide/plugins>).
 Substitution and namespacing facts: `harness-hermes.md` (work-ledger measurements).
 
 ## kimi
 
-Install the skill directory through Kimi's skill mechanism, activate one skill, confirm
-instructed paths resolve. Discovery roots and substitution facts: `harness-kimi.md`
-(work-ledger measurements).
+```text
+/plugins info <id>     # the ONLY official validation surface: plugin details + diagnostics;
+                       # broken manifests / unsafe paths appear here (kimi doctor covers only
+                       # config.toml/tui.toml — not plugins)
+/reload  (or /new)     # required after install/enable/disable/remove — the current session
+                       # does not update; plugin MCP servers start only after this
+/skill:<name>          # activate a skill in a NEW session
+```
+
+Managed-copy trap: local installs are **copied** to `$KIMI_CODE_HOME/plugins/managed/<id>/`
+— editing the source directory after install has no effect; reinstall to test a change.
+The smoke test must exercise the managed copy, not the source. Skill frontmatter hard
+requirement: `name` AND `description` must both be explicit or parsing fails. No official
+testing/validation page exists beyond `/plugins info` (checked all of docs/en). Official
+guidance: <https://github.com/MoonshotAI/kimi-code/blob/main/docs/en/customization/plugins.md>.
+Discovery roots and substitution facts: `harness-kimi.md` (work-ledger measurements).
 
 ## Recording results
 
