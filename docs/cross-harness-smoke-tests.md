@@ -83,3 +83,22 @@ Update the plugin's `verification.<harness>` entry in `harness_compatibility.jso
 `status: verified`, the ISO date, and the issue/PR reference in `notes`. Objective fields
 are regenerated — run `uv run --script scripts/generate_harness_compatibility.py` after
 editing, and never hand-edit `manifests`/`components`/`blockers`.
+
+## Plugin-root resolution strategies
+
+How to author a plugin so the "Common" checks pass on every harness. The spec's
+`${PLUGIN_ROOT}` expansion exists only for stdio MCP subprocesses (spec §9.1) — skills-only
+plugins (22 of 29 here) cannot use it. Strategies, all audited against upstream source
+(this doc's citation table):
+
+| Strategy | claude-code | codex | hermes | kimi | Tradeoff |
+|---|---|---|---|---|---|
+| **1. Skill-local relative paths** — assets in `skills/<name>/scripts/`, referenced as `scripts/foo.py` | ✅ | ✅ | ✅ | ✅ | Zero machinery; every harness resolves relative to the skill dir. Assets can't be shared between skills without duplication. |
+| **2. Self-locating launcher** — tiny script derives plugin root via `Path(__file__).resolve().parents[N]`, execs the real entrypoint | ✅ | ✅ | ✅ | ✅ | The only token-free way to reach plugin-root shared code. `parents[N]` depth must match the installed layout. |
+| **3. Hook env vars** — `CLAUDE_PLUGIN_ROOT` / `PLUGIN_ROOT`+`CLAUDE_PLUGIN_ROOT` / `KIMI_PLUGIN_ROOT` | ✅ hooks | ✅ hooks | ✅ hooks | ✅ hooks | Hook processes only, variable name differs per harness — hooks stay per-harness surface. Useless in skill/agent prose. |
+| **4. `${CLAUDE_PLUGIN_ROOT}` in SKILL.md text** | ✅ | ❌ literal | ❌ literal | ❌ literal | Claude-only; the failure class tracked in `blockers` and #3445. Retire to generated Claude-only surfaces. |
+| **5. Agent discovers the path at runtime** (`find ~/.hermes/plugins …`) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | Rejected: hermes namespaces are `agent-plugin-<slug>-<sha8>`, install roots differ per harness — brittle at the layer that must be reliable. |
+
+**Default: strategy 1; strategy 2 where code is genuinely shared at plugin root** (e.g.
+`dh`'s `sam_schema/cli.py` behind a skill-local `scripts/sam` launcher). Both are pure
+filesystem mechanics — no token, no shell assumption, no per-harness variance.
