@@ -68,7 +68,7 @@ bundled skills/tools. Enablement check: `.codex/config.toml`
 `[plugins."<name>@local-repo"] enabled = true`. Skill discovery: `/skills` or
 `$`-mention; skill changes are detected automatically — restart if an update doesn't
 appear. Official guidance: <https://developers.openai.com/codex/skills> and
-<https://developers.openai.com/codex/plugins/build/plugins>.
+<https://developers.openai.com/codex/plugins/build>.
 
 No inline substitution — blocker counts are tracked in `harness_compatibility.json`
 (`blockers`) and issue #3445. Codex reads a root `plugin.json` as an Agent Plugins v1
