@@ -329,7 +329,7 @@ def _check_url_format(lines: list[str]) -> list[Issue]:
         List of ``Issue`` dicts, one per malformed URL.
     """
     issues: list[Issue] = []
-    bare_url_pattern = re.compile(r"(?<!\()(?<!<)(?:www\.)\S+", re.IGNORECASE)
+    bare_url_pattern = re.compile(r"(?<!\()(?<!<)(?<!https://)(?<!http://)(?:www\.)\S+", re.IGNORECASE)
 
     for i, line in enumerate(lines):
         for match in bare_url_pattern.finditer(line):

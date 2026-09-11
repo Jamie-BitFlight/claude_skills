@@ -41,11 +41,12 @@ flowchart TD
     QMore -->|"Yes — advance to next batch of 5"| WNa
     QMore -->|"No — all URLs processed"| Collect
     Collect --> RelayCheck["Apply pre-relay quality checklist<br>to all collected agent results"]
-    RelayCheck --> Results{"Did any agent return status: failed?"}
-    Results -->|"No — all succeeded"| SpawnAnalysis["For each successful entry (up to 5 entries concurrently)<br>spawn analysis agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
-    Results -->|"Yes — one or more failed"| SpawnAnalysisPartial["For each successful entry only (up to 5 concurrently)<br>spawn analysis agents per entry:<br>- @research-insight-extractor<br>- @research-utilization-assessor<br>- @research-cross-referencer<br>Relay each failure with exact reason to user"]
-    SpawnAnalysis --> UpdateAll["Update ./research/README.md<br>add all new entries to category tables<br>(concurrent with analysis agents)"]
-    SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with successful entries only<br>(concurrent with analysis agents)"]
+    RelayCheck --> Gate["For each entry with status: succeeded<br>run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md): fix_research_formatting.py<br>+ validate_research.py --json; on a gated warning<br>(header_fields/access_dates/freshness_tracking/url_format)<br>spawn @research-curator --fix and retry once"]
+    Gate --> Results{"Per entry: did the curator agent fail,<br>or do errors / gated warnings remain<br>after the validation gate retry?"}
+    Results -->|"No for an entry — clean"| SpawnAnalysis["For each clean entry (up to 5 entries concurrently)<br>spawn analysis agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
+    Results -->|"Yes for an entry — curator failure, or validation issues remain"| SpawnAnalysisPartial["Mark that entry failed or created with issues<br>Skip analysis agents for it<br>Relay the exact failure or issue text to user"]
+    SpawnAnalysis --> UpdateAll["Update ./research/README.md<br>add all clean new entries to category tables<br>(concurrent with analysis agents)"]
+    SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with clean entries only<br>(concurrent with analysis agents)"]
     UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
     Partial --> WaitAnalysis
     WaitAnalysis --> BacklinkPass["For each successful entry in sequence (one at a time):<br>spawn @research-backlink-detector<br>'Add backlinks for {file-path}'<br>wait for completion before spawning next<br>(sequential to prevent write races on shared cited entries)"]
@@ -60,6 +61,8 @@ flowchart TD
 **Analysis phase concurrency**: After all curator waves complete, analysis agents spawn concurrently per entry: up to 5 entries, each spawning its own insight-extractor, utilization-assessor, and cross-referencer. This is distinct from the 5-agent curator wave limit.
 
 **Backlink phase serialization**: After all analysis agents complete, backlink-detector agents run **sequentially** — one entry at a time. Concurrent backlink passes on multiple entries that cite a shared target file would produce a write race (each agent reads a stale snapshot and the last writer drops the other's row). Sequential execution prevents this.
+
+**Validation gate**: Every entry a curator agent successfully wrote this wave passes through the [Validation Gate for New/Refreshed Entries](./validation-rules.md#validation-gate-for-newrefreshed-entries) before it is eligible for the analysis-agent fan-out. Error-severity issues, and warning-severity issues from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`, are must-fix — the researching agent already has the facts (today's date, the source URL, the version and access dates it just gathered), so a single `--fix` retry is spawned for gated warnings before an entry is marked "created with issues." `cross_references_absent` is not part of this gate.
 
 ---
 

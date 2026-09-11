@@ -125,7 +125,7 @@ Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Bat
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- if research status is not `failed`, run the validation gate on the created or refreshed file:
+5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file:
 
    a. Run fix script:
 
@@ -139,9 +139,11 @@ Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Bat
    uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file-path-from-agent-result}
    ```
 
-   c. If validator returns errors: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, report to user with exact error text from validator JSON
+   c. If validator returns any error-severity issue: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, report to user with exact error text from validator JSON
 
-   d. If validator passes: proceed to step 6
+   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: the agent just wrote this file this invocation, so it already has the research date, source URL, version, and access dates needed to satisfy these. Spawn `@research-curator` with `--fix` and the exact warning issue list from the JSON, then repeat steps a-b on the same file. If errors or any of these four warning types still remain after the retry, treat as step c.
+
+   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` and info-severity items do not block this step -- proceed to step 6
 
 6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
@@ -192,12 +194,13 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry:
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries):
 
 1. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
 2. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
-3. If validator returns errors: mark entry as "created with issues", skip analysis agents for that entry, include in output report with exact error text
-4. If validator passes: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents)
+3. If validator returns any error-severity issue: mark entry as "created with issues", skip analysis agents for that entry, include in output report with exact error text
+4. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps 1-2 on the same file. If errors or any of these four warning types still remain after the retry, treat as step 3.
+5. If validator passes with zero errors and zero warnings from the four checks in step 4 (`cross_references_absent` does not block this step): spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents)
 
 See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
@@ -249,16 +252,22 @@ flowchart TD
     VerifyFile -->|"Yes — file exists"| ReadFile["Read ./research/category/name.md<br>extract current content and metadata"]
     ReadFile --> Spawn1["Spawn @research-curator via Agent tool<br>prompt: --rerun ./research/category/name.md"]
     Spawn1 --> RelayCheck1["Apply pre-relay quality checklist"]
-    RelayCheck1 --> UpdateDate["Update ./research/README.md<br>refresh freshness date for this entry"]
+    RelayCheck1 --> Validate1["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on this file"]
+    Validate1 -->|"errors, or gated warnings remain<br>after --fix retry"| Issues1(["Mark entry refreshed with issues<br>Skip analysis agents for it<br>Report exact issue text to user"])
+    Validate1 -->|"clean"| UpdateDate["Update ./research/README.md<br>refresh freshness date for this entry"]
     FindAll --> WaveSpawn["Spawn @research-curator agents in waves of 5<br>each receives --rerun ./research/category/name.md<br>wait for each wave before spawning next"]
     WaveSpawn --> RelayCheck2["Apply pre-relay quality checklist<br>to all wave results"]
-    RelayCheck2 --> UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
+    RelayCheck2 --> ValidateN["Run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md) on each updated entry"]
+    ValidateN -->|"an entry has errors, or gated<br>warnings remain after --fix retry"| IssuesN["Mark that entry refreshed with issues<br>Skip analysis agents for it<br>Include exact issue text in report"]
+    ValidateN -->|"clean entries"| UpdateDates["Update ./research/README.md<br>refresh freshness dates for all re-researched entries"]
     UpdateDate --> SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
     WaitAnalysis1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    Issues1 --> PostActions
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
     WaitAnalysisN --> PostActions
+    IssuesN --> PostActions
 ```
 
 ### Single Entry Rerun
@@ -273,15 +282,17 @@ flowchart TD
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
 5. Update README with refreshed date
-6. **Validate** -- run the validation gate on the updated file:
+6. **Validate** -- run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the updated file:
 
    a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py ./research/{category}/{name}.md`
 
    b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{category}/{name}.md`
 
-   c. If validator returns errors: mark entry as "refreshed with issues", skip step 7, report to user with exact error text from validator JSON
+   c. If validator returns any error-severity issue: mark entry as "refreshed with issues", skip step 7, report to user with exact error text from validator JSON
 
-   d. If validator passes: proceed to step 7
+   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: the agent just refreshed this file this invocation, so it already has the facts to satisfy these. Spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps a-b. If errors or any of these four warning types still remain after the retry, treat as step c.
+
+   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- proceed to step 7
 
 7. Concurrently spawn three analysis agents:
 
@@ -300,15 +311,17 @@ flowchart TD
 3. Each agent receives `--rerun ./research/{category}/{name}.md`
 4. Apply pre-relay quality checklist after each wave
 5. Update README once after all waves complete
-6. **Validate** -- for each successfully updated entry, run the validation gate before spawning analysis agents:
+6. **Validate** -- for each successfully updated entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) before spawning analysis agents:
 
    a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
 
    b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
 
-   c. If validator returns errors: mark entry as "refreshed with issues", skip analysis agents for that entry
+   c. If validator returns any error-severity issue: mark entry as "refreshed with issues", skip analysis agents for that entry
 
-   d. If validator passes: include in analysis agent dispatch (step 7)
+   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps a-b on the same file. If errors or any of these four warning types still remain after the retry, treat as step c.
+
+   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- include in analysis agent dispatch (step 7)
 
 7. For each entry that passed validation: spawn concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
 
@@ -329,7 +342,7 @@ Run structural validation and fix error-severity issues.
 The validator script (`validate_research.py`) checks each entry file against the rules in [Validation Rules](./references/validation-rules.md). It emits JSON with three severity levels:
 
 - **error** -- structural violations that make entries unusable (missing required fields, broken links, malformed frontmatter). Auto-fixed by spawning `@research-curator` with `--fix` and the specific issue list.
-- **warning** -- quality issues that don't break entries (stale dates, thin summaries). Reported to user; not auto-fixed.
+- **warning** -- quality issues that don't break entries (stale dates, thin summaries). For the entries Validate Mode scans here -- pre-existing entries this invocation did not itself create or refresh -- reported to user; not auto-fixed. This is the intentionally lighter touch appropriate for legacy content some other agent wrote before the skill enforced these fields strictly. It does not apply to entries Default Mode, Batch Mode, or Rerun Mode just created or refreshed in the current invocation -- those follow the stricter [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries), which must-fixes four of these warning checks before the entry is reported complete.
 - **info** -- informational observations (entry age, word count). Reported to user; no action.
 
 ### Validation Workflow
@@ -373,7 +386,7 @@ Issues to fix (from validator JSON):
 Severity handling per [Validation Rules](./references/validation-rules.md):
 
 - **error** -- spawn `@research-curator` with `--fix` flag and the exact issue list extracted from JSON
-- **warning** -- include exact warning text in report to user; do not auto-fix
+- **warning** -- include exact warning text in report to user; do not auto-fix. This applies to entries Validate Mode scans here -- entries this invocation did not itself create or refresh. Validate Mode never re-researches (that is `--rerun`'s job), so it does not have fresh facts in hand the way a researching agent does; the lighter report-only touch is the correct behavior for this legacy content, unlike the must-fix rule Default/Batch/Rerun Mode apply to the same four checks on entries they just wrote (see [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries)).
 - **info** -- include exact info text in report; no action needed
 
 For error-severity fixes, spawn agents in waves of 5 (same pattern as Batch Mode).
