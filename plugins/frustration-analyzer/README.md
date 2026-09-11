@@ -75,7 +75,7 @@ RTFP interprets `this week` in your timezone and shows the exact dates plus the 
 └──────────────────────────────────────────────────┘
 ```
 
-PNG saved to `/tmp/rtfp-abc123.png`
+PNG saved to the run's private output location.
 
 ## Privacy
 

@@ -19,6 +19,10 @@ Before starting, confirm the plugin MCP tools needed for this run are available:
 
 ## Step 1 — Resolve the Session Set
 
+Create a fresh private temporary workspace for this invocation and refer to it
+as `{run_dir}`. Keep every intermediate and rendered artifact inside that
+workspace; never reuse a fixed path across runs.
+
 For a direct path, use it as the one-item set and skip listing and selection.
 
 For an explicit range such as `all this week`, resolve the dates in the user's timezone before the MCP call. Call `mcp__frustration-analyzer__list_sessions` with `provider`, `modified_after`, `modified_before`, and `limit=1000`. Report the resolved dates, matched count, and Claude/Codex split. “Progressed” means a file's modification time is inside the requested interval and the whole session is analyzed. If the result is truncated, ask the user for a narrower range or provider; only a complete result proceeds to analysis.
@@ -45,7 +49,7 @@ For each selected file, in bounded parallel waves of at most four sessions, call
 ```text
 mcp__frustration-analyzer__extract_user_messages(
     file="{session_file}",
-    output_path="/tmp/rtfp-batch-{session_key}.jsonl"
+    output_path="{run_dir}/batch-{session_key}.jsonl"
 )
 ```
 
@@ -71,7 +75,7 @@ mcp__frustration-analyzer__render_rage_receipt(
     task_summary="session-set analysis complete",
     assistant_excerpt="No strong emotional reactions detected in these sessions.",
     user_reply="👍",
-    output_path="/tmp/rtfp-session-set-clean.png"
+    output_path="{run_dir}/session-set-clean.png"
 )
 ```
 
@@ -79,7 +83,7 @@ Then skip to Step 8 and present the receipt using the same format as a normal re
 
 ## Step 5 — Merge Flags
 
-Merge every returned `flags` array into `/tmp/rtfp-merged-session-set.json`. Preserve each flag's originating `file`, raw `line_index`, and text; never renumber lines across files. This artifact is internal: do not expose its path or raw line details in progress reports.
+Merge every returned `flags` array into `{run_dir}/merged-session-set.json`. Preserve each flag's originating `file`, raw `line_index`, and text; never renumber lines across files. This artifact is internal: do not expose its path or raw line details in progress reports.
 
 ```json
 {
@@ -118,7 +122,7 @@ mcp__frustration-analyzer__render_rage_receipt(
     task_summary="{task_summary}",
     assistant_excerpt="{assistant_excerpt}",
     user_reply="{user_reply}",
-    output_path="/tmp/rtfp-{session_stem}.png"
+    output_path="{run_dir}/{session_stem}.png"
 )
 ```
 
