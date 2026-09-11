@@ -62,8 +62,13 @@ def scan_plugin(plugin_dir: Path) -> dict:
     mcp_server_count = 0
     for p in (plugin_dir / ".mcp.json", plugin_dir / "mcp.json"):
         if p.exists():
-            with contextlib.suppress(json.JSONDecodeError, OSError):
+            try:
                 mcp_server_count += len(json.loads(p.read_text(encoding="utf-8")).get("mcpServers", {}))
+            except (json.JSONDecodeError, OSError) as exc:
+                print(
+                    f"warning: {plugin_dir.name}: cannot parse {p.name} ({exc}); counting 0 MCP servers",
+                    file=sys.stderr,
+                )
     return {
         "manifests": {
             "claude": (plugin_dir / ".claude-plugin" / "plugin.json").exists(),
@@ -91,7 +96,14 @@ def preserve_verification(old: dict, name: str) -> dict:
         Per-harness verification mapping, defaulting to ``unverified``.
     """
     prev = old.get("plugins", {}).get(name, {}).get("verification", {})
-    return {h: prev.get(h, {"status": "unverified", "date": None, "notes": None}) for h in HARNESSES}
+    default = {"status": "unverified", "date": None, "notes": None}
+    if not isinstance(prev, dict):
+        prev = {}
+    out = {}
+    for h in HARNESSES:
+        entry = prev.get(h)
+        out[h] = entry if isinstance(entry, dict) and "status" in entry else dict(default)
+    return out
 
 
 def build_table() -> dict:
@@ -135,8 +147,14 @@ def main() -> int:
     table = build_table()
     rendered = json.dumps(table, indent=2, ensure_ascii=False) + "\n"
     if args.check:
-        current = TABLE_PATH.read_text(encoding="utf-8") if TABLE_PATH.exists() else ""
-        if current != rendered:
+        # Compare parsed content, not bytes: the repo's JSON formatter hooks (biome) may
+        # reflow the committed file, and cosmetic reflow is not staleness.
+        current_text = TABLE_PATH.read_text(encoding="utf-8") if TABLE_PATH.exists() else ""
+        try:
+            current = json.loads(current_text) if current_text else None
+        except json.JSONDecodeError:
+            current = None
+        if current != table:
             print(
                 "harness_compatibility.json is stale; run: uv run --script scripts/generate_harness_compatibility.py",
                 file=sys.stderr,

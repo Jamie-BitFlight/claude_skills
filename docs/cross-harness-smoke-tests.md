@@ -129,9 +129,9 @@ editing, and never hand-edit `manifests`/`components`/`blockers`.
 ## Plugin-root resolution strategies
 
 How to author a plugin so the "Common" checks pass on every harness. The spec's
-`${PLUGIN_ROOT}` expansion exists only for stdio MCP subprocesses (spec §9.1) — skills-only
-plugins (22 of 29 here) cannot use it. Strategies, all audited against upstream source
-(this doc's citation table):
+`${PLUGIN_ROOT}` expansion exists only for stdio MCP subprocesses (spec §9.1) — the 22
+plugins with no MCP servers cannot use it. Strategies, all audited against upstream
+source (this doc's citation table):
 
 | Strategy | claude-code | codex | hermes | kimi | Tradeoff |
 |---|---|---|---|---|---|
