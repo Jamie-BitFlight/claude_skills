@@ -26,6 +26,13 @@ TIKTOKEN_ENCODING = _module._TIKTOKEN_ENCODING
 DEFAULT_WIDTH = _module._DEFAULT_WIDTH
 DEFAULT_FONT_SIZE = _module._DEFAULT_FONT_SIZE
 extract_user_messages = _module.extract_user_messages
+generate_social_post = _module.generate_social_post
+get_context_window = _module.get_context_window
+get_scenario = _module.get_scenario
+list_sessions = _module.list_sessions
+read_session = _module.read_session
+scan_transcripts = _module.scan_transcripts
+ToolError = _module.ToolError
 
 # Shared test constants for render tests.
 TASK = "Implement login page"

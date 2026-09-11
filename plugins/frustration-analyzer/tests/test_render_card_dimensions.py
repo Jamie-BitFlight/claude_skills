@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING
+from xml.etree import ElementTree as ET
 
+import pytest
 from _server import ASSISTANT, DEFAULT_FONT_SIZE, DEFAULT_WIDTH, TASK, USER, render_card
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
@@ -29,6 +31,20 @@ _USER = USER
 
 class TestRenderCardCustomWidth:
     """Tests for custom width parameter."""
+
+    def test_svg_border_stays_within_exported_viewbox(self, tmp_path: Path) -> None:
+        out = tmp_path / "card.svg"
+        _render_card(_TASK, _ASSISTANT, _USER, str(out))
+
+        root = ET.fromstring(out.read_text(encoding="utf-8"))
+        viewbox_width = float(root.attrib["viewBox"].split()[2])
+        border = next(rect for rect in root if rect.get("stroke") == "#1984e9")
+        border_x = float(border.attrib["x"])
+        border_right = border_x + float(border.attrib["width"])
+
+        assert border_x >= 0
+        assert border_right <= viewbox_width
+        assert border_right == pytest.approx(viewbox_width, abs=20)
 
     def test_svg_contains_custom_width_attribute(self, tmp_path: Path) -> None:
         out = tmp_path / "card.svg"

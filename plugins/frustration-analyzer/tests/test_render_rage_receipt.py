@@ -12,7 +12,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from _server import ASSISTANT, TASK, USER, render_card
+import pytest
+from _server import ASSISTANT, TASK, USER, _module, render_card
 from fastmcp.utilities.types import Image
 from mcp.types import TextContent
 
@@ -23,6 +24,12 @@ _render_card = render_card
 _TASK = TASK
 _ASSISTANT = ASSISTANT
 _USER = USER
+
+
+async def test_render_rage_receipt_does_not_write_to_stdout(tmp_path: Path, capfd: pytest.CaptureFixture[str]) -> None:
+    await _module.render_rage_receipt(_TASK, _ASSISTANT, _USER, str(tmp_path / "card.svg"))
+
+    assert capfd.readouterr().out == ""
 
 
 class TestRenderCardSVG:
