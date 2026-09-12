@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["typer>=0.21"]
+#
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Fix common markdown formatting issues in research entries.
 
