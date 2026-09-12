@@ -26,9 +26,13 @@ from pathlib import Path
 
 _scripts_dir = Path(__file__).resolve().parent
 _plugin_root = _scripts_dir.parent
-# Scripts first for dh_mcp_preinit; plugin root second for backlog_core.
+# Scripts first for dh_mcp_preinit/tls_compat; plugin root second for backlog_core.
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 import os
 
@@ -40,6 +44,14 @@ load_dotenv()
 # 403, blocking a PAT that is otherwise valid; in others, the proxy is the only component
 # that can authenticate the token (it injects working credentials of its own), and bypassing
 # it makes GitHub reject the same token with 401. Probe instead of hard-coding either route.
+#
+# Deliberately probes REST, not the GraphQL endpoint backlog_core actually uses. Measured in a
+# Claude Code session (2026-09-12): through the proxy, REST /user returns 200 while POST /graphql
+# returns 403 with "GitHub GraphQL is not available from Claude Code sessions; use the REST API".
+# That GraphQL block is a policy decision, not a routing fault — bypassing the proxy does not
+# recover it. With api.github.com in NO_PROXY, REST and GraphQL both return 401 Bad credentials,
+# because the proxy supplies the working credentials. Probing /graphql here would therefore read
+# the 403, set NO_PROXY, and turn a working REST path into a uniformly failing one.
 _HTTP_FORBIDDEN = 403
 
 _github_token = os.environ.get("GITHUB_TOKEN")

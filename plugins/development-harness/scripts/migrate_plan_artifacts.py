@@ -3,11 +3,16 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "gitpython>=3.1.0",
-#   "ruamel.yaml",
+#   "ruamel.yaml>=0.18.0",
+#   "pygithub>=2.8.1",
+#   "pydantic>=2.12.3",
+#   "marko>=2.0.0",
+#   "tiktoken>=0.12.0",
+#   "httpx>=0.28.1",
 # ]
 #
 # [tool.ty.environment]
-# extra-paths = [".."]
+# extra-paths = ["..", "."]
 # ///
 """Migrate existing plan artifacts into the GitHub Issue artifact manifest system.
 
@@ -38,6 +43,13 @@ from typing import TYPE_CHECKING, NamedTuple
 _PLUGIN_ROOT = Path(__file__).parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 from backlog_core import models as _models
 from backlog_core.artifact_provider import GitHubArtifactProvider
