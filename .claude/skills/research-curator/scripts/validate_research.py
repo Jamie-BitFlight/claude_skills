@@ -350,12 +350,23 @@ def _check_url_format(lines: list[str]) -> list[Issue]:
     return issues
 
 
+_LAST_VERIFIED_LABEL_PATTERN = re.compile(
+    "(?:"
+    + "|".join(re.escape(label) for label in ("Last Verified", *FRESHNESS_ALIASES.get("Last Verified", [])))
+    + r").{0,10}?(\d{4}-\d{2}-\d{2})"
+)
+
+
 def reference_date_from_freshness_section(lines: list[str], sections: dict[str, tuple[int, int]]) -> str | None:
     """Scan the body Freshness Tracking section for its Last Verified date.
 
     Shared by both entry formats: a YAML-frontmatter entry can still carry its
     freshness date only in the body, under a frontmatter key spelling this file
-    does not enumerate.
+    does not enumerate. Matches ``Last Verified`` or any of its accepted
+    ``FRESHNESS_ALIASES`` labels (e.g. ``Research Date`` used inside this
+    section) -- ``_check_freshness_tracking_text`` already accepts those as
+    satisfying the same field, so this must recognize the same labels or a
+    refreshed entry using an alias falls back to the older header date.
 
     Returns:
         The ``YYYY-MM-DD`` Last Verified date, or ``None`` when the section is
@@ -366,7 +377,7 @@ def reference_date_from_freshness_section(lines: list[str], sections: dict[str, 
         return None
     start, end = ft_section
     section_text = "\n".join(lines[start - 1 : end])
-    match = re.search(r"Last Verified.{0,10}?(\d{4}-\d{2}-\d{2})", section_text)
+    match = _LAST_VERIFIED_LABEL_PATTERN.search(section_text)
     return match.group(1) if match else None
 
 

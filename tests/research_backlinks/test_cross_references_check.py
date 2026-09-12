@@ -14,9 +14,24 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Final
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
+_REPO_ROOT = Path(__file__).parents[2]
+_SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+
+# Per AGENTS.md's "Bounded subprocess execution" gotcha: wrap external commands that could hang
+# (uv resolving PEP 723 deps, or a spawned child left running) so a timeout kills the whole
+# process group instead of stalling the pytest worker indefinitely.
+_RUN_BOUNDED: Final = (
+    "uv",
+    "run",
+    "--script",
+    str(_REPO_ROOT / "scripts" / "run_bounded.py"),
+    "--timeout-seconds",
+    "60",
+    "--",
+)
 
 
 def _uv_path() -> str:
@@ -29,7 +44,7 @@ def _uv_path() -> str:
 
 def _run_json(path: Path) -> dict:
     """Run validate_research.py main --json on a single file and parse the result."""
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", "--json", str(path)]
+    cmd = [*_RUN_BOUNDED, _uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", "--json", str(path)]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return json.loads(result.stdout)
 
@@ -315,6 +330,54 @@ class TestYamlEntryPrefersBodyOverStaleFrontmatter:
         """A pre-cutoff frontmatter date must not exempt an entry the body shows is post-cutoff."""
         entry = tmp_path / "example.md"
         _write_yaml_entry_stale_frontmatter(entry, frontmatter_date="2026-01-31", body_date="2026-05-08")
+        result = _run_json(entry)
+        issues = _issues_for(result, "cross_references_absent")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
+
+
+def _write_text_entry_alias_body_date(path: Path, *, header_date: str, body_date: str) -> None:
+    """Write a text-header entry whose body Freshness Tracking uses the ``Research Date`` alias.
+
+    Mirrors the corpus shape Codex found on PR #3506's fourth review round:
+    ``FRESHNESS_ALIASES`` accepts ``Research Date`` inside ``## Freshness
+    Tracking`` as satisfying the ``Last Verified`` field, but the regex that
+    resolves the cutoff-exemption date only matched the literal ``Last
+    Verified`` label, so a refreshed entry using the alias fell back to the
+    older header date instead of the current body one.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = f"""\
+# Example
+
+**Research Date**: {header_date}
+**Source URL**: https://example.com/example
+**Version at Research**: 1.0.0
+**License**: MIT
+
+---
+
+"""
+    body = _body(body_date, cross_references=False).replace(
+        f"- **Last Verified**: {body_date}", f"- **Research Date**: {body_date}"
+    )
+    path.write_text(header + body, encoding="utf-8")
+
+
+class TestTextEntryRecognizesFreshnessAliasLabel:
+    """The body Freshness Tracking date resolves even when it uses the ``Research Date`` alias label.
+
+    Regression guard for the false-exemption Codex found on PR #3506's fourth
+    review round: the date-resolution regex must accept the same
+    ``FRESHNESS_ALIASES`` labels ``_check_freshness_tracking_text`` already
+    accepts for field completeness, or a refreshed entry using the alias is
+    silently exempted using its stale header date.
+    """
+
+    def test_post_cutoff_alias_body_date_overrides_pre_cutoff_header(self, tmp_path: Path) -> None:
+        """A pre-cutoff header date must not exempt an entry whose aliased body date is post-cutoff."""
+        entry = tmp_path / "example.md"
+        _write_text_entry_alias_body_date(entry, header_date="2026-01-15", body_date="2026-06-01")
         result = _run_json(entry)
         issues = _issues_for(result, "cross_references_absent")
         assert len(issues) == 1
