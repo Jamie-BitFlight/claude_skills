@@ -66,7 +66,7 @@ function installRTK() {
 installRTK();
 ```
 
-**Note**: The exact hook API for Claude Code PreToolUse registration is documented in the RTK README (line 415-437). The session-start hook would invoke `rtk init -g` once per session to ensure the hook is registered. Subsequent Bash calls are transparently rewritten (e.g., `git status` → `rtk git status`) without requiring agent-level changes.
+**Note**: The exact hook API for Claude Code PreToolUse registration is documented in the RTK README (line 415-437). The session-start hook would invoke `rtk init -g` once per session to register the hook. Per the research entry (README.md lines 124-140), RTK requires restarting the AI tool after `rtk init -g` before the hook takes effect — so filtering begins with the *next* session after installation, not the current one. A session-start hook that only just ran the install cannot rewrite Bash calls made later in that same session.
 
 ---
 
@@ -92,33 +92,25 @@ Referencing `./plugins/development-harness/AGENTS.md`: the harness "owns the pro
 
 ### Integration sketch
 
-**Scenario 1: Via session-start hook (minimal setup)**
+**Scenario 1: Via session-start hook (minimal setup, next session onward)**
 
-Once RTK is installed via the session-start hook (Utilization 1), all agents automatically benefit:
+Once RTK is installed and the AI tool has been restarted after `rtk init -g` (see Utilization 1), the PreToolUse hook rewrites the agent's own Bash tool calls — not subprocess calls an agent's Python code makes internally. A Claude Code Bash tool invocation of `git status` is what gets rewritten; a `subprocess.run(["git", "status"])` executed from inside an already-running Python process is not intercepted, since PreToolUse only sees the outer tool call that started that process, not what it does afterward. An agent that wants RTK's filtering on a command it runs via Python must invoke `rtk git status` explicitly rather than the bare command.
 
-```python
-# Development Harness agent Bash command (no changes needed)
-result = subprocess.run(["git", "status"], capture_output=True)
-# Output is automatically filtered by RTK PreToolUse hook before reaching the agent
-# e.g., 200 lines of git status output → 20 lines of key changes only
+**Scenario 2: Explicit RTK configuration (per-milestone control) — requires new implementation work**
+
+RTK's actual configuration file is `~/.config/rtk/config.toml` (README.md lines 442-459), not `.dh/config.yaml`:
+
+```toml
+[hooks]
+exclude_commands = ["curl", "playwright"]  # skip rewrite for these
+
+[retriever]
+mode = "sqlite"  # sqlite (default) | tee (legacy) | disabled
 ```
 
-**Scenario 2: Explicit RTK configuration (per-milestone control)**
+Nothing in this repo currently reads `.dh/config.yaml` or dispatch plan metadata to configure RTK — a repository-wide search finds no such integration. Per-milestone control would require new harness code to translate dispatch/milestone settings into this TOML file (or invoke `rtk` with equivalent flags) before spawning agents; this is unbuilt, not an existing capability.
 
-For fine-grained control, the development-harness dispatch system can configure RTK behavior per milestone or task:
-
-```bash
-# In .dh/config.yaml or dispatch plan metadata
-rtk:
-  enabled: true
-  mode: auto-rewrite
-  exclude_commands:
-    - "curl"          # Preserve curl output for API debugging
-    - "playwright"    # Preserve test output for visual regression testing
-  retrieve_mode: sqlite  # Enable output recovery via rtk recall {token-id}
-```
-
-This allows agents to recover full unfiltered output when needed (e.g., `rtk recall {token-id}`) without losing context during typical execution.
+When a command fails, RTK saves the unfiltered output for later recovery via `rtk recall {token-id}` (README.md line 193).
 
 ---
 
