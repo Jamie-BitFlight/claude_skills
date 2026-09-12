@@ -803,6 +803,7 @@ Developer productivity tools and workflow automation for software engineering wi
 | [sigmap.md](./developer-tools/sigmap.md) | Zero-dependency AI context engine extracting codebase signatures for ranked file retrieval | 2026-05-08 |
 | [tolaria.md](./developer-tools/tolaria.md) | Tolaria is a desktop application for macOS and Linux designed for managing markdown-based knowledge bases and second brains. Built with Tauri (Rust backend), React, and TypeScript, it provides a four-panel interface for organizing, searching, and collaborating on personal notes, company documentation, and AI agent cont | 2026-04-26 |
 | [claude-codepro.md](./developer-tools/claude-codepro.md) | Claude CodePro — containerized Claude Code dev environment (lcatlett fork): Alpine Linux container, Node 22, Python 3.12, 5 MCP servers, modular rules, hooks, and spec-driven slash commands (/setup, /plan, /implement, /verify) (AGPL-3.0) | 2026-05-25 |
+| [rtk.md](./developer-tools/rtk.md) | RTK (Rust Token Killer) v0.48.0 — single Rust binary proxying 100+ shell commands with smart filtering, grouping, truncation, and deduplication; transparent PreToolUse hook for Claude Code and 17 other AI coding tools, up to 90% output reduction | 2026-09-12 |
 
 **Key Topics**:
 
