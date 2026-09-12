@@ -11,7 +11,7 @@
 ## Utilization 1: Claude Code Session Hook → RTK Auto-Installation
 
 **Research entry**: ./research/developer-tools/rtk.md
-**Caller**: `.claude/hooks/session-start.js` (to be created)
+**Caller**: `.claude/hooks/session-start.js` (to be created) plus a new `SessionStart` entry in `.claude/settings.json` — creating the file alone does not register it; `.claude/settings.json` currently registers exactly three `SessionStart` commands (`context-loader.mjs --reset`, `session-init.sh`, `bd prime --hook-json`), none of which reference this file
 **Integration mechanism**: PreToolUse hook via `rtk init -g`
 **Replaces or adds**: Adds transparent command filtering for all Bash tool calls in Claude Code sessions
 **Setup cost**: Low (single binary install + hook registration, no state management)
@@ -37,19 +37,24 @@ function installRTK() {
   const checkResult = spawnSync('which', ['rtk'], { stdio: 'pipe' });
 
   if (checkResult.status !== 0) {
-    // Install via homebrew (macOS/Linux) or cargo (fallback)
+    // Install via homebrew (macOS/Linux) or cargo (fallback), each bounded so a stalled
+    // registry/network call cannot block SessionStart indefinitely (see AGENTS.md's
+    // scripts/run_bounded.py convention for external command invocations).
     console.log('Installing RTK...');
 
-    const installResult = spawnSync('brew', ['install', 'rtk'], {
-      stdio: 'inherit',
-      shell: true
-    });
+    const installResult = spawnSync(
+      'uv',
+      ['run', '--script', 'scripts/run_bounded.py', '--timeout-seconds', '60', '--', 'brew', 'install', 'rtk'],
+      { stdio: 'inherit', shell: true }
+    );
 
     if (installResult.status !== 0) {
-      // Fallback to cargo
-      spawnSync('cargo', ['install', '--git', 'https://github.com/rtk-ai/rtk'], {
-        stdio: 'inherit'
-      });
+      // Fallback to cargo, same bound
+      spawnSync(
+        'uv',
+        ['run', '--script', 'scripts/run_bounded.py', '--timeout-seconds', '120', '--', 'cargo', 'install', '--git', 'https://github.com/rtk-ai/rtk'],
+        { stdio: 'inherit' }
+      );
     }
   }
 
