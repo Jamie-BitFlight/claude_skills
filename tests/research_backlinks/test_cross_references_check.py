@@ -34,19 +34,9 @@ def _run_json(path: Path) -> dict:
     return json.loads(result.stdout)
 
 
-def _write_entry(path: Path, *, research_date: str, cross_references: bool) -> None:
-    """Write a minimal well-formed text-header entry, with a controllable date and Cross-References section."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _body(research_date: str, cross_references: bool) -> str:
+    """Build the shared body sections used by both entry formats."""
     content = f"""\
-# Example
-
-**Research Date**: {research_date}
-**Source URL**: https://example.com/example
-**Version at Research**: 1.0.0
-**License**: MIT
-
----
-
 ## Overview
 
 Example test entry.
@@ -91,7 +81,49 @@ Test.
 |-------|----------|--------------|
 | [Other](../other/other.md) | other | related |
 """
-    path.write_text(content, encoding="utf-8")
+    return content
+
+
+def _write_entry(path: Path, *, research_date: str, cross_references: bool) -> None:
+    """Write a minimal well-formed text-header entry, with a controllable date and Cross-References section."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = f"""\
+# Example
+
+**Research Date**: {research_date}
+**Source URL**: https://example.com/example
+**Version at Research**: 1.0.0
+**License**: MIT
+
+---
+
+"""
+    path.write_text(header + _body(research_date, cross_references), encoding="utf-8")
+
+
+def _write_yaml_entry_with_body_date(path: Path, *, research_date: str, cross_references: bool) -> None:
+    """Write a YAML-frontmatter entry whose freshness date lives only in the body.
+
+    Mirrors the legacy corpus shape that regressed: the frontmatter carries the
+    date under ``metadata.verified`` — a spelling the validator does not
+    enumerate — while the body Freshness Tracking table carries it plainly.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frontmatter = f"""\
+---
+name: Example
+license: MIT
+metadata:
+  category: developer-tools
+  source_url: https://example.com/example
+  version: "1.0.0"
+  verified: "{research_date}"
+---
+
+# Example
+
+"""
+    path.write_text(frontmatter + _body(research_date, cross_references), encoding="utf-8")
 
 
 def _issues_for(entry_json: dict, check: str) -> list[dict]:
@@ -123,6 +155,33 @@ class TestCrossReferencesAbsent:
         _write_entry(entry, research_date="2026-01-15", cross_references=False)
         result = _run_json(entry)
         assert _issues_for(result, "cross_references_absent") == []
+
+
+class TestYamlEntryBodyDateFallback:
+    """A YAML entry whose date lives only in the body still gets the cutoff exemption.
+
+    Regression guard for the false positive Codex found on PR #3506: legacy
+    entries store the freshness date under frontmatter spellings the validator
+    does not enumerate (``metadata.verified``), so resolving from frontmatter
+    alone reported pre-cutoff entries as missing Cross-References.
+    """
+
+    def test_pre_cutoff_body_date_exempts_yaml_entry(self, tmp_path: Path) -> None:
+        """Body Last Verified before the cutoff exempts the entry despite unknown frontmatter keys."""
+        entry = tmp_path / "example.md"
+        _write_yaml_entry_with_body_date(entry, research_date="2026-01-15", cross_references=False)
+        result = _run_json(entry)
+        assert result["entries"][0]["format"] == "yaml_frontmatter"
+        assert _issues_for(result, "cross_references_absent") == []
+
+    def test_post_cutoff_body_date_still_warns_yaml_entry(self, tmp_path: Path) -> None:
+        """The fallback must not suppress the warning for an entry dated after the cutoff."""
+        entry = tmp_path / "example.md"
+        _write_yaml_entry_with_body_date(entry, research_date="2026-06-01", cross_references=False)
+        result = _run_json(entry)
+        issues = _issues_for(result, "cross_references_absent")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
 
 
 class TestHeaderFieldsSeverity:
