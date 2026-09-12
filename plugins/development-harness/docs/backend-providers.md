@@ -61,7 +61,14 @@ capability boundary" section for the concrete protocol names and file paths.
 
 The CLI and MCP are two transports over the same configured backend. Use the
 surface available to the caller; do not infer a different source of truth from
-the transport. Shared logical operations include:
+the transport.
+
+The CLI transport is `sam_schema/cli.py` (grouped Typer app: `plan`, `backlog`,
+`dispatch`, `artifact`, `active-task`; also reachable through the
+`scripts/run_sam_cli.py` wrapper). Per-command reference lives in
+[DH CLI Usage Guide](../skills/dh-meta-docs/references/dh-cli-usage-guide.md).
+
+Shared logical operations include:
 
 - Work-item CRUD, grooming, comments, status, and closure.
 - Plan creation, listing, status, readiness, and finalization.

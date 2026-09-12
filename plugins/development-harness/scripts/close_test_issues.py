@@ -14,7 +14,7 @@
 # ]
 #
 # [tool.ty.environment]
-# extra-paths = [".."]
+# extra-paths = ["..", "."]
 # ///
 """Close orphaned [MCP-TEST-*] GitHub issues left by failed e2e test teardown.
 
@@ -41,6 +41,11 @@ from pathlib import Path
 # (which does not install development-harness as an editable package).
 # Pattern mirrors run_backlog_server.py.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 from backlog_core.gh_client import GitHubUnavailableError, close_github_issue, get_github, sync_issues_graphql
 from backlog_core.models import Output

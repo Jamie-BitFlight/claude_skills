@@ -371,6 +371,10 @@ Load these documents based on what you are doing. They contain the system design
 
 - Run `/dh:meta-workflow-graph-refresh` — step-by-step extraction and assembly process for keeping `docs/dh-workflow-graph.json` accurate after structural changes; covers which layer to re-extract, how to run the ensemble, and how to rebuild the graph
 
+**Checking whether a CLI or MCP capability already exists, before building, replacing, or diagnosing one:**
+
+- Load `dh:dh-meta-docs` — its [DH CLI Usage Guide](./skills/dh-meta-docs/references/dh-cli-usage-guide.md) is the only document naming the CLI adapter's actual entry point, `sam_schema/cli.py`, with the grouped commands (`plan`, `backlog`, `dispatch`, `artifact`, `active-task`) and their invocation form. Every backlog, plan, artifact, and dispatch operation this plugin exposes over MCP has a CLI equivalent there. Check it before concluding a capability is missing — a filename search alone does not find it.
+
 Note: The layer-0 design documents artifact-conventions, task-file-format, sam-pipeline, and arl-touchpoints were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
 
 ### Documentation Update Triggers

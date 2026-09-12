@@ -15,7 +15,7 @@
 # ]
 #
 # [tool.ty.environment]
-# root = [".", ".."]
+# root = [".", "..", "../scripts"]
 # ///
 """Root Typer composer for the provider-neutral SAM CLI."""
 
@@ -48,6 +48,11 @@ if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 import typer
 

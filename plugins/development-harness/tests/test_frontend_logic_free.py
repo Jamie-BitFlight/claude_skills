@@ -54,6 +54,10 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "sam_schema",
         "dh_paths",
         "backlog_core",
+        # Process-level TLS shim, not business logic: cli.py is itself an entry point
+        # (own shebang + PEP 723 header) and must apply the patch before any
+        # urllib3/httpx-importing module loads, so it cannot be deferred to a wrapper.
+        "tls_compat",
     },
     "sam_schema/server.py": {
         "__future__",
