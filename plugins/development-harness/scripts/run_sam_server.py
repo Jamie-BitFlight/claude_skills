@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
-# requires-python = ">=3.11"
+# requires-python = ">=3.11,<3.13"
 # dependencies = [
 #   "fastmcp>=4.0.0",
 #   "httpx>=0.27.0",

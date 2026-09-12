@@ -2,41 +2,15 @@
   "mcpServers": {
     "backlog": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/run_backlog_server.py"],
+      "args": ["run", "--python", "3.12", "--script", "scripts/run_backlog_server.py"],
       "cwd": ".",
-      "env": {
-        "REQUESTS_CA_BUNDLE": "${REQUESTS_CA_BUNDLE}",
-        "SSL_CERT_FILE": "${SSL_CERT_FILE}",
-        "CURL_CA_BUNDLE": "${CURL_CA_BUNDLE}",
-        "HTTPS_PROXY": "${HTTPS_PROXY}"
-      },
-      "env_vars": [
-        "PWD",
-        "CODEX_THREAD_ID",
-        "REQUESTS_CA_BUNDLE",
-        "SSL_CERT_FILE",
-        "CURL_CA_BUNDLE",
-        "HTTPS_PROXY"
-      ]
+      "env_vars": ["PWD", "CODEX_THREAD_ID"]
     },
     "sam": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/run_sam_server.py"],
+      "args": ["run", "--python", "3.12", "--script", "scripts/run_sam_server.py"],
       "cwd": ".",
-      "env": {
-        "REQUESTS_CA_BUNDLE": "${REQUESTS_CA_BUNDLE}",
-        "SSL_CERT_FILE": "${SSL_CERT_FILE}",
-        "CURL_CA_BUNDLE": "${CURL_CA_BUNDLE}",
-        "HTTPS_PROXY": "${HTTPS_PROXY}"
-      },
-      "env_vars": [
-        "PWD",
-        "CODEX_THREAD_ID",
-        "REQUESTS_CA_BUNDLE",
-        "SSL_CERT_FILE",
-        "CURL_CA_BUNDLE",
-        "HTTPS_PROXY"
-      ]
+      "env_vars": ["PWD", "CODEX_THREAD_ID"]
     },
     "sequential_thinking": {
       "command": "npx",

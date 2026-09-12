@@ -2,17 +2,17 @@
   "mcpServers": {
     "backlog": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/run_backlog_server.py"],
+      "args": ["run", "--python", "3.12", "--script", "scripts/run_backlog_server.py"],
       "cwd": ".",
       "env": { "DH_CODEX_MCP": "1" },
-      "env_vars": ["PWD", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "CURL_CA_BUNDLE", "HTTPS_PROXY"]
+      "env_vars": ["PWD"]
     },
     "sam": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/run_sam_server.py"],
+      "args": ["run", "--python", "3.12", "--script", "scripts/run_sam_server.py"],
       "cwd": ".",
       "env": { "DH_CODEX_MCP": "1" },
-      "env_vars": ["PWD", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "CURL_CA_BUNDLE", "HTTPS_PROXY"]
+      "env_vars": ["PWD"]
     },
     "sequential_thinking": {
       "command": "npx",
