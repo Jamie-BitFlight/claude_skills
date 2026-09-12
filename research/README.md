@@ -536,6 +536,7 @@ Agent SDKs, orchestration frameworks, and comparative studies of multi-agent arc
 | [omnigent.md](./agent-frameworks/omnigent.md) | Omnigent v0.1.0 (Databricks) — Python 3.12+ multi-agent harness for orchestrating Claude Code, Codex, Cursor, Pi without rewriting; unified YAML policy enforcement (ALLOW/DENY/ASK), cross-device session sync via WebSocket, MCP support (Apache 2.0) | 2026-06-18 |
 | [ponytail.md](./agent-frameworks/ponytail.md) | Ponytail v4.7.0 — "lazy senior developer mode" for AI agents; 6-rung decision ladder (YAGNI→stdlib→native→deps→one-liner→minimal code) with benchmark results: 80–94% code reduction, 42–75% cost reduction, 3–6× faster; 13 platform support (MIT) | 2026-06-18 |
 | [flue.md](./agent-frameworks/flue.md) | Flue — TypeScript agent harness framework providing durable-first execution, sandboxes, typed tools, MCP integration, subagent delegation, and 20+ channel adapters (Slack, Teams, Discord, GitHub); deploys to Node.js, Cloudflare Workers, GitHub Actions, GitLab CI/CD, Daytona, Render (Apache-2.0, v1.0.0-beta.9) | 2026-07-03 |
+| [deepseek-harness.md](./agent-frameworks/deepseek-harness.md) | DeepSeek Harness (`dsh`) — DeepSeek AI's open-source agent harness; everything-is-a-plugin architecture on Cordis; 30+ capability packages (core loop, LLM access, shell/fs/web execution, subagent delegation, workflow, skills, session persistence); Service Definition/Provider/Consumer seam pattern; bridges Claude Code, Codex, OpenCode, GitHub coding agents via shared wire protocol; developer preview, no security audit (MIT) | 2026-09-11 |
 
 **Key Topics**:
 
@@ -1259,6 +1260,7 @@ AI research newsletters, curated resource collections, and tools for staying cur
 | [OpenSpace.md](./ai-research-tools/OpenSpace.md) | OpenSpace — self-evolving skills engine for AI agents: autonomous skill development, 46% token reduction via reuse, collective skill sharing across agent networks (1.7K stars, MIT, v0.1.0) | 2026-03-28   |
 | [meta-harness.md](./ai-research-tools/meta-harness.md) | Meta-Harness — End-to-end optimization framework for model harnesses (LLM context management infrastructure) using agentic proposer with execution traces | 2026-04-06   |
 | [notebooklm.md](./ai-research-tools/notebooklm.md) | NotebookLM (Google NotebookLM; LM = "Language Model") is a research and note-taking online tool developed by Google Labs that uses Google Gemini to assist users in interacting with their documents.... | 2026-01-31 |
+| [zvec-grep.md](./ai-research-tools/zvec-grep.md) | zvec-grep — local-first hybrid workspace search (ripgrep + BM25 + vector) for humans and AI agents; MCP integration for Claude Code, Codex, Qwen, OpenCode, Cursor, Qoder; daemon-based auto/server/direct modes (@zvec/zvec-grep v0.2.1, Apache 2.0, pre-v1.0) | 2026-09-11 |
 
 **Key Topics**:
 
@@ -1384,6 +1386,7 @@ Interactive prompt development platforms and tools for iterating on LLM prompts,
 | [ctxforge.md](./prompt-engineering/ctxforge.md)           | ctxforge — protocol-based context engineering framework; 16 markdown workflows auto-loaded via intent detection (~95% accuracy); 30+ performance/quality directives; project.md cross-session memory; ~15K token overhead (7.5%); v3.1.2, 22 stars | 2026-03-17 |
 | [system-prompts-ai-tools.md](./prompt-engineering/system-prompts-ai-tools.md) | x1xhlol/system-prompts-and-models-of-ai-tools — 30,000+ lines of leaked system prompts and model configs for 30+ AI tools including Claude Code, Cursor, Windsurf, Devin AI, Copilot, v0, Replit (117.9K stars, GPL-3.0) | 2026-02-23 |
 | [prompt-optimizer.md](./prompt-engineering/prompt-optimizer.md) | prompt-optimizer v2.11.6 — TypeScript monorepo (31K stars); dual-mode optimization (system + user prompts), multi-model adapters (OpenAI/Gemini/DeepSeek/Grok/Zhipu), MCP server, 4 deployment paths (Vercel/Electron/Chrome extension/Docker), structured evaluation with compare, image generation T2I/I2I | 2026-06-18 |
+| [open-spdd.md](./prompt-engineering/open-spdd.md) | OpenSPDD — Go CLI turning AI coding prompts into "executable design contracts" via the 7-dimension REASONS Canvas (Requirements, Entities, Approach, Structure, Operations, Norms, Safeguards); bidirectional `/spdd-sync` keeps design docs and code aligned; generates commands for Cursor, Claude Code, Copilot, Antigravity, OpenCode, Codex (MIT, unversioned) | 2026-09-11 |
 
 **Key Topics**:
 
