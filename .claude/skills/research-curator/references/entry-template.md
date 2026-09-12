@@ -76,6 +76,8 @@ File location: `./research/{category}/{resource-name}.md`
 ````markdown
 ---
 name: {resource-name-slug}
+title: {Official resource name}
+subtitle: {What a reader finds inside — the key capability, finding, or differentiator, in 5-10 words}
 research_date: YYYY-MM-DD
 source_url: https://...
 github_repository: https://github.com/... # if applicable
