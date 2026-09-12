@@ -126,6 +126,69 @@ metadata:
     path.write_text(frontmatter + _body(research_date, cross_references), encoding="utf-8")
 
 
+def _write_yaml_entry_verified_only(path: Path, *, research_date: str, cross_references: bool) -> None:
+    """Write a YAML-frontmatter entry with a legacy ``metadata.verified`` date and no body date at all.
+
+    Mirrors the corpus shape Codex found still regressed after the body-date
+    fallback: no ``## Freshness Tracking`` section in the body, so the fallback
+    also returns ``None`` unless ``verified`` itself is a recognized alias of
+    ``last_verified``.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frontmatter = f"""\
+---
+name: Example
+license: MIT
+metadata:
+  category: developer-tools
+  source_url: https://example.com/example
+  version: "1.0.0"
+  verified: "{research_date}"
+---
+
+# Example
+
+## Overview
+
+Example test entry.
+
+## Problem Addressed
+
+Test.
+
+## Key Features
+
+- Feature A
+
+## Technical Architecture
+
+Simple.
+
+## Installation & Usage
+
+```bash
+pip install example
+```
+
+## Relevance to Claude Code Development
+
+Test.
+
+## References
+
+- [Example](https://example.com) (accessed {research_date})
+"""
+    if cross_references:
+        frontmatter += """
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Other](../other/other.md) | other | related |
+"""
+    path.write_text(frontmatter, encoding="utf-8")
+
+
 def _issues_for(entry_json: dict, check: str) -> list[dict]:
     return [i for i in entry_json["entries"][0]["issues"] if i["check"] == check]
 
@@ -178,6 +241,34 @@ class TestYamlEntryBodyDateFallback:
         """The fallback must not suppress the warning for an entry dated after the cutoff."""
         entry = tmp_path / "example.md"
         _write_yaml_entry_with_body_date(entry, research_date="2026-06-01", cross_references=False)
+        result = _run_json(entry)
+        issues = _issues_for(result, "cross_references_absent")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
+
+
+class TestYamlEntryVerifiedOnlyFallback:
+    """A YAML entry with only ``metadata.verified`` and no body date still gets the exemption.
+
+    Regression guard for the second false positive Codex found on PR #3506,
+    reproduced against the real corpus at ``research/agent-frameworks/agno.md``
+    (``metadata.verified: "2026-01-31"``, no body Freshness Tracking section):
+    the body-date fallback alone doesn't help when there is no body date to
+    fall back to -- ``verified`` itself must be recognized as an alias.
+    """
+
+    def test_pre_cutoff_verified_only_exempts_yaml_entry(self, tmp_path: Path) -> None:
+        """A pre-cutoff ``metadata.verified`` date exempts the entry with no body date at all."""
+        entry = tmp_path / "example.md"
+        _write_yaml_entry_verified_only(entry, research_date="2026-01-15", cross_references=False)
+        result = _run_json(entry)
+        assert result["entries"][0]["format"] == "yaml_frontmatter"
+        assert _issues_for(result, "cross_references_absent") == []
+
+    def test_post_cutoff_verified_only_still_warns_yaml_entry(self, tmp_path: Path) -> None:
+        """The ``verified`` alias must not suppress the warning for a post-cutoff entry."""
+        entry = tmp_path / "example.md"
+        _write_yaml_entry_verified_only(entry, research_date="2026-06-01", cross_references=False)
         result = _run_json(entry)
         issues = _issues_for(result, "cross_references_absent")
         assert len(issues) == 1

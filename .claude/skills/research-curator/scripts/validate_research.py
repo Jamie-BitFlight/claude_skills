@@ -392,16 +392,17 @@ def reference_date_yaml(
     """Resolve the date that gates the cross_references_absent exemption (YAML frontmatter).
 
     Prefers ``freshness_tracking.last_verified`` over ``research_date``/``date``,
-    then falls back to the body Freshness Tracking section. Legacy entries store
-    the date under frontmatter spellings this list does not cover (for example
-    ``metadata.verified``) while still carrying it in the body, so without the
-    fallback a pre-cutoff entry is wrongly reported as missing Cross-References.
+    recognizes the legacy corpus's bare ``metadata.verified`` spelling as an
+    alias of ``last_verified``, then falls back to the body Freshness Tracking
+    section for entries whose date lives only there. Without both, a
+    pre-cutoff entry using either legacy shape is wrongly reported as missing
+    Cross-References.
 
     Returns:
         The first matching date string found, or ``None`` when neither source has one.
     """
     flat = flatten_yaml_items(frontmatter)
-    for key in ("last_verified", "research_date", "date"):
+    for key in ("last_verified", "verified", "research_date", "date"):
         value = flat.get(key)
         if value:
             return str(value)
