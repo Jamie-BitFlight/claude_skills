@@ -275,6 +275,52 @@ class TestYamlEntryVerifiedOnlyFallback:
         assert issues[0]["severity"] == "warning"
 
 
+def _write_yaml_entry_stale_frontmatter(path: Path, *, frontmatter_date: str, body_date: str) -> None:
+    """Write a YAML entry whose frontmatter ``verified`` predates a fresher body Last Verified.
+
+    Mirrors the corpus shape Codex found on PR #3506's third review round (e.g.
+    ``research/context-management/claude-mem.md``: frontmatter ``2026-01-31``,
+    body ``2026-05-08``): a rerun updated the body Freshness Tracking section
+    but not the legacy frontmatter field, so resolving frontmatter first would
+    use the stale, pre-cutoff date to wrongly exempt an entry that is actually
+    past the cutoff.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frontmatter = f"""\
+---
+name: Example
+license: MIT
+metadata:
+  category: developer-tools
+  source_url: https://example.com/example
+  version: "1.0.0"
+  verified: "{frontmatter_date}"
+---
+
+# Example
+
+"""
+    path.write_text(frontmatter + _body(body_date, cross_references=False), encoding="utf-8")
+
+
+class TestYamlEntryPrefersBodyOverStaleFrontmatter:
+    """The body Freshness Tracking date wins over a stale frontmatter ``verified`` value.
+
+    Regression guard for the false negative Codex found on PR #3506's third
+    review round: checking frontmatter before the body let a rerun that only
+    updated the body silently keep the old, pre-cutoff exemption.
+    """
+
+    def test_post_cutoff_body_date_overrides_pre_cutoff_frontmatter(self, tmp_path: Path) -> None:
+        """A pre-cutoff frontmatter date must not exempt an entry the body shows is post-cutoff."""
+        entry = tmp_path / "example.md"
+        _write_yaml_entry_stale_frontmatter(entry, frontmatter_date="2026-01-31", body_date="2026-05-08")
+        result = _run_json(entry)
+        issues = _issues_for(result, "cross_references_absent")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
+
+
 class TestHeaderFieldsSeverity:
     """header_fields must report warning severity, matching the Validation Gate flowchart."""
 
