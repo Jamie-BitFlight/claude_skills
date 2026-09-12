@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
-# requires-python = ">=3.11,<3.13"
+# requires-python = ">=3.11"
 # dependencies = [
 #   "fastmcp[tasks]>=4.0.0",
 #   "httpx>=0.27.0",
@@ -26,9 +26,13 @@ from pathlib import Path
 
 _scripts_dir = Path(__file__).resolve().parent
 _plugin_root = _scripts_dir.parent
-# Scripts first for dh_mcp_preinit; plugin root second for backlog_core.
+# Scripts first for dh_mcp_preinit/tls_compat; plugin root second for backlog_core.
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 import os
 

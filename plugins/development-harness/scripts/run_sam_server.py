@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
-# requires-python = ">=3.11,<3.13"
+# requires-python = ">=3.11"
 # dependencies = [
 #   "fastmcp>=4.0.0",
 #   "httpx>=0.27.0",
@@ -27,6 +27,10 @@ _scripts_dir = Path(__file__).resolve().parent
 _plugin_root = _scripts_dir.parent
 sys.path.insert(0, str(_plugin_root))
 sys.path.insert(0, str(_scripts_dir))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 from dh_mcp_preinit import apply_project_dir_from_argv
 
