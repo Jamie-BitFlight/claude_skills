@@ -5,14 +5,14 @@
       "args": ["run", "--script", "scripts/run_backlog_server.py"],
       "cwd": ".",
       "env": { "DH_CODEX_MCP": "1" },
-      "env_vars": ["PWD"]
+      "env_vars": ["PWD", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "CURL_CA_BUNDLE", "HTTPS_PROXY"]
     },
     "sam": {
       "command": "uv",
       "args": ["run", "--script", "scripts/run_sam_server.py"],
       "cwd": ".",
       "env": { "DH_CODEX_MCP": "1" },
-      "env_vars": ["PWD"]
+      "env_vars": ["PWD", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE", "CURL_CA_BUNDLE", "HTTPS_PROXY"]
     },
     "sequential_thinking": {
       "command": "npx",

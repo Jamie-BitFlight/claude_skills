@@ -4,13 +4,39 @@
       "command": "uv",
       "args": ["run", "--script", "scripts/run_backlog_server.py"],
       "cwd": ".",
-      "env_vars": ["PWD", "CODEX_THREAD_ID"]
+      "env": {
+        "REQUESTS_CA_BUNDLE": "${REQUESTS_CA_BUNDLE}",
+        "SSL_CERT_FILE": "${SSL_CERT_FILE}",
+        "CURL_CA_BUNDLE": "${CURL_CA_BUNDLE}",
+        "HTTPS_PROXY": "${HTTPS_PROXY}"
+      },
+      "env_vars": [
+        "PWD",
+        "CODEX_THREAD_ID",
+        "REQUESTS_CA_BUNDLE",
+        "SSL_CERT_FILE",
+        "CURL_CA_BUNDLE",
+        "HTTPS_PROXY"
+      ]
     },
     "sam": {
       "command": "uv",
       "args": ["run", "--script", "scripts/run_sam_server.py"],
       "cwd": ".",
-      "env_vars": ["PWD", "CODEX_THREAD_ID"]
+      "env": {
+        "REQUESTS_CA_BUNDLE": "${REQUESTS_CA_BUNDLE}",
+        "SSL_CERT_FILE": "${SSL_CERT_FILE}",
+        "CURL_CA_BUNDLE": "${CURL_CA_BUNDLE}",
+        "HTTPS_PROXY": "${HTTPS_PROXY}"
+      },
+      "env_vars": [
+        "PWD",
+        "CODEX_THREAD_ID",
+        "REQUESTS_CA_BUNDLE",
+        "SSL_CERT_FILE",
+        "CURL_CA_BUNDLE",
+        "HTTPS_PROXY"
+      ]
     },
     "sequential_thinking": {
       "command": "npx",
