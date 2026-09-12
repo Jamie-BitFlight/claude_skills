@@ -33,8 +33,10 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 function installRTK() {
-  // Check if rtk is already installed
-  const checkResult = spawnSync('which', ['rtk'], { stdio: 'pipe' });
+  // Probe the binary itself rather than `which`, which native Windows does not provide —
+  // a `which` check there reports RTK missing even when rtk.exe is installed, and
+  // re-triggers the install path on every SessionStart.
+  const checkResult = spawnSync('rtk', ['--version'], { stdio: 'pipe' });
 
   if (checkResult.status !== 0) {
     // Install via homebrew (macOS/Linux) or cargo (fallback), each bounded so a stalled
@@ -49,10 +51,15 @@ function installRTK() {
     );
 
     if (installResult.status !== 0) {
-      // Fallback to cargo, same bound
+      // Fallback to cargo, same bound. Pinned to the researched release tag and --locked:
+      // upstream's own documented command is unpinned (`cargo install --git <url>`), which in
+      // an automatic SessionStart install would build whatever sits on the default branch at
+      // that moment — non-reproducible, and it takes an upstream branch compromise straight
+      // into every new session. v0.48.0 is the release the accompanying entry verified.
       spawnSync(
         'uv',
-        ['run', '--script', 'scripts/run_bounded.py', '--timeout-seconds', '120', '--', 'cargo', 'install', '--git', 'https://github.com/rtk-ai/rtk'],
+        ['run', '--script', 'scripts/run_bounded.py', '--timeout-seconds', '120', '--',
+         'cargo', 'install', '--locked', '--git', 'https://github.com/rtk-ai/rtk', '--tag', 'v0.48.0'],
         { stdio: 'inherit' }
       );
     }
@@ -78,7 +85,7 @@ installRTK();
 ## Utilization 2: Development Harness Execution Agents → RTK Command Filtering
 
 **Research entry**: ./research/developer-tools/rtk.md
-**Caller**: Development Harness agents (e.g., `@dh:execution`, `@dh:task-worker`) spawned by `/dh:dispatch` and `/dh:work-milestone`
+**Caller**: Development Harness agents (e.g., `@dh:task-worker`, `@dh:code-reviewer`) spawned by `/dh:dispatch` and `/dh:work-milestone`. Note `/dh:execution` is the S5 workflow *skill*, not an agent — `plugins/development-harness/agents/` contains no `execution` agent, and `@dh:task-worker` is the harness's execution fallback.
 **Integration mechanism**: Implicit via session-start hook (or explicit per-task opt-in via RTK configuration)
 **Replaces or adds**: Adds transparent token reduction for git, test, and build command output captured by agents
 **Setup cost**: Low (zero additional setup if session-start hook installed; medium if per-task configuration required)
@@ -86,7 +93,7 @@ installRTK();
 
 ### Why this caller
 
-The development-harness plugin orchestrates multi-step workflows through its SAM 7-stage pipeline and dispatch system. Stages like S5 (Execution) and S6 (Forensic Review) spawn agents (`@dh:task-worker`, `@dh:code-reviewer`, `@dh:execution`) that run Bash commands to:
+The development-harness plugin orchestrates multi-step workflows through its SAM 7-stage pipeline and dispatch system. Stages like S5 (Execution, driven by the `/dh:execution` skill) and S6 (Forensic Review) spawn agents (`@dh:task-worker`, `@dh:code-reviewer`) that run Bash commands to:
 - Execute Git operations for branch management and changelog generation
 - Run test suites (pytest, cargo test, jest) to validate implementations
 - Run build/lint commands (ruff, tsc, cargo build, golangci-lint) to verify code quality
