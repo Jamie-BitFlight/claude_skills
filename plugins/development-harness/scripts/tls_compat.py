@@ -22,9 +22,14 @@ else using the standard path) and by ``urllib3``'s own context builder
 ``verify_mode`` (``CERT_REQUIRED`` stays on) and hostname checking
 untouched -- certificate verification still happens, just without this one
 additional check. It is a no-op on Python <3.13, where the flag was never
-set by default. Every script that imports this module already depends on
-PyGithub, which pulls in ``urllib3`` transitively, so importing it here
-unconditionally adds no new dependency.
+set by default.
+
+``urllib3`` is imported defensively: not every entry point that needs the
+stdlib half of this shim declares PyGithub (``migrate_plan_artifacts.py``
+declares only gitpython and ruamel.yaml), and an unconditional import there
+raises ``ModuleNotFoundError`` before the script runs. When ``urllib3`` is
+absent there is nothing for the urllib3 half to patch, and the
+``ssl.create_default_context`` half still applies.
 
 Must run before any ``backlog_core``/``github``/``requests``/``httpx``
 import: ``urllib3.connection`` binds ``create_urllib3_context`` via
@@ -41,8 +46,13 @@ from __future__ import annotations
 import ssl
 import sys
 
-import urllib3.connection
-import urllib3.util.ssl_
+try:
+    import urllib3.connection
+    import urllib3.util.ssl_
+
+    _URLLIB3_AVAILABLE = True
+except ImportError:  # entry points that need only the stdlib half do not declare PyGithub
+    _URLLIB3_AVAILABLE = False
 
 
 def relax_verify_x509_strict() -> None:
@@ -60,6 +70,9 @@ def relax_verify_x509_strict() -> None:
         return _without_strict(original_create_default_context(*args, **kwargs))  # type: ignore[arg-type]
 
     ssl.create_default_context = _create_default_context_no_strict
+
+    if not _URLLIB3_AVAILABLE:
+        return
 
     original_create_urllib3_context = urllib3.util.ssl_.create_urllib3_context
 

@@ -10,7 +10,7 @@
 # ]
 #
 # [tool.ty.environment]
-# extra-paths = [".."]
+# extra-paths = ["..", "."]
 # ///
 r"""Migrate SAM task files to GitHub sub-issues.
 
@@ -57,6 +57,13 @@ if isinstance(sys.stderr, TextIOWrapper):
 _HARNESS_DIR = Path(__file__).resolve().parents[1]
 if str(_HARNESS_DIR) not in sys.path:
     sys.path.insert(0, str(_HARNESS_DIR))
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 import dh_paths
 import typer

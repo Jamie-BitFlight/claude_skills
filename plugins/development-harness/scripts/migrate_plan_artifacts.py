@@ -7,7 +7,7 @@
 # ]
 #
 # [tool.ty.environment]
-# extra-paths = [".."]
+# extra-paths = ["..", "."]
 # ///
 """Migrate existing plan artifacts into the GitHub Issue artifact manifest system.
 
@@ -38,6 +38,13 @@ from typing import TYPE_CHECKING, NamedTuple
 _PLUGIN_ROOT = Path(__file__).parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
 
 from backlog_core import models as _models
 from backlog_core.artifact_provider import GitHubArtifactProvider
