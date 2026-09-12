@@ -414,7 +414,12 @@ Validation complete:
 
 Shared by all modes. Execute after any mode completes successfully.
 
-1. **README Update** -- add or update entries in `./research/README.md` category tables
+1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
+   a shared restatement of the mode-specific README step each mode's own flow already gates
+   (Default/Batch step 6d, Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated
+   pass. Do not add a row, or refresh the Last Updated date on an existing row, for any entry
+   marked "created with issues" or "refreshed with issues" earlier in this run; that entry's
+   README state stays exactly as it was before this run started
 2. **Lint** -- run formatting checks on all modified files:
 
    ```bash
