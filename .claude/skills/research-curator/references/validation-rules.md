@@ -9,15 +9,15 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 ### Error Severity (must fix)
 
 - **section_completeness**: All required `##`-level sections (defined in `entry-template.md`'s Entry File Template) must exist — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. Header fields (Research Date, Source URL, etc.) are checked separately via **header_fields**.
-- **header_fields**: Header block must contain Research Date, Source URL, Version at Research, License
 - **empty_sections**: Section heading exists but contains no content below it before the next heading
 
 ### Warning Severity (should fix)
 
+- **header_fields**: Header block must contain Research Date, Source URL, Version at Research, License
 - **access_dates**: Every URL in the References section must have an access date in format `(accessed YYYY-MM-DD)` or `(YYYY-MM-DD)`
 - **freshness_tracking**: Freshness Tracking section must contain Last Verified, Version at Verification, Next Review Recommended fields
 - **url_format**: All URLs must be valid `http://` or `https://` format
-- **cross_references_absent**: Entry does not contain a `## Cross-References` section. Expected for entries created or last verified on or after 2026-03-12. Entries with Research Date or Last Verified before this date are exempt. Note for `validate_research.py` implementers: gate this warning on the Research Date or Last Verified field value — exempt entries with dates before 2026-03-12.
+- **cross_references_absent**: Entry does not contain a `## Cross-References` section. Expected for entries created or last verified on or after 2026-03-12. Entries with Research Date or Last Verified before this date are exempt. Gated on the Research Date or Last Verified field value in `validate_research.py`'s `_check_cross_references`.
 
 > **Handling differs by mode, not by severity.** `header_fields`, `access_dates`, `freshness_tracking`, and `url_format` stay warning-severity in the JSON output no matter who calls the script. But for an entry that Default Mode, Batch Mode, or Rerun Mode just created or refreshed *this invocation*, these four are must-fix before the entry is reported complete — the researching agent already holds every fact they need (today's research/verification date, the source URL it was given, the version and access dates it just gathered), so there is no legitimate reason to leave them open on output the agent itself just produced. See [Validation Gate for New/Refreshed Entries](#validation-gate-for-newrefreshed-entries) below. `cross_references_absent` is explicitly excluded from this must-fix rule — its own date-based exemption above is unrelated and unaffected. For pre-existing entries that Validate Mode scans without this invocation having written them, all four checks remain report-only, per Validate Mode's Issue Handling in `SKILL.md`.
 

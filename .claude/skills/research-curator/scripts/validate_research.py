@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+from datetime import date
 from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict
@@ -87,6 +88,11 @@ _YAML_FRESHNESS_ALIASES: dict[str, list[str]] = {
 
 URL_PATTERN = re.compile(r"https?://[^\s>)\]]+")
 ACCESS_DATE_PATTERN = re.compile(r"(?:accessed\s+\d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))")
+
+# cross_references_absent (validation-rules.md) exempts entries verified before this date —
+# the ## Cross-References convention only applies from this date forward.
+CROSS_REFERENCES_EXEMPT_BEFORE = date(2026, 3, 12)
+_ISO_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 _yaml = YAML()
 _yaml.preserve_quotes = True
@@ -344,6 +350,69 @@ def _check_url_format(lines: list[str]) -> list[Issue]:
     return issues
 
 
+def _reference_date_text(header_lines: list[str], lines: list[str], sections: dict[str, tuple[int, int]]) -> str | None:
+    """Resolve the date that gates the cross_references_absent exemption (text-header format).
+
+    Prefers Freshness Tracking's Last Verified over the header's Research Date,
+    matching the precedence FRESHNESS_ALIASES already applies elsewhere in this file.
+
+    Returns:
+        The first ``YYYY-MM-DD`` date found, or ``None`` if neither is present.
+    """
+    ft_section = sections.get("Freshness Tracking")
+    if ft_section is not None:
+        start, end = ft_section
+        section_text = "\n".join(lines[start - 1 : end])
+        match = re.search(r"Last Verified.{0,10}?(\d{4}-\d{2}-\d{2})", section_text)
+        if match:
+            return match.group(1)
+    match = _ISO_DATE_PATTERN.search("\n".join(header_lines))
+    return match.group() if match else None
+
+
+def _reference_date_yaml(frontmatter: dict[str, Any]) -> str | None:
+    """Resolve the date that gates the cross_references_absent exemption (YAML frontmatter).
+
+    Prefers ``freshness_tracking.last_verified`` over ``research_date``/``date``.
+
+    Returns:
+        The first matching date string found, or ``None`` if none of the known keys are present.
+    """
+    flat = _flatten_yaml_items(frontmatter)
+    for key in ("last_verified", "research_date", "date"):
+        value = flat.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def _check_cross_references(sections: dict[str, tuple[int, int]], reference_date: str | None) -> list[Issue]:
+    """Check for a ``## Cross-References`` section, exempting older entries.
+
+    Per validation-rules.md, entries with a Research Date or Last Verified date
+    before ``CROSS_REFERENCES_EXEMPT_BEFORE`` are exempt from this check.
+
+    Returns:
+        A single-item list with the ``cross_references_absent`` issue, or an empty list.
+    """
+    if "Cross-References" in sections:
+        return []
+    if reference_date is not None:
+        try:
+            if date.fromisoformat(reference_date) < CROSS_REFERENCES_EXEMPT_BEFORE:
+                return []
+        except ValueError:
+            pass
+    return [
+        {
+            "check": "cross_references_absent",
+            "severity": "warning",
+            "message": "Entry has no Cross-References section",
+            "line": None,
+        }
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Format-specific header / freshness checks
 # ---------------------------------------------------------------------------
@@ -487,6 +556,31 @@ def _flatten_yaml_keys(data: dict[str, Any], prefix: str = "") -> set[str]:
     return keys
 
 
+def _flatten_yaml_items(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    """Recursively collect leaf key -> value pairs from a nested dict, with dotted paths.
+
+    Mirrors ``_flatten_yaml_keys`` but keeps the values, so a caller can look up
+    e.g. ``last_verified`` whether it lives at the root or under ``freshness_tracking``.
+
+    Args:
+        data: Dict to flatten.
+        prefix: Dot-separated key prefix accumulated by recursive calls.
+
+    Returns:
+        Dict mapping each bare and dotted key to its value.
+    """
+    items: dict[str, Any] = {}
+    for k, v in data.items():
+        bare = str(k)
+        dotted = f"{prefix}.{bare}" if prefix else bare
+        if isinstance(v, dict):
+            items.update(_flatten_yaml_items(v, dotted))
+        else:
+            items[bare] = v
+            items[dotted] = v
+    return items
+
+
 # ---------------------------------------------------------------------------
 # Top-level validation
 # ---------------------------------------------------------------------------
@@ -564,6 +658,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
         all_issues.extend(_check_url_format(body_lines))
         all_issues.extend(_check_formatting_suggestions(body_lines))
+        all_issues.extend(_check_cross_references(sections, _reference_date_yaml(frontmatter)))
     else:
         header_lines, _ = _get_header_block(lines)
         sections = _parse_sections(lines)
@@ -577,6 +672,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_freshness_tracking_text(lines, sections))
         all_issues.extend(_check_url_format(lines))
         all_issues.extend(_check_formatting_suggestions(lines))
+        all_issues.extend(_check_cross_references(sections, _reference_date_text(header_lines, lines, sections)))
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
     status = "fail" if has_errors else "pass"
