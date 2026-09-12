@@ -7,6 +7,9 @@
 #     "ruamel.yaml>=0.18.0",
 #     "PyGithub>=2.1.0",
 #     "pydantic>=2.12.3",
+#     "marko>=2.0.0",
+#     "tiktoken>=0.12.0",
+#     "httpx>=0.28.1",
 # ]
 #
 # [tool.ty.environment]

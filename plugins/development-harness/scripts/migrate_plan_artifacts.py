@@ -3,7 +3,12 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "gitpython>=3.1.0",
-#   "ruamel.yaml",
+#   "ruamel.yaml>=0.18.0",
+#   "pygithub>=2.8.1",
+#   "pydantic>=2.12.3",
+#   "marko>=2.0.0",
+#   "tiktoken>=0.12.0",
+#   "httpx>=0.28.1",
 # ]
 #
 # [tool.ty.environment]
