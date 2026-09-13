@@ -374,12 +374,18 @@ which files this run touched by diffing the current working tree against the pre
 captured in [Mode Routing](#mode-routing) -- no file path needs manual tracking through the steps
 below.
 
-1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
-   a shared restatement of the mode-specific README step each mode's own flow already gates
-   (Default/Batch step 6d, Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated
-   pass. Do not add a row, or refresh the Last Updated date on an existing row, for any entry
-   marked "created with issues" or "refreshed with issues" earlier in this run; that entry's
-   README state stays exactly as it was before this run started
+1. **README Update** -- if `./research/README.md` was already dirty in the pre-mode baseline
+   (see [Mode Routing](#mode-routing)), report to the user: `./research/README.md -- pre-existing
+   uncommitted changes present; this run's README update will not be committed` before proceeding
+   -- the update below still needs to happen so the mode's own entry is recorded, but step 3 will
+   exclude README.md from this run's commit, so the edit lands mixed into someone else's
+   uncommitted file rather than silently being treated as if nothing was wrong. Otherwise, add or
+   update entries in `./research/README.md` category tables as usual. This is a shared restatement
+   of the mode-specific README step each mode's own flow already gates (Default/Batch step 6d,
+   Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated pass. Do not add a row, or
+   refresh the Last Updated date on an existing row, for any entry marked "created with issues" or
+   "refreshed with issues" earlier in this run; that entry's README state stays exactly as it was
+   before this run started
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched (asymmetric edges can persist from any
