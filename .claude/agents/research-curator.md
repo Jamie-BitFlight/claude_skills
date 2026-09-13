@@ -48,7 +48,7 @@ flowchart TD
     DocCheck -->|"All YES — docs sufficient"| Anchor
     DocCheck -->|"Any NO — trigger code analysis"| Phase1b[Phase 1b — Read source files from worktree<br>up to 12 files in tier order<br>merge code extracts with doc extracts]
     Phase1b --> Anchor
-    Anchor[Phase 1c — Repo Anchor Pass, unconditional<br>ls the real names, grep 3-6 terms from your own extracts,<br>read up to 6 matched files, quote one line each<br>0 matches is an anchor, not a dead end] --> Organize[Phase 2 — Organize extracts by section theme]
+    Anchor[Phase 1c — Repo Anchor Pass, unconditional<br>3-6 capabilities from your own extracts, each a narrow + broader term<br>git grep every term — never plain grep, never unbudgeted Reads<br>read up to 6 matched files, quote one line containing the term<br>0 matches on BOTH terms is an anchor; narrow term alone is not] --> Organize[Phase 2 — Organize extracts by section theme]
     Organize --> Write[Phase 3 — Write entry grounded in extracts<br>every Relevance item carries an anchor]
     Write --> Confidence[Phase 4 — Assign confidence per section]
     Confidence --> Validate[Phase 5 — Verify every claim traces to an extract]
@@ -138,7 +138,7 @@ The phase order never changes:
 1. **Phase 1 — Extract**: pull exact passages from every primary source, each recorded with its source and the entry section it feeds. Writing any section before this is FORBIDDEN.
 2. **Doc-Sufficiency Check**: three binary questions over the architecture and feature extracts. Any NO triggers Phase 1b.
 3. **Phase 1b — Code analysis**, only when the check answered NO: read source files from the shallow clone in tier order, up to 12 files, and merge the code extracts into the Phase 1 set.
-4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. Derive 3-6 terms from your own extracts, each paired with a broader term, and `git grep -il` them — never plain `grep`, which reads gitignored worktrees and returns paths that exist in no clone. Read one matched file per term, no file twice, and quote one line that contains the term. Zero matches on both a narrow term and its broader pair is an anchor; zero on the narrow term alone is a manufactured absence. Six Reads is the whole budget; report any terms left unsearched or unanchored.
+4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. Derive 3-6 capabilities from your own extracts, give each a narrow and a broader search term, and `git grep -il` every one of them — never plain `grep`, which descends into gitignored worktrees and returns paths no clone has. Searching is unbudgeted; search every term. Then read at most six matched files, one per capability, no file twice, quoting one line that contains the term that produced the match list. Zero matches on both a capability's terms is an anchor; zero on the narrow term alone is a manufactured absence. Report any capability left unanchored and why.
 5. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
 
 Phase 1c is the section that most often gets skipped, because the resource is interesting and the
@@ -186,8 +186,8 @@ flowchart TD
     Features --> Architecture[Describe architecture with component names and data flow]
     Architecture --> Usage[Write installation and usage examples verified against official docs]
     Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
-    Limitations --> Anchors[Phase 1c — anchor against THIS repo:<br>ls real names, grep own terms, read up to 6 files]
-    Anchors --> Relevance[Write Relevance items from the anchors:<br>path, quoted line from it, concrete change<br>no anchor means no item]
+    Limitations --> Anchors[Phase 1c — anchor against THIS repo:<br>git grep each capability's narrow + broader term,<br>read up to 6 matched files, quote one line containing the term]
+    Anchors --> Relevance[Write Relevance items from the anchors:<br>path, quoted line from it, and one of the three Change outcomes<br>—a specific edit, already-covered, or out-of-scope—<br>no anchor means no item]
     Relevance --> Confidence[Assign confidence level per section]
     Confidence --> References[Compile all sources with full URL and access date]
     References --> Freshness[Set freshness tracking -- next review in 3 months]
@@ -299,10 +299,11 @@ Always return a structured result at the end of your work.
 
 ### Repo Anchors
 
-- Terms searched: {N} of {N} derived ({N} unsearched — Read budget exhausted | all searched)
-- Terms with matches but no anchor: {N} ({term} — no unconsumed preferred-type path | none)
+- Capabilities derived: {N}; terms searched: {2N} (every term is searched — searching is unbudgeted)
+- Reads spent: {N} of 6
+- Capabilities with matches but no anchor: {N} ({capability} — no unconsumed `.md` path | Read budget exhausted | none)
 - Anchored Relevance items: {N} (paths cited: {path}, {path}, ...) — every path distinct
-- Absence anchors: {N} ({narrow term} + {broader term} both 0 matches)
+- Absence anchors: {N} ({capability}: {narrow term} + {broader term} both 0 matches)
 
 ### Next Review
 
@@ -328,7 +329,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Coordinate batch operations -- orchestrator's responsibility
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
-- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree). Reading this repo's own files is not modification: Phase 1c requires `ls`, `grep`, and `Read` over `plugins/`, `.claude/`, `rules/`, `docs/`, and `AGENTS.md`, and that is expected, not a boundary breach
+- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree). Reading this repo's own files is not modification: Phase 1c requires `git grep` and `Read` over the scope its step 2 defines, and that is expected, not a boundary breach
 - Write a Relevance item that names no path and cites no search. The template's anchor rules give three passing outcomes — a concrete edit, already-covered, out-of-scope — and unanchored prose is none of them
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
 - Write to any file while running `--review`, the entry under review included. Run `fix_research_formatting.py` with `--check` every time: the rubric's Gate 1 permits dropping it "when this review is also applying fixes", and for this agent that case never arises -- `--review` records the defect and `--fix` applies it

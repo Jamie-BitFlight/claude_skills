@@ -162,7 +162,8 @@ How the resource works internally. Include diagrams if helpful.
 > - `Today:` carries evidence, not characterisation: a line read from that path, or the exact
 >   search command that returned nothing. "Claude Code skills need X" is neither.
 > - Two item forms, shown in the template above. Present anchor: `-> {path}` with a quoted line
->   that contains the search term, and is not a frontmatter field, a link-list bullet, or a sample
+>   that contains whichever term produced the match list, and is not a frontmatter field, a
+>   link-list bullet, or a sample
 >   argument inside a code fence — those carry the term without asserting anything. Absence anchor:
 >   `-> nothing in {scope searched}` with both the narrow and the broader search command at
 >   `0 matches`. Zero matches is a finding, not a failure to find one — but it records that these
