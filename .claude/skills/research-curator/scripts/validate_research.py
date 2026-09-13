@@ -72,16 +72,19 @@ FRESHNESS_ALIASES: dict[str, list[str]] = {
     "Next Review Recommended": ["Next Review"],
 }
 
-# YAML frontmatter key aliases mapping canonical requirement name → accepted YAML keys
+# YAML frontmatter key aliases mapping canonical requirement name → accepted YAML keys.
+# ``resource_url``, ``date_created``, and ``date_last_reviewed`` are the spellings used by
+# the second historical schema documented in references/frontmatter-generation.md — accepted
+# here so both historical formats validate under one schema instead of two.
 _YAML_HEADER_ALIASES: dict[str, list[str]] = {
-    "Research Date": ["research_date", "date"],
-    "Source URL": ["source_url", "url"],
+    "Research Date": ["research_date", "date", "date_created"],
+    "Source URL": ["source_url", "url", "resource_url"],
     "Version at Research": ["version_at_research", "version"],
     "License": ["license"],
 }
 
 _YAML_FRESHNESS_ALIASES: dict[str, list[str]] = {
-    "Last Verified": ["last_verified"],
+    "Last Verified": ["last_verified", "date_last_reviewed"],
     "Version at Verification": ["version_at_verification"],
     "Next Review Recommended": ["next_review", "next_review_recommended"],
 }
