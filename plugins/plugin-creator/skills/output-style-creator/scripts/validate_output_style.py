@@ -64,8 +64,9 @@ class DiscoveryResult(BaseModel):
         project: Styles under every ``.claude/output-styles/`` from ``start`` up to the repo root.
         plugin: Styles under the plugin's default directory and every ``outputStyles`` path it declares.
         plugin_declared_paths: The raw ``outputStyles`` entries read from the plugin manifest.
-        plugin_rejected_paths: Declared entries that resolve outside the plugin root, and were
-            therefore not searched. A plugin cannot reference files outside its own directory.
+        plugin_rejected_paths: Declared entries that resolve outside the plugin root, and style
+            files inside an accepted directory whose symlink target escapes it. Neither is
+            searched or returned. A plugin cannot reference files outside its own directory.
     """
 
     user: list[str]
@@ -234,18 +235,32 @@ def repository_root(start: Path) -> Path:
     return Path(start.anchor or "/")
 
 
-def styles_in(directory: Path) -> list[str]:
-    """List the markdown files in a directory.
+def styles_in(directory: Path, root: Path | None = None) -> tuple[list[str], list[str]]:
+    """List the markdown files in a directory, optionally confined to a root.
+
+    ``Path.glob`` and ``is_file`` follow symlinks, so a markdown symlink inside an accepted
+    directory can point outside it. When ``root`` is given, such a file is excluded and reported
+    rather than returned, because the caller reads every path this yields.
 
     Args:
-        directory: The directory to list. A missing directory yields an empty list.
+        directory: The directory to list. A missing directory yields two empty lists.
+        root: Confine results to this directory, or None to accept whatever the directory holds.
 
     Returns:
-        The sorted markdown file paths as strings.
+        The sorted markdown file paths, and the sorted paths excluded for escaping ``root``.
     """
     if not directory.is_dir():
-        return []
-    return sorted(str(entry) for entry in directory.glob("*.md") if entry.is_file())
+        return [], []
+    kept: list[str] = []
+    escaped: list[str] = []
+    for entry in sorted(directory.glob("*.md")):
+        if not entry.is_file():
+            continue
+        if root is not None and not is_within(root, entry):
+            escaped.append(str(entry))
+        else:
+            kept.append(str(entry))
+    return kept, escaped
 
 
 def declared_output_style_paths(plugin: Path) -> list[str] | None:
@@ -277,6 +292,23 @@ def declared_output_style_paths(plugin: Path) -> list[str] | None:
     return None
 
 
+def is_within(root: Path, candidate: Path) -> bool:
+    """Report whether a path resolves to the root itself or somewhere beneath it.
+
+    Both sides are resolved, so a symlink is judged by its target rather than its location.
+
+    Args:
+        root: The directory that must contain the candidate.
+        candidate: The path to test.
+
+    Returns:
+        True when the resolved candidate is the resolved root or lies beneath it.
+    """
+    resolved_root = root.resolve()
+    resolved = candidate.resolve()
+    return resolved == resolved_root or resolved_root in resolved.parents
+
+
 def confine_to_root(root: Path, entry: str) -> Path | None:
     """Resolve a declared manifest path, rejecting anything outside the plugin root.
 
@@ -291,11 +323,10 @@ def confine_to_root(root: Path, entry: str) -> Path | None:
     Returns:
         The resolved directory when it lies at or beneath the root, otherwise None.
     """
-    candidate = (root / entry.removeprefix("./")).resolve()
-    resolved_root = root.resolve()
-    if candidate != resolved_root and resolved_root not in candidate.parents:
+    candidate = root / entry.removeprefix("./")
+    if not is_within(root, candidate):
         return None
-    return candidate
+    return candidate.resolve()
 
 
 def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
@@ -314,7 +345,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
     project: list[str] = []
     root = repository_root(start)
     for directory in [start, *start.parents]:
-        project.extend(styles_in(directory / ".claude" / "output-styles"))
+        project.extend(styles_in(directory / ".claude" / "output-styles")[0])
         if directory == root:
             break
 
@@ -336,11 +367,16 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
                 else:
                     searched.append(confined)
         for directory in searched:
-            plugin_styles.extend(styles_in(directory) or ([str(directory)] if directory.is_file() else []))
+            found_styles, escaped = styles_in(directory, plugin)
+            rejected.extend(escaped)
+            if found_styles:
+                plugin_styles.extend(found_styles)
+            elif directory.is_file() and is_within(plugin, directory):
+                plugin_styles.append(str(directory))
 
     return DiscoveryResult(
-        user=styles_in(Path.home() / ".claude" / "output-styles"),
-        managed=styles_in(managed_settings_directory() / ".claude" / "output-styles"),
+        user=styles_in(Path.home() / ".claude" / "output-styles")[0],
+        managed=styles_in(managed_settings_directory() / ".claude" / "output-styles")[0],
         project=project,
         plugin=plugin_styles,
         plugin_declared_paths=declared,

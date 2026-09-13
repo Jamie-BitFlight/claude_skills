@@ -281,6 +281,41 @@ def test_symlink_escaping_the_plugin_root_is_rejected(tmp_path: Path) -> None:
     assert result.plugin_rejected_paths == ["./linked/"]
 
 
+def test_symlinked_style_file_escaping_the_plugin_is_rejected(tmp_path: Path) -> None:
+    """A markdown symlink inside an accepted directory is judged by its target.
+
+    Confining the declared directory is not enough: glob and is_file both follow symlinks, so a
+    link sitting legitimately inside output-styles/ can still point anywhere on disk.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target = write_style(outside, "evil", "name: A\ndescription: fine")
+    plugin = make_plugin(tmp_path / "plug", {"name": "p"}, {})
+    (plugin / "output-styles").mkdir()
+    try:
+        (plugin / "output-styles" / "looks-fine.md").symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not allow creating a symlink here")
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_rejected_paths == [str(plugin / "output-styles" / "looks-fine.md")]
+
+
+def test_real_style_file_beside_an_escaping_symlink_is_kept(tmp_path: Path) -> None:
+    """Rejecting one escaping link does not discard the plugin's genuine styles."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target = write_style(outside, "evil", "name: A\ndescription: fine")
+    plugin = make_plugin(tmp_path / "plug", {"name": "p"}, {"output-styles": "genuine"})
+    try:
+        (plugin / "output-styles" / "looks-fine.md").symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not allow creating a symlink here")
+    result = v.discover(tmp_path, plugin)
+    assert [p.rsplit("/", 1)[-1] for p in result.plugin] == ["genuine.md"]
+    assert len(result.plugin_rejected_paths) == 1
+
+
 def test_declared_path_inside_the_root_is_not_rejected(tmp_path: Path) -> None:
     """The confinement check does not reject a legitimate nested directory."""
     plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": "./deep/nested/"}, {"deep/nested": "ok"})
