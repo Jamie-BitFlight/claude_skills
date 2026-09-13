@@ -174,7 +174,13 @@ def validate(path: Path) -> ValidationResult:
         if re.search(r"[\r\n]", description):
             problems.append("description must not contain a newline")
 
-    fields = {key: type(value).__name__ for key, value in data.items()}
+    problems.extend(
+        f"frontmatter key {key!r} must be a string, not {type(key).__name__}"
+        for key in data
+        if not isinstance(key, str)
+    )
+
+    fields = {str(key): type(value).__name__ for key, value in data.items()}
     return ValidationResult(path=str(path), valid=not problems, problems=problems, fields=fields)
 
 
@@ -272,7 +278,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
     declared: list[str] = []
     if plugin is not None:
         declared = declared_output_style_paths(plugin)
-        searched = [plugin / entry.lstrip("./") for entry in declared] if declared else [plugin / "output-styles"]
+        searched = [plugin / entry.removeprefix("./") for entry in declared] if declared else [plugin / "output-styles"]
         for directory in searched:
             plugin_styles.extend(styles_in(directory) or ([str(directory)] if directory.is_file() else []))
 
