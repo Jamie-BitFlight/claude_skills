@@ -11,5 +11,6 @@ Cursor too (see the `.codex-plugin/`, `.cursor-plugin/` manifests beside `.claud
 @../AGENTS.md
 
 This session's `Setup` hook (`.claude/settings.json`, matcher `init|maintenance`) already runs
-`uv self update` and `prek install` for you — AGENTS.md's "Environment Setup" commands exist for
-harnesses without that hook. Skip re-running them here unless troubleshooting a setup failure.
+`uv self update` and `prek install` for you — skip re-running those two specific commands unless
+troubleshooting a setup failure. The hook does not run `uv sync`; still run that yourself per
+AGENTS.md's "Environment Setup" before assuming dependencies are installed.

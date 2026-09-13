@@ -123,7 +123,7 @@ repo's policy on *when a given one is mandatory*:
 |-------|------|
 | Starting a complex task | `/dh:rt-ica <#N \| goal>` |
 | Delegating to a sub-agent | `/agent-orchestration:delegate` |
-| Reviewing agent output | `/hallucination-detector:hallucination-audit` (requires the `hallucination-detector` plugin enabled — see Repository Overview) |
+| Reviewing agent output | `/hallucination-detector:hallucination-audit`; if that plugin isn't enabled or isn't available in the current harness (see Repository Overview), fall back to a manual pass against this file's "no speculation as diagnosis" and hedge-language constraints above |
 | Claiming a task complete | `/dh:verify-done` |
 | Writing or improving a process | `/process-siren:improve-processes` |
 | Debugging, investigating, or facing a repeated/unclear failure | `/scientific-method:scientific-thinking` |
@@ -410,8 +410,11 @@ After pushing a commit to a PR, or when asked to check or address PR reviews, lo
 
 ## GitHub CLI Conventions
 
-`gh` is not necessarily pre-installed — install and configure it via the `/gh` skill before first
-use, and prefer this repo's own PyGithub-based backlog tooling over ad hoc `gh` calls where it
+`gh` is not necessarily pre-installed. In Claude Code, install and configure it via the `/gh`
+skill before first use. That skill currently exists only under `.claude/skills/gh` with no
+Codex/Cursor manifest, so in a harness without it, run its installer directly instead —
+`uv run .claude/skills/gh/scripts/setup_gh.py` — which needs only `uv` and works the same in any
+harness. Prefer this repo's own PyGithub-based backlog tooling over ad hoc `gh` calls where it
 already covers the task. Before using `gh` beyond that, read `docs/github-cli-conventions.md`. Use
 `gh` to observe CI output when verifying a workflow change — see
 [rules/ci-workflows.md](rules/ci-workflows.md) Phase 5.
