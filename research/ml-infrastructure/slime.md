@@ -1,12 +1,20 @@
-# slime
-
-**Research Date**: 2026-06-29
-**Source URL**: <https://github.com/THUDM/slime>
-**GitHub Repository**: <https://github.com/THUDM/slime>
-**Version at Research**: v0.3.0
-**License**: Apache-2.0
-
 ---
+name: slime
+title: slime
+subtitle: RL post-training framework unifying Megatron training and SGLang rollout
+research_date: 2026-06-29
+source_url: https://github.com/THUDM/slime
+github_repository: https://github.com/THUDM/slime
+version_at_research: v0.3.0
+license: Apache-2.0
+freshness_tracking:
+  last_verified: 2026-06-29
+  version_at_verification: v0.3.0
+  next_review: 2026-08-10
+  confidence_map: "Overview: high (docs); Problem Addressed: high (docs); Key Statistics: high (GitHub API); Key Features: medium (doc + code-read); Technical Architecture: medium (doc + code-read); Installation & Usage: medium (docs); Relevance: medium (inference from docs + code-read)"
+---
+
+# slime
 
 ## Overview
 
@@ -145,14 +153,3 @@ The exact model, checkpoint, parallelism, data, and SGLang flags depend on the t
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Ray](./ray.md) | ml-infrastructure | slime uses Ray actors and placement groups for distributed training and rollout orchestration. |
-
----
-
-## Freshness Tracking
-
-| Field | Value |
-|-------|-------|
-| Last Verified | 2026-06-29 |
-| Version at Verification | v0.3.0 |
-| Next Review Recommended | 2026-08-10 |
-| Confidence Map | `Overview: high (docs); Problem Addressed: high (docs); Key Statistics: high (GitHub API); Key Features: medium (doc + code-read); Technical Architecture: medium (doc + code-read); Installation & Usage: medium (docs); Relevance: medium (inference from docs + code-read)` |
