@@ -11,12 +11,27 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
+_REPO_ROOT = Path(__file__).parents[2]
+_SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+
+# Per AGENTS.md's "Bounded subprocess execution" gotcha: wrap external commands that could hang
+# (uv resolving PEP 723 deps, or a spawned child left running) so a timeout kills the whole
+# process group instead of stalling the pytest worker indefinitely. Matches the pattern already
+# established in the neighboring test_cross_references_check.py for this same validator script.
+_RUN_BOUNDED: Final = (
+    "uv",
+    "run",
+    "--script",
+    str(_REPO_ROOT / "scripts" / "run_bounded.py"),
+    "--timeout-seconds",
+    "60",
+    "--",
+)
 
 
 def _uv_path() -> str:
@@ -29,13 +44,13 @@ def _uv_path() -> str:
 
 
 def _run_json(args: list[str]) -> dict[str, Any]:
-    """Run validate_research.py main with --json and parse the result.
+    """Run validate_research.py main with --json (bounded) and parse the result.
 
     ``Any`` is this test module's JSON-parsing boundary (subprocess stdout from an
     external script whose shape each caller asserts directly), per this repo's typing
     policy of confining ``Any`` to boundary code that ingests unknown-shape external data.
     """
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", *args, "--json"]
+    cmd = [*_RUN_BOUNDED, _uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", *args, "--json"]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     assert result.stderr == "" or result.returncode in (0, 1), (
         f"Unexpected failure running validator:\n{result.stdout}\n{result.stderr}"
