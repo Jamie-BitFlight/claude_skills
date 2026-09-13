@@ -62,6 +62,8 @@ class DiscoveryResult(BaseModel):
         user: Styles under the user-level directory.
         managed: Styles under the operating system's managed settings directory.
         project: Styles under every ``.claude/output-styles/`` from ``start`` up to the repo root.
+        project_rejected_paths: Project style files whose symlink target escapes the repository.
+            A checkout can be untrusted, so a link out of the tree is not the project's content.
         plugin: Styles under the plugin's default directory and every ``outputStyles`` path it declares.
         plugin_declared_paths: The raw ``outputStyles`` entries read from the plugin manifest.
         plugin_rejected_paths: Declared entries that resolve outside the plugin root, and style
@@ -72,6 +74,7 @@ class DiscoveryResult(BaseModel):
     user: list[str]
     managed: list[str]
     project: list[str]
+    project_rejected_paths: list[str]
     plugin: list[str]
     plugin_declared_paths: list[str]
     plugin_rejected_paths: list[str]
@@ -313,16 +316,22 @@ def confine_to_root(root: Path, entry: str) -> Path | None:
     """Resolve a declared manifest path, rejecting anything outside the plugin root.
 
     A plugin cannot reference files outside its own directory, so a declared ``../outside/`` or an
-    absolute path is not a path this plugin ships. Discovery's output is read by an agent, so an
-    escaping entry would hand it unrelated file content from an untrusted plugin.
+    absolute path is not a path this plugin ships, and every component path must start with
+    ``./``. Discovery's output is read by an agent, so an escaping entry would hand it unrelated
+    file content from an untrusted plugin.
 
     Args:
         root: The plugin root directory.
         entry: One raw ``outputStyles`` entry.
 
     Returns:
-        The resolved directory when it lies at or beneath the root, otherwise None.
+        The resolved directory when the entry carries the required ``./`` prefix and lies at or
+        beneath the root, otherwise None.
     """
+    if not entry.startswith("./"):
+        # rules/plugin-json.md: every component path must start with "./". Claude's own plugin
+        # validator rejects the manifest, so a style under such a path is not one it would load.
+        return None
     candidate = root / entry.removeprefix("./")
     if not is_within(root, candidate):
         return None
@@ -343,9 +352,13 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
         The styles found at each scope.
     """
     project: list[str] = []
+    project_rejected: list[str] = []
     root = repository_root(start)
     for directory in [start, *start.parents]:
-        project.extend(styles_in(directory / ".claude" / "output-styles")[0])
+        # A checkout can belong to someone else, so a link out of the tree is not its content.
+        found, escaped = styles_in(directory / ".claude" / "output-styles", root)
+        project.extend(found)
+        project_rejected.extend(escaped)
         if directory == root:
             break
 
@@ -378,6 +391,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
         user=styles_in(Path.home() / ".claude" / "output-styles")[0],
         managed=styles_in(managed_settings_directory() / ".claude" / "output-styles")[0],
         project=project,
+        project_rejected_paths=project_rejected,
         plugin=plugin_styles,
         plugin_declared_paths=declared,
         plugin_rejected_paths=rejected,

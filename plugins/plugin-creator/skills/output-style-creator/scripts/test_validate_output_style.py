@@ -338,6 +338,39 @@ def test_project_scan_walks_ancestors_to_the_repository_root(tmp_path: Path) -> 
     assert found == {"root.md", "leaf.md"}
 
 
+def test_project_symlink_escaping_the_checkout_is_rejected(tmp_path: Path) -> None:
+    """A project style linking outside the repository is not the checkout's content.
+
+    A cloned repository can belong to someone else, so a link out of the tree is treated the same
+    way as a plugin's escaping path.
+    """
+    (tmp_path / "repo" / ".claude" / "output-styles").mkdir(parents=True)
+    (tmp_path / "repo" / ".git").mkdir()
+    outside = tmp_path / "secrets"
+    outside.mkdir()
+    target = write_style(outside, "private", "name: A\ndescription: fine")
+    link = tmp_path / "repo" / ".claude" / "output-styles" / "leak.md"
+    try:
+        link.symlink_to(target)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not allow creating a symlink here")
+    result = v.discover(tmp_path / "repo", None)
+    assert result.project == []
+    assert result.project_rejected_paths == [str(link)]
+
+
+def test_manifest_path_without_the_required_prefix_is_rejected(tmp_path: Path) -> None:
+    """rules/plugin-json.md requires every component path to start with './'.
+
+    Claude's own plugin validator rejects a manifest without it, so reporting styles under such a
+    path would claim the plugin ships something Claude does not load.
+    """
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": "extras/"}, {"extras": "s"})
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_rejected_paths == ["extras/"]
+
+
 def test_project_scan_stops_at_the_repository_root(tmp_path: Path) -> None:
     """A style above the repository root is out of scope."""
     repo = tmp_path / "repo"
@@ -361,6 +394,14 @@ def test_managed_directory_differs_per_platform(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_discovery_result_reports_every_scope(tmp_path: Path) -> None:
-    """discover always returns all five keys, so a caller can rely on the shape."""
+    """discover always returns the full key set, so a caller can rely on the shape."""
     payload = json.loads(v.discover(tmp_path, None).model_dump_json())
-    assert set(payload) == {"user", "managed", "project", "plugin", "plugin_declared_paths", "plugin_rejected_paths"}
+    assert set(payload) == {
+        "user",
+        "managed",
+        "project",
+        "project_rejected_paths",
+        "plugin",
+        "plugin_declared_paths",
+        "plugin_rejected_paths",
+    }
