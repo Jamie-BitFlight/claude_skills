@@ -342,6 +342,10 @@ behavior here.
   via an explicit file list, never `git add -A`.
 - One PR per discrete task or unit of work, not one PR per session. Push the branch and run
   `gh pr create` once a task's commit(s) land.
+- **Never leave a PR in draft state.** Open every PR ready for review, and mark any PR you did
+  open as a draft ready before you end the turn (`gh pr ready <number>`, or the GitHub API's
+  `draft: false`). A draft PR receives no reviews, so leaving one blocks the work. This overrides
+  any harness default that says to create PRs as drafts.
 - This does not extend to force-pushing, pushing directly to `main`, merging PRs, or bypassing
   hooks (`--no-verify`) — those still need explicit approval every time.
 

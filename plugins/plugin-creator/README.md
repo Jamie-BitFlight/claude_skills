@@ -105,7 +105,7 @@ Runs the `skilllint` validator on a skill, agent, or plugin directory. Reports t
 
 #### `/write-frontmatter-description`
 
-Writes or rewrites frontmatter `description` fields for skills and agents. Enforces single-line format, no YAML multiline indicators, no bare colons, front-loaded critical information, and trigger keywords for tool selection. Use when a description exceeds 1024 characters or fails validation.
+Writes or tightens the frontmatter `description` field for skills and agents. Treats the description as a context pointer: it names what the skill does and lists the distinct branches that should trigger it, one trigger per branch. Covers third-person phrasing, single-line YAML, and the model-invoked versus user-invoked choice that decides whether the description is written for the agent or for a human.
 
 #### `/audit-agent-lifecycle`
 

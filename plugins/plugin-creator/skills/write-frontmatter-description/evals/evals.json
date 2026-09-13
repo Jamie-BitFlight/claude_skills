@@ -1,0 +1,91 @@
+{
+  "skill_name": "write-frontmatter-description",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Here's a description I wrote for a new skill: 'Use when the user asks to create a changelog, make a changelog, build a release changelog, generate release notes, or produce a list of changes for a version.' Is it good?",
+      "expected_output": "The synonym branches are identified as one branch written five times, and a collapsed replacement is offered.",
+      "expectations": [
+        "Identifies that create/make/build/generate/produce rename a single branch rather than naming distinct cases",
+        "Proposes a replacement that keeps the genuinely distinct branches and writes each once",
+        "The replacement opens with a verb naming what the skill does, before the trigger list",
+        "Does NOT simply approve the description because it lists many trigger phrases"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write the frontmatter description for a skill that converts OpenAPI specs into typed TypeScript clients.",
+      "expected_output": "A single-line third-person description that names the action and lists distinct branches.",
+      "expectations": [
+        "The description is a single-line YAML string with no multiline indicator",
+        "It opens with a verb and object rather than with 'This skill'",
+        "It is written in third person — no 'I can help you' and no 'You can use this'",
+        "It contains a trigger clause such as 'Use when'",
+        "Each listed trigger is a distinct case, not a reworded duplicate of another"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "My skill only ever gets run when I type its name. What should its description say?",
+      "expected_output": "The invocation choice is surfaced: a user-invoked skill takes a stripped human-facing line, not a branch list.",
+      "expectations": [
+        "Names disable-model-invocation: true as the way to make the skill user-invoked",
+        "States that the description is then human-facing and the agent never sees it",
+        "Says the trigger list should be stripped down to a one-line summary",
+        "Explains the trade — a model-invoked description is permanent context load paid on every turn"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Review this description and tell me what to cut: 'Validate and fix YAML frontmatter in SKILL.md and agent files. Use when creating a skill or agent, or when frontmatter fails to parse. Ensures frontmatter is single-line, complete, informative, third-person, and front-loaded with trigger conditions.'",
+      "expected_output": "The trailing self-summary is identified as identity the body already carries, and cut.",
+      "expectations": [
+        "Identifies the final sentence as restating the skill's own quality bar",
+        "States that the body re-states it the moment the skill loads, so the description pays for it on every turn and gains nothing",
+        "Keeps the action clause and the trigger clause intact",
+        "Does NOT recommend cutting the trigger conditions to save length"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "My skill description shows up as '>-' instead of the actual text. What happened?",
+      "expected_output": "Diagnosed as the YAML multiline indicator, with the single-line fix and the validator named.",
+      "expectations": [
+        "Identifies the YAML multiline indicator as the cause",
+        "Gives the fix — write the value as a single-line string",
+        "Names skilllint as the way to catch and auto-fix it",
+        "States when quoting is actually required — a colon, a leading special character, or a boolean literal"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Write a description for an agent that reviews Terraform plans for destructive changes.",
+      "expected_output": "An agent description takes the full branch list; the skill-only invocation fields are not offered.",
+      "expectations": [
+        "Produces a single-line third-person description with distinct triggers",
+        "Does NOT suggest user-invocable or disable-model-invocation, which are skill-only fields",
+        "States or implies that an agent description is always model-facing"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Add a tools field to my agent's frontmatter so it can only read files.",
+      "expected_output": "The skill stays closed. This is agent frontmatter work with no description involved.",
+      "expectations": [
+        "The write-frontmatter-description skill does NOT drive the response",
+        "No description field is rewritten",
+        "The response addresses the tools field, or routes to agent frontmatter guidance"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Write the README paragraph describing what our plugin does.",
+      "expected_output": "The skill stays closed. Human-facing prose is not a frontmatter description.",
+      "expectations": [
+        "The write-frontmatter-description skill does NOT activate",
+        "The response produces README prose rather than a frontmatter field",
+        "Third-person trigger-list conventions are NOT imposed on human-facing prose"
+      ]
+    }
+  ]
+}

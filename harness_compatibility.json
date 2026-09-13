@@ -730,7 +730,7 @@
         "hermes_native": false
       },
       "components": {
-        "skills": 47,
+        "skills": 48,
         "agents": 15,
         "mcp_servers": 1,
         "hooks": false

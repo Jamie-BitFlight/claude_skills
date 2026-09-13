@@ -1,0 +1,8 @@
+{
+  "name": "acme-tools",
+  "description": "Fixture plugin declaring a dot-prefixed output-style directory",
+  "version": "1.0.1",
+  "outputStyles": [
+    "./.extras/"
+  ]
+}
