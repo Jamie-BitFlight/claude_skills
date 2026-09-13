@@ -56,15 +56,15 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 
 ### Phase 1: Discovery
 
-1. RUN discovery. It lists user-level styles, every `.claude/output-styles/` between the working directory and the repository root, and a plugin's styles at each path its `outputStyles` manifest key declares:
+1. RUN discovery. It lists user-level styles, managed-policy styles from this platform's managed settings directory, every `.claude/output-styles/` between the working directory and the repository root, and a plugin's styles at each path its `outputStyles` manifest key declares:
 
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/skills/output-style-creator/scripts/validate_output_style.py discover --plugin {plugin-path}
    ```
 
-   Omit `--plugin` when no plugin is in scope. Output is compact JSON with `user`, `project`, `plugin`, and `plugin_declared_paths` keys.
+   Omit `--plugin` when no plugin is in scope. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
 
-2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
+2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering
@@ -135,7 +135,7 @@ RUN this check on every style, at any scope. It exits non-zero when the style fa
 ${CLAUDE_PLUGIN_ROOT}/skills/output-style-creator/scripts/validate_output_style.py check {style-path}
 ```
 
-It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules it enforces: frontmatter opens and closes with `---` on its own line; the frontmatter parses to a YAML mapping; `name` and `description` are strings when present; `keep-coding-instructions` and `force-for-plugin` are booleans when present; `description` occupies a single line and carries no newline in any YAML encoding.
+It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules it enforces: frontmatter opens and closes with `---` on its own line; the frontmatter parses to a YAML mapping; `name` and `description` are strings when present; `keep-coding-instructions` and `force-for-plugin` are booleans when present; `description` occupies a single line and carries no newline in any YAML encoding; the frontmatter uses no YAML merge key, which would source a field from another mapping and hide where it was written.
 
 For a plugin-bundled style, also validate the containing plugin:
 

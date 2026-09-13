@@ -20,6 +20,7 @@ import argparse
 import json
 import re
 import sys
+from collections.abc import Iterator
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Any
@@ -59,12 +60,14 @@ class DiscoveryResult(BaseModel):
 
     Attributes:
         user: Styles under the user-level directory.
+        managed: Styles under the operating system's managed settings directory.
         project: Styles under every ``.claude/output-styles/`` from ``start`` up to the repo root.
         plugin: Styles under the plugin's default directory and every ``outputStyles`` path it declares.
         plugin_declared_paths: The raw ``outputStyles`` entries read from the plugin manifest.
     """
 
     user: list[str]
+    managed: list[str]
     project: list[str]
     plugin: list[str]
     plugin_declared_paths: list[str]
@@ -93,23 +96,45 @@ def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
     return front, data
 
 
-def description_spans_lines(front: str) -> bool:
-    """Report whether the description value is written across more than one source line.
+def description_nodes(node: yaml.Node | None) -> Iterator[yaml.Node]:
+    """Yield every value node keyed ``description`` anywhere in a composed document.
 
-    Catches every YAML multiline form — a folded or literal indicator, a quoted key, a tagged
-    scalar, an implicitly continued plain scalar — because it reads the composed node's source
-    span rather than matching the text that introduced it.
+    Walks nested mappings and sequences rather than only the top level, so a description reached
+    through a YAML anchor or merge key is inspected too.
 
     Args:
-        front: The raw frontmatter text.
+        node: The composed node to walk, or None.
+
+    Yields:
+        Each value node whose key is ``description``.
+    """
+    if isinstance(node, yaml.MappingNode):
+        for key, value in node.value:
+            if getattr(key, "value", None) == "description":
+                yield value
+            yield from description_nodes(value)
+    elif isinstance(node, yaml.SequenceNode):
+        for item in node.value:
+            yield from description_nodes(item)
+
+
+def uses_merge_key(node: yaml.Node | None) -> bool:
+    """Report whether a composed document uses a YAML merge key.
+
+    A merge (``<<: *anchor``) sources a field from another mapping, which hides where the value
+    was written and defeats any source-span check on the field itself. The style schema is a flat
+    mapping of known fields, so a merge has no legitimate use here.
+
+    Args:
+        node: The composed node to walk, or None.
 
     Returns:
-        True when the description node starts and ends on different lines.
+        True when any mapping in the document carries a ``<<`` key.
     """
-    node = yaml.compose(front)
-    for key, value in getattr(node, "value", []):
-        if key.value == "description":
-            return bool(value.start_mark.line != value.end_mark.line)
+    if isinstance(node, yaml.MappingNode):
+        return any(getattr(key, "value", None) == "<<" or uses_merge_key(value) for key, value in node.value)
+    if isinstance(node, yaml.SequenceNode):
+        return any(uses_merge_key(item) for item in node.value)
     return False
 
 
@@ -138,15 +163,35 @@ def validate(path: Path) -> ValidationResult:
         if field in data and not isinstance(data[field], bool)
     )
 
+    composed = yaml.compose(front)
+    if uses_merge_key(composed):
+        problems.append("frontmatter must not use a YAML merge key; write each field directly")
+
     description = data.get("description")
     if isinstance(description, str):
-        if description_spans_lines(front):
+        if any(node.start_mark.line != node.end_mark.line for node in description_nodes(composed)):
             problems.append("description must occupy a single line")
         if re.search(r"[\r\n]", description):
             problems.append("description must not contain a newline")
 
     fields = {key: type(value).__name__ for key, value in data.items()}
     return ValidationResult(path=str(path), valid=not problems, problems=problems, fields=fields)
+
+
+def managed_settings_directory() -> Path:
+    r"""Return the operating system's managed settings directory.
+
+    Claude Code reads a managed policy from a system directory that differs per platform. The
+    legacy Windows path ``C:\\ProgramData\\ClaudeCode`` is not read and is not returned here.
+
+    Returns:
+        The system directory for this platform.
+    """
+    if sys.platform == "darwin":
+        return Path("/Library/Application Support/ClaudeCode")
+    if sys.platform == "win32":
+        return Path("C:/Program Files/ClaudeCode")
+    return Path("/etc/claude-code")
 
 
 def repository_root(start: Path) -> Path:
@@ -233,6 +278,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
 
     return DiscoveryResult(
         user=styles_in(Path.home() / ".claude" / "output-styles"),
+        managed=styles_in(managed_settings_directory() / ".claude" / "output-styles"),
         project=project,
         plugin=plugin_styles,
         plugin_declared_paths=declared,
