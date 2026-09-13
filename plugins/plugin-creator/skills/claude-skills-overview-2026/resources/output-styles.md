@@ -1,9 +1,12 @@
 # Output Styles — Claude Code Reference
 
-SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-04-23)
+SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-09-13)
 
-Output styles allow Claude Code to operate as different types of agent while retaining core
-capabilities (running scripts, reading/writing files, tracking TODOs).
+Output styles change how Claude responds, not what Claude knows. They set Claude's role, tone, and
+output format for every response. A custom style supplies its own instructions and chooses whether
+to keep Claude Code's built-in software engineering instructions.
+
+To create one, load `plugin-creator:output-style-creator`.
 
 ---
 
@@ -11,123 +14,157 @@ capabilities (running scripts, reading/writing files, tracking TODOs).
 
 | Style | Behavior |
 |-------|----------|
-| `default` | Standard system prompt designed for software engineering tasks |
-| `explanatory` | Adds "Insights" sections between engineering tasks — explains implementation choices and codebase patterns |
-| `learning` | Collaborative, learn-by-doing mode — shares "Insights" while coding AND asks the user to contribute small strategic code pieces; adds `TODO(human)` markers in code |
+| Default | Standard system prompt designed for software engineering tasks |
+| Proactive | Executes immediately, makes reasonable assumptions instead of pausing for routine decisions, prefers action over planning. Stronger than auto mode's autonomous-execution guidance and independent of permission mode — the permission mode still decides what runs without asking |
+| Concise | Leads with the result, skips preamble and narration, keeps responses short by default while doing the engineering work as thoroughly as Default; answers in full when asked for detail; always keeps error reports, security warnings, and destructive-action confirmations complete. Requires Claude Code v2.1.237 or later |
+| Explanatory | Adds educational "Insights" between engineering tasks — explains implementation choices and codebase patterns |
+| Learning | Collaborative, learn-by-doing mode — shares "Insights" while coding AND asks the user to contribute small strategic code pieces; adds `TODO(human)` markers in code |
 
 ---
 
 ## How Output Styles Work
 
-- Output styles directly modify Claude Code's system prompt.
-- Custom output styles exclude coding-related instructions (such as "verify code with tests")
-  UNLESS `keep-coding-instructions: true` is set in the style's frontmatter.
-- Custom instructions are appended to the END of the system prompt.
-- All output styles trigger reminders for Claude to adhere to the output style instructions
-  throughout the conversation.
+- Claude Code sends the active style's instructions with every request.
+- When a style other than Default is selected, Claude Code also reminds Claude of the style during
+  the conversation.
+- Custom styles omit Claude Code's built-in software engineering instructions — how to scope
+  changes, write comments, and verify work — unless `keep-coding-instructions: true` is set.
+- Styles apply to the main conversation and to a fork, which inherits the parent's full conversation
+  and system prompt. Other subagents run their own system prompt, so styles do not shape their
+  responses.
 
 ---
 
 ## Activating an Output Style
 
-```text
-/output-style                    — opens the style selection menu (also accessible from /config)
-/output-style explanatory        — switches directly to the named style
+| Surface | Action | Requires |
+|---------|--------|----------|
+| Terminal | `/config` → Output style; saved to `.claude/settings.local.json` | — |
+| VS Code extension | `/` command menu → Output styles (custom styles included) | v2.1.257 or later |
+| VS Code extension | Create a style file from the Output styles menu | v2.1.261 or later |
+| Desktop app | Set the `outputStyle` field in a settings file; `/config` opens Settings → Claude Code | — |
+| Any | Edit `outputStyle` directly in a settings file | — |
+
+```json
+{
+  "outputStyle": "Explanatory"
+}
 ```
 
-- Changes apply at the local project level.
-- Saved in `.claude/settings.local.json` under the `outputStyle` field.
-- Can also be set by directly editing the `outputStyle` field in any settings file.
-- Style changes take effect at the start of the next session — they do not apply mid-conversation.
-  The output style is set in the system prompt at session start; keeping the system prompt stable
-  throughout a conversation allows prompt caching to reduce latency and cost.
+The standalone `/output-style` command was deprecated in v2.1.73 and removed in v2.1.91 — use
+`/config` or the `outputStyle` setting.
 
-SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-04-23)
+Switching styles mid-session applies from the next message. Before v2.1.251, the new style applied
+only after `/clear` or a new session. In the terminal, style files are read at startup, so restart
+Claude Code after creating or editing one during a running session.
+
+SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-09-13)
 
 ---
 
 ## Custom Output Styles
 
-Markdown files with YAML frontmatter placed in:
+Markdown files with YAML frontmatter, saved at one of three levels. The filename becomes the style
+name unless `name` is set in the frontmatter.
 
 - `~/.claude/output-styles/` — user level
 - `.claude/output-styles/` — project level
+- `.claude/output-styles/` inside the managed settings directory — managed policy level
+
+Project styles load from every `.claude/output-styles/` directory between the working directory and
+the repository root. When more than one of those directories defines a style with the same name,
+Claude Code uses the one closest to the working directory.
 
 ### File Format
 
 ````markdown
 ---
-name: My Custom Style
-description: A brief description of what this style does
-keep-coding-instructions: false
+name: Diagrams first
+description: Lead every explanation with a diagram
+keep-coding-instructions: true
 ---
 
-# Custom Style Instructions
+When explaining code, architecture, or data flow, start with a Mermaid diagram showing the
+structure, then explain in prose.
 
-You are an interactive CLI tool that helps users...
-[custom instructions here]
+## Diagram conventions
+
+Use `flowchart TD` for control flow and `sequenceDiagram` for request paths. Keep diagrams under
+15 nodes.
 ````
 
 ### Frontmatter Fields
 
 | Field | Purpose | Default |
 |-------|---------|---------|
-| `name` | Display name for the style; if omitted, inherits from the filename | Filename |
-| `description` | Description shown in the `/output-style` UI | None |
-| `keep-coding-instructions` | When `true`, retains the coding-related parts of Claude Code's default system prompt | `false` |
+| `name` | Name of the output style, if not the file name | Inherits from file name |
+| `description` | Description shown in the `/config` picker | None |
+| `keep-coding-instructions` | Keep Claude Code's built-in software engineering instructions | `false` |
+| `force-for-plugin` | Plugin output styles only: apply automatically whenever the plugin is enabled, overriding the user's `outputStyle` setting. If multiple enabled plugins set this, the first one loaded wins | `false` |
 
 ---
 
 ## Plugin Integration
 
-Plugins can bundle output styles via the `outputStyles` field in `plugin.json`:
+Plugins ship output styles in an `output-styles/` directory at the plugin root, auto-discovered when
+the manifest does not declare `outputStyles`.
+
+```text
+plugin-root/
+└── output-styles/
+    └── terse.md
+```
+
+The `outputStyles` field in `plugin.json` accepts a string or an array of `./`-relative paths and
+REPLACES the default directory scan. Declaring it without listing `./output-styles/` makes every
+style in that directory invisible.
 
 ```json
 {
-  "outputStyles": ["./output-styles/my-style.md"]
+  "outputStyles": ["./output-styles/", "./extras/"]
 }
 ```
 
-The path is relative to `plugin.json`. The style file uses the same frontmatter format as
-project- or user-level custom styles.
+Claude Code warns about an ignored default folder in `claude plugin list` and in the `/plugin` detail
+view when both a default folder and the matching manifest key exist.
+
+SOURCE: <https://code.claude.com/docs/en/plugins-reference.md> (accessed 2026-09-13)
 
 ---
 
 ## Token Costs and Prompt Caching
 
-Adding instructions to the system prompt increases input tokens. Prompt caching reduces this cost
-after the first request in a session — the cached system prompt is not re-processed on subsequent
-turns within the same session.
+A style's instructions add input tokens on every request; prompt caching reduces this cost after the
+first request in a session. For the cost of the first request after a mid-session switch, see
+<https://code.claude.com/docs/en/prompt-caching> (accessed 2026-09-13).
 
-The built-in `explanatory` and `learning` styles produce longer responses than `default` by
-design, which increases output tokens. For custom styles, output token usage depends on what your
-instructions tell Claude to produce.
+The built-in Explanatory and Learning styles produce longer responses than Default by design, which
+increases output tokens. Concise does the opposite. For custom styles, output token usage depends on
+what the instructions tell Claude to produce.
 
-SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-04-23)
+SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-09-13)
 
 ---
 
 ## Comparison to Related Features
 
-| Feature | Scope | Mechanism | Active When |
-|---------|-------|-----------|-------------|
-| **Output styles** | Main agent loop only; affects system prompt | Replaces or augments the default system prompt; coding instructions opt-in via `keep-coding-instructions` | Always active once selected |
-| **CLAUDE.md** | Appended as a user message after the default system prompt | Does NOT replace the default system prompt; adds content on top | Always active (file is present) |
-| **`--append-system-prompt`** | Appended to the system prompt | Appends to the existing system prompt; does not replace it | When flag is passed |
-| **Agents** | Per-task invocation | Separate agent context; can include model, tools, and additional settings | Only when invoked for a specific task |
-| **Skills** | Per-task or auto-loaded | Task-specific prompts invoked with `/skill-name` or triggered by relevance | When invoked or auto-matched; not always active |
+| Feature | How it works | Use it when |
+|---------|--------------|-------------|
+| Output styles | Changes Claude Code's default instructions; active every turn once selected | A different role, tone, or default response format is wanted every turn |
+| CLAUDE.md | Adds a user message after the system prompt; removes nothing | Claude should always know project conventions and codebase context |
+| `--append-system-prompt` | Appends to the system prompt without removing anything | A one-off addition passed as a CLI flag at launch |
+| Agents | Runs a subagent with its own system prompt, model, and tools | A separately scoped helper for a focused task is wanted |
+| Skills | Loads task-specific instructions when invoked or relevant | There is a reusable workflow |
 
 ### Key Distinctions
 
-**Output styles vs CLAUDE.md:** Output styles can completely replace the coding-specific parts
-of Claude Code's default system prompt. CLAUDE.md adds content as a user message following the
-default system prompt — it does not replace any part of it.
+**Output styles vs CLAUDE.md:** Output styles replace Claude Code's default instructions, including
+the software engineering ones unless `keep-coding-instructions` is set. CLAUDE.md adds content as a
+user message after the system prompt — it replaces nothing.
 
-**Output styles vs agents:** Output styles affect only the main agent loop and only the system
-prompt. Agents are invoked for specific tasks and can configure model selection, tool access,
-and additional context independently.
+**Output styles vs agents:** Output styles shape the main conversation and forks only. Agents are
+invoked for specific tasks and configure their own model, tools, and system prompt.
 
-**Output styles vs skills:** Output styles modify HOW Claude responds (formatting, tone,
-structure) and remain active for the duration of the session once selected. Skills are
-task-specific prompts that are invoked on demand or auto-loaded when relevant — they are not
+**Output styles vs skills:** Output styles modify HOW Claude responds and stay active for the
+session. Skills are task-specific instructions invoked on demand or loaded when relevant — not
 persistently active.
