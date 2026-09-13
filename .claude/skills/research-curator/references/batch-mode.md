@@ -26,13 +26,14 @@ flowchart TD
     RelayCheck --> Gate["For each entry with status: succeeded<br>run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md): fix_research_formatting.py<br>+ validate_research.py --json; on a gated warning<br>(header_fields/access_dates/freshness_tracking/url_format)<br>spawn @research-curator --fix and retry once"]
     Gate --> Results{"Per entry: did the curator agent fail,<br>or do errors / gated warnings remain<br>after the validation gate retry?"}
     Results -->|"No for an entry — clean"| SpawnAnalysis["For each clean entry (up to 5 entries concurrently —<br>separate from the 5-agent curator wave cap)<br>spawn analysis agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
-    Results -->|"Yes for an entry — curator failure, or validation issues remain"| SpawnAnalysisPartial["Mark that entry failed or created with issues<br>Skip analysis agents for it<br>Relay the exact failure or issue text to user"]
+    Results -->|"Yes for an entry — curator failure, or validation issues remain"| SpawnAnalysisPartial["Mark that entry failed, created with issues,<br>or refreshed with issues<br>Skip analysis agents for it<br>Relay the exact failure or issue text to user"]
     SpawnAnalysis --> UpdateAll["Update ./research/README.md<br>add all clean new entries to category tables<br>(concurrent with analysis agents)"]
     SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with clean entries only<br>(concurrent with analysis agents)"]
     UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
     Partial --> WaitAnalysis
     WaitAnalysis --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added<br>Relay non-empty SKIPPED lists verbatim"]
-    NotifyUser --> PostActions(["Execute Post-Actions — vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
+    NotifyUser --> Review["Run Entry Review (SKILL.md) on each clean entry<br>backlink repair first, then one review per entry, in waves of 5<br>entries marked failed, created with issues, or refreshed with issues are not reviewed"]
+    Review --> PostActions(["Execute Post-Actions — vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
 ```
 
 ---
