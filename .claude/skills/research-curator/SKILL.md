@@ -369,10 +369,10 @@ Validation complete:
 
 ## Post-Actions
 
-Shared by all modes. Execute after any mode completes successfully. Track every file path
-written or modified by any step below (agent-created/refreshed entries, README.md,
-insight/utilization files, cross-reference files, backlink-repaired files) in a running list --
-the Commit step stages exactly that list, nothing else.
+Shared by all modes. Execute after any mode completes successfully. Step 4 (Commit)
+derives exactly which files this run touched by diffing the current working tree against the
+pre-mode baseline captured in [Mode Routing](#mode-routing) -- no file path needs manual
+tracking through the steps below.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
    a shared restatement of the mode-specific README step each mode's own flow already gates
@@ -389,39 +389,41 @@ the Commit step stages exactly that list, nothing else.
    uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
-   Each printed `{source} -> {target}` line preceding the `backlinks_repaired:` count names a
-   `{target}` file this command may have modified.
+   If this command's stderr contains any `warning: could not repair ...` line: that is an
+   operational I/O failure (permissions, disk space, an invalid path) reading or writing a target,
+   not a structural limitation. Halt Post-Actions and report the exact warning text to the user.
 
-   - If `{target}` was **not** dirty in the pre-write baseline captured before this mode started
-     (see [Mode Routing](#mode-routing)): add it to the tracked file list. This includes an entry
-     this run itself just created or refreshed, even though it is now dirty by the time this step
-     runs -- it was clean at baseline, so it is this run's own write, not someone else's.
-   - If `{target}` **was** already dirty in that baseline (present before this run wrote anything):
-     leave it out of the tracked file list -- do not stage someone else's in-progress work alongside
-     the repair -- and report it to the user as `{path} -- pre-existing uncommitted changes, backlink
-     repair not committed this run`.
+   Otherwise, a non-zero exit here reports asymmetric edges the script cannot structurally repair
+   (a dangling link to a missing target, or a manually authored row with a different description
+   it refuses to overwrite) -- continue to step 3 regardless of this exit code. Which files, if
+   any, this command actually modified is determined by step 4's diff, not by this step -- do not
+   parse the printed `{source} -> {target}` lines to guess at modified files, since they list every
+   asymmetric edge found *before* repair is attempted, not which repairs succeeded.
 
-   This command exits non-zero whenever any asymmetric edge remains after the fix pass, including
-   edges it cannot structurally repair (a dangling link to a missing target, or a manually authored
-   row with a different description it refuses to overwrite). That non-zero exit reports remaining
-   edges; it is not a failure of this step -- continue to step 3 regardless of this command's exit
-   code. Only a failure to run the command at all (script or vault path not found) halts
-   Post-Actions here.
-
-3. **Lint** -- run formatting checks on all modified files:
+3. **Lint** -- run formatting checks on every file this run touched (the same diff step 4 uses):
 
    ```bash
-   uv run prek run --files ./research/README.md [tracked file list from steps 1-2]
+   git diff --name-only -- ./research/
+   git ls-files --others --exclude-standard -- ./research/
+   uv run prek run --files ./research/README.md [files from the two commands above]
    ```
 
-4. **Commit** -- if the tracked file list is empty (nothing was created, refreshed, or repaired
-   this run -- e.g. a clean Validate Mode pass where the backlink repair also found nothing
-   writable to fix), skip this step and step 5: there is nothing to commit, and this is not a
-   failure. Otherwise, stage and commit exactly the tracked file list -- never a blanket
-   `git add -A` or a directory-wide `git add ./research/`:
+4. **Commit** -- diff the current working tree against the pre-mode baseline (see
+   [Mode Routing](#mode-routing)) to get the exact list of files under `./research/` this run
+   touched: modified paths from `git diff --name-only -- ./research/`, plus new paths from
+   `git ls-files --others --exclude-standard -- ./research/`. Exclude any path that was **already**
+   dirty in the baseline -- that is another contributor's pre-existing uncommitted work, not
+   something this run produced -- and report it to the user as `{path} -- pre-existing uncommitted
+   changes, not committed this run` instead of staging it.
+
+   If the resulting list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
+   clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
+   this step and step 5: there is nothing to commit, and this is not a failure. Otherwise, stage
+   and commit exactly that list -- never a blanket `git add -A` or a directory-wide
+   `git add ./research/`:
 
    ```bash
-   git add ./research/README.md ./research/{category}/{name}.md [...tracked file list]
+   git add ./research/README.md ./research/{category}/{name}.md [...files from the diff above]
    git commit -m "docs(research): [action] [resource names]"
    ```
 
