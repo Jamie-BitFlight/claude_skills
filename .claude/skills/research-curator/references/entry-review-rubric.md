@@ -90,8 +90,13 @@ into the verdict block as its own word so a caller can never read it as a pass, 
 belongs to a later run. Record it and move on — do not substitute a fetch through any other tool to
 manufacture a verdict, and do not let an unreachable host stop Gate 2 or the rest of the review.
 
-Every other validator warning and info item is **reported, not scored** — include the counts from
-`summary` in the verdict block and move on.
+Every other validator warning and info item is **reported, not scored**. Not scored means it is not
+a defect and never fails the entry. Reported means reported in full: record each issue's `check`,
+`severity`, `message`, and `line`, quoted from the JSON, under the Gate 1 block, with the `summary`
+counts alongside them. Three integers cannot tell a genuinely stale entry from one tripping a
+validator alias gap, and the reader of this verdict block is the only party positioned to act on
+that difference — collapsing the text into a count is exactly the generalization the
+[Agent Result Relay Rules](../SKILL.md#agent-result-relay-rules) exist to prevent.
 
 ---
 
@@ -185,6 +190,7 @@ REVIEW: ./research/{category}/{name}.md
 
 GATE 1 pointer:     PASS | FAIL | UNVERIFIED | NOT RUN ({reason})
   validate_research main --json: errors {N}, warnings {N}, info {N}
+    {check} — {severity} — line {N} — "{message}"      <- one line per issue, all of them
   source URL: {url} — LIVE | DEAD | UNVERIFIED — {the verbatim curl write-out line}
   verified: {date | absent}
 GATE 2 repo claims: {N} claims checked, {N} defective | NOT RUN ({reason})
