@@ -860,7 +860,7 @@ def test_token_count_deterministic(text):
 | Script | Purpose |
 |--------|---------|
 | `skilllint` | Main validation CLI — frontmatter, links, complexity, plugin structure |
-| `auto_sync_manifests.py` | Pre-commit hook — syncs plugin.json component arrays, bumps semver |
+| `auto_sync_manifests.py` | Legacy compatibility script; the shared `agent-marketplace-versioner` pre-commit hook syncs manifests and bumps versions |
 
 ---
 
