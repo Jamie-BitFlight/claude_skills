@@ -103,7 +103,16 @@ Scan the entry and both analysis files for each trigger. Quote every hit.
 | **Pseudo-quantification** | Scores and percentages — "8.5/10", "70% faster", "100% coverage" | The figure is quoted from a primary source with its method, or the entry states the method used to produce it | Replace with the measured evidence, or remove the figure |
 | **Completeness overclaims** | "all files checked", "comprehensive analysis", "fully resolved", "everything fixed", "every skill reviewed" | The text lists the concrete checks performed and their scope | List what was inspected and with what scope, or narrow the claim to what was actually covered |
 
-SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13); also reachable in this repo as the `/hallucination-detector:hallucination-audit` command.
+These four triggers are local **by decision, not by fallback**. Nothing in
+`.claude/skills/research-curator/` or in its agents calls the `hallucination-detector` plugin, and
+that plugin is not in `enabledPlugins` in `.claude/settings.json`, so
+`/hallucination-detector:hallucination-audit` is not reachable in this checkout — and
+`harness_compatibility.json` carries no entry for it, so it is reachable in no other harness either.
+Whether it is enabled is therefore not a question this gate's behaviour turns on. Do not re-open it,
+and do not replace this table with a call to that plugin or any other out-of-skill route: everything
+this rubric needs lives under `.claude/skills/research-curator/`.
+
+SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13) — copied in and re-scoped, not referenced. Plugin availability read from `.claude-plugin/marketplace.json`, `.claude/settings.json` `enabledPlugins`, and `harness_compatibility.json` (2026-09-13); `AGENTS.md` Repository Overview states the plugin is "not enabled by default in every install".
 
 ---
 
