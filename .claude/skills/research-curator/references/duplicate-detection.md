@@ -1,6 +1,6 @@
 # Duplicate Detection
 
-Shared by Default Mode and Batch Mode. Runs before spawning `@research-curator` for a URL.
+Runs before spawning `@research-curator` for a URL.
 
 Check whether `./research/` already contains an entry for the URL's resource. If found:
 

@@ -1,24 +1,6 @@
 # Batch Mode Workflow
 
-Processing multiple URLs in parallel via `--batch`.
-
----
-
-## Layer Filter
-
-When `--layer 0|1|2` is also present, apply the layer filter to scope category selection. Pass the layer value to each `@research-curator` agent as context so it classifies entries within the appropriate SDLC layer.
-
----
-
-## URL Parsing
-
-Extract URLs from the `--batch` argument. Input format:
-
-```text
-/research-curator --batch https://url1.com https://url2.com https://url3.com
-```
-
-Parse all tokens after `--batch` that match `https?://` as target URLs. Non-URL tokens are ignored with a warning.
+Processing multiple URLs in parallel via `--batch`. URL parsing and the wave spine are in `SKILL.md`'s Batch Mode section.
 
 ---
 
@@ -40,29 +22,18 @@ flowchart TD
     WNaDone --> QMore{"More URLs remaining?"}
     QMore -->|"Yes — advance to next batch of 5"| WNa
     QMore -->|"No — all URLs processed"| Collect
-    Collect --> RelayCheck["Apply pre-relay quality checklist<br>to all collected agent results"]
+    Collect --> RelayCheck["Apply the Agent Result Relay Rules (SKILL.md)<br>to all collected agent results"]
     RelayCheck --> Gate["For each entry with status: succeeded<br>run the Validation Gate for New/Refreshed Entries<br>(validation-rules.md): fix_research_formatting.py<br>+ validate_research.py --json; on a gated warning<br>(header_fields/access_dates/freshness_tracking/url_format)<br>spawn @research-curator --fix and retry once"]
     Gate --> Results{"Per entry: did the curator agent fail,<br>or do errors / gated warnings remain<br>after the validation gate retry?"}
-    Results -->|"No for an entry — clean"| SpawnAnalysis["For each clean entry (up to 5 entries concurrently)<br>spawn analysis agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
+    Results -->|"No for an entry — clean"| SpawnAnalysis["For each clean entry (up to 5 entries concurrently —<br>separate from the 5-agent curator wave cap)<br>spawn analysis agents per entry:<br>- @research-insight-extractor 'Extract improvements from {file-path}'<br>- @research-utilization-assessor 'Assess utilization opportunities from {file-path}'<br>- @research-cross-referencer 'Add cross-references to {file-path}'"]
     Results -->|"Yes for an entry — curator failure, or validation issues remain"| SpawnAnalysisPartial["Mark that entry failed or created with issues<br>Skip analysis agents for it<br>Relay the exact failure or issue text to user"]
     SpawnAnalysis --> UpdateAll["Update ./research/README.md<br>add all clean new entries to category tables<br>(concurrent with analysis agents)"]
     SpawnAnalysisPartial --> Partial["Update ./research/README.md<br>with clean entries only<br>(concurrent with analysis agents)"]
     UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
     Partial --> WaitAnalysis
-    WaitAnalysis --> BacklinkPass["For each successful entry in sequence (one at a time):<br>spawn @research-backlink-detector<br>'Add backlinks for {file-path}'<br>wait for completion before spawning next<br>(sequential to prevent write races on shared cited entries)"]
-    BacklinkPass --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added<br>Report total BACKLINKS_ADDED count<br>Relay non-empty SKIPPED lists verbatim"]
-    NotifyUser --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    WaitAnalysis --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added<br>Relay non-empty SKIPPED lists verbatim"]
+    NotifyUser --> PostActions(["Execute Post-Actions — vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
 ```
-
-**Wave size**: Maximum 5 concurrent @research-curator agents per wave.
-
-**Sequential waves**: Wait for all agents in current wave to complete before spawning next wave. This prevents overwhelming MCP tool rate limits.
-
-**Analysis phase concurrency**: After all curator waves complete, analysis agents spawn concurrently per entry: up to 5 entries, each spawning its own insight-extractor, utilization-assessor, and cross-referencer. This is distinct from the 5-agent curator wave limit.
-
-**Backlink phase serialization**: After all analysis agents complete, backlink-detector agents run **sequentially** — one entry at a time. Concurrent backlink passes on multiple entries that cite a shared target file would produce a write race (each agent reads a stale snapshot and the last writer drops the other's row). Sequential execution prevents this.
-
-**Validation gate**: Every entry a curator agent successfully wrote this wave passes through the [Validation Gate for New/Refreshed Entries](./validation-rules.md#validation-gate-for-newrefreshed-entries) before it is eligible for the analysis-agent fan-out. Error-severity issues, and warning-severity issues from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`, are must-fix — the researching agent already has the facts (today's date, the source URL, the version and access dates it just gathered), so a single `--fix` retry is spawned for gated warnings before an entry is marked "created with issues." `cross_references_absent` is not part of this gate.
 
 ---
 
@@ -71,39 +42,3 @@ flowchart TD
 - **Individual failure**: Log the error, continue with remaining URLs. Do not abort the batch.
 - **Agent timeout**: If an agent does not return within reasonable time, mark as failed and continue.
 - **Duplicate detection**: see [Duplicate Detection](./duplicate-detection.md) — applied before spawning, per URL.
-
----
-
-## Progress Reporting
-
-After each wave completes, report:
-
-```text
-Wave N complete: M/N succeeded
-  ✓ category/resource-name.md — created
-  ✓ category/resource-name.md — created
-  ✗ https://failed-url.com — error: [reason]
-```
-
-After all waves:
-
-```text
-Batch complete: X/Y total succeeded
-Files created: [list]
-README updated: Yes
-Utilization proposals written: N files
-Cross-references added: N entries updated
-Backlinks added: N rows across M entries
-Backlink skipped: [(path, reason), ...] (omitted when empty)
-```
-
----
-
-## Post-Batch Actions
-
-These happen ONCE after all waves complete (not per-entry):
-
-1. Update `./research/README.md` with all new entries
-2. Run `uv run prek run --files` on README and all new entry files
-3. Commit all changes in a single commit
-4. Push to current branch

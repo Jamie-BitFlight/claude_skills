@@ -54,20 +54,23 @@ When the research entry describes an external tool's pattern, map it to the clos
 
 | Pattern domain | Look for local system at |
 |---|---|
-| Agent orchestration, task dispatch, concurrency | `.claude/skills/implement-feature/SKILL.md` |
-| Task state, status tracking, retry | `.claude/skills/implementation-manager/` scripts and `SKILL.md` |
-| Task hooks, lifecycle events | `.claude/skills/start-task/SKILL.md`, `task_status_hook.py` |
-| Skill structure, frontmatter, validation | `.claude/skills/research-curator/`, `plugin-creator/skill-creator/SKILL.md` |
+| Agent orchestration, task dispatch, concurrency | `plugins/development-harness/skills/implement-feature/SKILL.md` |
+| Task state, status tracking, retry | `plugins/development-harness/skills/implementation-manager/` scripts and `SKILL.md` |
+| Task hooks, lifecycle events | `plugins/development-harness/skills/start-task/SKILL.md`, `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` |
+| Skill structure, frontmatter, validation | `.claude/skills/research-curator/`, `plugins/plugin-creator/skills/skill-creator/SKILL.md` |
 | Research workflows | `.claude/agents/research-curator.md`, `.claude/skills/research-curator/SKILL.md` |
-| Backlog, issue management | `.claude/skills/backlog/SKILL.md` |
-| Agent creation, agent format | `.claude/agents/`, `plugin-creator/agent-creator/SKILL.md` |
+| Backlog, issue management | `plugins/development-harness/skills/work-backlog-item/SKILL.md` |
+| Agent creation, agent format | `.claude/agents/`, `plugins/plugin-creator/skills/agent-creator/SKILL.md` |
 | Multi-agent fan-out, parallel work | `plugins/agent-orchestration/skills/parallel-work/SKILL.md` |
-| Code review, quality gates | `.claude/skills/complete-implementation/SKILL.md` |
-| Context management, memory | CLAUDE.md, `.claude/rules/` |
-| MCP tools, server integration | `.claude/skills/fastmcp-creator/SKILL.md` |
-| Testing, validation | `python3-development:fastmcp-python-tests` SKILL.md |
+| Code review, quality gates | `plugins/development-harness/skills/complete-implementation/SKILL.md` |
+| Context management, memory | `.claude/CLAUDE.md`, `AGENTS.md`, `rules/` |
+| MCP tools, server integration | `plugins/fastmcp-creator/skills/fastmcp-creator/SKILL.md` |
+| Testing, validation | `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` |
 
-If the pattern does not map to any listed system, search with `Glob` for relevant files before concluding there is no match.
+This table is a starting point that drifts as skills move between plugins. Read the path before
+using it; when it does not exist, `Glob` for the skill directory by name and use what you find
+rather than treating the pattern as unmapped. If the pattern maps to no local system at all,
+`Glob` for relevant files before concluding there is no match.
 
 </system_map>
 

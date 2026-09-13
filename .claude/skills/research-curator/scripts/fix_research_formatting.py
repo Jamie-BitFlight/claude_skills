@@ -2,6 +2,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["typer>=0.21"]
+#
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Fix common markdown formatting issues in research entries.
 
@@ -15,6 +18,7 @@ Run this script BEFORE validate_research.py, not as a replacement for it.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -209,9 +213,6 @@ def _apply_fixes(lines: list[str], issues: FileIssues) -> list[str]:
 # ---------------------------------------------------------------------------
 # File-level orchestration
 # ---------------------------------------------------------------------------
-
-
-from dataclasses import dataclass
 
 
 @dataclass
