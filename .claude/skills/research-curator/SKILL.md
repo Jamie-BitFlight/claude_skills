@@ -20,10 +20,15 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 ## Mode Routing
 
 Parse `<mode_args/>` to select operating mode. Before executing any mode below, capture a
-`git status --porcelain -- ./research/` baseline -- this is the invocation's pre-write state,
-taken before this run's own README update, curator agent, or analysis agent writes anything.
-Post-Actions' Backlink Repair step compares against this baseline, not a fresh snapshot, to tell
-this run's own writes apart from another contributor's pre-existing uncommitted work.
+`git status --porcelain --untracked-files=all -- ./research/` baseline -- this is the
+invocation's pre-write state, taken before this run's own README update, curator agent, or
+analysis agent writes anything. `--untracked-files=all` is required: the default mode collapses
+an untracked directory to one line (`?? research/new-category/`) instead of listing the files
+inside it, while step 3 below always lists individual files via `git ls-files --others` -- without
+this flag, a pre-existing untracked file inside a new untracked directory would never match
+anything in the baseline and would be misclassified as this run's own work. Post-Actions' steps
+compare against this baseline, not a fresh snapshot, to tell this run's own writes apart from
+another contributor's pre-existing uncommitted work.
 
 The following diagram is the authoritative procedure for mode routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
