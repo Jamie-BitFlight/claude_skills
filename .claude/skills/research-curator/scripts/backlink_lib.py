@@ -1,24 +1,22 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marko>=2.0.0"]
+# dependencies = ["marko>=2.0.0", "pydantic>=2.12.5"]
 # ///
 """Shared library for backlink detection: cross-reference table parsing, relationship-description transforms, and idempotent backlink emission."""
 
 from __future__ import annotations
 
+import pathlib
 import re
+import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import marko
 import marko.block
 import marko.ext.gfm.elements as gfm_elements
 import marko.inline
-
-if TYPE_CHECKING:
-    import pathlib
-import sys
+from pydantic import BaseModel, Field
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -33,6 +31,30 @@ class CrossRefRow:
     link_path: str
     category: str
     relationship: str
+
+
+class ScanSkip(BaseModel):
+    """One file the vault scan could not fold into the graph, and why."""
+
+    path: str = Field(description="Path of the skipped file, relative to the vault root.")
+    reason: str = Field(description="Which phase dropped it: 'read', 'parse', or 'resolve'.")
+    detail: str = Field(description="The originating exception rendered as text.")
+
+
+class CrossReferenceScan(BaseModel):
+    """A vault scan: the edge graph, plus every file dropped while building it.
+
+    The skips travel with the graph so that a caller cannot read the graph without
+    also being handed the scan's coverage. A graph alone cannot distinguish
+    "this vault has no asymmetric edges" from "the files that had them were dropped".
+    """
+
+    graph: dict[pathlib.Path, list[pathlib.Path]] = Field(
+        default_factory=dict, description="Adjacency list mapping each entry to the entries it cites."
+    )
+    skips: list[ScanSkip] = Field(
+        default_factory=list, description="Every file dropped during the scan, in vault-walk order."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -589,30 +611,42 @@ def append_backlink_row(
     return ("\n".join(new_lines) + ("\n" if ends_with_newline else ""), True)
 
 
-def build_cross_reference_graph(
-    vault_root: pathlib.Path, *, quiet: bool = False
-) -> dict[pathlib.Path, list[pathlib.Path]]:
-    """Build a directed adjacency list of all cross-reference edges in the vault.
+def build_cross_reference_graph(vault_root: pathlib.Path, *, quiet: bool = False) -> CrossReferenceScan:
+    """Scan the vault and return its cross-reference edge graph plus every skipped file.
 
     Walks all .md files under vault_root (excluding README.md), parses each entry's
     Cross-References table, and records directed edges (entry -> cited_entry).
 
+    A file this function cannot read, parse, or resolve a link from is dropped from
+    the graph and recorded in ``skips``. It is never fatal: one damaged entry does not
+    abort the scan. Because the skips are returned alongside the graph, a caller that
+    treats an empty asymmetric-edge list as "the vault is clean" can check whether the
+    scan actually covered the vault first.
+
     Args:
         vault_root: Absolute path to the research vault root directory.
-        quiet: When True, suppress ``warning: scan-skipped`` stderr output.
-            ``check-backlinks --fix`` calls this twice per run -- once to find
-            asymmetric edges, once more afterward to verify none remain -- and
-            a scan-skip is a pre-existing file defect the fix step never
-            touches, so the second call would otherwise reprint every skip
-            already reported by the first.
+        quiet: When True, suppress ``warning: scan-skipped`` stderr output. The skips
+            are still recorded in the returned ``skips`` list. ``check-backlinks --fix``
+            calls this twice per run -- once to find asymmetric edges, once more
+            afterward to verify none remain -- and a scan-skip is a pre-existing file
+            defect the fix step never touches, so the second call would otherwise
+            reprint every skip already reported by the first.
 
     Returns:
-        Dict mapping each entry's absolute Path to a list of absolute Paths it cites.
-        Entries with no Cross-References section appear with an empty list.
-        Paths that cannot be resolved (broken links) are silently skipped.
+        A CrossReferenceScan whose ``graph`` maps each entry's absolute Path to the
+        absolute Paths it cites, and whose ``skips`` lists every dropped file in
+        vault-walk order. Entries with no Cross-References section appear in the graph
+        with an empty list.
     """
     vault_root = vault_root.resolve()
     graph: dict[pathlib.Path, list[pathlib.Path]] = {}
+    skips: list[ScanSkip] = []
+
+    def record(rel_file: pathlib.Path, reason: str, message: str) -> None:
+        """Record one skip and, unless quiet, mirror it to stderr."""
+        skips.append(ScanSkip(path=rel_file.as_posix(), reason=reason, detail=message))
+        if not quiet:
+            print(f"warning: scan-skipped, could not {message}", file=sys.stderr)
 
     for md_file in sorted(vault_root.rglob("*.md")):
         if md_file.name == "README.md":
@@ -628,31 +662,25 @@ def build_cross_reference_graph(
         try:
             text = md_file.read_text(encoding="utf-8")
         except OSError as exc:
-            if not quiet:
-                print(f"warning: scan-skipped, could not read {rel_file}: {exc}", file=sys.stderr)
+            record(rel_file, "read", f"read {rel_file}: {exc}")
             continue
 
         try:
             rows = parse_cross_references_table(text)
         except ValueError as exc:
-            if not quiet:
-                print(f"warning: scan-skipped, could not parse {rel_file}: {exc}", file=sys.stderr)
+            record(rel_file, "parse", f"parse {rel_file}: {exc}")
             continue
 
         for row_item in rows:
             try:
                 target = resolve_link_path(abs_file, row_item.link_path)
             except (OSError, ValueError) as exc:
-                if not quiet:
-                    print(
-                        f"warning: scan-skipped, could not resolve {row_item.link_path!r} in {rel_file}: {exc}",
-                        file=sys.stderr,
-                    )
+                record(rel_file, "resolve", f"resolve {row_item.link_path!r} in {rel_file}: {exc}")
                 continue
             if target.exists():
                 graph[abs_file].append(target)
 
-    return graph
+    return CrossReferenceScan(graph=graph, skips=skips)
 
 
 def find_asymmetric_edges(graph: dict[pathlib.Path, list[pathlib.Path]]) -> list[tuple[pathlib.Path, pathlib.Path]]:

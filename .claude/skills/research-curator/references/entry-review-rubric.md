@@ -31,7 +31,11 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. `--check` does not write; drop `--check` only when this review is also applying fixes |
 | `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
-| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry | Each asymmetric pair by both paths. Run without `--fix` to review; `--fix` repairs but hides what was wrong |
+| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each asymmetric pair by both paths, and every `{path} ({reason})` line under `scan_skipped_files: N`. Run without `--fix` to review; `--fix` repairs but hides what was wrong |
+
+A non-zero `scan_skipped_files: N` fails this command on its own, because a file dropped from
+the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
+paths as Gate 1 defects, not as noise.
 
 **Cross-reference reciprocity** is measured by `check-backlinks`, not by eye. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
 
@@ -142,7 +146,7 @@ REVIEW: ./research/{category}/{name}.md
 GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   fix_research_formatting --check: exit {N}
   validate_research main --json:   errors {N}, warnings {N}
-  check-backlinks:                 {N} asymmetric pairs
+  check-backlinks:                 {N} asymmetric pairs, {N} scan-skipped files
 GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
 GATE 3 depth:         PASS | FAIL — sections failed: {names}
 GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective

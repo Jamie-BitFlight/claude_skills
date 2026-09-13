@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["marko>=2.2.2", "ruamel.yaml>=0.18.0", "typer>=0.21.0"]
+# dependencies = ["marko>=2.2.2", "pydantic>=2.12.5", "ruamel.yaml>=0.18.0", "typer>=0.21.0"]
 # ///
 """Validate research entries against the research-curator quality standard.
 
@@ -1109,13 +1109,34 @@ def main(
 def check_backlinks(
     vault_path: Annotated[Path, typer.Argument(help="Root directory of the research vault")],
     fix: Annotated[bool, typer.Option("--fix", help="Auto-append missing backlink rows")] = False,
+    exclude: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--exclude",
+            help=(
+                "Path that --fix must not write to. Repeatable. The excluded file is still "
+                "scanned and its asymmetric pairs are still reported -- only the write is skipped."
+            ),
+        ),
+    ] = None,
+    allow_partial_scan: Annotated[
+        bool,
+        typer.Option(
+            "--allow-partial-scan",
+            help=(
+                "Exit 0 even when files were skipped during the scan. Without this, a skipped "
+                "file fails the run, because exit 0 otherwise claims coverage the scan did not have."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Scan the vault for asymmetric cross-references and optionally repair them."""
     bl = _load_backlink_lib()
     vault_path = vault_path.resolve()
+    excluded: set[Path] = {path.resolve() for path in (exclude or [])}
 
-    graph: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
-    asymmetric: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph)
+    scan = bl.build_cross_reference_graph(vault_path)
+    asymmetric: list[tuple[Path, Path]] = bl.find_asymmetric_edges(scan.graph)
     count = len(asymmetric)
 
     print(f"asymmetric_cross_references: {count}")
@@ -1124,9 +1145,24 @@ def check_backlinks(
         target_rel = target.relative_to(vault_path)
         print(f"  {source_rel} -> {target_rel}")
 
+    print(f"scan_skipped_files: {len(scan.skips)}")
+    for skip in scan.skips:
+        print(f"  {skip.path} ({skip.reason})")
+
+    # A skipped file is a hole in the scan's coverage, so it decides the exit code
+    # independently of the edges found. Reported before any repair, because --fix
+    # does not touch scan-skip defects.
+    scan_incomplete = bool(scan.skips) and not allow_partial_scan
+
     if fix and count > 0:
         repaired = 0
+        excluded_writes = 0
         for source, target in asymmetric:
+            # _repair_one_asymmetric_pair writes the reciprocal row into target.
+            if target.resolve() in excluded:
+                excluded_writes += 1
+                typer.echo(f"note: excluded, not writing to {target.relative_to(vault_path)}", err=True)
+                continue
             try:
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
@@ -1144,16 +1180,17 @@ def check_backlinks(
                 )
 
         print(f"backlinks_repaired: {repaired}")
+        print(f"backlinks_excluded: {excluded_writes}")
         # quiet=True: this rebuild only checks for remaining asymmetric edges after
         # repair; the fix step never touches scan-skip defects, so re-scanning here
         # would reprint every skip the first build (above) already reported.
-        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path, quiet=True)
-        remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph_after)
-        if remaining:
+        rescan = bl.build_cross_reference_graph(vault_path, quiet=True)
+        remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(rescan.graph)
+        if remaining or scan_incomplete:
             sys.exit(1)
         sys.exit(0)
 
-    if count > 0:
+    if count > 0 or scan_incomplete:
         sys.exit(1)
     sys.exit(0)
 

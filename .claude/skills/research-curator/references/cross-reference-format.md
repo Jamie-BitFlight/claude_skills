@@ -45,6 +45,8 @@ Within a category: `./other-entry.md`. Across categories: `../other-category/fil
 
 Every path must resolve to a real file. `validate_research.py check-backlinks` reports rows pointing at paths that do not exist on disk, and `--fix` skips them rather than writing a reciprocal row into nothing.
 
+The reciprocal row is written into the *cited* entry, so `--fix` modifies files the current task may not own. Pass `--exclude {path}` once per file the run must leave untouched -- an excluded file is still scanned and still reported, only the write is withheld.
+
 ---
 
 ## Relationship Phrase

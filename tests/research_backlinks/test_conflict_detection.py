@@ -208,7 +208,7 @@ Test.
         self._make_entry_with_dangling_link(vault / "agent-frameworks" / "source.md")
 
         # Must not raise — dangling links are skipped
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         source = (vault / "agent-frameworks" / "source.md").resolve()
         assert source in graph
         # The dangling target is not in the adjacency list
@@ -222,7 +222,7 @@ Test.
         (vault / "agent-frameworks").mkdir()
 
         self._make_entry_with_dangling_link(vault / "agent-frameworks" / "source.md")
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
 
         dangling = (vault / "tools" / "does_not_exist.md").resolve()
         assert dangling not in graph, "Dangling target must not appear as a graph node"
@@ -235,7 +235,7 @@ Test.
         (vault / "agent-frameworks").mkdir()
 
         self._make_entry_with_dangling_link(vault / "agent-frameworks" / "source.md")
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         assert asymmetric == [], "No asymmetric edges expected when only target is dangling (not a graph node)"
@@ -364,7 +364,7 @@ Test.
         (vault / "tools" / "valid.md").write_text(valid_content, encoding="utf-8")
         # tools/missing.md does NOT exist
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         source_abs = (vault / "agent-frameworks" / "source.md").resolve()
         valid_abs = (vault / "tools" / "valid.md").resolve()
 
