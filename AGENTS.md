@@ -74,10 +74,10 @@ skills). Read the manifest for the current roster.
 **Purpose**: Extends Claude Code CLI (and secondarily Codex, OpenCode, and GitHub's coding agent)
 with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD,
 AI/LLM tools, documentation, and agent orchestration. Skills, commands, and agents are project
-workflow tooling, not a Claude-Code-only concern — but harness coverage per plugin is uneven today:
-nearly every plugin ships a `.codex-plugin/` manifest beside `.claude-plugin/`, while `.cursor-plugin/`
-exists for only a handful. Check `harness_compatibility.json` (below) for a given plugin's actual
-manifests before assuming a skill is reachable outside Claude Code.
+workflow tooling, not a Claude-Code-only concern, but harness coverage varies per plugin — check
+that plugin's entry in `harness_compatibility.json` (below) for its actual manifests before
+assuming a skill is reachable outside Claude Code; do not assume a specific ratio here, it drifts
+as manifests are added.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
 JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
@@ -113,7 +113,10 @@ Run scripts using `uv run` — if `uv` is unavailable, see [rules/uv-run-fallbac
 Before linting, formatting, or type-checking, read `docs/linting-and-type-checking.md`.
 Before writing, running, or placing a test, read `docs/testing.md`.
 Before validating an MCP server (protocol, Codex, or Claude plugin integration), read
-`docs/mcp-server-validation.md`.
+`docs/mcp-server-validation.md`. After modifying any MCP server in a plugin, load
+`/fastmcp-creator:fastmcp-client-cli` and validate against the plugin's source directory, not the
+installed cache — `fastmcp discover` does not surface plugin-delivered MCP servers, so pass
+`--command` with the server script's path instead.
 
 ## Skill, Command, and Agent Usage Policy
 
@@ -201,7 +204,7 @@ and reject the deletion if that comparison is flawed or incomplete rather than p
 partial check. If an agent flags "NEEDS MERGE" but the user says proceed anyway, ask for
 clarification rather than resolving the conflict yourself. After an irreversible mistake, state
 concretely what was lost and what can/cannot be recovered — speculating optimistically about the
-loss is inaccurate, give concrete facts.
+loss is inaccurate, give concrete facts — then ask the user what they want to do next.
 
 ## Pre-Existing Issues and Backlog Progression
 
