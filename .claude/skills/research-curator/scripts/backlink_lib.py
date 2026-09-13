@@ -524,7 +524,9 @@ def append_backlink_row(
     return ("\n".join(new_lines) + ("\n" if ends_with_newline else ""), True)
 
 
-def build_cross_reference_graph(vault_root: pathlib.Path) -> dict[pathlib.Path, list[pathlib.Path]]:
+def build_cross_reference_graph(
+    vault_root: pathlib.Path, *, quiet: bool = False
+) -> dict[pathlib.Path, list[pathlib.Path]]:
     """Build a directed adjacency list of all cross-reference edges in the vault.
 
     Walks all .md files under vault_root (excluding README.md), parses each entry's
@@ -532,40 +534,51 @@ def build_cross_reference_graph(vault_root: pathlib.Path) -> dict[pathlib.Path, 
 
     Args:
         vault_root: Absolute path to the research vault root directory.
+        quiet: When True, suppress ``warning: scan-skipped`` stderr output.
+            ``check-backlinks --fix`` calls this twice per run -- once to find
+            asymmetric edges, once more afterward to verify none remain -- and
+            a scan-skip is a pre-existing file defect the fix step never
+            touches, so the second call would otherwise reprint every skip
+            already reported by the first.
 
     Returns:
         Dict mapping each entry's absolute Path to a list of absolute Paths it cites.
         Entries with no Cross-References section appear with an empty list.
         Paths that cannot be resolved (broken links) are silently skipped.
     """
+    vault_root = vault_root.resolve()
     graph: dict[pathlib.Path, list[pathlib.Path]] = {}
 
     for md_file in sorted(vault_root.rglob("*.md")):
         if md_file.name == "README.md":
             continue
         abs_file = md_file.resolve()
+        rel_file = abs_file.relative_to(vault_root)
         graph.setdefault(abs_file, [])
 
         try:
             text = md_file.read_text(encoding="utf-8")
         except OSError as exc:
-            print(f"warning: scan-skipped, could not read {abs_file}: {exc}", file=sys.stderr)
+            if not quiet:
+                print(f"warning: scan-skipped, could not read {rel_file}: {exc}", file=sys.stderr)
             continue
 
         try:
             rows = parse_cross_references_table(text)
         except ValueError as exc:
-            print(f"warning: scan-skipped, could not parse {abs_file}: {exc}", file=sys.stderr)
+            if not quiet:
+                print(f"warning: scan-skipped, could not parse {rel_file}: {exc}", file=sys.stderr)
             continue
 
         for row_item in rows:
             try:
                 target = resolve_link_path(abs_file, row_item.link_path)
             except (OSError, ValueError) as exc:
-                print(
-                    f"warning: scan-skipped, could not resolve {row_item.link_path!r} in {abs_file}: {exc}",
-                    file=sys.stderr,
-                )
+                if not quiet:
+                    print(
+                        f"warning: scan-skipped, could not resolve {row_item.link_path!r} in {rel_file}: {exc}",
+                        file=sys.stderr,
+                    )
                 continue
             if target.exists():
                 graph[abs_file].append(target)

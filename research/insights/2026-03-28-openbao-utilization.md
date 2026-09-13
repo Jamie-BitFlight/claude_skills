@@ -22,7 +22,7 @@ OpenBao exposes callable integration surfaces at three layers:
 | `.claude/agents/c-systems-programmer.md` | Specialist developer agent for C code review and systems programming. OpenBao integration would require infrastructure orchestration layer (agent spawning, credential injection) not present in developer agents. |
 | `.claude/agents/javascript-pro.md` | Modern JavaScript specialist for application code review and development. Does not manage external services or credential infrastructure. |
 | `.claude/agents/code-review.md` | Code quality reviewer. Does not execute or integrate external services; only reviews code artifacts. |
-| `.claude/agents/research-context-agent.md` | Research cross-referencer. Analyzes research files for opportunities; does not execute or integrate external services. |
+| `.claude/agents/research-context-agent.md` (deleted 2026-09-13, PR #3529 — no successor) | Research cross-referencer. Analyzes research files for opportunities; does not execute or integrate external services. |
 | `.claude/agents/context-gathering.md` | Reads codebase and builds context manifests. Does not manage secrets or external services. |
 | `.claude/agents/context-refinement.md` | Updates agent prompts with discovered context. Does not integrate external services. |
 | `.claude/agents/backlog-mcp-validator.md` | Validates MCP server implementations. Does not integrate application-layer services. |

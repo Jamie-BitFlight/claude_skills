@@ -148,17 +148,28 @@ def parse_yaml_frontmatter(lines: list[str]) -> dict[str, Any]:
 
 
 def _yaml_body_lines(lines: list[str]) -> list[str]:
-    """Return the body lines after the closing ``---`` of YAML frontmatter.
+    """Return file lines with the YAML frontmatter blanked out, not removed.
+
+    Every check downstream computes 1-indexed line numbers (in both the
+    ``line`` field and embedded message text) from list position (``i + 1``).
+    Truncating the frontmatter off the front used to make those numbers
+    relative to where the frontmatter ends rather than the actual file --
+    every yaml_frontmatter entry's reported ``{file}:{line}`` locator was off
+    by that entry's frontmatter length. Blanking the frontmatter in place
+    instead keeps body content at its real file line number, so every
+    downstream number is already file-absolute.
 
     Args:
         lines: All file lines; first line must be ``---``.
 
     Returns:
-        Lines after the closing ``---``, or all lines when no closing found.
+        ``lines`` with the frontmatter block (opening ``---`` through closing
+        ``---``, inclusive) replaced by empty strings. Returns ``lines``
+        unchanged when no closing ``---`` is found.
     """
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
-            return lines[i + 1 :]
+            return [""] * (i + 1) + lines[i + 1 :]
     return lines
 
 
@@ -601,9 +612,19 @@ def _infer_research_root(resolved: list[Path]) -> Path:
 
     When all inputs share a common directory ancestor (e.g. ``research/``),
     that ancestor is returned and used as the base for relative path display.
-    If only a single path is provided and it is a directory, that directory is
-    the root. Falls back to the current working directory when the common
-    ancestor cannot be determined from the input set alone.
+    A lone directory argument is the root as-is (so scanning an arbitrary
+    vault directory reports paths relative to that vault, not to whatever
+    repository happens to contain it).
+
+    A lone *file* argument is the one case a plain "parent of the input"
+    heuristic cannot serve: the pre-commit hook passes exactly one staged
+    filename for a one-entry commit, and a root of that file's own directory
+    collapses the report to a bare basename with no path context left to
+    resolve it from. For that case only, walk up to the nearest enclosing
+    git repository root instead, so the printed locator stays resolvable
+    from the repo root the file actually lives under. Falls back to the
+    file's own parent when no repository is found (e.g. a throwaway vault
+    built by a test fixture, which is never inside a git repo of its own).
 
     Args:
         resolved: Non-empty list of file or directory paths to validate.
@@ -611,16 +632,17 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     Returns:
         A ``Path`` that is an ancestor of every path in ``resolved``.
     """
-    # Resolve all paths to absolute so commonpath works across relative inputs.
     absolute_paths = [p.resolve() for p in resolved]
-
-    # Directories contribute themselves; files contribute their parent.
-    # This means a lone directory arg returns that directory as the root,
-    # and a set of files returns their deepest common directory ancestor.
     candidate_dirs = [p if p.is_dir() else p.parent for p in absolute_paths]
 
     if len(candidate_dirs) == 1:
-        return candidate_dirs[0]
+        single = absolute_paths[0]
+        if single.is_dir():
+            return single
+        for candidate in (single.parent, *single.parent.parents):
+            if (candidate / ".git").exists():
+                return candidate
+        return single.parent
 
     # os.path.commonpath returns the longest common sub-path string.
     return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
@@ -933,7 +955,10 @@ def check_backlinks(
                 )
 
         print(f"backlinks_repaired: {repaired}")
-        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
+        # quiet=True: this rebuild only checks for remaining asymmetric edges after
+        # repair; the fix step never touches scan-skip defects, so re-scanning here
+        # would reprint every skip the first build (above) already reported.
+        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path, quiet=True)
         remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph_after)
         if remaining:
             sys.exit(1)
