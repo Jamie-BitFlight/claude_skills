@@ -476,6 +476,7 @@ Tools and frameworks for autonomous code security auditing and vulnerability det
 | [snyk-cli-cpp-scans.md](./code-auditing/snyk-cli-cpp-scans.md) | Snyk CLI hash-based open-source vulnerability scanning for C/C++ unmanaged dependencies via `--unmanaged` flag | 2026-02-23   |
 | [syft.md](./code-auditing/syft.md) | Syft v1.42.3 — Anchore SBOM generation tool: 3-stage pipeline (source resolution → cataloging → format output), 20+ ecosystem catalogers, CycloneDX/SPDX/Syft JSON output, signed attestations, Grype integration (8.6K stars, Apache-2.0) | 2026-03-28   |
 | [rope.md](./code-auditing/rope.md) | Rope v1.14.0 — pure Python AST-based refactoring library; 11 operations (rename, move, extract, inline, change signature, etc.); scope-aware symbol resolution, minimal deps (pytoolconfig only), Python 3.8-3.14 support, designed for IDE embedding (2.2K stars, LGPL-3.0) | 2026-03-29   |
+| [skylos.md](./code-auditing/skylos.md) | Skylos v4.36.1 — local-first static analysis, deterministic AI-code verification, agent guardrails, and contract-based behavior tests | 2026-09-13 |
 
 **Key Topics**:
 
