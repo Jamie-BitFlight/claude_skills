@@ -50,3 +50,29 @@ importing code itself. A root-level `ty.toml`, if one exists, takes precedence o
 resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see [AGENTS.md's "Common ty Failure
 Patterns"](AGENTS.md#common-ty-failure-patterns).
+
+### `unresolved-import` on a PEP 723 script, specifically in the language server
+
+If the file is a PEP 723 script (has a `# /// script … # ///` block, per the pattern above) and
+the false `unresolved-import` shows up in **live editor/LSP diagnostics** but `uv run ty check
+<path>` passes clean on the same file, this is **not** an `extra-paths` problem — do not add
+entries for it. Confirmed root cause (evidence trail and minimal 7-line reproduction in the PR that
+added this note): ty 0.0.75–0.0.80 type-checks a `# /// script` file as an isolated single-file
+project and never consults `[tool.ty.environment]` (from either `pyproject.toml` or `ty.toml`) for
+it — `extra-paths`, `root`, and every other environment key are silently ignored for that file,
+regardless of where they're declared. Tracked upstream, open, unfixed as of ty 0.0.80:
+<https://github.com/astral-sh/ty/issues/691>.
+
+The only thing that resolves this for a PEP 723 file is the `VIRTUAL_ENV` environment variable
+(config-file settings and `[[tool.ty.overrides]]` cannot carry an `environment` table — schema only
+accepts `include`/`exclude`/`rules`/`analysis`). `uv run ty check` already works because `uv run`
+sets `VIRTUAL_ENV`. The Astral plugin's bundled language server does not: its `lspServers.ty` entry
+launches `uvx ty@latest server` with no ambient `uv run`, no CLI flags (`ty server --help` takes
+only `-h`), and no supported way to override or add args to a single plugin-provided LSP server
+without disabling the whole plugin. This repo's fix is `.claude/settings.json`'s `env.VIRTUAL_ENV =
+".venv"` — a relative path so it resolves correctly from whichever project root Claude Code (or a
+`.claude/worktrees/*` worktree) launches the server from, once `uv sync` has created that
+directory's own `.venv` per the Environment Setup step in `AGENTS.md`. See
+[`docs/linting-and-type-checking.md`](docs/linting-and-type-checking.md) for the trustworthy-channel
+guidance and [`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the
+regression coverage.
