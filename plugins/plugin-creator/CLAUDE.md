@@ -69,6 +69,7 @@ flowchart TD
 | `/skill-creator` | Yes | Create skills from scratch or templates; handles scope and validation |
 | `/skill-goal-extractor` | Yes | Extract a skill's small set of explicit goals by reading it in full — for characterizing a skill's purpose before refactoring or reviewing it |
 | `/skill-sync` | Yes | Sync skill content against upstream documentation — update STALE SOURCE: URLs, add NEW upstream claims, enforce progressive-disclosure structure via /refactor-skill |
+| `/output-style-creator` | Yes | Create, validate, and ship Claude Code output styles — mechanism selection, frontmatter, scope placement, plugin packaging, activation and testing |
 | `/claude-skills-overview-2026` | Yes | Complete reference for Claude Code skills system (January 2026) |
 | `/claude-plugins-reference-2026` | Yes | Complete reference for Claude Code plugins system (January 2026) |
 | `/hooks-guide` | Yes | Cross-platform hooks reference — Claude Code, GitHub Copilot, Cursor, Windsurf, Amp |

@@ -6,7 +6,8 @@ Output styles change how Claude responds, not what Claude knows. They set Claude
 output format for every response. A custom style supplies its own instructions and chooses whether
 to keep Claude Code's built-in software engineering instructions.
 
-To create one, load `plugin-creator:output-style-creator`.
+To create one, load `plugin-creator:output-style-creator`. Both files mirror the same upstream page —
+re-sync them together via `plugin-creator:skill-sync`.
 
 ---
 
@@ -64,8 +65,8 @@ SOURCE: <https://code.claude.com/docs/en/output-styles.md> (accessed 2026-09-13)
 
 ## Custom Output Styles
 
-Markdown files with YAML frontmatter, saved at one of three levels. The filename becomes the style
-name unless `name` is set in the frontmatter.
+Markdown files with YAML frontmatter, saved at any of the levels below. The filename becomes the
+style name unless `name` is set in the frontmatter.
 
 - `~/.claude/output-styles/` — user level
 - `.claude/output-styles/` — project level

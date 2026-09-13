@@ -2,11 +2,10 @@
 
 Adapt these rather than writing from a blank file. Each is a complete style file: copy it to the
 chosen location, then rewrite the body for the actual role. Field semantics are in
-`output-style-schema.md`.
+[output-style-schema.md](./output-style-schema.md).
 
 The frontmatter shape and the `keep-coding-instructions` decision follow
 SOURCE: [Output styles](https://code.claude.com/docs/en/output-styles) (accessed 2026-09-13).
-The bodies below are authored instruction, not quoted documentation.
 
 ## Selection Guide
 
@@ -157,15 +156,6 @@ out. Do not close with a summary of what you just said.
 Deliver error text, security warnings, and destructive-action confirmations in full.
 ```
 
-Place the file at `{plugin-path}/output-styles/{name}.md` and leave `plugin.json` alone — the
-directory is auto-discovered, and declaring `outputStyles` replaces that scan. See
-`output-style-schema.md` for the packaging rules.
-
 ## Adaptation Checklist
 
-- [ ] Body addresses Claude in the imperative, never describes the style in the third person
 - [ ] Every rule is observable in a response — a reader could tell whether it was followed
-- [ ] Anything the style suppresses has a stated exception for errors, warnings, and confirmations
-- [ ] No project names, file paths, or conventions — those belong in `CLAUDE.md`
-- [ ] `keep-coding-instructions` matches whether the session still does engineering work
-- [ ] `force-for-plugin` present only when overriding the user's selection is intended

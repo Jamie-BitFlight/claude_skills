@@ -5,18 +5,8 @@ SOURCE: [Output styles](https://code.claude.com/docs/en/output-styles) (accessed
 ## File Shape
 
 An output style is a markdown file: YAML frontmatter, then the instructions Claude receives. The
-body replaces Claude Code's default system instructions unless `keep-coding-instructions` is set.
-
-```markdown
----
-name: Diagrams first
-description: Lead every explanation with a diagram
-keep-coding-instructions: true
----
-
-When explaining code, architecture, or data flow, start with a Mermaid diagram showing the
-structure, then explain in prose.
-```
+body replaces Claude Code's default system instructions. Setting `keep-coding-instructions: true`
+retains the built-in software engineering instructions on top of it.
 
 ## Frontmatter Fields
 
@@ -27,8 +17,8 @@ structure, then explain in prose.
 | `keep-coding-instructions` | Keep Claude Code's built-in software engineering instructions | `false` |
 | `force-for-plugin` | Plugin styles only: apply automatically whenever the plugin is enabled, overriding the user's `outputStyle` setting. When several enabled plugins set it, the first plugin loaded wins | `false` |
 
-`description` must be a single line. Multiline YAML indicators (`>-`, `|-`) fail validation in this
-repository's plugin content — see `plugin-creator:skill-creator` for the same constraint on skills.
+Keep `description` on a single line. Multiline YAML indicators (`>-`, `|-`) are a repository
+convention for plugin content; no tooling validates output-style frontmatter, so check it by hand.
 
 ## Install Locations
 
@@ -59,8 +49,8 @@ one closest to the working directory wins.
 }
 ```
 
-Settings precedence, highest first: managed settings, `claude --settings` on the command line,
-`.claude/settings.local.json`, `.claude/settings.json`, `~/.claude/settings.json`.
+Settings precedence, highest first: managed settings, command-line arguments passed when starting
+`claude`, `.claude/settings.local.json`, `.claude/settings.json`, `~/.claude/settings.json`.
 SOURCE: [Settings files and precedence](https://code.claude.com/docs/en/settings) (accessed 2026-09-13)
 
 The standalone `/output-style` command was deprecated in v2.1.73 and removed in v2.1.91.
@@ -72,14 +62,6 @@ The standalone `/output-style` command was deprecated in v2.1.73 and removed in 
 - In the terminal, style files are read at startup. Creating or editing a file during a running
   session requires a restart before Claude Code sees it.
 
-## How the Instructions Are Delivered
-
-- Claude Code sends the active style's instructions with every request.
-- When a style other than Default is selected, Claude Code also reminds Claude of the style during
-  the conversation.
-- A custom style omits the built-in software engineering instructions — how to scope changes, write
-  comments, and verify work — unless `keep-coding-instructions: true` is set.
-
 ## Scope Boundary: Subagents and Forks
 
 Output styles apply to the main conversation and to a fork, which inherits the parent's full
@@ -87,14 +69,6 @@ conversation and system prompt. Other subagents run their own system prompt, so 
 shape their responses. Behavior that must hold inside delegated work belongs in the agent
 definition, not in a style.
 SOURCE: [Subagents](https://code.claude.com/docs/en/sub-agents) (accessed 2026-09-13)
-
-## Token Cost
-
-- A style's instructions add input tokens on every request; prompt caching reduces the cost after
-  the first request in a session.
-- Explanatory and Learning produce longer responses than Default by design, increasing output
-  tokens. Concise does the opposite.
-- For a custom style, output token usage follows whatever the instructions tell Claude to produce.
 
 ## Packaging in a Plugin
 
@@ -121,21 +95,11 @@ Claude Code warns about an ignored default folder in `claude plugin list` and in
 view when both a default folder and the matching manifest key exist.
 SOURCE: [Plugins reference](https://code.claude.com/docs/en/plugins-reference) (accessed 2026-09-13)
 
-## Comparison to Related Features
-
-| Feature | How it works | Use it when |
-| --- | --- | --- |
-| Output styles | Changes Claude Code's default instructions | A different role, tone, or default response format is wanted every turn |
-| `CLAUDE.md` | Adds a user message after the system prompt | Claude should always know project conventions and codebase context |
-| `--append-system-prompt` | Appends to the system prompt without removing anything | A one-off addition passed as a CLI flag at launch |
-| Agents | Runs a subagent with its own system prompt, model, and tools | A separately scoped helper for a focused task is wanted |
-| Skills | Loads task-specific instructions when invoked or relevant | There is a reusable workflow |
-
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| New style absent from the `/config` picker | File created during a running terminal session | Restart Claude Code; style files are read at startup |
+| New style absent from the `/config` picker | File created during a running terminal session | Restart Claude Code; style files are read at startup. For a plugin-bundled style, `/reload-plugins` also picks it up |
 | Style picked but behavior unchanged | Change applies from the next message; on versions before v2.1.251 it needed `/clear` | Send another message, or start a new session |
 | Wrong style of the same name applied | Two nested `.claude/output-styles/` directories define it | The directory closest to the working directory wins — rename or remove one |
 | User's chosen style overridden | An enabled plugin sets `force-for-plugin: true` | Disable that plugin, or drop the field from the plugin style |

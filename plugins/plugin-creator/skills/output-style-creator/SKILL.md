@@ -8,15 +8,16 @@ If the user's intent does not match the purpose of this skill, load `plugin-crea
 
 # Output Style Creator
 
-Create output styles: markdown files whose body replaces Claude Code's default system instructions for every turn of a session. An output style sets role, tone, and default response format. It does not add knowledge and it does not run a workflow.
+Create output styles: markdown files whose body replaces Claude Code's default system instructions for every turn of a session. Setting `keep-coding-instructions: true` retains the built-in software engineering instructions alongside it. An output style sets role, tone, and default response format. It does not add knowledge and it does not run a workflow.
 
 SOURCE: [Output styles](https://code.claude.com/docs/en/output-styles) (accessed 2026-09-13)
 
 ## Quick Reference
 
-- `references/output-style-schema.md` — frontmatter fields, install locations and resolution order, plugin packaging, subagent behavior, token cost, troubleshooting
-- `references/output-style-templates.md` — complete ready-to-adapt style files for common roles
-- `plugin-creator:claude-skills-overview-2026` — skills system reference, including the stale-source protocol for `resources/output-styles.md`
+- [Output style schema](./references/output-style-schema.md) — frontmatter fields, install locations and resolution order, plugin packaging, subagent behavior, troubleshooting
+- [Output style templates](./references/output-style-templates.md) — complete ready-to-adapt style files for common roles
+- `plugin-creator:claude-skills-overview-2026` — skills system reference; its `resources/output-styles.md` mirrors this material from upstream
+- `plugin-creator:skill-sync` — re-sync both files when the upstream output-styles documentation changes
 - `plugin-creator:claude-plugins-reference-2026` — plugin manifest reference for `outputStyles` packaging
 
 ## Choose the Right Mechanism First
@@ -42,7 +43,7 @@ Confirm no built-in already covers the request:
 | Style | Behavior |
 | --- | --- |
 | Default | Standard software engineering instructions |
-| Proactive | Executes immediately, assumes instead of pausing, prefers action over planning; independent of permission mode |
+| Proactive | Executes immediately, assumes instead of pausing, prefers action over planning; works without changing the permission mode, which still decides what runs without asking |
 | Concise | Leads with the result, skips preamble, keeps responses short; full detail on request; requires Claude Code v2.1.237 or later |
 | Explanatory | Adds educational "Insights" between engineering tasks |
 | Learning | Shares insights and asks the user to write small strategic pieces; inserts `TODO(human)` markers |
@@ -74,7 +75,7 @@ USE AskUserQuestion to settle these before writing:
 4. Scope — user, project, managed policy, or plugin-bundled.
 5. Plugin activation — for a plugin style only: should it apply automatically when the plugin is enabled (`force-for-plugin`)?
 
-Set `keep-coding-instructions: true` when the session is still software engineering and only the communication changes. Leave it out when Claude is doing something else entirely, such as writing or data analysis — the built-in engineering instructions are then dead weight in the prompt.
+Set `keep-coding-instructions: true` when the session is still software engineering and only the communication changes. Leave it out when Claude is doing something else entirely, such as writing or data analysis.
 
 SOURCE: [Output styles — Create a custom output style](https://code.claude.com/docs/en/output-styles) (accessed 2026-09-13)
 
@@ -103,11 +104,11 @@ Authoring rules:
 - Address Claude directly in the imperative. The body becomes system instructions, not documentation about the style.
 - State what every response must do, not what the style is "for". "Start with the conclusion, then the evidence" is actionable; "this style is concise" is not.
 - Name the exception cases. A style that shortens output must say what is never shortened — error text, security warnings, destructive-action confirmations.
-- Keep the body proportionate. Every line is re-sent as input tokens on each request; prompt caching amortizes it after the first request of a session but does not remove it.
+- Keep the body proportionate. Every line is re-sent as input tokens on each request.
 - Put project facts in `CLAUDE.md`, not here. A style that names files or conventions stops being portable.
 - Do not restate Claude Code's default engineering instructions. Set `keep-coding-instructions: true` to retain them instead of paraphrasing them.
 
-Full field semantics and defaults: `references/output-style-schema.md`. Complete worked styles: `references/output-style-templates.md`.
+Full field semantics and defaults: [output-style-schema.md](./references/output-style-schema.md). Complete worked styles: [output-style-templates.md](./references/output-style-templates.md).
 
 ### Phase 4: Placement
 
@@ -116,7 +117,7 @@ Full field semantics and defaults: `references/output-style-schema.md`. Complete
 | User | `~/.claude/output-styles/{name}.md` | Every project for this user |
 | Project | `.claude/output-styles/{name}.md` | This repository, checked into git |
 | Managed policy | `.claude/output-styles/` inside the managed settings directory | Every user under the policy |
-| Plugin | `{plugin-path}/output-styles/{name}.md` | Every session with the plugin enabled |
+| Plugin | `{plugin-path}/output-styles/{name}.md` | Selectable in every session with the plugin enabled; applied without selection only with `force-for-plugin: true` |
 
 Project styles load from every `.claude/output-styles/` between the working directory and the repository root; on a name collision the directory closest to the working directory wins.
 
@@ -126,17 +127,17 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 
 ### Phase 5: Validation
 
-RUN these checks before reporting completion:
+RUN this check on every style, at any scope:
 
 ```bash
-# Frontmatter and structure of the containing plugin
+uv run --with pyyaml python -c "import re,sys,yaml; t=open(sys.argv[1]).read().split('---')[1]; d=yaml.safe_load(t); assert isinstance(d.get('description'), str), 'description must be a string'; assert not re.search(r'^description:\s*[|>]', t, re.M), 'description must not use a multiline YAML indicator'" {style-path}
+```
+
+For a plugin-bundled style, also validate the containing plugin:
+
+```bash
 uvx skilllint@latest check {plugin-path}
-
-# Plugin manifest and path references
 claude plugin validate {plugin-path}
-
-# YAML frontmatter parses
-python3 -c "import sys,yaml; yaml.safe_load(open(sys.argv[1]).read().split('---')[1])" {style-path}
 ```
 
 Checklist:
@@ -165,7 +166,7 @@ ACTIVATE the style:
 
 The standalone `/output-style` command was deprecated in v2.1.73 and removed in v2.1.91 — do not document or script it.
 
-A style switch applies starting with the next message. Before v2.1.251 it applied only after `/clear` or a new session. In the terminal, style files are read at startup, so restart Claude Code after creating or editing a file mid-session.
+A style switch applies starting with the next message. Before v2.1.251 it applied only after `/clear` or a new session. In the terminal, style files are read at startup, so restart Claude Code after creating or editing a file mid-session. For a plugin-bundled style, `/reload-plugins` picks up the change without a restart.
 
 TEST with prompts that exercise the style's rules, not just its happy path:
 
@@ -203,31 +204,11 @@ You are a technical writer. Produce prose in second person, present tense. Never
 blocks unless the user asks for one.
 ```
 
-### Suppression without exceptions
-
-A style that says "keep every answer to three lines" with no carve-out truncates stack traces and
-security warnings. State what is always delivered in full.
-
-### Re-implementing the coding instructions
-
-Paraphrasing "write tests, scope your changes, verify your work" costs tokens and drifts from the
-built-in wording. Set `keep-coding-instructions: true` instead.
-
-### Declaring `outputStyles` for the default directory
-
-Adding `"outputStyles": ["./output-styles/my-style.md"]` to `plugin.json` for a style already in
-`output-styles/` replaces the default scan and hides every other style in the plugin.
-
 ### Expecting a style to reach subagents
 
 Subagents run their own system prompt, so a style shapes only the main conversation and forks. A
 behavior that must hold inside delegated work belongs in the agent definition.
 
+SOURCE: [Subagents](https://code.claude.com/docs/en/sub-agents) (accessed 2026-09-13)
+
 </anti_patterns>
-
-## Sources
-
-- [Output styles](https://code.claude.com/docs/en/output-styles) (accessed 2026-09-13)
-- [Plugins reference](https://code.claude.com/docs/en/plugins-reference) (accessed 2026-09-13)
-- [Settings files and precedence](https://code.claude.com/docs/en/settings) (accessed 2026-09-13)
-- [Subagents](https://code.claude.com/docs/en/sub-agents) (accessed 2026-09-13)
