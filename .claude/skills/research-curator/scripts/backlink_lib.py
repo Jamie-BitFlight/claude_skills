@@ -387,11 +387,19 @@ def transform_to_backlink_description(
     truth does not depend on which side is named as subject. "Shares" is the only
     such case this function recognizes:
 
-    1. If source_category == target_category and "shares" appears in forward_phrase,
-       append "(bidirectional)". Sharing is symmetric by definition -- if the source
-       shares something with the target, the target shares it right back -- so the
-       phrase reads the same regardless of which entry is named as Entry, and
-       marking it bidirectional asserts nothing new.
+    1. If source_category == target_category and forward_phrase *begins* with
+       "shares", append "(bidirectional)". A phrase whose first word is the
+       symmetric verb has no leading clause describing one particular entity, so
+       the whole phrase reads the same regardless of which entry is named as
+       Entry, and marking it bidirectional asserts nothing new.
+
+       The "begins with" test is load-bearing, not cosmetic. A substring test
+       admits the far more common corpus shape
+       "<descriptor of the target>; shares <X> with <source>", whose leading
+       clause describes exactly one entity. Relocating that phrase under a row
+       whose Entry is the *other* entity re-attributes the descriptor -- often
+       producing a self-referential row asserting X "shares ... with X".
+       See tests/research_backlinks/test_relationship_transform.py.
     2. Otherwise, fall back to bare_reference_description(). This is a deliberate
        floor, not a placeholder: cross-reference-format.md's "no generic label" bar
        governs human/agent-authored forward rows, where a specific phrase is
@@ -411,7 +419,7 @@ def transform_to_backlink_description(
     Returns:
         A deterministic backlink relationship description string.
     """
-    if source_category == target_category and "shares" in forward_phrase.lower():
+    if source_category == target_category and forward_phrase.lstrip().lower().startswith("shares"):
         return f"{forward_phrase} (bidirectional)"
 
     return bare_reference_description(source_name, source_category)
@@ -509,9 +517,13 @@ def append_backlink_row(
 
     insert_idx = _find_freshness_insert_index(lines_stripped, anchor_idx)
 
+    # Only prepend a horizontal rule when the preceding content does not already end with one,
+    # otherwise the new section lands under a doubled "---\n\n---" separator.
+    preceding = next((ln for ln in reversed(lines_stripped[:insert_idx]) if ln.strip()), "")
+    separator = [] if preceding.strip() == "---" else ["", "---"]
+
     new_section_lines = [
-        "",
-        "---",
+        *separator,
         "",
         "## Cross-References",
         "",
