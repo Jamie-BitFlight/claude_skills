@@ -2387,12 +2387,15 @@ class TestUpdateItemTitleAndDescription:
         assert result.get("description_updated") is True
         assert _stored_item(fake_dir / "p1-desc-item.md").description == "Updated description text."
 
-    def test_update_item_description_no_github_call(self, mocker: MockerFixture) -> None:
-        """update_item with description= never calls GitHub.
+    def test_update_item_description_no_direct_github_client_call(self, mocker: MockerFixture) -> None:
+        """update_item with description= never calls the PyGithub client directly.
 
-        Tests: update_item description local-only path.
+        Tests: update_item description path does not use try_get_github/GraphQL
+               issue-editing helpers the way title rename does.
         How: Write an item with an issue; patch try_get_github; verify it is not called.
-        Why: Description is intentionally local-only per the spec (no GitHub sync).
+        Why: Unlike title, a description update never edits the issue directly via
+             PyGithub or GraphQL -- it goes through the reconcile/audit-comment path
+             instead (see test_update_item_description_triggers_immediate_reconcile).
         """
         import backlog_core.models as models
         from backlog_core.operations import update_item
@@ -2404,6 +2407,78 @@ class TestUpdateItemTitleAndDescription:
         update_item(selector="Desc GitHub Item", description="Local only description.")
 
         mock_try_gh.assert_not_called()
+
+    def test_update_item_description_triggers_immediate_reconcile(self) -> None:
+        """update_item with description= reconciles the linked issue immediately.
+
+        Tests: _update_item_description's #3458 fix -- a description update on a
+               linked item triggers a targeted reconcile in the same call, instead
+               of leaving the mutation queued for an unbounded-delay later reconcile
+               the way it did before this fix (title rename, grooming, and striking
+               already reconciled immediately; description alone did not).
+        How: Write an item with an issue; call update_item with description=; assert
+             the configured backend's reconcile() was invoked with a TARGETED request
+             naming that issue.
+        Why: Without this, a caller reading the item back immediately after a
+             "successful" description update sees stale content with no signal that
+             anything is still pending (#2985's currently-reproducible symptom).
+        """
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
+        from backlog_core.operations import update_item
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
+
+        result = update_item(selector="Reconcile Desc Item", description="Amended description.")
+
+        assert result.get("description_updated") is True
+        backend = cast("Any", get_config().backend)
+        assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#123"])
+
+    def test_update_item_description_without_issue_skips_reconcile(self) -> None:
+        """update_item with description= on an item with no linked issue never reconciles.
+
+        Tests: _update_item_description -> _reconcile_item's early return when
+               item.issue is empty -- a purely local item has nothing to reconcile.
+        How: Write an item with no issue; call update_item with description=; assert
+             the configured backend's reconcile() was never invoked.
+        Why: Reconciling a non-existent issue reference would be a wasted call at
+             best and a misleading error at worst.
+        """
+        import backlog_core.models as models
+        from backlog_core.backend_protocol import get_config
+        from backlog_core.operations import update_item
+
+        fake_dir: Path = models.get_backlog_dir()
+        _write_item(fake_dir, title="No Issue Desc Item", topic="no-issue-desc-item", issue="")
+
+        update_item(selector="No Issue Desc Item", description="Still local only.")
+
+        backend = cast("Any", get_config().backend)
+        assert backend.reconcile_requests == []
+
+    def test_update_item_description_refreshes_callers_item_object(self) -> None:
+        """_update_item_description refreshes the item object it was handed.
+
+        Tests: _update_item_description's in-place ``item.description`` refresh.
+        How: Seed an item, then pass a *separate* BacklogItem carrying the same
+             reference -- what a backend that parses a fresh object per read (the
+             GitHub file cache) hands update_item -- and assert that object sees
+             the new description.
+        Why: update_item renders a newly created GitHub issue's body from this same
+             object (_create_issue_and_update_item -> create_issue_for_item), so a
+             stale copy publishes the pre-update description while the call reports
+             description_updated: true (#2985).
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        filepath = _write_item(fake_dir, title="Detached Desc Item", topic="detached-desc-item")
+        detached = BacklogItem(title="Detached Desc Item", description="Stale text.", reference=str(filepath))
+
+        assert ops._update_item_description(detached, "Fresh text.") is True
+        assert detached.description == "Fresh text."
 
 
 # ---------------------------------------------------------------------------

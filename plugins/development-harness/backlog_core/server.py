@@ -2613,7 +2613,13 @@ async def backlog_update(
     ] = None,
     description: Annotated[
         str | None,
-        Field(description="New description text for the item. Updates the local file only — no GitHub sync."),
+        Field(
+            description=(
+                "New description text for the item. Reconciled immediately to the linked "
+                "GitHub issue as an audit-trail comment if the item has one; never edits the "
+                "issue's raw body field, which stays human-owned."
+            )
+        ),
     ] = None,
     entry_id: Annotated[
         str | None,
