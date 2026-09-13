@@ -107,6 +107,53 @@ class TestSharesMustLeadThePhrase:
 
 
 # ---------------------------------------------------------------------------
+# Regression: leading "shares" is necessary but NOT sufficient (PR #3531 second
+# review). Both cases below are latent -- no corpus row exhibits either -- and
+# both defeated the earlier `startswith("shares")` guard.
+# ---------------------------------------------------------------------------
+
+
+class TestLeadingSharesIsNotSufficient:
+    """The guard claimed a phrase beginning with the symmetric verb "reads the
+    same regardless of which entry is named as Entry". Two shapes falsify that.
+    """
+
+    def test_word_prefix_is_not_the_verb(self) -> None:
+        """`startswith` has no word boundary: "shareset" is not "shares"."""
+        result = bl.transform_to_backlink_description(
+            "shareset semantics differ", "robyn", "api-frameworks", "api-frameworks"
+        )
+        assert "bidirectional" not in result
+        assert result == bl.bare_reference_description("robyn", "api-frameworks")
+
+    def test_trailing_with_source_would_self_reference(self) -> None:
+        """ "shares <X> with <source>" leads with the verb and is still not symmetric.
+
+        The backlink row names the source as Entry, and Entry is the phrase's
+        grammatical subject, so carrying it over asserts "Robyn shares a queueing
+        model with Robyn".
+        """
+        result = bl.transform_to_backlink_description(
+            "shares a queueing model with Robyn", "Robyn", "api-frameworks", "api-frameworks"
+        )
+        assert "bidirectional" not in result
+        assert result == bl.bare_reference_description("Robyn", "api-frameworks")
+
+    def test_source_named_outside_a_with_clause_stays_eligible(self) -> None:
+        """Only the "with" construction collapses subject into object.
+
+        A phrase that mentions the source elsewhere is redundant under the
+        source's own Entry, not false. Seven corpus rows have this shape and
+        must keep their content.
+        """
+        forward_phrase = (
+            "Shares Tauri + Rust cross-platform desktop architecture; Yume focuses on multi-agent orchestration UI"
+        )
+        result = bl.transform_to_backlink_description(forward_phrase, "Yume", "developer-tools", "developer-tools")
+        assert result == f"{forward_phrase} (bidirectional)"
+
+
+# ---------------------------------------------------------------------------
 # Rule 2: bare_reference_description fallback -- no verb inversion, no verbatim
 # reattribution, ever
 # ---------------------------------------------------------------------------
