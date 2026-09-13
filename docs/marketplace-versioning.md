@@ -38,5 +38,5 @@ not bypass branch protection, approve, or merge the PR.
 
 ## Changing versioning behavior
 
-Fix shared versioning behavior in the agent-marketplace-versioner project, then move the pin.
+Fix shared versioning behavior in [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), then move the pin.
 This repository carries no consumer adapter.

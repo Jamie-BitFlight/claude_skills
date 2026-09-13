@@ -109,6 +109,8 @@ flowchart TD
 | `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |
 
+Manifest sync and plugin version bumps come from [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action, not a script in this plugin.
+
 ---
 
 ## Workflow Reference

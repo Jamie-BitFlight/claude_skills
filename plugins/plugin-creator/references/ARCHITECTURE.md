@@ -860,6 +860,7 @@ def test_token_count_deterministic(text):
 | Script | Purpose |
 |--------|---------|
 | `skilllint` | Main validation CLI — frontmatter, links, complexity, plugin structure |
+| `agent-marketplace-versioner` | External pre-commit hook and GitHub Action — syncs manifests and bumps plugin versions; see [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) |
 
 ---
 

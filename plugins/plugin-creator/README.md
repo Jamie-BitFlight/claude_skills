@@ -445,6 +445,8 @@ Routing summary:
 | `check_agent_auto_discovery.py` | Detect `plugin.json` arrays that silently mask auto-discovered components | `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py` |
 | `validate-task-file.sh` | Validate refactoring task file format | `./plugins/plugin-creator/scripts/validate-task-file.sh <path>` |
 
+Plugin and marketplace manifest versions are managed by [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action.
+
 See [scripts/README.md](./scripts/README.md) for full documentation of each script.
 
 ## Requirements

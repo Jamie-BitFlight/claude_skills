@@ -211,7 +211,7 @@ The shared versioner and one local guard run automatically via `.pre-commit-conf
 
 | Hook ID | Script | Trigger pattern | Purpose |
 |---|---|---|---|
-| `agent-marketplace-versioner` | Shared `agent-marketplace-versioner` distribution | all conventional manifests | Plugin versioning and marketplace membership reconciliation |
+| `agent-marketplace-versioner` | [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) (external) | all conventional manifests | Plugin versioning and marketplace membership reconciliation |
 | `check-agent-auto-discovery` | `check_agent_auto_discovery.py` | `^plugins/.*plugin\.json$` | Guard against silent component masking |
 
 ---

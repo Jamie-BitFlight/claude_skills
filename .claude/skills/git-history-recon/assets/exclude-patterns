@@ -18,7 +18,8 @@
 #     | grep -v '^$' | wc -l
 
 # Claude Code plugin manifest — plugins/*/.claude-plugin/plugin.json is
-# rewritten by this repo's `agent-marketplace-versioner` pre-commit hook on
+# rewritten by this repo's agent-marketplace-versioner pre-commit hook
+# (https://github.com/Jamie-BitFlight/agent-marketplace-versioner) on
 # every commit that touches any component inside
 # that plugin, bumping the version field regardless of whether the commit
 # fixed a defect. Confirmed via git log: plugins/development-harness's

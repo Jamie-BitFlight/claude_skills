@@ -169,7 +169,7 @@ Toolkit for building, refactoring, and validating plugins. Claude won't drift fr
 
 **Agents include:** `refactor-planner`, `refactor-executor`, `refactor-validator`, `subagent-refactorer` (applies Anthropic prompt engineering best practices), `skill-auditor`, `skill-content-updater`, `ai-doc-optimizer`, `plugin-assessor`.
 
-**Scripts include:** `create_plugin.py` (interactive scaffolding). The shared `agent-marketplace-versioner` pre-commit hook synchronizes manifests and bumps plugin versions.
+**Scripts include:** `create_plugin.py` (interactive scaffolding). The shared [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) pre-commit hook synchronizes manifests and bumps plugin versions.
 
 **Validation:** Integrates with `skilllint` (`uvx skilllint@latest check <path>`) for frontmatter validation, skill complexity checking, and auto-fix of common errors.
 
