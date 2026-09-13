@@ -74,9 +74,14 @@ the diagnostic, with no `initializationOptions` message required at all.
 
 - **CLI**: set `TY_UV=scripts` in the environment `ty check` runs in.
 - **Language server, generic protocol form**: set the experimental `useUv` initialization option to
-  `"scripts"` (or `"on"`) — `initialization_options.experimental.useUv` in the `initialize` request.
-  This is what Astral's announcement documents and what an editor extension typically exposes as a
-  setting.
+  `"scripts"` — `initialization_options.experimental.useUv` in the `initialize` request. This is
+  what Astral's announcement documents and what an editor extension typically exposes as a setting.
+- **`"scripts"` is the only value verified to work.** ty ignores an unrecognised value silently —
+  no warning, no non-zero exit — so a wrong value looks configured while the fix is off. Measured
+  on both ty 0.0.75 (pinned) and 0.0.80 (`uvx ty@latest`) against
+  `tests/fixtures/pep723_ty_environment_fixture.py`: `TY_UV=scripts` → `All checks passed!`;
+  `TY_UV=on` and any other value → `error[unresolved-import]: Cannot resolve imported module
+  typer`, stderr empty. Re-verify behaviourally before documenting any other value.
 - **Language server, environment-variable form**: since `ty server` reads `TY_UV` the same way
   `ty check` does (verified above), any client that can set the server process's environment can
   use the exact same env var as the CLI, with no protocol-level configuration at all.

@@ -12,7 +12,9 @@ dependencies, in both the CLI (`TY_UV=scripts`) and the language server (the `us
 initialization option). This repo's checked-in configuration for the language-server side is
 `.vscode/settings.json`'s `"ty.experimental.useUv"` key -- see
 `rules/python-development.md#unresolved-import-on-a-pep-723-script-specifically-in-the-language-server`
-for the full narrative and why `.claude/settings.json` needs no edit under this approach.
+for the full narrative, including the still-open Claude Code language-server gap: that consumer
+needs `"TY_UV": "scripts"` added to `.claude/settings.json`'s `env` block by a human, and this
+suite does not gate it.
 
 This suite reads that repo configuration file rather than restating its value, so deleting the
 config entry it guards fails `test_repo_configures_ty_experimental_use_uv`, and drifting its value
@@ -55,16 +57,19 @@ pytestmark = pytest.mark.skipif(
 def _bare_environment() -> dict[str, str]:
     """Build a subprocess environment with no ambient venv signal at all.
 
-    Strips `VIRTUAL_ENV`, `UV_PROJECT_ENVIRONMENT`, and the running interpreter's own `bin`
-    directory from `PATH` -- the entry the *test runner's own* `uv run pytest` invocation
+    Strips `VIRTUAL_ENV`, `UV_PROJECT_ENVIRONMENT`, `TY_UV`, and the running interpreter's own
+    `bin` directory from `PATH` -- the entry the *test runner's own* `uv run pytest` invocation
     prepended. Without this, `subprocess.run` would silently inherit the test runner's `PATH`
     (which already has the project environment first) and every case would resolve correctly
     regardless of what this function's caller sets afterward -- exactly the false-negative this
-    helper exists to prevent. This reproduces what a bare language server launch (e.g.
-    `uvx ty@latest server`) actually experiences: no project environment on `PATH`. `uv`/`uvx`
-    themselves are deliberately left reachable on `PATH`, matching reality -- `TY_UV=scripts`
-    needs `uv` on `PATH` to shell out to, and a real editor launch inherits the same shell `PATH`
-    that has `uv` on it even when it strips the project venv.
+    helper exists to prevent. `TY_UV` matters for the same reason and is easy to miss: the
+    `.claude/settings.json` `env` entry this repo asks for puts `TY_UV=scripts` into every process
+    Claude Code spawns, pytest included, which would make the `_run_ty_check(ty_uv=None)` case
+    resolve cleanly and silently turn the #691 canary into a skip. This reproduces what a bare
+    language server launch (e.g. `uvx ty@latest server`) actually experiences: no project
+    environment on `PATH`. `uv`/`uvx` themselves are deliberately left reachable on `PATH`,
+    matching reality -- `TY_UV=scripts` needs `uv` on `PATH` to shell out to, and a real editor
+    launch inherits the same shell `PATH` that has `uv` on it even when it strips the project venv.
 
     Returns:
         A fresh copy of the current process environment with every ambient venv signal removed.
@@ -72,6 +77,7 @@ def _bare_environment() -> dict[str, str]:
     env = dict(os.environ)
     env.pop("UV_PROJECT_ENVIRONMENT", None)
     env.pop("VIRTUAL_ENV", None)
+    env.pop("TY_UV", None)
     path_entries = env.get("PATH", "").split(os.pathsep)
     env["PATH"] = os.pathsep.join(p for p in path_entries if p and os.path.normpath(p) != str(VENV_BIN))
     return env
@@ -122,8 +128,13 @@ def test_repo_configures_ty_experimental_use_uv() -> None:
     behaviour below: deleting or renaming the `ty.experimental.useUv` key fails this test even if
     ty itself still behaves correctly, because the config that reaches contributors is what
     disappeared.
+
+    Pinned to `"scripts"` specifically. ty silently ignores any value it does not recognise --
+    no warning, no non-zero exit -- so a wrong value here reads as "configured" while the fix is
+    off. Verified on ty 0.0.75 and 0.0.80: `TY_UV=scripts` resolves the fixture, `TY_UV=on` does
+    not. Widen this set only after re-verifying the new value behaviourally.
     """
-    assert _read_configured_use_uv() in {"scripts", "on"}
+    assert _read_configured_use_uv() == "scripts"
 
 
 def test_ty_resolves_pep723_script_imports_under_repo_configured_use_uv() -> None:
@@ -133,8 +144,9 @@ def test_ty_resolves_pep723_script_imports_under_repo_configured_use_uv() -> Non
     server -- per the upstream announcement, both share one implementation) set to the value read
     from `.vscode/settings.json`, under otherwise-bare conditions (no `uv run`, no project
     environment on `PATH`) matching what a language server launch experiences. Coupling the value
-    to the config file means a future change to that value (e.g. `"scripts"` -> `"on"`) is
-    exercised here too, instead of drifting against a second hardcoded copy.
+    to the config file means a future change to that value is exercised here too, instead of
+    drifting against a second hardcoded copy -- which matters because ty ignores an unrecognised
+    value silently rather than erroring.
     """
     result = _run_ty_check(ty_uv=_read_configured_use_uv())
 
