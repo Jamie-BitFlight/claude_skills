@@ -26,10 +26,6 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 >
 > **Rerun Mode is included deliberately, and this is what it costs.** A refresh updates Last Verified, which puts the entry on the gated side of `RELEVANCE_ANCHOR_EXEMPT_BEFORE`, so refreshing a corpus entry that has never carried anchors makes `relevance_unanchored` a must-fix for that refresh. That is not an accident of the cutoff: Rerun Mode's own graph runs ReAnchor on every pass, so an entry that comes out of a refresh still unanchored is a skipped ReAnchor, not a legacy artifact. The consequence to expect: the first refresh of an unanchored entry does Phase 1c work it has never done, and if that work is skipped the orchestrator marks the entry refreshed with issues and skips the analysis fan-out for it.
 
-### Info Severity (optional)
-
-- **formatting_suggestions**: Minor markdown formatting issues (missing blank lines around fences, inconsistent heading levels)
-
 ---
 
 ## Validation Gate for New/Refreshed Entries

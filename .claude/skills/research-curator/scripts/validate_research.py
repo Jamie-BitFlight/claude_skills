@@ -160,17 +160,28 @@ def parse_yaml_frontmatter(lines: list[str]) -> dict[str, Any]:
 
 
 def _yaml_body_lines(lines: list[str]) -> list[str]:
-    """Return the body lines after the closing ``---`` of YAML frontmatter.
+    """Return file lines with the YAML frontmatter blanked out, not removed.
+
+    Every check downstream computes 1-indexed line numbers (in both the
+    ``line`` field and embedded message text) from list position (``i + 1``).
+    Truncating the frontmatter off the front used to make those numbers
+    relative to where the frontmatter ends rather than the actual file --
+    every yaml_frontmatter entry's reported ``{file}:{line}`` locator was off
+    by that entry's frontmatter length. Blanking the frontmatter in place
+    instead keeps body content at its real file line number, so every
+    downstream number is already file-absolute.
 
     Args:
         lines: All file lines; first line must be ``---``.
 
     Returns:
-        Lines after the closing ``---``, or all lines when no closing found.
+        ``lines`` with the frontmatter block (opening ``---`` through closing
+        ``---``, inclusive) replaced by empty strings. Returns ``lines``
+        unchanged when no closing ``---`` is found.
     """
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
-            return lines[i + 1 :]
+            return [""] * (i + 1) + lines[i + 1 :]
     return lines
 
 
@@ -302,44 +313,6 @@ def _check_access_dates(lines: list[str], sections: dict[str, tuple[int, int]]) 
                 "message": f"Reference without access date on line {i + 1}",
                 "line": i + 1,
             })
-    return issues
-
-
-def _check_formatting_suggestions(lines: list[str]) -> list[Issue]:
-    """Check for minor markdown formatting issues (MD031: blank lines around fences).
-
-    Returns:
-        List of Issue dicts with severity 'info' for each formatting issue found.
-    """
-    issues: list[Issue] = []
-    in_fence = False
-
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("```"):
-            if not in_fence:
-                in_fence = True
-                if i > 0:
-                    prev = lines[i - 1].strip()
-                    if prev and not prev.startswith("#") and prev != "---":
-                        issues.append({
-                            "check": "formatting_suggestions",
-                            "severity": "info",
-                            "message": f"Missing blank line before code fence on line {i + 1}",
-                            "line": i + 1,
-                        })
-            else:
-                in_fence = False
-                if i + 1 < len(lines):
-                    next_line = lines[i + 1].strip()
-                    if next_line and not next_line.startswith("#") and next_line != "---":
-                        issues.append({
-                            "check": "formatting_suggestions",
-                            "severity": "info",
-                            "message": f"Missing blank line after code fence on line {i + 1}",
-                            "line": i + 1,
-                        })
-
     return issues
 
 
@@ -815,9 +788,23 @@ def _infer_research_root(resolved: list[Path]) -> Path:
 
     When all inputs share a common directory ancestor (e.g. ``research/``),
     that ancestor is returned and used as the base for relative path display.
-    If only a single path is provided and it is a directory, that directory is
-    the root. Falls back to the current working directory when the common
-    ancestor cannot be determined from the input set alone.
+    A lone directory argument is the root as-is (so scanning an arbitrary
+    vault directory reports paths relative to that vault, not to whatever
+    repository happens to contain it).
+
+    An all-*files* argument list is the case a plain "common ancestor of the
+    inputs" heuristic cannot serve. The pre-commit hook runs with
+    ``pass_filenames: true``, so it passes the staged entries themselves --
+    one filename for a one-entry commit, N for an N-entry commit. Their common
+    ancestor is the entries' own directory whenever they share a category
+    (``research/coding-agents/`` for three staged entries from that category),
+    which collapses every locator to a bare basename with no path context left
+    to resolve it from. For an all-files argument list, walk up from that
+    common ancestor to the nearest enclosing git repository root instead, so
+    the printed locator stays resolvable from the repo root the files actually
+    live under. Falls back to the common ancestor when no repository is found
+    (e.g. a throwaway vault built by a test fixture, which is never inside a
+    git repo of its own).
 
     Args:
         resolved: Non-empty list of file or directory paths to validate.
@@ -825,19 +812,23 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     Returns:
         A ``Path`` that is an ancestor of every path in ``resolved``.
     """
-    # Resolve all paths to absolute so commonpath works across relative inputs.
     absolute_paths = [p.resolve() for p in resolved]
-
-    # Directories contribute themselves; files contribute their parent.
-    # This means a lone directory arg returns that directory as the root,
-    # and a set of files returns their deepest common directory ancestor.
     candidate_dirs = [p if p.is_dir() else p.parent for p in absolute_paths]
 
     if len(candidate_dirs) == 1:
-        return candidate_dirs[0]
+        common = candidate_dirs[0]
+    else:
+        # os.path.commonpath returns the longest common sub-path string.
+        common = Path(os.path.commonpath([str(d) for d in candidate_dirs]))
 
-    # os.path.commonpath returns the longest common sub-path string.
-    return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
+    if any(p.is_dir() for p in absolute_paths):
+        return common
+
+    for candidate in (common, *common.parents):
+        # A worktree's .git is a file, not a directory -- exists() covers both.
+        if (candidate / ".git").exists():
+            return candidate
+    return common
 
 
 def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
@@ -881,7 +872,6 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_access_dates(body_lines, sections))
         all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
         all_issues.extend(_check_url_format(body_lines))
-        all_issues.extend(_check_formatting_suggestions(body_lines))
         entry_date = reference_date_yaml(frontmatter, body_lines, sections)
         all_issues.extend(check_cross_references(sections, entry_date))
         all_issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
@@ -898,7 +888,6 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_access_dates(lines, sections))
         all_issues.extend(_check_freshness_tracking_text(lines, sections))
         all_issues.extend(_check_url_format(lines))
-        all_issues.extend(_check_formatting_suggestions(lines))
         entry_date = reference_date_text(header_lines, lines, sections)
         all_issues.extend(check_cross_references(sections, entry_date))
         all_issues.extend(check_relevance_anchored(lines, sections, entry_date))
@@ -1060,13 +1049,17 @@ def _print_text_report(entries: list[dict[str, Any]], total_errors: int, total_w
     else:
         print(f"  {total_warnings} warnings")
     if verbose:
-        print()
         for entry in entries:
+            if not entry["issues"]:
+                continue
+            print()
             marker = "✓" if entry["status"] == "pass" else "✗"
             print(f"{marker} {entry['file']} [{entry['format']}]")
             for issue in entry["issues"]:
                 severity_label = issue["severity"].upper()
-                print(f"  {severity_label}: {issue['message']}")
+                line = issue.get("line")
+                locator = f"{entry['file']}:{line}" if line else entry["file"]
+                print(f"  {severity_label} {locator} [{issue['check']}] {issue['message']}")
 
 
 @app.command()
@@ -1097,17 +1090,10 @@ def main(
     passed = sum(1 for e in entries if e["status"] == "pass")
     total_errors = sum(1 for e in entries for i in e["issues"] if i["severity"] == "error")
     total_warnings = sum(1 for e in entries for i in e["issues"] if i["severity"] == "warning")
-    total_info = sum(1 for e in entries for i in e["issues"] if i["severity"] == "info")
 
     if output_json:
         result = {
-            "summary": {
-                "total": total,
-                "passed": passed,
-                "errors": total_errors,
-                "warnings": total_warnings,
-                "info": total_info,
-            },
+            "summary": {"total": total, "passed": passed, "errors": total_errors, "warnings": total_warnings},
             "entries": entries,
         }
         print(json.dumps(result, indent=2))
@@ -1158,7 +1144,10 @@ def check_backlinks(
                 )
 
         print(f"backlinks_repaired: {repaired}")
-        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path)
+        # quiet=True: this rebuild only checks for remaining asymmetric edges after
+        # repair; the fix step never touches scan-skip defects, so re-scanning here
+        # would reprint every skip the first build (above) already reported.
+        graph_after: dict[Path, list[Path]] = bl.build_cross_reference_graph(vault_path, quiet=True)
         remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(graph_after)
         if remaining:
             sys.exit(1)

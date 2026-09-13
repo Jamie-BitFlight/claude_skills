@@ -30,7 +30,7 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 | Command | What a defect looks like | Record |
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. `--check` does not write; drop `--check` only when this review is also applying fixes |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N, info: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
+| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
 | `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry | Each asymmetric pair by both paths. Run without `--fix` to review; `--fix` repairs but hides what was wrong |
 
 **Cross-reference reciprocity** is measured by `check-backlinks`, not by eye. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
@@ -70,7 +70,13 @@ Every statement an entry or an analysis file makes about **this repository** is 
 
 For each repo claim, in order:
 
-1. **Path exists** — read the path the claim names. A proposal resting on a path that is not in the repo is a defect, full stop. Resolve it yourself; do not assume a near-miss was a typo.
+1. **Path exists** — open the path first. If it opens, step 2 applies: verify what it says against
+   what is actually there. If it does not open, decide which kind of claim it was before recording a
+   defect:
+   A claim about **what is there now** — "`X` already does Y", "the hook in `Z` writes the field" — is a defect when the path does not open. Record what was named and what is actually there; do not repair a near-miss on the writer's behalf.
+   A path named as a **place to create something** is not a defect for being absent. That is the entire purpose of an Integration Opportunities item: the file's absence is the reason the proposal exists. "Integration point: `.claude/hooks/pre-push.js`", "new skill in `plugins/developer-tools/skills/ci-debugger/`", "new file at", "target state", "could add", "consider adding" are all this second kind. For one of these, check instead that the parent location it would go into exists, and let step 3 settle whether something already implements it.
+   Opening first rather than classifying first means a path renamed or removed elsewhere in the repo
+   since the claim was written is caught by this same read, not waved through as a creation target.
 2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
@@ -111,7 +117,18 @@ Scan the entry and both analysis files for each trigger. Quote every hit.
 | **Pseudo-quantification** | Scores and percentages — "8.5/10", "70% faster", "100% coverage" | The figure is quoted from a primary source with its method, or the entry states the method used to produce it | Replace with the measured evidence, or remove the figure |
 | **Completeness overclaims** | "all files checked", "comprehensive analysis", "fully resolved", "everything fixed", "every skill reviewed" | The text lists the concrete checks performed and their scope | List what was inspected and with what scope, or narrow the claim to what was actually covered |
 
-SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13); also reachable in this repo as the `/hallucination-detector:hallucination-audit` command.
+These four triggers are copied in **by decision, not by fallback, and scoped to Gate 6 only** —
+this does not contradict `AGENTS.md`'s skill-policy table routing "Reviewing agent output" to
+`/hallucination-detector:hallucination-audit` for other review contexts. Nothing under
+`.claude/skills/research-curator/`, or in the agents it spawns, calls that plugin; the plugin is not
+in `enabledPlugins` in `.claude/settings.json`, so `/hallucination-detector:hallucination-audit` is
+not reachable in this checkout; and `harness_compatibility.json` carries no entry for it, so it is
+reachable in no other harness either. Whether it is enabled is therefore not a question this gate's
+behaviour turns on. Do not re-open it, and do not replace this table with a call to that plugin or
+any other out-of-skill route: everything Gate 6 needs lives under
+`.claude/skills/research-curator/`.
+
+SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13) — copied in and re-scoped, not referenced. Plugin availability read from `.claude-plugin/marketplace.json`, `.claude/settings.json` `enabledPlugins`, and `harness_compatibility.json` (2026-09-13); `AGENTS.md` Repository Overview states the plugin is "not enabled by default in every install".
 
 ---
 
@@ -124,7 +141,7 @@ REVIEW: ./research/{category}/{name}.md
 
 GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   fix_research_formatting --check: exit {N}
-  validate_research main --json:   errors {N}, warnings {N}, info {N}
+  validate_research main --json:   errors {N}, warnings {N}
   check-backlinks:                 {N} asymmetric pairs
 GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
 GATE 3 depth:         PASS | FAIL — sections failed: {names}

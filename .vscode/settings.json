@@ -1,0 +1,4 @@
+{
+  "//": "Parsed with json.loads (not a JSONC parser) by tests/test_ty_pep723_environment.py -- do not add real // line comments to this file, only literal JSON string keys like this one.",
+  "ty.experimental.useUv": "scripts"
+}

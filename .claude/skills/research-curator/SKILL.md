@@ -212,20 +212,20 @@ flowchart TD
 
 Trigger: `<mode_args/>` contains `--validate`.
 
-`validate_research.py` checks each entry against [Validation Rules](./references/validation-rules.md) and emits JSON at three severity levels.
+`validate_research.py` checks each entry against [Validation Rules](./references/validation-rules.md) and emits JSON keyed by the severities that reference defines.
 
 ```mermaid
 flowchart TD
     Start(["Parse --validate argument value"]) --> Q{"What is the --validate target value?"}
     Q -->|"category/name — single entry path"| RunScript["Run validate_research.py --json<br>on ./research/category/name.md"]
     Q -->|"all — validate every entry"| RunScriptAll["Run validate_research.py --json<br>on ./research/ directory"]
-    RunScript --> ParseJSON["Parse JSON output<br>Extract issues keyed by severity: error, warning, info<br>Count totals per severity"]
+    RunScript --> ParseJSON["Parse JSON output<br>Extract issues keyed by severity: error, warning<br>Count totals per severity"]
     RunScriptAll --> ParseJSON
     ParseJSON --> HasErrors{"Does parsed output contain<br>any error-severity issues?"}
     HasErrors -->|"Yes — N error-severity issues found"| SpawnFix["Spawn @research-curator agents in waves of 5<br>Each agent receives --fix flag<br>PLUS the exact error list for that entry from JSON output<br>(not a summary — the raw issue text)"]
-    HasErrors -->|"No — zero error-severity issues"| ReportClean["Report: all entries passed. Include exact warning and info counts."]
+    HasErrors -->|"No — zero error-severity issues"| ReportClean["Report: all entries passed. Include the exact warning count."]
     SpawnFix --> RelayCheck["Apply the Agent Result Relay Rules<br>to all fix-agent results"]
-    RelayCheck --> ReportSummary["Report validation summary with exact counts<br>(total scanned, passed, errors fixed, warnings noted, info items)"]
+    RelayCheck --> ReportSummary["Report validation summary with exact counts<br>(total scanned, passed, errors fixed, warnings noted)"]
     ReportSummary --> PostActions(["Execute Post-Actions — lint, commit, push"])
     ReportClean --> PostActions
 ```
@@ -240,7 +240,6 @@ uv run .claude/skills/research-curator/scripts/validate_research.py main --json 
 
 - **error** -- spawn `@research-curator` with `--fix` and the exact issue list extracted from JSON
 - **warning** -- include the exact warning text in the report to the user; do not auto-fix
-- **info** -- include the exact info text in the report; no action needed
 
 This report-only handling of warnings applies to the pre-existing entries Validate Mode scans. An entry that Default, Batch, or Rerun Mode created or refreshed **this invocation** instead follows the stricter [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries).
 
@@ -353,7 +352,11 @@ in [Mode Routing](#mode-routing).
    4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
       structural non-zero exit (a dangling link to a missing target) and a
       `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
-      e.g. a Cross-References row with no markdown link). Do not parse the printed
+      e.g. a Cross-References row with no markdown link). A `warning: scan-skipped, ...` line
+      belongs here too: that file was dropped from the graph before it could be compared, so the
+      printed `asymmetric_cross_references: N` undercounts by whatever it holds. Report each
+      scan-skipped path and its reason verbatim -- the file is repairable and nothing else in the
+      repo will name it -- then continue. Do not parse the printed
       `{source} -> {target}` lines to guess which files were modified -- they list every asymmetric
       edge found *before* repair was attempted, not which repairs succeeded. Step 3's diff
       determines what this command actually changed.
@@ -496,5 +499,16 @@ YYYY-MM-DD
 ```
 
 </output_format>
+
+## Preserved, Not Wired
+
+No mode below runs an integration-opportunity search; `/process-research-integration` and the
+`research-context-agent` that served it were deleted in PR #3529. The part of that agent's search
+procedure that was carried forward, and an inventory of the part that was not, is in
+[Integration Opportunity Search](./references/integration-opportunity-search.md). Load it only when
+redesigning that search or regenerating an existing `## Integration Opportunities` section — no
+step in this skill reads it.
+
+---
 
 SOURCE: Agent result relay rules adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).

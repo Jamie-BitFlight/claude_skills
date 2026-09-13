@@ -74,7 +74,7 @@ def _fence_has_language(line: str) -> bool:
 def _needs_blank_before(lines: list[str], fence_index: int) -> bool:
     """Return True when the line before an opening fence is non-blank.
 
-    Mirrors the condition used by validate_research._check_formatting_suggestions:
+    MD031: blank line required on both sides of a fenced block.
     a non-empty preceding line that is not a heading and not a ``---`` separator
     requires a blank line inserted before the fence.
 
@@ -94,7 +94,7 @@ def _needs_blank_before(lines: list[str], fence_index: int) -> bool:
 def _needs_blank_after(lines: list[str], fence_index: int) -> bool:
     """Return True when the line after a closing fence is non-blank.
 
-    Mirrors the condition used by validate_research._check_formatting_suggestions:
+    MD031: blank line required on both sides of a fenced block.
     a non-empty following line that is not a heading and not a ``---`` separator
     requires a blank line inserted after the fence.
 

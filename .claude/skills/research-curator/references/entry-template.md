@@ -204,7 +204,7 @@ How the resource works internally. Include diagrams if helpful.
 > `Source: src/core/engine.py — class TaskEngine, src/core/graph.py — class DependencyGraph`
 
 > **Note**: `## Cross-References` is populated by `@research-cross-referencer` (forward rows) and
-> `@research-backlink-detector` (reciprocal rows); add it by hand for a manually created entry.
+> `validate_research.py check-backlinks --fix` (reciprocal rows); add it by hand for a manually created entry.
 > Row shape, placement anchor, relative-path rules and the relationship-phrase bar:
 > [Cross-Reference Format](./cross-reference-format.md).
 

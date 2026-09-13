@@ -1,8 +1,8 @@
 # Cross-Reference Format
 
 The canonical shape of a research entry's `## Cross-References` section. Every producer writes rows
-in exactly this form — `@research-cross-referencer` (forward links), `@research-backlink-detector`
-(reciprocal rows), and anyone adding a row by hand.
+in exactly this form — `@research-cross-referencer` (forward links), `validate_research.py
+check-backlinks --fix` (reciprocal rows), and anyone adding a row by hand.
 
 ---
 
@@ -43,7 +43,7 @@ Relative paths are computed from the directory of the entry the row is being wri
 
 Within a category: `./other-entry.md`. Across categories: `../other-category/filename.md`. Use `pathlib.Path` to compute the relative path rather than assembling it by hand.
 
-Every path must resolve to a real file. Rows pointing at paths that do not exist on disk are defects — `validate_research.py check-backlinks` reports them, and `@research-backlink-detector` skips them with reason `path not found`.
+Every path must resolve to a real file. `validate_research.py check-backlinks` reports rows pointing at paths that do not exist on disk, and `--fix` skips them rather than writing a reciprocal row into nothing.
 
 ---
 
