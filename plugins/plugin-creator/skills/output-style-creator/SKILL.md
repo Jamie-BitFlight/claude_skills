@@ -63,9 +63,9 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
    uv run "$SKILL_DIR/scripts/validate_output_style.py" discover --plugin '{plugin-path}'
    ```
 
-   Substitute **absolute** paths, inside single quotes as above. Do not change the working directory to run the script: a relative `--plugin`, `--start` or style path resolves against wherever the caller stands, so a `cd` into this skill silently repoints it and discovery reports nothing. Single quotes keep whitespace, `$` and a backtick intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `project_rejected_paths`, `plugin`, `plugin_declared_paths`, and `plugin_rejected_paths` keys.
+   Substitute **absolute** paths in single quotes, as above; write each `'` inside a path as `'\''`. Omit `--plugin` when no plugin is in scope. `--start <directory>` walks up from somewhere other than the working directory.
 
-2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`. A non-empty `plugin_rejected_paths` means the manifest declared a path outside the plugin root, one missing the required `./` prefix, or a style file whose symlink target escapes the plugin. A non-empty `project_rejected_paths` means a project style links outside the repository. Discovery does not return any of them, and you must not read what they point at — a checkout can belong to someone else. Treat each as a defect in the plugin manifest or the repository that declares it.
+2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope from a subdirectory, and a managed-policy style explains one in force that appears at no other level. A plugin's `outputStyles` key replaces the default scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`. Report any path under `plugin_rejected_paths` or `project_rejected_paths` as a defect in the manifest or repository that declares it.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering
@@ -114,14 +114,12 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 
 ### Phase 5: Validation
 
-RUN this check on every style, at any scope. It exits non-zero when the style fails, so a caller can gate on the exit code. Assign `SKILL_DIR` again here — each shell invocation is a fresh process, so the Phase 1 assignment is gone. Use the same absolute-path rule as Phase 1:
+RUN this check on every style, at any scope. It exits non-zero on failure and names each failure in `problems`, so a caller can gate on the exit code:
 
 ```bash
 SKILL_DIR='<absolute path of the directory holding this SKILL.md>'
 uv run "$SKILL_DIR/scripts/validate_output_style.py" check '{style-path}'
 ```
-
-It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules it enforces: frontmatter opens and closes with `---` on its own line; the frontmatter parses to a YAML mapping; `name` and `description` are strings when present; `keep-coding-instructions` and `force-for-plugin` are booleans when present; `description` occupies a single line and carries no newline in any YAML encoding; the frontmatter uses no YAML merge key, which would source a field from another mapping and hide where it was written.
 
 For a plugin-bundled style, also validate the containing plugin:
 
@@ -134,9 +132,9 @@ else
 fi
 ```
 
-`skilllint` runs anywhere. `claude plugin validate` needs the Claude Code CLI, which a Codex, Hermes or Kimi session may not have. The `if` form exits zero when the CLI is absent, so the phase reads as skipped rather than failed, and still surfaces a real `claude plugin validate` failure when the CLI is present. When it is skipped, say so in the completion report and record that the manifest check is still outstanding.
+Report a skipped `claude plugin validate` in the completion report, with the manifest check still outstanding.
 
-The script covers the frontmatter only. A style with valid frontmatter and an empty body exits 0, so READ the remaining checks yourself — the script cannot make any of them:
+The script covers the frontmatter. A style with an empty body exits 0, so READ these yourself:
 
 - [ ] `name` matches the intended display name, or is omitted deliberately so the filename supplies it
 - [ ] `keep-coding-instructions` reflects whether the session still does engineering work
