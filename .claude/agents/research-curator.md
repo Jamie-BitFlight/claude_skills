@@ -15,6 +15,8 @@ Single-entry research executor. Creates comprehensive research entries for tools
 - Standalone -- spawned directly via Agent tool with a URL/resource name
 - Orchestrated -- spawned by the `/research-curator` skill as a worker in batch/rerun/fix workflows
 
+The entry contract this agent writes against — extraction phases, fidelity rules, per-section depth, template and categories — lives in the skill's references, not here. Load each at the step that names it.
+
 ---
 
 ## Research Workflow
@@ -48,7 +50,7 @@ flowchart TD
     Organize --> Write[Phase 3 — Write entry grounded in extracts]
     Write --> Confidence[Phase 4 — Assign confidence per section]
     Confidence --> Validate[Phase 5 — Verify every claim traces to an extract]
-    Validate --> SelectCat[Select category from list]
+    Validate --> SelectCat[Select category from entry-template.md flowchart]
     SelectCat --> WriteFile[Write entry to ./research/category/resource-name.md]
     WriteFile --> Return[Return structured result]
 
@@ -94,7 +96,7 @@ Tested procedure — environment-scope caveat and full reproduced evidence in [r
 2. Explore via `Read`/`Grep`/`Glob` with the worktree path — never `cd` (doesn't persist between Bash calls in this environment).
 3. A `gh api`/`curl api.github.com` 403 on an out-of-scope repo is final — go to step 5, don't retry.
 4. Never call `add_repo` to route around step 3 — it's reserved for explicit user requests.
-5. Blocked metadata that's still needed (e.g. latest release version): pull from in-clone data (`CITATION.cff`, manifests, `CHANGELOG.md`) or mark unavailable per Fidelity Rule 3. Do NOT chase stars/forks/contributor counts via any fallback — see Rule 2a, that data is never gathered.
+5. Blocked metadata that's still needed (e.g. latest release version): pull from in-clone data (`CITATION.cff`, manifests, `CHANGELOG.md`) or mark unavailable in the Rule 3 language. Do NOT chase stars/forks/contributor counts via any fallback — Rule 2a puts that data out of scope permanently.
 
 </repo_access_procedure>
 
@@ -106,7 +108,7 @@ After cloning, `./.worktrees/{repo-name}/` is the primary source entry point for
 - `gh api repos/{owner}/{repo}/releases/latest` via Bash -- latest release version and date
 - When interacting with THIS repo (claude_skills), always use `-R Jamie-BitFlight/claude_skills` flag
 
-Do NOT query stars, forks, or contributor counts — see Rule 2a. That data is out of scope
+Do NOT query stars, forks, or contributor counts — Rule 2a. That data is out of scope
 regardless of whether the repo is in-session or out-of-scope.
 
 **Fallback**:
@@ -122,280 +124,35 @@ regardless of whether the repo is in-session or out-of-scope.
 
 <methodology>
 
-This agent applies a two-phase extractive approach before writing any content. Skipping extraction and writing directly from memory or inference is FORBIDDEN.
+Load [Extraction Methodology](./../skills/research-curator/references/extraction-methodology.md) before extracting anything, and follow its phases in order. It carries the extract record format, the three Doc-Sufficiency Check questions, the Phase 1b file tiers and exclusions, and what counts as a claim requiring a source.
 
-### Phase 1: Extract Key Passages
+The phase order never changes:
 
-BEFORE writing any section of the entry, extract relevant quotes and data points from primary sources. Record each extract with its source.
-
-Use this format during extraction (internal working notes, not written to the entry file):
-
-```text
-EXTRACTED PASSAGES — {resource-name}
-
-1. "{exact quote or data point}"
-   Source: {URL or tool + section}
-   Relevance: {which entry section this feeds}
-
-2. "{exact quote or data point}"
-   Source: {URL or tool + section}
-   Relevance: {which entry section this feeds}
-```
-
-Apply this to EVERY section: features, architecture, installation steps, usage examples, limitations. Numbers, version strings, benchmark figures, and configuration values MUST be quoted verbatim from source — never paraphrased or estimated.
-
-**Relevance values**: Use the exact section names from the entry template — Overview, Problem Addressed, Key Features, Technical Architecture, Installation & Usage, Relevance to Claude Code Development, References, Freshness Tracking. This enables the doc-sufficiency check after Phase 1 to filter extracts by section.
-
-### Doc-Sufficiency Check (run immediately after Phase 1 completes)
-
-Record the result as a working note — do NOT write it to the entry file.
-
-1. Scan your Phase 1 extracts tagged with `Relevance: Technical Architecture` or `Relevance: Key Features`.
-2. Answer each question YES or NO:
-   - Q1: Do any extracts name at least 2 specific component, module, or class names (not generic descriptions like "has a plugin system")?
-   - Q2: Do any extracts describe how data or control flows between at least 2 named components (not generic statements like "processes data")?
-   - Q3: Do any extracts name an extension point, plugin interface, hook system, or registration mechanism with its concrete API?
-3. If ANY answer is NO: record working note "Architecture depth requirements unsatisfied — triggering code analysis" and proceed to Phase 1b.
-4. If ALL answers are YES: record working note "Architecture depth requirements satisfied from docs" and skip to Phase 2.
-
-### Phase 1b: Code Analysis (conditional)
-
-This phase triggers ONLY when the doc-sufficiency check recorded "Architecture depth requirements unsatisfied — triggering code analysis". It reads source files from the shallow clone to extract architectural evidence that documentation did not provide.
-
-**Phase 1b Procedure** (when triggered):
-
-1. **Detect primary language**: Check for `pyproject.toml` (Python), `package.json`
-   (Node.js/TypeScript), `Cargo.toml` (Rust), `go.mod` (Go), `pom.xml` / `build.gradle`
-   (Java/Kotlin). If none found, count file extensions via Glob to determine the dominant
-   language.
-
-2. **Read files in tier order** — stop at 12 files total:
-
-   **Tier 1 — Entrypoints** (read these first):
-
-   - Python: `**/main.py`, `**/cli.py`, `**/app.py`, `**/__main__.py`, `**/server.py`, `**/wsgi.py`, `**/asgi.py`
-   - Node/TS: `**/index.ts`, `**/index.js`, `**/main.ts`, `**/main.js`, `**/app.ts`, `**/app.js`, `**/server.ts`, `**/server.js`
-   - Go: `**/main.go`, `**/cmd/**/main.go`
-   - Rust: `**/main.rs`, `**/lib.rs`
-   - Java/Kotlin: `**/Application.java`, `**/Main.java`, `**/App.kt`
-   - Ruby: `**/config.ru`, `**/Rakefile`, `**/bin/*`
-
-   **Tier 2 — Type/schema declarations** (read after Tier 1):
-
-   - Python: `**/models.py`, `**/schema.py`, `**/schemas.py`, `**/types.py`, `**/models/*.py`
-   - Node/TS: `**/types.ts`, `**/types.d.ts`, `**/schema.ts`, `**/models/*.ts`, `**/interfaces.ts`
-   - Go: `**/types.go`, `**/models.go`
-   - Rust: `**/types.rs`, `**/models.rs`, `**/schema.rs`
-   - Any language: `**/*.proto`, `**/openapi.yaml`, `**/openapi.yml`, `**/openapi.json`, `**/schema.graphql`, `**/schema.json`
-
-   **Tier 3 — Index/barrel files** (read last):
-
-   - Python: `**/__init__.py` (top-level package directories only — skip deeply nested), `**/api.py`, `**/routes.py`, `**/urls.py`
-   - Node/TS: `**/index.ts` (in subdirectories — barrel exports), `**/exports.ts`
-   - Go: `**/doc.go`
-   - Rust: `**/mod.rs`
-   - Any language: `**/plugin.py`, `**/plugins/*.py`, `**/extensions/*.ts`, `**/middleware/*.py`, files matching `**/register*`
-
-   **Exclusions** — never read:
-
-   - Test files: `**/test_*.py`, `**/*_test.go`, `**/*.test.ts`, `**/*.spec.ts`, `**/*_test.*`, `**/*.test.*`
-   - Dependency dirs: `**/node_modules/**`, `**/.venv/**`, `**/vendor/**`, `**/__pycache__/**`
-   - Build artifacts: `**/*.min.js`, `**/*.bundle.js`, `**/dist/**`, `**/build/**`, `**/target/**`
-   - Files over 500 lines: skip and note "Skipped {path}: {N} lines (over 500-line limit)"
-
-   **Selection within a tier**: Prefer files in `src/` over root. Prefer shorter paths over
-   deeper paths. Read each file fully (do not use line limits). Increment the file counter after
-   each Read. Stop when counter reaches 12 or all tiers are exhausted. Record how many candidate
-   files remain unread when budget is exhausted.
-
-3. **Extract architectural evidence** from each file read. Record extracts using this format:
-
-   ```text
-   N. "{exact code passage — class definition, function signature, import block, or schema}"
-      Source: {relative-path}:{start-end lines} — {exported name}
-      Relevance: Technical Architecture | Key Features
-      Confidence: code-read
-   ```
-
-   Focus extraction on:
-
-   - Class/struct definitions with their public methods (architecture)
-   - Function signatures that reveal data flow (architecture)
-   - Import statements that reveal component dependencies (architecture)
-   - Schema/model field definitions (architecture)
-   - Registration patterns — decorators, register() calls, plugin lists (extension points)
-   - Configuration handling that reveals supported options (features)
-
-4. **Merge code extracts with Phase 1 extracts**. Both sets feed into Phase 2 identically.
-   Code extracts are distinguished only by their `Confidence: code-read` tag.
-
-### Phase 2: Write From Extracts
-
-Write each entry section by organizing the extracted passages for that section, then composing prose or structured content grounded in those extracts.
-
-REQUIRED verification step: Before finalizing a section, confirm that every factual claim in that section traces to at least one extracted passage. If a claim cannot be traced, either find a source passage or remove the claim.
-
-### What Counts as a Claim Requiring a Source
-
-- Version numbers ("v2.3.1")
-- Performance figures ("processes 10k events/sec")
-- Feature descriptions ("supports async/await")
-- License type
-- Architectural assertions ("uses a DAG-based task graph")
-- Installation commands (verify against official docs, not inferred)
-- Compatibility statements ("requires Python 3.11+")
-
-SOURCE: "Extract before abstracting" methodology from [fidelity-rules.md](./../../plugins/summarizer/skills/summarizer/references/fidelity-rules.md) Rule 2 (accessed 2026-03-06). Quote-grounding technique from Anthropic prompt engineering documentation (<https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips>, accessed 2026-02-06).
+1. **Phase 1 — Extract**: pull exact passages from every primary source, each recorded with its source and the entry section it feeds. Writing any section before this is FORBIDDEN.
+2. **Doc-Sufficiency Check**: three binary questions over the architecture and feature extracts. Any NO triggers Phase 1b.
+3. **Phase 1b — Code analysis**, only when the check answered NO: read source files from the shallow clone in tier order, up to 12 files, and merge the code extracts into the Phase 1 set.
+4. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
 
 </methodology>
 
 ---
 
-## Fidelity Rules
+## Entry Contract
 
-<fidelity_rules>
+Every entry this agent produces must satisfy the Fidelity Rules (1, 2, 2a, 3, 4) and the per-section Depth Requirements in [Entry Quality Standards](./../skills/research-curator/references/entry-quality-standards.md). Load it before Phase 2 and keep it in context while writing — it is the bar the entry is reviewed against.
 
-These rules apply to every research entry produced by this agent.
+Two of its rules bind gathering, before any writing begins:
 
-### Rule 1: Read Before Writing
-
-NEVER describe a resource based on its name, URL path, or domain alone. ALWAYS fetch and read primary sources before writing any section.
-
-If a source cannot be accessed: write "Unable to access [source]: [reason]" in the entry's References section. Do NOT infer content.
-
-### Rule 2: Preserve Counts and Specifics
-
-Write exact numbers as found in primary sources when the number describes what the resource
-does or how well it does it. NEVER substitute vague quantifiers for a capability figure.
-Popularity metrics (stars, downloads, forks) are out of scope entirely — see Rule 2a.
-
-| Source Says | Write | NEVER Write |
-|-------------|-------|-------------|
-| "supports 12 languages" | "supports 12 languages" | "many languages" |
-| "v0.8.2, released 2025-11-03" | "v0.8.2 (released 2025-11-03)" | "recent release" |
-| "benchmark: 45ms p99 latency" | "45ms p99 latency" | "low latency" |
-
-### Rule 2a: No Popularity Statistics
-
-Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
-These describe how popular a resource is, not what it does, how it does it, or why it's
-valuable — they don't inform the review or utility judgments this entry exists to support,
-and a reader can query them programmatically at any time via `gh api repos/{owner}/{repo}`
-if genuinely needed. There is no "Key Statistics" section in the entry template; do not
-add one, and do not fold this data into another section.
-
-### Rule 3: Distinguish Absence from Nonexistence
-
-Use precise language when information is not found in sources.
-
-| Situation | Write | NEVER Write |
-|-----------|-------|-------------|
-| Searched but not in source | "Not mentioned in documentation" | "Doesn't support X" |
-| Source inaccessible | "Unable to access [source]" | "Not available" |
-| Source doesn't cover topic | "Outside the scope of reviewed sources" | "Not supported" |
-| Contradictory sources | "Source A states X; Source B states Y" | "The answer is X" |
-
-### Rule 4: State Confidence Explicitly
-
-Each major section of the entry MUST have a confidence level. Record this in the entry's Freshness Tracking section as a confidence map.
-
-**Confidence levels**:
-
-- `high` -- full primary source read, official documentation, recent and dated
-- `medium` -- partial read, informal source, or single source with no corroboration
-- `low` -- inferred, dated source (>12 months), or source conflict
-
-**Factors that reduce confidence**: source truncated, source is informal (blog post vs official docs), sources contradict each other, content required interpretation rather than extraction.
-
-**Factors that increase confidence**: full read of official documentation, multiple sources agree, content is structured/machine-readable (API spec, package manifest), source is dated and recent.
-
-SOURCE: Confidence scoring methodology from [fidelity-rules.md](./../../plugins/summarizer/skills/summarizer/references/fidelity-rules.md) Rule 6 (accessed 2026-03-06).
-
-</fidelity_rules>
+- **Rule 2a** — never gather star, download, fork, or contributor counts. Not via `gh api`, not via web search, not from a README badge; in session scope or out of it.
+- **Rule 3** — when a source cannot be reached, or does not cover a topic, say exactly that. "Not mentioned in documentation" and "Unable to access {source}" are the language.
 
 ---
 
-## Depth Requirements
+## Entry Template and Category
 
-<depth_requirements>
-
-Research entries MUST go beyond surface-level feature lists. Each entry section has a minimum depth requirement.
-
-### Architecture Section — REQUIRED depth
-
-Do NOT write "uses a plugin-based architecture" without explaining what that means concretely. MUST include:
-
-- Core components and their relationships (with exact names from source)
-- Data flow or execution model
-- Key design decisions and their stated rationale (if documented)
-- Extension or integration points
-
-### Features Section — REQUIRED depth
-
-For each documented feature:
-
-1. State what it does (extracted from source)
-2. State HOW it does it — the mechanism, not just the outcome
-3. Include a concrete example if the source provides one
-4. Note any configuration or constraints
-
-### Usage Examples Section — REQUIRED depth
-
-MUST include at least one complete, working example extracted verbatim or adapted minimally from official documentation. Examples invented without a source basis are FORBIDDEN.
-
-For installation commands: verify the exact command from official docs. Do NOT construct install commands from assumed package names.
-
-### Limitations and Caveats Section
-
-REQUIRED — not optional. Every tool has limitations. If primary sources document none, write: "No limitations documented in reviewed sources (confidence: low — absence of documented limitations does not confirm absence of limitations)."
-
-</depth_requirements>
-
----
-
-## Category List
-
-<categories>
-
-Select the most appropriate category for the resource. Create the directory under `./research/` if it does not exist.
-
-- research-agent-patterns -- multi-agent orchestration
-- skill-generation-tools -- creates AI skills/prompts
-- prompt-engineering -- prompt optimization/testing
-- context-management -- memory, RAG, context window
-- mcp-ecosystem -- MCP server or integration
-- agent-frameworks -- agent SDK or framework
-- evaluation-testing -- agent evaluation/benchmarking
-- developer-tools -- developer productivity tool
-- async-libraries -- async/concurrency library
-- agent-infrastructure -- infrastructure for agents at scale
-- api-frameworks -- API/web framework
-- ai-observability -- LLM observability/debugging
-- code-auditing -- code security/auditing
-- coding-agents -- autonomous coding agent
-- data-infrastructure -- real-time data platform
-- ml-infrastructure -- ML compute/model serving
-- python-runtimes -- alternative Python runtime
-- rust-python-bindings -- Rust-Python bindings
-- task-management -- task management for dev
-- documentation-tools -- documentation tooling
-- llm-infrastructure -- LLM infra/serving
-- low-code-platforms -- low-code/no-code platform
-- ai-design-tools -- AI design tools
-- ai-research-tools -- AI research tools
-- ai-writing-tools -- AI writing tools
-
-</categories>
-
----
-
-## Entry Template
-
-Follow the entry template in [entry-template.md](./../skills/research-curator/references/entry-template.md).
+Follow the entry template, and select the category with the flowchart, in [entry-template.md](./../skills/research-curator/references/entry-template.md). Create the category directory under `./research/` if it does not exist.
 
 Entry files go at `./research/{category}/{resource-name}.md`.
-
-All sections in the template MUST be complete with real data gathered from primary sources. Placeholders, "TBD", and bare "N/A" are FORBIDDEN. If data is genuinely unavailable, write what was searched, what was found, and why the data is absent.
 
 ---
 
@@ -430,12 +187,7 @@ flowchart TD
 1. READ the existing entry file first.
 2. Re-gather fresh data for versions and features from primary sources.
 3. Re-extract passages. Note where data has changed vs. the existing entry.
-4. Run the Doc-Sufficiency Check on the re-extracted passages (same three binary questions):
-   - Q1: Do any extracts name at least 2 specific component, module, or class names (not generic descriptions like "has a plugin system")?
-   - Q2: Do any extracts describe how data or control flows between at least 2 named components (not generic statements like "processes data")?
-   - Q3: Do any extracts name an extension point, plugin interface, hook system, or registration mechanism with its concrete API?
-   If ANY answer is NO: record working note "Architecture depth requirements unsatisfied — triggering code analysis" and proceed to Phase 1b before updating sections.
-   If ALL answers are YES: record working note "Architecture depth requirements satisfied from docs" and skip Phase 1b.
+4. Run the Doc-Sufficiency Check from [Extraction Methodology](./../skills/research-curator/references/extraction-methodology.md) on the re-extracted passages. Any NO: proceed to Phase 1b before updating sections. All YES: skip Phase 1b.
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
 6. Update sections where source data has changed. Preserve sections where source data is unchanged.
 7. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
@@ -467,7 +219,7 @@ When a primary source cannot be fetched:
 4. Document the inaccessibility in the entry's References section with the exact error.
 5. If fallback sources exist (e.g., GitHub README when docs site is down), fetch those and note the fallback in the entry.
 
-"Not mentioned in the sources I could access" is NOT the same as "doesn't exist." Use the precise language from the Fidelity Rules.
+"Not mentioned in the sources I could access" is NOT the same as "doesn't exist." Use the precise Rule 3 language.
 
 </inaccessibility_handling>
 
