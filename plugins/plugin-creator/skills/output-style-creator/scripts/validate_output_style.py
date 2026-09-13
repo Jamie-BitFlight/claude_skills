@@ -34,7 +34,7 @@ if isinstance(sys.stdout, TextIOWrapper):
 if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-FRONTMATTER = re.compile(r"\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.DOTALL)
+FRONTMATTER = re.compile(r"\A---[ \t]*\r?\n(.*?)^---[ \t]*(?:\r?\n|\Z)", re.DOTALL | re.MULTILINE)
 STRING_FIELDS = ("name", "description")
 BOOLEAN_FIELDS = ("keep-coding-instructions", "force-for-plugin")
 
@@ -80,7 +80,8 @@ def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
         path: The style file to read.
 
     Returns:
-        The raw frontmatter text and the parsed mapping.
+        The raw frontmatter text and the parsed mapping. An empty block yields an empty mapping,
+        because every declared field is optional.
 
     Raises:
         ValueError: The file has no complete frontmatter block.
@@ -91,6 +92,9 @@ def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
         raise ValueError("frontmatter must open and close with --- on its own line")
     front = match.group(1)
     data = yaml.safe_load(front)
+    if data is None:
+        # Every field is optional — the filename supplies the name — so an empty block is valid.
+        return front, {}
     if not isinstance(data, dict):
         raise TypeError("frontmatter must be a YAML mapping")
     return front, data
@@ -252,14 +256,17 @@ def declared_output_style_paths(plugin: Path) -> list[str] | None:
 
     Returns:
         The declared paths, normalised to a list, or None when the key is absent or the manifest
-        cannot be read. An empty list means the key declares no paths, which is not the same as an
+        cannot be read or does not hold a JSON object. An empty list means the key declares no paths, which is not the same as an
         absent key: the key still replaces the default scan, so nothing is loaded.
     """
     manifest = plugin / ".claude-plugin" / "plugin.json"
     try:
-        declared = json.loads(manifest.read_text(encoding="utf-8")).get("outputStyles")
+        root = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if not isinstance(root, dict):
+        return None
+    declared = root.get("outputStyles")
     if isinstance(declared, str):
         return [declared]
     if isinstance(declared, list):

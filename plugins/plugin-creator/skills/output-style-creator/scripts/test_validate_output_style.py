@@ -102,6 +102,22 @@ def test_rejects_file_without_frontmatter(tmp_path: Path) -> None:
     assert not v.validate(path).valid
 
 
+def test_accepts_empty_frontmatter_block(tmp_path: Path) -> None:
+    """Every field is optional, so an empty block is a valid style."""
+    path = tmp_path / "s.md"
+    path.write_text("---\n\n---\n\nBody.\n", encoding="utf-8")
+    result = v.validate(path)
+    assert result.valid, result.problems
+    assert result.fields == {}
+
+
+def test_accepts_adjacent_delimiters(tmp_path: Path) -> None:
+    """A frontmatter block with no line between its delimiters is still a block."""
+    path = tmp_path / "s.md"
+    path.write_text("---\n---\n\nBody.\n", encoding="utf-8")
+    assert v.validate(path).valid
+
+
 def test_rejects_non_mapping_frontmatter(tmp_path: Path) -> None:
     """Frontmatter that parses to a list is not a style."""
     assert not v.validate(write_style(tmp_path, "s", "- one\n- two")).valid
@@ -207,6 +223,16 @@ def test_unreadable_manifest_falls_back_to_the_default_scan(tmp_path: Path) -> N
     """Malformed JSON is treated as an absent key rather than crashing discovery."""
     plugin = make_plugin(tmp_path / "p", {"name": "p"}, {"output-styles": "default"})
     (plugin / ".claude-plugin" / "plugin.json").write_text("{not json", encoding="utf-8")
+    assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["default.md"]
+
+
+def test_non_object_manifest_root_does_not_crash(tmp_path: Path) -> None:
+    """A manifest whose JSON root is a list is treated as absent, not a traceback.
+
+    ``json.loads`` succeeds on ``[]``, so reading the key off the result would raise AttributeError.
+    """
+    plugin = make_plugin(tmp_path / "p", {"name": "p"}, {"output-styles": "default"})
+    (plugin / ".claude-plugin" / "plugin.json").write_text("[]", encoding="utf-8")
     assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["default.md"]
 
 

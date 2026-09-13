@@ -59,10 +59,11 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 1. RUN discovery. It lists user-level styles, managed-policy styles from this platform's managed settings directory, every `.claude/output-styles/` between the working directory and the repository root, and a plugin's styles at each path its `outputStyles` manifest key declares:
 
    ```bash
-   uv run ./scripts/validate_output_style.py discover --plugin '{plugin-path}'
+   SKILL_DIR='<absolute path of the directory holding this SKILL.md>'
+   uv run "$SKILL_DIR/scripts/validate_output_style.py" discover --plugin '{plugin-path}'
    ```
 
-   Run both commands from this skill's own directory. Substitute each path inside single quotes, as above, so whitespace, `$` and a backtick reach the script intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
+   Substitute **absolute** paths, inside single quotes as above. Do not change the working directory to run the script: a relative `--plugin`, `--start` or style path resolves against wherever the caller stands, so a `cd` into this skill silently repoints it and discovery reports nothing. Single quotes keep whitespace, `$` and a backtick intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
 
 2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
@@ -113,10 +114,10 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 
 ### Phase 5: Validation
 
-RUN this check on every style, at any scope, from this skill's own directory. It exits non-zero when the style fails, so a caller can gate on the exit code. Quote the substituted path as in Phase 1:
+RUN this check on every style, at any scope. It exits non-zero when the style fails, so a caller can gate on the exit code. Use the same absolute-path rule as Phase 1:
 
 ```bash
-uv run ./scripts/validate_output_style.py check '{style-path}'
+uv run "$SKILL_DIR/scripts/validate_output_style.py" check '{style-path}'
 ```
 
 It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules it enforces: frontmatter opens and closes with `---` on its own line; the frontmatter parses to a YAML mapping; `name` and `description` are strings when present; `keep-coding-instructions` and `force-for-plugin` are booleans when present; `description` occupies a single line and carries no newline in any YAML encoding; the frontmatter uses no YAML merge key, which would source a field from another mapping and hide where it was written.
@@ -125,8 +126,10 @@ For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
 uvx skilllint@latest check '{plugin-path}'
-claude plugin validate '{plugin-path}'
+command -v claude >/dev/null && claude plugin validate '{plugin-path}'
 ```
+
+`skilllint` runs anywhere. `claude plugin validate` needs the Claude Code CLI, which a Codex, Hermes or Kimi session may not have — the guard skips it rather than failing the workflow. When it is skipped, say so in the completion report and record that the manifest check is still outstanding.
 
 The script covers the frontmatter only. A style with valid frontmatter and an empty body exits 0, so READ the remaining checks yourself — the script cannot make any of them:
 
