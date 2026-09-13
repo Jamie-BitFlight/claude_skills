@@ -2,6 +2,9 @@
 title: "Utilization Proposals: GitHub CLI (gh) Skill"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `plugins/development-harness/skills/backlog-tools-administrator/SKILL.md` was removed in PR #3330 (commit `20c84f3b5`, 2026-08-30) with no successor skill; conclusions below that treat it as an existing capability or constraint no longer hold.
+
 ## Utilization 1: create-milestone → GitHub CLI (gh)
 
 **Research entry**: ./research/developer-tools/gh-skill.md
@@ -177,7 +180,7 @@ gh issue list -R {owner}/{repo} --milestone {number} --json number,title,state
 
 | Local System | Reason skipped |
 |---|---|
-| `./.claude/skills/backlog-tools-administrator/SKILL.md` | This skill explicitly prevents `gh` command usage (line 11: "instead of bypassing the backlog tools ... with direct file edits or `gh` commands"). Integration would contradict the skill's purpose. |
+| `./.claude/skills/backlog-tools-administrator/SKILL.md` | ~~This skill explicitly prevents `gh` command usage (line 11: "instead of bypassing the backlog tools ... with direct file edits or `gh` commands"). Integration would contradict the skill's purpose.~~ **Skip reason no longer holds** — the skill was removed in PR #3330. The surviving constraint is weaker: `AGENTS.md` § "GitHub CLI Conventions" says to *prefer* this repo's PyGithub-based backlog tooling over ad hoc `gh` calls and to read `docs/github-cli-conventions.md` first. Re-assess this integration against that document. |
 | `./.claude/skills/daily-releases/SKILL.md` | Read and assessed: does not directly invoke GitHub API or CLI for issue/milestone operations; focuses on release notes generation. No integration surface overlap with `gh` skill documented in research entry. |
 
 ---
@@ -199,4 +202,4 @@ The GitHub CLI skill documents an **established integration surface** (CLI binar
 - The research entry is comprehensive and current (verified 2026-05-10 against GitHub CLI v2.87.2)
 - All proposed integrations use the `-R {owner}/{repo}` flag pattern, which is mandatory in proxy remote environments (documented at research entry lines 73–79)
 - The automation script `github_project_setup.py` appears in multiple skills — a single refactor would benefit all three callers
-- The `/backlog-tools-administrator` skill is a blocker: it explicitly prevents `gh` command usage to maintain backlog tooling isolation. Any integration proposal should respect this boundary.
+- ~~The `/backlog-tools-administrator` skill is a blocker: it explicitly prevents `gh` command usage to maintain backlog tooling isolation. Any integration proposal should respect this boundary.~~ That skill was removed in PR #3330 and is no longer a blocker. The boundary that survives is `AGENTS.md` § "GitHub CLI Conventions" (prefer the repo's PyGithub backlog tooling; read `docs/github-cli-conventions.md` before other `gh` use) — a preference, not a prohibition. The integrations skipped on the strength of this blocker are worth re-assessing.

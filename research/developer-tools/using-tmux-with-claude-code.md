@@ -166,7 +166,7 @@ tmux capture-pane -t 0 -p -S -10000 | v
 
 ### Applications
 
-- The interactive terminal workarounds rule at `.claude/rules/interactive-terminal-workarounds.md` already recommends tmux for PTY allocation and output capture — this guide validates and extends that practice specifically for Claude Code agent sessions
+- The interactive terminal workarounds rule at `rules/interactive-terminal-workarounds.md` already recommends tmux for PTY allocation and output capture — this guide validates and extends that practice specifically for Claude Code agent sessions
 - The `tmux capture-pane -t mysession -p` pattern in the rules file is identical to the technique described in this post, confirming the approach as an established Claude Code workflow
 - Running Claude Code inside tmux is the standard pattern for sessions that must survive SSH disconnection or terminal closure
 
@@ -179,7 +179,7 @@ tmux capture-pane -t 0 -p -S -10000 | v
 ### Integration Opportunities
 
 - Skills that spawn long-running processes (test runners, build servers, live-reload backends) can document their tmux window address so a Claude Code session in another window can monitor them without interrupting the process
-- The `.claude/rules/interactive-terminal-workarounds.md` pattern for `tmux capture-pane -t mysession -p -e` can be referenced in agent prompts directly — agents already understand the syntax
+- The `rules/interactive-terminal-workarounds.md` pattern for `tmux capture-pane -t mysession -p -e` can be referenced in agent prompts directly — agents already understand the syntax
 - The control-key passthrough technique applies to any Claude Code skill that relies on terminal shortcuts that would otherwise be intercepted by the tmux prefix key
 
 ---
@@ -189,6 +189,6 @@ tmux capture-pane -t 0 -p -S -10000 | v
 - [Using tmux with Claude Code — hboon.com](https://hboon.com/using-tmux-with-claude-code/) (accessed 2026-03-01)
 - [Auto-Renaming tmux Windows for AI Coding Agents — hboon.com](https://hboon.com/auto-renaming-tmux-windows-for-ai-coding-agents/) (accessed 2026-03-01)
 - [tmux man page — official reference](https://man.openbsd.org/tmux) (accessed 2026-03-01)
-- [Interactive Terminal Workarounds — .claude/rules/interactive-terminal-workarounds.md](./../../.claude/rules/interactive-terminal-workarounds.md) (accessed 2026-03-01)
+- [Interactive Terminal Workarounds — rules/interactive-terminal-workarounds.md](./../../rules/interactive-terminal-workarounds.md) (accessed 2026-03-01)
 
 ---

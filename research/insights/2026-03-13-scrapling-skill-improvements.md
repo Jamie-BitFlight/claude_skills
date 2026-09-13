@@ -5,14 +5,14 @@ title: "Improvement Proposals: Scrapling — Claude Code Web Scraping Skill"
 ## Improvement 1: Per-skill experience accumulation with structured pattern files
 
 **Source pattern**: "Site patterns saved after successful scrapes (avoid re-solving same problem)" and "Experience Accumulation — After successful scrape, check whether new site pattern or cookie should be saved to vault" — Relevance section + Architecture section, Step 6
-**Local system**: CLAUDE.md (memory), `.claude/rules/`
+**Local system**: CLAUDE.md (memory), `rules/`
 **Confidence**: Medium
 **Impact**: Medium
-**Backlog**: Deferred — confidence medium: the local system already has MEMORY.md and `.claude/rules/` for persistent patterns. The scrapling skill's approach (structured domain-specific pattern files updated during skill execution) is more systematic, but the local system's general-purpose memory mechanism may already serve the same function through a different path. Would need to examine multiple skill sessions to determine whether the lack of per-skill structured pattern accumulation causes re-solving of previously-solved problems.
+**Backlog**: Deferred — confidence medium: the local system already has MEMORY.md and `rules/` for persistent patterns. The scrapling skill's approach (structured domain-specific pattern files updated during skill execution) is more systematic, but the local system's general-purpose memory mechanism may already serve the same function through a different path. Would need to examine multiple skill sessions to determine whether the lack of per-skill structured pattern accumulation causes re-solving of previously-solved problems.
 
 ### Current state
 
-Skills in this repository do not have a standardized mechanism for saving learned patterns back into their own reference files during execution. When a skill successfully handles a novel scenario, the knowledge is captured in MEMORY.md (session-level) or `.claude/rules/` (manually added), but not in a skill-local structured format that the skill can query on subsequent invocations.
+Skills in this repository do not have a standardized mechanism for saving learned patterns back into their own reference files during execution. When a skill successfully handles a novel scenario, the knowledge is captured in MEMORY.md (session-level) or `rules/` (manually added), but not in a skill-local structured format that the skill can query on subsequent invocations.
 
 ### Target state
 

@@ -2,10 +2,13 @@
 title: "Improvement Proposals: wrkflw"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Add local GitHub Actions schema validation to pre-commit
 
 **Source pattern**: "Workflow Validation with Exit Codes — syntax checks, structural validation, and composite action input cross-checking with CI/CD-friendly exit codes. Enables use in CI pipelines and pre-commit hooks." (research entry, README.md line 101 citation; also "Integration Points: GitHub Actions validation in CI/CD pipelines — Projects using Claude Code could integrate `wrkflw validate` into pre-commit hooks or local CI checks to catch workflow errors before pushing.")
-**Local system**: ./.pre-commit-config.yaml and ./.claude/rules/ci-workflows.md
+**Local system**: ./.pre-commit-config.yaml and ./rules/ci-workflows.md
 **Confidence**: High
 **Impact**: High
 **Backlog**: #1933 created
@@ -17,7 +20,7 @@ title: "Improvement Proposals: wrkflw"
 `markdownlint-cli2` for docs. There is no hook that parses `.github/workflows/*.yml` against
 the Actions schema (jobs, steps, expressions, `uses:` references, `needs:` DAG validity).
 
-`./.claude/rules/ci-workflows.md` Phase 4 (line 51) states "Validate YAML syntax:
+`./rules/ci-workflows.md` Phase 4 (line 51) states "Validate YAML syntax:
 `python3 -m yaml <file>` or equivalent" — this is parsability only, not structural validation.
 Phase 5 (Verify) instructs "Push and check workflow run if possible" — i.e., the verification
 loop requires git push and observing GitHub-side execution. There is no local equivalent.
@@ -35,7 +38,7 @@ scoped to `^\.github/workflows/.*\.ya?ml$`. The hook fails with non-zero exit co
 - `if:` expressions contain unbalanced `${{ }}` or unknown context refs
 - Composite-action inputs are missing required keys
 
-`./.claude/rules/ci-workflows.md` Phase 4 is updated: "Validate workflow structure:
+`./rules/ci-workflows.md` Phase 4 is updated: "Validate workflow structure:
 `uv run prek run --hook actionlint --files .github/workflows/<file>`" replaces the YAML-syntax-only
 check.
 
@@ -54,14 +57,14 @@ line number. Without the error, hook exits 0.
 ## Improvement 2: Strict-mode rejection for ambiguous diff filters in research-curator workflow tooling
 
 **Source pattern**: "Strict Filter Mode (v0.8.0 Breaking Change) — `wrkflw run --event <name>` must also pass `--diff` or `--changed-files`. Prevents silent skipping of `paths:`-gated workflows ... Without a change set, all workflows with `paths:` filters are silently rejected, causing confusion. Strict mode (default) requires explicit change set input or `--no-strict-filter` to proceed." (research entry, BREAKING_CHANGES.md citation, lines 317–331)
-**Local system**: ./.claude/rules/silent-failure-prevention.md (the principle); concrete application target: any local script that accepts filter inputs and currently returns "no items matched" instead of erroring. Specifically `plugins/development-harness/scripts/` glob-filtered tooling and the `dispatch_*` family in `mcp__plugin_dh_backlog__`.
+**Local system**: ./rules/silent-failure-prevention.md (the principle); concrete application target: any local script that accepts filter inputs and currently returns "no items matched" instead of erroring. Specifically `plugins/development-harness/scripts/` glob-filtered tooling and the `dispatch_*` family in `mcp__plugin_dh_backlog__`.
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence Medium: would need a concrete inventory of which local CLI commands accept ambiguous filter combinations and currently silently no-op. Without that inventory, the proposal is a principle-extension rather than a directly observable gap. Raise to High after running a script-by-script audit for "no-op when filter is empty" patterns.
 
 ### Current state
 
-`./.claude/rules/silent-failure-prevention.md` covers two cases (write operations must report
+`./rules/silent-failure-prevention.md` covers two cases (write operations must report
 what changed; branching on inputs requires explicit fallback) but does not cover the third
 wrkflw-shaped case: **ambiguous filter inputs that result in no output should fail loudly,
 not silently match zero items**.
@@ -76,7 +79,7 @@ enumerated.
 
 ### Target state
 
-`./.claude/rules/silent-failure-prevention.md` gains a third subsection titled
+`./rules/silent-failure-prevention.md` gains a third subsection titled
 "Ambiguous Filters Must Reject, Not No-op". Content: when a user supplies a filter expression
 that lacks the inputs needed to resolve a non-empty result set, the command exits 2 (usage
 error) with a message naming each of the missing inputs and the explicit opt-out flag.
@@ -84,7 +87,7 @@ Includes the wrkflw error message verbatim as a Right example.
 
 ### Measurable signal
 
-Run `grep -A 5 "Ambiguous Filters Must Reject" .claude/rules/silent-failure-prevention.md` —
+Run `grep -A 5 "Ambiguous Filters Must Reject" rules/silent-failure-prevention.md` —
 returns the new subsection. The example block contains the literal phrase
 `--no-strict-filter`. After the rule is in place, a follow-up audit task identifies at least
 one local command that violates the rule and gets fixed.
@@ -173,7 +176,7 @@ no abstraction over secret sources because there is no demonstrated need for one
 
 ### Target state
 
-(Speculative) A `.claude/rules/secrets-resolution.md` documenting the multi-provider pattern
+(Speculative) A `rules/secrets-resolution.md` documenting the multi-provider pattern
 for plugins that may need credentials beyond env vars.
 
 ### Measurable signal

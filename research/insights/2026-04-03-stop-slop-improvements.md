@@ -71,7 +71,7 @@ N/A -- pattern already present in codebase.
 ## Improvement 4: Create anti-pattern phrase catalog for agent prompts
 
 **Source pattern**: "Comprehensive anti-pattern catalogs: The phrase and structure catalogs in references/phrases.md and references/structures.md provide a model for building reference materials that teach pattern recognition without lengthy explanations." (Patterns Worth Adopting, item 4) and "Prompt clarity audit: Use Stop Slop on agent prompts and orchestration task descriptions to eliminate rhetorical setups and vague declaratives that can cause agent misalignment." (Integration Opportunities, item 4)
-**Local system**: .claude/agents/ and .claude/rules/
+**Local system**: .claude/agents/ and rules/
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence Low: Agent prompts in this repository are procedural and technical, not prose-heavy. The Stop Slop patterns target human-facing writing (essays, blog posts, documentation). Agent prompts use imperative instructions, mermaid diagrams, and structured formats that naturally avoid most AI writing tells. Throat-clearing and rhetorical setups are less common in agent prompts than in user-facing prose. The gap may exist in some agent files but would need a systematic audit to confirm -- the inference that agent prompts suffer from these patterns is not directly observed.
@@ -82,11 +82,11 @@ Agent prompt files in `.claude/agents/` use structured formats (frontmatter, wor
 
 ### Target state
 
-A reference file (e.g., `.claude/rules/prompt-clarity.md`) listing prompt-specific anti-patterns adapted from Stop Slop: no rhetorical setups in task descriptions ("What if...?"), no vague declaratives in success criteria ("The implications are significant"), active voice for all instructions.
+A reference file (e.g., `rules/prompt-clarity.md`) listing prompt-specific anti-patterns adapted from Stop Slop: no rhetorical setups in task descriptions ("What if...?"), no vague declaratives in success criteria ("The implications are significant"), active voice for all instructions.
 
 ### Measurable signal
 
-`.claude/rules/prompt-clarity.md` exists with at least 10 prompt-specific anti-patterns and concrete replacements.
+`rules/prompt-clarity.md` exists with at least 10 prompt-specific anti-patterns and concrete replacements.
 
 ---
 

@@ -16,11 +16,11 @@ title: "Improvement Proposals: Huashu Design"
 
 ### Target state
 
-`./.claude/rules/fact-verification-first.md` exists and is referenced from `./.claude/CLAUDE.md`. The rule defines named-entity trigger patterns (specific product names, version strings like "v1.2.3", release event terms) and mandates that the orchestrator's first tool call be `WebSearch` or `mcp__Ref__ref_search_documentation` before any planning, design, or code-generation tool. A trigger table in the rule lists at least three example trigger phrases and the required verification action.
+`./rules/fact-verification-first.md` exists and is referenced from `./.claude/CLAUDE.md`. The rule defines named-entity trigger patterns (specific product names, version strings like "v1.2.3", release event terms) and mandates that the orchestrator's first tool call be `WebSearch` or `mcp__Ref__ref_search_documentation` before any planning, design, or code-generation tool. A trigger table in the rule lists at least three example trigger phrases and the required verification action.
 
 ### Measurable signal
 
-`grep -l "Fact Verification First\|named product\|Principle #0" ./.claude/CLAUDE.md ./.claude/rules/*.md` returns at least one path. The matched file contains a trigger table with at least three example named-entity patterns and a mandatory `WebSearch` action. A test prompt of the form "Make a demo for DJI Pocket 4" causes the orchestrator to run `WebSearch` before any other tool call.
+`grep -l "Fact Verification First\|named product\|Principle #0" ./.claude/CLAUDE.md ./rules/*.md` returns at least one path. The matched file contains a trigger table with at least three example named-entity patterns and a mandatory `WebSearch` action. A test prompt of the form "Make a demo for DJI Pocket 4" causes the orchestrator to run `WebSearch` before any other tool call.
 
 ---
 

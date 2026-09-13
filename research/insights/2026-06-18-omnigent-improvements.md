@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Omnigent"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 The Omnigent entry's "Relevance to Claude Code Development" section is populated with six
 patterns. Each pattern was mapped to a local system and assessed for an actionable, observable
 gap. The two policy mechanisms named concretely in the Policy Configuration section
@@ -96,7 +99,7 @@ PostToolUse handler does not already maintain a counter elsewhere.
 | #3 Cross-device session sync (CLI/web/mobile) | Not actionable. Requires a FastAPI server + WebSocket persistence layer (ap-web, SQLAlchemy) that has no local equivalent to extend; incompatible with the plugin/skill architecture. |
 | #4 Real-time multi-user collaboration / shared sessions | Not actionable. Same as #3 — depends on the server+persistence layer that does not exist locally. The swarm skills (`swarm-operations`, `swarm-patterns`) already cover multi-agent coordination within a single session; cross-user accounts are out of architectural scope. |
 | #5 Custom YAML agent authoring (`name:` + `prompt:`) | Already covered / weaker external form. This repo's agent definition format (`agents/*.md` with frontmatter + body, created via `/plugin-creator:agent-creator`) is richer than Omnigent's two-field YAML. No gap. |
-| #6 Model flexibility (Claude/OpenAI/gateway providers) | Not actionable here. Model selection for agent delegation is already governed by `.claude/rules/model-selection.md` (sonnet/opus/haiku tiers + effort). Multi-provider gateway support is a harness-runtime concern, not a skill/agent gap. |
+| #6 Model flexibility (Claude/OpenAI/gateway providers) | Not actionable here. Model selection for agent delegation is already governed by `rules/model-selection.md` (sonnet/opus/haiku tiers + effort). Multi-provider gateway support is a harness-runtime concern, not a skill/agent gap. |
 
 ---
 

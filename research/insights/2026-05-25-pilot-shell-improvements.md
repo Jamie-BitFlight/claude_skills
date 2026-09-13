@@ -27,7 +27,7 @@ Artifact ID `"plan-approval"` is registered under development-harness artifact c
 ## Improvement 2: Add `/dh:fix` lightweight bugfix workflow with built-in bail-out to `/dh:add-new-feature` for multi-component bugs
 
 **Source pattern**: Quote from research entry, "## /fix — Bugfix Workflow" section: "Lightweight bugfix lane for single-file, obvious-once-traced root causes. No plan file, no approval mid-flow, but TDD still enforced. Flow: Investigate → RED (write failing test) → Fix (at root cause) → Verify end-to-end → Quality gate → Done. Bail-out condition: If investigation reveals the bug is multi-component, architectural, needs defense-in-depth, or two attempts have failed, /fix stops cleanly and directs user to use /spec instead."
-**Local system**: /home/user/claude_skills/.claude/rules/fix-delegation-discipline.md and /home/user/claude_skills/plugins/development-harness/skills/work-backlog-item/SKILL.md (`--quick` mode)
+**Local system**: rules/fix-delegation-discipline.md and plugins/development-harness/skills/work-backlog-item/SKILL.md (`--quick` mode)
 **Confidence**: High
 **Impact**: High
 **Backlog**: #2445 created

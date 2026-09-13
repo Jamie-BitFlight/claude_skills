@@ -2,6 +2,9 @@
 title: "Development-Harness Skill Taxonomy Report"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `plugins/development-harness/skills/backlog-tools-administrator/SKILL.md` was removed in PR #3330 (commit `20c84f3b5`, 2026-08-30) with no successor skill; conclusions below that treat it as an existing capability or constraint no longer hold.
+
 # Development-Harness Skill Taxonomy Report
 
 Date: 2026-06-08
@@ -81,7 +84,7 @@ The main structural issue is not lack of capability alone. It is also packaging.
 | Code Quality & Review | Strong | The richest category: stack-specific code review skills, architectural review, test review, multi-perspective review, and file classification. |
 | CI/CD & Deployment | Thin | Present mainly through `gate-push` and milestone execution/closure flows, but not as a full deployment toolbox. |
 | Incident Runbooks | Thin | Investigation-oriented skills exist, but not many explicit symptom-to-investigation operational runbooks. |
-| Infrastructure Ops | Weak | Only a few adjacent fits such as `kage-bunshin`, `backlog-tools-administrator`, and `codemod-runner`; little true infra or maintenance coverage. |
+| Infrastructure Ops | Weak | Only a few adjacent fits such as `kage-bunshin`, `backlog-tools-administrator` (removed in PR #3330 — this category is now thinner than recorded here), and `codemod-runner`; little true infra or maintenance coverage. |
 
 ## Best-Fit Exemplars
 
@@ -144,7 +147,7 @@ The largest concentration of ambiguity comes from lifecycle orchestrators that m
   Primary straddle: Data & Analysis + Business Automation + CI/CD & Deployment
   Why: combines dependency analysis, conflict grouping, wave planning, and execution-readiness shaping.
 
-- `backlog-tools-administrator`
+- `backlog-tools-administrator` (removed in PR #3330; retained here as the state this survey recorded)
   Primary straddle: Infrastructure Ops + Business Automation + Code Quality & Review
   Why: handles tooling gaps across scripts, process, docs, tests, and registry maintenance.
 

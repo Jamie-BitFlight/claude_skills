@@ -2,6 +2,9 @@
 title: "Improvement Proposals: SoulForge"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: File-level edit coordination for parallel swarm agents
 
 **Source pattern**: "AgentBus: in-process coordination layer for parallel subagents. Handles file caching (deduplicated reads across agents), tool result caching (persists across dispatches), edit coordination (serialized writes per file with ownership tracking)" (from research entry, Technical Architecture section, line 56)
@@ -86,7 +89,7 @@ Running a command like `uv run cochange.py src/core/agents/forge.ts` returns a r
 | Budget scaling (token budget inversely with conversation length) | Runtime behavior of the LLM client, not extensible via skills or plugins in this repo |
 | Semantic summaries cached by mtime | Requires runtime codebase indexing infrastructure that does not exist locally |
 | Dual-backend architecture for LSP | This repo does not run LSP servers; pattern is not applicable |
-| Task routing per-task model assignment | Already covered by .claude/rules/model-selection.md which maps cognitive task type to model tier (haiku/sonnet/opus). SoulForge uses named slots (spark/ember) but the underlying principle is equivalent. |
+| Task routing per-task model assignment | Already covered by rules/model-selection.md which maps cognitive task type to model tier (haiku/sonnet/opus). SoulForge uses named slots (spark/ember) but the underlying principle is equivalent. |
 | MCP server extraction (@soulforge/mcp) | Integration opportunity for consuming SoulForge's tools, not an improvement to existing local systems. Already covered in the utilization file at research/insights/2026-04-05-soulforge-utilization.md |
 | Prompt caching strategy | Runtime concern for the LLM provider layer, not extensible via this repo's skills or plugins |
 | Real-time project detection | No existing local system to extend; would be a new capability rather than an improvement |

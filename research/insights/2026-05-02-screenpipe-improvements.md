@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Screenpipe"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Document transport-aware tool exposure (HTTP subset vs stdio full toolset) in fastmcp-creator
 
 **Source pattern**: "demonstrates progressive disclosure (basic tools in HTTP, full toolset in stdio)" — § Relevance to Claude Code Development > 3. MCP server design and integration. Also: "The HTTP server exposes `search_content` only. Full toolset (export-video, list-meetings, activity-summary, search-elements, frame-context) is available in stdio mode." — § Limitations > 6. MCP HTTP transport feature parity.
@@ -61,4 +64,4 @@ Run: `grep -n "layered\|defense.in.depth\|three.layer\|compromised agent" plugin
 |---|---|
 | Bearer token auth on HTTP with stdio fallback | Already covered: auth.md:11 explicitly states "Authentication applies only to FastMCP's HTTP-based transports (`http` and `sse`). STDIO transport inherits security from its local execution environment". The screenpipe pattern matches the existing FastMCP guidance. |
 | Event-driven architecture / hash-based deduplication | Not actionable in this repo's plugin architecture. Screenpipe's pattern (OS event hooks + frame hashing) is for continuous-capture desktop applications, not Claude Code plugins. swarm-patterns.md:514 already documents the inbox-based "no polling" pattern for this repo's use case (agent coordination). |
-| Pipe markdown files with YAML frontmatter for AI agent definitions | Already covered with a different mechanism. Claude Code agents already use frontmatter (`name`, `description`, `model`, `tools`) per .claude/rules/frontmatter-requirements.md. The `tools:` field provides the equivalent of screenpipe's `allow-apps`/`deny-apps` scope-restriction at the tool level. Agent runtime difference makes the screenpipe pipe-scheduling pattern non-portable. |
+| Pipe markdown files with YAML frontmatter for AI agent definitions | Already covered with a different mechanism. Claude Code agents already use frontmatter (`name`, `description`, `model`, `tools`) per rules/frontmatter-requirements.md. The `tools:` field provides the equivalent of screenpipe's `allow-apps`/`deny-apps` scope-restriction at the tool level. Agent runtime difference makes the screenpipe pipe-scheduling pattern non-portable. |

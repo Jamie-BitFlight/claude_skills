@@ -676,7 +676,7 @@ tessera -coordinator coordinator.example.org:8443 \
 
 2. **Just-In-Time Access in CI/CD**: Build pipelines requiring production access can integrate Tessera approval gates before granting temporary database or SSH access.
 
-3. **Approval Workflow Patterns**: Tessera's consent-based architecture — a blocking prompt with no timeout, answered where the approver already sits — is a reusable pattern for the human-in-the-loop gates this repository defines in `.claude/rules/proactive-fix-gate.md` and the Autonomous Action Boundary in `.claude/CLAUDE.md`.
+3. **Approval Workflow Patterns**: Tessera's consent-based architecture — a blocking prompt with no timeout, answered where the approver already sits — is a reusable pattern for the human-in-the-loop gates this repository defines in `rules/proactive-fix-gate.md` and the Autonomous Action Boundary in `.claude/CLAUDE.md`.
 
 ### Patterns Worth Adopting
 

@@ -43,5 +43,5 @@ Run `uv run .claude/skills/research-curator/scripts/validate_research.py` agains
 | Plugin Quality Certification | Suggests integrating Merly as an external commercial tool, not adopting a transferable pattern. |
 | Skill Developer Feedback Loop | Depends on Merly specifically as the feedback source. Not a generalizable pattern. |
 | Backlog Prioritization via Defect Detection | Suggests using Merly's proprietary defect detection. Not a transferable mechanism. |
-| Code Quality Baseline Measurement | Already covered by T0 baseline capture and TN verification gate in the SAM workflow (see .claude/rules/local-workflow.md, Bookend Tasks section). |
+| Code Quality Baseline Measurement | Already covered by T0 baseline capture and TN verification gate in the SAM workflow (see `plugins/development-harness/skills/implement-feature/SKILL.md`, "Bookend Task Ordering" section). Originally cited as `.claude/rules/local-workflow.md`, "Bookend Tasks"; that rule file was deleted 2026-03-29 (commit 18f93b5c6) and the section was re-verified in its surviving location. |
 | CI/CD Quality Gates | Already covered by /complete-implementation skill with 6 quality gate phases (code-reviewer, feature-verifier, integration-checker, doc-drift-auditor, service-docs-maintainer, context-refinement). |

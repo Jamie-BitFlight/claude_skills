@@ -5,22 +5,22 @@ title: "Improvement Proposals: ctxforge"
 ## Improvement 1: Auto-applied performance and security directives for implementation agents
 
 **Source pattern**: "PERFORMANCE-DIRECTIVES.md provides actionable quality standards (30+ rules) that can be auto-applied: algorithmic efficiency targets, memory management patterns, accessibility compliance, security baselines. These are language-agnostic and testable." (Relevance section, item 4)
-**Local system**: `.claude/rules/` directory and `plugins/python3-development/skills/complete-implementation/SKILL.md`
+**Local system**: `rules/` directory and `plugins/python3-development/skills/complete-implementation/SKILL.md`
 **Confidence**: Medium
 **Impact**: Medium
-**Backlog**: Deferred -- confidence medium: existing `.claude/rules/` files cover structural and formatting concerns (silent failure prevention, markdown formatting, linting). The code-reviewer agent and complete-implementation quality gates may already enforce performance and security standards through their built-in knowledge, but this has not been verified by reading those agents' full prompts and confirming coverage of algorithmic efficiency targets, memory management patterns, or accessibility compliance.
+**Backlog**: Deferred -- confidence medium: existing `rules/` files cover structural and formatting concerns (silent failure prevention, markdown formatting, linting). The code-reviewer agent and complete-implementation quality gates may already enforce performance and security standards through their built-in knowledge, but this has not been verified by reading those agents' full prompts and confirming coverage of algorithmic efficiency targets, memory management patterns, or accessibility compliance.
 
 ### Current state
 
-The `.claude/rules/` directory contains 13 rule files focused on structural concerns: silent failure prevention, large file write strategy, interactive terminal workarounds, language conventions, script invocation, linting exceptions, CI workflows, YAML/TOML libraries, plugin development, skill content optimization, frontmatter requirements, delegation format, and model selection. None of these files contain performance targets (e.g., algorithmic complexity bounds), memory management patterns (e.g., cleanup requirements, lazy loading), security baselines (e.g., input validation requirements, OWASP references), or accessibility compliance standards (e.g., WCAG). Quality enforcement occurs post-implementation via the `code-reviewer` agent in `/complete-implementation` Phase 1, but there is no pre-implementation directive document that implementation agents receive automatically.
+The `rules/` directory contains 13 rule files focused on structural concerns: silent failure prevention, large file write strategy, interactive terminal workarounds, language conventions, script invocation, linting exceptions, CI workflows, YAML/TOML libraries, plugin development, skill content optimization, frontmatter requirements, delegation format, and model selection. None of these files contain performance targets (e.g., algorithmic complexity bounds), memory management patterns (e.g., cleanup requirements, lazy loading), security baselines (e.g., input validation requirements, OWASP references), or accessibility compliance standards (e.g., WCAG). Quality enforcement occurs post-implementation via the `code-reviewer` agent in `/complete-implementation` Phase 1, but there is no pre-implementation directive document that implementation agents receive automatically.
 
 ### Target state
 
-A `.claude/rules/implementation-quality-directives.md` file containing testable performance, security, and accessibility rules that are loaded into every implementation agent's context during `/start-task` execution. Rules would include: algorithmic efficiency bounds for user-facing operations, memory cleanup requirements, input validation standards, and error handling patterns. The `/start-task` skill would reference this file so sub-agents receive the directives before writing code, not only after (via code review).
+A `rules/implementation-quality-directives.md` file containing testable performance, security, and accessibility rules that are loaded into every implementation agent's context during `/start-task` execution. Rules would include: algorithmic efficiency bounds for user-facing operations, memory cleanup requirements, input validation standards, and error handling patterns. The `/start-task` skill would reference this file so sub-agents receive the directives before writing code, not only after (via code review).
 
 ### Measurable signal
 
-File `.claude/rules/implementation-quality-directives.md` exists with at least 10 testable rules covering performance, security, and accessibility. The `/start-task` SKILL.md or the `feature-researcher` agent prompt references this file. Code-reviewer findings related to performance and security decrease after directives are applied (measured by comparing follow-up task file creation rate before and after).
+File `rules/implementation-quality-directives.md` exists with at least 10 testable rules covering performance, security, and accessibility. The `/start-task` SKILL.md or the `feature-researcher` agent prompt references this file. Code-reviewer findings related to performance and security decrease after directives are applied (measured by comparing follow-up task file creation rate before and after).
 
 ---
 

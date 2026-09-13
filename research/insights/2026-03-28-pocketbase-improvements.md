@@ -2,6 +2,9 @@
 title: "Improvement Proposals: PocketBase"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: SSE-based realtime push for swarm/task status monitoring
 
 **Source pattern**: "The SSE-based realtime subscriptions enable Claude Code agents to build interactive features requiring server-pushed updates (e.g., collaborative editing, live task updates, real-time status dashboards)" (Relevance to Claude Code Development, section 3)

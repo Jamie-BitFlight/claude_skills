@@ -38,11 +38,11 @@ The `task_status_hook.py` script handles two events: SubagentStop (marks task co
 
 ### Target state
 
-A PreToolUse hook on Write|Edit operations during `/start-task` execution that checks the content being written against project-level practice rules (e.g., no `print()` when structured logging is configured, no `import yaml` when `ruamel.yaml` is the project standard). The hook returns exit code 2 to block the write and show the violation to Claude, who can then self-correct before the write lands. Practice rules are defined in a machine-readable format under `.claude/rules/` or project skills.
+A PreToolUse hook on Write|Edit operations during `/start-task` execution that checks the content being written against project-level practice rules (e.g., no `print()` when structured logging is configured, no `import yaml` when `ruamel.yaml` is the project standard). The hook returns exit code 2 to block the write and show the violation to Claude, who can then self-correct before the write lands. Practice rules are defined in a machine-readable format under `rules/` or project skills.
 
 ### Measurable signal
 
-A PreToolUse hook script exists that reads practice rules from a configurable path. When Claude writes `import yaml` to a Python file in this repository, the hook exits with code 2 and stderr contains "Use ruamel.yaml per .claude/rules/yaml-toml-libraries.md". Claude then rewrites the import before proceeding.
+A PreToolUse hook script exists that reads practice rules from a configurable path. When Claude writes `import yaml` to a Python file in this repository, the hook exits with code 2 and stderr contains "Use ruamel.yaml per rules/yaml-toml-libraries.md". Claude then rewrites the import before proceeding.
 
 ---
 

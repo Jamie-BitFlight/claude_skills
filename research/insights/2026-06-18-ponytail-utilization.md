@@ -2,6 +2,9 @@
 title: "Utilization Proposals: Ponytail"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Utilization 1: research-insight-extractor → Ponytail ruleset
 
 **Research entry**: ./research/agent-frameworks/ponytail.md

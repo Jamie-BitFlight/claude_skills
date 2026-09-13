@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Sidecar"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Persistent structured session metadata for cross-session context recovery
 
 **Source pattern**: "Context Window Recovery: The Conversations plugin aggregates session history across all supported AI agents, enabling developers to review past conversations, token usage, and reasoning chains when context resets between agent invocations." (Relevance to Claude Code Development > Applications)
@@ -49,7 +52,7 @@ Adding a skill name to `.claude/config/disabled-skills.json` causes subsequent `
 ## Improvement 3: Tmux-based agent session isolation with output capture
 
 **Source pattern**: "Tmux integration for agent launchers: Workspaces manages agent sessions via tmux, capturing output and managing lifecycle. This pattern allows agents to run in isolated, observable contexts while Sidecar maintains visibility." (Patterns Worth Adopting, item 4)
-**Local system**: `.claude/rules/interactive-terminal-workarounds.md`, `.claude/skills/swarm-operations/SKILL.md`
+**Local system**: `rules/interactive-terminal-workarounds.md`, `.claude/skills/swarm-operations/SKILL.md`
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred -- confidence medium: The local system delegates agents via the `Agent()` tool which manages its own lifecycle. Tmux-based isolation would be relevant only if Agent() sessions needed external observability (output capture, session listing). The Agent tool's built-in message passing (`SendMessage`) already provides inter-agent communication. Whether tmux-layer visibility adds value over existing mechanisms needs experimental validation.

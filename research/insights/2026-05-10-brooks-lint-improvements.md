@@ -220,7 +220,7 @@ The STATUS output includes `Health Score: NN/100`. The artifact registered as `c
 
 ### Current state
 
-Pre-commit auto-bumps `plugin.json` and `marketplace.json` versions when plugin files change (per `.claude/CLAUDE.md` "Automatic version bumping"). `skilllint` validates skill structure (per `.claude/rules/frontmatter-requirements.md`). No single script aggregates all repo-wide invariants (manifest version sync across plugins, source inventory, README badge presence, CHANGELOG entry per release) into one validation pass.
+Pre-commit auto-bumps `plugin.json` and `marketplace.json` versions when plugin files change (per `.claude/CLAUDE.md` "Automatic version bumping"). `skilllint` validates skill structure (per `rules/frontmatter-requirements.md`). No single script aggregates all repo-wide invariants (manifest version sync across plugins, source inventory, README badge presence, CHANGELOG entry per release) into one validation pass.
 
 ### Target state
 

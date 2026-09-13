@@ -5,7 +5,7 @@ title: "Improvement Proposals: Awesome AI Apps"
 ## Improvement 1: Persistent agent memory across sessions
 
 **Source pattern**: "Memory agent examples using GibsonAI Memori demonstrate: Long-term memory fabric for context retention, Preference tracking across conversations, Style consistency in multi-turn interactions, Fact accumulation in research workflows" (Section: Relevance to Claude Code Development, subsection 4)
-**Local system**: CLAUDE.md (context management), `.claude/rules/`
+**Local system**: CLAUDE.md (context management), `rules/`
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence Low: the research entry describes the pattern at a high level ("could adopt similar memory patterns") without naming a concrete mechanism. The local system already has per-project memory via agent `memory: project` frontmatter, and the `claude-mem` MCP search plugin provides observation storage. Whether GibsonAI Memori's "memory fabric" approach offers something materially different from the existing `claude-mem` plugin cannot be determined from the research entry alone.

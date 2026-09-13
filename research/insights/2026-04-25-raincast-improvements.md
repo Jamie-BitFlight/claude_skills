@@ -39,7 +39,7 @@ Run: `uv run plugins/plugin-creator/skills/skill-creator/scripts/init_skill.py e
 |---|---|
 | Proxy binary for dev/prod separation (proxyExtract.ts) | Tauri-specific build-time pattern. The repo's plugin/skill artifacts have no compiled-binary analog — skills are loaded from source on every session. The proxy concept does not map to any local system without inventing a new abstraction layer. |
 | Provider-agnostic AI integration (baseProvider.ts, registry.ts) | The Claude Code plugin and MCP system already provides this abstraction at a different level (any plugin can be swapped). The research entry itself notes "Claude Code already does this with the plugin system." No actionable gap. |
-| Error boundaries / graceful degradation (ErrorBoundary.tsx) | Local system already has equivalent mechanisms: hook profile fallback (`CLAUDE_SKILLS_HOOK_PROFILE=minimal` in implementation-manager/SKILL.md lines 207–209), agent BLOCKED status signaling (subagent-contract skill), and explicit exception handling rules (`.claude/rules/exception-handling.md`). The Raincast pattern is React-component-specific; no analogous file in this repo would benefit from a per-component try/catch wrapper. |
+| Error boundaries / graceful degradation (ErrorBoundary.tsx) | Local system already has equivalent mechanisms: hook profile fallback (`CLAUDE_SKILLS_HOOK_PROFILE=minimal` in implementation-manager/SKILL.md lines 207–209), agent BLOCKED status signaling (subagent-contract skill), and explicit exception handling rules (`rules/exception-handling.md`). The Raincast pattern is React-component-specific; no analogous file in this repo would benefit from a per-component try/catch wrapper. |
 
 ---
 

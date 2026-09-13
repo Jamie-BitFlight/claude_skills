@@ -33,7 +33,7 @@ title: "HomeButler Research — Actionable Improvements"
 - Create build templates for agents that need to produce compiled binaries
 
 **Action Items**:
-1. Add goreleaser reference to `.claude/rules/plugin-development.md` under "Binary Distribution"
+1. Add goreleaser reference to `rules/plugin-development.md` under "Binary Distribution"
 2. Create a template `plugins/template-mcp-binary-server/` showing Go + goreleaser setup
 3. Document the trade-off between npm-distributed and binary-distributed MCP servers
 
@@ -129,7 +129,7 @@ title: "HomeButler Research — Actionable Improvements"
 
 ### Phase 1 (Immediate): Documentation & Reference Integration
 1. Add HomeButler to `/plugin-creator:mcp-integration` skill reference materials
-2. Document goreleaser pattern in `.claude/rules/plugin-development.md`
+2. Document goreleaser pattern in `rules/plugin-development.md`
 3. Fill research gaps: app catalog, platform test status, log retention
 
 ### Phase 2 (Short-term): Pattern Documentation

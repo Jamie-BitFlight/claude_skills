@@ -12,7 +12,7 @@ title: "Improvement Proposals: Claude Code CLI Power Patterns"
 
 ### Current state
 
-`kage-bunshin/scripts/spawn.py` accepts `--model` to select the model (haiku, sonnet, opus) but has no `--effort` flag to set `CLAUDE_CODE_EFFORT_LEVEL` on the spawned `claude` process. The `work-milestone/SKILL.md` hardcodes `--model sonnet` in its spawn command template (line 48: `claude -p --model sonnet`) without any effort level parameter. The `model-selection.md` rule in `.claude/rules/` maps agents to models but does not mention effort tiers. As a result, all spawned sessions run at the default effort level regardless of task complexity. Coordinator sessions doing simple dispatch run at the same compute intensity as sessions doing architectural reasoning.
+`kage-bunshin/scripts/spawn.py` accepts `--model` to select the model (haiku, sonnet, opus) but has no `--effort` flag to set `CLAUDE_CODE_EFFORT_LEVEL` on the spawned `claude` process. The `work-milestone/SKILL.md` hardcodes `--model sonnet` in its spawn command template (line 48: `claude -p --model sonnet`) without any effort level parameter. The `model-selection.md` rule in `rules/` maps agents to models but does not mention effort tiers. As a result, all spawned sessions run at the default effort level regardless of task complexity. Coordinator sessions doing simple dispatch run at the same compute intensity as sessions doing architectural reasoning.
 
 ### Target state
 
@@ -22,7 +22,7 @@ title: "Improvement Proposals: Claude Code CLI Power Patterns"
 
 1. `uv run plugins/development-harness/skills/kage-bunshin/scripts/spawn.py spawn --help` shows `--effort` flag with choices `{low,medium,high,max}`.
 2. Spawning with `--effort low` results in the child process environment containing `CLAUDE_CODE_EFFORT_LEVEL=low` (observable via `tmux send-keys "! env | grep EFFORT"`).
-3. `.claude/rules/model-selection.md` contains an effort tier section.
+3. `rules/model-selection.md` contains an effort tier section.
 
 ---
 

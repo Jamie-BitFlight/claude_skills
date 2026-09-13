@@ -2,6 +2,9 @@
 title: "Improvement Proposals: MemPalace"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: PreCompact hook for emergency context preservation
 
 **Source pattern**: "PreCompact Hook — fires before context compression; emergency save before window shrinks" (Section 7: Auto-Save Hooks for Claude Code, lines 186-191)
@@ -71,14 +74,14 @@ A diary file exists at a predictable path per agent name. After a code-reviewer 
 ## Improvement 4: Structured wake-up context layer
 
 **Source pattern**: "wake-up context loads only ~170 tokens of critical facts (identity, team, projects, preferences) and queries fire on demand" (Section on Problem Addressed, line 30-31) and "L0 (identity) + L1 (critical facts) are generated, optionally compressed to AAAK, and injected into system prompt" (Section on Data Flow, line 231)
-**Local system**: `.claude/CLAUDE.md`, `.claude/rules/`
+**Local system**: `.claude/CLAUDE.md`, `rules/`
 **Confidence**: Low
 **Impact**: Low
 **Backlog**: Deferred — confidence low: CLAUDE.md already serves as the wake-up context layer, loading project identity, constraints, and behavioral rules on every session start. The research entry's pattern is about loading from a semantic database of past conversations, while the local system loads from authored instruction files. Whether the local system would benefit from a dynamic facts layer generated from past sessions (vs. the current manually-authored CLAUDE.md) is unclear without measuring what knowledge is actually lost between sessions. The local system may already have equivalent coverage via CLAUDE.md + rules/ + MEMORY.md.
 
 ### Current state
 
-CLAUDE.md loads on every session with project identity, constraints, tool usage rules, and behavioral standards. `.claude/rules/` loads context-specific rules. MEMORY.md persists key learnings across sessions. These are manually authored and maintained. There is no automatic extraction of "critical facts" from past session transcripts — the wake-up context is what was explicitly written, not what was discovered.
+CLAUDE.md loads on every session with project identity, constraints, tool usage rules, and behavioral standards. `rules/` loads context-specific rules. MEMORY.md persists key learnings across sessions. These are manually authored and maintained. There is no automatic extraction of "critical facts" from past session transcripts — the wake-up context is what was explicitly written, not what was discovered.
 
 ### Target state
 

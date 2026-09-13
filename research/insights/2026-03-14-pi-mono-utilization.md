@@ -2,6 +2,9 @@
 title: "Utilization Assessment: Pi Monorepo"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-primitives`, `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Integration Surfaces Found
 
 Pi-mono documents **three callable surfaces**:
@@ -35,7 +38,7 @@ Pi-mono documents **three callable surfaces**:
 **Role**: Primary Python implementation plugin with delegation framework for developers and agents.
 
 **Potential fit**: ❌ No
-- **Scope**: Python-focused (see .claude/rules/python-development.md). Routes all Python implementation tasks to specialist agents.
+- **Scope**: Python-focused (see rules/python-development.md). Routes all Python implementation tasks to specialist agents.
 - **Why unsuitable**: Pi-mono is TypeScript-only. The Python development plugin has no TypeScript agent counterpart in this repository, and adding one is out of scope for utilization assessment.
 
 ### 3. Agents: `feature-researcher`, `codebase-analyzer`, `integration-checker`

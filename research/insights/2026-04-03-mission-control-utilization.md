@@ -2,10 +2,13 @@
 title: "Utilization Proposals: Mission Control"
 ---
 
-## Utilization 1: swarm-orchestrating → Mission Control Cost Tracking API
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree. `plugins/development-harness/skills/backlog-tools-administrator/SKILL.md` was removed in PR #3330 (commit `20c84f3b5`, 2026-08-30) with no successor skill; conclusions below that treat it as an existing capability or constraint no longer hold. `swarm-orchestrating` never existed under any path in this repository — the real skill was `orchestrating-swarms`, itself removed in PR #3422.
+
+## Utilization 1: orchestrating-swarms → Mission Control Cost Tracking API
 
 **Research entry**: ./research/agent-frameworks/mission-control.md
-**Caller**: ./.claude/skills/swarm-orchestrating/SKILL.md and ./.claude/skills/swarm-operations/SKILL.md
+**Caller**: ./.claude/skills/orchestrating-swarms/SKILL.md and ./.claude/skills/swarm-operations/SKILL.md
 **Integration mechanism**: HTTP REST API call
 **Replaces or adds**: Adds cost visibility and budget enforcement to Claude Code swarms that run at scale
 **Setup cost**: Medium (API endpoint discovery, auth token configuration, cost model mapping)
@@ -13,7 +16,7 @@ title: "Utilization Proposals: Mission Control"
 
 ### Why this caller
 
-The `swarm-orchestrating` and `swarm-operations` skills document multi-agent execution patterns (parallel specialists, pipeline, convoy mode from Mission Control v2.3+) but do not address cost visibility. When orchestrating teams of 3-5 agents running simultaneously (Convoy Mode pattern, per research lines 72-80), costs accumulate rapidly and are invisible to the orchestrator. Mission Control's cost tracking engine (documented lines 240-244) records per-task costs broken down by agent, model, and token count with daily/monthly cap enforcement. Integrating with this API would allow Claude Code swarms to:
+The `orchestrating-swarms` and `swarm-operations` skills document multi-agent execution patterns (parallel specialists, pipeline, convoy mode from Mission Control v2.3+) but do not address cost visibility. When orchestrating teams of 3-5 agents running simultaneously (Convoy Mode pattern, per research lines 72-80), costs accumulate rapidly and are invisible to the orchestrator. Mission Control's cost tracking engine (documented lines 240-244) records per-task costs broken down by agent, model, and token count with daily/monthly cap enforcement. Integrating with this API would allow Claude Code swarms to:
 
 1. Track costs per-agent per-task in real-time
 2. Enforce budget caps before spawning parallel agents
@@ -132,7 +135,7 @@ The research entry documents the knowledge pattern at high level (lines 99-102) 
 |---|---|
 | ./.claude/agents/research-curator.md | Research-curator is a researcher, not a cost tracker. Integration opportunity exists only if Mission Control knowledge base API were documented; current research entry describes knowledge injection pattern but not API contract for knowledge retrieval/storage. Deferred until knowledge API is documented. |
 | ./.claude/skills/backlog-tools-administrator/SKILL.md | Scope orthogonal — backlog-tools-administrator manages backlog tooling (script, process, documentation gaps), not external cost tracking services. Mission Control cost tracking applies to swarm execution, not backlog metadata. |
-| ./.claude/skills/swarm-spawning/SKILL.md | Swarm-spawning documents agent creation mechanics but does not orchestrate external task dispatch services. Mission Control's task API and agent dispatch happen upstream of spawning; no integration point where swarm-spawning itself needs to call Mission Control APIs. Cost enforcement and monitoring (Utilization 1) is handled by swarm-orchestrating, not by the spawn mechanism. |
+| ./.claude/skills/swarm-spawning/SKILL.md | Swarm-spawning documents agent creation mechanics but does not orchestrate external task dispatch services. Mission Control's task API and agent dispatch happen upstream of spawning; no integration point where swarm-spawning itself needs to call Mission Control APIs. Cost enforcement and monitoring (Utilization 1) is handled by orchestrating-swarms, not by the spawn mechanism. |
 
 ---
 

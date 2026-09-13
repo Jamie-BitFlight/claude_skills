@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Agent Deck"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Hook-based instant status detection via SQLite event store
 
 **Source pattern**: "Agent Deck uses tool-specific hooks (Claude hooks, Gemini hooks, Codex hooks) installed into each tool to detect state changes and write to SQLite. This pattern is more reliable than polling file timestamps and enables instant status updates without excessive polling overhead" (Patterns Worth Adopting, bullet 1)
@@ -244,4 +247,4 @@ N/A -- out of scope for skill/plugin architecture.
 | Stall detection with heartbeat monitoring | Already tracked as #87 and #448 |
 | Concurrency cap for parallel task dispatch | Already tracked as #452 |
 | SubagentStop hook structured work summary | Already tracked as #576 |
-| TOML-based configuration with type safety | Too abstract -- the repo already uses TOML (tomlkit) and YAML (ruamel.yaml) per .claude/rules/yaml-toml-libraries.md; no specific gap identified |
+| TOML-based configuration with type safety | Too abstract -- the repo already uses TOML (tomlkit) and YAML (ruamel.yaml) per rules/yaml-toml-libraries.md; no specific gap identified |

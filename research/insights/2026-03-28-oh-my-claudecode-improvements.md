@@ -2,6 +2,9 @@
 title: "Improvement Proposals: oh-my-claudecode"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Verify-fix loop for failed tasks in implement-feature
 
 **Source pattern**: "Ralph mode and the team-verify-fix pipeline address a core failure mode: partial task completion. Rather than hoping agents succeed, OMC implements explicit verify-fix loops." (Section: Relevance to Claude Code Development, subsection 3)
@@ -106,6 +109,6 @@ A configuration file or plan-level field defines skill layers. Tasks dispatched 
 | Pattern | Reason skipped |
 |---|---|
 | Multi-Agent Coordination Patterns (pattern 1) | Already covered: swarm-operations/SKILL.md provides TeamCreate, SendMessage, TeamDelete; swarm-patterns/SKILL.md provides parallel specialist, pipeline, and self-organizing patterns; implement-feature dispatches parallel teams when 2+ tasks are ready |
-| Model Routing & Cost Optimization (pattern 2) | Already covered: .claude/rules/model-selection.md implements the same Haiku/Sonnet/Opus tier mapping by cognitive task type with identical rationale |
+| Model Routing & Cost Optimization (pattern 2) | Already covered: rules/model-selection.md implements the same Haiku/Sonnet/Opus tier mapping by cognitive task type with identical rationale |
 | Hooks & Plugin Integration (pattern 5) | Already covered: task_status_hook.py handles PostToolUse and SubagentStop events; start-task SKILL.md declares hook configuration; session-start hooks exist in .claude/hooks/ |
 | Cross-Provider Orchestration (pattern 7) | Incompatible with architecture: this repo targets Claude Code exclusively; cross-provider (Codex/Gemini) coordination is outside scope |

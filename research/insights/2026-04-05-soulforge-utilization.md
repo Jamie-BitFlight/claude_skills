@@ -2,6 +2,9 @@
 title: "Utilization Proposals: SoulForge"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `orchestrating-swarms` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Utilization 1: context-gathering → SoulForge repo map
 
 **Research entry**: ./research/coding-agents/soulforge.md
@@ -106,6 +109,6 @@ SoulForge's roadmap (line 294) includes `@soulforge/mcp` as MCP servers for Clau
 
 **Model Routing Relevance**
 
-SoulForge's task router (lines 57, 259-264) with per-model assignment (Opus for planning, Sonnet for coding, Haiku for cleanup) is architecturally relevant to Claude Code's model selection rules documented in `.claude/rules/model-selection.md`. This is a pattern adoption opportunity (not utilization), recommended for research-insight-extractor to surface separately.
+SoulForge's task router (lines 57, 259-264) with per-model assignment (Opus for planning, Sonnet for coding, Haiku for cleanup) is architecturally relevant to Claude Code's model selection rules documented in `rules/model-selection.md`. This is a pattern adoption opportunity (not utilization), recommended for research-insight-extractor to surface separately.
 
 ---

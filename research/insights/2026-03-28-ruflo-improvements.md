@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Ruflo"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+
 ## Improvement 1: Goal-drift validation between task batches in implement-feature
 
 **Source pattern**: "Hierarchical coordinator validates outputs against original goal" and "Short task cycles with verification gates" (Relevance section, Anti-Drift Swarm Configuration, README.md lines 370-383)
@@ -49,14 +52,14 @@ The `build_quality_gate_plan` function in `sam_schema.core.quality_gates` produc
 ## Improvement 3: Cost-aware model routing with skip-LLM tier for repetitive transforms
 
 **Source pattern**: "Token optimizer can extend Claude Code subscription usage by 250% through intelligent routing (Agent Booster for simple tasks skips LLM calls entirely, HNSW-based pattern retrieval reduces context size by 32%, caching provides 10% savings)" (Relevance section 2, README.md lines 284-313)
-**Local system**: .claude/rules/model-selection.md
+**Local system**: rules/model-selection.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: the model-selection.md rule was read and provides manual haiku/sonnet/opus guidance, but the research entry's WASM-based transform tier and automatic cost routing operate at a different architectural level (runtime code transforms vs. model selection guidance). The local system cannot implement WASM transforms within its current architecture (Claude Code skills and agents). The pattern would require building an MCP server for code transforms, which goes beyond extending existing systems.
 
 ### Current state
 
-Model selection is guided by `.claude/rules/model-selection.md`, a static decision table mapping agent task types to haiku/sonnet/opus. There is no runtime cost tracking, no automatic downgrade to cheaper models for simple tasks, and no skip-LLM path for repetitive code transforms. Every agent invocation uses LLM inference regardless of task complexity.
+Model selection is guided by `rules/model-selection.md`, a static decision table mapping agent task types to haiku/sonnet/opus. There is no runtime cost tracking, no automatic downgrade to cheaper models for simple tasks, and no skip-LLM path for repetitive code transforms. Every agent invocation uses LLM inference regardless of task complexity.
 
 ### Target state
 
@@ -71,14 +74,14 @@ A new MCP tool exists that handles at least 3 deterministic code transforms (e.g
 ## Improvement 4: Persistent cross-session pattern storage via MCP
 
 **Source pattern**: "RuVector's learning loop stores successful patterns from each task, builds a knowledge graph of architectural decisions, and predicts agent routing for future tasks. This enables the system to become more efficient over time." (Relevance section 3, README.md lines 299-303)
-**Local system**: .claude/CLAUDE.md, .claude/rules/
+**Local system**: .claude/CLAUDE.md, rules/
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: CLAUDE.md and the rules directory were examined and contain only static context. The research entry describes a learning loop with pattern extraction, indexing, and retrieval. The local system has no equivalent. However, Claude Code's architecture (stateless sessions with CLAUDE.md as the only persistent context) may already support a lightweight version via claude-mem MCP tools (`smart_search`, `get_observations`). Whether those tools already provide pattern storage equivalent to ReasoningBank was not verified in this assessment.
 
 ### Current state
 
-Context persists across sessions only via CLAUDE.md (static rules) and `.claude/rules/` files. Successful patterns from completed tasks are not stored, indexed, or retrievable. Each new session starts with the same static context regardless of what worked well in previous sessions.
+Context persists across sessions only via CLAUDE.md (static rules) and `rules/` files. Successful patterns from completed tasks are not stored, indexed, or retrievable. Each new session starts with the same static context regardless of what worked well in previous sessions.
 
 ### Target state
 
