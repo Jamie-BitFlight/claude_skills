@@ -5,7 +5,7 @@ title: "Improvement Proposals: Maverick"
 ## Improvement 1: Automated Project-Specific Skill Generation (Upskill System)
 
 **Source pattern**: "The separation of best-practice skills (universal standards) from project skills (stack-specific implementations) is directly applicable to Claude Code skill design. The upskill system demonstrates automated skill generation and project customization." (Relevance section, point 2)
-**Local system**: /home/user/claude_skills/plugins/plugin-creator/skills/skill-creator/SKILL.md
+**Local system**: ./plugins/plugin-creator/skills/skill-creator/SKILL.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence Low: the skill-creator already supports project-level skills and the `/init` step scans the environment. Whether Maverick's specific upskill mechanism (scan codebase for existing implementations of logging/testing/CI patterns and auto-generate compliant project skills) would produce better outcomes than the current manual skill-creation workflow is unclear without experimentation. The local system may already achieve equivalent results through the combination of `/skill-creator` and `/add-doc-updater`.
@@ -27,7 +27,7 @@ Running `/upskill` on a Python project with pytest and ruff configured produces 
 ## Improvement 2: Layered Enforcement Chain with Hook-Based Practice Verification
 
 **Source pattern**: "Enforcement Chain: 1. Best-practice skill -- prevents anti-patterns (console.log vs structured logger) 2. Project skill -- ensures project-specific implementation (Pino with CloudWatch) 3. Local verification -- catches syntax, lint, test failures before push 4. CI pipeline -- catches environment-specific, dependency, cross-platform issues 5. Agent review -- catches spec violations, missing tests, security issues, convention drift 6. Human review -- final gate for production-bound code" (Key Features section 5, from docs/overview.md)
-**Local system**: /home/user/claude_skills/plugins/development-harness/skills/start-task/SKILL.md and /home/user/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: ./plugins/development-harness/skills/start-task/SKILL.md and ./plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence Medium: the local system has hooks (PostToolUse, SubagentStop) that update task status and timestamps, and the complete-implementation skill runs a 6-phase quality gate chain (code review, feature verification, integration check, doc drift audit, doc update, context refinement). However, the local hooks do not enforce practice-specific rules at the tool-call boundary (e.g., blocking a Write that introduces console.log instead of structured logging). Whether adding practice-enforcement hooks at the PreToolUse boundary would improve outcomes or just add latency is unclear without measuring current failure rates from practice violations.
@@ -49,7 +49,7 @@ A PreToolUse hook script exists that reads practice rules from a configurable pa
 ## Improvement 3: Supervised Workflow Mode with Human Checkpoint Gates
 
 **Source pattern**: "do-issue-guided -- Supervised Development with Checkpoints: Human approval gates at four decision points: 1. After solution design (before task creation) 2. After task breakdown (before execution) 3. After implementation + agent review (before PR) 4. After PR creation (before merge)" (Key Features section 4)
-**Local system**: /home/user/claude_skills/plugins/development-harness/skills/add-new-feature/SKILL.md and /home/user/claude_skills/plugins/development-harness/skills/implement-feature/SKILL.md
+**Local system**: ./plugins/development-harness/skills/add-new-feature/SKILL.md and ./plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred -- confidence Medium: the local system already has the ARL (Adaptive Resource Level) human touchpoint model documented in the development harness CLAUDE.md, which uses constraint analysis to decide when to escalate rather than fixed checkpoints. Whether adding a fixed-checkpoint "guided" mode alongside the ARL-based model would improve outcomes or create confusion is unclear. The ARL approach may be architecturally superior (escalates based on risk, not phase boundaries).

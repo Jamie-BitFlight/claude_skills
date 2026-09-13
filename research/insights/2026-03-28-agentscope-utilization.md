@@ -3,7 +3,7 @@ title: "Utilization Proposals: AgentScope"
 ---
 
 <!-- removed-skill-citations -->
-> **Removed-skill citations:** `orchestrating-swarms` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+> **Removed-skill citations:** `orchestrating-swarms` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and `TeamCreate` survives in the tree only as a negation. The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
 
 ## Analysis Summary
 
@@ -26,7 +26,7 @@ Claude Code agents (ReActAgent, context-gathering, code-reviewer) operate within
 | Local System | Reason skipped |
 |---|---|
 | `.claude/agents/context-gathering.md` | Reads codebase to gather context — domain does not overlap with multi-agent orchestration or distributed agents |
-| `.claude/skills/orchestrating-swarms/SKILL.md` | Already uses Claude Code's native TeamCreate for agent orchestration; AgentScope is a separate framework for LLM-level agent systems, not Claude Code agents. Integration would require replacing Claude Code's swarm system entirely, a destructive architectural change outside this assessment scope |
+| `.claude/skills/orchestrating-swarms/SKILL.md` | Already uses Claude Code's native TeamCreate for agent orchestration; AgentScope is a separate framework for LLM-level agent systems, not Claude Code agents. Integration would require replacing Claude Code's swarm system entirely, a destructive architectural change outside this assessment scope **[Refuted — the skill(s) cited here were retired in PR #3422 (`4e1e73bd6`) and are absent from the current tree; see the removed-skill note at the top of this file.]** |
 | `plugins/development-harness/` (SAM orchestration) | Coordinates agent specialists synchronously through artifact-based handoff (plan → task file → agent execution → artifact output → next stage). AgentScope's async-first, message-driven, distributed architecture is incompatible without reimplementation of core orchestration. Potential future work: implement AgentScope-Runtime as an alternative backend for long-running milestone tasks, but requires new plugin rather than utilization of existing caller |
 | `.claude/agents/research-utilization-assessor.md` (this agent) | Self-referential; this agent assesses utilization but is not itself a caller of external services in this domain |
 

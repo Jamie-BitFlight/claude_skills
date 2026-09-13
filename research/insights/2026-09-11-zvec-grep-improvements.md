@@ -18,7 +18,7 @@
 ## Improvement 1: semantic-code-search routes lexical and semantic search as mutually exclusive, with no combined path for cross-file questions
 
 **Source pattern**: "Hybrid Search with Multiple Retrieval Paths" — `zg --fts "loadTheme" --vector "where user prefs are restored" --fuse` combines multiple groups and fuses results into a single ranked output; the entry's Problem Addressed section quotes the README: "zg works best when evidence spans files or modules and the target location is unknown, especially for call-chain, data-flow, and architectural questions."
-**Local system**: `/home/user/claude_skills/plugins/python3-development/skills/semantic-code-search/SKILL.md`
+**Local system**: `./plugins/python3-development/skills/semantic-code-search/SKILL.md`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: created as `p1-semantic-code-search-routes-lexical-and-semantic-search-as-m` (P1, Feature) — GitHub issue number pending, see sync note above
@@ -33,9 +33,9 @@ This is a two-branch exclusive router keyed on one variable — whether the agen
 
 The question shape zvec-grep names as its best case — evidence spanning files or modules where the target location is unknown (call-chain, data-flow, architectural questions) — is not addressed by either branch. An agent holding a partial identifier *and* a behavioral description is instructed to pick one path, not to run both and reconcile.
 
-The agent wrapper at `/home/user/claude_skills/plugins/python3-development/agents/semantic-code-search.md` line 9 reinforces the exclusivity from the other direction: "If the tool is unavailable, report BLOCKED — do not fall back to pattern-based search."
+The agent wrapper at `./plugins/python3-development/agents/semantic-code-search.md` line 9 reinforces the exclusivity from the other direction: "If the tool is unavailable, report BLOCKED — do not fall back to pattern-based search."
 
-Note on partial coverage: `/home/user/claude_skills/plugins/development-harness/agents/codebase-analyzer.md` does show both paths side by side per focus area (e.g. its "For conventions focus" block pairs `ccc search error handling exception raise catch` with `Grep(pattern="raise |except |try:")`), and its Search Tool Priority (line 118) says to use Grep "after ccc narrows the search space". That is a sequential narrowing recipe inside one agent, not a routing rule in the skill that owns the decision — and it exists only in that agent, not in the skill other callers load.
+Note on partial coverage: `./plugins/development-harness/agents/codebase-analyzer.md` does show both paths side by side per focus area (e.g. its "For conventions focus" block pairs `ccc search error handling exception raise catch` with `Grep(pattern="raise |except |try:")`), and its Search Tool Priority (line 118) says to use Grep "after ccc narrows the search space". That is a sequential narrowing recipe inside one agent, not a routing rule in the skill that owns the decision — and it exists only in that agent, not in the skill other callers load.
 
 ### Target state
 
@@ -43,8 +43,8 @@ Note on partial coverage: `/home/user/claude_skills/plugins/development-harness/
 
 ### Measurable signal
 
-- `grep -c 'Prefer' /home/user/claude_skills/plugins/python3-development/skills/semantic-code-search/SKILL.md` — the file contains a branch beyond the two `Prefer ...` sentences on line 14.
-- `grep -n 'call-chain\|data-flow\|both' /home/user/claude_skills/plugins/python3-development/skills/semantic-code-search/SKILL.md` returns at least one match in a routing branch.
+- `grep -c 'Prefer' ./plugins/python3-development/skills/semantic-code-search/SKILL.md` — the file contains a branch beyond the two `Prefer ...` sentences on line 14.
+- `grep -n 'call-chain\|data-flow\|both' ./plugins/python3-development/skills/semantic-code-search/SKILL.md` returns at least one match in a routing branch.
 - The new branch states a reconciliation rule, verifiable by reading the file: an instruction covering what to do when the two paths return overlapping or disjoint file sets.
 
 ---
@@ -52,7 +52,7 @@ Note on partial coverage: `/home/user/claude_skills/plugins/development-harness/
 ## Improvement 2: codebase-analyzer gates its primary search tool on an unverifiable freshness judgment with no index-state probe
 
 **Source pattern**: "Index Refresh Strategies" (`--refresh wait` / `background` / `off`) and the CLI's `zg --status [root]`: "Inspect index state and readiness."
-**Local system**: `/home/user/claude_skills/plugins/development-harness/agents/codebase-analyzer.md`
+**Local system**: `./plugins/development-harness/agents/codebase-analyzer.md`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: created as `p1-codebase-analyzer-gates-its-primary-search-tool-on-an-unveri` (P1, Refactor) — GitHub issue number pending, see sync note above
@@ -65,7 +65,7 @@ Note on partial coverage: `/home/user/claude_skills/plugins/development-harness/
 
 "if the codebase has changed recently" is not observable from anything the agent has. There is no probe named, no threshold, and no stated behavior for the stale case. A stale index returns a well-formed, ranked, confidently-worded result set that silently omits code added since the last index run — and that result set feeds the PATTERNS.md / ARCHITECTURE.md artifacts the agent registers (Step 4: Register Artifact), which downstream stages then read as authoritative.
 
-A readiness probe pattern already exists elsewhere in the repo but checks a different condition. `/home/user/claude_skills/plugins/development-harness/skills/codebase-auditor/SKILL.md` lines 60-63 run `ccc search "test" --limit 1` and, on `"Not in an initialized project directory"`, run `ccc init` then `ccc index`. That detects *absence* of an index, not *staleness* of one — an index built a hundred commits ago passes that probe.
+A readiness probe pattern already exists elsewhere in the repo but checks a different condition. `./plugins/development-harness/skills/codebase-auditor/SKILL.md` lines 60-63 run `ccc search "test" --limit 1` and, on `"Not in an initialized project directory"`, run `ccc init` then `ccc index`. That detects *absence* of an index, not *staleness* of one — an index built a hundred commits ago passes that probe.
 
 zvec-grep makes both states first-class: `zg --status` reports index state and readiness as data, and `--refresh wait|background|off` makes the stale-index policy an explicit, named choice rather than an unstated default.
 
@@ -77,7 +77,7 @@ Relationship to existing backlog: issue #1042 ("feat: Incremental commit-anchore
 
 ### Measurable signal
 
-- `grep -n 'if the codebase has changed recently' /home/user/claude_skills/plugins/development-harness/agents/codebase-analyzer.md` returns no match.
+- `grep -n 'if the codebase has changed recently' ./plugins/development-harness/agents/codebase-analyzer.md` returns no match.
 - The Search Tool Priority section names a concrete command whose output the agent reads to decide, and states an action for each outcome — verifiable by reading lines around 112-120.
 - The agent's structured return (Step 5: Return Confirmation) includes an index-state field, so a run of the agent produces output naming whether the index was current, was rebuilt, or was used stale.
 
@@ -97,5 +97,5 @@ Relationship to existing backlog: issue #1042 ("feat: Incremental commit-anchore
 | Pattern | Reason skipped |
 |---|---|
 | Time-based filtering (`--modified-before` / `--modified-after`) to scope search to recent changes | Already covered. `codebase-analyzer.md` line 117 makes git-forensics MCP the second-priority tool specifically for "co-change analysis and hot spot detection ... churn that Grep cannot find" — recency-scoped discovery is an existing, stronger path (it ranks by change coupling, not just a timestamp cutoff). |
-| One-command multi-agent MCP registration (`zg --install --target claude\|codex\|qwen\|qoder\|opencode\|cursor\|all` writing into each agent's config file) | Architecturally incompatible, and the incompatibility is deliberate. `/home/user/claude_skills/docs/cross-harness-smoke-tests.md` ("Common to every harness", step 1) requires installing "through that harness's own install mechanism (not the authoring checkout — an installed consumer is the point of the test)". A self-install path that writes harness config directly would bypass the exact mechanism the repo's verification depends on. |
+| One-command multi-agent MCP registration (`zg --install --target claude\|codex\|qwen\|qoder\|opencode\|cursor\|all` writing into each agent's config file) | Architecturally incompatible, and the incompatibility is deliberate. `./docs/cross-harness-smoke-tests.md` ("Common to every harness", step 1) requires installing "through that harness's own install mechanism (not the authoring checkout — an installed consumer is the point of the test)". A self-install path that writes harness config directly would bypass the exact mechanism the repo's verification depends on. |
 | Production MCP server implementation patterns — HTTP transport, tool schemas, error handling, authentication | Too abstract to express as an observable before/after state. The research entry's Relevance point 2 says these are "useful patterns" without naming a specific mechanism absent from `plugins/fastmcp-creator/`; no concrete target state can be written from it without first inventing the requirement. |

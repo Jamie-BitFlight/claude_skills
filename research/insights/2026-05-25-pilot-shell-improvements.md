@@ -5,7 +5,7 @@ title: "Improvement Proposals: Pilot Shell"
 ## Improvement 1: Add `/spec` orchestration skill that gates implementation on user plan approval with inline annotations
 
 **Source pattern**: Quote from research entry, "## /spec — Spec-Driven Development Workflow" section: "Waits for user approval with inline annotation support (select text or click + to annotate; agent reads annotations at next review checkpoint)" and "Spec-review sub-agent validates completeness".
-**Local system**: /home/user/claude_skills/plugins/development-harness/skills/add-new-feature/SKILL.md and implement-feature/SKILL.md
+**Local system**: ./plugins/development-harness/skills/add-new-feature/SKILL.md and implement-feature/SKILL.md
 **Confidence**: High
 **Impact**: High
 **Backlog**: #2444 created
@@ -57,7 +57,7 @@ File `plugins/development-harness/skills/fix/SKILL.md` exists with frontmatter `
 ## Improvement 3: Add `/dh:benchmark` skill for measuring effect of a rule, skill, or agent on output quality
 
 **Source pattern**: Quote from research entry, "### /benchmark — Impact Measurement" section: "Runs prompts with and without a target rule or skill, grades outputs against falsifiable assertions, and produces a structured verdict + improvement plan. Isolation mode auto-hides global extensions for duration, then restores on completion (survives SIGKILL via recovery manifest)."
-**Local system**: /home/user/claude_skills/plugins/development-harness/skills/impact-measurement/SKILL.md
+**Local system**: ./plugins/development-harness/skills/impact-measurement/SKILL.md
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #2447 created
@@ -85,7 +85,7 @@ File `plugins/development-harness/skills/benchmark/SKILL.md` exists. Running it 
 ## Improvement 4: Register `RED → GREEN → REFACTOR` enforcement as an executable hook on task transitions, not a documented norm
 
 **Source pattern**: Quote from research entry, "Implementation phase: Strict TDD: RED → GREEN → REFACTOR for each task" and "Quality hooks auto-lint, format, type-check on every edit" and "Full test suite runs after each task. No manual code edits — all changes go through claude Code's Edit tool."
-**Local system**: /home/user/claude_skills/plugins/development-harness/skills/start-task/SKILL.md (PostToolUse hook) and /home/user/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: ./plugins/development-harness/skills/start-task/SKILL.md (PostToolUse hook) and ./plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #2448 created

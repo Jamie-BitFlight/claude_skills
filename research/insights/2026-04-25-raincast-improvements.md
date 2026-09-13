@@ -5,7 +5,7 @@ title: "Improvement Proposals: Raincast"
 ## Improvement 1: Domain-specific skill scaffolding templates analogous to Raincast's 9 layout templates
 
 **Source pattern**: "Nine layout templates (src/lib/generation/templates/) emit production-ready React code. Each template is a pure function: metadata → scaffold." (Relevance to Claude Code Development, section 3 — Template-Driven Code Scaffolding)
-**Local system**: /home/user/claude_skills/plugins/plugin-creator/skills/skill-creator/scripts/init_skill.py
+**Local system**: ./plugins/plugin-creator/skills/skill-creator/scripts/init_skill.py
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #1936 created

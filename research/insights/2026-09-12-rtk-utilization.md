@@ -21,7 +21,7 @@
 
 Claude Code agents in this repository run intensive workflows involving Git operations (status, log, diff, commit, push, pull), testing (pytest, cargo test), and build commands (ruff, tsc, cargo build). These commands produce verbose output that consumes tokens without proportional information value (progress bars, boilerplate formatting, repetitive logging). A session-start hook can install RTK once per session and register its PreToolUse hook with Claude Code, transparently filtering all subsequent Bash command output.
 
-The `.claude/hooks/session-start.js` hook file does not currently exist (discovered at path `/home/user/claude_skills/.claude/hooks/`), so this represents new capability addition. RTK's "Auto-Rewrite (default)" mode applies 100% of invocations without context overhead, making this a transparent token-saving mechanism for agents running multi-step workflows.
+The `.claude/hooks/session-start.js` hook file does not currently exist (discovered at path `./.claude/hooks/`), so this represents new capability addition. RTK's "Auto-Rewrite (default)" mode applies 100% of invocations without context overhead, making this a transparent token-saving mechanism for agents running multi-step workflows.
 
 ### Integration sketch
 

@@ -3,7 +3,7 @@ title: "Improvement Proposals: Ruflo"
 ---
 
 <!-- removed-skill-citations -->
-> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and consolidated into `plugins/agent-orchestration/skills/delegate/` and `plugins/agent-orchestration/skills/parallel-work/`. The consolidation replaced roughly 2080 lines with roughly 330, so the line numbers, pattern numbers, and named sections cited below have no surviving equivalent — any "already covered" conclusion resting on them is unverified against the current tree.
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and `TeamCreate` survives in the tree only as a negation. The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
 
 ## Improvement 1: Goal-drift validation between task batches in implement-feature
 
@@ -131,6 +131,6 @@ A command or MCP tool query returns stall status for IN_PROGRESS tasks. Tasks wi
 
 | Pattern | Reason skipped |
 |---|---|
-| Native Claude Code Integration / Multi-agent decomposition | Already covered by implement-feature SAM task decomposition + TeamCreate parallel dispatch + swarm-patterns skill (7+ orchestration patterns) |
+| Native Claude Code Integration / Multi-agent decomposition | Already covered by implement-feature SAM task decomposition + TeamCreate parallel dispatch + swarm-patterns skill (7+ orchestration patterns) **[Refuted — the skill(s) cited here were retired in PR #3422 (`4e1e73bd6`) and are absent from the current tree; see the removed-skill note at the top of this file.]** |
 | Specialized Agent Pool (100+ pre-built agents) | Too abstract -- the gap is quantitative (more agents) not architectural; adding agents is routine, not an improvement pattern |
 | Automatic Documentation from Source | Already covered by complete-implementation Phase T4 (doc-drift-auditor) and T5 (service-docs-maintainer) |
