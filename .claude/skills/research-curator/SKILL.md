@@ -19,21 +19,26 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 
 ## Mode Routing
 
-Parse `<mode_args/>` to select operating mode. Optional `--layer 0|1|2` filters discovery by SDLC layer when used with knowledge-explorer or refresh-research.
+Parse `<mode_args/>` to select operating mode. Before executing any mode below, capture a
+`git status --porcelain --untracked-files=all -- ./research/` baseline -- this is the
+invocation's pre-write state, taken before this run's own README update, curator agent, or
+analysis agent writes anything. `--untracked-files=all` is required: the default mode collapses
+an untracked directory to one line (`?? research/new-category/`) instead of listing the files
+inside it, while step 3 below always lists individual files via `git ls-files --others` -- without
+this flag, a pre-existing untracked file inside a new untracked directory would never match
+anything in the baseline and would be misclassified as this run's own work. Post-Actions' steps
+compare against this baseline, not a fresh snapshot, to tell this run's own writes apart from
+another contributor's pre-existing uncommitted work.
 
 The following diagram is the authoritative procedure for mode routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
     Start(["Parse <mode_args/>"]) --> Q1{"Does <mode_args/> contain --batch?"}
-    Q1 -->|"Yes — batch flag present"| Q1Layer{"Does <mode_args/> also contain --layer 0, 1, or 2?"}
+    Q1 -->|"Yes — batch flag present"| Batch(["Execute Batch Mode"])
     Q1 -->|"No — batch flag absent"| Q2{"Does <mode_args/> contain --rerun?"}
-    Q1Layer -->|"Yes — layer filter present"| BatchLayer(["Execute Batch Mode with layer filter applied"])
-    Q1Layer -->|"No — no layer filter"| Batch(["Execute Batch Mode"])
-    Q2 -->|"Yes — rerun flag present"| Q2Layer{"Does <mode_args/> also contain --layer 0, 1, or 2?"}
+    Q2 -->|"Yes — rerun flag present"| Rerun(["Execute Rerun Mode"])
     Q2 -->|"No — rerun flag absent"| Q3{"Does <mode_args/> contain --validate?"}
-    Q2Layer -->|"Yes — layer filter present"| RerunLayer(["Execute Rerun Mode with layer filter applied"])
-    Q2Layer -->|"No — no layer filter"| Rerun(["Execute Rerun Mode"])
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
     Q3 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
 ```
@@ -125,25 +130,7 @@ Load [Duplicate Detection](./references/duplicate-detection.md) (shared with Bat
    ```
 
 4. **Wait** for structured result (status, file path, category, key findings)
-5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file:
-
-   a. Run fix script:
-
-   ```bash
-   uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file-path-from-agent-result}
-   ```
-
-   b. Run validator:
-
-   ```bash
-   uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file-path-from-agent-result}
-   ```
-
-   c. If validator returns any error-severity issue: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, report to user with exact error text from validator JSON
-
-   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: the agent just wrote this file this invocation, so it already has the research date, source URL, version, and access dates needed to satisfy these. Spawn `@research-curator` with `--fix` and the exact warning issue list from the JSON, then repeat steps a-b on the same file. If errors or any of these four warning types still remain after the retry, treat as step c.
-
-   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` and info-severity items do not block this step -- proceed to step 6
+5. **Validate** -- if research status is not `failed`, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the created or refreshed file. On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when step 2 routed to `--rerun`), skip steps 6–7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
 6. **Spawn four tasks concurrently** -- if research status is not `failed`:
 
@@ -194,13 +181,7 @@ Extract all tokens after `--batch` matching `https?://` as target URLs. Non-URL 
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries):
-
-1. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
-2. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
-3. If validator returns any error-severity issue: mark entry as "created with issues", skip analysis agents for that entry, include in output report with exact error text
-4. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps 1-2 on the same file. If errors or any of these four warning types still remain after the retry, treat as step 3.
-5. If validator passes with zero errors and zero warnings from the four checks in step 4 (`cross_references_absent` does not block this step): spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents)
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries). On its "mark issues" outcome: mark entry as "created with issues", skip analysis agents for that entry, and include the exact error or warning text in the output report. On its "proceed" outcome: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents).
 
 See [Batch Mode reference](./references/batch-mode.md) for the complete wave spawning diagram.
 
@@ -281,19 +262,9 @@ flowchart TD
 
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
-5. **Validate** -- run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the updated file:
+5. **Validate** -- run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the updated file. On its "mark issues" outcome: mark entry as "refreshed with issues", skip step 7, and report to user with the exact error or warning text from validator JSON. On its "proceed" outcome, continue to step 6.
 
-   a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py ./research/{category}/{name}.md`
-
-   b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{category}/{name}.md`
-
-   c. If validator returns any error-severity issue: mark entry as "refreshed with issues", skip step 7, report to user with exact error text from validator JSON
-
-   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: the agent just refreshed this file this invocation, so it already has the facts to satisfy these. Spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps a-b. If errors or any of these four warning types still remain after the retry, treat as step c.
-
-   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- proceed to step 6
-
-6. Update README with refreshed date (only reached on the clean path from step 5 -- an entry marked "refreshed with issues" in step 5c never gets a refreshed date)
+6. Update README with refreshed date (only reached on the "proceed" outcome of step 5 -- an entry marked "refreshed with issues" by step 5's "mark issues" outcome never gets a refreshed date)
 7. Concurrently spawn three analysis agents:
 
    ```text
@@ -310,19 +281,9 @@ flowchart TD
 2. Spawn agents in waves of 5 (same pattern as Batch Mode)
 3. Each agent receives `--rerun ./research/{category}/{name}.md`
 4. Apply pre-relay quality checklist after each wave
-5. **Validate** -- for each successfully updated entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) before spawning analysis agents:
+5. **Validate** -- for each successfully updated entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) before spawning analysis agents. On its "mark issues" outcome: mark that entry as "refreshed with issues" and skip analysis agents for it. On its "proceed" outcome: include the entry in analysis agent dispatch (step 7).
 
-   a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
-
-   b. Run validator: `uv run .claude/skills/research-curator/scripts/validate_research.py main --json {file}`
-
-   c. If validator returns any error-severity issue: mark entry as "refreshed with issues", skip analysis agents for that entry
-
-   d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps a-b on the same file. If errors or any of these four warning types still remain after the retry, treat as step c.
-
-   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- include in analysis agent dispatch (step 7)
-
-6. Update README once after all waves complete, refreshing freshness dates only for entries that passed validation in step 5 -- an entry marked "refreshed with issues" in step 5c does not get a refreshed date
+6. Update README once after all waves complete, refreshing freshness dates only for entries that passed validation in step 5 -- an entry marked "refreshed with issues" by step 5's "mark issues" outcome does not get a refreshed date
 7. For each entry that passed validation: spawn concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
 
 </rerun_mode>
@@ -358,10 +319,11 @@ flowchart TD
     RunScriptAll --> ParseJSON
     ParseJSON --> HasErrors{"Does parsed output contain<br>any error-severity issues?"}
     HasErrors -->|"Yes — N error-severity issues found"| SpawnFix["Spawn @research-curator agents in waves of 5<br>Each agent receives --fix flag<br>PLUS the exact error list for that entry from JSON output<br>(not a summary — the raw issue text)"]
-    HasErrors -->|"No — zero error-severity issues"| ReportClean(["Report: all entries passed. Include exact warning and info counts. Stop."])
+    HasErrors -->|"No — zero error-severity issues"| ReportClean["Report: all entries passed. Include exact warning and info counts."]
     SpawnFix --> RelayCheck["Apply pre-relay quality checklist<br>to all fix-agent results"]
     RelayCheck --> ReportSummary["Report validation summary with exact counts<br>(total scanned, passed, errors fixed, warnings noted, info items)"]
     ReportSummary --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    ReportClean --> PostActions
 ```
 
 ### Script Invocation
@@ -412,28 +374,112 @@ Validation complete:
 
 ## Post-Actions
 
-Shared by all modes. Execute after any mode completes successfully.
+Shared by all modes. Execute after any mode completes successfully. Step 3 derives exactly
+which files this run touched by diffing the current working tree against the pre-mode baseline
+captured in [Mode Routing](#mode-routing) -- no file path needs manual tracking through the steps
+below.
 
-1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
-   a shared restatement of the mode-specific README step each mode's own flow already gates
-   (Default/Batch step 6d, Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated
-   pass. Do not add a row, or refresh the Last Updated date on an existing row, for any entry
-   marked "created with issues" or "refreshed with issues" earlier in this run; that entry's
-   README state stays exactly as it was before this run started
-2. **Lint** -- run formatting checks on all modified files:
+1. **README Update** -- if `./research/README.md` was already dirty in the pre-mode baseline
+   (see [Mode Routing](#mode-routing)), report to the user: `./research/README.md -- pre-existing
+   uncommitted changes present; this run's README update will not be committed` before proceeding
+   -- the update below still needs to happen so the mode's own entry is recorded, but step 3 will
+   exclude README.md from this run's commit, so the edit lands mixed into someone else's
+   uncommitted file rather than silently being treated as if nothing was wrong. Otherwise, add or
+   update entries in `./research/README.md` category tables as usual. This is a shared restatement
+   of the mode-specific README step each mode's own flow already gates (Default/Batch step 6d,
+   Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated pass. Do not add a row, or
+   refresh the Last Updated date on an existing row, for any entry marked "created with issues" or
+   "refreshed with issues" earlier in this run; that entry's README state stays exactly as it was
+   before this run started
+
+2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
+   the whole vault, not just entries this run touched (asymmetric edges can persist from any
+   prior run that predates this check). Run it bounded, per `scripts/run_bounded.py`'s documented
+   convention for any external command that may hang -- a stalled `uv` dependency resolution or
+   vault scan would otherwise block every mode indefinitely:
 
    ```bash
-   uv run prek run --files ./research/README.md [new-or-modified-files]
+   uv run scripts/run_bounded.py --timeout-seconds 180 -- \
+     uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
-3. **Commit** -- stage and commit all research and insight changes:
+   Check the result in this order:
+
+   1. **Exit code 124** (`run_bounded.py`'s timeout signal): halt Post-Actions and report a
+      timeout, unconditionally -- even if `asymmetric_cross_references: N` already printed before
+      the timeout fired (e.g. during a repair write or the post-repair rescan), a terminated run's
+      partial state is not trustworthy to commit.
+   2. **Stdout does not contain an `asymmetric_cross_references: N` line**: the command failed
+      before completing its scan -- a `uv` dependency-resolution failure, a Python import error, or
+      any other crash -- rather than reporting a normal structural result. Halt Post-Actions and
+      report the failure to the user.
+   3. **Stderr contains a `warning: io-error, could not repair ...` line**: a genuine I/O failure
+      (permissions, disk space, an invalid path) reading or writing a target. Halt Post-Actions and
+      report the exact warning text.
+   4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
+      structural non-zero exit (a dangling link to a missing target) and a
+      `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
+      e.g. a Cross-References row with no markdown link -- confirmed against the real vault's one
+      persistent unrepairable edge). Which files, if any, this command actually modified is
+      determined by step 3's diff, not by this step -- do not parse the printed
+      `{source} -> {target}` lines to guess at modified files, since they list every asymmetric
+      edge found *before* repair is attempted, not which repairs succeeded.
+
+   **Known limitation**: this command has no per-file exclude option, so it can write into a
+   backlink-target file that was already dirty in the pre-mode baseline before step 3 ever
+   excludes that file from this run's commit -- the exclusion happens after the write, not before
+   it (tracked in backlog #3516; fixing it requires a change to `check-backlinks` itself, outside
+   this skill). See step 3's known limitation below for the general timing gap this is one case
+   of, and its mitigation.
+
+3. **Compute the filtered file list** -- diff the current working tree against the pre-mode
+   baseline (see [Mode Routing](#mode-routing)) to get every file under `./research/` this run
+   touched:
 
    ```bash
-   git add ./research/
-   git commit -m "docs(research): [action] [resource names]"
+   git diff --name-only -- ./research/
+   git ls-files --others --exclude-standard -- ./research/
    ```
 
-4. **Push** -- push to current branch:
+   Exclude any path that was **already** dirty in the baseline -- that is another contributor's
+   pre-existing uncommitted work, not something this run produced -- and report it to the user as
+   `{path} -- pre-existing uncommitted changes, not touched this run`. Call what remains **the
+   filtered list**; steps 4-6 below use it and nothing else, so a pre-existing dirty file is never
+   linted, staged, or committed by this run.
+
+   **Known limitation**: this only protects against a file that was already dirty *when the
+   baseline was captured*. A concurrent edit that starts on a previously-clean file after the
+   baseline but before this step runs is indistinguishable from this run's own write once it shows
+   up in the diff -- there is no locking primitive here to detect or prevent it. This is the same
+   underlying gap as step 2's check-backlinks limitation, just from the opposite timing direction.
+   Running research-curator from an isolated worktree when another contributor may be editing
+   `./research/` concurrently avoids the collision entirely, in both directions -- see
+   `rules/commit-cadence-and-worktrees.md`.
+
+   If the filtered list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
+   clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
+   steps 4-6 entirely: there is nothing to lint, commit, or push, and this is not a failure. Do not
+   invoke `prek run --files` with an empty list -- with no paths given, it falls back to its normal
+   staged-file selection instead of processing nothing, which could run auto-fixing hooks against
+   whatever another contributor already has staged.
+
+4. **Lint** -- run formatting checks on exactly the filtered list:
+
+   ```bash
+   uv run prek run --files [the filtered list]
+   ```
+
+5. **Commit** -- stage and commit **exactly** the filtered list, immune to whatever else might
+   already be staged in the working tree -- never a blanket `git add -A`, a directory-wide
+   `git add ./research/`, or a pathless `git commit -m` (which commits the entire index, not just
+   these paths):
+
+   ```bash
+   git add [the filtered list]
+   git commit [the filtered list] -m "docs(research): [action] [resource names]"
+   ```
+
+6. **Push** -- push to current branch:
 
    ```bash
    git push -u origin HEAD
@@ -542,6 +588,6 @@ YYYY-MM-DD
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
 - Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
 - Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
-- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- adds backlinks in cited entries during Batch Mode's sequential backlink pass
+- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- manual/ad-hoc backlink repair for a single entry; the deterministic `check-backlinks --fix` invocation in [Post-Actions](#post-actions) now covers all four modes and superseded this agent's former sequential pass in Batch Mode
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).

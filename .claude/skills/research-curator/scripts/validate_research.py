@@ -813,14 +813,16 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
 
     CrossRefRow = bl.CrossRefRow  # type: ignore[attr-defined]
 
+    # forward_row's entry_name is always target's own display name -- a cross-reference
+    # row's entry_name names the *other* entry a row points at, never the file the table
+    # lives in. source_name must therefore never come from forward_row.
+    source_name: str = source.stem
     if forward_row is not None:
-        source_name: str = getattr(forward_row, "entry_name", source.stem)
         forward_rel: str = getattr(forward_row, "relationship", "")
         backlink_relationship = bl.transform_to_backlink_description(
             forward_rel, source_name, source_category, bl.category_of(target, vault_path)
         )
     else:
-        source_name = source.stem
         backlink_relationship = f"referenced by {source_name} ({source_category})"
 
     backlink_row = CrossRefRow(
@@ -955,9 +957,16 @@ def check_backlinks(
             try:
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
-            except (OSError, ValueError):
+            except OSError as exc:
                 typer.echo(
-                    f"warning: could not repair {source.relative_to(vault_path)} -> {target.relative_to(vault_path)}",
+                    f"warning: io-error, could not repair {source.relative_to(vault_path)} -> "
+                    f"{target.relative_to(vault_path)}: {exc}",
+                    err=True,
+                )
+            except ValueError as exc:
+                typer.echo(
+                    f"warning: structural, could not repair {source.relative_to(vault_path)} -> "
+                    f"{target.relative_to(vault_path)}: {exc}",
                     err=True,
                 )
 
