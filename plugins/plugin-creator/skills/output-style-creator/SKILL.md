@@ -56,30 +56,15 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 
 ### Phase 1: Discovery
 
-1. READ existing styles before writing a new one. Claude Code loads every `.claude/output-styles/` between the working directory and the repository root, so walk the ancestors — checking only the working directory misses a root-level style and produces a duplicate or an unintended same-name override:
+1. RUN discovery. It lists user-level styles, every `.claude/output-styles/` between the working directory and the repository root, and a plugin's styles at each path its `outputStyles` manifest key declares:
 
    ```bash
-   ls ~/.claude/output-styles/ 2>/dev/null
-   root=$(git rev-parse --show-toplevel 2>/dev/null || echo /)
-   d=$PWD
-   while true; do
-     ls "$d/.claude/output-styles/" 2>/dev/null
-     [ "$d" = "$root" ] && break
-     [ "$d" = / ] && break
-     d=$(dirname "$d")
-   done
+   ${CLAUDE_PLUGIN_ROOT}/skills/output-style-creator/scripts/validate_output_style.py discover --plugin {plugin-path}
    ```
 
-2. READ any plugin-bundled styles in scope. A plugin's `outputStyles` manifest key replaces the default directory scan, so read the manifest and inspect every path it declares as well as the default directory — a plugin that ships its styles in `./extras/` has none in `output-styles/`:
+   Omit `--plugin` when no plugin is in scope. Output is compact JSON with `user`, `project`, `plugin`, and `plugin_declared_paths` keys.
 
-   ```bash
-   PLUGIN_PATH='{plugin-path}'
-   ls "$PLUGIN_PATH/output-styles/" 2>/dev/null
-   uv run python -c "import json,sys,pathlib; v=json.loads(pathlib.Path(sys.argv[1]).read_text()).get('outputStyles') or []; print('\n'.join([v] if isinstance(v, str) else v))" "$PLUGIN_PATH/.claude-plugin/plugin.json" 2>/dev/null
-   ```
-
-   Substitute every path inside **single** quotes, as above. Double quotes still let the shell expand `$`, a backtick, or `\` in the path, so a style named `style-$USER.md` is looked up under the expanded name. If a path itself contains a single quote, replace each `'` with `'\''`.
-
+2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering
@@ -144,35 +129,19 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 
 ### Phase 5: Validation
 
-RUN this check on every style, at any scope. Substitute the path inside **single** quotes, as below:
+RUN this check on every style, at any scope. It exits non-zero when the style fails, so a caller can gate on the exit code:
 
 ```bash
-STYLE_PATH='{style-path}'
-uv run --with pyyaml python -c "
-import re, sys, yaml
-text = open(sys.argv[1], encoding='utf-8').read()
-match = re.match(r'\A---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)', text, re.S)
-assert match, 'frontmatter must open and close with --- on its own line'
-front = match.group(1)
-data = yaml.safe_load(front)
-assert isinstance(data, dict), 'frontmatter must be a YAML mapping'
-for field in ('name', 'description'):
-    assert field not in data or isinstance(data[field], str), field + ' must be a string when present'
-for field in ('keep-coding-instructions', 'force-for-plugin'):
-    assert field not in data or isinstance(data[field], bool), field + ' must be a boolean when present, not a quoted string'
-for key, value in getattr(yaml.compose(front), 'value', []):
-    if key.value == 'description':
-        assert value.start_mark.line == value.end_mark.line, 'description must occupy a single line'
-assert not re.search(r'[\r\n]', data.get('description', '')), 'description must not contain a newline'
-" "$STYLE_PATH"
+${CLAUDE_PLUGIN_ROOT}/skills/output-style-creator/scripts/validate_output_style.py check {style-path}
 ```
+
+It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules it enforces: frontmatter opens and closes with `---` on its own line; the frontmatter parses to a YAML mapping; `name` and `description` are strings when present; `keep-coding-instructions` and `force-for-plugin` are booleans when present; `description` occupies a single line and carries no newline in any YAML encoding.
 
 For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
-PLUGIN_PATH='{plugin-path}'
-uvx skilllint@latest check "$PLUGIN_PATH"
-claude plugin validate "$PLUGIN_PATH"
+uvx skilllint@latest check {plugin-path}
+claude plugin validate {plugin-path}
 ```
 
 Checklist:
