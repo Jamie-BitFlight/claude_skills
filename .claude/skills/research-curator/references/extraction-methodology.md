@@ -4,7 +4,11 @@ Extract before abstracting. Every claim in a research entry traces back to a pas
 verbatim from a primary source, recorded before any prose is written. Writing a section from
 memory, from inference, or from a model's prior knowledge of the resource is FORBIDDEN.
 
-The phases run in order: Phase 1 → Doc-Sufficiency Check → (Phase 1b, conditional) → Phase 2.
+The phases run in order: Phase 1 → Doc-Sufficiency Check → (Phase 1b, conditional) → Phase 1c → Phase 2.
+
+Phases 1 and 1b extract from the resource being researched. Phase 1c extracts from this repo. A
+`Relevance to Claude Code Development` section written without Phase 1c has nothing real to name,
+and degrades into claims true of any repository and checkable against none.
 
 The content bar each written section must then clear is in [Entry Quality Standards](./entry-quality-standards.md).
 
@@ -125,6 +129,71 @@ Entries carrying code-derived claims cite them inline and qualify their confiden
 
 ---
 
+## Phase 1c: Repo Anchor Pass
+
+Unconditional — runs for every entry, after Phase 1 (and Phase 1b when it triggered) and before
+Phase 2. It produces the anchor records that the `Relevance to Claude Code Development` section is
+written from, and nothing else in the entry depends on it.
+
+Read this repo the same way Phase 1 read the resource: extract first, characterise second. Four
+steps, budget six Read calls.
+
+1. Inventory the real names, once:
+
+   ```bash
+   ls plugins/ .claude/skills/ .claude/agents/ rules/ docs/
+   ```
+
+   An anchor may cite only a name that appeared in this listing or in a search result below.
+   Naming a path from memory of what a repo like this usually contains is the failure mode this
+   pass exists to prevent.
+
+2. Derive 3-6 search terms from your own Phase 1 extracts — the mechanisms named in
+   `Problem Addressed` and `Key Features`, not the resource's brand name, which by definition
+   will not appear here. A browser-automation resource yields `playwright`, `headless`, `browser`,
+   `screenshot`, `WebFetch`; a serialization library yields `pydantic`, `dataclass`, `TypedDict`,
+   `serializ`.
+
+3. Search each term:
+
+   ```bash
+   grep -ril "{term}" plugins/ .claude/ rules/ docs/ AGENTS.md
+   ```
+
+   Record the outcome either way. Zero matches is an anchor, not a dead end — it is the cheapest
+   checkable statement this entry can make about the repo, and it is re-runnable by any reader.
+
+4. Read up to six matched files, preferring `AGENTS.md`, `rules/*.md`, `SKILL.md`, and agent
+   definitions over scripts, and pull one exact line from each: a rule, a heading, a table row, a
+   config value. Stop at the sixth Read even if terms remain unsearched, and record how many went
+   unsearched — an incomplete anchor pass is reported, never silently completed.
+
+Record anchors alongside the Phase 1 extracts, in this format:
+
+```text
+REPO ANCHORS — {resource-name}
+
+A1. Path: {repo-relative path}
+    Today: "{exact line, heading, table row, or config value read from that path}"
+    Feeds: {which Relevance item}
+
+A2. Scope: {paths searched}
+    Today: grep -ril "{term}" {scope} → 0 matches
+    Feeds: {which Relevance item}
+```
+
+An A-record carrying neither a quoted line nor a search command is not an anchor. Drop it rather
+than writing it into the entry.
+
+Scope of this pass versus the downstream analysis agents: `research-insight-extractor` and
+`research-utilization-assessor` run after the entry is written and do the deep repo-grounded work
+— gap assessment, confidence scoring, backlog items, integration sketches. This pass does not
+duplicate them and must not try to. It finds the paths and quotes the lines; six Reads is its
+whole budget. Its output is what those agents start from instead of re-deriving the mapping from
+an entry that named nothing.
+
+---
+
 ## Phase 2: Write From Extracts
 
 Write each entry section by organizing the extracted passages for that section, then composing prose or structured content grounded in those extracts.
@@ -142,5 +211,8 @@ REQUIRED verification step: Before finalizing a section, confirm that every fact
 - Architectural assertions ("uses a DAG-based task graph")
 - Installation commands (verify against official docs, not inferred)
 - Compatibility statements ("requires Python 3.11+")
+- Any statement about this repository ("`rules/` has no worktree guidance", "`parallel-work`
+  already covers fan-out") — sourced by a Phase 1c anchor, quoted line or search command, never by
+  recall of what a repo like this usually contains
 
 SOURCE: "Extract before abstracting" methodology from [fidelity-rules.md](./../../../../plugins/summarizer/skills/summarizer/references/fidelity-rules.md) Rule 2 (accessed 2026-03-06). Quote-grounding technique from Anthropic prompt engineering documentation (<https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips>, accessed 2026-02-06).

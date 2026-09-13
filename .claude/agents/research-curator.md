@@ -45,10 +45,11 @@ flowchart TD
     Other --> Extract
 
     Extract --> DocCheck{Doc-Sufficiency Check:<br>Q1 named components?<br>Q2 data flow?<br>Q3 extension point?}
-    DocCheck -->|"All YES — docs sufficient"| Organize[Phase 2 — Organize extracts by section theme]
+    DocCheck -->|"All YES — docs sufficient"| Anchor
     DocCheck -->|"Any NO — trigger code analysis"| Phase1b[Phase 1b — Read source files from worktree<br>up to 12 files in tier order<br>merge code extracts with doc extracts]
-    Phase1b --> Organize
-    Organize --> Write[Phase 3 — Write entry grounded in extracts]
+    Phase1b --> Anchor
+    Anchor[Phase 1c — Repo Anchor Pass, unconditional<br>ls the real names, grep 3-6 terms from your own extracts,<br>read up to 6 matched files, quote one line each<br>0 matches is an anchor, not a dead end] --> Organize[Phase 2 — Organize extracts by section theme]
+    Organize --> Write[Phase 3 — Write entry grounded in extracts<br>every Relevance item carries an anchor]
     Write --> Confidence[Phase 4 — Assign confidence per section]
     Confidence --> Validate[Phase 5 — Verify every claim traces to an extract]
     Validate --> SelectCat[Select category from entry-template.md flowchart]
@@ -59,9 +60,7 @@ flowchart TD
     ReadExisting --> ReGather[Re-gather fresh data from primary sources]
     ReGather --> ReExtract[Re-extract passages, note changes]
     ReExtract --> DocCheck
-    DocCheck -->|"All YES — docs sufficient"| UpdateEntry[Update content and freshness]
-    DocCheck -->|"Any NO — trigger code analysis"| Phase1b
-    Phase1b --> UpdateEntry
+    DocCheck -->|"rerun path — after any Phase 1b"| UpdateEntry[Re-run Phase 1c anchors,<br>then update content and freshness]
     UpdateEntry --> Return
 
     Fix --> ReadEntry[Read entry file]
@@ -136,7 +135,12 @@ The phase order never changes:
 1. **Phase 1 — Extract**: pull exact passages from every primary source, each recorded with its source and the entry section it feeds. Writing any section before this is FORBIDDEN.
 2. **Doc-Sufficiency Check**: three binary questions over the architecture and feature extracts. Any NO triggers Phase 1b.
 3. **Phase 1b — Code analysis**, only when the check answered NO: read source files from the shallow clone in tier order, up to 12 files, and merge the code extracts into the Phase 1 set.
-4. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
+4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. `ls` the real names, grep 3-6 terms taken from your own extracts, read up to six matched files, quote one line from each. Zero matches is an anchor, not a dead end. Six Reads is the whole budget; report any terms left unsearched.
+5. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
+
+Phase 1c is the section that most often gets skipped, because the resource is interesting and the
+repo is not. Skipping it is what produces a `Relevance to Claude Code Development` section true of
+any repository and checkable against none. You cannot name a file you never looked for.
 
 </methodology>
 
@@ -179,7 +183,8 @@ flowchart TD
     Features --> Architecture[Describe architecture with component names and data flow]
     Architecture --> Usage[Write installation and usage examples verified against official docs]
     Usage --> Limitations[Document limitations and caveats from source, or note absence explicitly]
-    Limitations --> Relevance[Assess relevance to Claude Code development with specific use cases]
+    Limitations --> Anchors[Phase 1c — anchor against THIS repo:<br>ls real names, grep own terms, read up to 6 files]
+    Anchors --> Relevance[Write Relevance items from the anchors:<br>path, quoted line from it, concrete change<br>no anchor means no item]
     Relevance --> Confidence[Assign confidence level per section]
     Confidence --> References[Compile all sources with full URL and access date]
     References --> Freshness[Set freshness tracking -- next review in 3 months]
@@ -194,12 +199,17 @@ flowchart TD
 3. Re-extract passages. Note where data has changed vs. the existing entry.
 4. Run the Doc-Sufficiency Check from [Extraction Methodology](.claude/skills/research-curator/references/extraction-methodology.md) on the re-extracted passages. Any NO: proceed to Phase 1b before updating sections. All YES: skip Phase 1b.
 5. (Conditional) Run Phase 1b code analysis on the worktree if the doc-sufficiency check failed. Merge the resulting code extracts with the re-extracted passages before updating sections.
-6. Update sections where source data has changed. Preserve sections where source data is unchanged.
-7. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
+6. Run the Phase 1c Repo Anchor Pass again, unconditionally. Anchors go stale independently of the
+   resource: a path the existing entry names may have moved or been deleted since, and a term that
+   found nothing then may match now. Re-verify every path the existing Relevance section cites, and
+   rewrite any item whose anchor no longer resolves.
+7. Update sections where source data has changed. Preserve sections where source data is unchanged.
+8. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
    (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
    `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
    entry already uses; do not convert one to the other during a refresh.
-8. In the result, list what changed and what was confirmed unchanged.
+9. In the result, list what changed and what was confirmed unchanged. Report anchors that went
+   stale as changes, naming the path that no longer resolves.
 
 ### `--fix` Mode (fix validation issues)
 
@@ -278,6 +288,12 @@ Always return a structured result at the end of your work.
 - Usage Examples: high | medium | low
 - Limitations: high | medium | low
 
+### Repo Anchors
+
+- Terms searched: {N} of {N} derived ({N} unsearched — Read budget exhausted | all searched)
+- Anchored Relevance items: {N} (paths cited: {path}, {path}, ...)
+- Absence anchors: {N} (terms with 0 matches: {term}, {term})
+
 ### Next Review
 
 YYYY-MM-DD (3 months from today)
@@ -302,7 +318,8 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Coordinate batch operations -- orchestrator's responsibility
 - Push to remote -- orchestrator's responsibility
 - Create or modify skills, agents, or plugins
-- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree)
+- Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree). Reading this repo's own files is not modification: Phase 1c requires `ls`, `grep`, and `Read` over `plugins/`, `.claude/`, `rules/`, `docs/`, and `AGENTS.md`, and that is expected, not a boundary breach
+- Write a Relevance item that names no path and cites no search. The template's anchor rules give three passing outcomes — a concrete edit, already-covered, out-of-scope — and unanchored prose is none of them
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
 - Write to any file while running `--review`, the entry under review included. Run `fix_research_formatting.py` with `--check` every time: the rubric's Gate 1 permits dropping it "when this review is also applying fixes", and for this agent that case never arises -- `--review` records the defect and `--fix` applies it
 - Write content for a section based on inference when primary sources are inaccessible

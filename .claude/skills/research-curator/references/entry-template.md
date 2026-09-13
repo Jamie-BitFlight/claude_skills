@@ -114,15 +114,21 @@ How the resource works internally. Include diagrams if helpful.
 
 ### Applications
 
-- How this applies to our work
+- **{capability this resource provides}** -> `{repo-relative path}`
+  - Today: "{exact line, heading, table row, or config value read from that path}"
+  - Change: {the specific edit this suggests}
 
 ### Patterns Worth Adopting
 
-- Patterns from this resource we could use
+- **{pattern}** -> `{repo-relative path}`
+  - Today: "{exact line read from that path}"
+  - Change: none — {path} already covers it
 
 ### Integration Opportunities
 
-- How we could integrate this with Claude Code
+- **{API, package, or CLI this resource exposes}** -> nothing in `{scope searched}`
+  - Today: `grep -ril "{term}" {scope}` -> 0 matches
+  - Change: {what would have to exist here first}
 
 ---
 
@@ -139,6 +145,32 @@ How the resource works internally. Include diagrams if helpful.
 |-------|----------|--------------|
 | [Resource Name](../category/filename.md) | category-name | {one-phrase relationship} |
 ````
+
+> **Relevance section — subject**: THIS REPOSITORY, the `claude_skills` marketplace checkout: its
+> `plugins/`, `.claude/skills/`, `.claude/agents/`, `rules/`, `docs/`, and `AGENTS.md`. Not Claude
+> Code the product. "Claude Code skills could use X" describes the product and is out of scope here
+> however true it is; "`plugins/agent-orchestration/skills/parallel-work/SKILL.md` does X"
+> describes the repository and is in scope. The heading is fixed by the validator's
+> required-section list and reads ambiguously; this note, not the heading, defines the subject.
+
+> **Relevance section — anchor rules**. Write every item from an anchor record produced by the
+> Repo Anchor Pass in [Extraction Methodology](./extraction-methodology.md); run that pass before
+> writing any item:
+>
+> - The path is repo-relative from the repository root and comes from an anchor record — never
+>   from memory of what a repo like this usually contains.
+> - `Today:` carries evidence, not characterisation: a line read from that path, or the exact
+>   search command that returned nothing. "Claude Code skills need X" is neither.
+> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a quoted line.
+>   Absence anchor: `-> nothing in {scope searched}` with the search command and `0 matches`. Zero
+>   matches is a finding, not a failure to find one.
+> - `Change:` has three passing outcomes — a specific edit, `none — {path} already covers it`, or
+>   `none — out of scope ({why})`. An entry recording that this repo already solved something is
+>   worth more than one proposing it again, and unlike a proposal it is falsifiable. The
+>   out-of-scope outcome is the honest exit for a pattern that maps to nothing here; force-fitting
+>   it to an unrelated path is the defect this shape removes.
+> - Drop a sub-heading with no anchored item rather than filling it with unanchored prose. Three
+>   anchored items beat twelve unanchored ones; item count is not a target.
 
 > **Confidence qualifiers**: When a section's claims derive from code analysis rather than
 > documentation, append `(code-read)` to the confidence level — e.g., `Architecture: medium

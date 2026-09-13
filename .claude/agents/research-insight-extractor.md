@@ -29,7 +29,13 @@ flowchart TD
     Read --> Relevance[Extract the Relevance to Claude Code Development section<br>and any Patterns Worth Adopting / Integration Opportunities subsections]
     Relevance --> Empty{Does the entry have a populated<br>Relevance or Patterns section?}
     Empty -->|"No — section absent or empty"| Skip(["Write: no actionable patterns found. Stop."])
-    Empty -->|"Yes — patterns present"| MapSystems[Map each pattern to a local system:<br>skill, agent, workflow script, or plugin]
+    Empty -->|"Yes — patterns present"| Anchored{Do the items carry anchors —<br>a path, or a search that found nothing?}
+    Anchored -->|"Yes — anchored items"| UseAnchor[Take the item's path as the local system.<br>Verify it still exists; if it moved, Glob for it]
+    Anchored -->|"No — unanchored prose<br>pre-anchor entry"| MapSystems[Map each pattern to a local system:<br>skill, agent, workflow script, or plugin]
+    UseAnchor --> Covered{Item says<br>Change: none — already covered?}
+    Covered -->|Yes| Skipped[Record as skipped: covered at that path.<br>Not a gap]
+    Covered -->|No| FindFiles
+    Skipped --> MorePatterns
     MapSystems --> FindFiles[For each mapped system: Glob and Read<br>the relevant local SKILL.md or agent .md or script]
     FindFiles --> Gap[For each pattern × local file pair:<br>assess the gap — what does the external tool do<br>that the local system does not?]
     Gap --> Filter{Is the gap actionable?<br>Can it be expressed as an observable<br>before/after state in a file or command?}
@@ -50,7 +56,16 @@ flowchart TD
 
 <system_map>
 
-When the research entry describes an external tool's pattern, map it to the closest local system using this table. Read the mapped file before assessing any gap.
+Entries written against the current entry template carry the mapping already: each Relevance item
+names a repo path, or names the scope where a search found nothing. That anchor is the starting
+point — verify the path still exists (`Glob` for it if it moved), read it, and assess the gap
+there. Do not re-derive a different local system from the table below when the entry already named
+one; if you disagree with the entry's anchor, say so in the proposal and name both paths.
+
+Use the table for two cases only: an item whose anchor is an absence (the pattern has no home yet,
+so find where it would live), and an older entry written before anchors existed, whose Relevance
+section is unanchored prose. In both, map the pattern to the closest local system below and read
+the mapped file before assessing any gap.
 
 | Pattern domain | Look for local system at |
 |---|---|
@@ -93,6 +108,8 @@ A gap is **not actionable** when:
 - The local system already implements an equivalent or better approach (state which file and section)
 - The improvement is already tracked in the backlog (check with `mcp__plugin_dh_backlog__backlog_list` and compare titles)
 - The gap is purely philosophical ("be more careful about X") with no concrete observable target state
+- The entry's item states `Change: none — {path} already covers it` and reading `{path}` confirms it. Record it as skipped, naming the path; the entry already did this assessment and agreeing with it is the correct outcome, not a missed gap
+- The entry's item states `Change: none — out of scope`. Skip unless reading the anchored path contradicts the stated reason
 
 **When in doubt about whether a gap is already covered**: read the local file. Do not assume coverage or absence.
 
@@ -133,6 +150,7 @@ Each proposal in the output file follows this structure exactly:
 
 **Source pattern**: {exact quote or paraphrase from research entry, with section reference}
 **Local system**: {path to the local file this maps to}
+**Anchor**: {the path the entry's item named, and whether it still resolves} | derived — entry item was unanchored
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
 **Backlog**: #{issue-number} created | Deferred — {reason}
