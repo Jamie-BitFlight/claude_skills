@@ -412,7 +412,10 @@ Validation complete:
 
 ## Post-Actions
 
-Shared by all modes. Execute after any mode completes successfully.
+Shared by all modes. Execute after any mode completes successfully. Track every file path
+written or modified by any step below (agent-created/refreshed entries, README.md,
+insight/utilization files, cross-reference files, backlink-repaired files) in a running list --
+the Commit step stages exactly that list, nothing else.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
    a shared restatement of the mode-specific README step each mode's own flow already gates
@@ -420,20 +423,33 @@ Shared by all modes. Execute after any mode completes successfully.
    pass. Do not add a row, or refresh the Last Updated date on an existing row, for any entry
    marked "created with issues" or "refreshed with issues" earlier in this run; that entry's
    README state stays exactly as it was before this run started
-2. **Lint** -- run formatting checks on all modified files:
+
+2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
+   the whole vault, not just entries this run touched (asymmetric edges can persist from any
+   prior run that predates this check):
 
    ```bash
-   uv run prek run --files ./research/README.md [new-or-modified-files]
+   uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
-3. **Commit** -- stage and commit all research and insight changes:
+   Each printed `{source} -> {target}` line preceding the `backlinks_repaired:` count names a
+   `{target}` file this command may have modified. Add every such target to the tracked file list.
+
+3. **Lint** -- run formatting checks on all modified files:
 
    ```bash
-   git add ./research/
+   uv run prek run --files ./research/README.md [tracked file list from steps 1-2]
+   ```
+
+4. **Commit** -- stage and commit exactly the tracked file list -- never a blanket `git add -A`
+   or a directory-wide `git add ./research/`:
+
+   ```bash
+   git add ./research/README.md ./research/{category}/{name}.md [...tracked file list]
    git commit -m "docs(research): [action] [resource names]"
    ```
 
-4. **Push** -- push to current branch:
+5. **Push** -- push to current branch:
 
    ```bash
    git push -u origin HEAD
@@ -542,6 +558,6 @@ YYYY-MM-DD
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
 - Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
 - Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
-- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- adds backlinks in cited entries during Batch Mode's sequential backlink pass
+- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- manual/ad-hoc backlink repair for a single entry; the deterministic `check-backlinks --fix` invocation in [Post-Actions](#post-actions) now covers all four modes and superseded this agent's former sequential pass in Batch Mode
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).
