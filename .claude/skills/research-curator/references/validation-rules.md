@@ -21,10 +21,6 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 
 > **Handling differs by mode, not by severity.** `header_fields`, `access_dates`, `freshness_tracking`, and `url_format` stay warning-severity in the JSON output no matter who calls the script. For an entry that Default Mode, Batch Mode, or Rerun Mode created or refreshed *this invocation*, these four are must-fix before the entry is reported complete — see [Validation Gate for New/Refreshed Entries](#validation-gate-for-newrefreshed-entries) below. `cross_references_absent` is excluded from this must-fix rule; its own date-based exemption above is unaffected. For pre-existing entries that Validate Mode scans, all four remain report-only, per Validate Mode's Issue Handling in `SKILL.md`.
 
-### Info Severity (optional)
-
-- **formatting_suggestions**: Minor markdown formatting issues (missing blank lines around fences, inconsistent heading levels)
-
 ---
 
 ## Validation Gate for New/Refreshed Entries

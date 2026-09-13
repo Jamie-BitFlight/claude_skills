@@ -177,7 +177,7 @@ zg --rg -i -g "test*.ts" "beforeEach\|setUp" --modified-after "1 month ago"
 
 | Local System | Reason skipped |
 |---|---|
-| `research-context-agent` (`./.claude/agents/research-context-agent.md`) | Already specialized in searching the research knowledge base itself, not codebases. Integration would add search across general code, which is outside its scope. No overlap with zvec-grep's use case (code/codebase search, not research KB). |
+| `research-context-agent` (`./.claude/agents/research-context-agent.md`) (deleted 2026-09-13, PR #3529 — no successor) | Already specialized in searching the research knowledge base itself, not codebases. Integration would add search across general code, which is outside its scope. No overlap with zvec-grep's use case (code/codebase search, not research KB). |
 
 ---
 

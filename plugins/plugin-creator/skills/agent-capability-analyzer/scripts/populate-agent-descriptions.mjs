@@ -334,7 +334,6 @@ function buildAgentList() {
     { key: 'logging', file: 'logging.md' },
     { key: 'plugin-docs-writer', file: 'plugin-docs-writer.md' },
     { key: 'process-siren', file: 'process-siren.md' },
-    { key: 'research-context-agent', file: 'research-context-agent.md' },
     { key: 'research-curator', file: 'research-curator.md' },
     { key: 'topic-specialist', file: 'topic-specialist.md' },
     { key: 'typescript-pro', file: 'typescript-pro.md' },

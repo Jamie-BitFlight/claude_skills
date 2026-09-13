@@ -12,7 +12,7 @@
 |-------|---------------|
 | **Observe** | agentskill-kaizen, session-historian, logging |
 | **Identify** | hallucination-detector, fact-check, doc-drift-auditor, code-review |
-| **Accumulate** | knowledge-explorer, refresh-research, research-curator, context-refinement, research-context-agent |
+| **Accumulate** | knowledge-explorer, refresh-research, research-curator, context-refinement |
 | **Improve** | kaizen-improvement, optimize-claude-md, work-backlog-item close, topic-specialist |
 
 ---

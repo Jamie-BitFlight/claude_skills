@@ -1430,7 +1430,7 @@ Implement the Chief of Staff + Iterative Loop hybrid:
 | `plugins/development-harness/skills/development-harness/` | skill | Integrate iterative research loop pattern with exit criteria (Plan → Execute → Synthesize → Continue/Exit) to enable the SAM 7-stage pipeline to perform multi-iteration refinement with memory persistence across phases. |
 | `plugins/summarizer/skills/multi-source-synthesis/` | skill | Add citation tracking patterns from Pydantic AI research pipeline (hash-based citation keys generated during research, URL→key mappings in memory, dedicated citation insertion agent) to enable proper bibliography management in multi-source synthesis. |
 | `.claude/agents/research-curator.md` | agent | Enhance with Academic Research Workflow patterns (12-agent pipeline structure, Research PRD format, Literature & Conceptual Framework integration, Figure Factory approach) to enable comprehensive research entry creation beyond basic documentation. |
-| `.claude/agents/research-context-agent.md` | agent | Add structured output patterns using Pydantic models (Finding, Synthesis, Plan, CitationRequest) and memory persistence patterns to enable traceable cross-referencing with state preservation across research analysis iterations. |
+| `.claude/agents/research-context-agent.md` (deleted 2026-09-13, PR #3529 — no successor) | agent | Add structured output patterns using Pydantic models (Finding, Synthesis, Plan, CitationRequest) and memory persistence patterns to enable traceable cross-referencing with state preservation across research analysis iterations. |
 
 ### New Skill Candidates
 

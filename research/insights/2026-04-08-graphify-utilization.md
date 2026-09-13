@@ -70,7 +70,7 @@ diff baseline-graph-out/GRAPH_REPORT.md graphify-out/GRAPH_REPORT.md
 
 | Local System | Reason skipped |
 |---|---|
-| .claude/agents/research-context-agent.md | **Incompatible scope** — research-context-agent appends Integration Opportunities sections to research entries; graphify is a target tool, not a framework for discovery. The agent doesn't need to call graphify. |
+| .claude/agents/research-context-agent.md (deleted 2026-09-13, PR #3529 — no successor) | **Incompatible scope** — research-context-agent appends Integration Opportunities sections to research entries; graphify is a target tool, not a framework for discovery. The agent doesn't need to call graphify. |
 | .claude/agents/research-utilization-assessor.md | **Functional conflict** — This agent IS the utilization assessor. It should not depend on graphify for its own operation. |
 | .claude/agents/research-insight-extractor.md | **No integration surface** — Agent creates backlog items from research findings. No codebase analysis dependency. |
 | .claude/skills/knowledge-explorer/SKILL.md | **Scope mismatch** — Manages `research/` KB entries (metadata, versioning, category tracking). Does not analyze target codebases. graphify targets user codebases, not the skills repository itself. |
