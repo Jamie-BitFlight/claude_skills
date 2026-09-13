@@ -111,12 +111,21 @@ First, run the validator over each analysis file the invocation named:
 uv run --script .claude/skills/research-curator/scripts/validate_research.py main --json {analysis-file-path}
 ```
 
-That run gives you the analysis file's own structural issues. It resolves no repository path: the
-checks this validator emits are `section_completeness`, `empty_sections`, `access_dates`,
-`formatting_suggestions`, `url_format`, `cross_references_absent`, `header_fields` and
-`freshness_tracking`, and not one of them opens a path a claim names. Every step below is therefore
-yours to run by hand — a clean validator run is not partial evidence about any claim, and must not
-be reported as though it were.
+**The steps below are the contract.** Every claim is settled by walking them, whatever that run did
+or did not print. The run is a shortcut that may save you some of step 2; it is never the reason a
+claim passed.
+
+Read what the run actually reported rather than what you expected it to report. If it names an issue
+that resolved a repository path a claim cited — `repo_path_unresolved`, in a validator build that
+carries that check — take each one as a confirmed step-2 defect: record it, and do not re-derive it
+by hand.
+
+An output with no such issue in it tells you nothing, and it is important to see why it cannot. Two
+different situations print identically: the check ran and cleared the paths, or the installed
+validator has no path-resolving check to run. Even in the first, the check reaches only
+existing-state assertions inside `research/insights/` and `research/utilization/` — never the entry,
+and not every claim even in those files. So a quiet run is never evidence that a claim is sound, and
+reporting it as though it were is the failure this gate exists to catch. Walk every step.
 
 Then enumerate every claim the scoped text makes about **this** repository and walk the steps in
 order, stopping at the first failure:
