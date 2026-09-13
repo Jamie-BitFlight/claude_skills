@@ -268,3 +268,4 @@ Syft's license detection supports ensuring Claude Code plugins meet open source 
 | [Hound - Autonomous AI Security Auditor with Knowledge Graphs](./hound.md) | code-auditing | Complements SBOM generation with hypothesis-driven security analysis and knowledge graph-based vulnerability reasoning |
 | [Snyk CLI for Open-Source C++ Scans](./snyk-cli-cpp-scans.md) | code-auditing | Alternative vulnerability scanner providing hash-based dependency identification for C/C++ projects; both generate software component inventories for security auditing |
 | [Narsil-MCP - Code Intelligence and Security MCP Server](../mcp-ecosystem/narsil-mcp.md) | mcp-ecosystem | MCP wrapper providing SBOM generation and supply chain security analysis (CVE scanning, taint analysis, license compliance) alongside Syft's inventory capabilities |
+| [skylos](./skylos.md) | code-auditing | referenced by skylos (code-auditing) |

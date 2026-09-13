@@ -312,3 +312,11 @@ Source: [hound README](https://github.com/scabench-org/hound#installation) — I
 3. **Paper Abstract**: <https://arxiv.org/abs/2510.09633> (accessed 2026-01-26)
 4. **Author Walkthrough**: <https://muellerberndt.medium.com/hunting-for-security-bugs-in-code-with-ai-agents-a-full-walkthrough-a0dc24e1adf0>
 5. **ScaBench Benchmark**: Referenced in paper as evaluation dataset
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [skylos](./skylos.md) | code-auditing | is complemented by skylos (code-auditing) |
