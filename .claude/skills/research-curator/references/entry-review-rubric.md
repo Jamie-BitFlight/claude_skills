@@ -24,7 +24,7 @@ per-section confidence levels, exact capability figures, markdown formatting, an
 symmetry are not reviewed here: the writing standards govern the first four, `prek` (Post-Actions
 step 4) governs formatting, and `check-backlinks --fix` (Post-Actions step 2) repairs cross-reference
 symmetry deterministically before any review runs. Re-adjudicating them by hand changes nothing
-about the entry and buries the two findings that do.
+about the entry and buries the findings that do.
 
 **Review scope**:
 
@@ -65,7 +65,7 @@ when no HTTP response ever reached curl, and `exitcode`/`errormsg` then carry th
 
 | Check | Defect when | Record |
 |---|---|---|
-| **Validator errors** | `summary.errors > 0` | Every error's `check`, `message`, `line`. An entry with errors should not have reached review — the Validation Gate holds it back — so report this and stop rather than continuing to Gate 2 |
+| **Validator errors** | `summary.errors > 0` | Every error's `check`, `message`, `line`. An entry with errors should not have reached review — the Validation Gate holds it back — so report this and stop rather than continuing to the remaining gates |
 | **Source URL present** | The entry names no canonical source URL — nothing in frontmatter (root or nested, e.g. `metadata.source_url`, `github_repository`), no `Source URL` text-header field, and no URL in References standing in for one | Read the entry for this rather than trusting the validator's `header_fields` warning, which only knows a fixed set of key spellings. Quote the URL you found, or record that none exists |
 | **Source URL reachable** | The probe returns HTTP `404` or `410` — the origin server's own statement that this resource is gone. Nothing else is a defect here; see the three outcomes below | The full write-out line. `2xx`/`3xx` after `-L` passes — record the final effective URL as the required correction when it differs |
 | **Verification date present** | The entry carries no date saying when the source was last read — no `last_verified`, `verified`, `research_date`, or text-header `Research Date` | Read the entry's own frontmatter or header block for this; the validator knows a narrower set of key spellings, so its `freshness_tracking` and `header_fields` warnings are a prompt to look, never the finding. Quote the date you found, or record that none exists. Without one the reader cannot tell how stale the pointer is |
@@ -219,7 +219,8 @@ VERDICT: USABLE | UNUSABLE | NOT RUN
 what this entry alone provides; a wrong proposal inside it is a repair to make, not a reason to
 withhold the entry from the index.
 
-`UNVERIFIED` when every other Gate 1 check passes and the probe came back UNVERIFIED. The entry is
+**Gate 1 `UNVERIFIED`** — not a verdict value, a gate-line one — when every other Gate 1 check
+passes and only the probe came back UNVERIFIED. The entry is
 sound as far as anything observed here can say, and the one thing left unobserved is the network,
 not the entry. The verdict is `USABLE` and the entry keeps its README row; the gate line carries
 the word `UNVERIFIED` and the write-out so the reader knows the pointer is unconfirmed and a later
