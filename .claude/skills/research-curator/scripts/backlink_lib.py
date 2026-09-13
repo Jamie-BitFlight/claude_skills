@@ -553,7 +553,11 @@ def build_cross_reference_graph(
         if md_file.name == "README.md":
             continue
         abs_file = md_file.resolve()
-        rel_file = abs_file.relative_to(vault_root)
+        # Relative to the *unresolved* rglob path, which is always literally under
+        # vault_root. Deriving it from abs_file instead would raise ValueError for
+        # any .md that symlinks outside the vault, aborting the whole scan on a
+        # display string -- the opposite of this function's skip-and-continue contract.
+        rel_file = md_file.relative_to(vault_root)
         graph.setdefault(abs_file, [])
 
         try:

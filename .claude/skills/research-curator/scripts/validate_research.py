@@ -616,15 +616,19 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     vault directory reports paths relative to that vault, not to whatever
     repository happens to contain it).
 
-    A lone *file* argument is the one case a plain "parent of the input"
-    heuristic cannot serve: the pre-commit hook passes exactly one staged
-    filename for a one-entry commit, and a root of that file's own directory
-    collapses the report to a bare basename with no path context left to
-    resolve it from. For that case only, walk up to the nearest enclosing
-    git repository root instead, so the printed locator stays resolvable
-    from the repo root the file actually lives under. Falls back to the
-    file's own parent when no repository is found (e.g. a throwaway vault
-    built by a test fixture, which is never inside a git repo of its own).
+    An all-*files* argument list is the case a plain "common ancestor of the
+    inputs" heuristic cannot serve. The pre-commit hook runs with
+    ``pass_filenames: true``, so it passes the staged entries themselves --
+    one filename for a one-entry commit, N for an N-entry commit. Their common
+    ancestor is the entries' own directory whenever they share a category
+    (``research/coding-agents/`` for three staged entries from that category),
+    which collapses every locator to a bare basename with no path context left
+    to resolve it from. For an all-files argument list, walk up from that
+    common ancestor to the nearest enclosing git repository root instead, so
+    the printed locator stays resolvable from the repo root the files actually
+    live under. Falls back to the common ancestor when no repository is found
+    (e.g. a throwaway vault built by a test fixture, which is never inside a
+    git repo of its own).
 
     Args:
         resolved: Non-empty list of file or directory paths to validate.
@@ -636,16 +640,19 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     candidate_dirs = [p if p.is_dir() else p.parent for p in absolute_paths]
 
     if len(candidate_dirs) == 1:
-        single = absolute_paths[0]
-        if single.is_dir():
-            return single
-        for candidate in (single.parent, *single.parent.parents):
-            if (candidate / ".git").exists():
-                return candidate
-        return single.parent
+        common = candidate_dirs[0]
+    else:
+        # os.path.commonpath returns the longest common sub-path string.
+        common = Path(os.path.commonpath([str(d) for d in candidate_dirs]))
 
-    # os.path.commonpath returns the longest common sub-path string.
-    return Path(os.path.commonpath([str(d) for d in candidate_dirs]))
+    if any(p.is_dir() for p in absolute_paths):
+        return common
+
+    for candidate in (common, *common.parents):
+        # A worktree's .git is a file, not a directory -- exists() covers both.
+        if (candidate / ".git").exists():
+            return candidate
+    return common
 
 
 def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
