@@ -176,8 +176,6 @@ snyk monitor --unmanaged --project-name=my-c-project
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

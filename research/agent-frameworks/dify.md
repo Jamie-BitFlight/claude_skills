@@ -279,14 +279,12 @@ curl -X POST https://api.dify.ai/v1/workflows/run \
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
-| [ruflo](./ruflo.md) | agent-frameworks | Open-source LLM platform with 100+ model providers, RAG pipelines, and visual workflow builder; shares multi-provider routing and HITL patterns (bidirectional) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
 | [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
 | [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
 | [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |

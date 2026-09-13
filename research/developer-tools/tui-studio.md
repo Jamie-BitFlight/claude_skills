@@ -234,8 +234,6 @@ No limitations are explicitly documented in official sources. However, given the
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

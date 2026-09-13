@@ -252,8 +252,6 @@ surf install <extension-id>
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

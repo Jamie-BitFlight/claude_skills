@@ -371,7 +371,7 @@ All factual claims in this entry are traceable to extracted passages from the of
 | [Motherduck](../data-infrastructure/motherduck.md) | data-infrastructure | Serverless DuckDB with native MCP integration and Dual Execution engine; provides memory backend alternative to AgentDB for pattern storage |
 | [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | Version-controlled SQL database with Git semantics and Beads agentic memory; provides persistent memory layer for Ruflo's ReasoningBank pattern storage |
 | [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
-| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | Enterprise multi-agent orchestration with 215+ MCP tools; shares MCP ecosystem integration and swarm coordination patterns (bidirectional) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
 | [iii](../agent-infrastructure/iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
 | [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
 | [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |

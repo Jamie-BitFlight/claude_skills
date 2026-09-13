@@ -265,8 +265,6 @@ The `entitlements.ts` pattern (per-user-type rate limits stored as config) is a 
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

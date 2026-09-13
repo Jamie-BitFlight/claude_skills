@@ -278,7 +278,7 @@ For trusted, low-risk operations, users can configure auto-approval rules to red
 | [brooks-lint](./brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
 | [claude-replay](./claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
 | [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
-| [maverick](./maverick.md) | coding-agents | Alternative autonomous coding agent with human-in-the-loop approval; shares skill-based extensibility and MCP server support (bidirectional) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
 | [pilot-shell](./pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
 | [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |

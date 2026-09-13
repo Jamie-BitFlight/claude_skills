@@ -286,8 +286,6 @@ docker run -it --rm byobu:6.14
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

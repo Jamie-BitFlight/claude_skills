@@ -124,8 +124,6 @@ Prompt Engine is a web-only SaaS; no installation is required.
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

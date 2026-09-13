@@ -206,5 +206,5 @@ Example: query exact token counts for your context bundle across multiple AI mod
 | [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
 | [stop-slop](../ai-writing-tools/stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |
 | [slimcontext](../context-management/slimcontext.md) | context-management | referenced by slimcontext (context-management) |
-| [prompt-optimizer](./prompt-optimizer.md) | prompt-engineering | protocol-based context engineering framework with 16 auto-loaded workflows; shares context-injection pattern with Prompt Optimizer's template system (bidirectional) |
+| [prompt-optimizer](./prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
 

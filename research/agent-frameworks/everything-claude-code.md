@@ -368,8 +368,6 @@ node scripts/setup-package-manager.js --detect
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

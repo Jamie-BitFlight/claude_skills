@@ -260,11 +260,9 @@ Switch profile per chat via the chat configuration panel.
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
-| [gridland](./gridland.md) | developer-tools | Cross-platform desktop UI framework; shares Gridland's goal of unified rendering across environments (bidirectional) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |

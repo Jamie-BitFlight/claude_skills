@@ -266,8 +266,6 @@ Note: 3-second wait is required after navigation — Chrome's accessibility tree
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

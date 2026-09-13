@@ -221,8 +221,6 @@ See the [Gemini Cookbook Colab](https://colab.sandbox.google.com/github/google-g
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

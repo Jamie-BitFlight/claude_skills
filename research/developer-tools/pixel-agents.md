@@ -173,8 +173,6 @@ Usage workflow:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

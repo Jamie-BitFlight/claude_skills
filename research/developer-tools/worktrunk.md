@@ -247,6 +247,6 @@ model = "claude-3-5-sonnet"
 | [Vibe Kanban](../vibe-kanban.md) | task-management | Kanban UI for parallel AI agent orchestration with git worktree isolation |
 | [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
 | [no-mistakes](./no-mistakes.md) | developer-tools | shares isolated git worktree pattern for non-blocking parallel agent validation (bidirectional) |
-| [tolaria](./tolaria.md) | developer-tools | Rust git worktree CLI for parallel AI agent workflows; shares Tolaria's git-centric development model and multi-agent support (bidirectional) |
+| [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
 
 ---

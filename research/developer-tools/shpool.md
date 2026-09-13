@@ -221,8 +221,6 @@ action = "detach"
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

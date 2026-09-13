@@ -353,7 +353,7 @@ The `writing-skills` skill treats skill creation as TDD for documentation:
 | [gstack](./gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
 | [orchestra](./orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
 | [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
-| [ruflo](./ruflo.md) | agent-frameworks | Structured orchestration with specialized agent roles and two-stage verification; shares TDD enforcement and agent pool architecture patterns (bidirectional) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
 | [agent-skills-eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

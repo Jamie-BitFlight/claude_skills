@@ -432,13 +432,11 @@ Launches the Electron-based desktop application UI (available at `chatgpt.com/co
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [nemoclaw](../agent-infrastructure/nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
-| [1code](./1code.md) | coding-agents | Codex binary bundled inside 1Code; shares dual MCP client+server role and AGENTS.md context (bidirectional) |
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
 | [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
-| [maverick](./maverick.md) | coding-agents | Competing autonomous agent platform with OS sandbox; shares multi-provider support and workspace isolation patterns (bidirectional) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |

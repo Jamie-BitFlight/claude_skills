@@ -171,8 +171,6 @@ no extra logos, keep brand colors exactly, no text overlays.
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

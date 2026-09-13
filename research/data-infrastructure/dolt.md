@@ -420,8 +420,6 @@ For most Go use cases, the recommended approach is spawning `dolt sql-server` an
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

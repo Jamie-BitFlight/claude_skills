@@ -305,7 +305,7 @@ The [cookbook](https://github.com/agno-agi/agno/tree/main/cookbook) provides hun
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [AutoResearchClaw](./AutoResearchClaw.md) | agent-frameworks | multi-agent orchestration with learning systems and knowledge transfer; shares async-first design and stateful agent architecture for cross-session context persistence (bidirectional) |
+| [AutoResearchClaw](./AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
 | [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
 | [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
 | [awesome-ai-apps](../ai-research-tools/awesome-ai-apps.md) | ai-research-tools | referenced by awesome-ai-apps (ai-research-tools) |

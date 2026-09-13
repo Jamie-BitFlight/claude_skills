@@ -260,8 +260,6 @@ export const handler: Handlers['DailySummary'] = async ({ state, enqueue }) => {
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -255,12 +255,10 @@ func main() {
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | referenced by fleet (agent-infrastructure) |
-| [robyn](./robyn.md) | api-frameworks | Go-based backend alternative; shares realtime and auth patterns with Robyn's WebSocket and SSE support (bidirectional) |
+| [robyn](./robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
 | [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |

@@ -191,8 +191,6 @@ Each contribution should include:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

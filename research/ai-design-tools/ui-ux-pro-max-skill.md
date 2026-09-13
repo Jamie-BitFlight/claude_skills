@@ -184,8 +184,6 @@ python3 src/ui-ux-pro-max/scripts/search.py "dashboard" --domain chart --stack r
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

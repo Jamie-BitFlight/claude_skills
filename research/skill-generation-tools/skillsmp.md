@@ -210,8 +210,6 @@ mv SKILL.md .claude/skills/skill-name/
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

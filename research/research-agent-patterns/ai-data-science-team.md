@@ -196,8 +196,6 @@ response = team.invoke({
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

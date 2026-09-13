@@ -438,8 +438,6 @@ Concrete applications:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

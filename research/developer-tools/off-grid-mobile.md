@@ -158,8 +158,6 @@ End users can install without building:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -204,8 +204,6 @@ curl https://api.jina.ai/v1/rerank \
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

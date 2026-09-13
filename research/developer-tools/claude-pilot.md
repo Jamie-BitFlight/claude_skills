@@ -291,8 +291,6 @@ curl -fsSL https://raw.githubusercontent.com/maxritter/claude-pilot/main/uninsta
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
@@ -303,7 +301,7 @@ curl -fsSL https://raw.githubusercontent.com/maxritter/claude-pilot/main/uninsta
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [claude-code-cli-power-patterns](./claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
 | [no-mistakes](./no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
-| [rtk](./rtk.md) | developer-tools | quality enforcement layer for Claude Code using hook-based automation (shares PreToolUse hook infrastructure with RTK) (bidirectional) |
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |
 | [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
 | [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
 | [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

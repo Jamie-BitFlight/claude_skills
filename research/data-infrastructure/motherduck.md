@@ -205,8 +205,6 @@ con.sql("""
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -237,8 +237,6 @@ SPEC_WORKFLOW_HOME=/workspace/.spec-workflow-mcp npx -y @pimzino/spec-workflow-m
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

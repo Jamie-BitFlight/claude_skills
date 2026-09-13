@@ -173,8 +173,6 @@ worker.onmessage = (e) => console.log('Loss:', e.data.loss);
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

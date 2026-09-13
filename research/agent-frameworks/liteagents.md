@@ -368,9 +368,9 @@ liteagents friction ~/.claude/projects
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
-| [orchestra](./orchestra.md) | agent-frameworks | 11-agent toolkit with orchestrator agent and session memory pipeline; shares Orchestra's intent-based agent routing and multi-step workflow coordination (bidirectional) |
+| [orchestra](./orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
 | [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
-| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | Multi-agent toolkit with 11 specialized agents and orchestrator agent; shares task delegation and agent-to-agent workflow patterns (bidirectional) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
 | [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
 | [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
 | [simplemem-cross](../context-management/simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |

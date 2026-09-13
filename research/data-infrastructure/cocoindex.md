@@ -219,8 +219,6 @@ def text_embedding_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

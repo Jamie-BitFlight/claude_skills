@@ -297,8 +297,6 @@ cargo clippy              # 0 warnings enforced
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
@@ -306,8 +304,8 @@ cargo clippy              # 0 warnings enforced
 | [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
 | [esp-claw](./esp-claw.md) | agent-frameworks | referenced by esp-claw (agent-frameworks) |
 | [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
-| [gitagent](./gitagent.md) | agent-frameworks | Rust Agent OS with native SKILL.md support; shares structured agent definition and autonomous hands pattern with gitagent skills system (bidirectional) |
-| [ruflo](./ruflo.md) | agent-frameworks | Agent OS with 40 channel adapters and 16-layer security; shares autonomous scheduling, multi-provider routing, and WASM sandbox execution model (bidirectional) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
 | [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
 | [fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | referenced by fleet (agent-infrastructure) |
 | [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |

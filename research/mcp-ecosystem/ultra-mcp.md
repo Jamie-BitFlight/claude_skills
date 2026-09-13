@@ -239,8 +239,6 @@ SOURCE: [GitHub README - RealMikeChong/ultra-mcp](https://github.com/RealMikeCho
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

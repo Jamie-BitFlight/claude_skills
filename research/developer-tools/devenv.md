@@ -300,8 +300,6 @@ imports:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

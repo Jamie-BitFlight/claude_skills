@@ -275,12 +275,10 @@ CLAUDE.md states "No build system or test frameworks — intentional design choi
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
 | [graphify](./graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
-| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | 170 modular skills across 9 domains with identical architecture (SKILL.md + references); shares vertical-slice and deep-module philosophy (bidirectional) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

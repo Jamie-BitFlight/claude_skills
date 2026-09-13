@@ -346,14 +346,14 @@ await agent.prompt("Hello!");
 | [Everything Claude Code](../everything-claude-code.md) | agent-frameworks | Comprehensive agent harness toolkit; parallel toolkit ecosystem approach to pi-mono for agent development and orchestration |
 | [Byobu](../../developer-tools/byobu.md) | developer-tools | terminal multiplexer wrapper with session persistence; complements pi-tui's differential rendering with terminal session management |
 | [surf-cli](../../developer-tools/surf-cli.md) | developer-tools | agent-agnostic Chrome control via CLI; extends pi-coding-agent and pi-web-ui with browser automation capability |
-| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | TypeScript agent runtime with unified LLM API and CLI framework; shares multi-interface patterns (TUI, web, Slack) with Cookbook examples (bidirectional) |
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |
 | [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
 | [browser-harness-js](./browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
 | [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
 | [esp-claw](./esp-claw.md) | agent-frameworks | referenced by esp-claw (agent-frameworks) |
 | [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
-| [gitagent](./gitagent.md) | agent-frameworks | TypeScript agent framework with unified LLM API and modular architecture; shares agent composition and skill reuse philosophy with gitagent (bidirectional) |
-| [ruflo](./ruflo.md) | agent-frameworks | TypeScript monorepo with unified LLM API and agent runtime; shares provider-agnostic model support and MCP extensibility patterns (bidirectional) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
 | [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
 | [gridland](../developer-tools/gridland.md) | developer-tools | referenced by gridland (developer-tools) |
 

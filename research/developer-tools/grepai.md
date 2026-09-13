@@ -346,7 +346,7 @@ grepai update           # Download and install latest
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [SigMap](../developer-tools/sigmap.md) | developer-tools | Semantic code search with call graph analysis; shares SigMap's goal of AI-friendly code retrieval with embedding-based approach vs TF-IDF (bidirectional) |
+| [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 | [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
 | [codewiki-google](../ai-research-tools/codewiki-google.md) | ai-research-tools | referenced by codewiki-google (ai-research-tools) |
 | [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |

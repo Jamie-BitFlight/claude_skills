@@ -311,8 +311,6 @@ const systemPrompt = catalog.prompt();
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -211,8 +211,6 @@ Add a `tembo.md` (or `AGENTS.md`) to your repo root to guide agent behavior:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

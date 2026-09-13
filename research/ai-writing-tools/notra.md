@@ -162,8 +162,6 @@ SOURCE: [Notra pricing](https://www.usenotra.com/pricing) (accessed 2026-03-04)
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

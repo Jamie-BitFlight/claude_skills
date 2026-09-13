@@ -210,8 +210,6 @@ SOURCE: [Your AGENTS.md is costing more than you think](https://straion.com/blog
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

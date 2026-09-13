@@ -243,8 +243,6 @@ tracker_dashboard({})
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

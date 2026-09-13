@@ -238,8 +238,6 @@ router.post('/console-log', asyncHandler(async (req, res) => {
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

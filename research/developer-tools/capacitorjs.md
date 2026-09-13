@@ -220,8 +220,6 @@ console.log(photo.webPath);
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

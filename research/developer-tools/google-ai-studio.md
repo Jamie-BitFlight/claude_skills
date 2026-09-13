@@ -232,8 +232,6 @@ print(response.text)
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -246,8 +246,6 @@ curl -X POST https://api.sourcesync.ai/v1/search/hybrid \
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -193,8 +193,6 @@ tmux capture-pane -t 0 -p -S -10000 | v
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

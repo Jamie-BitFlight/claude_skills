@@ -262,8 +262,6 @@ codex:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

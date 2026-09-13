@@ -374,8 +374,6 @@ relevant in two specific contexts:
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

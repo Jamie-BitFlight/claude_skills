@@ -224,8 +224,6 @@ npx -y @smithery/cli install @pbteja1998/sourcesyncai-mcp --client claude
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

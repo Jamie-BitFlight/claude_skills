@@ -211,8 +211,6 @@ results = response.json()  # list of {title, content, url}
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

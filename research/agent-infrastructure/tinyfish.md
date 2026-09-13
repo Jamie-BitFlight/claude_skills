@@ -227,8 +227,6 @@ curl --location 'https://agent.tinyfish.ai/v1/automation/run-sse' \
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

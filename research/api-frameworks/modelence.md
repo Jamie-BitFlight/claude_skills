@@ -268,8 +268,6 @@ SOURCE: [Modelence Docs — Stores](https://docs.modelence.com/stores) (accessed
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

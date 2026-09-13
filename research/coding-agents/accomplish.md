@@ -208,8 +208,6 @@ const task = await taskManager.startAgent({
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

@@ -248,4 +248,4 @@ void drawIcon(TFT_eSPI &tft, int x, int y) {
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [tui-studio](./tui-studio.md) | developer-tools | Visual-to-code editor for embedded displays; shares design-then-export pattern and multi-framework code generation strategy (bidirectional) |
+| [tui-studio](./tui-studio.md) | developer-tools | referenced by tui-studio (developer-tools) |

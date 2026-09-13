@@ -398,7 +398,7 @@ Tornado has been deployed in production at scale by major organizations:
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [robyn](./robyn.md) | api-frameworks | Python async web framework with networking primitives; shares concurrent I/O model and async/await patterns with Robyn (bidirectional) |
+| [robyn](./robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
 | [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |
 | [aiomqtt](../async-libraries/aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |
 | [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

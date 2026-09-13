@@ -328,7 +328,7 @@ SimpleMem-Cross is directly applicable to Claude Code's agent systems:
 | [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
 | [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
 | [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
-| [mex](./mex.md) | context-management | Persistent cross-conversation memory with automatic session lifecycle and context injection — shares heuristic observation extraction with mex's decision logging (bidirectional) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
 | [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
 
 ---

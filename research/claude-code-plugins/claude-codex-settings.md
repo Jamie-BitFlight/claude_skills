@@ -198,8 +198,6 @@ export ANTHROPIC_MODEL=kimi-k2-thinking-turbo
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

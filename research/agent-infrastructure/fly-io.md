@@ -243,8 +243,6 @@ fly wireguard create personal my-peer > peer.conf
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

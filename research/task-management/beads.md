@@ -253,8 +253,6 @@ SOURCE: [INSTALLING.md](https://github.com/steveyegge/beads/blob/main/docs/INSTA
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

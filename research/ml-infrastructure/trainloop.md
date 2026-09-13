@@ -155,8 +155,6 @@ SOURCE: Multiple sources confirm three-line SDK and OpenAI API compatibility (ac
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

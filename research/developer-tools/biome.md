@@ -274,8 +274,6 @@ npx @biomejs/biome migrate prettier --write
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
