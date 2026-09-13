@@ -10,8 +10,8 @@ consuming repo, which never had the authoring repo checked out. A path into that
 for the author and for nobody else, so the failure reaches real users and never reaches anyone
 testing from the authoring checkout.
 
-Runtime text is what loads with the artifact: ``SKILL.md`` bodies, agent bodies, and
-``references/**``. Design-time siblings travel inside the package but never load
+Runtime text is what loads with the artifact: ``SKILL.md`` bodies, agent and command
+bodies, and ``references/**``. Design-time siblings travel inside the package but never load
 (``SKILL-GOALS.md``, ``MAINTENANCE.md``, ``BENCHMARKS.md``, ``maintenance/**``, ``evals/**``);
 they are skipped, and a runtime link pointing *at* one of them is itself reported.
 
@@ -55,6 +55,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import sys
 from collections import Counter
@@ -63,7 +64,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 # Directories under the plugin whose markdown loads at runtime.
-_RUNTIME_ROOTS = ("skills", "agents")
+_RUNTIME_ROOTS = ("skills", "agents", "commands")
 
 # Design-time artifacts: they ship inside the package but never load with SKILL.md.
 # Excluded from scanning, and a runtime link into one is reported as design-time-link.
@@ -100,10 +101,6 @@ _SKILL_REF_RE = re.compile(r"\b([a-z][a-z0-9-]{2,}):([a-z][a-z0-9-]{2,})\b")
 # Words that, on the same line, suggest the cross-plugin reference is guarded rather
 # than unconditional. A heuristic for triage, not a verdict.
 _GUARD_WORDS = ("if ", "when ", "available", "installed", "optional", "present", "fallback", "unless")
-
-# Leading `../` segments at which a relative link leaves the plugin. A reference inside
-# skills/<name>/references/ needs three to climb past the plugin root.
-_PLUGIN_ESCAPE_DEPTH = 3
 
 # Characters that continue a path token. Used to widen a repo-root match leftwards to the
 # whole path it sits in, so the decision is made on that one token rather than on a search
@@ -165,24 +162,25 @@ def _points_at_design_time(target: str) -> bool:
     return any(f"{d}/" in tail for d in _DESIGN_TIME_DIRS)
 
 
-def _escapes_plugin(target: str) -> bool:
-    """Return True when a relative link target climbs out of the plugin directory.
+def _escapes_plugin(target: str, rel_path: str) -> bool:
+    """Return True when a relative target, resolved from the file naming it, leaves the plugin.
 
-    Counts ``../`` segments against consumed segments; a target that rises above its
-    own start has left the plugin only if it also rises above the plugin root, which
-    cannot be known from the string alone. This reports any target with three or more
-    leading ``../`` segments, the depth at which a skill reference leaves ``skills/``.
+    The target is joined to the directory of *rel_path* and normalised, so the verdict follows
+    the file's own depth: ``../../rules/x.md`` leaves the plugin from ``agents/a.md`` and lands
+    on the plugin root's ``rules/`` from ``skills/x/SKILL.md``.
+
+    Args:
+        target: The link target or path token.
+        rel_path: Plugin-relative, forward-slash path of the file the target appears in.
+
+    Returns:
+        True when the resolved path rises above the plugin root.
     """
     tail = target.split("#", 1)[0].strip()
     if not tail or tail.startswith(_PORTABLE_PREFIXES):
         return False
-    leading = 0
-    for segment in tail.split("/"):
-        if segment == "..":
-            leading += 1
-        else:
-            break
-    return leading >= _PLUGIN_ESCAPE_DEPTH
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(rel_path), tail))
+    return resolved == ".." or resolved.startswith("../")
 
 
 def sibling_plugin_names(plugin_dir: Path) -> frozenset[str]:
@@ -205,7 +203,7 @@ def sibling_plugin_names(plugin_dir: Path) -> frozenset[str]:
     )
 
 
-def repo_rooted_token(line: str, match: re.Match[str]) -> str | None:
+def repo_rooted_token(line: str, match: re.Match[str], rel_path: str) -> str | None:
     """Widen a repo-root match to its whole path token and return it when it is an escape.
 
     ``_REPO_PATH_RE`` matches a repo-root directory segment wherever it appears, including
@@ -219,6 +217,7 @@ def repo_rooted_token(line: str, match: re.Match[str]) -> str | None:
     Args:
         line: The raw source line.
         match: A ``_REPO_PATH_RE`` match within *line*.
+        rel_path: Plugin-relative path of the file *line* comes from, for the climb depth.
 
     Returns:
         The full path token when it is a repo-rooted escape, otherwise None.
@@ -239,7 +238,7 @@ def repo_rooted_token(line: str, match: re.Match[str]) -> str | None:
         return token
     if all(segment in {"", ".", ".."} for segment in prefix.split("/")):
         # A relative climb. `_escapes_plugin` already owns the depth rule; reuse it.
-        return token if _escapes_plugin(token) else None
+        return token if _escapes_plugin(token, rel_path) else None
     # A directory precedes the match, so this is a tail of a longer path — reported by the
     # cross-plugin check when it is one, and internal to the plugin when it is not.
     return None
@@ -268,7 +267,7 @@ def _scan_line(
             continue
         if _points_at_design_time(target):
             found.append(Escape(rel_path, line_no, "design-time-link", target, stripped))
-        elif _escapes_plugin(target):
+        elif _escapes_plugin(target, rel_path):
             found.append(Escape(rel_path, line_no, "repo-path", target, stripped))
 
     found.extend(
@@ -278,7 +277,7 @@ def _scan_line(
     )
 
     for match in _REPO_PATH_RE.finditer(line):
-        token = repo_rooted_token(line, match)
+        token = repo_rooted_token(line, match, rel_path)
         if token is None:
             continue
         found.append(Escape(rel_path, line_no, "repo-path", token, stripped))
@@ -308,7 +307,7 @@ def collect_escapes(plugin_dir: Path) -> list[Escape]:
         for path in sorted((plugin_dir / root).rglob("*.md")):
             if _is_design_time(path):
                 continue
-            rel_path = str(path.relative_to(plugin_dir))
+            rel_path = path.relative_to(plugin_dir).as_posix()
             text = path.read_text(encoding="utf-8", errors="replace")
             in_fence = False
             for line_no, line in enumerate(text.splitlines(), start=1):
@@ -391,8 +390,8 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
             f"({', '.join(repr(w.strip()) for w in _GUARD_WORDS)}). It triages; it does not decide."
         ),
         "- Fenced code blocks are skipped, so illustrative paths inside examples are not counted.",
-        "- A relative path is reported when it carries three or more leading `../` segments, the",
-        "  depth at which a skill reference leaves `skills/`. Shallower climbs stay inside the plugin.",
+        "- A relative path is reported when, resolved from the file it appears in, it rises above",
+        "  the plugin root. A climb that stays inside the plugin is not reported.",
         "- Repo-root paths are matched lowercase and forward-slash-separated, so a backslash separator,",
         "  an uppercase directory, or a URL-encoded separator is not detected.",
         "- Same-plugin (`dh:`) references are never reported. Paths built on `${CLAUDE_PLUGIN_ROOT}` or",

@@ -1111,8 +1111,13 @@ def update_plan_fields(
 
     Returns:
         What was written, and the names ``plan.fields`` does not set.
+
+    Raises:
+        LookupError: When no such plan exists, so no ``plan.fields`` event is appended for it.
     """
+    row = store.fetch_plan(conn, plan)
     applied, unsettable = settable("plans", PLAN_FIELD_COLUMNS, values)
+    applied = validated(Plan, row, applied)
     write_fields(conn, "plans", "plan_id = :plan", {"plan": plan}, applied)
     append(conn, kind="plan.fields", plan=plan, task=None, payload={"changed": applied}, at=moment)
     return applied, unsettable
@@ -1136,10 +1141,38 @@ def update_task_fields(
     Returns:
         What was written, and the names ``task.fields`` does not set.
     """
+    row = fetch_task(conn, plan, task)
     applied, unsettable = settable("tasks", TASK_FIELD_COLUMNS, values)
+    applied = validated(Task, row, applied)
     write_fields(conn, "tasks", "plan = :plan AND id = :task", {"plan": plan, "task": task}, applied)
     append(conn, kind="task.fields", plan=plan, task=task, payload={"changed": applied}, at=moment)
     return applied, unsettable
+
+
+def validated(model: type[BaseModel], row: Mapping[str, Any], applied: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate ``--set`` values through the canonical model before they reach a row.
+
+    The row's required fields stand in for the rest of the record, so each value is checked against
+    its own field's type and validators. A column the model does not declare passes through as given.
+
+    Args:
+        model: ``Task`` or ``Plan``.
+        row: The row being updated, for the model's required fields.
+        applied: The values :func:`settable` permitted.
+
+    Returns:
+        The values as the model normalises them.
+
+    Raises:
+        ValueError: A ``pydantic.ValidationError`` when a value does not fit its field, so a
+            malformed ``dependencies`` never lands where ``json_each`` later reads it.
+    """
+    declared = {name: value for name, value in applied.items() if name in model.model_fields}
+    if not declared:
+        return dict(applied)
+    base = {name: row[name] for name, field in model.model_fields.items() if field.is_required()}
+    dumped = model.model_validate({**base, **declared}).model_dump(mode="json", by_alias=False)
+    return {**applied, **{name: dumped[name] for name in declared}}
 
 
 def update(
@@ -1246,10 +1279,13 @@ def renew(
         A result whose ``renew_by`` is the new deadline.
 
     Raises:
-        ValueError: When neither an attempt nor a path addresses the lease.
+        ValueError: When neither an attempt nor a path addresses the lease, or both do.
     """
     if attempt is None and path is None:
         msg = "renew needs --attempt or --path"
+        raise ValueError(msg)
+    if path is not None and (task is not None or attempt is not None):
+        msg = "renew takes --path or --address with --attempt, not both"
         raise ValueError(msg)
     with store.transaction(conn):
         moment = now()
@@ -1376,10 +1412,14 @@ def settle(
         A result, or a ``already-settled`` no-op.
 
     Raises:
-        ValueError: When neither an attempt nor a path addresses the attempt.
+        ValueError: When neither an attempt nor a path addresses the attempt, or both do — a path
+            that matched another open task would otherwise settle that task instead.
     """
     if attempt is None and path is None:
         msg = "settle needs --attempt or --path"
+        raise ValueError(msg)
+    if path is not None and (task is not None or attempt is not None):
+        msg = "settle takes --path or --address with --attempt, not both"
         raise ValueError(msg)
     with store.transaction(conn):
         moment = now()

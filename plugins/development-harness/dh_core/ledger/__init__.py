@@ -62,11 +62,13 @@ from dh_core.ledger.port import (
     content_store,
     export_plan,
     from_milestone,
+    held_source,
     import_plan,
     milestone_source,
     plan_source,
     projection,
     projection_hash,
+    projection_source,
 )
 from dh_core.ledger.queries import Finding, FindingCode, PlanStatus, list_plans, ready, status, validate
 from dh_core.ledger.store import Refusal, database_path, open_ledger, transaction
@@ -118,6 +120,7 @@ __all__ = [
     "finalize",
     "finish",
     "from_milestone",
+    "held_source",
     "import_plan",
     "list_plans",
     "milestone_source",
@@ -126,6 +129,7 @@ __all__ = [
     "progress",
     "projection",
     "projection_hash",
+    "projection_source",
     "read",
     "ready",
     "ready_tasks",

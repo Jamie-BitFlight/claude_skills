@@ -1472,6 +1472,34 @@ def test_update_set_names_the_columns_it_would_not_write(set_conn: sqlite3.Conne
     assert result.unsettable == ["status"]
 
 
+def test_update_set_refuses_a_value_its_field_rejects(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """A malformed ``--set`` value is refused before it lands where ``json_each`` reads it."""
+    before = store.fetch_task(set_conn, set_plan, "T1")["dependencies"]
+    with pytest.raises(ValueError, match="oops"):
+        transitions.update(set_conn, set_plan, "T1", values={"dependencies": "oops"})
+    assert store.fetch_task(set_conn, set_plan, "T1")["dependencies"] == before
+    assert store.events_of(set_conn, set_plan, kind=TASK_FIELDS_EVENT) == []
+
+
+def test_update_of_a_missing_plan_refuses_and_appends_nothing(set_conn: sqlite3.Connection) -> None:
+    """A plan-level ``--set`` on a plan the ledger does not hold fails instead of logging a ghost event."""
+    with pytest.raises(LookupError):
+        transitions.update(set_conn, "Pmissing", values={"goal": "x"})
+    assert store.all_events(set_conn) == []
+
+
+@pytest.mark.parametrize("command", [transitions.settle, transitions.renew])
+def test_path_and_attempt_addresses_are_refused_together(
+    set_conn: sqlite3.Connection, set_plan: str, tmp_path: Path, command: Callable[..., object]
+) -> None:
+    """Naming an attempt and a path at once is refused rather than letting the path pick the task."""
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    transitions.dispatch(set_conn, set_plan, "T1", worktree=str(worktree))
+    with pytest.raises(ValueError, match="not both"):
+        command(set_conn, set_plan, "T1", attempt=1, path=str(worktree))
+
+
 # ---------------------------------------------------------------------------
 # read heads every response with the authority preamble, unconditionally
 # ---------------------------------------------------------------------------
