@@ -281,12 +281,13 @@ Agent tool parameters:
   agent: .claude/agents/research-curator.md
   prompt: "--review ./research/{category}/{name}.md
 Analysis files written this run:
-  {improvements file path from the insight agent result, when it wrote one}
-  {utilization FILE path from the utilization agent result, when it wrote one}"
+  improvements: {path from the insight agent result, or none}
+  utilization:  {FILE path from the utilization agent result, or none}"
 ```
 
-Name those paths: they carry a date the agent cannot derive from the entry name, and the rubric puts
-them in scope for gates 4, 5 and 6. Omitting them costs three gates.
+Answer both lines, `none` included: the paths carry a date the agent cannot derive from the entry
+name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs three gates, while a bare
+`none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
 reviewed this run -- it never reached the analysis agents, so most of the rubric's scope does not
@@ -300,8 +301,7 @@ Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
 - **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
   continue to Post-Actions, which then withholds this entry's README row and date (step 1), keeping
   it out of the index until a later run reviews it clean. Correction belongs to a later `--rerun`
-  rather than to `--fix`: `--fix` takes validator issues, and a gate 4 or gate 5 defect needs
-  re-research.
+  rather than to `--fix`: `--fix` takes validator issues, and a gate 4 or 5 defect needs re-research.
 
 </entry_review>
 
