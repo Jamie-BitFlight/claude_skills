@@ -3,11 +3,20 @@
 The content contract every research entry under `./research/` must satisfy, whoever writes it. Fidelity Rules govern each claim; Depth Requirements govern each section's coverage. Both apply to every entry being written.
 
 This is a writing contract, not an audit checklist. [Entry Review Rubric](./entry-review-rubric.md)
-gates only two things — that a reader can reach the canonical source, and that claims about *this*
-repository check out against it — because an agent that needs a fact about the subject reads the
-source rather than the entry. Everything else below shapes the entry at writing time and costs
-nothing to honour while the sources are open, but a finished entry is never failed, edited, or
-withheld for it.
+gates the entry on one thing — that a reader can reach the canonical source — because an agent that
+needs a fact about the subject reads the source rather than the entry. Everything else below shapes
+the entry at writing time and costs nothing to honour while the sources are open, but a finished
+entry is never failed, edited, or withheld for it.
+
+**Rule 3 is the exception, and it is deliberate.** A bare nonexistence claim is the one writing
+failure that tells the reader, on the writer's word, not to bother going to the source — so it
+attacks the very thing the rubric gates, and it is Gate 1's last check. A finished entry *is* failed
+and *is* withheld from the index for it. Read the sentence above as covering every rule below except
+this one.
+
+The rubric's other gates never touch a finished entry's index row: Gate 2 records repo-claim defects
+for repair, and Gate 3 adjudicates the reasoning in the `insights/` and `utilization/` files, which
+are not this contract's subject at all.
 
 ---
 
