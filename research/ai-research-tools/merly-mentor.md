@@ -227,6 +227,6 @@ curl http://localhost:8080/api/v1/repositories/{id}/issues \
 | [Biome](../developer-tools/biome.md) | developer-tools | High-performance code quality enforcement via linting, formatting, and multi-language support |
 | [Niteni](../developer-tools/niteni.md) | developer-tools | AI-powered code review with inline diff analysis and severity classification for GitLab CI/CD |
 | [Harness Engineering (OpenAI)](../evaluation-testing/harness-engineering-openai.md) | evaluation-testing | Quality gates and code quality enforcement in CI/CD pipelines for AI-driven development workflows |
-| [skylos](../code-auditing/skylos.md) | code-auditing | referenced by skylos (code-auditing) |
+| [skylos](../code-auditing/skylos.md) | code-auditing | parallel deterministic multi-language code-quality analysis and CI gating |
 
 ---

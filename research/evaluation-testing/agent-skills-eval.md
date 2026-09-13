@@ -323,7 +323,7 @@ Source: README.md lines 217–232
 | [mattpocock/skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | 21 battle-tested specialized skills for Claude Code; exemplar use case for agent-skills-eval's empirical impact measurement |
 | [Superpowers Framework](../agent-frameworks/superpowers.md) | agent-frameworks | Agentic skills framework with TDD enforcement; shares goal-driven evaluation patterns and skill-to-capability mapping with agent-skills-eval |
 | [awesome-ai-apps](../ai-research-tools/awesome-ai-apps.md) | ai-research-tools | Curated 76 AI agent projects across 6 categories; agent-skills-eval enables comparative evaluation of these diverse implementations |
-| [skylos](../code-auditing/skylos.md) | code-auditing | is complemented by skylos (code-auditing) |
+| [skylos](../code-auditing/skylos.md) | code-auditing | contributes deterministic agent behavior contracts where this tool evaluates skills empirically |
 
 ---
 

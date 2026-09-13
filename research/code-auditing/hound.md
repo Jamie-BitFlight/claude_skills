@@ -319,4 +319,4 @@ Source: [hound README](https://github.com/scabench-org/hound#installation) — I
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [skylos](./skylos.md) | code-auditing | is complemented by skylos (code-auditing) |
+| [skylos](./skylos.md) | code-auditing | supplies the deterministic multi-class scans this tool's graph-guided investigation does not perform |

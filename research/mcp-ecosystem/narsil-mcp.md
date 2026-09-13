@@ -450,4 +450,4 @@ CLI flags > Environment vars > Project config (`.narsil.yaml`) > User config (`~
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
-| [skylos](../code-auditing/skylos.md) | code-auditing | is extended by local code intelligence with MCP security and taint-analysis tools |
+| [skylos](../code-auditing/skylos.md) | code-auditing | broader static-analysis surface without this tool's MCP taint-analysis depth |
