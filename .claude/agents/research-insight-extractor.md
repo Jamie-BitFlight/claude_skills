@@ -40,8 +40,12 @@ flowchart TD
     MorePatterns -->|Yes| Gap
     MorePatterns -->|No| CheckBacklog[Check existing backlog items<br>to avoid duplicate proposals]
     CheckBacklog --> WriteFile[Write all proposals to<br>./research/insights/YYYY-MM-DD-resource-name-improvements.md]
-    WriteFile --> CreateItems[Create backlog items for High and Medium impact proposals<br>that are not already tracked]
-    CreateItems --> Return([Return structured result])
+    WriteFile --> Gate[Filing gate, per proposal:<br>test -e every repo path the proposal names<br>run and record the search behind every absence claim]
+    Gate --> GateQ{Did both checks pass<br>for this proposal?}
+    GateQ -->|"No — a path is MISSING,<br>or an absence was never searched for"| Defer[Record Backlog: Deferred with the reason<br>in the improvements file. File no item]
+    GateQ -->|"Yes — output pasted into **Verified**"| CreateItems[Create backlog items for high-confidence proposals<br>that are not already tracked]
+    Defer --> Return([Return structured result])
+    CreateItems --> Return
 ```
 
 ---
@@ -135,6 +139,7 @@ Each proposal in the output file follows this structure exactly:
 **Local system**: {path to the local file this maps to}
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
+**Verified**: {verbatim output of the filing gate's path check, one line per path, plus the search command and output behind any absence claim}
 **Backlog**: #{issue-number} created | Deferred — {reason}
 
 ### Current state
@@ -166,7 +171,43 @@ Impact definitions:
 
 ## Backlog Item Creation
 
-Create a backlog item for **every high-confidence proposal that is not already tracked**, regardless of impact level. Priority is selected by the impact × confidence matrix:
+### Filing gate — run this before any item is created
+
+Filing a backlog item is the irreversible step in this agent's run: an item outlives the proposal
+file, gets groomed, and gets worked. The review that audits these claims (`--review`, Gate 2) runs
+*after* this agent returns, so nothing downstream catches a bad claim before it is already tracked.
+Every claim a proposal rests on is therefore settled here, before the item exists — not by
+re-reading the proposal, but by running these two checks and pasting their output into the
+proposal's `**Verified**` field.
+
+**1. Every repo path the proposal names must open.** Confidence prose is not this check; a
+proposal can read as high-confidence and still cite a path that was never opened. Run the paths
+through a single command and keep the result:
+
+```bash
+for p in {every repo path this proposal names}; do
+  if [ -e "$p" ]; then echo "OK      $p"; else echo "MISSING $p"; fi
+done
+```
+
+Any `MISSING` line disqualifies the proposal from filing. Record it in the improvements file as
+`Backlog: Deferred — cited path does not exist: {path}` and move to the next proposal. Do not repair
+the path on the writer's behalf, and do not file the item with the bad path stripped out — the
+proposal rested on it.
+
+**2. Every claim that this repo *lacks* something must name the search that failed.** An absence is
+not observed by not having noticed the thing; a `Glob`/`Grep` across `.claude/` and `plugins/` for
+the capability's name, and for the two or three other words it could plausibly be called, is what
+observes it. Paste the command and its output into `**Verified**`. A proposal asserting an absence
+with no recorded search is deferred as `Backlog: Deferred — absence not searched for`, however
+confident the reasoning around it reads.
+
+Both checks are local and deterministic: they need no network and return the same answer on every
+run, so a sandbox with no egress executes this gate in full.
+
+### Priority
+
+Create a backlog item for **every high-confidence proposal that passed the filing gate above and is not already tracked**, regardless of impact level. Priority is selected by the impact × confidence matrix:
 
 | Confidence | Impact | Priority |
 |---|---|---|
