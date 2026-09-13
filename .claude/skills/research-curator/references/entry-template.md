@@ -115,19 +115,21 @@ How the resource works internally. Include diagrams if helpful.
 ### Applications
 
 - **{capability this resource provides}** -> `{repo-relative path}`
+  - Term: `{the term that produced this match list — narrow or broader}`
   - Today: "{exact line, heading, table row, or config value read from that path}"
   - Change: {the specific edit this suggests}
 
 ### Patterns Worth Adopting
 
 - **{pattern}** -> `{repo-relative path}`
+  - Term: `{the term that produced this match list — narrow or broader}`
   - Today: "{exact line read from that path}"
   - Change: none — {path} already covers it
 
 ### Integration Opportunities
 
 - **{API, package, or CLI this resource exposes}** -> nothing in `{scope searched}`
-  - Today: `git grep -il "{narrow term}" -- {scope}` and `git grep -il "{broader term}" -- {scope}` -> 0 matches each
+  - Today: `git grep --full-name -il "{narrow term}" -- {root-anchored scope}` and `git grep --full-name -il "{broader term}" -- {root-anchored scope}` -> 0 matches each
   - Change: {what would have to exist here first}
 
 ---
@@ -161,10 +163,13 @@ How the resource works internally. Include diagrams if helpful.
 >   from memory of what a repo like this usually contains.
 > - `Today:` carries evidence, not characterisation: a line read from that path, or the exact
 >   search command that returned nothing. "Claude Code skills need X" is neither.
-> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a quoted line
->   that contains whichever term produced the match list, and is not a frontmatter field, a
+> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a `Term:` line
+>   naming the term that produced the match list — copied from the anchor record's `Term matched:`
+>   field — and a quoted line that contains that term, and is not a frontmatter field, a
 >   link-list bullet, or a sample
->   argument inside a code fence — those carry the term without asserting anything. Absence anchor:
+>   argument inside a code fence — those carry the term without asserting anything. `Term:` is what
+>   makes the quote checkable by a reader who did not run the pass; without it Gate 4 Rule 5 of
+>   [Entry Review Rubric](./entry-review-rubric.md) has nothing to check against. Absence anchor:
 >   `-> nothing in {scope searched}` with both the narrow and the broader search command at
 >   `0 matches`. Zero matches is a finding, not a failure to find one — but it records that these
 >   terms found nothing, never that the capability is absent from this repo.

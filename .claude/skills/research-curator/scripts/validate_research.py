@@ -95,6 +95,18 @@ ACCESS_DATE_PATTERN = re.compile(r"(?:accessed\s+\d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}
 # cross_references_absent (validation-rules.md) exempts entries verified before this date —
 # the ## Cross-References convention only applies from this date forward.
 CROSS_REFERENCES_EXEMPT_BEFORE = date(2026, 3, 12)
+
+# relevance_unanchored exempts entries dated before this — the Phase 1c Repo Anchor Pass only
+# applies from this date forward. validation-rules.md states the check is must-fix only for an
+# entry a run just created or refreshed; that is a fact about the caller's mode, which this script
+# cannot observe. The date is the observable proxy: an entry a run just wrote or refreshed carries
+# a current Research Date or Last Verified, so it lands on or after the cutoff and is gated, while
+# the pre-existing corpus stays quiet. Same mechanism as CROSS_REFERENCES_EXEMPT_BEFORE above.
+#
+# relevance_anchor_path_missing deliberately has NO such cutoff. "This entry predates Phase 1c" is
+# a reason not to demand anchors of it; it is not a reason to let it keep citing a path that is not
+# in the repository. That claim is false at any age and checkable at any age.
+RELEVANCE_ANCHOR_EXEMPT_BEFORE = date(2026, 9, 15)
 _ISO_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 _yaml = YAML()
@@ -442,7 +454,125 @@ RELEVANCE_SECTION = "Relevance to Claude Code Development"
 RELEVANCE_ANCHOR_PATTERN = re.compile(r"`(?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*`|git\s+grep")
 
 
-def check_relevance_anchored(lines: list[str], sections: dict[str, tuple[int, int]]) -> list[Issue]:
+# The backticked repo-relative path inside a Relevance anchor. Same roots as
+# RELEVANCE_ANCHOR_PATTERN, but capturing the path so it can be resolved against the repo root.
+RELEVANCE_ANCHOR_PATH_PATTERN = re.compile(r"`((?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*)`")
+
+# A backticked span carrying one of these is a shape (a glob, a template placeholder), not a path
+# any single file can satisfy, so it is excluded from the existence check rather than failed by it.
+_UNRESOLVABLE_PATH_CHARS = "*?[{"
+
+
+def exempt_by_date(reference_date: str | None, cutoff: date) -> bool:
+    """Report whether an entry's date puts it before a check's cutoff.
+
+    Args:
+        reference_date: ISO date string from the entry, or ``None`` when the entry has none.
+        cutoff: The first date on which the check applies.
+
+    Returns:
+        ``True`` when ``reference_date`` parses and falls before ``cutoff``. An entry with no
+        date, or an unparseable one, is not exempt -- an exemption has to be earned by a date
+        that was actually read.
+    """
+    if reference_date is None:
+        return False
+    try:
+        return date.fromisoformat(reference_date) < cutoff
+    except ValueError:
+        return False
+
+
+def repo_root_for(path: Path) -> Path | None:
+    """Find the repository checkout containing ``path``.
+
+    Walks up from ``path`` to the first directory holding a ``.git`` entry. ``.git`` is a
+    directory in a primary checkout and a file in a linked worktree, so existence is the test,
+    not directory-ness.
+
+    Args:
+        path: A file inside the checkout.
+
+    Returns:
+        The checkout root, or ``None`` when ``path`` is not inside one.
+    """
+    for candidate in path.resolve().parents:
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def check_relevance_anchor_paths(
+    lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
+) -> list[Issue]:
+    """Check that every repo path the Relevance section cites resolves in the repository.
+
+    ``check_relevance_anchored`` below tests only that anchor-shaped evidence is present. Shape
+    alone is satisfied by a plausible-looking path that was never opened, which makes naming an
+    invented file the cheapest way to clear the gate -- the failure mode the Phase 1c anchor pass
+    exists to remove. Every path in a real anchor record came from a ``git grep`` hit, so it
+    resolves; one that does not resolve did not come from the pass.
+
+    Args:
+        lines: Body lines of the entry.
+        sections: Section heading -> (start_line, end_line) mapping from ``_parse_sections``.
+        repo_root: Checkout root the paths resolve against, or ``None`` when it was not found.
+
+    Returns:
+        One ``relevance_anchor_path_missing`` issue per unresolvable path; or a single
+        ``relevance_anchor_paths_unchecked`` issue when paths were cited but no checkout root was
+        available to resolve them against, so that a skipped check is never reported as a clean one.
+    """
+    section = sections.get(RELEVANCE_SECTION)
+    if section is None:
+        # section_completeness already reports the section as missing; do not double-report.
+        return []
+
+    start, end = section
+    cited: list[str] = []
+    for match in RELEVANCE_ANCHOR_PATH_PATTERN.finditer("\n".join(lines[start - 1 : end])):
+        candidate = match.group(1).split()[0].rstrip(".,;:)")
+        if any(ch in candidate for ch in _UNRESOLVABLE_PATH_CHARS):
+            continue
+        if candidate not in cited:
+            cited.append(candidate)
+
+    if not cited:
+        # Nothing to resolve. An absence anchor cites a search command rather than a path, and
+        # check_relevance_anchored already reports a section carrying neither.
+        return []
+
+    if repo_root is None:
+        return [
+            {
+                "check": "relevance_anchor_paths_unchecked",
+                "severity": "warning",
+                "message": (
+                    f"{RELEVANCE_SECTION} cites {len(cited)} repo path(s) that were not checked: "
+                    "no .git found above this entry -- run the validator inside the checkout"
+                ),
+                "line": start,
+            }
+        ]
+
+    return [
+        {
+            "check": "relevance_anchor_path_missing",
+            "severity": "warning",
+            "message": (
+                f"{RELEVANCE_SECTION} anchors to `{candidate}`, which does not exist in this "
+                "repository -- an anchor path comes from a git grep hit, so it resolves"
+            ),
+            "line": start,
+        }
+        for candidate in cited
+        if not (repo_root / candidate).exists()
+    ]
+
+
+def check_relevance_anchored(
+    lines: list[str], sections: dict[str, tuple[int, int]], reference_date: str | None
+) -> list[Issue]:
     """Check that the Relevance section cites a repo path or a search command.
 
     Phase 1c of references/extraction-methodology.md writes every Relevance item from an anchor:
@@ -457,6 +587,7 @@ def check_relevance_anchored(lines: list[str], sections: dict[str, tuple[int, in
     Args:
         lines: Body lines of the entry.
         sections: Section heading -> (start_line, end_line) mapping from ``_parse_sections``.
+        reference_date: Entry date gating ``RELEVANCE_ANCHOR_EXEMPT_BEFORE``.
 
     Returns:
         A single-item list with the ``relevance_unanchored`` issue, or an empty list.
@@ -464,6 +595,8 @@ def check_relevance_anchored(lines: list[str], sections: dict[str, tuple[int, in
     section = sections.get(RELEVANCE_SECTION)
     if section is None:
         # section_completeness already reports the section as missing; do not double-report.
+        return []
+    if exempt_by_date(reference_date, RELEVANCE_ANCHOR_EXEMPT_BEFORE):
         return []
     start, end = section
     if RELEVANCE_ANCHOR_PATTERN.search("\n".join(lines[start - 1 : end])):
@@ -492,12 +625,8 @@ def check_cross_references(sections: dict[str, tuple[int, int]], reference_date:
     """
     if "Cross-References" in sections:
         return []
-    if reference_date is not None:
-        try:
-            if date.fromisoformat(reference_date) < CROSS_REFERENCES_EXEMPT_BEFORE:
-                return []
-        except ValueError:
-            pass
+    if exempt_by_date(reference_date, CROSS_REFERENCES_EXEMPT_BEFORE):
+        return []
     return [
         {
             "check": "cross_references_absent",
@@ -753,8 +882,10 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
         all_issues.extend(_check_url_format(body_lines))
         all_issues.extend(_check_formatting_suggestions(body_lines))
-        all_issues.extend(check_cross_references(sections, reference_date_yaml(frontmatter, body_lines, sections)))
-        all_issues.extend(check_relevance_anchored(body_lines, sections))
+        entry_date = reference_date_yaml(frontmatter, body_lines, sections)
+        all_issues.extend(check_cross_references(sections, entry_date))
+        all_issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
+        all_issues.extend(check_relevance_anchor_paths(body_lines, sections, repo_root_for(filepath)))
     else:
         header_lines, _ = _get_header_block(lines)
         sections = _parse_sections(lines)
@@ -768,8 +899,10 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_freshness_tracking_text(lines, sections))
         all_issues.extend(_check_url_format(lines))
         all_issues.extend(_check_formatting_suggestions(lines))
-        all_issues.extend(check_cross_references(sections, reference_date_text(header_lines, lines, sections)))
-        all_issues.extend(check_relevance_anchored(lines, sections))
+        entry_date = reference_date_text(header_lines, lines, sections)
+        all_issues.extend(check_cross_references(sections, entry_date))
+        all_issues.extend(check_relevance_anchored(lines, sections, entry_date))
+        all_issues.extend(check_relevance_anchor_paths(lines, sections, repo_root_for(filepath)))
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
     status = "fail" if has_errors else "pass"

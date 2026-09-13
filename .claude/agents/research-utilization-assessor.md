@@ -161,8 +161,7 @@ This agent MUST NOT:
 - Invent integration surfaces not documented in the research entry
 - Propose integrations without reading the local system file first
 - Name a caller path that was not opened. Most of this repo's skills live under
-  `plugins/*/skills/`, not `.claude/skills/` — 251 tracked `SKILL.md` against 30 at this writing,
-  so a `.claude/skills/` path reached for from memory is the majority-wrong guess
+  `plugins/*/skills/`, not `.claude/skills/` — a path recalled rather than listed is usually wrong
 - State that no local system does something without the search that shows it. Put the exact command
   and its result in the proposal or the skipped table; an unsearched absence proposes building
   something that may already exist

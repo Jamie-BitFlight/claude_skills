@@ -52,6 +52,19 @@ ABSENCE_ANCHOR = """\
   - Change: none -- out of scope
 """
 
+# Dates straddling RELEVANCE_ANCHOR_EXEMPT_BEFORE in validate_research.py. The relevance checks
+# are must-fix only for an entry a run just created or refreshed (validation-rules.md); the entry
+# date is the observable proxy for that, so a current date is gated and an older one is not.
+GATED_DATE = "2026-09-20"
+EXEMPT_DATE = "2026-06-01"
+
+# A present anchor naming a path that is not in the repository -- shape-valid, existence-invalid.
+FABRICATED_ANCHOR = """\
+- **Terminal workarounds** -> `.claude/rules/interactive-terminal-workarounds.md`
+  - Today: "run the command non-interactively"
+  - Change: none -- that rule already covers it
+"""
+
 
 def _uv_path() -> str:
     """Locate the uv binary, raising RuntimeError if not found."""
@@ -68,14 +81,22 @@ def _run_json(path: Path) -> dict:
     return json.loads(result.stdout)
 
 
-def _write_entry(path: Path, relevance_body: str) -> None:
-    """Write a minimal well-formed text-header entry with a given Relevance section body."""
+def _write_entry(path: Path, relevance_body: str, entry_date: str = GATED_DATE) -> None:
+    """Write a minimal well-formed text-header entry with a given Relevance section body.
+
+    Args:
+        path: Where to write the entry.
+        relevance_body: Body of the Relevance to Claude Code Development section.
+        entry_date: Research Date and Last Verified value. Defaults to a date on or after
+            RELEVANCE_ANCHOR_EXEMPT_BEFORE so the relevance checks apply; pass EXEMPT_DATE to
+            exercise the pre-existing-corpus side of that cutoff.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         f"""\
 # Example
 
-**Research Date**: 2026-06-01
+**Research Date**: {entry_date}
 **Source URL**: https://example.com/example
 **Version at Research**: 1.0.0
 **License**: MIT
@@ -114,7 +135,7 @@ pip install example
 
 ## Freshness Tracking
 
-- **Last Verified**: 2026-06-01
+- **Last Verified**: {entry_date}
 - **Version at Verification**: 1.0.0
 - **Next Review Recommended**: 2027-01-01
 """,
@@ -161,3 +182,70 @@ class TestRelevanceUnanchored:
         _write_entry(entry, "- Install into `/usr/local/bin/example` and run it.")
         issues = _issues_for(_run_json(entry), "relevance_unanchored")
         assert len(issues) == 1
+
+    def test_entry_predating_the_cutoff_is_exempt(self, tmp_path: Path) -> None:
+        """The pre-existing corpus stays quiet: the anchor pass applies from its cutoff forward."""
+        entry = tmp_path / "example.md"
+        _write_entry(entry, UNANCHORED, entry_date=EXEMPT_DATE)
+        assert _issues_for(_run_json(entry), "relevance_unanchored") == []
+
+
+def _init_checkout(root: Path) -> None:
+    """Make ``root`` a git checkout so repo_root_for resolves anchor paths against it."""
+    subprocess.run(["git", "init", "--quiet", str(root)], check=True, capture_output=True)
+
+
+class TestRelevanceAnchorPaths:
+    """relevance_anchor_path_missing: an anchor path that shape-matches but does not resolve.
+
+    Shape alone is satisfied by a plausible-looking path nobody opened, which makes naming an
+    invented file the cheapest way to clear the anchor gate. Every path in a real anchor record
+    came from a git grep hit, so it exists.
+    """
+
+    def test_fabricated_path_warns(self, tmp_path: Path) -> None:
+        """A path absent from the checkout is reported, however well-formed it looks."""
+        _init_checkout(tmp_path)
+        entry = tmp_path / "research" / "example.md"
+        _write_entry(entry, FABRICATED_ANCHOR)
+        issues = _issues_for(_run_json(entry), "relevance_anchor_path_missing")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
+        assert ".claude/rules/interactive-terminal-workarounds.md" in issues[0]["message"]
+
+    def test_resolving_path_is_clean(self, tmp_path: Path) -> None:
+        """A path that exists in the checkout raises nothing."""
+        _init_checkout(tmp_path)
+        anchored = tmp_path / "plugins" / "agent-orchestration" / "skills" / "parallel-work" / "SKILL.md"
+        anchored.parent.mkdir(parents=True)
+        anchored.write_text("teams are not the default\n", encoding="utf-8")
+        entry = tmp_path / "research" / "example.md"
+        _write_entry(entry, PRESENT_ANCHOR)
+        assert _issues_for(_run_json(entry), "relevance_anchor_path_missing") == []
+
+    def test_absence_anchor_has_no_path_to_resolve(self, tmp_path: Path) -> None:
+        """An absence anchor cites a command, not a path, so nothing is checked and nothing warns."""
+        _init_checkout(tmp_path)
+        entry = tmp_path / "research" / "example.md"
+        _write_entry(entry, ABSENCE_ANCHOR)
+        assert _issues_for(_run_json(entry), "relevance_anchor_path_missing") == []
+        assert _issues_for(_run_json(entry), "relevance_anchor_paths_unchecked") == []
+
+    def test_no_date_exemption(self, tmp_path: Path) -> None:
+        """Unlike relevance_unanchored, this check has no cutoff.
+
+        Predating Phase 1c excuses an entry from having anchors. It does not excuse an entry from
+        citing a path that is not in the repository -- that claim is false at any age.
+        """
+        _init_checkout(tmp_path)
+        entry = tmp_path / "research" / "example.md"
+        _write_entry(entry, FABRICATED_ANCHOR, entry_date=EXEMPT_DATE)
+        assert len(_issues_for(_run_json(entry), "relevance_anchor_path_missing")) == 1
+
+    def test_outside_a_checkout_reports_unchecked_rather_than_clean(self, tmp_path: Path) -> None:
+        """No checkout root means the paths were not checked -- say so instead of passing silently."""
+        entry = tmp_path / "example.md"
+        _write_entry(entry, FABRICATED_ANCHOR)
+        issues = _issues_for(_run_json(entry), "relevance_anchor_paths_unchecked")
+        assert len(issues) == 1
+        assert _issues_for(_run_json(entry), "relevance_anchor_path_missing") == []

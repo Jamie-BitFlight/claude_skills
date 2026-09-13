@@ -155,28 +155,41 @@ capped at six Read calls, and the cap falls entirely on step 3.
 2. Search every term — both halves of every capability, no exceptions and no budget:
 
    ```bash
-   git grep -il "{term}" -- plugins/ .claude/skills/ .claude/agents/ rules/ docs/ AGENTS.md ':!research/'
+   git grep --full-name -il "{term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md
    ```
 
-   `git grep`, never plain `grep`. `git grep` searches tracked files only, so it never descends
-   into `.claude/worktrees/`, which holds more files than the rest of the repo combined; plain
-   `grep` over the same scope returns mostly worktree copies, so it reports paths no clone has and
-   lets the entry being written match itself. The counts are machine- and hour-dependent, which is
-   the point: a plain-`grep` anchor is not re-runnable by the reader checking it.
+   The `:/` on every pathspec and the `--full-name` are load-bearing. Git resolves a bare pathspec
+   against the current directory, so the same command without `:/`, run anywhere below the
+   repository root, resolves all six paths to nothing and exits 1 printing no message — a
+   manufactured absence on every term, indistinguishable in the output from a real one. `:/`
+   anchors each path to the repository root wherever the command runs, and `--full-name` makes the
+   output repo-relative so an anchor record's path is usable exactly as printed.
 
-   The scope is the six paths above and no others. Wholesale `.claude/` adds `agent-memory/`,
-   `audits/`, and `plan/` — agent scratch output, which records what some past agent did, not what
-   this repo instructs. (Those three are partly tracked, so `git grep` alone does not exclude them;
-   the narrowed pathspec is what does.) `':!research/'` keeps the research corpus out by any route,
-   since an entry anchored to another entry says nothing about the repo.
+   `git grep`, never plain `grep`, and the scope is those six paths and no others — two separate
+   constraints, neither doing the other's job. Measured on the term `refusal` in the primary
+   checkout: plain `grep -ril` over `plugins/ .claude/ rules/ docs/ AGENTS.md` returns 73 files,
+   `git grep -il` over that same over-broad scope returns 3, and the command above returns 1. The
+   73→3 is plain `grep` descending into gitignored `.claude/worktrees/`, which holds more files
+   than the rest of the repo combined — paths no clone has, and a route for the entry being
+   written to match itself. The 3→1 is the narrowed scope dropping `.claude/agent-memory/`,
+   `.claude/audits/`, and `.claude/plan/`: agent scratch output recording what some past agent did,
+   not what this repo instructs, and containing tracked files, so `git grep` reaches them and only
+   the pathspec excludes them. Over the six paths alone both commands return the same single file,
+   so do not read the `git grep` rule as covering the narrowing — it is the backstop that keeps an
+   untracked file from becoming an anchor.
+
+   `research/` needs no exclusion and gets none: it lies under none of the six paths, so the corpus
+   is already out of scope and an entry cannot anchor to another entry.
 
    Record the match count for every term, matched or not.
 
 3. Read matched files and quote one exact line from each. At most six Reads, and selection is
    fixed, not a preference:
 
-   - Work capabilities in the order derived, at most one anchor and one Read each. Stop at the
-     sixth Read; report any capability left unread.
+   - Work capabilities in the order derived, at most one anchor each. Six Reads is the only
+     budget; a capability is not separately capped at one, because the rejection rule below can
+     spend a Read on a file that yields no usable line. Stop at the sixth Read; report any
+     capability left unanchored and why.
    - A capability whose narrow term matched uses the narrow term's match list. When only the
      broader term matched, use the broader term's list, and the quoted line must then contain the
      broader term — whichever term produced the list is the term the line must carry.
@@ -212,14 +225,15 @@ A1. Capability: {capability}  From: {the Phase 1 extract it came from}
     Feeds: {which Relevance item}
 
 A2. Capability: {capability}  From: {the Phase 1 extract it came from}
-    Today: git grep -il "{narrow term}" -- plugins/ .claude/skills/ .claude/agents/ rules/ docs/ AGENTS.md ':!research/' → 0 matches
-           git grep -il "{broader term}" -- plugins/ .claude/skills/ .claude/agents/ rules/ docs/ AGENTS.md ':!research/' → 0 matches
+    Today: git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
+           git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
     Feeds: {which Relevance item}
 ```
 
-Write both commands into an A2 record in full, `':!research/'` included. A recorded scope that does
-not reproduce the command actually run is not re-runnable, which is the only property an absence
-anchor has.
+Write both commands into an A2 record in full, every `:/` prefix included. A recorded scope that
+does not reproduce the command actually run is not re-runnable, which is the only property an
+absence anchor has — and a reader who re-runs a copy with the `:/` prefixes stripped, from a
+subdirectory, gets a clean zero that confirms nothing.
 
 An absence anchor needs both the narrow term and its broader pair at zero. When the broader term
 matches, there is no absence to record — read that file and write a presence anchor instead. An
