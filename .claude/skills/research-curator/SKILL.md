@@ -281,8 +281,7 @@ flowchart TD
 
 3. Agent reads existing entry, re-gathers fresh data, updates content and freshness tracking
 4. Apply pre-relay quality checklist to agent result
-5. Update README with refreshed date
-6. **Validate** -- run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the updated file:
+5. **Validate** -- run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) on the updated file:
 
    a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py ./research/{category}/{name}.md`
 
@@ -292,8 +291,9 @@ flowchart TD
 
    d. If validator returns zero errors but any warning-severity issue from `header_fields`, `access_dates`, `freshness_tracking`, or `url_format`: the agent just refreshed this file this invocation, so it already has the facts to satisfy these. Spawn `@research-curator` with `--fix` and the exact warning issue list, then repeat steps a-b. If errors or any of these four warning types still remain after the retry, treat as step c.
 
-   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- proceed to step 7
+   e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- proceed to step 6
 
+6. Update README with refreshed date (only reached on the clean path from step 5 -- an entry marked "refreshed with issues" in step 5c never gets a refreshed date)
 7. Concurrently spawn three analysis agents:
 
    ```text
@@ -310,8 +310,7 @@ flowchart TD
 2. Spawn agents in waves of 5 (same pattern as Batch Mode)
 3. Each agent receives `--rerun ./research/{category}/{name}.md`
 4. Apply pre-relay quality checklist after each wave
-5. Update README once after all waves complete
-6. **Validate** -- for each successfully updated entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) before spawning analysis agents:
+5. **Validate** -- for each successfully updated entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries) before spawning analysis agents:
 
    a. Run fix script: `uv run .claude/skills/research-curator/scripts/fix_research_formatting.py {file}`
 
@@ -323,6 +322,7 @@ flowchart TD
 
    e. If validator passes with zero errors and zero warnings from the four checks in (d) -- `cross_references_absent` does not block this step -- include in analysis agent dispatch (step 7)
 
+6. Update README once after all waves complete, refreshing freshness dates only for entries that passed validation in step 5 -- an entry marked "refreshed with issues" in step 5c does not get a refreshed date
 7. For each entry that passed validation: spawn concurrent analysis agents per entry (up to 5 entries concurrently) — `@research-insight-extractor`, `@research-utilization-assessor`, `@research-cross-referencer`
 
 </rerun_mode>
@@ -367,7 +367,7 @@ flowchart TD
 ### Script Invocation
 
 ```bash
-uv run .claude/skills/research-curator/scripts/validate_research.py --json ./research/{target}
+uv run .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{target}
 ```
 
 ### Fix Agent Delegation
@@ -414,7 +414,12 @@ Validation complete:
 
 Shared by all modes. Execute after any mode completes successfully.
 
-1. **README Update** -- add or update entries in `./research/README.md` category tables
+1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
+   a shared restatement of the mode-specific README step each mode's own flow already gates
+   (Default/Batch step 6d, Rerun step 6/`UpdateDate(s)`) -- it does not run as a fresh, ungated
+   pass. Do not add a row, or refresh the Last Updated date on an existing row, for any entry
+   marked "created with issues" or "refreshed with issues" earlier in this run; that entry's
+   README state stays exactly as it was before this run started
 2. **Lint** -- run formatting checks on all modified files:
 
    ```bash
@@ -531,9 +536,12 @@ YYYY-MM-DD
 - [Entry Template](./references/entry-template.md) -- standard format for all research entries
 - [Validation Rules](./references/validation-rules.md) -- checks and severity mapping for `--validate` mode
 - [Batch Mode](./references/batch-mode.md) -- wave spawning workflow for `--batch` mode
+- [Duplicate Detection](./references/duplicate-detection.md) -- shared pre-spawn check for Default Mode and Batch Mode
+- [Repo Access Procedure](./references/repo-access-procedure.md) -- tested shallow-clone procedure for repository research
 - Agent: `@research-curator` at `.claude/agents/research-curator.md` -- single-entry research executor
 - Agent: `@research-insight-extractor` at `.claude/agents/research-insight-extractor.md` -- extracts backlog improvements from research entries
 - Agent: `@research-utilization-assessor` at `.claude/agents/research-utilization-assessor.md` -- assesses direct API/service utilization opportunities
 - Agent: `@research-cross-referencer` at `.claude/agents/research-cross-referencer.md` -- appends Cross-References section to research entries
+- Agent: `@research-backlink-detector` at `.claude/agents/research-backlink-detector.md` -- adds backlinks in cited entries during Batch Mode's sequential backlink pass
 
 SOURCE: Agent result relay rules and pre-relay checklist adapted from `plugins/summarizer/skills/agent-result-relay/SKILL.md` (accessed 2026-03-06).
