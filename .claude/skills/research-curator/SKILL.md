@@ -426,8 +426,15 @@ below.
    Exclude any path that was **already** dirty in the baseline -- that is another contributor's
    pre-existing uncommitted work, not something this run produced -- and report it to the user as
    `{path} -- pre-existing uncommitted changes, not touched this run`. Call what remains **the
-   filtered list**; steps 4 and 5 below use it and nothing else, so a pre-existing dirty file is
-   never linted, staged, or committed by this run.
+   filtered list**; steps 4-6 below use it and nothing else, so a pre-existing dirty file is never
+   linted, staged, or committed by this run.
+
+   If the filtered list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
+   clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
+   steps 4-6 entirely: there is nothing to lint, commit, or push, and this is not a failure. Do not
+   invoke `prek run --files` with an empty list -- with no paths given, it falls back to its normal
+   staged-file selection instead of processing nothing, which could run auto-fixing hooks against
+   whatever another contributor already has staged.
 
 4. **Lint** -- run formatting checks on exactly the filtered list:
 
@@ -435,11 +442,8 @@ below.
    uv run prek run --files [the filtered list]
    ```
 
-5. **Commit** -- if the filtered list is empty (nothing was created, refreshed, or repaired this
-   run -- e.g. a clean Validate Mode pass where the backlink repair also found nothing writable to
-   fix), skip this step and step 6: there is nothing to commit, and this is not a failure.
-   Otherwise, stage and commit **exactly** the filtered list, immune to whatever else might already
-   be staged in the working tree -- never a blanket `git add -A`, a directory-wide
+5. **Commit** -- stage and commit **exactly** the filtered list, immune to whatever else might
+   already be staged in the working tree -- never a blanket `git add -A`, a directory-wide
    `git add ./research/`, or a pathless `git commit -m` (which commits the entire index, not just
    these paths):
 
