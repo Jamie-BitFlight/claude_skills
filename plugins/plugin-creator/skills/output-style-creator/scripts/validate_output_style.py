@@ -55,6 +55,23 @@ class ValidationResult(BaseModel):
     fields: dict[str, str]
 
 
+class DeclaredOutputStyles(BaseModel):
+    """A plugin manifest's ``outputStyles`` declaration.
+
+    Attributes:
+        paths: The valid string entries read from the key.
+        present: Whether the key is declared at all. Any declaration replaces Claude Code's
+            default ``output-styles/`` scan, an empty one included.
+        problems: Defects found while reading the manifest or the key. A declaration that cannot
+            be read as paths attributes no styles to the plugin, rather than falling back to the
+            default scan and reporting styles the manifest may not ship.
+    """
+
+    paths: list[str]
+    present: bool
+    problems: list[str]
+
+
 class DiscoveryResult(BaseModel):
     """Output styles visible from a starting directory.
 
@@ -69,6 +86,10 @@ class DiscoveryResult(BaseModel):
         plugin_rejected_paths: Declared entries that resolve outside the plugin root, and style
             files inside an accepted directory whose symlink target escapes it. Neither is
             searched or returned. A plugin cannot reference files outside its own directory.
+        plugin_manifest_problems: Defects in the plugin manifest itself — unparseable JSON, a
+            non-object root, or an ``outputStyles`` value that is not a string or an array of
+            strings. A plugin reporting one attributes no styles here, since the declaration
+            that would name them cannot be read.
     """
 
     user: list[str]
@@ -78,6 +99,7 @@ class DiscoveryResult(BaseModel):
     plugin: list[str]
     plugin_declared_paths: list[str]
     plugin_rejected_paths: list[str]
+    plugin_manifest_problems: list[str]
 
 
 def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
@@ -266,33 +288,91 @@ def styles_in(directory: Path, root: Path | None = None) -> tuple[list[str], lis
     return kept, escaped
 
 
-def declared_output_style_paths(plugin: Path) -> list[str] | None:
+def json_type_name(value: object) -> str:
+    """Name a decoded JSON value's type the way the manifest author wrote it.
+
+    Args:
+        value: Any value decoded from JSON.
+
+    Returns:
+        The JSON type name, so a message quotes ``null`` rather than ``NoneType``.
+    """
+    names = {
+        type(None): "null",
+        bool: "boolean",
+        int: "number",
+        float: "number",
+        str: "string",
+        list: "array",
+        dict: "object",
+    }
+    return names.get(type(value), type(value).__name__)
+
+
+def load_plugin_manifest(manifest: Path) -> tuple[dict[str, Any] | None, list[str]]:
+    """Read a plugin manifest into a JSON object.
+
+    Args:
+        manifest: The ``plugin.json`` path.
+
+    Returns:
+        The decoded object and an empty problem list, or None and the defect that stopped it. A
+        manifest that is simply absent is neither: None with no problem, since a directory that
+        declares nothing is not malformed.
+    """
+    try:
+        text = manifest.read_text(encoding="utf-8")
+    except OSError:
+        return None, []
+    try:
+        root = json.loads(text)
+    except json.JSONDecodeError as exc:
+        return None, [f"{manifest}: not valid JSON ({exc.msg}, line {exc.lineno} column {exc.colno})"]
+    if not isinstance(root, dict):
+        return None, [f"{manifest}: manifest root is {json_type_name(root)}, expected an object"]
+    return root, []
+
+
+def declared_output_style_paths(plugin: Path) -> DeclaredOutputStyles:
     """Read a plugin manifest's ``outputStyles`` entries.
 
     The key replaces Claude Code's default ``output-styles/`` scan, so a plugin declaring
     ``./extras/`` ships nothing in the default directory.
 
+    An absent key and an unreadable declaration are different states with different consequences,
+    so they are reported separately rather than both falling back to the default scan. Reporting a
+    malformed manifest as though its default directory were in force would tell the agent the
+    plugin ships styles that Claude Code may never load.
+
     Args:
         plugin: The plugin root directory.
 
     Returns:
-        The declared paths, normalised to a list, or None when the key is absent or the manifest
-        cannot be read or does not hold a JSON object. An empty list means the key declares no paths, which is not the same as an
-        absent key: the key still replaces the default scan, so nothing is loaded.
+        The declaration: its valid string paths, whether the key is present at all, and any defect
+        found while reading it.
     """
     manifest = plugin / ".claude-plugin" / "plugin.json"
-    try:
-        root = json.loads(manifest.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(root, dict):
-        return None
-    declared = root.get("outputStyles")
+    root, problems = load_plugin_manifest(manifest)
+    if root is None:
+        return DeclaredOutputStyles(paths=[], present=False, problems=problems)
+    if "outputStyles" not in root:
+        return DeclaredOutputStyles(paths=[], present=False, problems=[])
+    declared = root["outputStyles"]
     if isinstance(declared, str):
-        return [declared]
+        return DeclaredOutputStyles(paths=[declared], present=True, problems=[])
     if isinstance(declared, list):
-        return [entry for entry in declared if isinstance(entry, str)]
-    return None
+        paths = [entry for entry in declared if isinstance(entry, str)]
+        problems = [
+            f"{manifest}: outputStyles entry {index} is {json_type_name(entry)}, expected a string"
+            for index, entry in enumerate(declared)
+            if not isinstance(entry, str)
+        ]
+        return DeclaredOutputStyles(paths=paths, present=True, problems=problems)
+    return DeclaredOutputStyles(
+        paths=[],
+        present=True,
+        problems=[f"{manifest}: outputStyles is {json_type_name(declared)}, expected a string or an array of strings"],
+    )
 
 
 def is_within(root: Path, candidate: Path) -> bool:
@@ -365,11 +445,14 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
     plugin_styles: list[str] = []
     declared: list[str] = []
     rejected: list[str] = []
+    manifest_problems: list[str] = []
     if plugin is not None:
         found = declared_output_style_paths(plugin)
-        declared = found if found is not None else []
-        # An absent key leaves the default scan in place; any declaration replaces it, empty included.
-        if found is None:
+        declared = found.paths
+        manifest_problems = found.problems
+        # An absent, readable key leaves the default scan in place; any declaration replaces it,
+        # empty included. A manifest defect names no directory to scan and guesses at none.
+        if not found.present and not found.problems:
             searched = [plugin / "output-styles"]
         else:
             searched = []
@@ -395,6 +478,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
         plugin=plugin_styles,
         plugin_declared_paths=declared,
         plugin_rejected_paths=rejected,
+        plugin_manifest_problems=manifest_problems,
     )
 
 

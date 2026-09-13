@@ -1,0 +1,6 @@
+{
+  "name": "broken-manifest",
+  "description": "Fixture: outputStyles declares a number instead of paths.",
+  "version": "0.1.2",
+  "outputStyles": 42
+}

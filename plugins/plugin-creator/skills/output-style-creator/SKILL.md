@@ -63,7 +63,7 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 
    Omit `--plugin` when no plugin is in scope.
 
-2. READ the styles it lists. A nearer `.claude/output-styles/` **shadows** a farther one, and a plugin's `outputStyles` key shadows the plugin's default `output-styles/` directory — so a style you cannot see may be the one in force, and a directory you can see may be scanned by nobody. Report any path under `plugin_rejected_paths` or `project_rejected_paths` as a defect in the manifest or repository that declares it.
+2. READ the styles it lists. A nearer `.claude/output-styles/` **shadows** a farther one, and a plugin's `outputStyles` key shadows the plugin's default `output-styles/` directory — so a style you cannot see may be the one in force, and a directory you can see may be scanned by nobody. Report anything under `plugin_manifest_problems`, `plugin_rejected_paths`, or `project_rejected_paths` as a defect in the manifest or repository that declares it. A plugin with a manifest problem reports no styles, because the declaration that would name them cannot be read — that is a broken manifest, not a plugin shipping nothing.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering

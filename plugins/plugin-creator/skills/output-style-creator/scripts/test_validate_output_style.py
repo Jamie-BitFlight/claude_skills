@@ -219,21 +219,93 @@ def test_string_declaration_is_accepted(tmp_path: Path) -> None:
     assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["one.md"]
 
 
-def test_unreadable_manifest_falls_back_to_the_default_scan(tmp_path: Path) -> None:
-    """Malformed JSON is treated as an absent key rather than crashing discovery."""
+def test_unreadable_manifest_is_reported_and_scans_nothing(tmp_path: Path) -> None:
+    """Malformed JSON is a manifest defect, not an absent key.
+
+    Falling back to the default scan would report the plugin as shipping styles on the strength of
+    a manifest nothing can read.
+    """
     plugin = make_plugin(tmp_path / "p", {"name": "p"}, {"output-styles": "default"})
     (plugin / ".claude-plugin" / "plugin.json").write_text("{not json", encoding="utf-8")
-    assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["default.md"]
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert len(result.plugin_manifest_problems) == 1
+    assert "not valid JSON" in result.plugin_manifest_problems[0]
 
 
-def test_non_object_manifest_root_does_not_crash(tmp_path: Path) -> None:
-    """A manifest whose JSON root is a list is treated as absent, not a traceback.
+def test_non_object_manifest_root_is_reported_and_scans_nothing(tmp_path: Path) -> None:
+    """A manifest whose JSON root is a list is a defect, not a traceback and not an absent key.
 
     ``json.loads`` succeeds on ``[]``, so reading the key off the result would raise AttributeError.
     """
     plugin = make_plugin(tmp_path / "p", {"name": "p"}, {"output-styles": "default"})
     (plugin / ".claude-plugin" / "plugin.json").write_text("[]", encoding="utf-8")
-    assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["default.md"]
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_manifest_problems == [
+        f"{plugin / '.claude-plugin' / 'plugin.json'}: manifest root is array, expected an object"
+    ]
+
+
+def test_missing_manifest_is_not_a_defect(tmp_path: Path) -> None:
+    """A directory with no manifest declares nothing, and the default scan still applies."""
+    root = tmp_path / "p"
+    (root / "output-styles").mkdir(parents=True)
+    write_style(root / "output-styles", "default", "name: A\ndescription: fine")
+    result = v.discover(tmp_path, root)
+    assert [p.rsplit("/", 1)[-1] for p in result.plugin] == ["default.md"]
+    assert result.plugin_manifest_problems == []
+
+
+def test_invalid_output_styles_type_is_reported_and_scans_nothing(tmp_path: Path) -> None:
+    """outputStyles: 42 is a declaration this cannot read, so it is not treated as absent.
+
+    Scanning the default directory here would attribute styles to a plugin whose manifest names
+    none, misreporting a malformed plugin as one that ships usable styles.
+    """
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": 42}, {"output-styles": "default"})
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_declared_paths == []
+    assert result.plugin_manifest_problems == [
+        f"{plugin / '.claude-plugin' / 'plugin.json'}: outputStyles is number, expected a string or an array of strings"
+    ]
+
+
+def test_null_output_styles_is_reported_rather_than_absent(tmp_path: Path) -> None:
+    """An explicit null is a present declaration, and its message names the JSON type."""
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": None}, {"output-styles": "default"})
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert "outputStyles is null" in result.plugin_manifest_problems[0]
+
+
+def test_non_string_entries_are_reported_and_valid_ones_kept(tmp_path: Path) -> None:
+    """A mixed array keeps its string entries and reports each entry it dropped, by index.
+
+    Silently dropping them would report the plugin's styles as complete when the manifest is not.
+    """
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": ["./extras/", 42, None]}, {"extras": "declared"})
+    result = v.discover(tmp_path, plugin)
+    assert [p.rsplit("/", 1)[-1] for p in result.plugin] == ["declared.md"]
+    assert result.plugin_declared_paths == ["./extras/"]
+    manifest = plugin / ".claude-plugin" / "plugin.json"
+    assert result.plugin_manifest_problems == [
+        f"{manifest}: outputStyles entry 1 is number, expected a string",
+        f"{manifest}: outputStyles entry 2 is null, expected a string",
+    ]
+
+
+def test_valid_manifest_reports_no_problems(tmp_path: Path) -> None:
+    """A well-formed declaration leaves plugin_manifest_problems empty."""
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": ["./extras/"]}, {"extras": "declared"})
+    assert v.discover(tmp_path, plugin).plugin_manifest_problems == []
+
+
+def test_boolean_output_styles_is_not_read_as_a_number(tmp_path: Path) -> None:
+    """JSON true is a boolean, even though Python bool subclasses int."""
+    plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": True}, {"output-styles": "default"})
+    assert "outputStyles is boolean" in v.discover(tmp_path, plugin).plugin_manifest_problems[0]
 
 
 def test_declared_path_escaping_the_plugin_root_is_rejected(tmp_path: Path) -> None:
@@ -404,4 +476,5 @@ def test_discovery_result_reports_every_scope(tmp_path: Path) -> None:
         "plugin",
         "plugin_declared_paths",
         "plugin_rejected_paths",
+        "plugin_manifest_problems",
     }

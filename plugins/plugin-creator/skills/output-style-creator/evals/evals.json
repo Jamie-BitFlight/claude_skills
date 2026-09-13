@@ -8,7 +8,7 @@
       "expectations": [
         "The response diagnoses rather than proposing to rewrite or recreate the style file",
         "It names the cause: in the terminal, style files are read at startup, so a file created mid-session is not seen",
-        "It gives the fix — restart Claude Code, or /reload-plugins for a plugin-bundled style",
+        "It gives the fix \u2014 restart Claude Code, or /reload-plugins for a plugin-bundled style",
         "It runs or references Phase 1 discovery to rule out a same-named style in a nearer directory"
       ]
     },
@@ -21,7 +21,7 @@
         "The bundled validator is run rather than the frontmatter being checked by hand",
         "The response reports that the frontmatter passes",
         "The response does NOT report the style as ready on the strength of the exit code alone",
-        "It flags the empty body against the Phase 5 checks the script cannot make — no imperative instruction to Claude, no stated exceptions for what a terse style must still deliver in full"
+        "It flags the empty body against the Phase 5 checks the script cannot make \u2014 no imperative instruction to Claude, no stated exceptions for what a terse style must still deliver in full"
       ]
     },
     {
@@ -31,7 +31,7 @@
       "expectations": [
         "Names scripts/validate_output_style.py and its check subcommand",
         "Does not state that output-style frontmatter must be checked by hand",
-        "Describes what the script enforces — delimiters, YAML mapping, field types, single-line description",
+        "Describes what the script enforces \u2014 delimiters, YAML mapping, field types, single-line description",
         "Distinguishes the frontmatter rules the script covers from the body rules it does not"
       ]
     },
@@ -68,7 +68,7 @@
       "expectations": [
         "Places the file at the plugin's output-styles/ directory",
         "Declines to add an outputStyles key to plugin.json for a style in that default directory",
-        "States the reason — declaring the key replaces the default scan and hides every style not listed",
+        "States the reason \u2014 declaring the key replaces the default scan and hides every style not listed",
         "Asks whether force-for-plugin is wanted rather than setting it unasked"
       ]
     },
@@ -100,7 +100,7 @@
       "expectations": [
         "The output-style-creator skill activates on the arbitration question",
         "It routes the request to an output style and explains why CLAUDE.md is the wrong mechanism",
-        "It states the distinction — CLAUDE.md adds knowledge, an output style changes how every response is shaped"
+        "It states the distinction \u2014 CLAUDE.md adds knowledge, an output style changes how every response is shaped"
       ]
     },
     {
@@ -142,6 +142,21 @@
         "The output-style-creator skill does NOT activate",
         "No output style file is created",
         "The response addresses theme configuration"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "List the output styles that the plugin at evals/files/broken-manifest/ ships.",
+      "expected_output": "The manifest is reported as broken. Reporting ghost.md as a shipped style, or reporting the plugin as shipping nothing, are both failures.",
+      "files": [
+        "evals/files/broken-manifest/.claude-plugin/plugin.json",
+        "evals/files/broken-manifest/output-styles/ghost.md"
+      ],
+      "expectations": [
+        "Reports the outputStyles key as malformed \u2014 a number where a string or an array of strings belongs",
+        "Does NOT report ghost.md as a style the plugin ships",
+        "Does NOT report the plugin as shipping no output styles, which is a different diagnosis",
+        "Reads plugin_manifest_problems from the discovery output rather than inferring from an empty plugin list"
       ]
     }
   ]
