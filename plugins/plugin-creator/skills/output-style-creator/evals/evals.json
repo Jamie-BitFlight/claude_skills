@@ -1,0 +1,148 @@
+{
+  "skill_name": "output-style-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My new output style isn't showing up in the /config picker. I created the file about ten minutes ago and I've been in this terminal session the whole time.",
+      "expected_output": "Diagnosis, not re-authoring. The skill reaches Phase 7 and the troubleshooting table, identifies the startup-read cause from the symptom, and answers with the fix.",
+      "expectations": [
+        "The response diagnoses rather than proposing to rewrite or recreate the style file",
+        "It names the cause: in the terminal, style files are read at startup, so a file created mid-session is not seen",
+        "It gives the fix — restart Claude Code, or /reload-plugins for a plugin-bundled style",
+        "It runs or references Phase 1 discovery to rule out a same-named style in a nearer directory"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Validate this output style file for me: evals/files/empty-body/terse.md",
+      "expected_output": "The script reports valid, and the skill does not stop there. The body is empty, so the Phase 5 manual checks fail and the response says so.",
+      "files": ["evals/files/empty-body/terse.md"],
+      "expectations": [
+        "The bundled validator is run rather than the frontmatter being checked by hand",
+        "The response reports that the frontmatter passes",
+        "The response does NOT report the style as ready on the strength of the exit code alone",
+        "It flags the empty body against the Phase 5 checks the script cannot make — no imperative instruction to Claude, no stated exceptions for what a terse style must still deliver in full"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Is there a tool that checks output-style frontmatter, or do I have to check it by hand?",
+      "expected_output": "Points at the bundled validator. Does not repeat the superseded claim that no tooling exists.",
+      "expectations": [
+        "Names scripts/validate_output_style.py and its check subcommand",
+        "Does not state that output-style frontmatter must be checked by hand",
+        "Describes what the script enforces — delimiters, YAML mapping, field types, single-line description",
+        "Distinguishes the frontmatter rules the script covers from the body rules it does not"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "List the output styles that the plugin at evals/files/hidden-styles/ ships.",
+      "expected_output": "One style found, in the dot-prefixed directory the manifest declares. An empty result is a failure.",
+      "files": [
+        "evals/files/hidden-styles/.claude-plugin/plugin.json",
+        "evals/files/hidden-styles/.extras/acme-house.md"
+      ],
+      "expectations": [
+        "Reports acme-house.md as the plugin's style",
+        "Does not report that the plugin ships no output styles",
+        "Reads the outputStyles manifest key rather than listing output-styles/ alone",
+        "States that the declared path replaces the default scan, so output-styles/ is not consulted"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Make Claude always respond as a security reviewer in this repo.",
+      "expected_output": "Requirements are settled before any file is written, and no repository facts land in the style body.",
+      "expectations": [
+        "Asks whether the session still writes and verifies code, to set keep-coding-instructions",
+        "Asks which scope the style belongs at before writing",
+        "The authored body contains no repository names, file paths, or project conventions",
+        "The body addresses Claude in the imperative rather than describing the style"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Bundle our team's response format as an output style in the acme plugin.",
+      "expected_output": "The file goes in the plugin's output-styles/ directory, and the outputStyles manifest key is deliberately not added.",
+      "expectations": [
+        "Places the file at the plugin's output-styles/ directory",
+        "Declines to add an outputStyles key to plugin.json for a style in that default directory",
+        "States the reason — declaring the key replaces the default scan and hides every style not listed",
+        "Asks whether force-for-plugin is wanted rather than setting it unasked"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Write me a terse output style.",
+      "expected_output": "The exception cases are settled before the style is written. A style that suppresses output without carve-outs is the failure.",
+      "expectations": [
+        "Asks what must never be shortened before authoring the body",
+        "The authored body states exceptions for error text, security warnings, and destructive-action confirmations",
+        "Every rule in the body is observable in a response",
+        "Considers the built-in Concise style before authoring a new one"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Every answer should start with a Mermaid diagram from now on.",
+      "expected_output": "The skill activates. The request names no skill vocabulary, but it is a persistent response-shape change, which is exactly an output style.",
+      "expectations": [
+        "The output-style-creator skill activates",
+        "The request is identified as an output style rather than a CLAUDE.md addition",
+        "The Diagrams first template is offered as a starting point"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "I want Claude to always explain trade-offs before recommending anything. Should that go in CLAUDE.md or somewhere else?",
+      "expected_output": "The mechanism table arbitrates. A response-shape preference is an output style, not a CLAUDE.md fact.",
+      "expectations": [
+        "The output-style-creator skill activates on the arbitration question",
+        "It routes the request to an output style and explains why CLAUDE.md is the wrong mechanism",
+        "It states the distinction — CLAUDE.md adds knowledge, an output style changes how every response is shaped"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Our plugin should force its own response format on everyone who installs it.",
+      "expected_output": "force-for-plugin is reachable, and its cost is stated rather than assumed acceptable.",
+      "expectations": [
+        "Names force-for-plugin as the mechanism",
+        "States that it overrides the user's own outputStyle setting",
+        "Notes that when several enabled plugins set it, the first plugin loaded wins",
+        "Confirms the override is intended before writing it"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Add a section to CLAUDE.md describing our coding standards.",
+      "expected_output": "The skill stays closed. This is a persistent behavior change, but the mechanism table routes it away from an output style.",
+      "expectations": [
+        "The output-style-creator skill does NOT drive the response",
+        "No output style file is created",
+        "CLAUDE.md is edited, or the user is helped to edit it"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Create a subagent that always reports findings severity-ranked with file and line references.",
+      "expected_output": "The skill stays closed. The response shape matches the Review voice template, but a style never reaches a subagent.",
+      "expectations": [
+        "The output-style-creator skill does NOT drive the response",
+        "The work routes to agent creation rather than to an output style",
+        "If output styles are mentioned at all, it is to say they shape only the main conversation and forks"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "Change the terminal color theme.",
+      "expected_output": "The skill stays closed. Themes share the /config surface with output styles and are an unrelated mechanism.",
+      "expectations": [
+        "The output-style-creator skill does NOT activate",
+        "No output style file is created",
+        "The response addresses theme configuration"
+      ]
+    }
+  ]
+}
