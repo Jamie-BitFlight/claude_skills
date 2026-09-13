@@ -57,25 +57,64 @@ If the file is a PEP 723 script (has a `# /// script … # ///` block, per the p
 the false `unresolved-import` shows up in **live editor/LSP diagnostics** but `uv run ty check
 <path>` passes clean on the same file, this is **not** an `extra-paths` problem — do not add
 entries for it. Confirmed root cause (evidence trail and minimal 7-line reproduction in the PR that
-added this note): ty 0.0.75–0.0.80 type-checks a `# /// script` file as an isolated single-file
-project and never consults `[tool.ty.environment]` (from either `pyproject.toml` or `ty.toml`) for
-it — `extra-paths`, `root`, and every other environment key are silently ignored for that file,
-regardless of where they're declared. Tracked upstream, open, unfixed as of ty 0.0.80:
-<https://github.com/astral-sh/ty/issues/691>.
+added this note): ty (through at least 0.0.80) type-checks a `# /// script` file as an isolated
+single-file project and, by default, never consults `[tool.ty.environment]` (from either
+`pyproject.toml` or `ty.toml`) for it — `extra-paths`, `root`, and every other environment key are
+silently ignored for that file, regardless of where they're declared. Tracked upstream, open as of
+this writing: <https://github.com/astral-sh/ty/issues/691>.
 
-The only thing that resolves this for a PEP 723 file is the `VIRTUAL_ENV` environment variable
-(config-file settings and `[[tool.ty.overrides]]` cannot carry an `environment` table — schema only
-accepts `include`/`exclude`/`rules`/`analysis`). `uv run ty check` already works because `uv run`
-sets `VIRTUAL_ENV`. The Astral plugin's bundled language server does not: its `lspServers.ty` entry
-launches `uvx ty@latest server` with no ambient `uv run`, no CLI flags (`ty server --help` takes
-only `-h`), and no supported way to override or add args to a single plugin-provided LSP server
-without disabling the whole plugin. The fix is to add `"VIRTUAL_ENV": ".venv"` to
-`.claude/settings.json`'s `env` block — a relative path so it resolves correctly from whichever
-project root Claude Code (or a `.claude/worktrees/*` worktree) launches the server from, once
-`uv sync` has created that directory's own `.venv` per the Environment Setup step in `AGENTS.md`.
-**Check whether that key is actually present before assuming the mitigation is live** — it needs a
-`.claude/settings.json` write, which some agent sessions are not permitted to make, so the entry
-can be absent even though this rule describes it. See
-[`docs/linting-and-type-checking.md`](docs/linting-and-type-checking.md) for the trustworthy-channel
-guidance and [`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the
-regression coverage.
+**The fix is Astral's own experimental PEP 723/uv integration, not an environment-variable
+workaround.** Announced by MichaReiser against #691 on 2026-08-28 (requires uv ≥0.12.3): ty can
+shell out to `uv` to synchronise a script's own inline `dependencies = [...]` list, in both the CLI
+and the language server. It is opt-in on both sides:
+
+- **CLI**: set `TY_UV=scripts` in the environment `ty check` runs in.
+- **Language server**: set the experimental `useUv` initialization option to `"scripts"` (or
+  `"on"`). For VS Code's `astral-sh.ty` extension (already recommended in
+  [`.vscode/extensions.json`](.vscode/extensions.json)) this is checked into
+  [`.vscode/settings.json`](.vscode/settings.json) as `"ty.experimental.useUv": "scripts"` — no
+  further setup needed for VS Code contributors. Any other LSP client configures the same knob
+  directly via its own server-settings mechanism, sending
+  `initialization_options.experimental.useUv` (or, per the upstream comment, a client-specific
+  wrapper such as `lsp.ty.initialization_options.experimental.useUv` for Zed) — there is no
+  repo-committed config file for those clients, so set it in your own editor config.
+
+This repo's own `uv run ty check` (prek, CI, and any contributor running it from the CLI) already
+resolves PEP 723 scripts correctly **without** `TY_UV`, because `uv run` sets `VIRTUAL_ENV` to the
+project's own `.venv`, and every PEP 723 script's dependencies are mirrored into the root
+`[dependency-groups] dev` group (see above) — so the project venv already satisfies the import.
+`TY_UV=scripts` is not wired into prek or CI here because that path isn't broken; it remains
+available as a CLI escape hatch for a script whose dependency was never mirrored. The gap this fix
+closes is specifically the **language server**, which (via `uvx ty@latest server` or equivalent)
+has no ambient `uv run` and no project `.venv` on `PATH`.
+
+**`.claude/settings.json` needs no edit for this.** The previous attempt at this fix
+(`VIRTUAL_ENV=".venv"` in that file's `env` block) was Claude-Code-only, depended on a relative
+`.venv` existing at the process's working directory, and took the type checker down entirely
+(`Failed to discover local Python environment`) when that `.venv` was missing — none of which
+applies to the `useUv`/`TY_UV` mechanism, which is ty's own opt-in feature and needs no Claude Code
+configuration at all.
+
+**Do not use `[tool.ty.environment]` inside a PEP 723 script's own inline metadata block either.**
+It appears to resolve the same symptom, but it is accidental, not supported: uv's PR
+[#26671](https://github.com/astral-sh/uv/pull/26671) (merged 2026-07-21) added `[tool.ty.rules]`
+and `[tool.ty.analysis]` to the set of `[tool.ty]` keys read from PEP 723 metadata, and its author
+stated `environment` settings were deliberately excluded because different environments require
+different databases. Relying on it ships an unsupported configuration surface that could be
+removed without notice.
+
+See [`docs/linting-and-type-checking.md`](docs/linting-and-type-checking.md) for the
+trustworthy-channel guidance and
+[`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the regression
+coverage — including a canary for #691 fully closing.
+
+#691 remains **open**, and the shipped support is explicitly labeled experimental/preview by its
+author ("Expect rough edges, missing documentation, and breaking changes") — treat `TY_UV`/`useUv`
+as the current best mitigation, not a closed issue. Two related upstream rough edges, not yet fixed
+as of this writing, are why the environment-pointing approaches (this one included) remain a
+mitigation rather than a full fix:
+
+- [astral-sh/ty#4083](https://github.com/astral-sh/ty/issues/4083) — project `[tool.ty]` settings
+  are ignored in PEP 723 scripts.
+- [astral-sh/ty#4324](https://github.com/astral-sh/ty/issues/4324) — `[environment] root` from an
+  auto-discovered `ty.toml` is ignored for scripts; an explicit `--config-file` is required.
