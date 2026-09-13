@@ -262,6 +262,25 @@ def test_absolute_declared_path_is_rejected(tmp_path: Path) -> None:
     assert result.plugin_rejected_paths == [str(outside)]
 
 
+def test_symlink_escaping_the_plugin_root_is_rejected(tmp_path: Path) -> None:
+    """A symlink inside the plugin that points outside it is rejected.
+
+    ``Path.resolve`` follows symlinks, so the confinement check sees the real target rather than
+    the link's location inside the root.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    write_style(outside, "not-mine", "name: A\ndescription: fine")
+    plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": "./linked/"}, {})
+    try:
+        (plugin / "linked").symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not allow creating a symlink here")
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_rejected_paths == ["./linked/"]
+
+
 def test_declared_path_inside_the_root_is_not_rejected(tmp_path: Path) -> None:
     """The confinement check does not reject a legitimate nested directory."""
     plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": "./deep/nested/"}, {"deep/nested": "ok"})
