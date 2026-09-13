@@ -6,7 +6,8 @@
     "**/.claude/worktrees/**/CLAUDE.local.md"
   ],
   "enabledPlugins": {
-    "astral@jamie-bitflight-skills": true
+    "astral@jamie-bitflight-skills": true,
+    "mattpocock-skills@claude-plugins-official": true
   },
   "env": {
     "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD": "1",
