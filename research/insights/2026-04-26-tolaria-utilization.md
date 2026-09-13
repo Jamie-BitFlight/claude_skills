@@ -8,7 +8,7 @@ title: "Utilization Proposals: Tolaria"
 ## Utilization 1: research-context-agent → Tolaria MCP Server
 
 **Research entry**: ./research/developer-tools/tolaria.md
-**Caller**: ./.claude/agents/research-context-agent.md
+**Caller**: ./.claude/agents/research-context-agent.md (deleted 2026-09-13, commit `8f9529010`, PR #3529 — nothing replaced it; the search procedure it used is preserved in `.claude/skills/research-curator/references/integration-opportunity-search.md`)
 **Integration mechanism**: MCP server (stdio or WebSocket bridge to tolaria)
 **Replaces or adds**: Adds structured vault-backed note linking and relationship navigation during research integration analysis
 **Setup cost**: Medium (tolaria installation, vault creation, MCP registration, then MCP tool calls in agent prompt)
@@ -16,7 +16,7 @@ title: "Utilization Proposals: Tolaria"
 
 ### Why this caller
 
-The research-context-agent currently discovers integration opportunities by searching the repo codebase (skills, agents, plugins, commands) and validates claims against primary sources. It searches for existing skill/agent/hook/command coverage, then proposes new capabilities.
+The research-context-agent discovered integration opportunities by searching the repo codebase (skills, agents, plugins, commands) and validated claims against primary sources. It searched for existing skill/agent/hook/command coverage, then proposed new capabilities.
 
 Tolaria's vault system would provide a **persistent knowledge graph** where research context (tool capabilities, patterns, design decisions) can be stored as typed entities with relationships. Instead of re-analyzing each research file against the codebase in isolation, the agent could:
 
@@ -27,7 +27,7 @@ Tolaria's vault system would provide a **persistent knowledge graph** where rese
 
 This moves research-context-agent from a transactional search-and-match workflow (per-file) to a **knowledge graph navigation workflow** where discovered patterns and prior integrations inform future discoveries.
 
-**Current Implementation**: Lines 26–70 of research-context-agent.md describe the three-phase process (absorb, search & match, write opportunities). Search happens via Grep, Glob, WebSearch on the live codebase — no memory of prior discoveries persists between runs.
+**Prior Implementation** (before its 2026-09-13 deletion): Lines 26–70 of research-context-agent.md described the three-phase process (absorb, search & match, write opportunities). Search happened via Grep, Glob, WebSearch on the live codebase — no memory of prior discoveries persisted between runs.
 
 **Tolaria Advantage**: The MCP server (via `vault_context` and `search_notes`) exposes vault-structured knowledge. A vault storing research findings as typed entities (type: tool, type: pattern, type: integration-opportunity) with relationships (belongs_to, related_to, has) would allow the agent to build on prior discoveries instead of rediscovering patterns each time a research file is analyzed.
 

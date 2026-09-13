@@ -52,7 +52,7 @@ Swarm-patterns SKILL.md includes guidance that file paths in dispatch prompts mu
 ## Improvement 3: Git co-change analysis for context gathering
 
 **Source pattern**: "Cochange analysis: Parse git log to find files always edited together. Captures implicit coupling that import graphs miss." (from research entry, Patterns Worth Adopting section, line 288)
-**Local system**: .claude/agents/research-context-agent.md (context management), CLAUDE.md (no codebase indexing)
+**Local system**: .claude/agents/research-context-agent.md (deleted 2026-09-13, PR #3529 — no successor) (context management), CLAUDE.md (no codebase indexing)
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: the research entry describes a concrete mechanism (parse git log --name-only for last 300 commits, record pairwise file combinations in commits with 2-20 files). However, the local system that would benefit -- context-gathering agents -- was not fully examined. The context-gathering agent may already use git log as part of its process, and the co-change data would need a consumer (a skill or agent that acts on coupling data). The gap is inferred rather than directly observed in a specific local file.
