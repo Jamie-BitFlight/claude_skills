@@ -72,9 +72,11 @@ Or write a small inline driver that imports and calls the public API functions d
 - `append_backlink_row(target_entry_markdown, row)` — idempotent append, returns `(new_md, modified)`
 - `category_of(entry_path, vault_root)` — returns category directory name for a path
 
-All transform rules, INVERSE_VERBS mappings, and fallback logic are defined exclusively in
+All transform rules and fallback logic are defined exclusively in
 [backlink_lib.py](./../skills/research-curator/scripts/backlink_lib.py). Do not duplicate or
-inline the transform table here.
+inline any of that logic here. The transform never inverts a relationship verb — it only ever
+marks an already-symmetric phrase as bidirectional or attributes the forward phrase verbatim; see
+that module's docstrings for why (#3524).
 
 ---
 

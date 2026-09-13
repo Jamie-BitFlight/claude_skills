@@ -45,38 +45,24 @@ _TABLE_SEPARATOR_MIN_PIPES = 2
 
 # ---------------------------------------------------------------------------
 # Deterministic relationship-description transform
+#
+# There used to be a verb-substitution table here (INVERSE_VERBS) that tried to
+# invert forward relationship prose into a reciprocal claim -- e.g. "provides X"
+# became "consumes X provided by". Removed per #3524: measuring it against the
+# real vault corpus (823 asymmetric edges) showed 802/823 forward phrases never
+# even matched a verb (real rows rarely open with a bare directional verb), so
+# the table's only real-world effect was to route almost everything to the
+# generic fallback it was supposed to be an alternative to. Of the phrases it
+# did match, at least one produced a confidently-worded but false integration
+# claim (a "provides AST graph context ... through MCP" row inverted into an
+# MCP integration that does not exist). A human hand-inverting the same corpus
+# for PR #3510, working file by file with full context, made the identical
+# class of mistake twice out of seven tries. If careful manual inversion has a
+# two-in-seven false-claim rate, a fixed verb table applied blindly across 823
+# pairs is not going to do better. A deterministic transform has no way to
+# verify whether a described integration is real, so it must not assert one --
+# see transform_to_backlink_description below.
 # ---------------------------------------------------------------------------
-
-INVERSE_VERBS: dict[str, str] = {
-    "provides": "consumes",
-    "consumes": "provides",
-    "extends": "is extended by",
-    "is extended by": "extends",
-    "wraps": "is wrapped by",
-    "is wrapped by": "wraps",
-    "feeds": "is fed by",
-    "is fed by": "feeds",
-    "orchestrates": "is orchestrated by",
-    "is orchestrated by": "orchestrates",
-    "delegates to": "receives delegation from",
-    "receives delegation from": "delegates to",
-    "calls": "is called by",
-    "is called by": "calls",
-    "implements": "is implemented by",
-    "is implemented by": "implements",
-    "replaces": "is replaced by",
-    "is replaced by": "replaces",
-    "competes with": "competes with",
-    "complements": "is complemented by",
-    "is complemented by": "complements",
-    "alternatives to": "alternative for",
-    "alternative for": "alternatives to",
-    "extends pattern from": "pattern extended by",
-    "pattern extended by": "extends pattern from",
-}
-
-# Verbs that follow "V X" -> "inverse X" pattern
-_SYMMETRIC_REST_VERBS = frozenset({"extends", "wraps", "feeds", "orchestrates", "calls", "implements", "replaces"})
 
 
 # ---------------------------------------------------------------------------
@@ -164,33 +150,6 @@ def _parse_table_rows(table_node: gfm_elements.Table) -> list[CrossRefRow]:
                 continue
         rows.append(_extract_row(row_node))
     return rows
-
-
-def _invert_directional_verb(verb: str, inverse: str, rest: str, source_name: str, source_category: str) -> str:
-    """Apply directional verb inversion to produce a backlink phrase.
-
-    Args:
-        verb: The matched forward verb (lowercase).
-        inverse: The inverse of the verb from INVERSE_VERBS.
-        rest: The remainder of the phrase after removing the verb.
-        source_name: Display name of the source entry.
-        source_category: Category of the source entry.
-
-    Returns:
-        The inverted relationship phrase.
-    """
-    if verb == "provides":
-        return f"consumes {rest} provided by"
-    if verb in _SYMMETRIC_REST_VERBS:
-        if rest:
-            return f"{inverse} {rest}"
-        return f"{inverse} {source_name} ({source_category})"
-    if verb == "complements":
-        return f"is complemented by {source_name} ({source_category})"
-    # Generic verb swap
-    if rest:
-        return f"{inverse} {rest}"
-    return f"{inverse} {source_name} ({source_category})"
 
 
 def _find_table_insert_index(lines_stripped: list[str], heading_idx: int) -> int:
@@ -364,41 +323,66 @@ def category_of(entry_path: pathlib.Path, vault_root: pathlib.Path) -> str:
     return relative.parts[0] if len(relative.parts) > 1 else entry_path.parent.name
 
 
+def bare_reference_description(source_name: str, source_category: str) -> str:
+    """Return the relationship text used when no forward phrase is available at all.
+
+    This is the single source of truth for that one literal string -- callers that
+    hit an asymmetric edge with no parseable forward row (e.g. a malformed or
+    unresolvable Cross-References table) must call this instead of inlining the
+    template, so the wording only ever needs to change in one place.
+
+    This is a genuinely different situation from "could not confidently invert a
+    forward phrase" (handled by transform_to_backlink_description): here there is no
+    forward phrase to attribute at all, so naming the source entry is the only true
+    statement available.
+
+    Args:
+        source_name: Display name of the source entry (the one adding the backlink).
+        source_category: Category of the source entry.
+
+    Returns:
+        A deterministic, content-free reference description.
+    """
+    return f"referenced by {source_name} ({source_category})"
+
+
 def transform_to_backlink_description(
     forward_phrase: str, source_name: str, source_category: str, target_category: str
 ) -> str:
     """Transform a forward relationship phrase into a backlink relationship phrase.
 
-    Rules applied in order:
-    1. If forward_phrase starts with a known verb from INVERSE_VERBS, invert it.
-    2. If source_category == target_category and "shares" appears in forward_phrase,
-       append "(bidirectional)".
-    3. Fallback: return "referenced by {source_name} ({source_category})".
+    This function never invents a new directional relationship claim. Earlier versions
+    tried to invert the forward phrase's verb (e.g. "provides X" -> "consumes X"), but
+    a deterministic transform has no way to verify that a described integration is
+    real, and measuring that approach against the actual research vault showed it
+    producing false claims -- see the module-level comment above transform section for
+    the evidence. The only transformations applied here are ones that cannot fabricate
+    a relationship that doesn't already hold:
+
+    1. If source_category == target_category and "shares" appears in forward_phrase,
+       append "(bidirectional)". Sharing is symmetric by definition -- if the source
+       shares something with the target, the target shares it right back -- so marking
+       the existing phrase as bidirectional asserts nothing new.
+    2. Otherwise, attribute the forward phrase without changing its claimed direction:
+       "cites this entry: {forward_phrase}". This carries the real, specific content
+       from the forward row (satisfying the "no generic label" bar in
+       cross-reference-format.md) while asserting only the one fact that is always
+       true: the source entry's own file contains that phrase, citing this entry.
 
     Args:
         forward_phrase: The relationship description from the forward cross-reference row.
         source_name: Display name of the source entry (the one adding the backlink).
         source_category: Category of the source entry.
-        target_category: Category of the target entry (unused directly; kept for callers
-            that may extend rule logic for cross-category cases in future).
+        target_category: Category of the target entry, used only for the same-category
+            "shares" check in rule 1.
 
     Returns:
         A deterministic backlink relationship description string.
     """
-    phrase_lower = forward_phrase.lower()
-
-    # Rule 1: directional verb inversion
-    for verb, inverse in INVERSE_VERBS.items():
-        if phrase_lower.startswith(verb):
-            rest = forward_phrase[len(verb) :].strip()
-            return _invert_directional_verb(verb, inverse, rest, source_name, source_category)
-
-    # Rule 2: same-category "shares" pattern
-    if source_category == target_category and "shares" in phrase_lower:
+    if source_category == target_category and "shares" in forward_phrase.lower():
         return f"{forward_phrase} (bidirectional)"
 
-    # Rule 3: fallback
-    return f"referenced by {source_name} ({source_category})"
+    return f"cites this entry: {forward_phrase}"
 
 
 def backlink_exists(target_entry_markdown: str, source_entry_path_link: str) -> bool:

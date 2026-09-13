@@ -59,4 +59,4 @@ Good examples:
 - "complements this tool's data collection with analysis"
 - "overlapping use case: structured agent output validation"
 
-Backlink rows do not restate the forward phrase verbatim — they carry its inverse, produced by `transform_to_backlink_description()` in [backlink_lib.py](./../scripts/backlink_lib.py), which is the single source of truth for that transform.
+Backlink rows attribute the forward phrase rather than inverting it — `transform_to_backlink_description()` in [backlink_lib.py](./../scripts/backlink_lib.py), the single source of truth for this transform, does not invert relationship verbs. A deterministic transform cannot verify whether a described integration is real, so it never fabricates a reciprocal claim; it either marks an already-symmetric "shares" phrase as bidirectional, or prefixes the forward phrase with "cites this entry:" and leaves its content unchanged. See the module-level comment above that function for the evidence (#3524).

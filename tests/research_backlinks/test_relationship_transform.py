@@ -1,238 +1,137 @@
-"""Tests for transform_to_backlink_description: all 9 Appendix patterns + fallback."""
+"""Tests for transform_to_backlink_description and bare_reference_description.
+
+Covers #3524: the function must never fabricate a directional relationship claim
+from arbitrary forward-phrase prose. It only marks an already-symmetric "shares"
+phrase as bidirectional, or attributes the forward phrase verbatim -- it never
+inverts a verb.
+"""
 
 from __future__ import annotations
-
-import pytest
 
 import backlink_lib as bl
 
 # ---------------------------------------------------------------------------
-# Pattern 1: "provides X" → "consumes X provided by"
-# ---------------------------------------------------------------------------
-
-
-class TestProvidesPattern:
-    """Pattern 1: 'provides' verb inversion."""
-
-    def test_provides_simple(self) -> None:
-        """'provides embedding layer' → 'consumes embedding layer provided by'."""
-        result = bl.transform_to_backlink_description("provides embedding layer", "Alpha", "agent-frameworks", "tools")
-        assert result == "consumes embedding layer provided by"
-
-    def test_provides_preserves_rest(self) -> None:
-        """Remainder after 'provides' is preserved in output."""
-        result = bl.transform_to_backlink_description("provides async task queue", "Celery", "tools", "api-frameworks")
-        assert "async task queue" in result
-        assert result.startswith("consumes")
-
-    def test_provides_no_rest(self) -> None:
-        """'provides' alone still produces 'consumes  provided by' (rest is empty)."""
-        result = bl.transform_to_backlink_description("provides", "Alpha", "agent-frameworks", "tools")
-        assert result == "consumes  provided by"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 2: "consumes X" → "provides X"
-# ---------------------------------------------------------------------------
-
-
-class TestConsumesPattern:
-    """Pattern 2: 'consumes' verb inversion."""
-
-    def test_consumes_inverted(self) -> None:
-        """'consumes context window' → 'provides context window'."""
-        result = bl.transform_to_backlink_description("consumes context window", "Ctx", "context-management", "tools")
-        assert result.startswith("provides")
-        assert "context window" in result
-
-
-# ---------------------------------------------------------------------------
-# Pattern 3: "extends X" → "is extended by X"
-# ---------------------------------------------------------------------------
-
-
-class TestExtendsPattern:
-    """Pattern 3: 'extends' symmetric rest verb."""
-
-    def test_extends_with_rest(self) -> None:
-        """'extends tree-sitter parsing' → 'is extended by tree-sitter parsing'."""
-        result = bl.transform_to_backlink_description(
-            "extends tree-sitter parsing", "SoulForge", "coding-agents", "tools"
-        )
-        assert result == "is extended by tree-sitter parsing"
-
-    def test_extends_no_rest(self) -> None:
-        """'extends' with empty rest uses source_name fallback."""
-        result = bl.transform_to_backlink_description("extends", "MyTool", "tools", "agent-frameworks")
-        assert result == "is extended by MyTool (tools)"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 4: "wraps X" → "is wrapped by X"
-# ---------------------------------------------------------------------------
-
-
-class TestWrapsPattern:
-    """Pattern 4: 'wraps' symmetric rest verb."""
-
-    def test_wraps_with_rest(self) -> None:
-        """'wraps the OpenAI SDK' → 'is wrapped by the OpenAI SDK'."""
-        result = bl.transform_to_backlink_description("wraps the OpenAI SDK", "Wrapper", "tools", "api-frameworks")
-        assert result == "is wrapped by the OpenAI SDK"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 5: "orchestrates X" → "is orchestrated by X"
-# ---------------------------------------------------------------------------
-
-
-class TestOrchestratesPattern:
-    """Pattern 5: 'orchestrates' symmetric rest verb."""
-
-    def test_orchestrates_with_rest(self) -> None:
-        """'orchestrates worker agents' → 'is orchestrated by worker agents'."""
-        result = bl.transform_to_backlink_description(
-            "orchestrates worker agents", "Conductor", "agent-frameworks", "tools"
-        )
-        assert result == "is orchestrated by worker agents"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 6: "calls X" → "is called by X"
-# ---------------------------------------------------------------------------
-
-
-class TestCallsPattern:
-    """Pattern 6: 'calls' symmetric rest verb."""
-
-    def test_calls_with_rest(self) -> None:
-        """'calls the REST API' → 'is called by the REST API'."""
-        result = bl.transform_to_backlink_description("calls the REST API", "Client", "tools", "api-frameworks")
-        assert result == "is called by the REST API"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 7: "implements X" → "is implemented by X"
-# ---------------------------------------------------------------------------
-
-
-class TestImplementsPattern:
-    """Pattern 7: 'implements' symmetric rest verb."""
-
-    def test_implements_with_rest(self) -> None:
-        """'implements MCP protocol' → 'is implemented by MCP protocol'."""
-        result = bl.transform_to_backlink_description("implements MCP protocol", "Server", "tools", "api-frameworks")
-        assert result == "is implemented by MCP protocol"
-
-
-# ---------------------------------------------------------------------------
-# Pattern 8: "complements X" → "is complemented by {source_name} ({source_category})"
-# ---------------------------------------------------------------------------
-
-
-class TestComplementsPattern:
-    """Pattern 8: 'complements' uses source_name in output."""
-
-    def test_complements_uses_source_name(self) -> None:
-        """'complements drift detection' → 'is complemented by Logfire (ai-observability)'."""
-        result = bl.transform_to_backlink_description(
-            "complements drift detection", "Logfire", "ai-observability", "ai-observability"
-        )
-        assert result == "is complemented by Logfire (ai-observability)"
-
-    def test_complements_cross_category(self) -> None:
-        """'complements async pipeline' uses source_name regardless of category."""
-        result = bl.transform_to_backlink_description(
-            "complements async pipeline", "AsyncTool", "tools", "api-frameworks"
-        )
-        assert "AsyncTool" in result
-        assert "tools" in result
-
-
-# ---------------------------------------------------------------------------
-# Pattern 9: same-category "shares" → append "(bidirectional)"
+# Rule 1: same-category "shares" -> append "(bidirectional)"
 # ---------------------------------------------------------------------------
 
 
 class TestSharesBidirectionalPattern:
-    """Pattern 9: same-category 'shares' appends '(bidirectional)'."""
+    """Sharing is symmetric by definition, so marking it bidirectional asserts nothing new."""
 
     def test_shares_same_category_bidirectional(self) -> None:
-        """Same-category 'shares pattern' → 'shares pattern (bidirectional)'."""
+        """Same-category 'shares pattern' -> 'shares pattern (bidirectional)'."""
         result = bl.transform_to_backlink_description(
             "shares async-first design", "AgentB", "agent-frameworks", "agent-frameworks"
         )
         assert result == "shares async-first design (bidirectional)"
 
-    def test_shares_cross_category_no_bidirectional(self) -> None:
-        """Cross-category 'shares X' falls through to fallback (no 'bidirectional')."""
+    def test_shares_cross_category_falls_through_to_attribution(self) -> None:
+        """Cross-category 'shares X' does not get '(bidirectional)' -- category differs."""
         result = bl.transform_to_backlink_description(
             "shares async-first design", "AgentB", "agent-frameworks", "tools"
         )
-        # Cross-category: 'shares' not preceded by a known verb → fallback
         assert "bidirectional" not in result
+        assert result == "cites this entry: shares async-first design"
+
+    def test_shares_case_insensitive(self) -> None:
+        """The 'shares' check is case-insensitive."""
+        result = bl.transform_to_backlink_description(
+            "Shares a queueing model", "AgentB", "agent-frameworks", "agent-frameworks"
+        )
+        assert result == "Shares a queueing model (bidirectional)"
 
 
 # ---------------------------------------------------------------------------
-# Pattern 10: fallback — no known verb, cross-category
+# Rule 2: attribution fallback -- no verb inversion, ever
 # ---------------------------------------------------------------------------
 
 
-class TestFallbackPattern:
-    """Pattern 10: fallback 'referenced by {source_name} ({source_category})'."""
+class TestAttributionFallback:
+    """Every non-'shares' phrase is attributed verbatim, never inverted."""
 
     def test_fallback_on_unknown_phrase(self) -> None:
-        """Unrecognized phrase → 'referenced by Alpha (agent-frameworks)'."""
+        """Unrecognized phrase -> attributed verbatim, no invented direction."""
         result = bl.transform_to_backlink_description(
             "is adjacent to deployment pipeline", "Alpha", "agent-frameworks", "tools"
         )
-        assert result == "referenced by Alpha (agent-frameworks)"
+        assert result == "cites this entry: is adjacent to deployment pipeline"
 
-    def test_fallback_preserves_source_name(self) -> None:
-        """Fallback includes the exact source_name provided."""
+    def test_fallback_preserves_forward_phrase_verbatim(self) -> None:
+        """The forward phrase is never altered -- only prefixed with attribution."""
         result = bl.transform_to_backlink_description(
             "totally unknown relationship", "SomeTool", "tools", "coding-agents"
         )
-        assert "SomeTool" in result
-        assert "tools" in result
+        assert result == "cites this entry: totally unknown relationship"
 
-    def test_case_insensitive_verb_matching(self) -> None:
-        """Verb matching is case-insensitive (phrase_lower used)."""
+    def test_fallback_does_not_restate_source_name_or_category(self) -> None:
+        """Attribution never duplicates the Entry/Category columns already in the row."""
+        result = bl.transform_to_backlink_description("some relationship", "AuthSvc", "tools", "api-frameworks")
+        assert "AuthSvc" not in result
+        assert "tools" not in result
+
+
+# ---------------------------------------------------------------------------
+# Regression: directional verbs must not be inverted (root cause of #3524)
+# ---------------------------------------------------------------------------
+
+
+class TestNoVerbInversionRegression:
+    """A forward phrase that starts with a directional verb must not be inverted.
+
+    These are the exact failure modes reported in #3524: the removed INVERSE_VERBS
+    table asserted a "consumes" relationship for "provides" phrases (dangling
+    fragment, and no way to verify the claimed integration is real), and collapsed
+    "complements" phrases to a category-restating template that discarded all
+    relationship content.
+    """
+
+    def test_provides_is_not_inverted_to_consumes(self) -> None:
+        """'provides X' must not become 'consumes X provided by' (dangling, unverifiable)."""
+        result = bl.transform_to_backlink_description("provides embedding layer", "Alpha", "agent-frameworks", "tools")
+        assert not result.startswith("consumes")
+        assert "provided by" not in result
+        assert result == "cites this entry: provides embedding layer"
+
+    def test_issue_reproduction_cgc_skylos_case(self) -> None:
+        """The exact #3524 reproduction case: no fabricated MCP integration claim."""
         result = bl.transform_to_backlink_description(
-            "Provides authentication layer", "AuthSvc", "tools", "api-frameworks"
+            "provides AST graph context and dead-code analysis through MCP", "Skylos", "code-auditing", "mcp-ecosystem"
         )
-        # "Provides" starts with known verb "provides" in lowercase check
-        assert result.startswith("consumes")
+        assert "consumes" not in result
+        assert not result.endswith("provided by")
+        assert result == "cites this entry: provides AST graph context and dead-code analysis through MCP"
+
+    def test_complements_does_not_collapse_to_category_restatement(self) -> None:
+        """'complements X' must not become 'is complemented by {name} ({category})' -- that
+        discards the actual relationship content and restates columns already in the row."""
+        result = bl.transform_to_backlink_description(
+            "complements drift detection", "Logfire", "ai-observability", "ai-observability"
+        )
+        assert "Logfire" not in result
+        assert "ai-observability" not in result
+        assert "complements drift detection" in result
+
+    def test_extends_is_not_inverted(self) -> None:
+        """'extends X' must not become 'is extended by X'."""
+        result = bl.transform_to_backlink_description(
+            "extends tree-sitter parsing", "SoulForge", "coding-agents", "tools"
+        )
+        assert result == "cites this entry: extends tree-sitter parsing"
+
+    def test_inverse_verbs_table_removed(self) -> None:
+        """The INVERSE_VERBS verb-substitution table no longer exists in the module."""
+        assert not hasattr(bl, "INVERSE_VERBS")
 
 
 # ---------------------------------------------------------------------------
-# Inverse verb table completeness
+# bare_reference_description: single source of truth for the no-forward-phrase case
 # ---------------------------------------------------------------------------
 
 
-class TestInverseVerbTable:
-    """Verify all listed INVERSE_VERBS keys produce distinct transforms."""
+class TestBareReferenceDescription:
+    """Used only when no forward phrase exists at all (distinct from low-confidence inversion)."""
 
-    @pytest.mark.parametrize(
-        ("verb", "expected_inverse"),
-        [
-            ("provides", "consumes"),
-            ("consumes", "provides"),
-            ("extends", "is extended by"),
-            ("is extended by", "extends"),
-            ("wraps", "is wrapped by"),
-            ("is wrapped by", "wraps"),
-            ("feeds", "is fed by"),
-            ("orchestrates", "is orchestrated by"),
-            ("delegates to", "receives delegation from"),
-            ("calls", "is called by"),
-            ("implements", "is implemented by"),
-            ("replaces", "is replaced by"),
-            ("complements", "is complemented by"),
-            ("alternatives to", "alternative for"),
-        ],
-    )
-    def test_inverse_verb_in_table(self, verb: str, expected_inverse: str) -> None:
-        """Each verb maps to expected_inverse in INVERSE_VERBS dict."""
-        assert verb in bl.INVERSE_VERBS
-        assert bl.INVERSE_VERBS[verb] == expected_inverse
+    def test_bare_reference_names_source_and_category(self) -> None:
+        """Bare reference names the source entry and its category."""
+        result = bl.bare_reference_description("Alpha", "agent-frameworks")
+        assert result == "referenced by Alpha (agent-frameworks)"
