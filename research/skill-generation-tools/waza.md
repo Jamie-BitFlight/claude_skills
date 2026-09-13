@@ -226,6 +226,9 @@ npx skills remove tw93/Waza -g
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| None at this time | — | — |
+
+No cross-references recorded yet. (This previously read as a `None at this time` table
+row; an Entry cell holding no link made this file invisible to the cross-reference
+graph, so incoming citations to it never registered as asymmetric.)
 
 ---
