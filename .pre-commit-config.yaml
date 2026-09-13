@@ -155,7 +155,7 @@ repos:
         types: [shell]
 
   - repo: https://github.com/Jamie-BitFlight/agent-marketplace-versioner
-    rev: 9aa39ed1f661d647cd02ae35348abe4e45279606
+    rev: 562755fd8f14ee76280130eb6db4612af72fdf45 # frozen: v0.1.2
     hooks:
       - id: agent-marketplace-versioner
 
