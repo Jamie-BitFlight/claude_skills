@@ -44,7 +44,7 @@ flowchart TD
     UpdateAll --> WaitAnalysis["Wait for all analysis agents to complete<br>Collect IMMEDIATE_ATTENTION items from insight results<br>Collect PROPOSALS_WRITTEN counts from utilization results<br>Collect CROSS_REFERENCES_ADDED counts from cross-referencer results"]
     Partial --> WaitAnalysis
     WaitAnalysis --> NotifyUser["If any IMMEDIATE_ATTENTION items exist:<br>report each to user with issue number and reason<br>Otherwise: report total backlog items created count<br>Report total utilization proposals written<br>Report total cross-references added<br>Relay non-empty SKIPPED lists verbatim"]
-    NotifyUser --> PostActions(["Execute Post-Actions — lint, commit, push, and vault-wide backlink repair"])
+    NotifyUser --> PostActions(["Execute Post-Actions — vault-wide backlink repair, then lint, commit, push (see SKILL.md for the authoritative step order)"])
 ```
 
 **Wave size**: Maximum 5 concurrent @research-curator agents per wave.
@@ -90,9 +90,13 @@ Cross-references added: N entries updated
 
 ## Post-Batch Actions
 
-These happen ONCE after all waves complete (not per-entry):
+These happen ONCE after all waves complete (not per-entry). This restates `SKILL.md`'s
+Post-Actions section for Batch Mode; SKILL.md's numbered steps there are authoritative for exact
+command invocations and ordering.
 
 1. Update `./research/README.md` with all new entries
-2. Run `uv run prek run --files` on README and all new entry files
-3. Commit all changes in a single commit
-4. Push to current branch
+2. Repair the bidirectional cross-reference graph across the whole vault (`check-backlinks --fix`)
+3. Run `uv run prek run --files` on the filtered list -- README, new entry files, and any files
+   step 2 repaired
+4. Commit all changes in a single commit
+5. Push to current branch
