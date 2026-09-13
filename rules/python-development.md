@@ -66,34 +66,60 @@ this writing: <https://github.com/astral-sh/ty/issues/691>.
 **The fix is Astral's own experimental PEP 723/uv integration, not an environment-variable
 workaround.** Announced by MichaReiser against #691 on 2026-08-28 (requires uv ≥0.12.3): ty can
 shell out to `uv` to synchronise a script's own inline `dependencies = [...]` list, in both the CLI
-and the language server. It is opt-in on both sides:
+and the language server. It is opt-in on both sides, and both sides are driven by the same knob —
+directly confirmed here by a minimal LSP JSON-RPC probe (`initialize` → `textDocument/didOpen` →
+`textDocument/publishDiagnostics`) against `uvx ty@latest server` (this repo's Astral plugin's exact
+launch command): setting the plain `TY_UV` **environment variable** on that server process clears
+the diagnostic, with no `initializationOptions` message required at all.
 
 - **CLI**: set `TY_UV=scripts` in the environment `ty check` runs in.
-- **Language server**: set the experimental `useUv` initialization option to `"scripts"` (or
-  `"on"`). For VS Code's `astral-sh.ty` extension (already recommended in
-  [`.vscode/extensions.json`](.vscode/extensions.json)) this is checked into
-  [`.vscode/settings.json`](.vscode/settings.json) as `"ty.experimental.useUv": "scripts"` — no
-  further setup needed for VS Code contributors. Any other LSP client configures the same knob
-  directly via its own server-settings mechanism, sending
-  `initialization_options.experimental.useUv` (or, per the upstream comment, a client-specific
-  wrapper such as `lsp.ty.initialization_options.experimental.useUv` for Zed) — there is no
-  repo-committed config file for those clients, so set it in your own editor config.
+- **Language server, generic protocol form**: set the experimental `useUv` initialization option to
+  `"scripts"` (or `"on"`) — `initialization_options.experimental.useUv` in the `initialize` request.
+  This is what Astral's announcement documents and what an editor extension typically exposes as a
+  setting.
+- **Language server, environment-variable form**: since `ty server` reads `TY_UV` the same way
+  `ty check` does (verified above), any client that can set the server process's environment can
+  use the exact same env var as the CLI, with no protocol-level configuration at all.
+
+This repo has **two distinct language-server consumers**, with different coverage:
+
+1. **VS Code's `astral-sh.ty` extension** (already recommended in
+   [`.vscode/extensions.json`](.vscode/extensions.json)): covered by
+   `"ty.experimental.useUv": "scripts"` checked into
+   [`.vscode/settings.json`](.vscode/settings.json) — no further setup needed for VS Code
+   contributors. Any other editor's LSP client without a repo-committed config file (Zed, Neovim,
+   Emacs, etc.) configures the same `initialization_options.experimental.useUv` knob directly in
+   its own editor config.
+2. **Claude Code's own bundled Astral-plugin language server** — the process that actually produces
+   the live `unresolved-import` diagnostics inside a Claude Code session, launched as
+   `command: uvx, args: ["ty@latest", "server"]` by that plugin's own `plugin.json`. This repo does
+   not vendor that file: the `astral` plugin is pulled live from `astral-sh/claude-code-plugins` at
+   a pinned SHA (`git-subdir` source in `.claude-plugin/marketplace.json`), so there is nothing in
+   this repo to edit to add `env`/`initializationOptions` to its `lspServers.ty` entry directly.
+   **This is a still-open gap, not fixed by this repo's `.vscode/settings.json` change.** The
+   reachable lever is `.claude/settings.json`'s top-level `env` block: confirmed by inspecting the
+   live `ty server` process's own environment (`ps -E <pid>`), which already carries that file's two
+   existing `env` entries (`CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD`,
+   `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`) — proving that file's `env` values do reach this exact
+   spawned process. Adding `"TY_UV": "scripts"` there would close this gap, but no agent may write
+   it: that file is denied to agents as security-sensitive (this is the same permission wall that
+   caused PR #3533's `VIRTUAL_ENV` attempt to land undocumented-as-unapplied). A human with write
+   access to `.claude/settings.json` needs to add that one key.
 
 This repo's own `uv run ty check` (prek, CI, and any contributor running it from the CLI) already
 resolves PEP 723 scripts correctly **without** `TY_UV`, because `uv run` sets `VIRTUAL_ENV` to the
 project's own `.venv`, and every PEP 723 script's dependencies are mirrored into the root
 `[dependency-groups] dev` group (see above) — so the project venv already satisfies the import.
 `TY_UV=scripts` is not wired into prek or CI here because that path isn't broken; it remains
-available as a CLI escape hatch for a script whose dependency was never mirrored. The gap this fix
-closes is specifically the **language server**, which (via `uvx ty@latest server` or equivalent)
-has no ambient `uv run` and no project `.venv` on `PATH`.
+available as a CLI escape hatch for a script whose dependency was never mirrored.
 
-**`.claude/settings.json` needs no edit for this.** The previous attempt at this fix
-(`VIRTUAL_ENV=".venv"` in that file's `env` block) was Claude-Code-only, depended on a relative
-`.venv` existing at the process's working directory, and took the type checker down entirely
-(`Failed to discover local Python environment`) when that `.venv` was missing — none of which
-applies to the `useUv`/`TY_UV` mechanism, which is ty's own opt-in feature and needs no Claude Code
-configuration at all.
+**Why this is still better than the rejected `VIRTUAL_ENV` mitigation, even where it also needs
+`.claude/settings.json`**: `TY_UV=scripts` needs only `uv`/`uvx` reachable on `PATH` — true by
+construction for a process `uvx` itself just launched — with no dependency on a relative `.venv`
+existing at the process's working directory, and it does not take ty down entirely when that
+condition isn't met (`VIRTUAL_ENV` did, with `Failed to discover local Python environment`). It is
+also the exact env var ty's own CLI and LSP already read, not a Claude-Code-specific `env` hack
+being repurposed for an unrelated variable.
 
 **Do not use `[tool.ty.environment]` inside a PEP 723 script's own inline metadata block either.**
 It appears to resolve the same symptom, but it is accidental, not supported: uv's PR
@@ -105,8 +131,11 @@ removed without notice.
 
 See [`docs/linting-and-type-checking.md`](docs/linting-and-type-checking.md) for the
 trustworthy-channel guidance and
-[`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the regression
-coverage — including a canary for #691 fully closing.
+[`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the CLI-level
+regression coverage (the LSP-protocol-level verification above was done manually, not encoded as an
+automated test — it exercises the same underlying ty resolution engine as `ty check`, only over a
+different transport, and encoding it would add a network dependency on `uvx ty@latest` and JSON-RPC
+framing for no additional engine coverage) — including a canary for #691 fully closing.
 
 #691 remains **open**, and the shipped support is explicitly labeled experimental/preview by its
 author ("Expect rough edges, missing documentation, and breaking changes") — treat `TY_UV`/`useUv`

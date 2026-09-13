@@ -40,14 +40,24 @@ not add a rule-level suppression. Confirm with `uv run ty check <path>` (or
 `prek run ty --files <path>`) before treating any ty diagnostic as real; if that passes clean,
 trust it over the editor's live diagnostic.
 
-The fix is Astral's own experimental PEP 723/uv integration (`TY_UV=scripts` for the CLI,
-`ty.experimental.useUv` — checked into [`.vscode/settings.json`](../.vscode/settings.json) for VS
-Code — for the language server), not an environment-variable-pointing workaround. Full root cause,
-the upstream tracking issue, and the fix live in
-[`rules/python-development.md`](../rules/python-development.md#unresolved-import-on-a-pep-723-script-specifically-in-the-language-server).
-`.claude/settings.json` needs no edit for this. Regression coverage:
-[`tests/test_ty_pep723_environment.py`](../tests/test_ty_pep723_environment.py).
+The fix is Astral's own experimental PEP 723/uv integration (`TY_UV=scripts` — as a plain
+environment variable, verified to work identically for `ty check` and `ty server` — or the
+protocol-level `ty.experimental.useUv` equivalent), not an environment-pointing workaround. It has
+**two separate consumers in this repo, only one of which this repo can currently configure**:
 
+- VS Code's `astral-sh.ty` extension — covered, via
+  [`.vscode/settings.json`](../.vscode/settings.json).
+- Claude Code's own bundled Astral-plugin language server (the process producing live diagnostics
+  inside a Claude Code session) — **not yet covered**; needs `"TY_UV": "scripts"` added to
+  `.claude/settings.json`'s `env` block by a human with write access to that file. See
+  [`rules/python-development.md`](../rules/python-development.md#unresolved-import-on-a-pep-723-script-specifically-in-the-language-server)
+  for the full evidence trail and coverage breakdown.
+
+`.claude/settings.json`'s `env` values do reach that spawned process (confirmed by inspecting the
+live server's own environment), but no agent may write to that file. Regression coverage (CLI-level
+only — see the note in `rules/python-development.md` on why the LSP-protocol verification isn't
+also an automated test):
+[`tests/test_ty_pep723_environment.py`](../tests/test_ty_pep723_environment.py).
 ### Common ty failure patterns
 
 - **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is
