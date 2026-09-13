@@ -1,134 +1,137 @@
 # Research Entry Review Rubric
 
-How to review a finished research entry and the analysis files produced from it.
+How to decide whether a finished research entry is worth having.
 
-Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entry-quality-standards.md) and [Extraction Methodology](./extraction-methodology.md) instead — this rubric is the audit that runs afterwards.
+Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entry-quality-standards.md)
+and [Extraction Methodology](./extraction-methodology.md). This rubric is the audit that runs
+afterwards, and it deliberately does not score everything those files ask a writer to do.
 
-**Review scope** — every file the entry's creation touched:
+An entry has two jobs:
+
+1. **Deliver a reader to the canonical source, dated.** An agent that needs a fact about the subject
+   reads the source, not this summary. The entry is the pointer and the reason to follow it — never
+   the authority on the subject.
+2. **Say what this repository should do about the subject, in terms that are true here.** Nothing
+   but this repo's own files can settle such a claim, and a wrong one costs a reader a wasted
+   session.
+
+Those two jobs are the two gates. **Only the checks below produce defects.** Depth, prose quality,
+per-section confidence levels, exact capability figures, markdown formatting, and cross-reference
+symmetry are not reviewed here: the writing standards govern the first four, `prek` (Post-Actions
+step 4) governs formatting, and `check-backlinks --fix` (Post-Actions step 2) repairs cross-reference
+symmetry deterministically before any review runs. Re-adjudicating them by hand changes nothing
+about the entry and buries the two findings that do.
+
+**Review scope**:
 
 - The entry: `./research/{category}/{name}.md`
-- Improvement proposals, when present: `./research/insights/{YYYY-MM-DD}-{name}-improvements.md`
-- Utilization proposals, when present: `./research/insights/{YYYY-MM-DD}-{name}-utilization.md`
-- Cited entries, when the entry added cross-references to them
+- Improvement proposals, when the invocation names one: `./research/insights/{YYYY-MM-DD}-{name}-improvements.md`
+- Utilization proposals, when the invocation names one: `./research/insights/{YYYY-MM-DD}-{name}-utilization.md`
 
-**Completion criterion**: every gate below has been run and its result recorded. A gate you skipped is a gate that FAILED — record it as `NOT RUN` with the reason, never as a pass.
+**Completion criterion**: both gates have been run and their results recorded. A gate you skipped is
+recorded `NOT RUN` with the reason — never as a pass.
 
-**Defect** = any finding under any gate. Record every defect as `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Quote the offending text verbatim; paraphrase loses the reviewer's evidence.
+**Defect** = any finding under either gate. Record every defect as
+`{file}:{line} — GATE {1|2} — {exact quoted text} — {required correction}`. Quote verbatim;
+paraphrase loses the evidence.
 
 ---
 
-## Gate 1 — Mechanical Checks
+## Gate 1 — Can a reader reach the canonical source?
 
-Run all three commands. Report their output as **exact counts per severity and the verbatim issue lines** — "mostly clean", "a few warnings", and "passes validation" are not review output.
+This gate decides the verdict. An entry that cannot deliver a reader to the source, or that talks
+them out of going, has failed at the one thing nothing else in the repo does for it.
+
+Run the validator and record `summary` verbatim:
 
 ```bash
-uv run --script .claude/skills/research-curator/scripts/fix_research_formatting.py --check ./research/{category}/{name}.md
 uv run --script .claude/skills/research-curator/scripts/validate_research.py main --json ./research/{category}/{name}.md
-uv run --script .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research
 ```
 
-| Command | What a defect looks like | Record |
+| Check | Defect when | Record |
 |---|---|---|
-| `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. `--check` does not write; drop `--check` only when this review is also applying fixes |
-| `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N, info: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
-| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry | Each asymmetric pair by both paths. Run without `--fix` to review; `--fix` repairs but hides what was wrong |
+| **Validator errors** | `summary.errors > 0` | Every error's `check`, `message`, `line`. An entry with errors should not have reached review — the Validation Gate holds it back — so report this and stop rather than continuing to Gate 2 |
+| **Source URL present** | The entry names no canonical source URL — nothing in frontmatter (root or nested, e.g. `metadata.source_url`, `github_repository`), no `Source URL` text-header field, and no URL in References standing in for one | Read the entry for this rather than trusting the validator's `header_fields` warning, which only knows a fixed set of key spellings. Quote the URL you found, or record that none exists |
+| **Source URL resolves** | `curl -sS -o /dev/null -w '%{http_code} %{url_effective}' -L --max-time 15 {source_url}` returns 4xx/5xx, or the host does not resolve | The status and the effective URL. A redirect to a live page passes — record the final URL as the required correction |
+| **Verification date present** | The entry carries no date saying when the source was last read — no `last_verified`, `verified`, `research_date`, or text-header `Research Date` | Read the entry's own frontmatter or header block for this; the validator knows a narrower set of key spellings, so its `freshness_tracking` and `header_fields` warnings are a prompt to look, never the finding. Quote the date you found, or record that none exists. Without one the reader cannot tell how stale the pointer is |
+| **No bare nonexistence claim** | "Doesn't support X", "Not available", "Not supported", "X is impossible" asserted about the subject | Quote it. Correction: Rule 3 language from [Entry Quality Standards](./entry-quality-standards.md) — "Not mentioned in {source}" / "Unable to access {source}". This is the one fidelity failure that survives: it tells the reader, on the writer's word, not to bother going to the source |
 
-**Cross-reference reciprocity** is measured by `check-backlinks`, not by eye. An entry that cites B while B does not cite back is a defect against this entry even though the missing row lives in B. Row format: [Cross-Reference Format](./cross-reference-format.md).
-
----
-
-## Gate 2 — Fidelity Rules
-
-Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separate check with its own verdict. Run all five; one rule's pass says nothing about another's.
-
-| Check | Question | Defect |
-|---|---|---|
-| **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
-| **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
-| **Rule 2a — No Popularity Statistics** | Is the entry free of star, download, fork, and contributor counts? | Any such figure anywhere in the entry, including inside a badge, a quoted README passage, or a "Key Statistics" section that should not exist |
-| **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}" |
-| **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
+Every other validator warning and info item is **reported, not scored** — include the counts from
+`summary` in the verdict block and move on.
 
 ---
 
-## Gate 3 — Depth
+## Gate 2 — Do the claims about this repository survive contact with it?
 
-Score each section against its bar in [Entry Quality Standards](./entry-quality-standards.md#depth-requirements). Present-but-thin is a defect; the section existing is not the bar.
+Scope: the entry's "Relevance to Claude Code Development" section and every proposal in the
+`-improvements.md` and `-utilization.md` files the invocation named.
 
-| Section | Passes when | Defect |
-|---|---|---|
-| **Technical Architecture** | Names components with their exact source names, describes data flow or execution model, and names extension or integration points | "Uses a plugin-based architecture" with no component named and no mechanism given |
-| **Key Features** | Each feature states what it does AND the mechanism by which it does it | A feature list that is a list of outcomes with no mechanism |
-| **Installation & Usage** | At least one complete example taken verbatim or near-verbatim from official docs; install command verified against official docs | An install command assembled from a guessed package name. A usage example with no source behind it |
-| **Limitations and Caveats** | Present, with either documented limitations or the explicit low-confidence absence statement | Section missing, empty, or filled with "N/A" |
+First, run the validator over each analysis file the invocation named:
 
----
+```bash
+uv run --script .claude/skills/research-curator/scripts/validate_research.py main --json {analysis-file-path}
+```
 
-## Gate 4 — Repo Claims Verified Against the Repo
+Treat every `repo_path_unresolved` issue it reports as a confirmed step-2 defect below: record it and
+do not re-derive it. That check reaches only existing-state assertions inside `research/insights/`
+and `research/utilization/` — never the entry itself, and not every claim even in those files — so a
+clean run means nothing was flagged mechanically, not that the claims are verified. Everything the
+validator did not flag is judgment, below.
 
-Every statement an entry or an analysis file makes about **this repository** is a claim to verify against the actual files, not a claim to accept. This gate covers the entry's "Relevance to Claude Code Development" section and every proposal in the `-improvements.md` and `-utilization.md` files.
+Then enumerate every claim the scoped text makes about **this** repository and walk the steps in
+order, stopping at the first failure:
 
-For each repo claim, in order:
+1. **Names something here** — the claim names a concrete path, skill, agent, command, or workflow of
+   this repo. "Fits well with this project's architecture", "useful for agent workflows", "could
+   improve code quality" fail here: they name nothing, so nothing can falsify them, and they would
+   be equally true of any repository. A claim that survives a find-and-replace of this repo's name
+   is a defect no matter how many sentences around it verify.
+2. **Exists** — open the path. Not in the repo is a defect, full stop. Do not repair a near-miss on
+   the writer's behalf; record what was named and what is actually there.
+3. **Described correctly** — the file's real contents match what the claim says about them. Naming a
+   real path and misdescribing it is the same severity as inventing one.
+4. **Gap is real** — where the claim says this repo lacks a capability, the file confirms the
+   absence. A capability the file already implements makes the claim a defect, not a weak proposal.
+5. **Signal runs** — where the claim names a command or an observable field as its completion
+   signal, run that command and read that field.
 
-1. **Path exists** — read the path the claim names. A proposal resting on a path that is not in the repo is a defect, full stop. Resolve it yourself; do not assume a near-miss was a typo.
-2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
-3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
-4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
+A claim about the **subject** that a repo claim rests on is checked too, against the source the entry
+cites — a proposal to adopt a mechanism is a defect if the mechanism is not in the source. Subject
+claims that no repo claim rests on are out of scope: the reader goes to the source for those.
 
-Record each verified claim with the path you read. A gate 4 pass asserts you opened the files; it cannot be reached by reading the proposal alone.
-
----
-
-## Gate 5 — Did the Analysis Engage This Repo?
-
-Judgment check, applied to the entry's "Relevance to Claude Code Development" section and to both analysis files.
-
-Ask: **could this text have been written about any Python repository without opening this one?**
-
-- **Passes** when the analysis names specific files, skills, agents, or workflows of this repo and says something about them that is true here and would be false elsewhere.
-- **FAILS** when the analysis would survive a find-and-replace of this repo's name — generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
-
-A gate 5 failure is a defect even when every individual sentence in gate 4 verified.
-
----
-
-## Gate 6 — Hallucination Triggers
-
-Scan the entry and both analysis files for each trigger. Quote every hit.
-
-| Trigger | Scan for | Defect unless | Required correction |
-|---|---|---|---|
-| **Speculation language** | "I think", "likely", "probably", "seems", "should be", "assume", "maybe", "might" | The phrase sits inside a verbatim quotation from a primary source, attributed as such | Replace with what the source states, with "Not mentioned in documentation" per Rule 3, or with the steps taken and what was observed |
-| **Causality without evidence** | "because", "due to", "caused by", "therefore", "this means", "as a result" | The sentence cites the specific observation behind it — a source passage, a file and line, a command's output | Rewrite as an observation alone, or as an explicit hypothesis plus the verification step that would settle it |
-| **Pseudo-quantification** | Scores and percentages — "8.5/10", "70% faster", "100% coverage" | The figure is quoted from a primary source with its method, or the entry states the method used to produce it | Replace with the measured evidence, or remove the figure |
-| **Completeness overclaims** | "all files checked", "comprehensive analysis", "fully resolved", "everything fixed", "every skill reviewed" | The text lists the concrete checks performed and their scope | List what was inspected and with what scope, or narrow the claim to what was actually covered |
-
-SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13); also reachable in this repo as the `/hallucination-detector:hallucination-audit` command.
+Record each claim with the path you opened. A Gate 2 result asserts you opened the files; it cannot
+be reached by reading the proposals alone.
 
 ---
 
 ## Verdict
 
-Report in this form:
-
 ```text
 REVIEW: ./research/{category}/{name}.md
 
-GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
-  fix_research_formatting --check: exit {N}
-  validate_research main --json:   errors {N}, warnings {N}, info {N}
-  check-backlinks:                 {N} asymmetric pairs
-GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
-GATE 3 depth:         PASS | FAIL — sections failed: {names}
-GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective
-GATE 5 engagement:    PASS | FAIL
-GATE 6 triggers:      PASS | FAIL — triggers hit: {names}
+GATE 1 pointer:     PASS | FAIL | NOT RUN ({reason})
+  validate_research main --json: errors {N}, warnings {N}, info {N}
+  source URL: {url} — HTTP {status}
+  verified: {date | absent}
+GATE 2 repo claims: {N} claims checked, {N} defective | NOT RUN ({reason})
+  repo_path_unresolved: {N}
 
 DEFECTS: {N}
-1. {file}:{line} — GATE {N} — "{exact quoted text}" — {required correction}
+1. {file}:{line} — GATE {1|2} — "{exact quoted text}" — {required correction}
 2. ...
 
-VERDICT: APPROVE | REQUEST CHANGES
+VERDICT: USABLE | UNUSABLE | NOT RUN
 ```
 
-`APPROVE` requires every gate at PASS and `DEFECTS: 0`. Any gate at FAIL or NOT RUN, or any defect recorded, is `REQUEST CHANGES` — a defect count above zero and an `APPROVE` verdict cannot both be true.
+`USABLE` when Gate 1 passes, whatever Gate 2 found. A live, dated pointer to the canonical source is
+what this entry alone provides; a wrong proposal inside it is a repair to make, not a reason to
+withhold the entry from the index.
+
+`UNUSABLE` when Gate 1 fails. The entry points nowhere, so every claim in it rests on a subject the
+reader cannot go and check. Re-source it with `--rerun`.
+
+`NOT RUN` when Gate 1 could not run at all — the entry path does not exist, or this rubric could not
+be loaded. Report the reason instead of a partial verdict.
+
+Every recorded defect is a required repair regardless of verdict. `DEFECTS: 0` and `UNUSABLE` can
+both be true; so can `DEFECTS: 9` and `USABLE`.

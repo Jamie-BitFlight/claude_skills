@@ -1,8 +1,13 @@
 # Research Entry Quality Standards
 
-The content contract every research entry under `./research/` must satisfy, whoever writes it. Fidelity Rules govern each claim; Depth Requirements govern each section's coverage. Both apply to every entry.
+The content contract every research entry under `./research/` must satisfy, whoever writes it. Fidelity Rules govern each claim; Depth Requirements govern each section's coverage. Both apply to every entry being written.
 
-Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./entry-review-rubric.md), which turns both halves into discrete checks.
+This is a writing contract, not an audit checklist. [Entry Review Rubric](./entry-review-rubric.md)
+gates only two things — that a reader can reach the canonical source, and that claims about *this*
+repository check out against it — because an agent that needs a fact about the subject reads the
+source rather than the entry. Everything else below shapes the entry at writing time and costs
+nothing to honour while the sources are open, but a finished entry is never failed, edited, or
+withheld for it.
 
 ---
 
@@ -30,13 +35,22 @@ Popularity metrics (stars, downloads, forks) are out of scope entirely — see R
 
 ### Rule 2a: No Popularity Statistics
 
-Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
-There is no "Key Statistics" section in the entry template; do not add one, and do not fold
-this data into another section.
+Do NOT gather star counts, download counts, fork counts, or contributor counts. This binds the
+agent doing the gathering: it applies whether the repository is in the session's authorized GitHub
+scope or out of it, and no fallback source (web search, package registry, a badge in the README)
+makes the data in scope. Nothing that was never fetched can be written, so there is no separate
+writing prohibition to enforce. There is no "Key Statistics" section in the entry template; do not
+add one.
 
-This rule binds gathering as well as writing: it applies whether the repository is in the
-session's authorized GitHub scope or out of it, and no fallback source (web search, package
-registry, a badge in the README) makes the data in scope.
+This rule reaches forward only. Statistics already present in existing entries stay exactly where
+they are — a figure in a finished entry is not a defect, not a `--fix` target, and never a reason to
+edit or withhold that entry. The rule was formerly enforced against finished entries while the
+template still required a "Key Statistics" section, which is why entries written before that
+section was removed carry one.
+
+SOURCE: the "Key Statistics" block — `GitHub Stars`, `Downloads/month`, `Contributors` — was deleted
+from `entry-template.md` in commit `a54eef252` (2026-07-08). Every entry authored before that date
+was written against a template that required it.
 
 ### Rule 3: Distinguish Absence from Nonexistence
 
@@ -102,6 +116,33 @@ For installation commands: verify the exact command from official docs. Do NOT c
 ### Limitations and Caveats Section
 
 REQUIRED — not optional. Every tool has limitations. If primary sources document none, write: "No limitations documented in reviewed sources (confidence: low — absence of documented limitations does not confirm absence of limitations)."
+
+### Relevance to Claude Code Development — the section the review gates
+
+Every other section describes the subject, and a reader who needs the subject reads the subject's own
+documentation. This section says something a reader cannot get from the source URL, so it is the only
+prose [Entry Review Rubric](./entry-review-rubric.md) audits — claim by claim, against this
+repository's actual files.
+
+Write each item so that opening one file could prove it false:
+
+1. **Name the local thing** — a path, skill, agent, command, or workflow that exists in this repo.
+   Open it before writing the sentence.
+2. **Say what that file does today** — the state the proposal is measured against.
+3. **Say what the subject would change about it** — tied to a specific mechanism this entry already
+   documented from the source.
+4. **Name the signal** — the command to run or the field to read that shows whether the change
+   landed.
+
+An item that skips step 1 has nothing to verify and nothing to act on. "Fits well with this project's
+architecture", "useful for agent workflows", and "could improve code quality" would each be equally
+true of any repository, which is exactly what makes them worthless here. Three items that name files
+beat ten that do not. Where the sources support no such item, write "No application to this
+repository found in the sources reviewed" rather than filling the section with claims that name
+nothing.
+
+The same bar binds every proposal in the `-improvements.md` and `-utilization.md` analysis files,
+which are reviewed together with the entry.
 
 </depth_requirements>
 

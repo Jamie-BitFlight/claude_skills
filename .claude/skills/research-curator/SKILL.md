@@ -192,12 +192,12 @@ flowchart TD
     ValidateN -->|"clean entries"| UpdateDates["Update ./research/README.md once,<br>after all waves complete — refresh freshness<br>dates for clean re-researched entries only"]
     UpdateDate --> SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then review ./research/category/name.md<br>naming the analysis files just written"]
+    WaitAnalysis1 --> Review1["Run Entry Review on ./research/category/name.md<br>naming the analysis files just written"]
     Review1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     Issues1 --> PostActions
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then review each entry that reached analysis<br>one review per entry, in waves of 5"]
+    WaitAnalysisN --> ReviewN["Run Entry Review on each entry that reached analysis<br>one review per entry, in waves of 5"]
     ReviewN --> PostActions
     IssuesN --> PostActions
 ```
@@ -265,16 +265,14 @@ Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have al
 before Post-Actions. Audits each entry this run created or refreshed, with the analysis files
 written for it, against [Entry Review Rubric](./references/entry-review-rubric.md), which the agent loads.
 
-**Repair reciprocity first.** `@research-cross-referencer` writes forward links only, so the vault is
-asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
-against the citing entry -- reviewing now fails every entry on a defect this run is about to repair.
-Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four result cases exactly
-as step 2 specifies, before spawning any review. Step 2 still runs in its own place afterwards: the
-repair is idempotent, and Validate Mode reaches it without passing through here.
+The rubric asks two questions: can a reader reach the canonical source this entry points at, and do
+the entry's claims about *this* repository check out against its files. It scores nothing else --
+cross-reference symmetry is repaired deterministically by Post-Actions step 2, and formatting by
+step 4, so neither needs a review pass or an ordering constraint against one.
 
-Then spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One
-review per entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate
-opens the local file behind every proposal.
+Spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One review per
+entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate opens the
+local file behind every proposal.
 
 ```text
 Agent tool parameters:
@@ -298,11 +296,16 @@ Relay each verdict block verbatim under the [Agent Result Relay Rules](#agent-re
 every gate line and every defect, quoted as the agent wrote them, under an `### Entry Review
 Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
 
-- **APPROVE** -- continue to Post-Actions unchanged.
-- **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
-  continue to Post-Actions, which then withholds this entry's README row and date (step 1), keeping
-  it out of the index until a later run reviews it clean. Correction belongs to a later `--rerun`
-  rather than to `--fix`: `--fix` takes validator issues, and a gate 4 or 5 defect needs re-research.
+- **USABLE** -- continue to Post-Actions unchanged, defects and all. The entry points at a live,
+  dated source, which is what nothing else in the repo provides; a wrong repo claim inside it is a
+  repair to schedule, not grounds for hiding the entry from the index. Report every defect and leave
+  the README row in place.
+- **UNUSABLE** -- mark the entry "created with issues" (or "refreshed with issues") and continue to
+  Post-Actions, which then withholds this entry's README row and date (step 1), keeping it out of the
+  index until a later run re-sources it. Correction belongs to a later `--rerun` rather than to
+  `--fix`: `--fix` takes validator issues, and an unreachable or absent source URL needs re-research.
+- **NOT RUN** -- report the reason verbatim and treat the entry exactly as **UNUSABLE**: an unrun
+  review is not evidence the entry is sound.
 
 </entry_review>
 
@@ -429,7 +432,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: APPROVE | REQUEST CHANGES -- N defects
+**Entry Review**: USABLE | UNUSABLE -- N defects
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -452,7 +455,7 @@ YYYY-MM-DD
 **Refreshed**: Z existing entries
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A USABLE (D defects), R UNUSABLE
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -471,7 +474,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A APPROVE, R REQUEST CHANGES
+**Entry Review**: A USABLE (D defects), R UNUSABLE
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
