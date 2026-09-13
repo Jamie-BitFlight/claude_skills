@@ -278,7 +278,7 @@ This library is particularly relevant for AI-assisted development in several con
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| [Gridland](./gridland.md) | developer-tools | Shares React + Canvas rendering pattern for multi-environment output; Gridland's TextBuffer abstraction parallels Pretext's text measurement system for terminal/browser layout |
+| [Gridland](./gridland.md) | developer-tools | Shares HTML5 Canvas as a text-rendering target for browser output; Gridland's TextBuffer abstraction parallels Pretext's text measurement system for terminal/browser layout |
 | [json-render](../agent-frameworks/json-render.md) | agent-frameworks | Overlapping use case: structured UI generation where accurate text layout prevents component overflow; json-render's streaming spec compilation and Pretext's text measurement enable accurate multi-platform rendering |
 | [Pixel Agents](./pixel-agents.md) | developer-tools | Both use Canvas 2D API for measurement and rendering; shared performance optimization pattern of caching measurements to avoid repeated browser API calls |
 | [Anime.js](./animejs.md) | developer-tools | Complementary library for animating text properties (color, opacity) calculated via Pretext's layout; both prioritize performance through cached state and minimal DOM access |
@@ -299,7 +299,7 @@ This library is particularly relevant for AI-assisted development in several con
 - Installation & Usage: **high** — installation command and code examples from official README; confirmed against package.json exports
 - Limitations and Caveats: **high** — extracted from README "Caveats" section and source code comments in layout.ts
 - Relevance to Claude Code: **medium** — inferred from documented use cases (AI-friendly verification, no browser required); stated in README lines 49-50 but not explicitly detailed for AI development workflows
-- Cross-References: **high** — verified via file inspection of related entries (gridland.md, json-render.md, pixel-agents.md, animejs.md, lvgl.md); scoring based on shared technologies (Canvas/React/text layout) and problem domains (performance, font metrics, measurement)
+- Cross-References: **high** — verified via file inspection of related entries (gridland.md, json-render.md, pixel-agents.md, animejs.md, lvgl.md); scoring based on shared technologies (Canvas/text measurement/text layout) and problem domains (performance, font metrics, measurement)
 
 **Data Currency**:
 - Browser accuracy snapshots: 2026-03-27 (2 days old, recent)

@@ -3,7 +3,7 @@ title: "Improvement Proposals: wrkflw"
 ---
 
 <!-- removed-skill-citations -->
-> **Removed-skill citations:** `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and `TeamCreate` survives in the tree only as a negation. The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+> **Removed-skill citations:** `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
 
 ## Improvement 1: Add local GitHub Actions schema validation to pre-commit
 
@@ -11,24 +11,35 @@ title: "Improvement Proposals: wrkflw"
 **Local system**: ./.pre-commit-config.yaml and ./rules/ci-workflows.md
 **Confidence**: High
 **Impact**: High
-**Backlog**: #1933 created
+**Backlog**: #1933 created; closed — implemented by PR #2232 (commit `075491c33`, 2026-05-09)
 
 ### Current state
 
-`./.pre-commit-config.yaml` runs no GitHub Actions schema validator. The closest checks are
-`check-yaml` (lines 61–62) which validates raw YAML parsability only, and a generic
-`markdownlint-cli2` for docs. There is no hook that parses `.github/workflows/*.yml` against
-the Actions schema (jobs, steps, expressions, `uses:` references, `needs:` DAG validity).
+**Implemented — this proposal is closed.** On this entry's date, `./.pre-commit-config.yaml` ran
+no GitHub Actions schema validator: the closest checks were `check-yaml`, validating raw YAML
+parsability only, and a generic `markdownlint-cli2` for docs. Nothing parsed
+`.github/workflows/*.yml` against the Actions schema (jobs, steps, expressions, `uses:`
+references, `needs:` DAG validity).
+
+`actionlint` (`rhysd/actionlint` v1.7.12) now sits at `./.pre-commit-config.yaml` lines 123–126,
+added by PR #2232 (commit `075491c33`, 2026-05-09), which closed backlog #1933. Confirmed by
+execution: `uv run prek run --files .github/workflows/code-quality.yml` reports
+`Lint GitHub Actions workflow files......Passed`.
+
+The hook is local, and "the `prek run` step runs actionlint" is true of a local run and false of
+CI: `actionlint` is named in the `SKIP` env var of the `file-hygiene` job in
+`.github/workflows/code-quality.yml`. #1933's acceptance criterion 6 permits exactly that — the
+hook id in `SKIP` **or** the binary verifiably on the runner — so the closure is legitimate and
+the gap this entry identified is closed for local pre-push validation, which is what it asked for.
 
 `.claude/rules/ci-workflows.md` Phase 4, as it stood on this entry's date (commit `3bec019b4`),
 stated "Validate YAML syntax: `python3 -m yaml <file>` or equivalent" — parsability only, not
 structural validation. **That step no longer exists.** The file is now `./rules/ci-workflows.md`
 (renamed in PR #3391, commit `bf4dcd876`) and its Phase 4 step 2 reads
-"Validate: `uv run prek run --files <file>`", which still runs no Actions-schema check, so the gap
-this entry identifies is unchanged even though the wording it quoted is gone.
-Phase 5 (Verify) still instructs "Push and check workflow run if possible"
-(`./rules/ci-workflows.md` line 82) — i.e., the verification
-loop requires git push and observing GitHub-side execution. There is no local equivalent.
+"Validate: `uv run prek run --files <file>`" — which, since #2232, runs `actionlint` among the
+other hooks. Phase 5 (Verify) still instructs "Push and check workflow run if possible"
+(`./rules/ci-workflows.md` line 82), so confirming a workflow actually runs on GitHub still needs
+a push; what no longer needs one is catching a structural error before that push.
 
 Search confirmed no existing backlog item references actionlint, wrkflw, or local Actions
 validation (`backlog_list search="github actions OR actionlint OR wrkflw"` returned 0 items).
@@ -44,20 +55,18 @@ scoped to `^\.github/workflows/.*\.ya?ml$`. The hook fails with non-zero exit co
 - Composite-action inputs are missing required keys
 
 `./rules/ci-workflows.md` Phase 4 step 2 ("Validate: `uv run prek run --files <file>`") gains the
-structural check: `uv run prek run --hook actionlint --files .github/workflows/<file>`. The
-YAML-syntax-only step this proposal originally targeted was itself replaced by that `prek run` step
-after this entry was written, so there is no longer a syntax-only check to displace — only a
-schema-validation gap to fill.
+structural check. **Reached**: the YAML-syntax-only step this proposal originally targeted was
+replaced by that `prek run` step after this entry was written, and `prek run` now includes
+`actionlint`, so the structural check arrived through the step rather than alongside it.
 
 ### Measurable signal
 
-Run: `uv run prek run --files .github/workflows/code-quality.yml`. Output includes a row
-for the new validation hook with status `Passed` or `Failed`. Inject a deliberate error
-(e.g., `needs: [does-not-exist]`) — hook reports exit 1 and names the offending job and
-line number. Without the error, hook exits 0.
-
-`grep -E "actionlint|wrkflw" .pre-commit-config.yaml` returns at least one match on a hook
-`id:` line.
+**Both signals pass.** `uv run prek run --files .github/workflows/code-quality.yml` outputs
+`Lint GitHub Actions workflow files......Passed`, and
+`grep -E "actionlint|wrkflw" .pre-commit-config.yaml` matches the `- id: actionlint` line
+(`./.pre-commit-config.yaml` line 126). The error-injection half of the signal
+(`needs: [does-not-exist]` → exit 1 naming the offending job and line) is #1933's acceptance
+criterion 3 and was verified on that item, not re-run here.
 
 ---
 
