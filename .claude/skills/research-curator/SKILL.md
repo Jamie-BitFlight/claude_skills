@@ -310,10 +310,11 @@ flowchart TD
     RunScriptAll --> ParseJSON
     ParseJSON --> HasErrors{"Does parsed output contain<br>any error-severity issues?"}
     HasErrors -->|"Yes — N error-severity issues found"| SpawnFix["Spawn @research-curator agents in waves of 5<br>Each agent receives --fix flag<br>PLUS the exact error list for that entry from JSON output<br>(not a summary — the raw issue text)"]
-    HasErrors -->|"No — zero error-severity issues"| ReportClean(["Report: all entries passed. Include exact warning and info counts. Stop."])
+    HasErrors -->|"No — zero error-severity issues"| ReportClean["Report: all entries passed. Include exact warning and info counts."]
     SpawnFix --> RelayCheck["Apply pre-relay quality checklist<br>to all fix-agent results"]
     RelayCheck --> ReportSummary["Report validation summary with exact counts<br>(total scanned, passed, errors fixed, warnings noted, info items)"]
     ReportSummary --> PostActions(["Execute Post-Actions — lint, commit, push"])
+    ReportClean --> PostActions
 ```
 
 ### Script Invocation
