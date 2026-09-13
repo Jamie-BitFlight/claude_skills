@@ -374,12 +374,14 @@ def declared_output_style_paths(plugin: Path) -> DeclaredOutputStyles:
     if isinstance(declared, str):
         return DeclaredOutputStyles(paths=[declared], present=True, problems=[])
     if isinstance(declared, list):
-        paths = [entry for entry in declared if isinstance(entry, str)]
         problems = [
             f"{manifest}: outputStyles entry {index} is {json_type_name(entry)}, expected a string"
             for index, entry in enumerate(declared)
             if not isinstance(entry, str)
         ]
+        # A schema-invalid declaration is rejected whole, so no entry in it names a style that
+        # loads. Keeping the readable entries would report a broken plugin as shipping styles.
+        paths = [] if problems else [entry for entry in declared if isinstance(entry, str)]
         return DeclaredOutputStyles(paths=paths, present=True, problems=problems)
     return DeclaredOutputStyles(
         paths=[],

@@ -322,20 +322,31 @@ def test_null_output_styles_is_reported_rather_than_absent(tmp_path: Path) -> No
     assert "outputStyles is null" in result.plugin_manifest_problems[0]
 
 
-def test_non_string_entries_are_reported_and_valid_ones_kept(tmp_path: Path) -> None:
-    """A mixed array keeps its string entries and reports each entry it dropped, by index.
+def test_mixed_array_attributes_no_styles_and_reports_each_bad_entry(tmp_path: Path) -> None:
+    """One invalid entry invalidates the whole declaration, so no path in it is scanned.
 
-    Silently dropping them would report the plugin's styles as complete when the manifest is not.
+    Claude Code rejects the schema-invalid manifest whole. Keeping the readable entries would
+    report a broken plugin as shipping styles, which is what Phase 1 promises discovery never does.
     """
     plugin = make_plugin(tmp_path / "p", {"name": "p", "outputStyles": ["./extras/", 42, None]}, {"extras": "declared"})
     result = v.discover(tmp_path, plugin)
-    assert [p.rsplit("/", 1)[-1] for p in result.plugin] == ["declared.md"]
-    assert result.plugin_declared_paths == ["./extras/"]
+    assert result.plugin == []
+    assert result.plugin_declared_paths == []
     manifest = plugin / ".claude-plugin" / "plugin.json"
     assert result.plugin_manifest_problems == [
         f"{manifest}: outputStyles entry 1 is number, expected a string",
         f"{manifest}: outputStyles entry 2 is null, expected a string",
     ]
+
+
+def test_all_string_array_still_scans_every_entry(tmp_path: Path) -> None:
+    """A wholly valid array is unaffected — the all-or-nothing rule needs an invalid entry."""
+    plugin = make_plugin(
+        tmp_path / "p", {"name": "p", "outputStyles": ["./extras/", "./more/"]}, {"extras": "a", "more": "b"}
+    )
+    result = v.discover(tmp_path, plugin)
+    assert sorted(p.rsplit("/", 1)[-1] for p in result.plugin) == ["a.md", "b.md"]
+    assert result.plugin_manifest_problems == []
 
 
 def test_valid_manifest_reports_no_problems(tmp_path: Path) -> None:
