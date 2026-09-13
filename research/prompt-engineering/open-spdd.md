@@ -1,3 +1,19 @@
+---
+name: open-spdd
+title: OpenSPDD
+subtitle: Structured prompt-driven development tool for bidirectional design-code sync
+research_date: 2026-09-11
+source_url: https://github.com/gszhangwei/open-spdd
+github_repository: https://github.com/gszhangwei/open-spdd
+version_at_research: "unversioned (no tags; development in progress)"
+license: MIT
+freshness_tracking:
+  last_verified: 2026-09-11
+  version_at_verification: "unversioned (no tags at time of research)"
+  next_review: 2026-12-11
+  confidence_map: "Identity/Metadata: high; Overview/Problem Addressed: high; Key Features: high; Technical Architecture: high; Installation & Usage: high; Design Insights: high; Limitations: medium; Relevance: medium"
+---
+
 # OpenSPDD
 
 ## Identity
@@ -13,9 +29,13 @@
 **Latest Commit**: As of shallow clone: Merge pull request #19 (star-history-chart fix)
 **Release Versions**: Not yet versioned with tags (development in progress)
 
+---
+
 ## Overview
 
 "OpenSPDD is a methodology and cross-platform CLI tool for the AI coding era. It upgrades AI coding prompts from 'disposable inputs' to 'executable design contracts' with bidirectional synchronization between design and implementation" (README.md, line 17). The tool provides a structured framework for expressing design intent, architectural decisions, and execution constraints in a format that AI coding agents can reliably consume and maintain over time.
+
+---
 
 ## Problem Addressed
 
@@ -29,6 +49,8 @@ Typical AI coding workflows generate plan documents with fundamental limitations
 | No traceability; docs don't sync with code | Bidirectional sync via `/spdd-sync` command keeps design and implementation aligned |
 | Vague validation ("done when complete") | Explicit validation — exact error messages, HTTP status codes in Safeguards |
 | Implicit dependencies — AI infers them | Explicit execution order defined in Operations |
+
+---
 
 ## Key Features
 
@@ -83,6 +105,8 @@ Available via `openspdd generate <command>`:
 
 Auto-detection identifies the AI tool based on marker files (`.cursor/`, `.claude/`, `.github/copilot-instructions.md`, etc.) and generates appropriate templates.
 
+---
+
 ## Technical Architecture
 
 ### Core Dependencies
@@ -111,6 +135,8 @@ The tool follows a hierarchical command structure (inferred from cmd/ directory)
 ### Workflow Engine
 
 The `/spdd-sync` command implements bidirectional synchronization: it parses generated code, detects deviations from the REASONS Canvas specification, and updates the Canvas to reflect the actual implementation. This prevents design documents from becoming stale.
+
+---
 
 ## Installation & Usage
 
@@ -154,6 +180,8 @@ openspdd list --all        # List all commands
 openspdd list -c Development  # Filter by category
 ```
 
+---
+
 ## Key Design Insights
 
 ### Capability vs. Control
@@ -169,6 +197,8 @@ Code records "what is," not "what should be" and lacks "why." Codebase scanning 
 ### Bidirectional Synchronization Challenge
 
 "Do structured prompts themselves also become outdated?" (design-philosophy.md, line 380). The design philosophy acknowledges that specs become stale when code changes. Current mitigation: manually run `/spdd-sync` after code review to detect and update spec changes. Future direction: automated sync detection after each code update.
+
+---
 
 ## Limitations and Caveats
 
@@ -188,6 +218,8 @@ Bidirectional sync is manual and convention-based, not enforced. If code changes
 
 The repository has no release tags or version numbers (as of shallow clone). Commands marked "Optional (Beta)" — `spdd-story`, `spdd-code-review`, `spdd-api-test`, `spdd-reverse` — are not installed by default and may change. The tool is "still under continuous iteration" (design-philosophy.md, line 451).
 
+---
+
 ## Relevance to Claude Code Development
 
 OpenSPDD is highly relevant to Claude Code as a framework for:
@@ -199,6 +231,8 @@ OpenSPDD is highly relevant to Claude Code as a framework for:
 
 For Claude Code specifically, REASONS Canvas is complementary to CLAUDE.md (repo-level conventions) — Canvas works at feature-level granularity while CLAUDE.md covers project-level patterns.
 
+---
+
 ## References
 
 - **GitHub Repository**: <https://github.com/gszhangwei/open-spdd> (accessed 2026-09-11) (primary source for README, LICENSE, design-philosophy.md, go.mod)
@@ -206,6 +240,8 @@ For Claude Code specifically, REASONS Canvas is complementary to CLAUDE.md (repo
 - **docs/design-philosophy.md**: <https://github.com/gszhangwei/open-spdd/blob/main/docs/design-philosophy.md> (accessed 2026-09-11) — comprehensive exploration of capability vs. control, codebase scanning limitations, and structured prompt philosophy
 - **Installation**: Homebrew tap: <https://github.com/gszhangwei/tools> (accessed 2026-09-11) (formula provides installation)
 - **Build Requirements**: Go 1.23+ (from go.mod, accessed 2026-09-11)
+
+---
 
 ## Freshness Tracking
 
