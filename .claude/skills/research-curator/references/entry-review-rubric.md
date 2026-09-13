@@ -70,7 +70,10 @@ Every statement an entry or an analysis file makes about **this repository** is 
 
 For each repo claim, in order:
 
-1. **Path exists** — read the path the claim names. A proposal resting on a path that is not in the repo is a defect, full stop. Resolve it yourself; do not assume a near-miss was a typo.
+1. **Path exists** — decide which of two claims the path is making, then open it.
+   A claim about **what is there now** — "`X` already does Y", "the hook in `Z` writes the field" — is a defect when the path does not open. Record what was named and what is actually there; do not repair a near-miss on the writer's behalf.
+   A path named as a **place to create something** is not a defect for being absent. That is the entire purpose of an Integration Opportunities item: the file's absence is the reason the proposal exists. "Integration point: `.claude/hooks/pre-push.js`", "new skill in `plugins/developer-tools/skills/ci-debugger/`", "new file at", "target state", "could add", "consider adding" are all this second kind. For one of these, check instead that the parent location it would go into exists, and let step 3 settle whether something already implements it.
+   Decide the kind before opening anything. A creation target scored as a missing file is a manufactured defect, and most paths in a Relevance section are creation targets.
 2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
