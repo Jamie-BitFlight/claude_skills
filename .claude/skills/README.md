@@ -395,7 +395,7 @@ Claude automatically activates skills based on your request. Skills have trigger
 - **rt-ica**: "planning", "prerequisites", "spec", "PRD", "ticket", "RFC", "architecture design", "multi-step task"
 - **scientific-method:scientific-thinking**: "debugging", "strange behavior", "root cause", "architecture design", "complex refactoring", "investigation"
 - **verify**: "is it done", "task complete", "before commit", "completion", "finished"
-- **mattpocock-skills:writing-for-agents**: "skill", "AGENTS.md", "CLAUDE.md", "rule file", "research entry", "agent-facing document"
+- **mattpocock-skills:writing-for-agents** (external, optional): "skill", "AGENTS.md", "CLAUDE.md", "rule file", "research entry", "agent-facing document"
 - **claude-skills-overview-2026**: "skill format", "SKILL.md", "skill frontmatter", "skill best practices"
 - **hooks-guide**: "hook", "PreToolUse", "PostToolUse", "hook events", "inline-agent hooks", "platform hooks"
 - **claude-plugins-reference-2026**: "plugin", "plugin.json", "marketplace", "bundle"

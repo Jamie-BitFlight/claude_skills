@@ -73,9 +73,14 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 |-------|---------|---------|
 | Starting complex task | `/dh:rt-ica <#N \| goal>` | Works backward from the goal through the prerequisite chain, classifying each as available/derivable/missing, and blocks planning until nothing is missing |
 | Delegating to sub-agent | `/agent-orchestration:delegate` | Decompose, dispatch, adjudicate |
-| Writing or reviewing an agent-facing document | `/mattpocock-skills:writing-for-agents` | Skills, `AGENTS.md`, `CLAUDE.md`, rule files, research entries — pointer wording, information hierarchy, pruning |
 | Claiming task complete | `/dh:verify-done` | Runs "Is It Done?" checklist |
 | Writing or improving a process | `/process-siren:improve-processes` | Evaluates process completeness, improves before Mermaid conversion |
+
+**Agent-facing documents** — skills, `AGENTS.md`, `CLAUDE.md`, rule files, research entries — are written
+and reviewed against `mattpocock-skills:writing-for-agents`: pointer wording, information hierarchy,
+completion criteria, pruning. It ships outside this marketplace, so treat it as optional support — apply
+it when installed, and otherwise fall back to the conventions in this file and record that the result used
+built-in guidance only. Availability states and per-harness install paths: [Optional Supporting Skills](../plugins/the-rewrite-room/skills/the-rewrite-room/references/supporting-skills.md).
 
 **Critical Constraints:**
 
