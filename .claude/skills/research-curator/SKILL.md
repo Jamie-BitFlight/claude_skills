@@ -378,14 +378,29 @@ the Commit step stages exactly that list, nothing else.
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched (asymmetric edges can persist from any
-   prior run that predates this check):
+   prior run that predates this check). First snapshot which vault files are already dirty, so a
+   pre-existing uncommitted edit from another contributor is never folded into this run's commit:
 
    ```bash
+   git status --porcelain -- ./research/
    uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
    Each printed `{source} -> {target}` line preceding the `backlinks_repaired:` count names a
-   `{target}` file this command may have modified. Add every such target to the tracked file list.
+   `{target}` file this command may have modified.
+
+   - If `{target}` was **not** in the `git status` snapshot above (clean before this step): add it
+     to the tracked file list.
+   - If `{target}` **was** already dirty in that snapshot: leave it out of the tracked file list --
+     do not stage someone else's in-progress work alongside the repair -- and report it to the user
+     as `{path} -- pre-existing uncommitted changes, backlink repair not committed this run`.
+
+   This command exits non-zero whenever any asymmetric edge remains after the fix pass, including
+   edges it cannot structurally repair (a dangling link to a missing target, or a manually authored
+   row with a different description it refuses to overwrite). That non-zero exit reports remaining
+   edges; it is not a failure of this step -- continue to step 3 regardless of this command's exit
+   code. Only a failure to run the command at all (script or vault path not found) halts
+   Post-Actions here.
 
 3. **Lint** -- run formatting checks on all modified files:
 
