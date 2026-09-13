@@ -80,18 +80,10 @@ inline the transform table here.
 
 ## Section Format
 
-Backlink rows use the same canonical table format as the research-cross-referencer:
-
-```markdown
-## Cross-References
-
-| Entry | Category | Relationship |
-|-------|----------|--------------|
-| [Source Entry Name](../source-category/source-entry.md) | source-category | {transformed backlink description} |
-```
-
-Relative paths in the backlink row are relative to the **cited entry's** own directory, not
-the source entry's directory. Use `pathlib.Path` to compute the correct relative path.
+Backlink rows use the same canonical table as forward rows:
+[Cross-Reference Format](./../skills/research-curator/references/cross-reference-format.md).
+Its Link Paths section is the one that governs here — a backlink row's path is relative to the
+**cited** entry's directory, the file being written into, not the source entry's.
 
 ---
 

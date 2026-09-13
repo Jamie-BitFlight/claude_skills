@@ -51,32 +51,10 @@ flowchart TD
 
 ## Section Format
 
-The section is appended after `## Freshness Tracking` for legacy text-header entries, or after
-`## References` when the entry has no body Freshness Tracking heading (freshness data lives in
-frontmatter instead). Use relative paths from the entry's own directory:
-
-- Same-category entries: `./other-entry.md`
-- Different-category entries: `../other-category/filename.md`
-
-```markdown
----
-
-## Cross-References
-
-| Entry | Category | Relationship |
-|-------|----------|--------------|
-| [Resource Name](../other-category/filename.md) | other-category | {specific one-phrase relationship} |
-| [Resource Name](./same-category-file.md) | same-category | {specific one-phrase relationship} |
-```
-
-The **Relationship** column must name the specific conceptual link. It must never be a generic
-label like "related tool". Good examples:
-
-- "alternative MCP server transport approach"
-- "provides the embedding layer this tool queries"
-- "shares async task execution model"
-- "complements this tool's data collection with analysis"
-- "overlapping use case: structured agent output validation"
+Write the table, place it, and compute its link paths per
+[Cross-Reference Format](./../skills/research-curator/references/cross-reference-format.md).
+Load it before editing the entry — it is the single source of truth for the column shape, the
+placement anchor, the relative-path rule, and the bar the **Relationship** phrase must clear.
 
 ---
 
