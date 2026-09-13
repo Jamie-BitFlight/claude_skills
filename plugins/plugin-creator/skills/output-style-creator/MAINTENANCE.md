@@ -3,7 +3,6 @@
 This file and `SKILL-GOALS.md` are the only pair of their kind in this plugin, and no harness loads
 either. They are kept deliberately: this skill's claims are version-pinned against upstream
 documentation that moves, and the goals file is the contract a reviewer checks the workflow against.
-A skill-auditor pass raised their uniqueness; the repo owner confirmed they stay.
 
 ## Sources of truth
 
