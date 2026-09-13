@@ -830,15 +830,26 @@ class ContentProjectionStore:
             The decoded projection, or None when the backend holds no record or holds one this
             ledger did not write.
         """
+        return self.record(plan)[0]
+
+    def record(self, plan: str) -> tuple[dict[str, Any] | None, str]:
+        """Read the projection the backend holds for a plan, with the record's revision.
+
+        Args:
+            plan: The plan id.
+
+        Returns:
+            What :meth:`read` returns, and the record's revision; empty when there is no record.
+        """
         try:
             record = self.provider.get_content(self.reference(plan))
         except ContentNotFoundError:
-            return None
+            return None, ""
         try:
             decoded = json.loads(record.content)
         except json.JSONDecodeError:
-            return None
-        return decoded if isinstance(decoded, dict) else None
+            return None, record.revision
+        return (decoded if isinstance(decoded, dict) else None), record.revision
 
     def write(self, plan: str, content: Mapping[str, Any], *, expected_revision: str = "") -> str:
         """Write a projection to the backend.
@@ -882,6 +893,65 @@ def content_store(owner_reference: str = "") -> ContentProjectionStore:
         msg = "the configured backend does not support content records, so a plan cannot be exported to it"
         raise ContentUnavailableError(msg)
     return ContentProjectionStore(backend, owner_reference=owner_reference)
+
+
+def projection_source(document: Mapping[str, Any], *, source: str, revision: str = "") -> PlanSource | None:
+    """Build an import source from a projection, keeping the columns a canonical ``Plan`` drops.
+
+    :func:`plan_source` builds from a ``Plan``, which carries no ``attempts``, ``accepted``,
+    ``conflict_group`` or sections. A projection carries all of them, and the ``import`` transition
+    takes them "from the source", so a record :func:`export_plan` wrote is read through here.
+
+    Args:
+        document: A decoded plan record.
+        source: Where the rows came from, recorded in the events.
+        revision: The record's revision, recorded on the cursor.
+
+    Returns:
+        The source, or None when the document is not one :func:`projection` built — a record the
+        content path wrote carries none of :data:`LEDGER_PLAN_COLUMNS`.
+    """
+    if not set(LEDGER_PLAN_COLUMNS) <= set(document):
+        return None
+    tasks = [
+        TaskSource(
+            fields=decode_row({name: task.get(name) for name in ledger_spec.TASK_MODEL_FIELDS}, TASK_STRUCTURED),
+            conflict_group=task.get("conflict_group"),
+            attempts=int(task.get("attempts") or 0),
+            attempts_allowed=int(task.get("attempts_allowed") or 0),
+            accepted=int(task.get("accepted") or 0),
+            sections=[
+                SectionSource(name=str(section["name"]), content=str(section["content"]))
+                for section in task.get(SECTIONS_KEY, [])
+            ],
+        )
+        for task in document.get(TASKS_KEY) or []
+    ]
+    return PlanSource(
+        plan_id=str(document["plan_id"]),
+        fields=decode_row({name: document.get(name) for name in ledger_spec.PLAN_MODEL_FIELDS}, PLAN_STRUCTURED),
+        milestone=document.get("milestone"),
+        integration_branch=document.get("integration_branch"),
+        base_sha=document.get("base_sha"),
+        quality_gates=list(document.get("quality_gates") or []),
+        tasks=tasks,
+        source=source,
+        revision=revision,
+    )
+
+
+def held_source(plan: str, *, source: str = CONTENT_TARGET) -> PlanSource | None:
+    """Read the record the configured backend holds for a plan as an import source, when export wrote it.
+
+    Args:
+        plan: The plan id.
+        source: Where the rows came from, recorded in the events.
+
+    Returns:
+        The source with the record's revision, or None when there is no record or it is not a projection.
+    """
+    document, revision = content_store().record(plan)
+    return None if document is None else projection_source(document, source=source, revision=revision)
 
 
 def read_cursor(conn: sqlite3.Connection, plan: str, target: str) -> dict[str, Any] | None:
@@ -960,11 +1030,11 @@ def export_plan(
     reflected_seq = store.last_seq(conn, plan)
     digest = projection_hash(content)
     cursor = read_cursor(conn, plan, target)
-    if cursor is not None and str(cursor["projection_hash"] or "") == digest:
-        return transitions.declined("export", "unchanged", plan)
     held = projection_store.read(plan)
     diverged = divergences(held, content)
     unmoved = held is not None and not diverged
+    if unmoved and cursor is not None and str(cursor["projection_hash"] or "") == digest:
+        return transitions.declined("export", "unchanged", plan)
     expected = str(cursor["revision"] or "") if cursor is not None and unmoved else ""
     revision = projection_store.write(plan, content, expected_revision=expected)
     with store.transaction(conn):
@@ -1034,11 +1104,16 @@ def milestone_task(item: MilestoneItem, *, position: int, groups: Mapping[int, s
     )
 
 
-def conflict_groups_for(milestone_number: int, repo: str = "") -> dict[int, str]:
+def conflict_groups_for(milestone_number: int, items: Sequence[MilestoneItem], repo: str = "") -> dict[int, str]:
     """Read each milestone item's conflict group from ``dispatch_conflicts``.
+
+    ``dispatch_conflicts`` names a group by its integer ``group_id`` and its members by title, so
+    each title is matched back to the issues of *items* carrying it. Two items sharing a title both
+    join the group: an extra exclusion only serialises them, a missing one lets them collide.
 
     Args:
         milestone_number: The milestone.
+        items: The milestone's items, whose titles the groups name.
         repo: The repository, in ``owner/name`` form; the configured one when empty.
 
     Returns:
@@ -1046,12 +1121,14 @@ def conflict_groups_for(milestone_number: int, repo: str = "") -> dict[int, str]
         transition's "else null".
     """
     answer = dispatch_conflicts(milestone_number, repo)
+    issues_by_title: dict[str, list[int]] = {}
+    for item in items:
+        issues_by_title.setdefault(item.title, []).append(item.issue)
     groups: dict[int, str] = {}
     for group in answer.get("conflict_groups", []):
-        name = str(group.get("name") or group.get("group") or "")
-        for issue in group.get("issues", []) or group.get("items", []):
-            number = issue.get("issue") if isinstance(issue, dict) else issue
-            if name and isinstance(number, int):
+        name = f"conflict-{group['group_id']}"
+        for title in group["items"]:
+            for number in issues_by_title.get(title, []):
                 groups[number] = name
     return groups
 

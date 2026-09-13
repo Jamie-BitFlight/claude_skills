@@ -265,31 +265,9 @@ def source_from_projection(content: Mapping[str, Any], *, source: str, revision:
     Returns:
         The source, ready for ``port.import_plan``.
     """
-    tasks = [
-        port.TaskSource(
-            fields=decode({name: task.get(name) for name in ledger_spec.TASK_MODEL_FIELDS}, TASK_STRUCTURED),
-            conflict_group=task.get("conflict_group"),
-            attempts=int(task.get("attempts") or 0),
-            attempts_allowed=int(task.get("attempts_allowed") or 0),
-            accepted=int(task.get("accepted") or 0),
-            sections=[
-                port.SectionSource(name=str(section["name"]), content=str(section["content"]))
-                for section in task.get(port.SECTIONS_KEY, [])
-            ],
-        )
-        for task in content[port.TASKS_KEY]
-    ]
-    return port.PlanSource(
-        plan_id=str(content["plan_id"]),
-        fields=decode({name: content.get(name) for name in ledger_spec.PLAN_MODEL_FIELDS}, PLAN_STRUCTURED),
-        milestone=content.get("milestone"),
-        integration_branch=content.get("integration_branch"),
-        base_sha=content.get("base_sha"),
-        quality_gates=list(content.get("quality_gates") or []),
-        tasks=tasks,
-        source=source,
-        revision=revision,
-    )
+    built = port.projection_source(content, source=source, revision=revision)
+    assert built is not None
+    return built
 
 
 # ---------------------------------------------------------------------------
@@ -872,3 +850,58 @@ def test_the_record_export_writes_parses_as_plan_content(provider: InMemoryBacke
     record = provider.get_content(ContentRef(kind=ContentKind.PLAN, name=plan))
 
     assert parse_plan_content(record.content, plan)["plan_id"] == plan
+
+
+# ---------------------------------------------------------------------------
+# review follow-ups: unchanged re-reads the target, import keeps the projection, groups map by title
+# ---------------------------------------------------------------------------
+
+
+def test_export_repairs_a_record_edited_while_the_ledger_stood_still(
+    ledger: sqlite3.Connection, projection_store: RecordingStore
+) -> None:
+    """A matching cursor hash is not ``unchanged`` when the record itself was edited out of band."""
+    plan = plan_with_tasks(ledger, "T1")
+    port.export_plan(ledger, plan, projection_store=projection_store)
+    edited = held_record(plan)
+    edited["tasks"][0]["title"] = "edited by hand"
+    edit_held_record(plan, edited)
+
+    result = port.export_plan(ledger, plan, projection_store=projection_store)
+
+    assert result.noop is None
+    assert result.changed["divergences"] == ["T1"]
+    assert held_record(plan)["tasks"][0]["title"] == "Task T1"
+
+
+def test_import_from_content_keeps_what_only_the_projection_carries(
+    provider: InMemoryBackend, ledger: sqlite3.Connection
+) -> None:
+    """``import --from content`` of an exported record keeps attempts, acceptance, sections and revision.
+
+    Args:
+        provider: The configured backend.
+        ledger: An open ledger connection.
+    """
+    plan = worked_plan(ledger)
+    port.export_plan(ledger, plan, target=SOURCE, projection_store=port.content_store())
+
+    [source] = sam_plan.import_sources(SOURCE, plan, all_plans=False)
+
+    task = source.tasks[0]
+    assert (task.attempts, task.accepted) == (1, 1)
+    assert {section.name for section in task.sections} == set(ledger_spec.REPORT_SECTIONS)
+    assert source.revision
+
+
+def test_conflict_groups_map_member_titles_back_to_issues(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``dispatch_conflicts`` names a group by ``group_id`` and its members by title."""
+    answer = {"conflict_groups": [{"group_id": 1, "reason": "Shared file", "items": ["first", "second"]}]}
+    monkeypatch.setattr(port, "dispatch_conflicts", lambda *_: answer)
+    items = [
+        port.MilestoneItem(issue=10, title="first"),
+        port.MilestoneItem(issue=11, title="second"),
+        port.MilestoneItem(issue=12, title="third"),
+    ]
+
+    assert port.conflict_groups_for(MILESTONE, items) == {10: "conflict-1", 11: "conflict-1"}

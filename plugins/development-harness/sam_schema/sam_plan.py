@@ -93,6 +93,7 @@ from backlog_core.models import (
     get_repo_root,
 )
 from dh_core import ledger, ledger_spec, operations
+from dh_core.protocols import TaskBackend
 from github import GithubException
 from pydantic import TypeAdapter, ValidationError
 from ruamel.yaml import YAML, YAMLError
@@ -806,9 +807,31 @@ def import_sources(source: str, plan_address: str | None, *, all_plans: bool) ->
         [summary.plan_id for summary in operations.list_plans(backend)] if all_plans else [_plan_of(str(plan_address))]
     )
     try:
-        return [ledger.plan_source(operations.read_plan(backend, plan_id).plan, source=source) for plan_id in ids]
-    except (*_PLAN_LOAD_ERRORS, OSError) as exc:
+        return [_import_source(backend, source, plan_id) for plan_id in ids]
+    except (*_PLAN_LOAD_ERRORS, OSError, ContentProviderError) as exc:
         _error(str(exc), 2 if isinstance(exc, FormatDetectionError) else 1)
+
+
+def _import_source(backend: TaskBackend, source: str, plan_id: str) -> ledger.PlanSource:
+    """Read one plan for ``import``, raw when ``export`` wrote the record.
+
+    Reading an exported record as a ``Plan`` drops what only the projection carries — ``attempts``,
+    ``accepted``, ``conflict_group``, sections and the record's revision — so such a record is read
+    as the projection it is. Anything else is read through the backend as a canonical plan.
+
+    Args:
+        backend: The task backend ``IMPORT_SOURCES`` resolved.
+        source: The ``--from`` value.
+        plan_id: The plan to read.
+
+    Returns:
+        The source, ready for ``ledger.import_plan``.
+    """
+    if source == ledger.CONTENT_TARGET:
+        held = ledger.held_source(plan_id, source=source)
+        if held is not None:
+            return held
+    return ledger.plan_source(operations.read_plan(backend, plan_id).plan, source=source)
 
 
 # ---------------------------------------------------------------------------
@@ -1405,13 +1428,14 @@ def from_milestone(
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
 ) -> None:
     """Write a milestone's open items into the ledger as one plan."""
+    items = milestone_items(milestone_number)
     source = ledger.milestone_source(
         milestone_number=milestone_number,
         integration_branch=integration_branch,
         base_sha=branch_head(integration_branch),
-        items=milestone_items(milestone_number),
+        items=items,
         quality_gates=quality_gate or (),
-        conflict_groups=ledger.conflict_groups_for(milestone_number),
+        conflict_groups=ledger.conflict_groups_for(milestone_number, items),
     )
     with _ledger() as conn:
         _emit_transition(ledger.from_milestone(conn, source, replace=replace, dry_run=dry_run))

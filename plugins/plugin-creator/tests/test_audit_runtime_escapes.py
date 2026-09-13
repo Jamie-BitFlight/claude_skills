@@ -253,3 +253,32 @@ def test_cross_plugin_path_is_still_its_own_class(tmp_path: Path) -> None:
 def test_known_pattern_level_gaps(line: str) -> None:
     """Record the shapes the pattern itself cannot see; this fails loudly if one is closed."""
     assert _repo_path_tokens(line) != []
+
+
+# ===========================================================================
+# Escape depth follows the file, and commands are runtime text
+# ===========================================================================
+
+
+@pytest.mark.parametrize(
+    ("rel_path", "line", "escapes"),
+    [
+        ("agents/a.md", "See ../../rules/x.md.", True),
+        ("agents/a.md", "See [x](../../rules/x.md).", True),
+        ("skills/x/references/a.md", "See ../../../rules/x.md.", False),
+        ("skills/x/references/a.md", "See [x](../../../rules/x.md).", False),
+        ("skills/x/references/a.md", "See [x](../../../../rules/x.md).", True),
+    ],
+)
+def test_escape_depth_is_measured_from_the_scanned_file(rel_path: str, line: str, *, escapes: bool) -> None:
+    """A climb leaves the plugin only when it rises above the plugin root from that file's own depth."""
+    found = _audit._scan_line(rel_path, 1, line, _SIBLINGS, _OWN)
+    assert any(e.kind == "repo-path" for e in found) is escapes
+
+
+def test_command_documents_are_scanned(tmp_path: Path) -> None:
+    """A command body is runtime text, so an escape in one fails the gate."""
+    plugin_dir = tmp_path / "plugins" / _OWN
+    (plugin_dir / "commands").mkdir(parents=True)
+    (plugin_dir / "commands" / "run.md").write_text("Read rules/private.md\n", encoding="utf-8")
+    assert _run_gate(plugin_dir).returncode == 1
