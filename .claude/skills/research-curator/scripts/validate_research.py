@@ -954,9 +954,16 @@ def check_backlinks(
             try:
                 if _repair_one_asymmetric_pair(bl, source, target, vault_path):
                     repaired += 1
-            except (OSError, ValueError):
+            except OSError as exc:
                 typer.echo(
-                    f"warning: could not repair {source.relative_to(vault_path)} -> {target.relative_to(vault_path)}",
+                    f"warning: io-error, could not repair {source.relative_to(vault_path)} -> "
+                    f"{target.relative_to(vault_path)}: {exc}",
+                    err=True,
+                )
+            except ValueError as exc:
+                typer.echo(
+                    f"warning: structural, could not repair {source.relative_to(vault_path)} -> "
+                    f"{target.relative_to(vault_path)}: {exc}",
                     err=True,
                 )
 
