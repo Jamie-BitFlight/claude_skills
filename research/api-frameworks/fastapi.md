@@ -418,3 +418,18 @@ FastAPI is used in production by major organizations:
 | FastMCP                     | <https://github.com/jlowin/fastmcp>                                | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, issues, contributors), PyPI metadata, and pyproject.toml dependencies. Enterprise adoption quotes verified from README testimonials with linked references.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [omniroute](./omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
+| [robyn](./robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
+| [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [aiomqtt](../async-libraries/aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |
+| [pandera](../data-infrastructure/pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |
+| [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |

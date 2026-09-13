@@ -519,5 +519,9 @@ Matching patterns prevent files and directories from being indexed.
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase packaging tool using Tree-sitter for code extraction; shares language-agnostic parsing approach and generates agent skills |
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 | [skylos](../code-auditing/skylos.md) | code-auditing | analyses dead code on its CLI scan rather than over MCP, exposing only generated-code and agent verification to MCP clients |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
+| [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [codebase-recon-skill](../skill-generation-tools/codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |
 
 ---

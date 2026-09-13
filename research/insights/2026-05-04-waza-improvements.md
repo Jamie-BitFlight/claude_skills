@@ -5,14 +5,14 @@ title: "Improvement Proposals: Waza — Engineering Habits as Claude Skills"
 ## Improvement 1: Marketplace ↔ skill directory cross-reference validation
 
 **Source pattern**: From research entry, "Verification and Validation" — `./scripts/verify-skills.sh` "enforces ... Every marketplace entry has a matching `skills/*/SKILL.md` directory" and "`skills/RESOLVER.md` routing table references only existing skills". Verified directly against `.worktrees/waza/AGENTS.md` Verification section: "Marketplace, resolver, or root dispatcher changes: run `./scripts/verify-skills.sh` and confirm every marketplace source points at an existing skill directory."
-**Local system**: `/home/user/claude_skills/.claude-plugin/marketplace.json` (30 plugin entries) and `plugins/*/` directories; current validator is `uvx skilllint@latest` which checks individual skill structure but does not cross-reference marketplace entries against actual plugin directories.
+**Local system**: `./.claude-plugin/marketplace.json` (30 plugin entries) and `plugins/*/` directories; current validator is `uvx skilllint@latest` which checks individual skill structure but does not cross-reference marketplace entries against actual plugin directories.
 **Confidence**: High
 **Impact**: High
 **Backlog**: #2124 created
 
 ### Current state
 
-`/home/user/claude_skills/.claude-plugin/marketplace.json` lists 30 plugins as `{ "name": "...", "source": "./plugins/..." }` entries. Plugin auto-sync is handled by `plugins/plugin-creator/scripts/auto_sync_manifests.py`, which updates plugin component arrays and version fields on commit. There is no validator that walks `marketplace.json` plugin entries, resolves each `source` path, and verifies the referenced directory exists with a valid `.claude-plugin/plugin.json`. A renamed/deleted plugin directory results in a stale marketplace entry that passes lint but breaks installation. Evidence: no script in `/home/user/claude_skills/scripts/` or `plugins/plugin-creator/scripts/` references `marketplace.json` cross-validation; `grep -r "marketplace.*skills\|skills.*marketplace"` over `plugin-creator/scripts/` returns zero hits.
+`./.claude-plugin/marketplace.json` lists 30 plugins as `{ "name": "...", "source": "./plugins/..." }` entries. Plugin auto-sync is handled by `plugins/plugin-creator/scripts/auto_sync_manifests.py`, which updates plugin component arrays and version fields on commit. There is no validator that walks `marketplace.json` plugin entries, resolves each `source` path, and verifies the referenced directory exists with a valid `.claude-plugin/plugin.json`. A renamed/deleted plugin directory results in a stale marketplace entry that passes lint but breaks installation. Evidence: no script in `./scripts/` or `plugins/plugin-creator/scripts/` references `marketplace.json` cross-validation; `grep -r "marketplace.*skills\|skills.*marketplace"` over `plugin-creator/scripts/` returns zero hits.
 
 ### Target state
 
@@ -27,7 +27,7 @@ Run: `uv run scripts/verify_marketplace_consistency.py` — exit code 0 with no 
 ## Improvement 2: "Not for" exclusion section in skill frontmatter description
 
 **Source pattern**: From research entry "Skill Design Principles" (item 4): "Explicit 'Not for' sections — Each skill states what it doesn't do, reducing ambiguity about when to use which skill." Verified directly in `.worktrees/waza/skills/check/SKILL.md` line 3: `description: "... Not for exploring ideas or debugging."` and `.worktrees/waza/AGENTS.md`: "Create or update `skills/<name>/SKILL.md`; keep the description concrete, triggerable, and include a `Not for ...` exclusion."
-**Local system**: `/home/user/claude_skills/plugins/plugin-creator/skills/skill-creator/SKILL.md` (Step 5 frontmatter guidance) and `/home/user/claude_skills/plugins/plugin-creator/skills/write-frontmatter-description/`.
+**Local system**: `./plugins/plugin-creator/skills/skill-creator/SKILL.md` (Step 5 frontmatter guidance) and `./plugins/plugin-creator/skills/write-frontmatter-description/`.
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #2125 created
@@ -49,7 +49,7 @@ Read `plugins/plugin-creator/skills/skill-creator/SKILL.md` — the Step 5 §"Fr
 ## Improvement 3: Routing table validation for skill name → trigger consistency
 
 **Source pattern**: From research entry "Verification and Validation": "`skills/RESOLVER.md` routing table references only existing skills". Verified in `.worktrees/waza/skills/RESOLVER.md` (60 lines of trigger → SKILL.md path tables) and `.worktrees/waza/AGENTS.md`: "Keep `skills/RESOLVER.md` in sync when a skill description, trigger, or scope changes."
-**Local system**: `/home/user/claude_skills/plugins/development-harness/skills/development-harness/SKILL.md` and per-plugin `CLAUDE.md` files document skill routing (e.g., the dh CLAUDE.md "Skills Overview" section lists 30+ `/dh:*` skills with one-line descriptions).
+**Local system**: `./plugins/development-harness/skills/development-harness/SKILL.md` and per-plugin `CLAUDE.md` files document skill routing (e.g., the dh CLAUDE.md "Skills Overview" section lists 30+ `/dh:*` skills with one-line descriptions).
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence medium: the routing-table-as-validation-target pattern depends on whether this repo wants to formalize per-plugin SKILL routing tables (Waza has one resolver for 8 skills; this repo has 30 plugins with 200+ skills, so the equivalent design choice is non-obvious).
@@ -73,7 +73,7 @@ Add a script + pre-commit hook. Adding a fake skill reference like `/dh:nonexist
 ## Improvement 4: Mandatory shared output marker enforced by linter
 
 **Source pattern**: From research entry "Verification and Validation": "Shared output marker `🥷` present in every skill". Verified in `.worktrees/waza/skills/check/SKILL.md` line 11: "Prefix your first line with 🥷 inline, not as its own paragraph" and `.worktrees/waza/skills/RESOLVER.md` line 5: "所有技能都沿用同一个输出约定：首行内联带上 `🥷` ... `verify-skills.sh` 也会校验它."
-**Local system**: This repo's CLAUDE.md (`/home/user/claude_skills/.claude/CLAUDE.md`) defines "Response style: Concise, precise, direct answer only" but no per-skill output marker convention exists.
+**Local system**: This repo's CLAUDE.md (`./.claude/CLAUDE.md`) defines "Response style: Concise, precise, direct answer only" but no per-skill output marker convention exists.
 **Confidence**: High
 **Impact**: Low
 **Backlog**: Deferred — impact too narrow to justify a backlog item: per-skill output markers are a Waza branding choice; this repo's convention is "concise direct answer only" which is functionally equivalent for the AI consumer. Adopting an emoji marker would conflict with `.claude/CLAUDE.md` rule "Only use emojis if the user explicitly requests it. Avoid using emojis in all communication unless asked." (Tone and style section).
@@ -95,7 +95,7 @@ N/A.
 ## Improvement 5: Multi-mode skill architecture — explicit mode branching with disambiguation rules
 
 **Source pattern**: From research entry "Skill Modes and Branching": `/think` skill has three independent modes (Standard/Lightweight/Evaluation); `/check` skill has three parallel modes (Code review/Ship-Release/Triage). Verified in `.worktrees/waza/skills/check/SKILL.md` Triage Mode section (line 34) and Ship/Release Follow-through section (line 51). Disambiguation rules in `.worktrees/waza/skills/RESOLVER.md` lines 46-55 (numbered rules 1-9 explaining when each mode wins).
-**Local system**: `/home/user/claude_skills/plugins/plugin-creator/skills/skill-creator/SKILL.md` (Step 5 body guidance) and `plugins/plugin-creator/skills/refactor-skill/SKILL.md`.
+**Local system**: `./plugins/plugin-creator/skills/skill-creator/SKILL.md` (Step 5 body guidance) and `plugins/plugin-creator/skills/refactor-skill/SKILL.md`.
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence medium: this repo's existing pattern is "split when domains diverge" (refactor-skill pattern) — Waza's "branch within one skill via labelled modes" is the opposite design choice. Whether multi-mode-within-one-skill is a net improvement depends on the trade-off between description length budget (1024 chars) and the overhead of cross-skill orchestration. Needs experiment to validate.
@@ -119,14 +119,14 @@ Read `plugins/plugin-creator/skills/skill-creator/references/workflows.md` — s
 ## Improvement 6: Scoped smoke tests with mock-environment validation for installer scripts
 
 **Source pattern**: From research entry "Verification and Validation": Makefile smoke targets — `smoke-statusline-installer: Tests installer with mock environment (HOME, PATH override)`, `smoke-english-coaching-installer: Tests coaching rule install idempotence`, `smoke-package: Validates generated ZIP has exactly one root SKILL.md`, `smoke-verify-skills: Tests 6 validation edge cases`. Verified in `.worktrees/waza/AGENTS.md` Commands section: `make test`, `make package`, `./scripts/verify-skills.sh`.
-**Local system**: `/home/user/claude_skills/scripts/` (9 maintenance scripts including `check_symlinks.py`, `repair_symlinks.py`, `process-research-integration.py`) and `plugins/plugin-creator/scripts/` (init_skill, package_skill, etc.). Pre-commit hooks via `.pre-commit-config.yaml` and `prek` runner. CI workflows at `.github/workflows/`.
+**Local system**: `./scripts/` (9 maintenance scripts including `check_symlinks.py`, `repair_symlinks.py`, `process-research-integration.py`) and `plugins/plugin-creator/scripts/` (init_skill, package_skill, etc.). Pre-commit hooks via `.pre-commit-config.yaml` and `prek` runner. CI workflows at `.github/workflows/`.
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #2126 created
 
 ### Current state
 
-Pre-commit hooks run linters (`ruff`, `ty`, `markdownlint`, `auto_sync_manifests.py`). CI workflow `code-quality.yml` runs the same. No script in `/home/user/claude_skills/scripts/` or under any plugin runs an end-to-end smoke test of installer or scaffolder scripts (e.g., `init_skill.py`, `package_skill.py`) against a mock `HOME`/`PATH` environment to verify idempotence and edge cases. `init_skill.py` validates inputs but is never executed in CI with a tmpdir target. `package_skill.py` is never executed against a known-good skill directory in CI to validate ZIP structure. Failure mode: a regression that breaks `init_skill.py` (e.g., wrong path resolution, missing example file) is only caught when a developer runs it manually.
+Pre-commit hooks run linters (`ruff`, `ty`, `markdownlint`, `auto_sync_manifests.py`). CI workflow `code-quality.yml` runs the same. No script in `./scripts/` or under any plugin runs an end-to-end smoke test of installer or scaffolder scripts (e.g., `init_skill.py`, `package_skill.py`) against a mock `HOME`/`PATH` environment to verify idempotence and edge cases. `init_skill.py` validates inputs but is never executed in CI with a tmpdir target. `package_skill.py` is never executed against a known-good skill directory in CI to validate ZIP structure. Failure mode: a regression that breaks `init_skill.py` (e.g., wrong path resolution, missing example file) is only caught when a developer runs it manually.
 
 ### Target state
 
@@ -147,7 +147,7 @@ Run `make smoke-init-skill` — exit code 0, output ends with `OK: skill scaffol
 ## Improvement 7: Source-root SKILL.md / dispatcher anti-pattern check
 
 **Source pattern**: From research entry "Distribution and Installation": "Release: v3.12.2 (May 4, 2026) restores default `npx skills add tw93/Waza` behavior for direct skill discovery and removes source-root `SKILL.md` that caused discovery to halt at `/waza`." And "Distribution Packaging" — source has no root `SKILL.md`; Claude Desktop ZIP contains a single generated root `SKILL.md` for distribution only. Verified in `.worktrees/waza/AGENTS.md` Distribution Rules: "Do not add a source-root `SKILL.md`; it prevents nested skill discovery."
-**Local system**: This repo's structure — no `SKILL.md` exists at repo root, but `plugins/<name>/` directories use the documented Claude Code plugin structure. Existing rule in `/home/user/claude_skills/.claude/CLAUDE.md`: "All skill directories must sit directly under `skills/` — one level deep only. Do not create grouping subdirectories" — already addresses the analogous "subdirectory namespacing" anti-pattern.
+**Local system**: This repo's structure — no `SKILL.md` exists at repo root, but `plugins/<name>/` directories use the documented Claude Code plugin structure. Existing rule in `./.claude/CLAUDE.md`: "All skill directories must sit directly under `skills/` — one level deep only. Do not create grouping subdirectories" — already addresses the analogous "subdirectory namespacing" anti-pattern.
 **Confidence**: High
 **Impact**: Low
 **Backlog**: Skipped — already covered by the existing CLAUDE.md rule "Subdirectory Namespaces — Skills Do NOT Support This" which addresses the same class of discovery-halting structural error. The Waza-specific "source-root SKILL.md" variant does not occur in this repo because plugins are the unit of distribution, not a top-level SKILL.md. No action required.

@@ -269,3 +269,12 @@ SOURCE: [coding-agent README](https://github.com/badlogic/pi-mono/tree/main/pack
 | Last Verified | 2026-02-26 |
 | Version at Verification | v0.55.1 |
 | Next Review Recommended | 2026-05-26 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |

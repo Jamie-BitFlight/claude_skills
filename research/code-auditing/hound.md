@@ -320,3 +320,6 @@ Source: [hound README](https://github.com/scabench-org/hound#installation) — I
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [skylos](./skylos.md) | code-auditing | supplies the deterministic multi-class scans this tool's graph-guided investigation does not perform |
+| [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |
+| [syft](./syft.md) | code-auditing | referenced by syft (code-auditing) |
+| [brooks-lint](../coding-agents/brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |

@@ -333,3 +333,13 @@ This fills a gap in the research directory's MCP ecosystem coverage:
 4. **Architecture Documentation**: <https://github.com/arabold/docs-mcp-server/blob/main/ARCHITECTURE.md> (accessed 2026-01-26)
 5. **Installation Guide**: <https://github.com/arabold/docs-mcp-server/blob/main/docs/setup/installation.md>
 6. **MCP Protocol Specification**: <https://modelcontextprotocol.io/>
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
+| [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [claude-scientific-skills](../skill-generation-tools/claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |

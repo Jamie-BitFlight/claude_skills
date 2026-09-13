@@ -263,3 +263,6 @@ The project provides hands-on tutorials for:
 | [LiteAgents](./liteagents.md) | agent-frameworks | Multi-agent toolkit with 11 specialized agents and orchestrator agent; shares task delegation and agent-to-agent workflow patterns |
 | [CopilotKit](./copilotkit.md) | agent-frameworks | React frontend framework with AG-UI protocol for bi-directional agent-UI state sync; complements SAM's Gateway architecture for user interaction |
 | [Plano](../agent-infrastructure/plano.md) | agent-infrastructure | AI-native proxy with unified agent orchestration and model routing; addresses similar infrastructure concerns for multi-agent coordination |
+| [esp-claw](./esp-claw.md) | agent-frameworks | referenced by esp-claw (agent-frameworks) |
+| [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [takt](../research-agent-patterns/takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |

@@ -420,6 +420,14 @@ movements:
 | [Ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | production-scale multi-agent orchestration: 100+ specialized agents, 215+ MCP tools, fault-tolerant consensus |
 | [Solace Agent Mesh](../agent-frameworks/solace-agent-mesh.md) | agent-frameworks | event-driven agent delegation: scalable peer-to-peer agent collaboration via message-broker architecture |
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [omnigent](../agent-frameworks/omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [iii](../agent-infrastructure/iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [no-mistakes](../developer-tools/no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |
 
 ---
 

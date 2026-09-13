@@ -170,3 +170,10 @@ no extra logos, keep brand colors exactly, no text overlays.
 - [WaveSpeed AI — SeedDance 2.0 international access](https://wavespeed.ai) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |

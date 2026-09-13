@@ -549,3 +549,4 @@ GitAgent is directly relevant to Claude Code development in several ways:
 | [AI Agents Frameworks](./ai-agents-frameworks.md) | agent-frameworks | Comparative benchmarks of 10+ agent frameworks; gitagent enables unified definition and export across these evaluated frameworks |
 | [Ruflo](./ruflo.md) | agent-frameworks | Multi-agent orchestration with 100+ agents and 215+ MCP tools; gitagent format enables portable agent definitions for Ruflo's swarm coordination |
 | [Pi Monorepo](./pi-mono.md) | agent-frameworks | TypeScript agent framework with unified LLM API and modular architecture; shares agent composition and skill reuse philosophy with gitagent |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |

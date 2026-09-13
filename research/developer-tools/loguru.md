@@ -347,3 +347,11 @@ logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 6. **Installed Package Metadata** - `importlib.metadata.metadata('loguru')` on loguru 0.7.3: version, license, Python requirement, dependencies
 7. **Installed Package Source** - `/usr/local/lib/python3.11/dist-packages/loguru/`: file sizes, architecture, type stubs verified by direct inspection
 8. **Installed Package Help** - `help(logger.add)`, `help(logger.catch)`, `help(logger.opt)`, `help(logger.bind)`, `help(logger.contextualize)`: parameter documentation and signatures verified by direct execution
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |

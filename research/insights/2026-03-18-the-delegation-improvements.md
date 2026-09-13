@@ -83,6 +83,6 @@ A SKILL.md file exists at a skills directory for `request-approval`. The `/imple
 
 | Pattern | Reason skipped |
 |---|---|
-| Synchronous Approval Gates | Already covered — research entry itself notes "Claude Code's /complete-implementation quality gates use a similar async gate pattern." File: `plugins/python3-development/skills/complete-implementation/SKILL.md` implements multi-phase quality gates. |
+| Synchronous Approval Gates | Already covered — research entry itself notes "Claude Code's /complete-implementation quality gates use a similar async gate pattern." File: `plugins/development-harness/skills/complete-implementation/SKILL.md` implements multi-phase quality gates ("Proportional Quality Gates", "SAM Dispatch Loop (Phases T0-T6)"). |
 | Real-Time Status Visualization (Kanban / 3D) | Incompatible architecture — The Delegation uses WebGPU/Three.js/React for 3D visualization. Claude Code is a CLI tool. The research entry's suggestion to "Adapt The Delegation's React + Three.js UI" would require building an entirely separate application, not extending an existing local system. |
 | Spatial Workstation Allocation (POI occupancy / double-dispatch prevention) | Already covered — `sam claim P{N} {task_id}` in `/start-task` SKILL.md (step 3) prevents double-dispatch with exclusive claim semantics. Research entry maps this pattern directly to the claim logic. |

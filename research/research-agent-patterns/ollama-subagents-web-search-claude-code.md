@@ -203,3 +203,12 @@ claude --model minimax-m2.5:cloud
 - [ollama launch - Ollama Blog](https://ollama.com/blog/launch) (accessed 2026-02-19)
 - [Claude Code with Anthropic API compatibility - Ollama Blog](https://ollama.com/blog/claude) (accessed 2026-02-19)
 - [ollama/ollama GitHub Repository](https://github.com/ollama/ollama) (accessed 2026-02-19)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |

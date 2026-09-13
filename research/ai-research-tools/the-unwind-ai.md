@@ -157,3 +157,11 @@ Individual posts: https://www.theunwindai.com/p/{slug}
 - [Shubham Saboo - GitHub Profile](https://github.com/Shubhamsaboo) (accessed 2026-02-19)
 - [Unwind AI - LinkedIn](https://www.linkedin.com/company/unwind-ai) (accessed 2026-02-19)
 - [Unwind AI - X/Twitter](https://x.com/unwind_ai_) (accessed 2026-02-19)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [awesome-ai-apps](./awesome-ai-apps.md) | ai-research-tools | referenced by awesome-ai-apps (ai-research-tools) |

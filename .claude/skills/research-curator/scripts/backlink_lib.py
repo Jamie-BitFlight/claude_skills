@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -367,6 +368,48 @@ def bare_reference_description(source_name: str, source_category: str) -> str:
     return f"referenced by {source_name} ({source_category})"
 
 
+# "shares" as the phrase's whole first word, not a prefix of one. Without \b,
+# "shareset semantics differ" matches and asserts nothing symmetric.
+_SHARES_LEAD_PATTERN = re.compile(r"^\s*shares\b", re.IGNORECASE)
+
+
+def phrase_is_symmetric_shares(forward_phrase: str, source_name: str) -> bool:
+    """Report whether a forward phrase stays true with either entry as its subject.
+
+    This table's Entry column is the relationship phrase's grammatical subject,
+    so a phrase can only be reused verbatim under a different Entry when its
+    truth does not depend on which side that is. Two conditions, both required:
+
+    1. The phrase leads with the symmetric verb "shares" as a whole word, so it
+       carries no leading clause describing one particular entity.
+    2. The phrase does not name ``source_name`` as the object of "with". A
+       phrase shaped "shares <X> with <source>" satisfies (1) and is still not
+       symmetric: the backlink row names the source as Entry, so the phrase's
+       subject becomes the entity its own "with" clause names, and the row
+       asserts "Robyn shares a queueing model with Robyn".
+
+       Only the "with" construction is rejected, because only it makes subject
+       and object the same entity. A phrase that merely mentions the source
+       elsewhere -- "Shares Tauri + Rust cross-platform desktop architecture;
+       Yume focuses on multi-agent orchestration UI" -- is redundant under the
+       source's own Entry, not false, and stays eligible. Seven of the thirty-one
+       "shares"-leading rows in the corpus mention their source that way, and
+       none of the thirty-one names it as the object of "with"; rejecting the
+       seven would replace true content with the bare fallback for no gain.
+
+    Args:
+        forward_phrase: The relationship description from the forward row.
+        source_name: Display name of the source entry, which becomes the Entry
+            -- and therefore the subject -- of the backlink row.
+
+    Returns:
+        ``True`` when the phrase is safe to carry over verbatim.
+    """
+    if not _SHARES_LEAD_PATTERN.match(forward_phrase):
+        return False
+    return re.search(rf"\bwith\s+{re.escape(source_name)}\b", forward_phrase, re.IGNORECASE) is None
+
+
 def transform_to_backlink_description(
     forward_phrase: str, source_name: str, source_category: str, target_category: str
 ) -> str:
@@ -387,11 +430,29 @@ def transform_to_backlink_description(
     truth does not depend on which side is named as subject. "Shares" is the only
     such case this function recognizes:
 
-    1. If source_category == target_category and "shares" appears in forward_phrase,
-       append "(bidirectional)". Sharing is symmetric by definition -- if the source
-       shares something with the target, the target shares it right back -- so the
-       phrase reads the same regardless of which entry is named as Entry, and
-       marking it bidirectional asserts nothing new.
+    1. If source_category == target_category and
+       ``phrase_is_symmetric_shares(forward_phrase, source_name)``, append
+       "(bidirectional)". That predicate holds two conditions, and the invariant
+       needs both -- leading "shares" alone does not make a phrase symmetric:
+
+       a. "shares" is the phrase's whole first word. A substring test admits the
+          far more common corpus shape
+          "<descriptor of the target>; shares <X> with <source>", whose leading
+          clause describes exactly one entity. Relocating that phrase under a row
+          whose Entry is the *other* entity re-attributes the descriptor. A
+          prefix test without a word boundary is not enough either: "shareset
+          semantics differ" starts with those six letters and asserts nothing
+          symmetric.
+       b. The phrase does not name the source entry. "shares <X> with <source>"
+          passes (a) -- it leads with the verb and carries no leading clause --
+          and is still not symmetric, because the backlink row names the source
+          as Entry and this table's Entry column is the phrase's grammatical
+          subject. The result reads "Robyn shares a queueing model with Robyn".
+          Rule 2's fallback is correct for it.
+
+       No row in the current corpus exhibits either shape; both conditions are
+       guards against a phrase a future entry could legitimately write.
+       See tests/research_backlinks/test_relationship_transform.py.
     2. Otherwise, fall back to bare_reference_description(). This is a deliberate
        floor, not a placeholder: cross-reference-format.md's "no generic label" bar
        governs human/agent-authored forward rows, where a specific phrase is
@@ -411,7 +472,7 @@ def transform_to_backlink_description(
     Returns:
         A deterministic backlink relationship description string.
     """
-    if source_category == target_category and "shares" in forward_phrase.lower():
+    if source_category == target_category and phrase_is_symmetric_shares(forward_phrase, source_name):
         return f"{forward_phrase} (bidirectional)"
 
     return bare_reference_description(source_name, source_category)
@@ -509,9 +570,13 @@ def append_backlink_row(
 
     insert_idx = _find_freshness_insert_index(lines_stripped, anchor_idx)
 
+    # Only prepend a horizontal rule when the preceding content does not already end with one,
+    # otherwise the new section lands under a doubled "---\n\n---" separator.
+    preceding = next((ln for ln in reversed(lines_stripped[:insert_idx]) if ln.strip()), "")
+    separator = [] if preceding.strip() == "---" else ["", "---"]
+
     new_section_lines = [
-        "",
-        "---",
+        *separator,
         "",
         "## Cross-References",
         "",

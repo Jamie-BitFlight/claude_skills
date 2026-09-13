@@ -198,3 +198,4 @@ mcpskills-cli is relevant to the claude_skills ecosystem in two specific areas:
 | [SkillKit](../skill-generation-tools/skillkit.md) | skill-generation-tools | cross-format skill translation; both transform tool schemas into SKILL.md |
 | [narsil-mcp](./narsil-mcp.md) | mcp-ecosystem | mcpskills-cli can auto-generate skills from narsil-mcp's 90 tools |
 | [octocode-mcp](./octocode-mcp.md) | mcp-ecosystem | mcpskills-cli can auto-generate skills from octocode-mcp's research tools |
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |

@@ -183,3 +183,13 @@ python3 src/ui-ux-pro-max/scripts/search.py "dashboard" --domain chart --stack r
 - [Product Website: uupm.cc](https://www.uupm.cc/) (accessed 2026-02-26)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [dark-design](./dark-design.md) | ai-design-tools | referenced by dark-design (ai-design-tools) |
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |
+| [open-pencil](./open-pencil.md) | ai-design-tools | referenced by open-pencil (ai-design-tools) |
+| [boneyard](../developer-tools/boneyard.md) | developer-tools | referenced by boneyard (developer-tools) |

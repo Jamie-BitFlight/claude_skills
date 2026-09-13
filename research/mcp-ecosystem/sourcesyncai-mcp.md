@@ -223,3 +223,10 @@ npx -y @smithery/cli install @pbteja1998/sourcesyncai-mcp --client claude
 - [Model Context Protocol](https://modelcontextprotocol.io/introduction) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [unblocked](../context-management/unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | shares multi-source document aggregation pattern for knowledge base ingestion and cross-service sync (bidirectional) |

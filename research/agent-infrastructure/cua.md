@@ -203,5 +203,6 @@ CUA integrates with and builds upon:
 | [AutoResearchClaw](./AutoResearchClaw.md) | agent-infrastructure | Multi-agent orchestration with iterative repair: both systems spawn specialized agents for complex tasks and recover from failures. CUA's multi-OS environment could serve as execution layer for AutoResearchClaw's code generation experiments |
 | [Kernel](./kernel-sh.md) | agent-infrastructure | Shared problem: providing isolated browser instances for agent automation. CUA covers full desktop; Kernel focuses on headless Chrome. Different scopes, same architectural principle (environment abstraction) |
 | [Fly.io](./fly-io.md) | agent-infrastructure | Cloud deployment platform for agents: CUA provides the sandbox/runtime layer; Fly.io provides the deployment/scaling infrastructure. Complementary — CUA agents could be containerized and deployed on Fly.io for multi-region execution |
+| [zeroboot](./zeroboot.md) | agent-infrastructure | referenced by zeroboot (agent-infrastructure) |
 
 ---

@@ -235,3 +235,17 @@ analyze dependencies, and generate a structured report.
 - [app/mcp/server.py - Built-in MCP server](https://github.com/fdueblab/Micro-Agent/blob/master/app/mcp/server.py) (accessed 2026-02-20)
 - [requirements.txt](https://github.com/fdueblab/Micro-Agent/blob/master/requirements.txt) (accessed 2026-02-20)
 - [GitHub API - repos/fdueblab/Micro-Agent](https://api.github.com/repos/fdueblab/Micro-Agent) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [agentscope](./agentscope.md) | agent-frameworks | shares lightweight Python ReAct pattern with MCP multi-server support (bidirectional) |
+| [esp-claw](./esp-claw.md) | agent-frameworks | Shares MCP multi-server integration pattern and ReAct execution model with streaming JSON parsing (bidirectional) |
+| [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |

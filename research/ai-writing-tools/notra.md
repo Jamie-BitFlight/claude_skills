@@ -161,3 +161,9 @@ SOURCE: [Notra pricing](https://www.usenotra.com/pricing) (accessed 2026-03-04)
 - [Notra changelog/showcase](https://www.usenotra.com/changelog) (linked from site nav; not fully indexed)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [stop-slop](./stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |

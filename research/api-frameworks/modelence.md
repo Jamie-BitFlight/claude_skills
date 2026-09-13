@@ -267,3 +267,9 @@ SOURCE: [Modelence Docs — Stores](https://docs.modelence.com/stores) (accessed
 - [Modelence Docs — Quickstart](https://docs.modelence.com/quickstart) (accessed 2026-03-04)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

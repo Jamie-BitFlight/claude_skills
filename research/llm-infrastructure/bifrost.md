@@ -337,3 +337,13 @@ Bifrost excels at high-throughput gateway infrastructure and MCP orchestration. 
 | NPM Package | <https://www.npmjs.com/package/@maximhq/bifrost> | 2026-02-26 |
 
 **Research Method**: Information gathered from GitHub API (repository metadata, releases, languages, contributors, directory contents), GitHub README decoded from API response, official documentation pages (docs.getbifrost.ai), and gateway setup documentation. All statistics verified via direct API calls on 2026-02-26.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [glm5-exacto](./glm5-exacto.md) | llm-infrastructure | referenced by glm5-exacto (llm-infrastructure) |
+| [openbao](./openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
+| [quantum-free-router](./quantum-free-router.md) | llm-infrastructure | referenced by quantum-free-router (llm-infrastructure) |

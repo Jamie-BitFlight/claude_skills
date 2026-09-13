@@ -230,3 +230,18 @@ kernel logs my-action --follow
 - [Kernel $22M Series A announcement](https://www.kernel.sh/blog/series-a-announcement) (accessed 2026-02-22)
 - [kernel/kernel-images GitHub repository](https://github.com/kernel/kernel-images) (accessed 2026-02-22)
 - [onkernel/kernel-mcp-server GitHub repository](https://github.com/onkernel/kernel-mcp-server) (accessed 2026-02-22)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [cmux](./cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [happycapy](./happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [holyclaude](./holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [vibium](./vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |
+| [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

@@ -277,3 +277,4 @@ Index validation is less documented and tested compared to column validation. Co
 | [Chroma](./chroma.md) | data-infrastructure | vector database requiring validation of embedding data quality before indexing |
 | [FastAPI](../api-frameworks/fastapi.md) | api-frameworks | integrates seamlessly with Pandera for validating API request/response DataFrames |
 | [Logfire](../ai-observability/logfire.md) | ai-observability | Pydantic-ecosystem observability platform for monitoring data quality validations in production pipelines |
+| [duckdb-python-client](../database-libraries/duckdb-python-client.md) | database-libraries | referenced by duckdb-python-client (database-libraries) |

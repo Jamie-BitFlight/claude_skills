@@ -15,7 +15,7 @@ For this reason, several patterns are deferred — the gaps are real but the app
 ## Improvement 1: Document HTML5 drag-and-drop recipe for components that ignore Playwright's drag
 
 **Source pattern**: "HTML5 DnD (`dragstart` / `drop` events) requires `Input.dispatchDragEvent`, not `Input.dispatchMouseEvent` alone" — research entry lines 104–117 (interaction-skills/drag-and-drop.md derivation)
-**Local system**: `/home/user/claude_skills/.claude/skills/agent-browser/SKILL.md` and `/home/user/claude_skills/.claude/skills/agent-browser/references/commands.md`
+**Local system**: `./.claude/skills/agent-browser/SKILL.md` and `./.claude/skills/agent-browser/references/commands.md`
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence Medium: cannot directly observe whether `agent-browser drag @e1 @e2` (Playwright-backed) fires HTML5 dragstart/drop events without runtime testing on a real React DnD target
@@ -30,14 +30,14 @@ For this reason, several patterns are deferred — the gaps are real but the app
 
 ### Measurable signal
 
-Run: `grep -l 'dispatchDragEvent\|HTML5 DnD' /home/user/claude_skills/.claude/skills/agent-browser/references/*.md` returns at least one path. The `drag` command entry in `commands.md` contains a markdown link to the recipe file.
+Run: `grep -l 'dispatchDragEvent\|HTML5 DnD' ./.claude/skills/agent-browser/references/*.md` returns at least one path. The `drag` command entry in `commands.md` contains a markdown link to the recipe file.
 
 ---
 
 ## Improvement 2: Add interaction-recipes index for non-obvious browser patterns
 
 **Source pattern**: "Interaction Skills Library: Non-Obvious CDP Recipes ... 16 markdown files covering connection, cookies, dialogs, drag-and-drop, downloads, iframes, network waits, PDFs, screenshots, scrolling, shadow DOM, tabs, uploads, viewport" — research entry lines 100–121
-**Local system**: `/home/user/claude_skills/.claude/skills/agent-browser/`
+**Local system**: `./.claude/skills/agent-browser/`
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence Medium: agent-browser provides equivalents for many of these via its CLI (e.g., upload, screenshot, pdf, frame), so the gap is "named recipe coverage" rather than "missing capability". Verifying which recipes are missing vs which are covered requires a per-topic comparison.
@@ -52,14 +52,14 @@ The agent-browser skill has reference files for `commands.md`, `snapshot-refs.md
 
 ### Measurable signal
 
-Run: `ls /home/user/claude_skills/.claude/skills/agent-browser/references/interaction-recipes.md` returns the file. SKILL.md "Deep-Dive Documentation" table contains a row pointing to it.
+Run: `ls ./.claude/skills/agent-browser/references/interaction-recipes.md` returns the file. SKILL.md "Deep-Dive Documentation" table contains a row pointing to it.
 
 ---
 
 ## Improvement 3: Document the CDP escape hatch — when to drop from agent-browser to raw CDP
 
 **Source pattern**: "the protocol is the API ... eliminates that boundary by making every CDP method available with full fidelity" — research entry lines 19–23, 316–334
-**Local system**: `/home/user/claude_skills/.claude/skills/agent-browser/SKILL.md`
+**Local system**: `./.claude/skills/agent-browser/SKILL.md`
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred — confidence Medium: the philosophical decision (Playwright-wrapped vs raw CDP) is upstream of this skill. Documenting an escape hatch is useful but its impact is bounded by how often agents actually hit Playwright's limits.
@@ -74,7 +74,7 @@ SKILL.md adds a section "When to drop to raw CDP" listing concrete symptoms (HTM
 
 ### Measurable signal
 
-Run: `grep -c 'When to drop to raw CDP\|chromedevtools.github.io/devtools-protocol' /home/user/claude_skills/.claude/skills/agent-browser/SKILL.md` returns a value greater than 0.
+Run: `grep -c 'When to drop to raw CDP\|chromedevtools.github.io/devtools-protocol' ./.claude/skills/agent-browser/SKILL.md` returns a value greater than 0.
 
 ---
 

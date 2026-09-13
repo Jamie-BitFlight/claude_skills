@@ -264,3 +264,13 @@ ZeroClaw was created on 2026-02-13 and reached v0.1.0 on 2026-02-19 — it is si
 | Anthropic Auth Notice   | <https://code.claude.com/docs/en/legal-and-compliance#authentication-and-credential-use> | 2026-02-19 |
 
 **Research Method**: Information gathered from GitHub API (stars, forks, issues, releases, contributors via Link header pagination), and README decoded from base64 GitHub contents API response. No external web search required — all data sourced from primary GitHub repository.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [esp-claw](../agent-frameworks/esp-claw.md) | agent-frameworks | referenced by esp-claw (agent-frameworks) |
+| [happycapy](./happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [nemoclaw](./nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |

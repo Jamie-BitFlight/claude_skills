@@ -273,3 +273,11 @@ No public benchmarking or user studies document the effectiveness or adoption of
 | Technical Architecture | high | Based on actual file structure and Agent Skills specification |
 | Installation & Usage | high | Commands directly from installation guides and examples |
 | Relevance | medium | Patterns identified from structure and design; specific Claude Code integration not independently tested |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |

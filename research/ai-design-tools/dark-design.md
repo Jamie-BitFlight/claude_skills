@@ -151,6 +151,7 @@ dark.design is **moderately relevant** to Claude Code development in the followi
 | [OpenPencil](./open-pencil.md) | ai-design-tools | open-source design editor with native .fig file support and AI-assisted design |
 | [interface-design](./interface-design.md) | ai-design-tools | Claude Code plugin that persists design system decisions across sessions |
 | [Claude Code Templates](../skill-generation-tools/claude-code-templates.md) | skill-generation-tools | marketplace for distributing 100+ agents and skills to Claude Code, similar template commerce model |
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
 
 ## References
 

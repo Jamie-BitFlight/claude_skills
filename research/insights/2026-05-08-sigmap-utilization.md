@@ -74,7 +74,7 @@ The resulting manifest includes a "Ranked File List" section derived from `sigma
 
 ### Why this caller
 
-The SAM feature implementation workflow decomposes tasks based on explicit dependencies and impact estimates (per .claude/rules/local-workflow.md and /dh:implement-feature skill). Currently, impact analysis relies on agent reasoning about dependencies and file relationships — a process that is:
+The SAM feature implementation workflow decomposes tasks based on explicit dependencies and impact estimates (per the `/dh:implement-feature` skill; the `.claude/rules/local-workflow.md` rule also cited here was already deleted when this entry was written — commit 18f93b5c6, 2026-03-29). Currently, impact analysis relies on agent reasoning about dependencies and file relationships — a process that is:
 
 1. Non-deterministic (different agents may estimate different impact radii)
 2. Manual (requires reading dependency graphs and inferring change cascades)

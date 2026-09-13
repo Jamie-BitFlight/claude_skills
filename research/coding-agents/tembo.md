@@ -210,3 +210,12 @@ Add a `tembo.md` (or `AGENTS.md`) to your repo root to guide agent behavior:
 - [Tembo: The Background Coding Agents Company — Cerebral Valley](https://cerebralvalley.beehiiv.com/p/tembo-the-background-coding-agents-company) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [claude-replay](./claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [agent-deck](../developer-tools/agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |

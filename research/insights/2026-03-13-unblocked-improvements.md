@@ -27,7 +27,7 @@ The code-reviewer agent's review output references at least one project-specific
 ## Improvement 2: Source deconfliction for contradicting context sources
 
 **Source pattern**: "Source Deconfliction -- When multiple sources contradict each other, resolves via 'recency + authority signals' to determine the authoritative answer." (Architecture section, Mechanism 3) referenced indirectly via "Code Generation Fidelity: agents produce code that aligns with existing systems" (Relevance section, item 1)
-**Local system**: .claude/CLAUDE.md, .claude/rules/, MEMORY.md
+**Local system**: .claude/CLAUDE.md, rules/, MEMORY.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: the research entry describes this pattern in Unblocked's Architecture section but does not explicitly name it as a pattern to adopt in the Relevance section; the gap is inferred from the code generation fidelity pattern rather than directly observed
@@ -42,7 +42,7 @@ A documented precedence hierarchy in CLAUDE.md or a rules/ file that explicitly 
 
 ### Measurable signal
 
-A section titled "Source Precedence" or equivalent exists in .claude/CLAUDE.md or .claude/rules/ that explicitly ranks context sources by authority. Agents encountering contradictions can reference this section to resolve them without human intervention.
+A section titled "Source Precedence" or equivalent exists in .claude/CLAUDE.md or rules/ that explicitly ranks context sources by authority. Agents encountering contradictions can reference this section to resolve them without human intervention.
 
 ---
 

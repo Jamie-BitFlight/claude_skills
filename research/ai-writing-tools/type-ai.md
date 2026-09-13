@@ -329,3 +329,11 @@ Source: [type.ai](https://type.ai/) homepage and [blog.type.ai/faqs](https://blo
 | Type.ai FAQ             | <https://blog.type.ai/faqs>                            | 2026-01-31 |
 
 **Research Method**: Information gathered from Type.ai official website, YCombinator company profile, blog content, and FAQ. Statistics verified through direct observation of marketing materials and pricing pages.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [stop-slop](./stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |

@@ -428,7 +428,7 @@ Beyond the above design constraints (which are intentional), no other limitation
 | [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | terminal UI with in-app browser for agent debugging |
 | [HappyCapy](../agent-infrastructure/happycapy.md) | agent-infrastructure | browser-based sandbox for agent execution |
 | [Browser MCP](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | MCP-based Chrome automation (protocol adapter pattern) |
-| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | provides full Chrome DevTools Protocol surface for agent interaction; complements Cookbook's CDP method for browser automation workflows (bidirectional) |
+| [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |
 
 ---
 

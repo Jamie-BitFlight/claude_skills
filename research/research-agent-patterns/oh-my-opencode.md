@@ -211,3 +211,18 @@ curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/he
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [iii](../agent-infrastructure/iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
+| [claude-code-cli-power-patterns](../developer-tools/claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
+| [repowise](../mcp-ecosystem/repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
+| [mattpocock-skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

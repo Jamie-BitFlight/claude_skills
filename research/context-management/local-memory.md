@@ -326,3 +326,21 @@ curl "http://localhost:3002/api/v1/health"
 7. **NPM README** - `npm view local-memory-mcp readme` (accessed 2026-02-07, version shown as 1.3.3)
 8. **NPM Download Statistics** - <https://api.npmjs.org/downloads/> endpoints (accessed 2026-02-07)
 9. **Website Structured Data (JSON-LD)** - Extracted from HTML `<script type="application/ld+json">` at localmemory.co (accessed 2026-02-07, shows softwareVersion "v1.3.0" and dateModified "2025-11-13", lagging behind current NPM version 1.4.0)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
+| [simplemem-cross](./simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

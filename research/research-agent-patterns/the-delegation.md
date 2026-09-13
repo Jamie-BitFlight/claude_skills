@@ -226,5 +226,6 @@ The demo includes a default team (Designer, Developer, Copywriter, Analyst). To 
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | 16-agent orchestration system with explicit chief-of-staff coordinator; demonstrates scaled multi-agent patterns similar to The Delegation's Project Manager + worker agent hierarchy |
 | [Agent Deck](../developer-tools/agent-deck.md) | developer-tools | Terminal UI for managing multiple concurrent AI agent sessions; shares The Delegation's real-time status monitoring, session forking, and isolated execution (worktree/sandbox) patterns |
 | [OpenHands](../coding-agents/openhands.md) | coding-agents | Multi-agent platform with task decomposition and cloud deployment; provides architectural contrast showing alternative approaches to agent coordination and workspace isolation |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
 
 ---

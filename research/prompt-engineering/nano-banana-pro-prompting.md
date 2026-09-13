@@ -220,3 +220,9 @@ See the [Gemini Cookbook Colab](https://colab.sandbox.google.com/github/google-g
 - [Google AI Studio](https://aistudio.google.com/) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [prompt-optimizer](./prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

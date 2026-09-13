@@ -5,7 +5,7 @@ title: "Improvement Proposals: Claude Brain"
 ## Improvement 1: Project-portable session memory file committable to git
 
 **Source pattern**: "Memory is stored in one file (`.claude/mind.mv2`) at the project root under `.claude/`. ... Versionable: Commit to git, preserving memory in project history; Portable: Transfer via scp, email, or git clone for instant teammate onboarding" (Key Features → Single-File Memory Storage)
-**Local system**: `/home/user/claude_skills/.claude/skills/session-historian/SKILL.md` (and `scripts/session_query.py`)
+**Local system**: `./.claude/skills/session-historian/SKILL.md` (and `scripts/session_query.py`)
 **Confidence**: High
 **Impact**: High
 **Backlog**: #2095 created
@@ -46,7 +46,7 @@ Output lists session summaries committed under `.claude/sessions/` without touch
 ## Improvement 2: PostToolUse observation classification and capture beyond LastActivity timestamp
 
 **Source pattern**: "PostToolUse hook captures observations from tool outputs without explicit user action. Observations are classified into 10 types: discovery, decision, problem, solution, pattern, warning, success, refactor, bugfix, feature... Captured tools include: Read, Edit, Write, Update, Bash, Grep, Glob, WebFetch, WebSearch, Task, NotebookEdit. ... Deduplicates observations (1-minute window to avoid re-capturing same tool call)" (Key Features → Automatic Observation Capture; Technical Architecture → PostToolUse Hook)
-**Local system**: `/home/user/claude_skills/plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` (PostToolUse handler at line 854 and 929-933)
+**Local system**: `./plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py` (PostToolUse handler at line 854 and 929-933)
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #2096 created

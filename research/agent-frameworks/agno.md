@@ -298,3 +298,18 @@ The [cookbook](https://github.com/agno-agi/agno/tree/main/cookbook) provides hun
 | LLM Documentation         | <https://docs.agno.com/llms-full.txt>                    | 2026-01-31 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, issues, releases), PyPI statistics API, and cookbook README. Statistics verified via direct API calls.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](./AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [awesome-ai-apps](../ai-research-tools/awesome-ai-apps.md) | ai-research-tools | referenced by awesome-ai-apps (ai-research-tools) |
+| [hyperagents](../coding-agents/hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [simplemem-cross](../context-management/simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |

@@ -183,3 +183,18 @@ The Chrome extension must be installed separately from the Chrome Web Store. Aft
 - [npm: @browsermcp/mcp](https://www.npmjs.com/package/@browsermcp/mcp) (accessed 2026-02-20)
 - [Playwright MCP Server (upstream)](https://github.com/microsoft/playwright-mcp) (accessed 2026-02-20)
 - [GitHub API: repos/BrowserMCP/mcp](https://api.github.com/repos/BrowserMCP/mcp) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [vibium](../agent-infrastructure/vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |
+| [open-pencil](../ai-design-tools/open-pencil.md) | ai-design-tools | referenced by open-pencil (ai-design-tools) |
+| [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
+| [screenpipe](./screenpipe.md) | mcp-ecosystem | referenced by screenpipe (mcp-ecosystem) |

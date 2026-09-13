@@ -293,3 +293,6 @@ Agent Skills directly addresses the Claude Code ecosystem's need for agent disci
 | [Orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | agent orchestration framework enabling skill composition and coordination |
 | [Anthropic Agent Skills](./anthropics-skills.md) | skill-generation-tools | official Anthropic skills library with lifecycle-driven architecture |
 | [Orchestrator Agent Creation Guide](../research-agent-patterns/orchestrator-agent-creation-guide.md) | research-agent-patterns | patterns for building orchestrator agents that route across skill domains |
+| [awesome-codex-skills-issue-triage](./awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
+| [codebase-recon-skill](./codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |
+| [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |

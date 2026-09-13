@@ -423,6 +423,13 @@ No limitations were documented in the official documentation or README beyond th
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase packaging and compression tool using Tree-sitter; generates agent skills and supports MCP server interface |
 | [CodeWiki (Google)](../ai-research-tools/codewiki-google.md) | ai-research-tools | AI-powered repository documentation system generating architecture diagrams and hyperlinked symbol navigation from code analysis |
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
+| [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [codegraphcontext](./codegraphcontext.md) | mcp-ecosystem | referenced by codegraphcontext (mcp-ecosystem) |
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
+| [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [codebase-recon-skill](../skill-generation-tools/codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |
 
 ---
 

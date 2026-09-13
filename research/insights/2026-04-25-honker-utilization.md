@@ -2,6 +2,9 @@
 title: "Utilization Proposals: Honker"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `plugins/development-harness/skills/backlog-tools-administrator/SKILL.md` was removed in PR #3330 (commit `20c84f3b5`, 2026-08-30) with no successor skill; conclusions below that treat it as an existing capability or constraint no longer hold.
+
 ## Utilization 1: development-harness dispatch orchestration → honker work queues
 
 **Research entry**: ./research/data-infrastructure/honker.md

@@ -475,6 +475,8 @@ All sources accessed 2026-05-02 from <https://github.com/screenpipe/screenpipe> 
 |-------|----------|--------------|
 | [Octocode-MCP](./octocode-mcp.md) | mcp-ecosystem | complementary context infrastructure: Octocode provides code research context while Screenpipe provides screen/audio activity context to AI agents |
 | [Browser MCP](./browsermcp-mcp.md) | mcp-ecosystem | adjacent context capture: both extract activity from user environment via local architecture; Browser MCP captures web interactions while Screenpipe captures screen and audio |
+| [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
+| [github-patterns](../research-agent-patterns/github-patterns.md) | research-agent-patterns | referenced by github-patterns (research-agent-patterns) |
 
 ---
 

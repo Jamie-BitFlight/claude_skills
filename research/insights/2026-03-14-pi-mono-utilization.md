@@ -2,6 +2,9 @@
 title: "Utilization Assessment: Pi Monorepo"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-primitives`, `swarm-spawning` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Integration Surfaces Found
 
 Pi-mono documents **three callable surfaces**:
@@ -35,7 +38,7 @@ Pi-mono documents **three callable surfaces**:
 **Role**: Primary Python implementation plugin with delegation framework for developers and agents.
 
 **Potential fit**: ❌ No
-- **Scope**: Python-focused (see .claude/rules/python-development.md). Routes all Python implementation tasks to specialist agents.
+- **Scope**: Python-focused (see rules/python-development.md). Routes all Python implementation tasks to specialist agents.
 - **Why unsuitable**: Pi-mono is TypeScript-only. The Python development plugin has no TypeScript agent counterpart in this repository, and adding one is out of scope for utilization assessment.
 
 ### 3. Agents: `feature-researcher`, `codebase-analyzer`, `integration-checker`

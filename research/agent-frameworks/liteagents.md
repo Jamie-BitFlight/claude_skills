@@ -360,3 +360,17 @@ liteagents friction ~/.claude/projects
 12. **Stash Command** - `packages/claude/commands/stash.md` with context capture design (cloned and read 2026-02-15)
 13. **Subagentic Manual** - `packages/subagentic-manual.md` complete agent/command reference (file exists, 13,204 bytes)
 14. **Variants Configuration** - `packages/claude/variants.json` showing Pro-only config (cloned and read 2026-02-15)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [orchestra](./orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [simplemem-cross](../context-management/simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |

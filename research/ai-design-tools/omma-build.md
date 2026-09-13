@@ -142,3 +142,5 @@ Credit-metered tiers: Free ($0, 50 credits/month), Pro ($39/mo, 3,000 credits/mo
 | [AgentScope](../agent-frameworks/agentscope.md) | agent-frameworks | Multi-agent framework with actor-model parallelism; shares parallel execution architecture |
 | [Ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | 100+ specialized agent orchestration with MCP tools; comparable scale of agent coordination |
 | [Solace Agent Mesh](../agent-frameworks/solace-agent-mesh.md) | agent-frameworks | Event-driven multi-agent collaboration framework; alternative approach to agent-to-agent communication patterns |
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |

@@ -185,3 +185,5 @@ Source: [README — Getting Started](https://github.com/Arindam200/awesome-ai-ap
 | [The Unwind AI](./the-unwind-ai.md) | ai-research-tools | Companion newsletter to `awesome-llm-apps`, the closest analogue: a curated open-source collection of LLM/agent/RAG example apps |
 | [Agno](../agent-frameworks/agno.md) | agent-frameworks | Agno is the framework behind the repository's `starter_ai_agents/agno_starter` example |
 | [AI Agents Frameworks](../agent-frameworks/ai-agents-frameworks.md) | agent-frameworks | Surveys the same framework landscape (LangChain, LangGraph, CrewAI, AutoGen) the repository's starter agents demonstrate |
+| [samuraizer](./samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |
+| [agent-skills-eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

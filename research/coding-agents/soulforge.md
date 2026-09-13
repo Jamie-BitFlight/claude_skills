@@ -286,7 +286,15 @@ Project config (`.soulforge/config.json`) overrides global settings.
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
-| Claude Code | coding-agents | Competing agent framework; SoulForge differentiates via live graph, multi-provider support, embedded editor |
-| Aider | coding-agents | Inspirational source; SoulForge extends tree-sitter repo maps with cochange, blast radius, clone detection, live updates |
+| [pilot-shell](./pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+
+Two comparisons recorded here named tools that have no entry in this vault, so they
+could not be written as cross-reference rows (the Entry column requires a link to a
+real entry, and a row whose Entry cell holds no link makes this file invisible to the
+cross-reference graph). Both are kept verbatim as prose; promote either to a row once
+the corresponding entry exists:
+
+- **Claude Code** (coding-agents) — Competing agent framework; SoulForge differentiates via live graph, multi-provider support, embedded editor.
+- **Aider** (coding-agents) — Inspirational source; SoulForge extends tree-sitter repo maps with cochange, blast radius, clone detection, live updates.
 
 ---

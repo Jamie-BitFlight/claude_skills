@@ -2,6 +2,9 @@
 title: "Improvement Proposals: mattpocock/skills"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Improvement 1: Add Anti-Pattern section to skill template and training
 
 **Source pattern**: mattpocock/skills systematically includes Anti-Patterns sections in every skill (tdd/SKILL.md, design-an-interface/SKILL.md, improve-codebase-architecture/SKILL.md). Example: tdd/SKILL.md Anti-Patterns section teaches "do not slice horizontally (all tests first, then all code)"
@@ -73,7 +76,7 @@ File: `./skills/plugin-creator/skill-creator/SKILL.md` — no References or "See
 
 **Source pattern**: mattpocock/skills skills declare required tools in frontmatter and descriptions. Example: tdd/SKILL.md requires npm, test framework; to-issues/SKILL.md requires gh CLI; obsidian-vault/SKILL.md requires Obsidian vault access. This enables skill discovery and agent routing: agents can check tool availability before attempting a skill.
 
-**Local system**: `./.claude/rules/frontmatter-requirements.md` and `./.claude-plugin/plugin.json`
+**Local system**: `./rules/frontmatter-requirements.md` and the per-plugin manifests at `plugins/*/.claude-plugin/plugin.json` (the repo root holds only `.claude-plugin/marketplace.json`)
 
 **Confidence**: High
 
@@ -99,7 +102,7 @@ Example: Reading frontmatter-requirements.md, the tools field is documented as "
 
 ### Measurable signal
 
-1. Read `./.claude/rules/frontmatter-requirements.md` — confirms `tools:` field semantics section is present with examples
+1. Read `./rules/frontmatter-requirements.md` — confirms `tools:` field semantics section is present with examples
 2. Read `./skills/plugin-creator/skill-creator/SKILL.md` — confirms template includes example `tools:` field with comments
 3. Run `grep -c "tools:" ./skills/*/SKILL.md` — count of skills declaring tools (audit baseline)
 4. Skill discovery system can parse and evaluate `tools:` field to check availability
@@ -143,7 +146,7 @@ Agents default to sequential analysis (form hypothesis → test → refine) when
 
 | Pattern | Confidence | Reason |
 |---------|-----------|--------|
-| Domain-aware guidance integration (CONTEXT.md, ADR format) | Medium | improve-codebase-architecture in mattpocock/skills integrates CONTEXT.md and docs/adr/. Local system has `.claude/rules/` context files but CONTEXT.md integration not verified in existing skills. Would need to audit specific skills to confirm gap. Recommend: check `/dh:improve-codebase-architecture` agent implementation to determine if CONTEXT.md awareness already exists before creating backlog item. |
+| Domain-aware guidance integration (CONTEXT.md, ADR format) | Medium | improve-codebase-architecture in mattpocock/skills integrates CONTEXT.md and docs/adr/. Local system has `rules/` context files but CONTEXT.md integration not verified in existing skills. Would need to audit specific skills to confirm gap. Recommend: check `/dh:improve-codebase-architecture` agent implementation to determine if CONTEXT.md awareness already exists before creating backlog item. |
 
 ---
 

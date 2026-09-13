@@ -343,3 +343,8 @@ Unit tests via `pytest` (configured in `pyproject.toml` with `asyncio_mode = "au
 | [Local Memory - Persistent Memory Infrastructure for AI Agents](../context-management/local-memory.md) | context-management | Uses Qdrant for vector search in agent memory; shared pattern for persistent semantic retrieval across sessions |
 | [MotherDuck](./motherduck.md) | data-infrastructure | Serverless analytics warehouse with Dual Execution model; complements Chroma for querying structured metadata alongside vectors |
 | [Dolt](./dolt.md) | data-infrastructure | Version-controlled SQL database enabling reproducible training data snapshots; pairs with Chroma for versioned knowledge bases |
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [helix-db](./helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
+| [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |

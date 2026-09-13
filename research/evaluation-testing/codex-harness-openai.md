@@ -253,3 +253,12 @@ Initialize handshake example (JSON-RPC):
 - [Codex app-server-protocol source](https://github.com/openai/codex/tree/main/codex-rs/app-server-protocol) (accessed 2026-02-21)
 - [Codex app-server source](https://github.com/openai/codex/tree/main/codex-rs/app-server) (accessed 2026-02-21)
 - [Harness engineering: leveraging Codex in an agent-first world (companion post)](https://openai.com/index/harness-engineering-leveraging-codex-in-an-agent-first-world/) (accessed 2026-02-21)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
+| [agent-skills-eval](./agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

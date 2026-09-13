@@ -5,14 +5,14 @@ title: "Improvement Proposals: repowise"
 ## Improvement 1: Command output distillation hook — compress noisy shell stdout before the agent reads it
 
 **Source pattern**: "Command Distillation — `repowise distill <cmd>` compresses shell command output before agent reads it — errors-first, exit code preserved, every omission reversible via `[repowise#<ref>]` marker ... Opt-in Claude Code hook rewrites noisy commands automatically." (Key Features §6, lines 135–144). Example savings: `git log -50` 3,064 → 331 tokens (89% saved); `git diff` (30 commits) 62,833 → 8,635 tokens (86% saved).
-**Local system**: `.claude/rules/` (No Invented Limits policy) and the PostToolUse hook surface (`plugins/development-harness/hooks/hooks.json`, `task_status_hook.py`). No local skill or hook implements shell-command output compression.
+**Local system**: `rules/` (No Invented Limits policy) and the PostToolUse hook surface (`plugins/development-harness/hooks/hooks.json`, `task_status_hook.py`). No local skill or hook implements shell-command output compression.
 **Confidence**: High
 **Impact**: High
 **Backlog**: #2589 created
 
 ### Current state
 
-There is no local mechanism that compresses verbose shell-command output (stdout/stderr) before it enters an agent's conversation. A Grep across the repo for `distill`, `reversible truncation`, and `omission store` returns only research entries and unrelated reference files — no implementation. The closest existing backlog items (#1089 SAM-task compaction, #930 wave discovery-relay compression, #1858 conventions extraction, #2096 PostToolUse observation classification) all operate on internal harness data (SAM task bodies, worker outputs, tool-call metadata), not raw command stdout. The repo's own `.claude/rules/` "No Invented Limits" policy forbids silent truncation, which means any compression added must be reversible — exactly the property repowise's omission-store + `[repowise#<ref>]` marker provides, and which no current rule or tool supplies.
+There is no local mechanism that compresses verbose shell-command output (stdout/stderr) before it enters an agent's conversation. A Grep across the repo for `distill`, `reversible truncation`, and `omission store` returns only research entries and unrelated reference files — no implementation. The closest existing backlog items (#1089 SAM-task compaction, #930 wave discovery-relay compression, #1858 conventions extraction, #2096 PostToolUse observation classification) all operate on internal harness data (SAM task bodies, worker outputs, tool-call metadata), not raw command stdout. The repo's own `rules/` "No Invented Limits" policy forbids silent truncation, which means any compression added must be reversible — exactly the property repowise's omission-store + `[repowise#<ref>]` marker provides, and which no current rule or tool supplies.
 
 ### Target state
 

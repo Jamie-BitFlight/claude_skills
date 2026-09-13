@@ -242,3 +242,15 @@ fly wireguard create personal my-peer > peer.conf
 - [WireGuard private network access](https://fly.io/docs/blueprints/connect-private-network-wireguard/) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [happycapy](./happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [iii](./iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [nemoclaw](./nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
+| [zeroboot](./zeroboot.md) | agent-infrastructure | referenced by zeroboot (agent-infrastructure) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |
+| [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |

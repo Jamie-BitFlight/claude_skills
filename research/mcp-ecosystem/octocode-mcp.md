@@ -424,3 +424,13 @@ Both navigation tools are anchored by symbol *and* location, not by symbol alone
 8. **MCP.so Listing**: <https://mcp.so/server/octocode/bgauryy> (accessed 2026-01-26)
 9. **YouTube Channel**: <https://www.youtube.com/@Octocode-ai>
 10. **GitHub Releases**: <https://github.com/bgauryy/octocode-mcp/releases> (accessed 2026-01-26)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [gitnexus](./gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |
+| [mcpskills-cli](./mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
+| [screenpipe](./screenpipe.md) | mcp-ecosystem | referenced by screenpipe (mcp-ecosystem) |

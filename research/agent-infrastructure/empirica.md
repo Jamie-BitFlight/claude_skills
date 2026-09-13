@@ -519,6 +519,7 @@ Review triggers:
 | [mimir-mcp.md](../mcp-ecosystem/mimir-mcp.md) | mcp-ecosystem | both provide persistent AI memory via structured storage; empirica's MCP server exposes memory operations as tools |
 | [gitnexus.md](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | shared Claude Code hooks integration; empirica provides agent self-awareness, gitnexus provides code intelligence graph |
 | [everything-claude-code.md](../developer-tools/everything-claude-code.md) | developer-tools | both target Claude Code performance optimization via hooks; empirica narrows on epistemic measurement, everything-claude-code provides broader harness |
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
 
 ---
 

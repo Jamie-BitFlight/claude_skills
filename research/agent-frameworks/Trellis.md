@@ -230,6 +230,7 @@ The PreToolUse hook (v0.3.6) aligns with Claude Code's hook system and can autom
 | [gastown.md](../research-agent-patterns/gastown.md) | research-agent-patterns | multi-agent workspace manager using tmux transport and Dolt ledger for coordinating 20-50+ Claude Code sessions |
 | [takt.md](../research-agent-patterns/takt.md) | research-agent-patterns | YAML-defined multi-agent workflow engine with state machine transitions and faceted prompting for agent coordination |
 | [claude-codex-settings.md](../claude-code-plugins/claude-codex-settings.md) | claude-code-plugins | battle-tested Claude Code plugin ecosystem with 17 plugins and multi-LLM backend configuration |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
 
 ---
 

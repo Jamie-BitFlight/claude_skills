@@ -245,5 +245,8 @@ model = "claude-3-5-sonnet"
 | [1Code](../1code.md) | coding-agents | Electron app wrapping Claude Code CLI with git worktree isolation for conflict-free parallel work |
 | [Gastown](../gastown.md) | research-agent-patterns | multi-agent workspace manager coordinating 20-50+ Claude Code sessions—addresses same parallelism problem |
 | [Vibe Kanban](../vibe-kanban.md) | task-management | Kanban UI for parallel AI agent orchestration with git worktree isolation |
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [no-mistakes](./no-mistakes.md) | developer-tools | shares isolated git worktree pattern for non-blocking parallel agent validation (bidirectional) |
+| [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
 
 ---

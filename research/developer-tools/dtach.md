@@ -169,7 +169,7 @@ dtach -a /tmp/my-session -e '^A'
 - AI agent processes spawned via Claude Code can be wrapped in dtach sessions, ensuring they survive SSH disconnection or terminal closure
 - The `-n` mode allows launching agent background workers that run independently of the invoking terminal
 - The `-p` mode provides a mechanism to inject commands or data into a running agent session from scripts or orchestrators without a full attach cycle
-- Relevant to the Interactive Terminal Workarounds rule in `.claude/rules/interactive-terminal-workarounds.md`: dtach satisfies the PTY requirement that many terminal-dependent tools impose, without the overhead of tmux session management
+- Relevant to the Interactive Terminal Workarounds rule in `rules/interactive-terminal-workarounds.md`: dtach satisfies the PTY requirement that many terminal-dependent tools impose, without the overhead of tmux session management
 
 ### Patterns Worth Adopting
 
@@ -181,7 +181,7 @@ dtach -a /tmp/my-session -e '^A'
 
 - Wrap long-running Claude Code agent loops: `dtach -n /tmp/claude-agent-$(date +%s) ./run-agent.sh`
 - Use `dtach -p` in CI/CD or agent orchestration pipelines to feed input into an already-running interactive tool
-- Combine with the tmux-based PTY pattern from `.claude/rules/interactive-terminal-workarounds.md` as a lighter alternative when only detach (not capture-pane) is needed
+- Combine with the tmux-based PTY pattern from `rules/interactive-terminal-workarounds.md` as a lighter alternative when only detach (not capture-pane) is needed
 - Could replace ad-hoc `nohup` or `&` background invocations in skill scripts where reattachability is valuable
 
 ---

@@ -226,3 +226,13 @@ curl --location 'https://agent.tinyfish.ai/v1/automation/run-sse' \
 - [AgentQL MCP Server on MCP Server Hub](https://mcpserverhub.net/server/agentql-mcp-tinyfish-io) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [happycapy](./happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [vibium](./vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |
+| [zeroboot](./zeroboot.md) | agent-infrastructure | referenced by zeroboot (agent-infrastructure) |
+| [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

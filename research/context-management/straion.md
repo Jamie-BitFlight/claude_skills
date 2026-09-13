@@ -209,3 +209,12 @@ SOURCE: [Your AGENTS.md is costing more than you think](https://straion.com/blog
 - [Marathon Venture Capital](https://marathon.vc/) — lead investor in seed round
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |

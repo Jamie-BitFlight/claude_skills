@@ -446,4 +446,7 @@ The repository identifies good-first-issues for contributors:
 | [oh-my-opencode.md](../research-agent-patterns/oh-my-opencode.md) | research-agent-patterns | production-scale multi-agent architecture with compression boundaries at agent-to-agent handoffs |
 | [gastown.md](../research-agent-patterns/gastown.md) | research-agent-patterns | multi-agent workspace manager coordinating 20-50+ sessions where cross-session compression drift can be tracked |
 | [takt.md](../research-agent-patterns/takt.md) | research-agent-patterns | YAML-defined workflow engine with multi-agent state transitions where behavioral footprint shifts indicate compression effects |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [research-mode](./research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
 

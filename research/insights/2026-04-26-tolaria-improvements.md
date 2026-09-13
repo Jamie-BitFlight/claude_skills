@@ -60,7 +60,7 @@ The research-curator skill produces a structured knowledge base at `./research/`
 
 ### Target state
 
-A FastMCP server at `.claude/skills/research-curator/scripts/research_mcp_server.py` exposing at minimum: `research_list`, `research_view`, `research_search`, `research_view_section` (progressive disclosure), `research_freshness_summary`, `research_add_cross_reference`. Server registered via `mcp:` frontmatter block in research-curator SKILL.md per `.claude/rules/frontmatter-requirements.md` ecosystem rules. Validation via `/fastmcp-creator:fastmcp-client-cli`.
+A FastMCP server at `.claude/skills/research-curator/scripts/research_mcp_server.py` exposing at minimum: `research_list`, `research_view`, `research_search`, `research_view_section` (progressive disclosure), `research_freshness_summary`, `research_add_cross_reference`. Server registered via `mcp:` frontmatter block in research-curator SKILL.md per `rules/frontmatter-requirements.md` ecosystem rules. Validation via `/fastmcp-creator:fastmcp-client-cli`.
 
 ### Measurable signal
 

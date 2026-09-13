@@ -5,7 +5,7 @@ title: "Improvement Proposals: TheAlgorithms-Python"
 ## Improvement 1: Add "expand acronyms" naming convention rule to Python coding standards
 
 **Source pattern**: From "Naming Conventions" section of TheAlgorithms-Python.md, citing the project's CONTRIBUTING.md: "Expand acronyms because `gcd()` is hard to understand but `greatest_common_divisor()` is not."
-**Local system**: /home/user/claude_skills/plugins/python3-development/skills/python3-development/references/python3-standards.md (and the parallel file in python-engineering)
+**Local system**: ./plugins/python3-development/skills/python3-development/references/python3-standards.md (and the parallel file in python-engineering)
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #1958 created

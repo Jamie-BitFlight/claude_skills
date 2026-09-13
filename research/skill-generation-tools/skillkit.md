@@ -296,3 +296,14 @@ skillkit manifest install                 # Install from manifest
 8. **NPM Package Registry** - <https://registry.npmjs.org/skillkit> (accessed 2026-02-08)
 9. **NPM Download Statistics** - <https://api.npmjs.org/downloads/> endpoints (accessed 2026-02-08)
 10. **Website HTML Source / JS Bundle** - <https://agenstskills.com/assets/index-BDs2-uIT.js> (accessed 2026-02-08, for feature strings and collection names)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [mcpskills-cli](../mcp-ecosystem/mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
+| [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
+| [graphify](./graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

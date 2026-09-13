@@ -298,3 +298,13 @@ Violations:
 | Project Homepage                   | <https://interface-design.dev>                                                                 | 2026-02-26 |
 
 **Research Method**: All data gathered from GitHub API (repository metadata, releases, directory contents, file contents via base64 decode) and raw file reads. No web scraping. Statistics reflect live API responses at the time of research.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [dark-design](./dark-design.md) | ai-design-tools | referenced by dark-design (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |
+| [minimal-gallery](../documentation-tools/minimal-gallery.md) | documentation-tools | referenced by minimal-gallery (documentation-tools) |

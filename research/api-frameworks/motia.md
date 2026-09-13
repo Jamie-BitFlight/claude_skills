@@ -259,3 +259,12 @@ export const handler: Handlers['DailySummary'] = async ({ state, enqueue }) => {
 **Research Method**: Information gathered from official website, GitHub repository README, GitHub API (stars, forks, issues, contributors), npm downloads API, and official documentation.
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [iii](../agent-infrastructure/iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [robyn](./robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
+| [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

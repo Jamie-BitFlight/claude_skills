@@ -348,6 +348,7 @@ Reduction is budget-aware—when conversation exceeds the LLM's context window t
 | [ZeroClaw](../../agent-infrastructure/zeroclaw.md) | agent-infrastructure | Ultra-lightweight Rust infrastructure for autonomous agents with 28+ providers and deny-by-default security |
 | [TinyClaw](../../research-agent-patterns/tinyclaw.md) | research-agent-patterns | Multi-agent 24/7 orchestration with cron scheduling, isolated workspaces, and peer-to-peer handoffs |
 | [Narsil-MCP](../../mcp-ecosystem/narsil-mcp.md) | mcp-ecosystem | Rust MCP server providing code intelligence and security scanning tools for AI assistants |
+| [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
 
 ---
 

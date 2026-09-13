@@ -251,3 +251,10 @@ surf install <extension-id>
 - [npm Downloads API](https://api.npmjs.org/downloads/point/last-month/surf-cli) (accessed 2026-02-26)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [scrapling-skill](./scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

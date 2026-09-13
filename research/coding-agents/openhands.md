@@ -330,3 +330,18 @@ docker run -p 3000:3000 openhands/openhands
 5. **CodeAct 2.1 Announcement**: <https://openhands.dev/blog/openhands-codeact-21-an-open-state-of-the-art-software-development-agent> (accessed 2026-01-26)
 6. **OpenHands LM 32B Announcement**: <https://openhands.dev/blog/introducing-openhands-lm-32b-a-strong-open-coding-agent-model> (accessed 2026-01-26)
 7. **Research Paper**: <https://arxiv.org/abs/2511.03690> (accessed 2026-01-26)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [brooks-lint](./brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |
+| [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
+| [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |

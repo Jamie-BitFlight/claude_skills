@@ -197,7 +197,7 @@ impact_radius = {
 repowise v0.20.0 is production-ready (GA release, research entry line 8). Before integrating:
 
 1. **Proof of Concept**: Test repowise MCP server startup on a 500-file repo, verify `get_health()` accuracy via manual inspection of Alert-tier files, validate `get_risk()` directives against actual co-change patterns
-2. **Setup Protocol**: Document the `repowise init` and MCP registration workflow in `.claude/rules/` for agents to follow; clarify when to index (once per project vs. per-session)
+2. **Setup Protocol**: Document the `repowise init` and MCP registration workflow in `rules/` for agents to follow; clarify when to index (once per project vs. per-session)
 3. **Prioritized Integration**: Start with **code-review** (narrow integration point, high value—defect prediction directly improves PR safety); then **doc-drift-auditor** (read-only, no side effects); then **impact-analyst** (enhances blast radius, medium complexity)
 4. **Incremental Sync**: Use repowise's `<30s incremental update` to keep health/risk data fresh during development without re-indexing from scratch
 5. **Validate PR Directives**: Before relying on `get_risk()` `missing_cochanges` and `will_break` in production, manually verify against 5-10 real PRs to ensure co-change detection is accurate

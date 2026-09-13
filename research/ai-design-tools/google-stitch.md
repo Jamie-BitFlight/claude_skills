@@ -245,3 +245,16 @@ Jules complements Stitch by handling backend/infrastructure while Stitch focuses
 | Last Verified           | 2026-03-04                                 |
 | Version at Verification | Beta (Stitch 2.0, released December 2025)  |
 | Next Review Recommended | 2026-06-04                                 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [dark-design](./dark-design.md) | ai-design-tools | referenced by dark-design (ai-design-tools) |
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |
+| [omma-build](./omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [open-pencil](./open-pencil.md) | ai-design-tools | referenced by open-pencil (ai-design-tools) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

@@ -457,6 +457,11 @@ This means cloud infrastructure features (remote workers, AMI building, instance
 | [SkillsMP](../skill-generation-tools/skillsmp.md) | skill-generation-tools | Open marketplace for 66,500+ AI agent skills with SKILL.md standard; represents decentralized skill distribution alternative to Maverick's integrated approach |
 | [Claude Pilot](../developer-tools/claude-pilot.md) | developer-tools | Quality enforcement layer with hooks pipeline, /spec workflow, persistent memory, and smart model routing; direct parallel to Maverick's multi-mode workflow architecture |
 | [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
+| [brooks-lint](./brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [pilot-shell](./pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |
 
 ---
 

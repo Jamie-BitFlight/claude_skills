@@ -373,3 +373,9 @@ relevant in two specific contexts:
 - [GitHub API — lvgl/lvgl latest release](https://api.github.com/repos/lvgl/lvgl/releases/latest) (accessed 2026-03-05)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pretext](../developer-tools/pretext.md) | developer-tools | referenced by pretext (developer-tools) |

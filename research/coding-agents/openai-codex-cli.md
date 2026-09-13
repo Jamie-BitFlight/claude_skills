@@ -431,3 +431,12 @@ Launches the Electron-based desktop application UI (available at `chatgpt.com/co
 - [GitHub Releases: openai/codex](https://github.com/openai/codex/releases) (accessed 2026-03-01)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [nemoclaw](../agent-infrastructure/nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |

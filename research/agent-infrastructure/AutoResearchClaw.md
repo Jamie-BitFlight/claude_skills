@@ -442,6 +442,8 @@ The KB tracks decisions, experiments, findings, and lessons across runs. Persist
 | [OpenHands](../coding-agents/openhands.md) | coding-agents | Sandbox code execution with iterative repair patterns; both systems generate code, execute in isolated environments, and auto-recover from execution failures |
 | [Claude-Mem](../context-management/claude-mem.md) | context-management | Persistent cross-session knowledge base with progressive disclosure; both systems maintain learnings across runs to improve future performance |
 | [The Claw Loop](../research-agent-patterns/claw-loop.md) | research-agent-patterns | Autonomous orchestration via supervisor agent polling; both implement fail-gracefully principles with automatic state recovery and context clearing |
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [nemoclaw](./nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
 
 ---
 

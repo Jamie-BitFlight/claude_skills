@@ -355,6 +355,15 @@ jscpd demonstrates that code quality tools benefit from language-aware tokenizat
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+
 ## Related Tools
 
 | Tool                                                                 | Relationship                                        |

@@ -227,3 +227,15 @@ npx claude-code-templates@latest --plugins         # Plugin dashboard
 | Last Verified | 2026-03-03 |
 | Version at Verification | v1.28.16 |
 | Next Review Recommended | 2026-06-03 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [dark-design](../ai-design-tools/dark-design.md) | ai-design-tools | referenced by dark-design (ai-design-tools) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |

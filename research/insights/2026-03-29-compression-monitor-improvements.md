@@ -2,6 +2,9 @@
 title: "Improvement Proposals: compression-monitor"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Improvement 1: Behavioral fingerprint tracking in PostToolUse hook
 
 **Source pattern**: "Behavioral Footprint -- Tool-Use Pattern Tracking: Shifts in response length, tool-call frequency, and latency across session boundaries." (Section: Key Features, subsection 2)
@@ -115,7 +118,7 @@ After a swarm operation, per-agent behavioral JSONL files exist. A lead-lag anal
 ## Improvement 6: Vocabulary decay detection for constraint persistence
 
 **Source pattern**: "Ghost Lexicon -- Vocabulary Decay Detection: Loss of low-frequency, high-precision terms after a compression boundary. High-precision terms (e.g., 'immutable', 'schema', 'rollback') are more vulnerable to compression loss than common terms. Their disappearance signals constraint loss without output-quality change." (Section: Key Features, subsection 1)
-**Local system**: `CLAUDE.md`, `.claude/rules/`
+**Local system**: `CLAUDE.md`, `rules/`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #1111 created
@@ -126,11 +129,11 @@ The CLAUDE.md and rules/ files define high-precision constraint terms (e.g., "su
 
 ### Target state
 
-A vocabulary canary list is maintained as a structured file at `.claude/rules/vocabulary-canary.md` containing high-precision constraint terms extracted from CLAUDE.md and rules/. A companion script `vocabulary_canary_check.py` takes a session JSONL log and checks whether canary terms appear in orchestrator outputs before and after detected compression boundaries. A decay score above 0.3 triggers a warning.
+A vocabulary canary list is maintained as a structured file at `rules/vocabulary-canary.md` containing high-precision constraint terms extracted from CLAUDE.md and rules/. A companion script `vocabulary_canary_check.py` takes a session JSONL log and checks whether canary terms appear in orchestrator outputs before and after detected compression boundaries. A decay score above 0.3 triggers a warning.
 
 ### Measurable signal
 
-File `.claude/rules/vocabulary-canary.md` exists with 20+ high-precision terms. Running `vocabulary_canary_check.py --session {path}` produces a decay score and lists ghost terms (present pre-compression, absent post-compression). Score below 0.1 = LOW, 0.1-0.3 = MODERATE, above 0.3 = HIGH.
+File `rules/vocabulary-canary.md` exists with 20+ high-precision terms. Running `vocabulary_canary_check.py --session {path}` produces a decay score and lists ghost terms (present pre-compression, absent post-compression). Score below 0.1 = LOW, 0.1-0.3 = MODERATE, above 0.3 = HIGH.
 
 ---
 

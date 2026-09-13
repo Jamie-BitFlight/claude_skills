@@ -464,6 +464,10 @@ The Context Curator is documented as assembling prompts "within a configurable t
 | [liteagents.md](./liteagents.md) | agent-frameworks | 11-agent toolkit with orchestrator agent and session memory pipeline; shares Orchestra's intent-based agent routing and multi-step workflow coordination |
 | [superpowers.md](./superpowers.md) | agent-frameworks | Composable skills framework with subagent-driven development and two-stage code review; analogous to Orchestra's context curation and task-specific agent dispatch |
 | [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | shares DAG task decomposition with Kahn's algorithm, parallel sub-agent execution, and context curation patterns (bidirectional) |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
+| [octogent](./octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |
 
 ---
 

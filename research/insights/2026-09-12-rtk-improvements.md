@@ -36,8 +36,8 @@ Consequence for this file:
 and token savings dashboard), `rtk discover` (find missed savings opportunities), `rtk session`
 (adoption across recent sessions). RTK measures the byte volume of command output actually observed
 and ranks where reduction would pay off.
-**Local system**: /home/user/claude_skills/plugins/agentskill-kaizen/skills/transcript-analysis/SKILL.md
-and /home/user/claude_skills/plugins/agentskill-kaizen/skills/transcript-analysis/references/duckdb-queries.md
+**Local system**: ./plugins/agentskill-kaizen/skills/transcript-analysis/SKILL.md
+and ./plugins/agentskill-kaizen/skills/transcript-analysis/references/duckdb-queries.md
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: Not created — backlog MCP unavailable. Would be P1 (High confidence x Medium impact).
@@ -89,7 +89,7 @@ command string, not null.
 **Source pattern**: "Design Principles" section of the research entry, principle 4 — "Fail-Safe — If
 filtering fails, fall back to original output" (ARCHITECTURE.md lines 31–36), paired with principle
 3, "Exit Code Preservation".
-**Local system**: /home/user/claude_skills/rules/silent-failure-prevention.md
+**Local system**: ./rules/silent-failure-prevention.md
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: Not created — backlog MCP unavailable. Would be P1 (High confidence x Medium impact).
@@ -144,7 +144,7 @@ RTK enumerates distinct interception mechanisms per harness: PreToolUse hooks (C
 Factory Droid), BeforeTool hooks (Gemini), AGENTS.md/rules directives (Codex, Kimi, Windsurf, Cline),
 TypeScript extensions (Pi, OMP), Python plugin adapters (Hermes), with per-harness install commands
 (`rtk init -g --gemini`, `--codex`, `--agent cline`, `--agent hermes`).
-**Local system**: /home/user/claude_skills/plugins/plugin-creator/skills/hooks-guide/references/platform-coverage.md
+**Local system**: ./plugins/plugin-creator/skills/hooks-guide/references/platform-coverage.md
 **Confidence**: High
 **Impact**: Low
 **Backlog**: Not created — backlog MCP unavailable. Would be P2 (High confidence x Low impact).

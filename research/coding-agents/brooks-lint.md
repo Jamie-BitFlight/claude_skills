@@ -469,8 +469,6 @@ Source: README.md, CLAUDE.md, AGENTS.md, plugin.json (accessed 2026-05-10).
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |

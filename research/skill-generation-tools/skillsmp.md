@@ -209,3 +209,11 @@ mv SKILL.md .claude/skills/skill-name/
 - [SkillsMP Complete Guide 2026 — SmartScope](https://smartscope.blog/en/blog/skillsmp-marketplace-guide/) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [happycapy](../agent-infrastructure/happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |

@@ -313,3 +313,11 @@ plugins/
 | Homepage                  | <https://athola.github.io/claude-night-market>                             | 2026-01-31 |
 
 **Research Method**: Information gathered from GitHub repository README, GitHub API for repository metadata (stars, forks, license, dates), marketplace.json for plugin details, and capabilities reference for skill/command/agent counts. Statistics re-verified via direct GitHub API calls and git-tree enumeration on 2026-08-11; the earlier 2026-01-31 figures (16 plugins / 126 skills / 114 commands / 41 agents, v1.3.7) were superseded.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [agent-skills](./agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |

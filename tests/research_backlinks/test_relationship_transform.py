@@ -48,6 +48,110 @@ class TestSharesBidirectionalPattern:
         )
         assert result == "Shares a queueing model (bidirectional)"
 
+    def test_leading_whitespace_tolerated(self) -> None:
+        """A phrase padded by table-cell whitespace still counts as leading 'shares'."""
+        result = bl.transform_to_backlink_description(
+            "  shares a queueing model", "AgentB", "agent-frameworks", "agent-frameworks"
+        )
+        assert result.endswith("(bidirectional)")
+
+
+# ---------------------------------------------------------------------------
+# Regression: "shares" must be the phrase's FIRST word, not merely present
+# (PR #3531 review -- a substring test wrote 25 misattributed rows into the
+# corpus, 14 of them self-referential)
+# ---------------------------------------------------------------------------
+
+
+class TestSharesMustLeadThePhrase:
+    """The common corpus shape is `<descriptor of the target>; shares <X> with
+    <source>`. It contains "shares" but its leading clause describes exactly one
+    entity, so relocating it under a row whose Entry is the other entity
+    re-attributes that clause -- frequently producing a row asserting that X
+    "shares ... with X". Only a phrase whose first word is the symmetric verb is
+    subject-independent.
+    """
+
+    def test_pocketbase_robyn_case_is_not_reused(self) -> None:
+        """Real PR #3531 case: robyn.md's row about PocketBase ("Go-based backend
+        alternative; shares realtime and auth patterns with Robyn's WebSocket and
+        SSE support") describes PocketBase -- a Go backend -- while Robyn is a
+        Python framework with a Rust runtime. The backlink written into
+        pocketbase.md (Entry=robyn) must not carry that description forward."""
+        forward_phrase = (
+            "Go-based backend alternative; shares realtime and auth patterns with Robyn's WebSocket and SSE support"
+        )
+        result = bl.transform_to_backlink_description(forward_phrase, "robyn", "api-frameworks", "api-frameworks")
+        assert "Go-based" not in result
+        assert result == "referenced by robyn (api-frameworks)"
+
+    def test_self_referential_row_is_not_produced(self) -> None:
+        """A phrase naming the source entity after "shares" must not be relocated
+        onto a row whose Entry is that same entity."""
+        result = bl.transform_to_backlink_description(
+            "TypeScript agent framework with unified LLM API; shares skill reuse philosophy with gitagent",
+            "gitagent",
+            "agent-frameworks",
+            "agent-frameworks",
+        )
+        assert "shares" not in result
+        assert result == "referenced by gitagent (agent-frameworks)"
+
+    def test_mid_phrase_shares_falls_back_even_same_category(self) -> None:
+        """Same category is not enough -- the phrase must also lead with "shares"."""
+        result = bl.transform_to_backlink_description(
+            "Rust git worktree CLI; shares a git-centric model", "tolaria", "developer-tools", "developer-tools"
+        )
+        assert "bidirectional" not in result
+        assert result == bl.bare_reference_description("tolaria", "developer-tools")
+
+
+# ---------------------------------------------------------------------------
+# Regression: leading "shares" is necessary but NOT sufficient (PR #3531 second
+# review). Both cases below are latent -- no corpus row exhibits either -- and
+# both defeated the earlier `startswith("shares")` guard.
+# ---------------------------------------------------------------------------
+
+
+class TestLeadingSharesIsNotSufficient:
+    """The guard claimed a phrase beginning with the symmetric verb "reads the
+    same regardless of which entry is named as Entry". Two shapes falsify that.
+    """
+
+    def test_word_prefix_is_not_the_verb(self) -> None:
+        """`startswith` has no word boundary: "shareset" is not "shares"."""
+        result = bl.transform_to_backlink_description(
+            "shareset semantics differ", "robyn", "api-frameworks", "api-frameworks"
+        )
+        assert "bidirectional" not in result
+        assert result == bl.bare_reference_description("robyn", "api-frameworks")
+
+    def test_trailing_with_source_would_self_reference(self) -> None:
+        """ "shares <X> with <source>" leads with the verb and is still not symmetric.
+
+        The backlink row names the source as Entry, and Entry is the phrase's
+        grammatical subject, so carrying it over asserts "Robyn shares a queueing
+        model with Robyn".
+        """
+        result = bl.transform_to_backlink_description(
+            "shares a queueing model with Robyn", "Robyn", "api-frameworks", "api-frameworks"
+        )
+        assert "bidirectional" not in result
+        assert result == bl.bare_reference_description("Robyn", "api-frameworks")
+
+    def test_source_named_outside_a_with_clause_stays_eligible(self) -> None:
+        """Only the "with" construction collapses subject into object.
+
+        A phrase that mentions the source elsewhere is redundant under the
+        source's own Entry, not false. Seven corpus rows have this shape and
+        must keep their content.
+        """
+        forward_phrase = (
+            "Shares Tauri + Rust cross-platform desktop architecture; Yume focuses on multi-agent orchestration UI"
+        )
+        result = bl.transform_to_backlink_description(forward_phrase, "Yume", "developer-tools", "developer-tools")
+        assert result == f"{forward_phrase} (bidirectional)"
+
 
 # ---------------------------------------------------------------------------
 # Rule 2: bare_reference_description fallback -- no verb inversion, no verbatim
@@ -190,7 +294,7 @@ class TestNeverLeaksForwardPhraseContent:
     proper nouns, or phrasing."""
 
     @given(
-        forward_phrase=st.text(min_size=1, max_size=200).filter(lambda s: "shares" not in s.lower()),
+        forward_phrase=st.text(min_size=1, max_size=200).filter(lambda s: not s.lstrip().lower().startswith("shares")),
         source_name=st.sampled_from(["Alpha", "Syft", "LocalAI", "Skylos"]),
         source_category=st.sampled_from(["tools", "code-auditing", "llm-infrastructure"]),
         target_category=st.sampled_from(["tools", "code-auditing", "llm-infrastructure", "mcp-ecosystem"]),

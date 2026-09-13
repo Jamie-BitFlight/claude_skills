@@ -224,3 +224,5 @@ SOURCE: [README.md upstream](https://github.com/Lumiaqian/openspec-mcp/blob/main
 | [SourceSync.ai MCP](./sourcesyncai-mcp.md) | mcp-ecosystem | shares multi-source document aggregation pattern for knowledge base ingestion and cross-service sync |
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | 16-agent framework implementing spec-driven orchestration and approval workflows alongside code execution |
 | [Claude CodePro](./../coding-agents/claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |

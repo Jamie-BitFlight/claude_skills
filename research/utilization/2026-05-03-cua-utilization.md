@@ -186,7 +186,7 @@ SAM Integration (proposed)
 - **CUA Documentation:** <https://cua.ai/docs>
 - **Python SDK:** <https://pypi.org/project/cua/>
 - **Benchmarks:** OSWorld, ScreenSpot, Windows Arena (integrated in CUA)
-- **Research entry:** `/home/user/claude_skills/research/agent-infrastructure/cua.md`
+- **Research entry:** `./research/agent-infrastructure/cua.md`
 
 ---
 

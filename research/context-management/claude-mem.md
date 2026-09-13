@@ -260,3 +260,18 @@ Settings are managed in `~/.claude-mem/settings.json`:
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [samuraizer](../ai-research-tools/samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
+| [simplemem-cross](./simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [abtop](../developer-tools/abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |

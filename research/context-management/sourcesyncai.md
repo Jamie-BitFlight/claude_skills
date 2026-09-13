@@ -245,3 +245,15 @@ curl -X POST https://api.sourcesync.ai/v1/search/hybrid \
 - [MCP Server on Smithery](https://smithery.ai/server/@pbteja1998/sourcesyncai-mcp) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [tolaria](../developer-tools/tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
+| [zvec](../ml-infrastructure/zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |

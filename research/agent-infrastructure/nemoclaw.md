@@ -245,3 +245,4 @@ Network egress approvals for unknown hosts require operator interaction via Open
 | [PicoClaw](./picoclaw.md) | agent-infrastructure | Sibling project in the Claw ecosystem; ultra-lightweight agent design vs NemoClaw's reference stack approach |
 | [AutoResearchClaw](./AutoResearchClaw.md) | agent-infrastructure | Advanced Claw variant; extends autonomous agent patterns with multi-stage pipeline and self-healing capabilities |
 | [OpenAI Codex CLI](../coding-agents/openai-codex-cli.md) | coding-agents | Shared security design pattern; both implement OS sandbox isolation plus policy-enforced approval model for untrusted code execution |
+| [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |

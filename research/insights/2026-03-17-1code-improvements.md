@@ -2,6 +2,9 @@
 title: "Improvement Proposals: 1Code"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Improvement 1: Add plan-mode gate to implement-feature SAM execution workflow before destructive agent dispatch
 
 **Source pattern**: "Plan mode before agent mode: requiring the agent to produce and surface a structured plan for review before executing destructive operations (file edits, bash commands) reduces irreversible mistakes — directly applicable to skill design." (Research entry §Relevance to Claude Code Development > Patterns Worth Adopting)
@@ -16,7 +19,7 @@ title: "Improvement Proposals: 1Code"
 
 `plugins/python3-development/skills/start-task/SKILL.md` claims the task at step 3 and immediately proceeds to implementation at step 6 (`Implement against the task acceptance criteria`). There is no plan-first phase between claiming and executing.
 
-The `swarm-patterns` skill (`/home/user/claude_skills/.claude/skills/swarm-patterns/SKILL.md`) documents Pattern 5 (Plan Approval Workflow) using `mode: "plan"` with team swarms and `plan_approval_response` messages, but this pattern is not wired into the SAM task execution path.
+The `swarm-patterns` skill (`./.claude/skills/swarm-patterns/SKILL.md`) documents Pattern 5 (Plan Approval Workflow) using `mode: "plan"` with team swarms and `plan_approval_response` messages, but this pattern is not wired into the SAM task execution path.
 
 ### Target state
 

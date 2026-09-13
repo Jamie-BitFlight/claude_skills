@@ -253,3 +253,13 @@ mcpskills --url https://mcp.example.com/sse --token <token> --multi-skills
 4. **mcpskills-cli Token Optimization Docs** - <https://github.com/dhanababum/mcpskills-cli/blob/main/docs/LOW_TOKEN_SKILLS.md> (accessed 2026-02-15)
 5. **fastmcp Documentation** - <https://github.com/jlowin/fastmcp> (accessed 2026-02-15)
 6. **MCP Protocol Specification** - <https://modelcontextprotocol.io/llms-full.txt> (accessed 2026-02-15)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
+| [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

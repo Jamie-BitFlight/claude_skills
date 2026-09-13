@@ -195,3 +195,9 @@ response = team.invoke({
 - [GitHub API: repos/business-science/ai-data-science-team](https://api.github.com/repos/business-science/ai-data-science-team) (accessed 2026-03-04)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |

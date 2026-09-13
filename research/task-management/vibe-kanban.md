@@ -190,3 +190,12 @@ pnpm run format     # Prettier + cargo fmt
 | Last Verified            | 2026-03-03 |
 | Version at Verification  | v0.1.22    |
 | Next Review Recommended  | 2026-06-03 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
+| [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |

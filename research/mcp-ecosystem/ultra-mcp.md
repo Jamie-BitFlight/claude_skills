@@ -238,3 +238,14 @@ SOURCE: [GitHub README - RealMikeChong/ultra-mcp](https://github.com/RealMikeCho
 - [LiteLLM Pricing Data](https://github.com/BerriAI/litellm) (accessed 2026-03-02)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [agentscope](../agent-frameworks/agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [violit](../api-frameworks/violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [gitnexus](./gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

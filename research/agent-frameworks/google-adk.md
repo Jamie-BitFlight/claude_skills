@@ -346,3 +346,14 @@ SOURCE: [GitHub README](https://github.com/google/adk-python/blob/main/README.md
 | GitHub API (release)           | <https://api.github.com/repos/google/adk-python/releases/latest>                 | 2026-02-26 |
 
 **Research Method**: Data gathered from GitHub API (stars, forks, issues, contributors, latest release), repository README and pyproject.toml via GitHub contents API, official documentation site, and PyPI package page. Contributor count verified via paginated GitHub contributors API (238 total across 3 pages).
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [orchestra](./orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |

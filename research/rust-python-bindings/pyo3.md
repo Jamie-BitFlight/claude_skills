@@ -478,3 +478,11 @@ async fn async_sleep(seconds: f64) -> PyResult<String> {
 | GitHub API (statistics)       | API calls for stars, forks, releases                               | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, Cargo.toml feature definitions, raw file fetches from main branch, and GitHub API for statistics. maturin statistics verified via separate API call. All statistics verified via direct API calls on 2026-02-05.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [robyn](../api-frameworks/robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |

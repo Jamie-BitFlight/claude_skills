@@ -299,6 +299,17 @@ Anime.js demonstrates that declarative, composable APIs with semantic naming con
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [boneyard](./boneyard.md) | developer-tools | referenced by boneyard (developer-tools) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [pretext](./pretext.md) | developer-tools | referenced by pretext (developer-tools) |
+
 ## Related Tools
 
 | Tool                                                          | Relationship                                           |

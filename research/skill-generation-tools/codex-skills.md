@@ -220,3 +220,11 @@ python3 scripts/check_invisible_chars.py --all
 - [skills.json catalog (v2.0.0)](https://raw.githubusercontent.com/jMerta/codex-skills/main/skills.json) (accessed 2026-02-20)
 - [GitHub Pages catalog](https://jmerta.github.io/codex-skills/) (accessed 2026-02-20)
 - [npm: codex-skills](https://www.npmjs.com/package/codex-skills) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [awesome-codex-skills-issue-triage](./awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |

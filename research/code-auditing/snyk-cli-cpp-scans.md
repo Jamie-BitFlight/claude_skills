@@ -176,10 +176,9 @@ snyk monitor --unmanaged --project-name=my-c-project
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [skylos](./skylos.md) | code-auditing | generalizes dependency checking across many languages where this tool specializes in unmanaged C/C++ |
+| [syft](./syft.md) | code-auditing | referenced by syft (code-auditing) |

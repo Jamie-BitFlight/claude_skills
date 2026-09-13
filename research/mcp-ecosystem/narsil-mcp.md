@@ -451,3 +451,11 @@ CLI flags > Environment vars > Project config (`.narsil.yaml`) > User config (`~
 |-------|----------|--------------|
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
 | [skylos](../code-auditing/skylos.md) | code-auditing | broader static-analysis surface without this tool's MCP taint-analysis depth |
+| [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [syft](../code-auditing/syft.md) | code-auditing | referenced by syft (code-auditing) |
+| [brooks-lint](../coding-agents/brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
+| [tolaria](../developer-tools/tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
+| [codegraphcontext](./codegraphcontext.md) | mcp-ecosystem | referenced by codegraphcontext (mcp-ecosystem) |
+| [mcpskills-cli](./mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
+| [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |

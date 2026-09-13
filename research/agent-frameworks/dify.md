@@ -278,3 +278,14 @@ curl -X POST https://api.dify.ai/v1/workflows/run \
 **Research Method**: Information gathered from the official GitHub repository README, GitHub API (stars, forks, issues, contributors, releases), official documentation, and release notes. Statistics verified via direct GitHub API calls on 2026-02-23.
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

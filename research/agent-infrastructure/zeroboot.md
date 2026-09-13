@@ -165,3 +165,5 @@ Per the README, Zeroboot has documented constraints:
 | [Fleet](./fleet.md) | agent-infrastructure | Both manage distributed compute environments; Fleet for device management, Zeroboot for code execution sandboxes |
 | [Fly.io](./fly-io.md) | agent-infrastructure | Complementary deployment patterns: Zeroboot sandboxes for execution, Fly.io for containerized agent deployment and scaling |
 | [TinyFish](./tinyfish.md) | agent-infrastructure | Both enable serverless agentic operations; TinyFish for web automation, Zeroboot for general code execution |
+| [iii](./iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [nemoclaw](./nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |

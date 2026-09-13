@@ -415,3 +415,12 @@ User Input (URL/GitHub/PDF)
 3. **PyPI Package**: <https://pypi.org/project/skill-seekers/> (accessed 2026-01-26)
 4. **Three-Stream Implementation Summary**: <https://github.com/yusufkaraaslan/Skill_Seekers/blob/main/docs/IMPLEMENTATION_SUMMARY_THREE_STREAM.md>
 5. **Claude AI Skills Announcement**: <https://www.anthropic.com/news/skills>
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

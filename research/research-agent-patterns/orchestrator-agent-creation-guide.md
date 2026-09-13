@@ -620,3 +620,5 @@ If you cannot route safely, ask up to 3 clarifying questions and stop.
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |

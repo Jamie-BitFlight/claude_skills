@@ -558,6 +558,11 @@ The ARCHITECTURE.md file covers overview and skill composition but does not deta
 | [claw-loop.md](../research-agent-patterns/claw-loop.md) | research-agent-patterns | Autonomous orchestration via tmux + cron with supervisor-worker pattern; foundational pattern for OMC's Ralph mode and persistent execution loops |
 | [ollama-subagents-web-search-claude-code.md](../research-agent-patterns/ollama-subagents-web-search-claude-code.md) | research-agent-patterns | Ollama native subagents for Claude Code with parallel task isolation; shares OMC's model-agnostic agent spawning and context isolation approach |
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [flue](../agent-frameworks/flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
 
 ---
 

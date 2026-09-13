@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Sidecar"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `swarm-operations`, `swarm-patterns` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Improvement 1: Persistent structured session metadata for cross-session context recovery
 
 **Source pattern**: "Context Window Recovery: The Conversations plugin aggregates session history across all supported AI agents, enabling developers to review past conversations, token usage, and reasoning chains when context resets between agent invocations." (Relevance to Claude Code Development > Applications)
@@ -49,7 +52,7 @@ Adding a skill name to `.claude/config/disabled-skills.json` causes subsequent `
 ## Improvement 3: Tmux-based agent session isolation with output capture
 
 **Source pattern**: "Tmux integration for agent launchers: Workspaces manages agent sessions via tmux, capturing output and managing lifecycle. This pattern allows agents to run in isolated, observable contexts while Sidecar maintains visibility." (Patterns Worth Adopting, item 4)
-**Local system**: `.claude/rules/interactive-terminal-workarounds.md`, `.claude/skills/swarm-operations/SKILL.md`
+**Local system**: `rules/interactive-terminal-workarounds.md`, and `.claude/skills/swarm-operations/SKILL.md` (removed in PR #3422, commit `4e1e73bd6`, 2026-09-06 — see the removed-skill note above)
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred -- confidence medium: The local system delegates agents via the `Agent()` tool which manages its own lifecycle. Tmux-based isolation would be relevant only if Agent() sessions needed external observability (output capture, session listing). The Agent tool's built-in message passing (`SendMessage`) already provides inter-agent communication. Whether tmux-layer visibility adds value over existing mechanisms needs experimental validation.
@@ -106,5 +109,5 @@ After a `/start-task` execution where the sub-agent encountered a pre-existing i
 |---|---|
 | Plugin-based architecture for extensibility | Already covered: local system has equivalent modular plugin/skill architecture in `plugins/` directory with SKILL.md frontmatter, marketplace.json registry, and skill activation via `Skill()` tool |
 | Local-first, read-only philosophy | Too abstract: this is a design philosophy, not a concrete mechanism. The local system's hook scripts already follow read-then-write patterns with explicit user-initiated writes |
-| Multi-Agent Orchestration as coordinator | Already covered: `swarm-operations/SKILL.md` and `swarm-patterns/SKILL.md` provide equivalent multi-agent coordination via TeamCreate, SendMessage, Agent() tool, and TaskCreate/TaskUpdate primitives |
+| Multi-Agent Orchestration as coordinator | Already covered: `swarm-operations/SKILL.md` and `swarm-patterns/SKILL.md` provide equivalent multi-agent coordination via TeamCreate, SendMessage, Agent() tool, and TaskCreate/TaskUpdate primitives **[Refuted — the skill(s) cited here were retired in PR #3422 (`4e1e73bd6`) and are absent from the current tree; see the removed-skill note at the top of this file.]** |
 | Documentation Generation from diffs | Already covered: `/complete-implementation` Phase 4 (doc-drift-auditor) and Phase 5 (service-docs-maintainer) already generate documentation updates based on code changes. Stall detection already tracked in backlog as #87 and #448 |

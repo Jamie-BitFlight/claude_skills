@@ -230,3 +230,11 @@ metadata:
 - [ClawHub Skills Website](https://www.clawhub.ai/skills) (accessed 2026-02-20)
 - [ClawHub Homepage](https://www.clawhub.ai) (accessed 2026-02-20)
 - Site meta description: "ClawHub — a fast skill registry for agents, with vector search." (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |

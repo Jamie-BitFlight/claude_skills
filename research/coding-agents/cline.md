@@ -274,3 +274,13 @@ For trusted, low-risk operations, users can configure auto-approval rules to red
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [brooks-lint](./brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [claude-replay](./claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [pilot-shell](./pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |
+| [unblocked](../context-management/unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [gitnexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |

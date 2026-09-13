@@ -378,5 +378,6 @@ Source: README.md lines 308–320.
 | [Dolt](./dolt.md) | data-infrastructure | Version-controlled alternative to embedded SQLite; competing approach for distributed agent workflows with Git-like semantics |
 | [Beads (bd)](../task-management/beads.md) | task-management | Hash-based distributed task graphs for multi-agent coordination; honker's queue/stream patterns complement Beads' dependency resolution |
 | [Trigger.dev](../agent-infrastructure/trigger-dev.md) | agent-infrastructure | Task orchestration and durable job execution; honker's at-least-once queue provides an embedded SQLite alternative to Trigger's cloud broker model |
+| [helix-db](./helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
 
 ---

@@ -234,8 +234,6 @@ No limitations are explicitly documented in official sources. However, given the
 
 ---
 
----
-
 ## Cross-References
 
 | Entry | Category | Relationship |
@@ -245,6 +243,7 @@ No limitations are explicitly documented in official sources. However, given the
 | [Agent Deck](./agent-deck.md) | developer-tools | Terminal session manager with unified TUI design for AI coding agents; overlapping use case for terminal UI composition |
 | [Lopaka](./lopaka.md) | developer-tools | Visual-to-code editor for embedded displays; shares design-then-export pattern and multi-framework code generation strategy |
 | [Pixel Agents](./pixel-agents.md) | developer-tools | Visual rendering of terminal interfaces via React and Canvas; complements TUI Studio's visual design approach for agent development |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
 
 ---
 

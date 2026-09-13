@@ -315,7 +315,7 @@ mex directly addresses a core Claude Code use case: persistent context for agent
 
 ### 2. Drift Detection for Instruction Files
 
-The 11 drift checkers (especially `tool-config-sync`, `broken-link`, `staleness`, `script-coverage`) are directly applicable to Claude Code's CLAUDE.md and .claude/rules/ ecosystem. mex's validation mechanisms prevent the documented-drift problem that plague instruction files over time.
+The 11 drift checkers (especially `tool-config-sync`, `broken-link`, `staleness`, `script-coverage`) are directly applicable to Claude Code's CLAUDE.md and rules/ ecosystem. mex's validation mechanisms prevent the documented-drift problem that plague instruction files over time.
 
 **Evidence**: Drift checker `tool-config-sync` specifically "flags Installed AI tool config files (e.g. `CLAUDE.md`, `.cursorrules`) out of sync with each other."
 

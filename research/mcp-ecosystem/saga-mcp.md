@@ -242,3 +242,11 @@ tracker_dashboard({})
 - [better-sqlite3 npm Package](https://www.npmjs.com/package/better-sqlite3) (accessed 2026-03-02)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [honker](../data-infrastructure/honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | shares hierarchical task tracking (Projects>Epics>Tasks) and immutable activity log audit trail (bidirectional) |

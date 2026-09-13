@@ -236,3 +236,10 @@ SPEC_WORKFLOW_HOME=/workspace/.spec-workflow-mcp npx -y @pimzino/spec-workflow-m
 - [package.json via GitHub API](https://api.github.com/repos/Pimzino/spec-workflow-mcp/contents/package.json) (accessed 2026-03-02)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [openspec-mcp](./openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
+| [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |

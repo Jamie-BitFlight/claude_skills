@@ -204,3 +204,14 @@ con.sql("""
 - [MotherDuck CIDR 2024 Paper](https://www.cidrdb.org/cidr2024/papers/p46-atwal.pdf) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [chroma](./chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [pocketbase](./pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |
+| [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
+| [duckdb-python-client](../database-libraries/duckdb-python-client.md) | database-libraries | referenced by duckdb-python-client (database-libraries) |

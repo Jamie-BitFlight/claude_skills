@@ -290,3 +290,19 @@ curl -fsSL https://raw.githubusercontent.com/maxritter/claude-pilot/main/uninsta
 - [Claude Pilot License](https://github.com/maxritter/claude-pilot/blob/main/LICENSE) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [stop-slop](../ai-writing-tools/stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [claude-code-cli-power-patterns](./claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [no-mistakes](./no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |
+| [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
+| [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
+| [mattpocock-skills](../skill-generation-tools/mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |

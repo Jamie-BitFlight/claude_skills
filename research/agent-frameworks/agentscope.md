@@ -455,6 +455,9 @@ AgentScope is async-first. Blocking I/O in tools or agent code will block the en
 | [mcpjam.md](../mcp-ecosystem/mcpjam.md) | mcp-ecosystem | local MCP server inspector with LLM playground for debugging tool integration |
 | [ultra-mcp.md](../mcp-ecosystem/ultra-mcp.md) | mcp-ecosystem | unified MCP routing interface with 25 tools as prompts and cost tracking |
 | [cocoindex-code.md](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | embedded MCP server for semantic code search via AST analysis |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [hyperagents](../coding-agents/hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
 
 ---
 

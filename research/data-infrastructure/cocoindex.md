@@ -218,3 +218,9 @@ def text_embedding_flow(flow_builder: cocoindex.FlowBuilder, data_scope: cocoind
 - [CocoIndex Claude Plugin](https://github.com/cocoindex-io/cocoindex-claude) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [chroma](./chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |

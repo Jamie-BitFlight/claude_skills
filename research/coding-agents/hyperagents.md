@@ -270,6 +270,8 @@ Source code review did not explicitly document:
 | [AgentScope - Alibaba's Multi-Agent Framework](../agent-frameworks/agentscope.md) | agent-frameworks | Actor-model multi-agent architecture with built-in agent introspection and prompt tuning |
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Agent optimization system: 16 specialized subagents, 65+ skills, learning-based improvements from session patterns |
 | [TrainLoop - Managed RL Fine-Tuning Platform](../ml-infrastructure/trainloop.md) | ml-infrastructure | Reinforcement learning for domain-specific agent improvement with reward model training and deployment |
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |
 
 ---
 

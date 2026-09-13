@@ -165,3 +165,14 @@ This is an article, not a software package. Key actionable patterns derived from
 - [Harness engineering: leveraging Codex in an agent-first world (OpenAI)](https://openai.com/index/harness-engineering/) (referenced in article; JavaScript-rendered, not directly accessible)
 - [My AI Adoption Journey — Step 5: Engineer the Harness (Mitchell Hashimoto)](https://mitchellh.com/writing/my-ai-adoption-journey#step-5-engineer-the-harness) (accessed 2026-02-21)
 - [Relocating Rigor (Chad Fowler, The Phoenix Architecture)](https://aicoding.leaflet.pub/3mbrvhyye4k2e) (accessed 2026-02-21)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
+| [agent-skills-eval](./agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |

@@ -419,3 +419,18 @@ For most Go use cases, the recommended approach is spawning `dolt sql-server` an
 - [GitHub Release v1.83.0](https://github.com/dolthub/dolt/releases/tag/v1.83.0) (accessed 2026-03-01)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | referenced by fleet (agent-infrastructure) |
+| [chroma](./chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [helix-db](./helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [honker](./honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
+| [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [pocketbase](./pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |
+| [polars-documentation](./polars-documentation.md) | data-infrastructure | referenced by polars-documentation (data-infrastructure) |
+| [duckdb-python-client](../database-libraries/duckdb-python-client.md) | database-libraries | referenced by duckdb-python-client (database-libraries) |
+| [stoat](../developer-tools/stoat.md) | developer-tools | referenced by stoat (developer-tools) |

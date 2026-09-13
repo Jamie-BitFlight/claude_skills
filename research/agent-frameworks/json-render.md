@@ -310,3 +310,10 @@ const systemPrompt = catalog.prompt();
 **Research Method**: GitHub API (stars, forks, issues, contributors, releases, file contents), npm downloads API, documentation site fetch, README and AGENTS.md source analysis.
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pretext](../developer-tools/pretext.md) | developer-tools | referenced by pretext (developer-tools) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |

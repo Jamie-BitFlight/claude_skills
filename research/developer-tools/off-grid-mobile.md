@@ -157,3 +157,9 @@ End users can install without building:
 - [Community Slack](https://join.slack.com/t/off-grid-mobile/shared_invite/zt-3q7kj5gr6-rVzx5gl5LKPQh4mUE2CCvA) (accessed 2026-02-28)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |

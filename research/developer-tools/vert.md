@@ -267,3 +267,11 @@ docker run -d --restart unless-stopped -p 3000:80 --name "vert" vert-sh/vert
 11. **GitHub API - VERT Languages** - <https://api.github.com/repos/VERT-sh/VERT/languages> (accessed 2026-02-08)
 12. **vertd Repository** - <https://github.com/VERT-sh/vertd> (accessed 2026-02-08, via GitHub API)
 13. **VERT Website HTML Source** - <https://vert.sh> (accessed 2026-02-08, for meta tags and footer commit reference 897ae56)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |

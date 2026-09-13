@@ -87,7 +87,7 @@ import { App } from './App'
 |---|---|
 | .claude/agents/* | Agents are reasoning/workflow tools, not UI rendering components. None generate or manage React components at runtime. |
 | .claude/skills/* | Skills provide instructions and documentation; they do not render UI or consume WebSocket data. Boneyard is a runtime UI library, not a skill pattern. |
-| .claude/rules/* | Rules are static documentation. Boneyard requires dynamic app state and interactive rendering. |
+| rules/* | Rules are static documentation. Boneyard requires dynamic app state and interactive rendering. |
 | plugins/dot-dash/server/ | Backend MCP server; Boneyard is a client-side React library. Integration would have no effect. |
 
 ---

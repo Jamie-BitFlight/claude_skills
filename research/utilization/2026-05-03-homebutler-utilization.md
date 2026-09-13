@@ -151,7 +151,7 @@ HomeButler presents **direct integration opportunities** as an MCP server depend
 
 ### Phase 3: Reference Integration (2-4 hours)
 
-1. **Document single-binary pattern** in `.claude/rules/` for future skill developers
+1. **Document single-binary pattern** in `rules/` for future skill developers
 2. **Add HomeButler to MCP ecosystem references** in research files
 
 ---

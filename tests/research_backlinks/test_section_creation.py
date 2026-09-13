@@ -226,3 +226,35 @@ class TestSectionCreatedAfterReferencesFallback:
         assert "ExistingEntry" in new_md
         # No second Cross-References heading created
         assert new_md.count("## Cross-References") == 1
+
+
+class TestNoDoubledHorizontalRule:
+    """The section writer prepends a horizontal rule, so an entry whose body already
+    ends with one must not gain a second (PR #3531 review, minor 11 -- 60 corpus files
+    took a ``---\\n\\n---\\n\\n## Cross-References`` separator that markdownlint does not flag).
+    """
+
+    def test_existing_trailing_rule_is_not_duplicated(self) -> None:
+        """A body already ending in '---' gets the section without a second rule."""
+        md = _FRESHNESS_ONLY.rstrip("\n") + "\n\n---\n"
+        row = bl.CrossRefRow(
+            entry_name="AlphaEntry",
+            link_path="../agent-frameworks/alpha.md",
+            category="agent-frameworks",
+            relationship="referenced by AlphaEntry (agent-frameworks)",
+        )
+        new_md, modified = bl.append_backlink_row(md, row)
+        assert modified
+        assert "---\n\n---\n\n## Cross-References" not in new_md
+        assert "---\n\n## Cross-References" in new_md
+
+    def test_rule_still_added_when_body_does_not_end_with_one(self) -> None:
+        """Without a trailing rule the separator is still written."""
+        row = bl.CrossRefRow(
+            entry_name="AlphaEntry",
+            link_path="../agent-frameworks/alpha.md",
+            category="agent-frameworks",
+            relationship="referenced by AlphaEntry (agent-frameworks)",
+        )
+        new_md, _ = bl.append_backlink_row(_FRESHNESS_ONLY, row)
+        assert "---\n\n## Cross-References" in new_md

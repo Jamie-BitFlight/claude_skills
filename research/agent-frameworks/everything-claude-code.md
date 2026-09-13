@@ -367,3 +367,33 @@ node scripts/setup-package-manager.js --detect
 - [MIT License](https://github.com/affaan-m/everything-claude-code/blob/main/LICENSE) (accessed 2026-03-10)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](./AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [Trellis](./Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [claude-code-harness](./claude-code-harness.md) | agent-frameworks | referenced by claude-code-harness (agent-frameworks) |
+| [composure](./composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
+| [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |
+| [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
+| [brooks-lint](../coding-agents/brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [hyperagents](../coding-agents/hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [no-mistakes](../developer-tools/no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [rtk](../developer-tools/rtk.md) | developer-tools | referenced by rtk (developer-tools) |
+| [openspec-mcp](../mcp-ecosystem/openspec-mcp.md) | mcp-ecosystem | referenced by openspec-mcp (mcp-ecosystem) |
+| [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
+| [awesome-codex-skills-issue-triage](../skill-generation-tools/awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
+| [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |

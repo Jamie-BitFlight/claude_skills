@@ -238,3 +238,15 @@ Plano's use of a purpose-built 4B parameter routing model demonstrates that spec
 5. **Orchestration Guide**: <https://docs.planoai.dev/guides/orchestration.html>
 6. **Filter Chains Documentation**: <https://docs.planoai.dev/concepts/filter_chain.html>
 7. **Research Publications**: <https://planoai.dev/research>
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [solace-agent-mesh](../agent-frameworks/solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [iii](./iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [nemoclaw](./nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
+| [xyops](../task-management/xyops.md) | task-management | referenced by xyops (task-management) |

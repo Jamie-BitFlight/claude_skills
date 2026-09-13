@@ -328,6 +328,9 @@ Unblocked directly addresses a core pain point in AI-driven development: context
 | [Claude-Task-Master](../task-management/claude-task-master.md) | task-management | Adjacent workflow: task decomposition benefits from Unblocked's architectural context for code generation fidelity |
 | [SourceSync.ai MCP](../mcp-ecosystem/sourcesyncai-mcp.md) | mcp-ecosystem | MCP server alternative for unified knowledge base access; both expose RAG context to agents via standardized protocol |
 | [Cline](../coding-agents/cline.md) | coding-agents | End-user agent; Unblocked integration improves Cline's ability to generate org-specific code without context hallucinations |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
 
 ---
 

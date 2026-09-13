@@ -123,3 +123,10 @@ Prompt Engine is a web-only SaaS; no installation is required.
 - [Prompt Engine](https://www.promptengine.cc) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [open-spdd](./open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [prompt-optimizer](./prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

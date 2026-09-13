@@ -261,3 +261,12 @@ codex:
 - GitHub API: `repos/openai/symphony/releases/latest` — HTTP 404, no tagged releases (accessed 2026-03-06)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |

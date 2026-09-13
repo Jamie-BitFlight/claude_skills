@@ -307,3 +307,8 @@ Stopping to approve `date` and `git commit` 50 times defeats the purpose of auto
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |
+| [gstack](./gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |

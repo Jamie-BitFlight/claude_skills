@@ -340,5 +340,9 @@ auto_update = true              # Optional: auto-check for updates
 | [1Code](../coding-agents/1code.md) | coding-agents | Shared multi-agent orchestration goals: both provide git worktree isolation per session, MCP management, and unified UI across multiple agent backends |
 | [Tembo](../coding-agents/tembo.md) | coding-agents | Cloud-based counterpart: Tembo automates agent dispatch from external events; Agent Deck provides local interactive session control and persistence |
 | [Everything Claude Code](./everything-claude-code.md) | developer-tools | Complementary harness approach: ECC provides 15 specialized sub-agents and hooks pipeline; Agent Deck enables running multiple agents in parallel with resource pooling |
+| [stoat](./stoat.md) | developer-tools | referenced by stoat (developer-tools) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
+| [tui-studio](./tui-studio.md) | developer-tools | referenced by tui-studio (developer-tools) |
+| [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |
 
 ---

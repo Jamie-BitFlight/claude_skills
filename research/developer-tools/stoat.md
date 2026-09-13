@@ -202,5 +202,7 @@ stoat
 | [Sidecar](./sidecar.md) | developer-tools | Go/Bubbletea TUI tool for agent workflow visibility |
 | [Agent Deck](./agent-deck.md) | developer-tools | Go/Bubbletea terminal session manager with keyboard-driven navigation |
 | [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | Version-controlled SQL database queryable via Stoat's database client interface |
+| [tabularis](./tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
 
 ---

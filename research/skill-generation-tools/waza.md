@@ -224,8 +224,10 @@ npx skills remove tw93/Waza -g
 
 ## Cross-References
 
-| Entry | Category | Relationship |
-|-------|----------|--------------|
-| None at this time | — | — |
+No cross-references recorded yet — no other entry's Cross-References table cites this one,
+and this entry cites none. (It previously held a `None at this time` table row. An Entry cell
+holding no link makes a file invisible to the cross-reference graph, which is why the
+placeholder was removed; with no inbound citations there was nothing for the graph to surface
+either way.)
 
 ---

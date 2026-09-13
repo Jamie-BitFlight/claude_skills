@@ -121,7 +121,7 @@ task_file.context_manifest.append(context_manifest)
 CodeGraphContext is an alpha release (v0.4.0, per research entry line 452). Before committing to integration:
 
 1. **Proof of Concept**: Test CGC's MCP server startup, index a real repo, and validate query accuracy against manual code inspection
-2. **Setup Protocol**: Document the `cgc mcp setup` and index workflow in `.claude/rules/` for agents to follow
+2. **Setup Protocol**: Document the `cgc mcp setup` and index workflow in `rules/` for agents to follow
 3. **Incremental Integration**: Start with doc-drift-auditor (audits are read-only, lowest risk), then context-gathering
 4. **Watch Pattern**: Leverage `cgc watch` for incremental re-indexing during active development to keep the graph fresh
 

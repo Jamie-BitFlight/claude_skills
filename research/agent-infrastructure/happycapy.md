@@ -336,6 +336,9 @@ The primary sources do not document:
 | [PicoClaw](./picoclaw.md) | agent-infrastructure | minimal Rust agent runtime for resource-constrained hardware with 6 messaging channels |
 | [Yume](../developer-tools/yume.md) | developer-tools | native desktop GUI wrapper for Claude Code CLI with multi-agent orchestration and zero-flicker rendering |
 | [SkillsMP](../skill-generation-tools/skillsmp.md) | skill-generation-tools | unified marketplace of 66,500+ AI agent skills using the SKILL.md standard compatible with HappyCapy's skill system |
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [vibium](./vibium.md) | agent-infrastructure | shares agent-native browser interaction patterns; agent-computer interface vs browser automation (bidirectional) |
 
 ---
 

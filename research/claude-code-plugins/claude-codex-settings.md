@@ -197,3 +197,9 @@ export ANTHROPIC_MODEL=kimi-k2-thinking-turbo
 - Local worktree at `.worktrees/claude-codex-settings/` — files: `README.md`, `.claude/settings.json`, `.claude/settings-zai.json`, `.codex/config.toml`, `.claude-plugin/marketplace.json`
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |

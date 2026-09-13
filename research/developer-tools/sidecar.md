@@ -277,5 +277,9 @@ Keyboard shortcuts:
 | [claude-replay](../coding-agents/claude-replay.md) | coding-agents | Session transcript playback tool for visualizing agent conversation history alongside Sidecar's live view |
 | [Byobu](./byobu.md) | developer-tools | Terminal multiplexer providing enhanced UI and status persistence as alternative to bare tmux |
 | [Claude Task Master](../task-management/claude-task-master.md) | task-management | Alternative task management system for AI-driven development workflows integrated via MCP |
+| [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
+| [stoat](./stoat.md) | developer-tools | referenced by stoat (developer-tools) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
+| [tui-studio](./tui-studio.md) | developer-tools | referenced by tui-studio (developer-tools) |
 
 ---

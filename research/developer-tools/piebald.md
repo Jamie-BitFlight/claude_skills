@@ -259,3 +259,10 @@ Switch profile per chat via the chat configuration panel.
 - [AgentSkills.io](https://agentskills.io/home) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |

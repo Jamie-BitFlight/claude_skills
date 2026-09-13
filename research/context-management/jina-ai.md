@@ -203,3 +203,16 @@ curl https://api.jina.ai/v1/rerank \
 - [ReaderLM-v2 Blog Post](https://jina.ai/news/readerlm-v2-frontier-small-language-model-for-html-to-markdown-and-json) (accessed 2026-02-23)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [unblocked](./unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
+| [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
+| [zvec](../ml-infrastructure/zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |

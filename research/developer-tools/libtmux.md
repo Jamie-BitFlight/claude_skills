@@ -526,7 +526,7 @@ libtmux self-describes as pre-1.0. Upstream recommends pinning to a minor versio
 
 | Target | Type | How |
 |--------|------|-----|
-| `.claude/rules/interactive-terminal-workarounds.md` | rule | Add libtmux as a named Python option under "PTY Providers" — `Server(socket_name=...) + new_session(attach=False, x=160, y=50)` replaces the `tmux new-session -d` shell invocation pattern, providing typed output from `capture_pane()` instead of `tmux capture-pane -p` shell call |
+| `rules/interactive-terminal-workarounds.md` | rule | Add libtmux as a named Python option under "PTY Providers" — `Server(socket_name=...) + new_session(attach=False, x=160, y=50)` replaces the `tmux new-session -d` shell invocation pattern, providing typed output from `capture_pane()` instead of `tmux capture-pane -p` shell call |
 | `plugins/python3-development/` | plugin | Add libtmux to the modern-modules reference as the recommended library for any Python script needing to create, control, or monitor tmux sessions — with the note to pin `libtmux==0.53.*` |
 | `research/developer-tools/psmux.md` | research | Cross-reference — psmux is a minimal tmux scripting alternative; libtmux is the full-featured ORM approach with pytest integration |
 | `research/developer-tools/using-tmux-with-claude-code.md` | research | Cross-reference libtmux as the Python programmatic control layer on top of the tmux patterns documented there |
@@ -558,3 +558,13 @@ libtmux self-describes as pre-1.0. Upstream recommends pinning to a minor versio
 14. **src/libtmux/__init__.py** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/__init__.py> (accessed 2026-03-01): public API surface: Server, Session, Window, Pane
 15. **src/libtmux/pytest_plugin.py** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/pytest_plugin.py> (accessed 2026-03-01): server, session, window, pane fixtures
 16. **CHANGES (Changelog)** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/CHANGES> (accessed 2026-03-01): v0.53.1 race condition fix, v0.53.0 breaking change in Session.attach()
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |

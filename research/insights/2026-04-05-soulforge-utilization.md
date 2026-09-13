@@ -2,6 +2,9 @@
 title: "Utilization Proposals: SoulForge"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-skill citations:** `orchestrating-swarms` were removed in PR #3422 (commit `4e1e73bd6`, 2026-09-06) and **retired in favour of** `plugins/agent-orchestration/skills/parallel-work/`, with what delegation guidance survives in `plugins/agent-orchestration/skills/delegate/`. "Retired in favour of" is that PR's own wording, at `plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` — not a capability-preserving consolidation: `parallel-work/SKILL.md` § "Persistent teams" argues against the long-lived-team model outright, and the `TeamCreate` call that model relied on no longer exists in Claude Code as of v2.1.178 (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md`). The removal replaced roughly 2080 lines with roughly 330; the line numbers, pattern numbers, and named sections cited below have no surviving equivalent, and grep over `plugins/` and `.claude/` returns zero hits for them (`Handling Crashed Teammates`, `permission_request`, and the rest). Any "already covered" conclusion resting on them is therefore **refuted by the current tree, not merely unverified against it**.
+
 ## Utilization 1: context-gathering → SoulForge repo map
 
 **Research entry**: ./research/coding-agents/soulforge.md
@@ -106,6 +109,6 @@ SoulForge's roadmap (line 294) includes `@soulforge/mcp` as MCP servers for Clau
 
 **Model Routing Relevance**
 
-SoulForge's task router (lines 57, 259-264) with per-model assignment (Opus for planning, Sonnet for coding, Haiku for cleanup) is architecturally relevant to Claude Code's model selection rules documented in `.claude/rules/model-selection.md`. This is a pattern adoption opportunity (not utilization), recommended for research-insight-extractor to surface separately.
+SoulForge's task router (lines 57, 259-264) with per-model assignment (Opus for planning, Sonnet for coding, Haiku for cleanup) is architecturally relevant to Claude Code's model selection rules documented in `rules/model-selection.md`. This is a pattern adoption opportunity (not utilization), recommended for research-insight-extractor to surface separately.
 
 ---

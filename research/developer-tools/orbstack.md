@@ -334,6 +334,16 @@ OrbStack demonstrates that significant performance improvements come from purpos
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |
+
 ## Related Tools
 
 | Tool                                                              | Relationship                                               |

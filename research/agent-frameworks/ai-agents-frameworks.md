@@ -304,3 +304,15 @@ streamlit run agent-ui.py
 - OpenAI Agents SDK: <https://openai.github.io/openai-agents-python/>
 - Pydantic-AI: <https://ai.pydantic.dev/>
 - smolagents: <https://huggingface.co/docs/smolagents/en/index>
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](./AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [awesome-ai-apps](../ai-research-tools/awesome-ai-apps.md) | ai-research-tools | referenced by awesome-ai-apps (ai-research-tools) |
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [agent-skills-eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

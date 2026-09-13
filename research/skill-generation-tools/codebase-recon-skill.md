@@ -266,3 +266,5 @@ SOURCE: Absence of documented limitations in README.md and SKILL.md files. Above
 | [agent-skills](./agent-skills.md) | skill-generation-tools | production-grade skills library by Addy Osmani with structured workflows; demonstrates canonical skill packaging pattern (Agent Skills Spec) that Codebase Recon follows for multi-agent distribution |
 | [everything-claude-code](./everything-claude-code.md) | skill-generation-tools | comprehensive agent harness with 65+ skills including codebase analysis workflows; shows how Codebase Recon insights integrate into larger multi-agent orchestration systems |
 | [Kythe](../developer-tools/kythe.md) | developer-tools | Google's language-agnostic code intelligence platform; alternative to git-based analysis offering static semantic indexing of hotspots, contributors, and risk areas |
+| [awesome-codex-skills-issue-triage](./awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
+| [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |

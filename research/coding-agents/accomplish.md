@@ -207,3 +207,10 @@ const task = await taskManager.startAgent({
 - [OpenCode CLI — upstream dependency](https://github.com/sst/opencode) (accessed 2026-02-27)
 
 ---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |

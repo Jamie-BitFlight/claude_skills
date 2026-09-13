@@ -369,3 +369,15 @@ LIMIT 100
 | Pricing/Costs                | <https://logfire.pydantic.dev/docs/logfire-costs/>                         | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, description, topics), PyPI package metadata, and official documentation markdown files fetched directly from GitHub. Statistics verified via direct API calls on 2026-02-05.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [compression-monitor](./compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [research-mode](./research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [pandera](../data-infrastructure/pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [abtop](../developer-tools/abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [msgspec](../serialization-libraries/msgspec.md) | serialization-libraries | referenced by msgspec (serialization-libraries) |
