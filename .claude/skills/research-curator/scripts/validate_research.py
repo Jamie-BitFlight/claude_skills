@@ -730,23 +730,28 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
 
 _NON_ENTRY_DIRS = frozenset({"insights", "utilization", "design-notes"})
 
+# Directory-level AI-facing instruction/navigation files, not comprehensive external-tool
+# reference entries -- excluded regardless of which directory under research/ they live in.
+_NON_ENTRY_FILENAMES = frozenset({"README.md", "CLAUDE.md", "AGENTS.md"})
+
 
 def _is_research_entry(file: Path) -> bool:
     """Return whether a markdown file is a research entry subject to the schema.
 
-    Excludes README.md and files under non-entry artifact directories such as
-    ``research/insights/`` (improvement/utilization reports written by
-    ``research-insight-extractor`` and ``research-utilization-assessor``, which
-    intentionally do not follow the research entry template) and
-    ``research/design-notes/`` (internal design/status notes for this project's
-    own features -- working investigations that inform an implementation
-    decision, not comprehensive external-tool reference entries).
+    Excludes directory-level AI-facing instruction/navigation files (see
+    ``_NON_ENTRY_FILENAMES`` -- e.g. ``README.md``, ``CLAUDE.md``, ``AGENTS.md``) and files
+    under non-entry artifact directories such as ``research/insights/``
+    (improvement/utilization reports written by ``research-insight-extractor`` and
+    ``research-utilization-assessor``, which intentionally do not follow the research entry
+    template) and ``research/design-notes/`` (internal design/status notes for this project's
+    own features -- working investigations that inform an implementation decision, not
+    comprehensive external-tool reference entries).
     """
-    return file.name != "README.md" and not _NON_ENTRY_DIRS.intersection(file.parts)
+    return file.name not in _NON_ENTRY_FILENAMES and not _NON_ENTRY_DIRS.intersection(file.parts)
 
 
 def collect_files(path: Path) -> list[Path]:
-    """Collect markdown files to validate, excluding README.md and non-entry artifacts.
+    """Collect markdown files to validate, excluding non-entry navigation files and artifacts.
 
     Returns:
         Sorted list of markdown file paths.
