@@ -127,7 +127,7 @@ How the resource works internally. Include diagrams if helpful.
 ### Integration Opportunities
 
 - **{API, package, or CLI this resource exposes}** -> nothing in `{scope searched}`
-  - Today: `grep -ril "{term}" {scope}` -> 0 matches
+  - Today: `git grep -il "{narrow term}" -- {scope}` and `git grep -il "{broader term}" -- {scope}` -> 0 matches each
   - Change: {what would have to exist here first}
 
 ---
@@ -161,9 +161,14 @@ How the resource works internally. Include diagrams if helpful.
 >   from memory of what a repo like this usually contains.
 > - `Today:` carries evidence, not characterisation: a line read from that path, or the exact
 >   search command that returned nothing. "Claude Code skills need X" is neither.
-> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a quoted line.
->   Absence anchor: `-> nothing in {scope searched}` with the search command and `0 matches`. Zero
->   matches is a finding, not a failure to find one.
+> - Two item forms, shown in the template above. Present anchor: `-> {path}` with a quoted line
+>   that contains the search term, and is not a frontmatter field, a link-list bullet, or a sample
+>   argument inside a code fence — those carry the term without asserting anything. Absence anchor:
+>   `-> nothing in {scope searched}` with both the narrow and the broader search command at
+>   `0 matches`. Zero matches is a finding, not a failure to find one — but it records that these
+>   terms found nothing, never that the capability is absent from this repo.
+> - No two items anchor to the same path. Repeating one file across items multiplies a single
+>   observation instead of adding one.
 > - `Change:` has three passing outcomes — a specific edit, `none — {path} already covers it`, or
 >   `none — out of scope ({why})`. An entry recording that this repo already solved something is
 >   worth more than one proposing it again, and unlike a proposal it is falsifiable. The

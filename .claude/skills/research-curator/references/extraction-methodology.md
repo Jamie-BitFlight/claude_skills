@@ -135,52 +135,85 @@ Unconditional — runs for every entry, after Phase 1 (and Phase 1b when it trig
 Phase 2. It produces the anchor records that the `Relevance to Claude Code Development` section is
 written from, and nothing else in the entry depends on it.
 
-Read this repo the same way Phase 1 read the resource: extract first, characterise second. Four
+Read this repo the same way Phase 1 read the resource: extract first, characterise second. Three
 steps, budget six Read calls.
 
-1. Inventory the real names, once:
-
-   ```bash
-   ls plugins/ .claude/skills/ .claude/agents/ rules/ docs/
-   ```
-
-   An anchor may cite only a name that appeared in this listing or in a search result below.
-   Naming a path from memory of what a repo like this usually contains is the failure mode this
-   pass exists to prevent.
-
-2. Derive 3-6 search terms from your own Phase 1 extracts — the mechanisms named in
+1. Derive 3-6 search terms from your own Phase 1 extracts — the mechanisms named in
    `Problem Addressed` and `Key Features`, not the resource's brand name, which by definition
    will not appear here. A browser-automation resource yields `playwright`, `headless`, `browser`,
    `screenshot`, `WebFetch`; a serialization library yields `pydantic`, `dataclass`, `TypedDict`,
-   `serializ`.
+   `serializ`. Record which extract each term came from — a term with no extract behind it was
+   guessed, not derived, and its result anchors nothing.
 
-3. Search each term:
+   Pair every narrow, resource-specific term with a broader term for the same capability:
+   `similarity search` with `embedding`, `reranking` with `vector`. The narrow term is the more
+   defensible description of the resource and the less likely to appear here, so searched alone it
+   manufactures absences — `similarity search` and `reranking` both return zero in a repo that
+   ships `plugins/python3-development/skills/semantic-code-search/SKILL.md`.
+
+2. Search each term over the tracked corpus:
 
    ```bash
-   grep -ril "{term}" plugins/ .claude/ rules/ docs/ AGENTS.md
+   git grep -il "{term}" -- plugins/ .claude/skills/ .claude/agents/ rules/ docs/ AGENTS.md ':!research/'
    ```
 
-   Record the outcome either way. Zero matches is an anchor, not a dead end — it is the cheapest
-   checkable statement this entry can make about the repo, and it is re-runnable by any reader.
+   `git grep`, never plain `grep`. `git grep` searches tracked files only, so it skips
+   `.claude/worktrees/` and every other gitignored directory by construction; plain `grep` over
+   the same scope returns mostly worktree copies, which lets an entry cite a path that exists in
+   no clone and lets the entry being written match itself.
 
-4. Read up to six matched files, preferring `AGENTS.md`, `rules/*.md`, `SKILL.md`, and agent
-   definitions over scripts, and pull one exact line from each: a rule, a heading, a table row, a
-   config value. Stop at the sixth Read even if terms remain unsearched, and record how many went
-   unsearched — an incomplete anchor pass is reported, never silently completed.
+   The scope is the six paths above and no others. Wholesale `.claude/` pulls in gitignored
+   `agent-memory/`, `audits/`, `backlog/`, `plan/`, `smells/`, and `reports/`, none of which is in
+   any clone; `':!research/'` keeps the research corpus out by any route, since an entry anchored
+   to another entry says nothing about the repo. Measured at this writing, the term `refusal`
+   returned 43 files under `grep -ril` over `plugins/ .claude/ rules/ docs/ AGENTS.md`, 3 under
+   `git grep -il` over that same over-broad scope, and 1 under the command above — and that 1,
+   `plugins/plugin-creator/skills/mission-statement/SKILL.md`, is the only one a fresh clone has.
+
+   Record the match count for every term, matched or not.
+
+3. Read matched files and quote one exact line from each. Selection is fixed, not a preference:
+
+   - One Read per term, in the order the terms were derived. The budget is six Reads total; a
+     seventh term goes unsearched and is reported.
+   - Within a term's match list take the first path of a preferred type — `AGENTS.md`,
+     `rules/*.md`, `SKILL.md`, agent definitions — that no earlier term already consumed. Never
+     anchor two terms to the same file: four anchors drawn from one document that merely shares CI
+     vocabulary is one observation wearing four hats.
+   - A term whose match list holds no unconsumed preferred-type path yields no anchor. Record it
+     as unanchored and move on; do not fall back to a script or to a file already read.
+
+   The quoted line must contain the search term. A line that does not is evidence about something
+   else: a GUI `widget` anchored to a tmux menu widget, or an SDL2 `simulator` anchored to an iOS
+   Simulator, clears every other check and states nothing true.
+
+   Reject the quote and take the next match when the line is a frontmatter field (`description:`,
+   `name:`, `allowed-tools:`), a bullet in a link list or index table, or a sample argument inside
+   a code fence — each carries the term without asserting anything about this repo's behaviour.
+   Reject it too when it is not a unique locator: `true`, `3`, or a lone heading word cannot be
+   re-found by the reader checking it.
 
 Record anchors alongside the Phase 1 extracts, in this format:
 
 ```text
 REPO ANCHORS — {resource-name}
 
-A1. Path: {repo-relative path}
-    Today: "{exact line, heading, table row, or config value read from that path}"
+A1. Term: {term}  From: {the Phase 1 extract this term came from}
+    Path: {repo-relative path}
+    Today: "{exact line read from that path, containing the term}"
     Feeds: {which Relevance item}
 
-A2. Scope: {paths searched}
-    Today: grep -ril "{term}" {scope} → 0 matches
+A2. Terms: {narrow term} + {broader term}  From: {the Phase 1 extract these came from}
+    Scope: git grep -il over plugins/ .claude/skills/ .claude/agents/ rules/ docs/ AGENTS.md
+    Today: both → 0 matches
     Feeds: {which Relevance item}
 ```
+
+An absence anchor needs both the narrow term and its broader pair at zero. When the broader term
+matches, there is no absence to record — read that file and write a presence anchor instead. An
+absence anchor reports that these terms returned nothing in this scope; it never reports that the
+capability is missing here. Asserting nonexistence from a keyword search is the defect this pass
+exists to stop reproducing, not a shortcut it licenses one layer up.
 
 An A-record carrying neither a quoted line nor a search command is not an anchor. Drop it rather
 than writing it into the entry.

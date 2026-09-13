@@ -107,7 +107,12 @@ The cost of skipping the search is building something that already exists.
 or `plugins/` provides semantic code search capability" and targets creating one, while
 `plugins/python3-development/skills/semantic-code-search/SKILL.md` and
 `plugins/python-engineering/agents/semantic-code-search.md` both exist. One
-`grep -ril "semantic" plugins/` would have prevented it.
+`git grep -il "semantic" -- plugins/` would have prevented it.
+
+Use `git grep`, never plain `grep`. `git grep` searches tracked files only; plain `grep` descends
+into gitignored `.claude/worktrees/`, which holds more files than the rest of the repo combined, so
+its hits are mostly worktree copies of paths that exist in no clone. An absence claim backed by a
+plain `grep` is not reproducible by the reader checking it.
 
 Open every path you name before naming it — in `**Local system**`, in Current state, and in Target
 state where the path is meant to already exist. A path you have not opened does not go in a
@@ -151,7 +156,7 @@ Each proposal in the output file follows this structure exactly:
 
 **Source pattern**: {exact quote or paraphrase from research entry, with section reference}
 **Local system**: {path to the local file this maps to}
-**Absence evidence**: {the exact search behind any "no local system does X" claim, with its result — e.g. `grep -ril "semantic" plugins/ .claude/` -> 0 matches} | not applicable — this proposal claims no absence
+**Absence evidence**: {the exact search behind any "no local system does X" claim, with its result — e.g. `git grep -il "semantic" -- plugins/ .claude/skills/ .claude/agents/` -> 0 matches} | not applicable — this proposal claims no absence
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
 **Backlog**: #{issue-number} created | Deferred — {reason}

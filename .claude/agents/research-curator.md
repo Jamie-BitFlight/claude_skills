@@ -59,8 +59,11 @@ flowchart TD
     Rerun --> ReadExisting[Read existing entry file]
     ReadExisting --> ReGather[Re-gather fresh data from primary sources]
     ReGather --> ReExtract[Re-extract passages, note changes]
-    ReExtract --> DocCheck
-    DocCheck -->|"rerun path — after any Phase 1b"| UpdateEntry[Re-run Phase 1c anchors,<br>then update content and freshness]
+    ReExtract --> ReDocCheck{Doc-Sufficiency Check:<br>Q1 named components?<br>Q2 data flow?<br>Q3 extension point?}
+    ReDocCheck -->|"All YES — docs sufficient"| ReAnchor
+    ReDocCheck -->|"Any NO — trigger code analysis"| RePhase1b[Phase 1b — Read source files from worktree<br>up to 12 files in tier order<br>merge code extracts with doc extracts]
+    RePhase1b --> ReAnchor
+    ReAnchor[Phase 1c — re-run the Repo Anchor Pass<br>re-verify every path the existing Relevance section cites<br>rewrite items whose anchor no longer resolves] --> UpdateEntry[Update changed sections, preserve unchanged<br>keep the entry's existing path, category, and freshness format]
     UpdateEntry --> Return
 
     Fix --> ReadEntry[Read entry file]
@@ -135,7 +138,7 @@ The phase order never changes:
 1. **Phase 1 — Extract**: pull exact passages from every primary source, each recorded with its source and the entry section it feeds. Writing any section before this is FORBIDDEN.
 2. **Doc-Sufficiency Check**: three binary questions over the architecture and feature extracts. Any NO triggers Phase 1b.
 3. **Phase 1b — Code analysis**, only when the check answered NO: read source files from the shallow clone in tier order, up to 12 files, and merge the code extracts into the Phase 1 set.
-4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. `ls` the real names, grep 3-6 terms taken from your own extracts, read up to six matched files, quote one line from each. Zero matches is an anchor, not a dead end. Six Reads is the whole budget; report any terms left unsearched.
+4. **Phase 1c — Repo Anchor Pass**, unconditional, every entry: extract from THIS repository the way Phase 1 extracted from the resource. Derive 3-6 terms from your own extracts, each paired with a broader term, and `git grep -il` them — never plain `grep`, which reads gitignored worktrees and returns paths that exist in no clone. Read one matched file per term, no file twice, and quote one line that contains the term. Zero matches on both a narrow term and its broader pair is an anchor; zero on the narrow term alone is a manufactured absence. Six Reads is the whole budget; report any terms left unsearched or unanchored.
 5. **Phase 2 — Write**: compose each section from its extracts, then confirm every factual claim in that section traces to at least one extract before finalizing the section.
 
 Phase 1c is the section that most often gets skipped, because the resource is interesting and the
@@ -202,8 +205,13 @@ flowchart TD
 6. Run the Phase 1c Repo Anchor Pass again, unconditionally. Anchors go stale independently of the
    resource: a path the existing entry names may have moved or been deleted since, and a term that
    found nothing then may match now. Re-verify every path the existing Relevance section cites, and
-   rewrite any item whose anchor no longer resolves.
+   rewrite any item whose anchor no longer resolves. Re-verification does not spend the six-Read
+   budget and is not capped: `ls {path}` settles whether a cited path still exists, and
+   `git grep -nF "{quoted line}" -- {path}` settles whether its quote is still there. Spend a Read
+   only on a file you are anchoring afresh.
 7. Update sections where source data has changed. Preserve sections where source data is unchanged.
+   Keep the entry at its existing path — a refresh never re-runs category selection, because moving
+   the file orphans every cross-reference and backlink pointing at it.
 8. Update Freshness Tracking with today's date and new confidence assessments — in frontmatter
    (`freshness_tracking.last_verified` etc.) for entries using that format, or in the body
    `## Freshness Tracking` table for legacy text-header entries. Match whichever format the
@@ -216,7 +224,8 @@ flowchart TD
 1. Receive the specific issues to fix (from validate_research.py output).
 2. READ the entry file.
 3. Fix ONLY the specified issues. Do NOT rewrite sections that are not flagged.
-4. Return an itemized list of each fix applied.
+4. `relevance_unanchored` is the one flagged issue that is not a text fix: it reports that Phase 1c never ran. Run the Repo Anchor Pass from [Extraction Methodology](.claude/skills/research-curator/references/extraction-methodology.md) and rewrite the Relevance section from the anchors it produces. Rewording the existing prose leaves the entry saying the same uncheckable thing and clears the regex, which is worse than leaving it flagged.
+5. Return an itemized list of each fix applied.
 
 ### `--review` Mode (audit a finished entry)
 
@@ -291,8 +300,9 @@ Always return a structured result at the end of your work.
 ### Repo Anchors
 
 - Terms searched: {N} of {N} derived ({N} unsearched — Read budget exhausted | all searched)
-- Anchored Relevance items: {N} (paths cited: {path}, {path}, ...)
-- Absence anchors: {N} (terms with 0 matches: {term}, {term})
+- Terms with matches but no anchor: {N} ({term} — no unconsumed preferred-type path | none)
+- Anchored Relevance items: {N} (paths cited: {path}, {path}, ...) — every path distinct
+- Absence anchors: {N} ({narrow term} + {broader term} both 0 matches)
 
 ### Next Review
 
