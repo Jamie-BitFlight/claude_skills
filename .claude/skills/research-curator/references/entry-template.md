@@ -189,9 +189,11 @@ How the resource works internally. Include diagrams if helpful.
 > `Source: src/core/engine.py — class TaskEngine, src/core/graph.py — class DependencyGraph`
 
 > **Note**: The `## Cross-References` section is populated automatically by
-> `@research-cross-referencer` after entry creation. For manually created entries, add it
-> after the fact. This section is optional for entries created before 2026-03-12; the
-> validator emits a warning (not error) if absent on newer entries.
+> `@research-cross-referencer` after entry creation, and reciprocal rows by
+> `@research-backlink-detector`. For manually created entries, add it after the fact. This
+> section is optional for entries created before 2026-03-12; the validator emits a warning
+> (not error) if absent on newer entries. Row shape, placement anchor, relative-path rules and
+> the relationship-phrase bar: [Cross-Reference Format](./cross-reference-format.md).
 
 > **Note**: The frontmatter's `freshness_tracking.next_review` field is a suggestion, not a
 > gate. When a user or orchestrator explicitly requests re-research for this entry — via
