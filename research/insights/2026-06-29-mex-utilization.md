@@ -13,7 +13,7 @@ title: "Utilization Proposals: mex"
 
 ### Why this caller
 
-The doc-drift-auditor agent (./claude/agents/doc-drift-auditor.md) detects divergence between documented features and actual implementation through git forensics and code analysis. Its current scope focuses on README ↔ code drift. However, the agent does not currently detect drift in AI-facing instruction files (.claude/CLAUDE.md, rules/*.md, .cursorrules) — files that guide agent behavior directly and deteriorate silently when unfollowed by code changes.
+The doc-drift-auditor agent (./.claude/agents/doc-drift-auditor.md) detects divergence between documented features and actual implementation through git forensics and code analysis. Its current scope focuses on README ↔ code drift. However, the agent does not currently detect drift in AI-facing instruction files (.claude/CLAUDE.md, rules/*.md, .cursorrules) — files that guide agent behavior directly and deteriorate silently when unfollowed by code changes.
 
 The mex tool provides 11 zero-token drift checkers that are directly applicable to this repo's instruction ecosystem:
 - **tool-config-sync**: Flags when CLAUDE.md, .cursorrules, and other AI tool configs get out of sync with each other
@@ -26,7 +26,7 @@ Integrating mex's checkers into the doc-drift-auditor workflow would extend its 
 
 ### Integration sketch
 
-In doc-drift-auditor.md (./claude/agents/doc-drift-auditor.md), add a new section after "Analysis Techniques" to call mex:
+In doc-drift-auditor.md (./.claude/agents/doc-drift-auditor.md), add a new section after "Analysis Techniques" to call mex:
 
 ```bash
 # Before: Audit documentation drift (current workflow)

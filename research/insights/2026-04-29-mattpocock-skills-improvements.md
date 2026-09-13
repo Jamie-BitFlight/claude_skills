@@ -76,7 +76,7 @@ File: `./skills/plugin-creator/skill-creator/SKILL.md` — no References or "See
 
 **Source pattern**: mattpocock/skills skills declare required tools in frontmatter and descriptions. Example: tdd/SKILL.md requires npm, test framework; to-issues/SKILL.md requires gh CLI; obsidian-vault/SKILL.md requires Obsidian vault access. This enables skill discovery and agent routing: agents can check tool availability before attempting a skill.
 
-**Local system**: `./rules/frontmatter-requirements.md` and `./.claude-plugin/plugin.json`
+**Local system**: `./rules/frontmatter-requirements.md` and the per-plugin manifests at `plugins/*/.claude-plugin/plugin.json` (the repo root holds only `.claude-plugin/marketplace.json`)
 
 **Confidence**: High
 

@@ -27,7 +27,7 @@ A GitHub Actions workflow file exists at `.github/workflows/doc-drift-check.yml`
 ## Improvement 2: Auto-generated architecture diagrams from plugin/skill structure
 
 **Source pattern**: "CodeWiki automatically generates always-current architecture, class, and sequence diagrams, ensuring you can visualize complex relationships that match the exact current state of the code" (Section: Key Features, subsection 3)
-**Local system**: Mermaid diagrams in SKILL.md files and `plugins/development-harness/docs/workflow-architecture-diagram.md`
+**Local system**: Mermaid diagrams in SKILL.md files and `plugins/development-harness/docs/workflow-architecture-diagram.md` (originally cited as `.claude/rules/local-workflow.md`, deleted 2026-03-29 in commit `18f93b5c6`; the replacement target was first added 2026-03-21 in commit `ddf452664`, after this entry's date)
 **Confidence**: Low
 **Impact**: Low
 **Backlog**: Deferred -- confidence low: the research entry describes auto-generated diagrams from code analysis infrastructure that does not exist in this repo; implementing this would require a new code analysis pipeline, not an extension of existing Mermaid authoring

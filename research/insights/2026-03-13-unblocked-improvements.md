@@ -16,7 +16,7 @@ The code-reviewer agent (plugins/python3-development/agents/code-reviewer.md) re
 
 ### Target state
 
-The code-reviewer agent incorporates project-specific context before reviewing: reads `CLAUDE.md` and any project-level `rules/` files from the target project, references prior review findings from the same feature (e.g., follow-up task files from earlier reviews), and checks git log for recent patterns in the files under review. The review checklist dynamically adapts to the project's actual conventions rather than applying only generic Python standards.
+The code-reviewer agent incorporates project-specific context before reviewing: reads `CLAUDE.md` and any project-level `.claude/rules/` files from the target project, references prior review findings from the same feature (e.g., follow-up task files from earlier reviews), and checks git log for recent patterns in the files under review. The review checklist dynamically adapts to the project's actual conventions rather than applying only generic Python standards.
 
 ### Measurable signal
 

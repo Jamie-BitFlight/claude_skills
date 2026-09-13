@@ -52,7 +52,7 @@ Adding a skill name to `.claude/config/disabled-skills.json` causes subsequent `
 ## Improvement 3: Tmux-based agent session isolation with output capture
 
 **Source pattern**: "Tmux integration for agent launchers: Workspaces manages agent sessions via tmux, capturing output and managing lifecycle. This pattern allows agents to run in isolated, observable contexts while Sidecar maintains visibility." (Patterns Worth Adopting, item 4)
-**Local system**: `rules/interactive-terminal-workarounds.md`, `.claude/skills/swarm-operations/SKILL.md`
+**Local system**: `rules/interactive-terminal-workarounds.md`, and `.claude/skills/swarm-operations/SKILL.md` (removed in PR #3422, commit `4e1e73bd6`, 2026-09-06 — see the removed-skill note above)
 **Confidence**: Medium
 **Impact**: Low
 **Backlog**: Deferred -- confidence medium: The local system delegates agents via the `Agent()` tool which manages its own lifecycle. Tmux-based isolation would be relevant only if Agent() sessions needed external observability (output capture, session listing). The Agent tool's built-in message passing (`SendMessage`) already provides inter-agent communication. Whether tmux-layer visibility adds value over existing mechanisms needs experimental validation.

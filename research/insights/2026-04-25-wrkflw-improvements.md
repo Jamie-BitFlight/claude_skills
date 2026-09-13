@@ -20,9 +20,14 @@ title: "Improvement Proposals: wrkflw"
 `markdownlint-cli2` for docs. There is no hook that parses `.github/workflows/*.yml` against
 the Actions schema (jobs, steps, expressions, `uses:` references, `needs:` DAG validity).
 
-`./rules/ci-workflows.md` Phase 4 (line 51) states "Validate YAML syntax:
-`python3 -m yaml <file>` or equivalent" — this is parsability only, not structural validation.
-Phase 5 (Verify) instructs "Push and check workflow run if possible" — i.e., the verification
+`.claude/rules/ci-workflows.md` Phase 4, as it stood on this entry's date (commit `3bec019b4`),
+stated "Validate YAML syntax: `python3 -m yaml <file>` or equivalent" — parsability only, not
+structural validation. **That step no longer exists.** The file is now `./rules/ci-workflows.md`
+(renamed in PR #3391, commit `bf4dcd876`) and its Phase 4 step 2 reads
+"Validate: `uv run prek run --files <file>`", which still runs no Actions-schema check, so the gap
+this entry identifies is unchanged even though the wording it quoted is gone.
+Phase 5 (Verify) still instructs "Push and check workflow run if possible"
+(`./rules/ci-workflows.md` line 82) — i.e., the verification
 loop requires git push and observing GitHub-side execution. There is no local equivalent.
 
 Search confirmed no existing backlog item references actionlint, wrkflw, or local Actions
@@ -38,9 +43,11 @@ scoped to `^\.github/workflows/.*\.ya?ml$`. The hook fails with non-zero exit co
 - `if:` expressions contain unbalanced `${{ }}` or unknown context refs
 - Composite-action inputs are missing required keys
 
-`./rules/ci-workflows.md` Phase 4 is updated: "Validate workflow structure:
-`uv run prek run --hook actionlint --files .github/workflows/<file>`" replaces the YAML-syntax-only
-check.
+`./rules/ci-workflows.md` Phase 4 step 2 ("Validate: `uv run prek run --files <file>`") gains the
+structural check: `uv run prek run --hook actionlint --files .github/workflows/<file>`. The
+YAML-syntax-only step this proposal originally targeted was itself replaced by that `prek run` step
+after this entry was written, so there is no longer a syntax-only check to displace — only a
+schema-validation gap to fill.
 
 ### Measurable signal
 
