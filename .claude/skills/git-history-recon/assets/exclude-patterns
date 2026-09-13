@@ -38,7 +38,8 @@
 
 # Marketplace manifest — bump-marketplace.yml bumps
 # .claude-plugin/marketplace.json's metadata.version after plugin changes
-# merge to main, in dedicated version-bump commits. Confirmed via git
+# merge to main, through a repair pull request that lands as its own
+# version-bump commit. Confirmed via git
 # log as one of the single largest hotspot file-change counts in a 1-year
 # window, with sampled commit messages showing pure version bumps rather
 # than content changes — reproduce with the command above.
