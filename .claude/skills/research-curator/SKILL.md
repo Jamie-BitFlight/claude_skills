@@ -265,10 +265,11 @@ Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have al
 before Post-Actions. Audits each entry this run created or refreshed, with the analysis files
 written for it, against [Entry Review Rubric](./references/entry-review-rubric.md), which the agent loads.
 
-The rubric asks two questions: can a reader reach the canonical source this entry points at, and do
-the entry's claims about *this* repository check out against its files. It scores nothing else --
-cross-reference symmetry is repaired deterministically by Post-Actions step 2, and formatting by
-step 4, so neither needs a review pass or an ordering constraint against one.
+The rubric asks three questions: can a reader reach the canonical source this entry points at, do
+the entry's claims about *this* repository check out against its files, and does the reasoning in
+the analysis files -- which have no canonical source to send a reader to -- rest on anything. It
+scores nothing else -- cross-reference symmetry is repaired deterministically by Post-Actions step
+2, and formatting by step 4, so neither needs a review pass or an ordering constraint against one.
 
 Spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One review per
 entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate opens the
@@ -285,8 +286,9 @@ Analysis files written this run:
 ```
 
 Answer both lines, `none` included: the paths carry a date the agent cannot derive from the entry
-name and the rubric scopes gates 4, 5 and 6 to them, so a blank line costs three gates, while a bare
-`none` stops the agent globbing up a stale proposal an earlier run wrote for this same resource.
+name, and the rubric scopes all of Gate 3 and the proposal half of Gate 2 to them, so a blank line
+costs that coverage, while a bare `none` stops the agent globbing up a stale proposal an earlier run
+wrote for this same resource.
 
 An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
 reviewed this run -- it never reached the analysis agents, so most of the rubric's scope does not

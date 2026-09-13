@@ -15,7 +15,11 @@ An entry has two jobs:
    but this repo's own files can settle such a claim, and a wrong one costs a reader a wasted
    session.
 
-Those two jobs are the two gates. **Only the checks below produce defects.** Depth, prose quality,
+Those two jobs are gates 1 and 2. Gate 3 covers what neither reaches: the `-improvements.md` and
+`-utilization.md` files are original argument written here about here, so there is no canonical
+source to send a reader to and no repo path for Gate 2 to open.
+
+**Only the checks below produce defects.** Depth, prose quality,
 per-section confidence levels, exact capability figures, markdown formatting, and cross-reference
 symmetry are not reviewed here: the writing standards govern the first four, `prek` (Post-Actions
 step 4) governs formatting, and `check-backlinks --fix` (Post-Actions step 2) repairs cross-reference
@@ -28,11 +32,11 @@ about the entry and buries the two findings that do.
 - Improvement proposals, when the invocation names one: `./research/insights/{YYYY-MM-DD}-{name}-improvements.md`
 - Utilization proposals, when the invocation names one: `./research/insights/{YYYY-MM-DD}-{name}-utilization.md`
 
-**Completion criterion**: both gates have been run and their results recorded. A gate you skipped is
+**Completion criterion**: every gate has been run and its result recorded. A gate you skipped is
 recorded `NOT RUN` with the reason — never as a pass.
 
-**Defect** = any finding under either gate. Record every defect as
-`{file}:{line} — GATE {1|2} — {exact quoted text} — {required correction}`. Quote verbatim;
+**Defect** = any finding under any gate. Record every defect as
+`{file}:{line} — GATE {1|2|3} — {exact quoted text} — {required correction}`. Quote verbatim;
 paraphrase loses the evidence.
 
 ---
@@ -134,6 +138,46 @@ be reached by reading the proposals alone.
 
 ---
 
+## Gate 3 — Does the analysis files' own reasoning rest on anything?
+
+Scope: the `-improvements.md` and `-utilization.md` files the invocation named, and nothing else.
+
+The entry is exempt on purpose. Every claim in it is about the subject, and the reader who needs to
+settle one goes to the canonical source Gate 1 just checked. An analysis file has no such source: it
+is an argument written here, about here, to justify work someone will later do. Gate 2 reaches only
+the part of that argument that names a repo path and asserts what is there. The reasoning attached
+to the path — why the change helps, by how much, through what mechanism — is checked by nothing
+else, and it is the half that turns into a backlog item.
+
+### The scan finds candidates; the adjudication finds defects
+
+Scanning for these phrases flags roughly 35% of sentences, of which about 10% turn out to be
+defects. Treating a hit as a finding therefore over-predicts by about 3.5x and buries the real ones.
+A hit is a **prompt to read the sentence**, never a defect on its own. Record a defect only after
+the "Defect unless" column comes back false, and record nothing at all for a hit that survives it —
+a list of adjudicated-clean hits is noise the reader has to re-adjudicate.
+
+| Trigger | Scan for | Defect unless | Required correction |
+|---|---|---|---|
+| **Speculation language** | "I think", "likely", "probably", "seems", "should be", "assume", "maybe", "might" | The phrase is inside a verbatim quotation from a primary source, attributed as such, or it explicitly marks a stated hypothesis rather than dressing a conclusion | Replace with what the source states, with "Not mentioned in documentation" per Rule 3 of [Entry Quality Standards](./entry-quality-standards.md), or with the steps taken and what was observed |
+| **Causality without evidence** | "because", "due to", "caused by", "therefore", "this means", "as a result" | The sentence cites the specific observation behind it — a source passage, a file and line, a command's output | Rewrite as an observation alone, or as an explicit hypothesis plus the verification step that would settle it |
+| **Pseudo-quantification** | Scores and percentages — "8.5/10", "70% faster", "100% coverage" | The figure is quoted from a primary source with its method, or the file states the method used to produce it | Replace with the measured evidence, or state the figure as the prediction it is, with the measurement that would confirm it |
+| **Completeness overclaims** | "all files checked", "comprehensive analysis", "fully resolved", "everything fixed", "every skill reviewed" | The text lists the concrete checks performed and their scope | List what was inspected and with what scope, or narrow the claim to what was actually covered |
+
+These four triggers are local **by decision, not by fallback**. This skill depends on the
+`hallucination-detector` plugin in no harness and in no install, so whether it is enabled here is
+not a question this gate's behaviour turns on — do not re-open it, and do not replace this table
+with a call to that plugin or with any other out-of-skill route. Everything this rubric needs lives
+under `.claude/skills/research-curator/`.
+
+SOURCE: Triggers adapted for analysis-file content from the `hallucination-detector` plugin's
+`commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>,
+accessed 2026-09-13); copied in and re-scoped to the `insights/` and `utilization/` files rather
+than referenced. Flag-rate and adjudicated-failure figures above: measurement recorded on this
+skill's own corpus, 2026-09-13.
+
+---
+
 ## Verdict
 
 ```text
@@ -145,15 +189,16 @@ GATE 1 pointer:     PASS | FAIL | UNVERIFIED | NOT RUN ({reason})
   verified: {date | absent}
 GATE 2 repo claims: {N} claims checked, {N} defective | NOT RUN ({reason})
   repo_path_unresolved: {N}
+GATE 3 analysis reasoning: {N} candidates read, {N} defective | NOT RUN ({reason})
 
 DEFECTS: {N}
-1. {file}:{line} — GATE {1|2} — "{exact quoted text}" — {required correction}
+1. {file}:{line} — GATE {1|2|3} — "{exact quoted text}" — {required correction}
 2. ...
 
 VERDICT: USABLE | UNUSABLE | NOT RUN
 ```
 
-`USABLE` when Gate 1 passes, whatever Gate 2 found. A live, dated pointer to the canonical source is
+`USABLE` when Gate 1 passes, whatever gates 2 and 3 found. A live, dated pointer to the canonical source is
 what this entry alone provides; a wrong proposal inside it is a repair to make, not a reason to
 withhold the entry from the index.
 
