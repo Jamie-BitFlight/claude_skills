@@ -75,12 +75,12 @@ The `plugin.json` file in `.claude-plugin/` defines your plugin's metadata and c
 
 | Field          | Type           | Description                                                                    | Example                                |
 | -------------- | -------------- | ------------------------------------------------------------------------------ | -------------------------------------- |
-| `commands`     | string\|array  | Additional command files/directories                                           | `"./custom/cmd.md"` or `["./cmd1.md"]` |
-| `agents`       | array          | Agent file paths (must be array of individual files, NOT directory string)     | `["./agents/reviewer.md"]`             |
-| `skills`       | string\|array  | Additional skill directories                                                   | `"./custom/skills/"`                   |
+| `commands`     | string\|array  | Command files/directories — replaces the default `commands/`                   | `"./custom/cmd.md"` or `["./cmd1.md"]` |
+| `agents`       | array          | Agent file paths — replaces the default `agents/`; must be an array of individual files, NOT a directory string | `["./agents/reviewer.md"]`             |
+| `skills`       | string\|array  | Additional skill directories — loaded alongside the default `skills/`          | `"./custom/skills/"`                   |
 | `hooks`        | string\|object | Hook config path or inline config                                              | `"./hooks.json"`                       |
 | `mcpServers`   | string\|object | MCP config path or inline config                                               | `"./mcp-config.json"`                  |
-| `outputStyles` | string\|array  | Additional output style files/directories                                      | `"./styles/"`                          |
+| `outputStyles` | string\|array  | Output style files/directories — replaces the default `output-styles/`         | `"./styles/"`                          |
 | `lspServers`   | string\|object | Language Server Protocol config for code intelligence (go to definition, etc.) | `"./.lsp.json"`                        |
 | `monitors`     | string\|array  | Background monitor configurations — path to monitors.json or inline array      | `"./monitors/monitors.json"`           |
 | `userConfig`   | object         | User-configurable values prompted at enable time; stored in keychain or settings | See [User Config Reference](./references/user-config.md) |
@@ -88,11 +88,15 @@ The `plugin.json` file in `.claude-plugin/` defines your plugin's metadata and c
 
 **Path behavior rules:**
 
-- Custom paths supplement default directories - they don't replace them
-- If `commands/` exists, it's loaded in addition to custom command paths
+Whether a custom path replaces or extends the plugin's default directory depends on the field:
+
+- **Replaces the default**: `commands`, `agents`, `workflows`, `outputStyles`, `experimental.themes`, `experimental.monitors`. Declaring the key stops the matching default directory being scanned. To keep the default and add more, list it explicitly: `"commands": ["./commands/", "./extras/"]`
+- **Adds to the default**: `skills`. The default `skills/` directory is always scanned, and directories listed in `skills` load alongside it. Exception: for a marketplace entry whose `source` resolves to the marketplace root, declaring specific subdirectories replaces the default `skills/` scan
 - All paths must be relative to plugin root and start with `./`
 - Multiple paths can be specified as arrays
 - **CRITICAL**: `agents` field must ALWAYS be an array of individual file paths, never a directory string
+
+SOURCE: [Plugins reference — Path resolution](https://code.claude.com/docs/en/plugins-reference) (accessed 2026-09-13)
 
 **Common validation errors**:
 

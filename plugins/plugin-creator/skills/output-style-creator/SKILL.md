@@ -152,7 +152,10 @@ assert match, 'frontmatter must open and close with --- on its own line'
 front = match.group(1)
 data = yaml.safe_load(front)
 assert isinstance(data, dict), 'frontmatter must be a YAML mapping'
-assert 'description' not in data or isinstance(data['description'], str), 'description must be a string when present'
+for field in ('name', 'description'):
+    assert field not in data or isinstance(data[field], str), field + ' must be a string when present'
+for field in ('keep-coding-instructions', 'force-for-plugin'):
+    assert field not in data or isinstance(data[field], bool), field + ' must be a boolean when present, not a quoted string'
 assert not re.search(r'^description:[ \t]*[|>]', front, re.M), 'description must not use a multiline YAML indicator'
 " "{style-path}"
 ```
