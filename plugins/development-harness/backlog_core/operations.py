@@ -725,7 +725,16 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
 
 def _update_item_description(item: BacklogItem, description: str, output: Output | None = None) -> bool:
-    """Update the backend-owned item description. Provider-only, no GitHub sync.
+    """Update the backend-owned item description and reconcile immediately.
+
+    Mirrors _rename_item_title/grooming/striking's immediate-reconcile
+    behavior. Without the ``_reconcile_item`` call below, the description
+    write was only queued to the offline mutation cache and became visible
+    at whatever unbounded delay some *unrelated* later reconcile happened to
+    run at (#3458) -- on a GitHub-backed checkout, that could mean never,
+    since nothing else in this write path triggers one. See
+    ``_reconcile_item`` for what "reconcile" durably records (a GitHub
+    audit-comment, not the issue's raw ``body`` field).
 
     Returns:
         True if updated, False if no backend reference on item.
@@ -735,6 +744,7 @@ def _update_item_description(item: BacklogItem, description: str, output: Output
     if not reference:
         return False
     update_item_metadata(reference, {"description": description}, output=out)
+    _reconcile_item(item, out)
     return True
 
 
@@ -1147,7 +1157,31 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
         output.warn(_AC_OVERLAP_MSG)
 
 
-def _reconcile_groomed_item(item: BacklogItem, output: Output) -> None:
+def _reconcile_item(item: BacklogItem, output: Output) -> None:
+    """Trigger an immediate targeted reconcile for one item's queued mutation.
+
+    Shared by every write path that must not leave its mutation sitting in the
+    offline queue at an unbounded delay (#3458): title rename, single/batch
+    grooming, striking, and description updates all call this right after
+    ``put_work_item``. A GitHub-backed reconcile posts the audit-comment
+    record backing ``backlog_view``'s rendered body/description immediately
+    (see ``backlog_core/ARCHITECTURE.md`` "GitHub writable records") -- it
+    never edits the issue's raw ``body`` field, which stays human-owned by
+    design, so a caller comparing against ``gh issue view --json body``
+    still sees the pre-update text even after a successful reconcile.
+
+    Args:
+        item: The work item whose queued mutation should be reconciled. Only
+            ``item.issue`` is read; the mutation content itself was already
+            persisted via ``put_work_item`` before this call.
+        output: Output aggregator that receives a reconciled/queued/
+            unsupported status message.
+
+    Raises:
+        CacheStateCorruptError: When the local cache state file is corrupted
+            -- this needs operator attention and is never downgraded to a
+            routine "queued" message.
+    """
     if not item.issue:
         return
     backend = get_config().backend
@@ -1211,7 +1245,7 @@ def _handle_update_groomed(
         append=append,
     )
     out.info(f"Updated {item.reference} with groomed content")
-    _reconcile_groomed_item(item, out)
+    _reconcile_item(item, out)
 
 
 def _handle_batch_groomed(
@@ -1266,7 +1300,7 @@ def _handle_batch_groomed(
     if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
 
-    _reconcile_groomed_item(batch_item, out)
+    _reconcile_item(batch_item, out)
 
     return written
 
@@ -1701,7 +1735,7 @@ def refresh_local_cache_from_github(
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled
         (closed) issues, and the offline queue's pending/rejected mutation
-        counts (see ``_reconcile_groomed_item`` for the same counts on the
+        counts (see ``_reconcile_item`` for the same counts on the
         per-item grooming path).
     """
     out = output or Output()
@@ -3902,7 +3936,7 @@ def strike_entry(
                 # degrade it to a routine "queued" message alongside the case below.
                 raise
             except BacklogError:
-                # Mirrors _reconcile_groomed_item: BackendUnavailableError and a bare
+                # Mirrors _reconcile_item: BackendUnavailableError and a bare
                 # BacklogError (e.g. a transient GraphQL failure) both mean this
                 # attempt didn't reconcile, not that the strike itself failed — the
                 # strike is already saved via put_work_item() above.
