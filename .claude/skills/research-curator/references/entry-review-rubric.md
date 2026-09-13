@@ -111,9 +111,14 @@ Scan the entry and both analysis files for each trigger. Quote every hit.
 
 These four triggers are copied in **by decision, not by fallback, and scoped to Gate 6 only** —
 this does not contradict `AGENTS.md`'s skill-policy table routing "Reviewing agent output" to
-`/hallucination-detector:hallucination-audit` for other review contexts. Do not replace this table
-with a call to that plugin or any other out-of-skill route: everything Gate 6 needs lives under
-`.claude/skills/research-curator/`. Full rationale: commit `940e5e223`.
+`/hallucination-detector:hallucination-audit` for other review contexts. Nothing under
+`.claude/skills/research-curator/`, or in the agents it spawns, calls that plugin; the plugin is not
+in `enabledPlugins` in `.claude/settings.json`, so `/hallucination-detector:hallucination-audit` is
+not reachable in this checkout; and `harness_compatibility.json` carries no entry for it, so it is
+reachable in no other harness either. Whether it is enabled is therefore not a question this gate's
+behaviour turns on. Do not re-open it, and do not replace this table with a call to that plugin or
+any other out-of-skill route: everything Gate 6 needs lives under
+`.claude/skills/research-curator/`.
 
 SOURCE: Triggers 1–4 adapted for research-entry content from the `hallucination-detector` plugin's `commands/hallucination-audit.md` (<https://github.com/bitflight-devops/hallucination-detector>, accessed 2026-09-13) — copied in and re-scoped, not referenced. Plugin availability read from `.claude-plugin/marketplace.json`, `.claude/settings.json` `enabledPlugins`, and `harness_compatibility.json` (2026-09-13); `AGENTS.md` Repository Overview states the plugin is "not enabled by default in every install".
 
