@@ -394,22 +394,30 @@ below.
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched (asymmetric edges can persist from any
-   prior run that predates this check):
+   prior run that predates this check). Run it bounded, per `scripts/run_bounded.py`'s documented
+   convention for any external command that may hang -- a stalled `uv` dependency resolution or
+   vault scan would otherwise block every mode indefinitely:
 
    ```bash
-   uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
+   uv run scripts/run_bounded.py --timeout-seconds 180 -- \
+     uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
-   If this command's stderr contains any `warning: could not repair ...` line: that is an
-   operational I/O failure (permissions, disk space, an invalid path) reading or writing a target,
-   not a structural limitation. Halt Post-Actions and report the exact warning text to the user.
+   If stdout does **not** contain an `asymmetric_cross_references: N` line, the command failed
+   before completing its scan -- a `uv` dependency-resolution failure, a Python import error, a
+   `run_bounded.py` timeout (exit code 124), or any other crash -- rather than reporting a normal
+   structural result. Halt Post-Actions and report the failure to the user; do not treat this as
+   an acceptable non-zero exit.
 
-   Otherwise, a non-zero exit here reports asymmetric edges the script cannot structurally repair
-   (a dangling link to a missing target, or a manually authored row with a different description
-   it refuses to overwrite) -- continue to step 3 regardless of this exit code. Which files, if
-   any, this command actually modified is determined by step 3's diff, not by this step -- do not
-   parse the printed `{source} -> {target}` lines to guess at modified files, since they list every
-   asymmetric edge found *before* repair is attempted, not which repairs succeeded.
+   If stdout does contain that line: a stderr `warning: could not repair ...` line means an
+   operational I/O failure (permissions, disk space, an invalid path) reading or writing a target,
+   not a structural limitation -- halt Post-Actions and report the exact warning text. Otherwise, a
+   non-zero exit here reports asymmetric edges the script cannot structurally repair (a dangling
+   link to a missing target, or a manually authored row with a different description it refuses to
+   overwrite) -- continue to step 3 regardless of this exit code. Which files, if any, this command
+   actually modified is determined by step 3's diff, not by this step -- do not parse the printed
+   `{source} -> {target}` lines to guess at modified files, since they list every asymmetric edge
+   found *before* repair is attempted, not which repairs succeeded.
 
    **Known limitation**: this command has no per-file exclude option, so it can write into a
    backlink-target file that was already dirty in the pre-mode baseline before step 3 ever
