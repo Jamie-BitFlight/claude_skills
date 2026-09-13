@@ -813,11 +813,10 @@ def import_sources(source: str, plan_address: str | None, *, all_plans: bool) ->
 
 
 def _import_source(backend: TaskBackend, source: str, plan_id: str) -> ledger.PlanSource:
-    """Read one plan for ``import``, raw when ``export`` wrote the record.
+    """Read one plan for ``import``.
 
-    Reading an exported record as a ``Plan`` drops what only the projection carries — ``attempts``,
-    ``accepted``, ``conflict_group``, sections and the record's revision — so such a record is read
-    as the projection it is. Anything else is read through the backend as a canonical plan.
+    A content record ``export`` wrote reads through ``ledger.held_source``, which keeps the ledger
+    columns a ``Plan`` drops. Every other record reads through the backend as a canonical plan.
 
     Args:
         backend: The task backend ``IMPORT_SOURCES`` resolved.

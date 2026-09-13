@@ -1113,7 +1113,8 @@ def update_plan_fields(
         What was written, and the names ``plan.fields`` does not set.
 
     Raises:
-        LookupError: When no such plan exists, so no ``plan.fields`` event is appended for it.
+        ValueError: When a value fails its model field; see :func:`validated`.
+        LookupError: When the ledger holds no such plan; the check runs before any write.
     """
     row = store.fetch_plan(conn, plan)
     applied, unsettable = settable("plans", PLAN_FIELD_COLUMNS, values)
@@ -1140,6 +1141,9 @@ def update_task_fields(
 
     Returns:
         What was written, and the names ``task.fields`` does not set.
+
+    Raises:
+        ValueError: When a value fails its model field; see :func:`validated`.
     """
     row = fetch_task(conn, plan, task)
     applied, unsettable = settable("tasks", TASK_FIELD_COLUMNS, values)
@@ -1150,22 +1154,23 @@ def update_task_fields(
 
 
 def validated(model: type[BaseModel], row: Mapping[str, Any], applied: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate ``--set`` values through the canonical model before they reach a row.
+    """Check ``--set`` values against the canonical model before they reach a row.
 
-    The row's required fields stand in for the rest of the record, so each value is checked against
-    its own field's type and validators. A column the model does not declare passes through as given.
+    The row's required fields complete the record, so each value meets its own field's type and
+    validators. A column the model does not declare passes through as given. The guard exists
+    because ``derive.READY_PREDICATE`` reads ``dependencies`` with ``json_each``: one malformed value
+    breaks every ``ready`` and ``dispatch`` on the plan.
 
     Args:
         model: ``Task`` or ``Plan``.
-        row: The row being updated, for the model's required fields.
+        row: The row being updated.
         applied: The values :func:`settable` permitted.
 
     Returns:
-        The values as the model normalises them.
+        *applied*, with each model field's value as the model normalises it.
 
     Raises:
-        ValueError: A ``pydantic.ValidationError`` when a value does not fit its field, so a
-            malformed ``dependencies`` never lands where ``json_each`` later reads it.
+        ValueError: A ``pydantic.ValidationError`` when a value fails its field.
     """
     declared = {name: value for name, value in applied.items() if name in model.model_fields}
     if not declared:
@@ -1207,8 +1212,9 @@ def update(
         ``fields`` event does not set.
 
     Raises:
-        ValueError: When a section name is given without content, or a ``--set`` name is not a
-            stored column of the table at all.
+        ValueError: When a section name comes without content, a ``--set`` name is not a stored
+            column of the table, or a ``--set`` value fails its model field.
+        LookupError: When the plan or the task is absent.
     """
     if section is not None and section_content is None:
         msg = "a section name needs --section-content"
@@ -1279,13 +1285,14 @@ def renew(
         A result whose ``renew_by`` is the new deadline.
 
     Raises:
-        ValueError: When neither an attempt nor a path addresses the lease, or both do.
+        ValueError: When the call gives no address or two; exactly one of ``path``, or ``task``
+            with ``attempt``, names the lease.
     """
     if attempt is None and path is None:
         msg = "renew needs --attempt or --path"
         raise ValueError(msg)
     if path is not None and (task is not None or attempt is not None):
-        msg = "renew takes --path or --address with --attempt, not both"
+        msg = "renew takes exactly one address: --path, or --address with --attempt"
         raise ValueError(msg)
     with store.transaction(conn):
         moment = now()
@@ -1412,14 +1419,14 @@ def settle(
         A result, or a ``already-settled`` no-op.
 
     Raises:
-        ValueError: When neither an attempt nor a path addresses the attempt, or both do — a path
-            that matched another open task would otherwise settle that task instead.
+        ValueError: When the call gives no address or two. Exactly one of ``path``, or ``task``
+            with ``attempt``, names the attempt, so the task settled is always the task named.
     """
     if attempt is None and path is None:
         msg = "settle needs --attempt or --path"
         raise ValueError(msg)
     if path is not None and (task is not None or attempt is not None):
-        msg = "settle takes --path or --address with --attempt, not both"
+        msg = "settle takes exactly one address: --path, or --address with --attempt"
         raise ValueError(msg)
     with store.transaction(conn):
         moment = now()

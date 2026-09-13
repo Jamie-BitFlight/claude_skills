@@ -1473,7 +1473,7 @@ def test_update_set_names_the_columns_it_would_not_write(set_conn: sqlite3.Conne
 
 
 def test_update_set_refuses_a_value_its_field_rejects(set_conn: sqlite3.Connection, set_plan: str) -> None:
-    """A malformed ``--set`` value is refused before it lands where ``json_each`` reads it."""
+    """A value its model field rejects raises, and the row and the event log stay as they were."""
     before = store.fetch_task(set_conn, set_plan, "T1")["dependencies"]
     with pytest.raises(ValueError, match="oops"):
         transitions.update(set_conn, set_plan, "T1", values={"dependencies": "oops"})
@@ -1482,7 +1482,7 @@ def test_update_set_refuses_a_value_its_field_rejects(set_conn: sqlite3.Connecti
 
 
 def test_update_of_a_missing_plan_refuses_and_appends_nothing(set_conn: sqlite3.Connection) -> None:
-    """A plan-level ``--set`` on a plan the ledger does not hold fails instead of logging a ghost event."""
+    """A plan-level ``--set`` on an absent plan raises before any event is appended."""
     with pytest.raises(LookupError):
         transitions.update(set_conn, "Pmissing", values={"goal": "x"})
     assert store.all_events(set_conn) == []
@@ -1492,11 +1492,11 @@ def test_update_of_a_missing_plan_refuses_and_appends_nothing(set_conn: sqlite3.
 def test_path_and_attempt_addresses_are_refused_together(
     set_conn: sqlite3.Connection, set_plan: str, tmp_path: Path, command: Callable[..., object]
 ) -> None:
-    """Naming an attempt and a path at once is refused rather than letting the path pick the task."""
+    """An attempt and a path together raise, so the task settled or renewed is always the task named."""
     worktree = tmp_path / "worktree"
     worktree.mkdir()
     transitions.dispatch(set_conn, set_plan, "T1", worktree=str(worktree))
-    with pytest.raises(ValueError, match="not both"):
+    with pytest.raises(ValueError, match="exactly one address"):
         command(set_conn, set_plan, "T1", attempt=1, path=str(worktree))
 
 

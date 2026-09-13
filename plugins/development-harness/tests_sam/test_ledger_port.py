@@ -26,7 +26,8 @@ assertion below names the part of it that states the property.
 
 ``export`` names what it overwrote
     ``plan.exported`` carries ``divergences`` in its payload. A record edited out of band since
-    the last export is named there, and the ledger's projection replaces it.
+    the last export is named there, and the ledger's projection replaces it, even when the ledger
+    itself has not moved.
 
 round trip
     ``export`` then ``import`` of what the store holds preserves ``attempts`` and ``accepted``,
@@ -251,11 +252,7 @@ def plan_with_tasks(conn: sqlite3.Connection, *task_ids: str) -> str:
 
 
 def source_from_projection(content: Mapping[str, Any], *, source: str, revision: str = "") -> port.PlanSource:
-    """Build an import source from a projection the store holds.
-
-    ``port.plan_source`` builds a source from a canonical ``Plan``, which carries no ``attempts``
-    and no ``accepted``. A projection carries both, and the ``import`` transition takes them "from
-    the source", so a round trip through the store goes through here.
+    """Build an import source from a projection the store holds, through ``port.projection_source``.
 
     Args:
         content: The projection, as ``port.projection`` builds it.
@@ -491,6 +488,23 @@ def test_hand_edited_record_is_overwritten(ledger: sqlite3.Connection, projectio
     transitions.dispatch(ledger, plan, "T2", ttl_seconds=TTL_SECONDS)
     port.export_plan(ledger, plan, projection_store=projection_store)
     assert held_record(plan) == json.loads(json.dumps(port.projection(ledger, plan), sort_keys=True, default=str))
+
+
+def test_export_repairs_a_record_edited_while_the_ledger_stood_still(
+    ledger: sqlite3.Connection, projection_store: RecordingStore
+) -> None:
+    """An out-of-band edit is rewritten even when the cursor hash still matches the projection."""
+    plan = plan_with_tasks(ledger, "T1")
+    port.export_plan(ledger, plan, projection_store=projection_store)
+    edited = held_record(plan)
+    edited["tasks"][0]["title"] = "edited by hand"
+    edit_held_record(plan, edited)
+
+    result = port.export_plan(ledger, plan, projection_store=projection_store)
+
+    assert result.noop is None
+    assert result.changed["divergences"] == ["T1"]
+    assert held_record(plan)["tasks"][0]["title"] == "Task T1"
 
 
 # ---------------------------------------------------------------------------
@@ -738,6 +752,24 @@ def test_from_milestone_replace_keeps_the_export_cursor_it_cannot_account_for(
 
 
 # ---------------------------------------------------------------------------
+# from-milestone: conflict groups
+# ---------------------------------------------------------------------------
+
+
+def test_conflict_groups_map_member_titles_back_to_issues(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each group member's title maps back to the milestone issue carrying it."""
+    answer = {"conflict_groups": [{"group_id": 1, "reason": "Shared file", "items": ["first", "second"]}]}
+    monkeypatch.setattr(port, "dispatch_conflicts", lambda *_: answer)
+    items = [
+        port.MilestoneItem(issue=10, title="first"),
+        port.MilestoneItem(issue=11, title="second"),
+        port.MilestoneItem(issue=12, title="third"),
+    ]
+
+    assert port.conflict_groups_for(MILESTONE, items) == {10: "conflict-1", 11: "conflict-1"}
+
+
+# ---------------------------------------------------------------------------
 # export to content, then import from it
 # ---------------------------------------------------------------------------
 
@@ -852,28 +884,6 @@ def test_the_record_export_writes_parses_as_plan_content(provider: InMemoryBacke
     assert parse_plan_content(record.content, plan)["plan_id"] == plan
 
 
-# ---------------------------------------------------------------------------
-# review follow-ups: unchanged re-reads the target, import keeps the projection, groups map by title
-# ---------------------------------------------------------------------------
-
-
-def test_export_repairs_a_record_edited_while_the_ledger_stood_still(
-    ledger: sqlite3.Connection, projection_store: RecordingStore
-) -> None:
-    """A matching cursor hash is not ``unchanged`` when the record itself was edited out of band."""
-    plan = plan_with_tasks(ledger, "T1")
-    port.export_plan(ledger, plan, projection_store=projection_store)
-    edited = held_record(plan)
-    edited["tasks"][0]["title"] = "edited by hand"
-    edit_held_record(plan, edited)
-
-    result = port.export_plan(ledger, plan, projection_store=projection_store)
-
-    assert result.noop is None
-    assert result.changed["divergences"] == ["T1"]
-    assert held_record(plan)["tasks"][0]["title"] == "Task T1"
-
-
 def test_import_from_content_keeps_what_only_the_projection_carries(
     provider: InMemoryBackend, ledger: sqlite3.Connection
 ) -> None:
@@ -892,16 +902,3 @@ def test_import_from_content_keeps_what_only_the_projection_carries(
     assert (task.attempts, task.accepted) == (1, 1)
     assert {section.name for section in task.sections} == set(ledger_spec.REPORT_SECTIONS)
     assert source.revision
-
-
-def test_conflict_groups_map_member_titles_back_to_issues(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``dispatch_conflicts`` names a group by ``group_id`` and its members by title."""
-    answer = {"conflict_groups": [{"group_id": 1, "reason": "Shared file", "items": ["first", "second"]}]}
-    monkeypatch.setattr(port, "dispatch_conflicts", lambda *_: answer)
-    items = [
-        port.MilestoneItem(issue=10, title="first"),
-        port.MilestoneItem(issue=11, title="second"),
-        port.MilestoneItem(issue=12, title="third"),
-    ]
-
-    assert port.conflict_groups_for(MILESTONE, items) == {10: "conflict-1", 11: "conflict-1"}

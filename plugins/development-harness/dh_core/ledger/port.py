@@ -7,8 +7,9 @@ half that talks to the outside is a small, named seam the caller supplies.
 
 ``import`` takes a :class:`PlanSource` — plan fields, task fields, sections, a revision — and never
 a reader. :func:`plan_source` builds one from a canonical ``sam_schema.core.models.Plan``, which is
-what every reader in ``sam_schema/readers`` already produces, so ``--from content`` and
-``--from legacy`` are two callers of one function rather than two import paths. ``--from dispatch``
+what every reader in ``sam_schema/readers`` already produces. A content record ``export`` wrote is
+the one exception: :func:`projection_source` builds from it directly, because a ``Plan`` drops the
+ledger columns it carries. ``--from dispatch``
 is Slice 5's, which moves the ``DISPATCH_PLAN`` reader; it will be a third caller of the same
 function and needs nothing added here.
 
@@ -896,11 +897,10 @@ def content_store(owner_reference: str = "") -> ContentProjectionStore:
 
 
 def projection_source(document: Mapping[str, Any], *, source: str, revision: str = "") -> PlanSource | None:
-    """Build an import source from a projection, keeping the columns a canonical ``Plan`` drops.
+    """Build an import source from a record :func:`export_plan` wrote.
 
-    :func:`plan_source` builds from a ``Plan``, which carries no ``attempts``, ``accepted``,
-    ``conflict_group`` or sections. A projection carries all of them, and the ``import`` transition
-    takes them "from the source", so a record :func:`export_plan` wrote is read through here.
+    The source keeps :data:`LEDGER_TASK_COLUMNS` and the sections, which a ``Plan`` read through
+    :func:`plan_source` drops.
 
     Args:
         document: A decoded plan record.
@@ -908,8 +908,8 @@ def projection_source(document: Mapping[str, Any], *, source: str, revision: str
         revision: The record's revision, recorded on the cursor.
 
     Returns:
-        The source, or None when the document is not one :func:`projection` built — a record the
-        content path wrote carries none of :data:`LEDGER_PLAN_COLUMNS`.
+        The source, or None for a record the content path wrote, which lacks the
+        :data:`LEDGER_PLAN_COLUMNS` keys every projection carries.
     """
     if not set(LEDGER_PLAN_COLUMNS) <= set(document):
         return None
@@ -941,14 +941,15 @@ def projection_source(document: Mapping[str, Any], *, source: str, revision: str
 
 
 def held_source(plan: str, *, source: str = CONTENT_TARGET) -> PlanSource | None:
-    """Read the record the configured backend holds for a plan as an import source, when export wrote it.
+    """Read a plan's content record as an import source.
 
     Args:
         plan: The plan id.
         source: Where the rows came from, recorded in the events.
 
     Returns:
-        The source with the record's revision, or None when there is no record or it is not a projection.
+        What :func:`projection_source` returns, carrying the record's revision; None when the
+        backend holds no record.
     """
     document, revision = content_store().record(plan)
     return None if document is None else projection_source(document, source=source, revision=revision)
@@ -1006,9 +1007,10 @@ def export_plan(
 ) -> TransitionResult:
     """Write a plan's projection to a target, or report that nothing changed.
 
-    The record is read back before it is written, so a projection edited out of band since the last
-    export is named in ``divergences`` rather than silently overwritten without a trace. The
-    compare-and-swap is against the revision the last export left, so it guards a write that landed
+    The record is read back before anything is decided. ``unchanged`` needs a matching cursor hash
+    and a held record equal to the projection, so a record edited out of band is named in
+    ``divergences`` and rewritten even when the ledger itself has not moved.
+    The compare-and-swap is against the revision the last export left, so it guards a write that landed
     between this read-back and this write; a divergence the read-back already named is recorded and
     then overwritten, because the ``export`` transition's only check is ``unchanged`` and
     ``ledger_spec.REASONS`` has no code for a store that moved.
@@ -1086,7 +1088,7 @@ def milestone_task(item: MilestoneItem, *, position: int, groups: Mapping[int, s
     Args:
         item: The milestone item.
         position: Its one-based position, used when it carries no task id.
-        groups: Issue number to conflict group, from ``dispatch_conflicts``.
+        groups: Issue number to conflict group, from :func:`conflict_groups_for`.
 
     Returns:
         The task, with the fields the transition names.
@@ -1107,9 +1109,9 @@ def milestone_task(item: MilestoneItem, *, position: int, groups: Mapping[int, s
 def conflict_groups_for(milestone_number: int, items: Sequence[MilestoneItem], repo: str = "") -> dict[int, str]:
     """Read each milestone item's conflict group from ``dispatch_conflicts``.
 
-    ``dispatch_conflicts`` names a group by its integer ``group_id`` and its members by title, so
-    each title is matched back to the issues of *items* carrying it. Two items sharing a title both
-    join the group: an extra exclusion only serialises them, a missing one lets them collide.
+    ``dispatch_conflicts`` names each group by ``group_id`` and each member by title, so every title
+    maps back to the issues in *items* carrying it. A title shared by two items puts both in the
+    group: over-grouping serialises them, which is the safe side.
 
     Args:
         milestone_number: The milestone.
