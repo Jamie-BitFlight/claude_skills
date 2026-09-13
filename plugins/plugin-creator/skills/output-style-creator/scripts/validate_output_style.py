@@ -37,6 +37,9 @@ if isinstance(sys.stderr, TextIOWrapper):
 FRONTMATTER = re.compile(r"\A---[ \t]*\r?\n(.*?)^---[ \t]*(?:\r?\n|\Z)", re.DOTALL | re.MULTILINE)
 STRING_FIELDS = ("name", "description")
 BOOLEAN_FIELDS = ("keep-coding-instructions", "force-for-plugin")
+# The schema is closed: a key outside it is a typo Claude Code ignores in silence, which drops the
+# behaviour the author asked for while the style still loads. See references/output-style-schema.md.
+KNOWN_FIELDS = frozenset(STRING_FIELDS + BOOLEAN_FIELDS)
 
 
 class ValidationResult(BaseModel):
@@ -224,6 +227,11 @@ def validate(path: Path) -> ValidationResult:
         for key in data
         if not isinstance(key, str)
     )
+    problems.extend(
+        f"{key!r} is not an output-style field; expected one of {', '.join(sorted(KNOWN_FIELDS))}"
+        for key in data
+        if isinstance(key, str) and key not in KNOWN_FIELDS
+    )
 
     fields = {str(key): type(value).__name__ for key, value in data.items()}
     return ValidationResult(path=str(path), valid=not problems, problems=problems, fields=fields)
@@ -322,8 +330,13 @@ def load_plugin_manifest(manifest: Path) -> tuple[dict[str, Any] | None, list[st
     """
     try:
         text = manifest.read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
+        # No manifest: the caller named a directory that declares nothing.
         return None, []
+    except OSError as exc:
+        # It exists but will not open — a directory, a permission denial, a bad symlink. Claude
+        # Code cannot load it either, so this is a defect rather than a plugin declaring nothing.
+        return None, [f"{manifest}: cannot be read ({exc.strerror or exc.__class__.__name__})"]
     try:
         root = json.loads(text)
     except json.JSONDecodeError as exc:

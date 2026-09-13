@@ -67,6 +67,10 @@ REJECTED = {
     "name-not-string": "name: 42\ndescription: fine",
     "keep-coding-quoted": 'name: A\nkeep-coding-instructions: "false"',
     "force-for-plugin-quoted": 'name: A\nforce-for-plugin: "true"',
+    # Unknown keys — a typo Claude Code ignores in silence.
+    "misspelled-boolean": "name: A\nkeep-coding-instruction: true",
+    "misspelled-description": "name: A\ndescriptions: One line",
+    "unknown-field": "name: A\ncolor: blue",
     # Structure.
     "merge-key": "base: &base\n  description: >-\n    folded through a merge\nname: A\n<<: *base",
     "non-string-key": "1: value\nname: A",
@@ -158,6 +162,27 @@ def test_paths_with_shell_metacharacters(tmp_path: Path) -> None:
     assert result.path == str(path)
 
 
+def test_misspelled_field_names_the_expected_set(tmp_path: Path) -> None:
+    """The problem tells the author which field they meant to write.
+
+    Claude Code ignores an unrecognised key, so the style loads without the behaviour its author
+    asked for. Naming the schema turns a silent drop into a fixable message.
+    """
+    result = v.validate(write_style(tmp_path, "s", "name: A\nkeep-coding-instruction: true"))
+    assert not result.valid
+    assert result.problems == [
+        (
+            "'keep-coding-instruction' is not an output-style field; expected one of "
+            "description, force-for-plugin, keep-coding-instructions, name"
+        )
+    ]
+
+
+def test_known_fields_match_the_documented_schema() -> None:
+    """The closed field set matches references/output-style-schema.md exactly."""
+    assert {"name", "description", "keep-coding-instructions", "force-for-plugin"} == v.KNOWN_FIELDS
+
+
 def make_plugin(root: Path, manifest: dict[str, object], style_dirs: dict[str, str]) -> Path:
     """Build a fixture plugin.
 
@@ -245,6 +270,23 @@ def test_non_object_manifest_root_is_reported_and_scans_nothing(tmp_path: Path) 
     assert result.plugin_manifest_problems == [
         f"{plugin / '.claude-plugin' / 'plugin.json'}: manifest root is array, expected an object"
     ]
+
+
+def test_unreadable_manifest_is_reported_rather_than_treated_as_absent(tmp_path: Path) -> None:
+    """A plugin.json that exists but will not open is a defect, not an absent manifest.
+
+    A bare ``except OSError`` swallowed this into the absent case, so discovery scanned the default
+    directory and attributed styles to a plugin whose manifest Claude Code cannot load either.
+    """
+    root = tmp_path / "p"
+    (root / "output-styles").mkdir(parents=True)
+    write_style(root / "output-styles", "default", "name: A\ndescription: fine")
+    # A directory in place of the file raises IsADirectoryError, an OSError that is not absence.
+    (root / ".claude-plugin" / "plugin.json").mkdir(parents=True)
+    result = v.discover(tmp_path, root)
+    assert result.plugin == []
+    assert len(result.plugin_manifest_problems) == 1
+    assert "cannot be read" in result.plugin_manifest_problems[0]
 
 
 def test_missing_manifest_is_not_a_defect(tmp_path: Path) -> None:
