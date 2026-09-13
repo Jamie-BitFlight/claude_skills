@@ -762,6 +762,204 @@ def collect_files(path: Path) -> list[Path]:
     return [f for f in files if _is_research_entry(f)]
 
 
+# ---------------------------------------------------------------------------
+# Repository path citation checks (insights/ and utilization/ analysis files)
+#
+# Scope rationale: this check runs on gap-analysis files only, not on entries or
+# design-notes. Measuring it against the real corpus (research/) showed the two
+# scopes have very different precision:
+#
+# - Entries mix description of the *researched* tool with commentary about this
+#   repo in the same paragraph ("their tests/ dir offers a pattern for our...").
+#   Scanning an entry's Relevance-to-Claude-Code-Development section for bare
+#   repo-relative paths produced a measured ~86% false-positive rate (19 of 22
+#   flagged entries cited the *researched* tool's own paths -- e.g.
+#   `docs/architecture.md` describing the subject tool, not this repo).
+#   Disambiguating "our path" from "their analogous path" needs semantic
+#   judgment a regex cannot carry, so entries are left to the manual "Path
+#   exists" step in entry-review-rubric.md's Gate 4.
+# - The `-improvements.md` / `-utilization.md` files under research/insights/
+#   and research/utilization/ exist *only* to compare a researched tool against
+#   this repo (see Gate 4's own scope statement), so a path cited there is far
+#   more likely to be a genuine self-referential claim. Gating on an
+#   "already exists" assertion phrase (`_EXISTING_STATE_MARKER`) and excluding
+#   negated/aspirational phrasing (`_NEGATION_OR_PROPOSAL_MARKER`) brought the
+#   measured false-positive rate in this scope to zero across the corpus
+#   sample manually reviewed while implementing this check (see
+#   validation-rules.md for the full measurement writeup).
+# ---------------------------------------------------------------------------
+
+_ANALYSIS_DIRS = frozenset({"insights", "utilization"})
+
+
+def _is_analysis_file(file: Path) -> bool:
+    """Return whether a markdown file is a research gap-analysis file.
+
+    ``-improvements.md`` / ``-utilization.md`` files under ``research/insights/`` and
+    ``research/utilization/`` compare a researched tool against this repository. They
+    do not follow the entry template (see ``_is_research_entry``) but are still subject
+    to the ``repo_path_unresolved`` check (see ``validate_analysis_file``).
+    """
+    return bool(_ANALYSIS_DIRS.intersection(file.parts))
+
+
+def collect_analysis_files(path: Path) -> list[Path]:
+    """Collect gap-analysis markdown files (insights/, utilization/) to check.
+
+    Returns:
+        Sorted list of matching markdown file paths.
+    """
+    if path.is_file():
+        return [path] if path.suffix == ".md" and _is_analysis_file(path) else []
+    files = sorted(path.rglob("*.md"))
+    return [f for f in files if _is_analysis_file(f)]
+
+
+def _find_repo_root() -> Path:
+    """Locate the repository root by walking up from this script's own location.
+
+    Uses ``pyproject.toml`` as the root marker rather than the research root a
+    caller passes in, because repo-path citations must resolve against the real
+    repository tree regardless of which subdirectory is being validated.
+
+    Returns:
+        The repository root directory.
+
+    Raises:
+        RuntimeError: If no ``pyproject.toml`` is found in any parent directory.
+    """
+    for candidate in Path(__file__).resolve().parents:
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    msg = f"Could not locate repo root (pyproject.toml) above {__file__}"
+    raise RuntimeError(msg)
+
+
+_REPO_ROOT = _find_repo_root()
+_TOP_LEVEL_REPO_ENTRIES = frozenset(p.name for p in _REPO_ROOT.iterdir() if p.is_dir() and p.name != ".git")
+_SKILL_DIR_NAMES = frozenset(p.parent.name for p in _REPO_ROOT.rglob("SKILL.md"))
+
+# Matches an optionally ``./``-prefixed repo-relative path whose first segment is a real
+# top-level entry of this repo (e.g. ``.claude/rules/x.md``, ``plugins/foo/skills/bar/``).
+# The negative lookbehind stops this from matching a path segment embedded inside a URL or
+# a longer identifier (``https://x.com/docs/y`` -- "docs" is preceded by "/", excluded).
+_REPO_PATH_CANDIDATE = re.compile(
+    r"(?<![\w./-])(?:\./)?(" + "|".join(re.escape(d) for d in sorted(_TOP_LEVEL_REPO_ENTRIES)) + r")(/[\w.*-]+)+"
+)
+
+# Matches a backtick-quoted bare skill reference such as `` `swarm-operations/SKILL.md` ``
+# or `` `swarm-operations SKILL.md` `` -- the corpus's shorthand for citing a skill without
+# its full directory path. Resolved against _SKILL_DIR_NAMES, not filesystem existence.
+_BARE_SKILL_CITATION = re.compile(r"`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)(?:/| +)SKILL\.md`")
+
+# An assertion that a capability already exists in this repo -- the harmful pattern named
+# in validation-rules.md: an "Already covered" (or equivalent) verdict citing evidence.
+_EXISTING_STATE_MARKER = re.compile(
+    r"already\s+(?:covered|implements?|uses?|has|exists?|provides?|does this)"
+    r"|currently\s+(?:implements?|uses?)"
+    r"|\*\*local system\*\*"
+    r"|\*\*caller\*\*",
+    re.IGNORECASE,
+)
+
+# Negation ("X does not exist") or forward-looking/aspirational phrasing ("new skill",
+# "target state", "to be created") -- a path on such a line is not a false existing-state
+# claim, it is either a correct absence statement or a proposal with no path yet.
+_NEGATION_OR_PROPOSAL_MARKER = re.compile(
+    r"does\s+not\s+(?:exist|occur)|doesn't\s+exist|no\s+such|not\s+in\s+the\s+repo|absence\s+of"
+    r"|to\s+be\s+created|not\s+yet\s+(?:created|exist)"
+    r"|integration point|could add|would add|new skill|new hook|propose[ds]?|target state"
+    r"|add a skill|add a hook|consider adding|new file at",
+    re.IGNORECASE,
+)
+
+_TRAILING_PUNCTUATION = ".,;:)]}'\">`"
+
+
+def _resolves_in_repo(candidate: str) -> bool:
+    """Return whether a repo-relative path (or glob) candidate resolves to a real path.
+
+    Args:
+        candidate: A repo-relative path, already stripped of any leading ``./``. May
+            contain a ``*`` wildcard (e.g. ``plugins/dh/skills/code-review-*/``), in
+            which case it resolves when the glob matches at least one path.
+
+    Returns:
+        True when the candidate exists (or, for a glob, matches something) in the repo.
+    """
+    if "*" in candidate:
+        return any(_REPO_ROOT.glob(candidate))
+    return (_REPO_ROOT / candidate).exists()
+
+
+def _check_repo_path_citations(lines: list[str]) -> list[Issue]:
+    """Flag cited repository paths/skills that do not exist, on existing-state lines only.
+
+    Restricted to lines carrying an ``_EXISTING_STATE_MARKER`` (e.g. "Already covered",
+    "**Local system**:") and excludes lines that also carry a
+    ``_NEGATION_OR_PROPOSAL_MARKER`` -- see the module-level scope rationale above this
+    section for why unrestricted scanning is not usable.
+
+    Args:
+        lines: All lines of an analysis file (insights/ or utilization/).
+
+    Returns:
+        List of ``repo_path_unresolved`` Issue dicts, one per unresolved citation.
+    """
+    issues: list[Issue] = []
+    for lineno, line in enumerate(lines, start=1):
+        if not _EXISTING_STATE_MARKER.search(line) or _NEGATION_OR_PROPOSAL_MARKER.search(line):
+            continue
+
+        for match in _REPO_PATH_CANDIDATE.finditer(line):
+            candidate = match.group(0).rstrip(_TRAILING_PUNCTUATION)
+            clean = candidate.removeprefix("./")
+            if not _resolves_in_repo(clean):
+                issues.append({
+                    "check": "repo_path_unresolved",
+                    "severity": "warning",
+                    "message": f"Cited repository path does not exist: {candidate}",
+                    "line": lineno,
+                })
+
+        for skill_match in _BARE_SKILL_CITATION.finditer(line):
+            slug = skill_match.group(1)
+            if slug not in _SKILL_DIR_NAMES:
+                issues.append({
+                    "check": "repo_path_unresolved",
+                    "severity": "warning",
+                    "message": f"Cited skill does not exist in the repo: {slug}",
+                    "line": lineno,
+                })
+    return issues
+
+
+def validate_analysis_file(filepath: Path, research_root: Path) -> dict[str, Any]:
+    """Validate a single gap-analysis file (insights/ or utilization/) for repo-path claims.
+
+    Unlike ``validate_file``, this does not run entry-template structural checks --
+    analysis files intentionally do not follow that template (see ``_is_analysis_file``).
+
+    Args:
+        filepath: Absolute path to the markdown file to validate.
+        research_root: Root directory used to produce a relative file path.
+
+    Returns:
+        Dict with keys ``file``, ``format`` (always ``"analysis"``), ``status``, ``issues``.
+    """
+    abs_filepath = filepath.resolve()
+    abs_root = research_root.resolve()
+    try:
+        relative = str(abs_filepath.relative_to(abs_root))
+    except ValueError:
+        relative = str(abs_filepath)
+
+    lines = filepath.read_text(encoding="utf-8").splitlines()
+    issues = _check_repo_path_citations(lines)
+    has_errors = any(i["severity"] == "error" for i in issues)
+    return {"file": relative, "format": "analysis", "status": "fail" if has_errors else "pass", "issues": issues}
+
+
 def _load_backlink_lib() -> types.ModuleType:
     """Load backlink_lib from the same directory as this script using importlib.util.
 
@@ -859,6 +1057,25 @@ def _collect_deduped_files(paths: list[Path]) -> list[Path]:
     return files
 
 
+def _collect_deduped_analysis_files(paths: list[Path]) -> list[Path]:
+    """Collect gap-analysis files from all paths, preserving order and deduplicating.
+
+    Args:
+        paths: Files or directories to collect from.
+
+    Returns:
+        Ordered, deduplicated list of matching analysis files.
+    """
+    seen: set[Path] = set()
+    files: list[Path] = []
+    for p in paths:
+        for f in collect_analysis_files(p):
+            if f not in seen:
+                seen.add(f)
+                files.append(f)
+    return files
+
+
 def _print_text_report(entries: list[dict[str, Any]], total_errors: int, total_warnings: int, verbose: bool) -> None:
     """Print a human-readable validation report.
 
@@ -900,7 +1117,8 @@ def main(
     research_root = _infer_research_root(resolved)
 
     files = _collect_deduped_files(resolved)
-    if not files:
+    analysis_files = _collect_deduped_analysis_files(resolved)
+    if not files and not analysis_files:
         if output_json:
             print(
                 json.dumps({"summary": {"total": 0, "passed": 0, "errors": 0, "warnings": 0}, "entries": []}, indent=2)
@@ -910,6 +1128,7 @@ def main(
         sys.exit(0)
 
     entries = [validate_file(f, research_root) for f in files]
+    entries.extend(validate_analysis_file(f, research_root) for f in analysis_files)
 
     total = len(entries)
     passed = sum(1 for e in entries if e["status"] == "pass")
