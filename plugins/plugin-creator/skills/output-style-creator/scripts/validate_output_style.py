@@ -96,45 +96,57 @@ def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
     return front, data
 
 
-def description_nodes(node: yaml.Node | None) -> Iterator[yaml.Node]:
+def description_nodes(node: yaml.Node | None, seen: set[int] | None = None) -> Iterator[yaml.Node]:
     """Yield every value node keyed ``description`` anywhere in a composed document.
 
     Walks nested mappings and sequences rather than only the top level, so a description reached
-    through a YAML anchor or merge key is inspected too.
+    through a YAML anchor or merge key is inspected too. A recursive alias produces a cyclic node
+    graph, so each node is visited once.
 
     Args:
         node: The composed node to walk, or None.
+        seen: Node identities already visited on this walk.
 
     Yields:
         Each value node whose key is ``description``.
     """
+    seen = set() if seen is None else seen
+    if node is None or id(node) in seen:
+        return
+    seen.add(id(node))
     if isinstance(node, yaml.MappingNode):
         for key, value in node.value:
             if getattr(key, "value", None) == "description":
                 yield value
-            yield from description_nodes(value)
+            yield from description_nodes(value, seen)
     elif isinstance(node, yaml.SequenceNode):
         for item in node.value:
-            yield from description_nodes(item)
+            yield from description_nodes(item, seen)
 
 
-def uses_merge_key(node: yaml.Node | None) -> bool:
+def uses_merge_key(node: yaml.Node | None, seen: set[int] | None = None) -> bool:
     """Report whether a composed document uses a YAML merge key.
 
     A merge (``<<: *anchor``) sources a field from another mapping, which hides where the value
     was written and defeats any source-span check on the field itself. The style schema is a flat
-    mapping of known fields, so a merge has no legitimate use here.
+    mapping of known fields, so a merge has no legitimate use here. A recursive alias produces a
+    cyclic node graph, so each node is visited once.
 
     Args:
         node: The composed node to walk, or None.
+        seen: Node identities already visited on this walk.
 
     Returns:
         True when any mapping in the document carries a ``<<`` key.
     """
+    seen = set() if seen is None else seen
+    if node is None or id(node) in seen:
+        return False
+    seen.add(id(node))
     if isinstance(node, yaml.MappingNode):
-        return any(getattr(key, "value", None) == "<<" or uses_merge_key(value) for key, value in node.value)
+        return any(getattr(key, "value", None) == "<<" or uses_merge_key(value, seen) for key, value in node.value)
     if isinstance(node, yaml.SequenceNode):
-        return any(uses_merge_key(item) for item in node.value)
+        return any(uses_merge_key(item, seen) for item in node.value)
     return False
 
 
@@ -229,7 +241,7 @@ def styles_in(directory: Path) -> list[str]:
     return sorted(str(entry) for entry in directory.glob("*.md") if entry.is_file())
 
 
-def declared_output_style_paths(plugin: Path) -> list[str]:
+def declared_output_style_paths(plugin: Path) -> list[str] | None:
     """Read a plugin manifest's ``outputStyles`` entries.
 
     The key replaces Claude Code's default ``output-styles/`` scan, so a plugin declaring
@@ -239,19 +251,20 @@ def declared_output_style_paths(plugin: Path) -> list[str]:
         plugin: The plugin root directory.
 
     Returns:
-        The declared paths, normalised to a list. An absent key or unreadable manifest yields
-        an empty list.
+        The declared paths, normalised to a list, or None when the key is absent or the manifest
+        cannot be read. An empty list means the key declares no paths, which is not the same as an
+        absent key: the key still replaces the default scan, so nothing is loaded.
     """
     manifest = plugin / ".claude-plugin" / "plugin.json"
     try:
         declared = json.loads(manifest.read_text(encoding="utf-8")).get("outputStyles")
     except (OSError, json.JSONDecodeError):
-        return []
+        return None
     if isinstance(declared, str):
         return [declared]
     if isinstance(declared, list):
         return [entry for entry in declared if isinstance(entry, str)]
-    return []
+    return None
 
 
 def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
@@ -277,8 +290,14 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
     plugin_styles: list[str] = []
     declared: list[str] = []
     if plugin is not None:
-        declared = declared_output_style_paths(plugin)
-        searched = [plugin / entry.removeprefix("./") for entry in declared] if declared else [plugin / "output-styles"]
+        found = declared_output_style_paths(plugin)
+        declared = found if found is not None else []
+        # An absent key leaves the default scan in place; any declaration replaces it, empty included.
+        searched = (
+            [plugin / entry.removeprefix("./") for entry in declared]
+            if found is not None
+            else [plugin / "output-styles"]
+        )
         for directory in searched:
             plugin_styles.extend(styles_in(directory) or ([str(directory)] if directory.is_file() else []))
 

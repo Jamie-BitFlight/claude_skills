@@ -124,8 +124,8 @@ It emits compact JSON with `path`, `valid`, `problems`, and `fields`. The rules 
 For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
-uvx skilllint@latest check {plugin-path}
-claude plugin validate {plugin-path}
+uvx skilllint@latest check '{plugin-path}'
+claude plugin validate '{plugin-path}'
 ```
 
 The script covers the frontmatter only. A style with valid frontmatter and an empty body exits 0, so READ the remaining checks yourself — the script cannot make any of them:
