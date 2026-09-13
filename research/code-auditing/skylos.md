@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-09-13
   version_at_verification: 4.36.1
   next_review: 2026-12-13
-  confidence_map: "Identity/Metadata: high (manifest + changelog); Overview: high (README); Problem Addressed: high (README); Key Features: high (README + local docs); Technical Architecture: medium (docs + bounded code-read); Installation & Usage: high (README); Relevance to Claude Code Development: high (README + agent-verification docs); Limitations: high (README + local docs)"
+  confidence_map: "Identity/Metadata: high (manifest + changelog); Overview: high (README); Problem Addressed: high (README); Key Features: medium (doc + code-read); Technical Architecture: medium (docs + bounded code-read); Installation & Usage: high (README); Relevance to Claude Code Development: high (README + agent-verification docs); Limitations: high (README + local docs)"
 ---
 
 # Skylos
@@ -47,13 +47,13 @@ It combines dead-code, security, secret, dependency, CI/CD, quality, AI-code-def
 
 - `skylos verify . --file src/app.py --range 40:75 --project-context` narrows verification to a file range and project context. Schema-version-2 results use `pass`, `fail`, and `incomplete`; `incomplete` exits with code `2` unless `--no-fail` is set. [Source: README](https://github.com/duriantaco/skylos/blob/main/README.md), [AI Code Verification](https://github.com/duriantaco/skylos/blob/main/docs/ai-code-verification.md)
 - Verification is documented not to execute target code, invoke package managers or compilers, call an LLM judge, or query a network service for local/workspace API verification. [Source: AI Code Verification](https://github.com/duriantaco/skylos/blob/main/docs/ai-code-verification.md)
-- `skylos contract init` creates a repository-local AI hallucination contract at `.skylos/ai-contract.yml`; the contract can configure phantom-symbol, dependency, API-surface, route, and test requirements. [Source: README](https://github.com/duriantaco/skylos/blob/main/README.md), [contracts/schema.py](https://github.com/duriantaco/skylos/blob/main/skylos/contracts/schema.py)
+- `skylos contract init` creates a repository-local AI hallucination contract at `.skylos/ai-contract.yml`; the contract can configure phantom-symbol, dependency, API-surface, route, and test requirements. [Source: README](https://github.com/duriantaco/skylos/blob/main/README.md), [Source: `skylos/contracts/schema.py` — `HallucinationContract` (code-read)](https://github.com/duriantaco/skylos/blob/main/skylos/contracts/schema.py)
 
 ### Agent verification and behavior testing
 
 - `skylos defend` evaluates ten weighted defense checks and three separately scored operations checks. The documented defense checks cover dangerous output sinks, tool scope and schemas, prompt-injection paths, output validation, RAG isolation, PII filtering, and model pinning. [Source: Agent Verification](https://github.com/duriantaco/skylos/blob/main/docs/agent-verification.md)
 - The `verify_agent` MCP tool returns compact JSON with defense and operations scores, failed checks, OWASP coverage, an attestation digest, and a gate verdict. [Source: Agent Verification](https://github.com/duriantaco/skylos/blob/main/docs/agent-verification.md)
-- Agent behavior contracts can require or forbid tool calls, constrain an exact tool sequence and call count, require response substrings and source IDs, and require an explicit refusal. [Source: Agent Behavior Testing](https://github.com/duriantaco/skylos/blob/main/docs/agent-behavior-testing.md), [agents/evaluation/schema.py](https://github.com/duriantaco/skylos/blob/main/skylos/agents/evaluation/schema.py)
+- Agent behavior contracts can require or forbid tool calls, constrain an exact tool sequence and call count, require response substrings and source IDs, and require an explicit refusal. [Source: Agent Behavior Testing](https://github.com/duriantaco/skylos/blob/main/docs/agent-behavior-testing.md), [Source: `skylos/agents/evaluation/schema.py` — `AgentBehaviorContract` (code-read)](https://github.com/duriantaco/skylos/blob/main/skylos/agents/evaluation/schema.py)
 
 ---
 
@@ -165,7 +165,7 @@ These commands are reproduced from the project's README. [Source: README](https:
 | Identity/Metadata | high | 2026-09-13 | Package manifest and current top changelog release read; citation file version conflicts. |
 | Overview | high | 2026-09-13 | Project README read. |
 | Problem Addressed | high | 2026-09-13 | README and local feature documentation read. |
-| Key Features | high | 2026-09-13 | README and three local feature documents read. |
+| Key Features | medium (doc + code-read) | 2026-09-13 | README and three local feature documents read; contract and behavior-schema items corroborated by bounded source review. |
 | Technical Architecture | medium (doc + code-read) | 2026-09-13 | Documentation did not fully satisfy component-flow depth; bounded 12-file source review supplied contract and evidence-structure details. |
 | Installation & Usage | high | 2026-09-13 | Commands reproduced from README. |
 | Relevance to Claude Code Development | high | 2026-09-13 | MCP and Claude Code use are stated in primary project documentation. |

@@ -19,7 +19,7 @@
 
 ### Current state
 
-The Stage 7 template allows only `CERTIFIED` or `NOT_CERTIFIED`; its required-truth and quality-gate tables allow only `YES / NO` and `PASS / FAIL`. Missing or unsupported verification evidence is therefore recorded as a gap under `NOT_CERTIFIED` and routed to corrective task decomposition, despite not demonstrating that a requirement is false.
+The Stage 7 template allows only `CERTIFIED` or `NOT_CERTIFIED`; its required-truth and quality-gate tables allow only `YES / NO` and `PASS / FAIL`. Missing or unsupported verification evidence is therefore recorded as a gap under `NOT_CERTIFIED` and routed to corrective task decomposition, despite not demonstrating that a requirement is false — the Gaps block records "what evidence is missing" and its Remediation Path loops back to Stage 4 (`final-verification/SKILL.md`, Gaps and Remediation Path sections).
 
 ### Target state
 
@@ -52,7 +52,7 @@ A final-verification artifact contains a named provenance block and digest; reru
 ## Improvement 3: Define an optional deterministic source-verifier quality gate
 
 **Source pattern**: Use the MCP `verify_change` result as one evidence source in a coding-agent verification gate, subject to repository language support and the accepted `incomplete` policy. (Relevance to Claude Code Development → Integration Opportunities)
-**Local system**: `plugins/development-harness/templates/language-manifest-template.md`; `plugins/development-harness/skills/final-verification/SKILL.md`
+**Local system**: `plugins/development-harness/templates/language-manifest-template.md`; `plugins/development-harness/skills/dh-meta-docs/references/language-manifest-schema.md`
 **Confidence**: Low
 **Impact**: Low
 **Backlog**: Deferred — confidence low: the source explicitly makes suitability conditional, and this checkout has no Skylos command, MCP server, supported-language inventory, or policy for handling its `incomplete` result.
@@ -79,7 +79,7 @@ A sample language manifest and final-verification record show the optional gate'
 
 ### Current state
 
-Each of Skylos's three behavior-contract axes already has a local precedent, but they are declared in three separate places and none of them is executable as a scenario. Refusals appear twice — `verdict-schema.md` §2.3 defines a SKIP rule with a `skip_reason` field required when `verdict == SKIP`, and `subagent-contract/SKILL.md` requires a first-line `STATUS: DONE` or `STATUS: BLOCKED` and says to "Return BLOCKED when a required input is missing, rather than inferring it." Source references appear as `verdict-schema.md`'s conservation invariant and its check that a finding's description appear "verbatim in some `entries[].descriptions`", which exists to catch a synthesizer altering attributions. Tool calls appear only as `dispatch-contract/SKILL.md`'s prose rule that a dispatched specialist's "declared tools reach every operation handed over" — a selection-time rule with no post-hoc check that the agent called what it was scoped to.
+Each of Skylos's three behavior-contract axes already has a local precedent, but they are declared in three separate places and none of them is executable as a scenario. Refusals appear twice — `verdict-schema.md` §2.1 requires a `skip_reason` field when `verdict == SKIP` and §2.3 defines the detection rule that selects SKIP, and `subagent-contract/SKILL.md` requires a first-line `STATUS: DONE` or `STATUS: BLOCKED` and says to "Return BLOCKED when a required input is missing, rather than inferring it." Source references appear as `verdict-schema.md`'s conservation invariant and its check that a finding's description appear "verbatim in some `entries[].descriptions`", which exists to catch a synthesizer altering attributions. Tool calls appear as `dispatch-contract/SKILL.md`'s prose rule that a dispatched specialist's "declared tools reach every operation handed over", and as `subagent-contract/SKILL.md`'s "Report every command you ran with its outcome." The first is a selection-time rule and the second a reporting duty; neither is a post-hoc check that the agent called only what it was scoped to.
 
 ### Target state
 

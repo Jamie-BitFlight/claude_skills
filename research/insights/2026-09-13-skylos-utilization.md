@@ -2,7 +2,7 @@
 
 **Research entry**: ./research/code-auditing/skylos.md
 **Generated**: 2026-09-13
-**Integration surfaces found**: 3 (CLI | Python package | MCP)
+**Integration surfaces found**: 2 (CLI | MCP)
 **Proposals written**: 4
 **Skipped**: 3 — resolver duplicates the execution gate; cognitive pre-action verification has no code-scan role; agent-definition generation is not an executable agent codebase
 
@@ -60,15 +60,15 @@ uvx skylos verify . --file src/app.py --range 40:75 --project-context
 **Research entry**: ./research/code-auditing/skylos.md
 **Caller**: `./plugins/development-harness/agents/reviewer-security.md`
 **Integration mechanism**: CLI subprocess
-**Replaces or adds**: Adds deterministic detection for the secret, injection, insecure-deserialization, unsafe-subprocess, and dependency findings the agent currently derives from grep patterns; it does not replace the agent's authentication and authorization reading, its false-positive triage, or its prompt-injection check on agent and skill Markdown.
+**Replaces or adds**: Adds deterministic detection in the secret, security-flaw, and dependency categories the entry documents for the `-a` scan; it does not replace the agent's authentication and authorization reading, its false-positive triage, or its prompt-injection check on agent and skill Markdown.
 **Setup cost**: Low (no API key required for documented local static analysis)
 **Integration surface**: `uvx skylos . -a --diff origin/main`
 
 ### Why this caller
 
-`reviewer-security.md` states that its "task body contains a newline-separated list of changed files (relative paths from the repo root). Use this list as your scan target." Its in-scope list covers hardcoded secrets, injection vectors, insecure deserialization, dependency CVEs, and unsafe subprocess usage — all classes the Skylos entry documents within the combined `-a` scan, which it also documents as scopable to changed work via `--diff origin/main`. The agent reaches those findings through pattern matches plus surrounding-context reading; Skylos documents deterministic checks for the same classes. This is a diff-level review gate, distinct from the per-task post-edit gate in Utilization 1, and it is a detection step rather than the remediation ownership that keeps `linting-root-cause-resolver.md` out of scope.
+`reviewer-security.md` states that its "task body contains a newline-separated list of changed files (relative paths from the repo root). Use this list as your scan target." Its in-scope list covers hardcoded secrets, injection vectors, insecure deserialization, dependency CVEs, and unsafe subprocess usage. The Skylos entry documents the combined `-a` scan as covering the secrets, security-flaw, and dependency *categories*, and documents `--diff origin/main` as its changed-work scoping flag; it does not enumerate which security sub-checks the scan performs, so overlap can be claimed at category level only. Confirming that injection, insecure deserialization, and unsafe subprocess usage are individually covered requires a source pass the entry has not made. This is a diff-level review gate, distinct from the per-task post-edit gate in Utilization 1, and it is a detection step rather than the remediation ownership that keeps `linting-root-cause-resolver.md` out of scope.
 
-Three constraints bind the caller. The agent's scan target is the changed-files list in its task body, not a git ref, so Skylos's diff-scoped output must be intersected with that list rather than widening the agent's scope. `-a` also emits dead-code and quality findings that this agent's definition places out of scope; those belong to the quality perspective and must not enter the security verdict. Authentication and authorization gaps have no documented Skylos equivalent for general application code — `skylos defend`'s guardrail checks target an LLM-agent implementation — and the agent's prompt-injection check on Claude agent and skill Markdown is out of Skylos's documented reach for the same reason recorded against `agent-creator.md` below.
+Three constraints bind the caller. The agent's scan target is the changed-files list in its task body, not a git ref, so Skylos's diff-scoped output must be intersected with that list rather than widening the agent's scope. `-a` also emits dead-code and quality findings that this agent's definition places out of scope; those belong to the quality perspective and must not enter the security verdict. Authentication and authorization gaps are likewise outside the categories the entry documents for general application code — `skylos defend`'s guardrail checks target an LLM-agent implementation — and the agent's prompt-injection check on Claude agent and skill Markdown is out of Skylos's documented reach for the same reason recorded against `agent-creator.md` below.
 
 ### Integration sketch
 
@@ -98,7 +98,8 @@ Use the default scan rather than `-a`. The default is already scoped to this per
 
 ```bash
 # Default scan is the documented dead-code analysis; -a is deliberately omitted
-# so security findings stay with the security perspective.
+# so security findings stay with the security perspective. The entry documents
+# --diff only in the -a form, so verify the flag against `skylos --help` first.
 uvx skylos . --diff origin/main
 ```
 
