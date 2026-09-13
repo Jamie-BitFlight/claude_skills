@@ -1,10 +1,8 @@
 # Cross-Reference Format
 
-The canonical shape of a research entry's `## Cross-References` section. Every producer of
-cross-reference rows — `@research-cross-referencer` writing forward links, `@research-backlink-detector`
-writing reciprocal ones, and anyone adding a row by hand — writes rows in exactly this form, so the
-graph stays parseable by `backlink_lib.py` and symmetric under
-`validate_research.py check-backlinks`.
+The canonical shape of a research entry's `## Cross-References` section. Every producer writes rows
+in exactly this form — `@research-cross-referencer` (forward links), `@research-backlink-detector`
+(reciprocal rows), and anyone adding a row by hand.
 
 ---
 
