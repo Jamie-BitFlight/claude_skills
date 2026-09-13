@@ -156,7 +156,9 @@ for field in ('name', 'description'):
     assert field not in data or isinstance(data[field], str), field + ' must be a string when present'
 for field in ('keep-coding-instructions', 'force-for-plugin'):
     assert field not in data or isinstance(data[field], bool), field + ' must be a boolean when present, not a quoted string'
-assert not re.search(r'^description:[ \t]*[|>]', front, re.M), 'description must not use a multiline YAML indicator'
+for key, value in getattr(yaml.compose(front), 'value', []):
+    if key.value == 'description':
+        assert value.start_mark.line == value.end_mark.line, 'description must occupy a single line'
 " "{style-path}"
 ```
 
