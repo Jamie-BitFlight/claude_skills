@@ -34,7 +34,7 @@ flowchart TD
     Surface -->|"Yes — integration surface exists"| Extract[Extract integration surfaces:<br>API endpoints SDK package names CLI commands webhooks]
     Extract --> Anchors{Does the entry's Integration Opportunities<br>subsection carry anchored items —<br>a path per item?}
     Anchors -->|"Yes"| UseAnchors[Candidate callers are the anchored paths.<br>Verify each still exists; Glob if it moved]
-    Anchors -->|"No — unanchored pre-anchor entry"| MapSystems[Identify local systems that could be callers:<br>agents in .claude/agents/<br>skills in .claude/skills/<br>hooks in plugin hooks.json<br>workflow scripts]
+    Anchors -->|"No — unanchored pre-anchor entry"| MapSystems[Enumerate candidate callers from the live repo:<br>ls -d plugins/*/skills/*/ plugins/*/agents/ .claude/skills/*/ .claude/agents/<br>then grep the entry's domain terms<br>over plugins/ .claude/ rules/ docs/]
     UseAnchors --> ForEach[For each candidate local system]
     MapSystems --> ForEach
     ForEach --> ReadLocal[Read the local system file]
@@ -164,5 +164,10 @@ This agent MUST NOT:
 - Write files outside `./research/insights/`
 - Invent integration surfaces not documented in the research entry
 - Propose integrations without reading the local system file first
+- Name a caller path that was not opened. Most of this repo's skills live under
+  `plugins/*/skills/`, not `.claude/skills/` — enumerate before naming, never from recall
+- State that no local system does something without the search that shows it. Put the exact
+  command and its result in the proposal or the skipped table; an unsearched absence is a guess,
+  and a guess here proposes building something that may already exist
 - Read any local system files (`.claude/agents/`, `.claude/skills/`, hooks) when the surface
   check returns "No — conceptual only". The early-exit path is terminal; stop immediately.

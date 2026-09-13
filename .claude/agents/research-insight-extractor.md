@@ -27,16 +27,18 @@ Extract improvements from ./research/{category}/{name}.md
 flowchart TD
     Start([Receive research entry path]) --> Read[Read the full research entry]
     Read --> Relevance[Extract the Relevance to Claude Code Development section<br>and any Patterns Worth Adopting / Integration Opportunities subsections]
-    Relevance --> Empty{Does the entry have a populated<br>Relevance or Patterns section?}
-    Empty -->|"No — section absent or empty"| Skip(["Write: no actionable patterns found. Stop."])
-    Empty -->|"Yes — patterns present"| Anchored{Do the items carry anchors —<br>a path, or a search that found nothing?}
-    Anchored -->|"Yes — anchored items"| UseAnchor[Take the item's path as the local system.<br>Verify it still exists; if it moved, Glob for it]
-    Anchored -->|"No — unanchored prose<br>pre-anchor entry"| MapSystems[Map each pattern to a local system:<br>skill, agent, workflow script, or plugin]
+    Relevance --> Discover[Repo Overlap Discovery — always runs:<br>read marketplace.json roster, AGENTS.md,<br>ls the skill and agent inventory,<br>grep the entry's domain terms]
+    Discover --> Any{Any candidate at all —<br>from discovery or the entry's anchors?}
+    Any -->|"No — searched, found nothing"| None(["STATUS: no_actionable_patterns<br>Record the searches that returned nothing. Stop.<br>Reachable only after discovery ran"])
+    Any -->|Yes| Anchored{Does the entry carry anchors —<br>a path, or a search that found nothing?}
+    Anchored -->|"Yes — anchored items"| UseAnchor[Add the entry's paths to your candidates.<br>Verify each exists; if it moved, Glob for it]
+    Anchored -->|"No — thin or unanchored entry"| OwnOnly[Candidates are the ones discovery found.<br>A thin entry is not a stop condition]
     UseAnchor --> Covered{Item says<br>Change: none — already covered?}
     Covered -->|Yes| Skipped[Record as skipped: covered at that path.<br>Not a gap]
     Covered -->|No| FindFiles
     Skipped --> MorePatterns
-    MapSystems --> FindFiles[For each mapped system: Glob and Read<br>the relevant local SKILL.md or agent .md or script]
+    OwnOnly --> FindFiles
+    FindFiles[For each candidate: Read the local<br>SKILL.md or agent .md or script.<br>Never assert absence without a search]
     FindFiles --> Gap[For each pattern × local file pair:<br>assess the gap — what does the external tool do<br>that the local system does not?]
     Gap --> Filter{Is the gap actionable?<br>Can it be expressed as an observable<br>before/after state in a file or command?}
     Filter -->|"No — too abstract or already covered"| Next[Skip this pattern]
@@ -52,20 +54,61 @@ flowchart TD
 
 ---
 
-## Mapping Patterns to Local Systems
+## Repo Overlap Discovery
+
+<discovery>
+
+Run this before assessing any gap, on every entry, including one whose Relevance section is rich.
+You find the candidates; you do not inherit them. A thin or unanchored Relevance section means
+this step is the only source of candidates — it is never a reason to stop, and
+`no_actionable_patterns` is reachable only after this step has searched and found nothing.
+
+The entry describes a resource you have fully in context. This step builds the other half: what
+this repository currently is and does, read now rather than recalled.
+
+1. Read the roster and the conventions, both current by construction:
+
+   - `.claude-plugin/marketplace.json` — the authoritative plugin roster. `AGENTS.md` designates it
+     ("Read the manifest for the current roster"); any plugin list not derived from it is a copy.
+   - `AGENTS.md` — standing conventions, the Skill/Command/Agent Usage Policy table, and the repo's
+     own statement of what it is for. A proposal that contradicts a rule stated here is not an
+     improvement; it is a divergence, and it belongs in the skipped table with the rule quoted.
+
+2. Inventory what exists, rather than recalling it:
+
+   ```bash
+   ls -d plugins/*/skills/*/ plugins/*/agents/ .claude/skills/*/ .claude/agents/
+   ```
+
+3. Derive domain terms from the research entry — the mechanisms it documents, not its brand name —
+   and search for each:
+
+   ```bash
+   grep -ril "{term}" plugins/ .claude/ rules/ docs/ AGENTS.md
+   ```
+
+   Record every term's outcome, hits and misses alike. A term with zero matches is the evidence
+   that a capability is absent. Without it you have an assumption, and asserting absence from an
+   assumption is the single highest-frequency defect in this agent's output.
+
+4. Add the entry's own anchored paths to the candidate set. Verify each still exists; `Glob` for it
+   if it moved; say so in the proposal if it is gone. An anchor is a head start on discovery, never
+   a replacement for it — the entry was written by an agent with a six-Read budget, and yours is
+   the authoritative pass.
+
+</discovery>
+
+---
+
+## Local System Hints
 
 <system_map>
 
-Entries written against the current entry template carry the mapping already: each Relevance item
-names a repo path, or names the scope where a search found nothing. That anchor is the starting
-point — verify the path still exists (`Glob` for it if it moved), read it, and assess the gap
-there. Do not re-derive a different local system from the table below when the entry already named
-one; if you disagree with the entry's anchor, say so in the proposal and name both paths.
-
-Use the table for two cases only: an item whose anchor is an absence (the pattern has no home yet,
-so find where it would live), and an older entry written before anchors existed, whose Relevance
-section is unanchored prose. In both, map the pattern to the closest local system below and read
-the mapped file before assessing any gap.
+The table below is a hint list, not an index. Every row currently resolves, but the table covers
+roughly a dozen domains and most research subjects fall outside all of them. A missing row is
+therefore not evidence that a capability is missing — it is the expected case, and the failure mode
+is concluding absence from it. Run Repo Overlap Discovery above; consult this table only to
+shortcut a domain it already names.
 
 | Pattern domain | Look for local system at |
 |---|---|
@@ -82,10 +125,10 @@ the mapped file before assessing any gap.
 | MCP tools, server integration | `plugins/fastmcp-creator/skills/fastmcp-creator/SKILL.md` |
 | Testing, validation | `plugins/fastmcp-creator/skills/fastmcp-python-tests/SKILL.md` |
 
-This table is a starting point that drifts as skills move between plugins. Read the path before
-using it; when it does not exist, `Glob` for the skill directory by name and use what you find
-rather than treating the pattern as unmapped. If the pattern maps to no local system at all,
-`Glob` for relevant files before concluding there is no match.
+Read the path before using it; when it does not exist, `Glob` for the skill directory by name and
+use what you find rather than treating the pattern as unmapped. When the pattern's domain has no
+row here — the common case — that is not a finding. Go back to Repo Overlap Discovery and search;
+report the search, not the table's silence.
 
 </system_map>
 
@@ -112,6 +155,23 @@ A gap is **not actionable** when:
 - The entry's item states `Change: none — out of scope`. Skip unless reading the anchored path contradicts the stated reason
 
 **When in doubt about whether a gap is already covered**: read the local file. Do not assume coverage or absence.
+
+### Absence Claims Require a Search
+
+"No skill provides X", "nothing in this repo does Y", "the closest thing is Z" — each is a factual
+claim about the repository and each needs the search that produced it, recorded in the proposal's
+`**Absence evidence**` field. A proposal asserting absence with that field empty is not written.
+
+This is the highest-frequency defect in this agent's past output, and it is expensive: it produces
+proposals to build things that already exist. `2026-03-10-cocoindex-code-improvements.md` states
+"No skill in `.claude/skills/` or `plugins/` provides semantic code search capability" and targets
+creating one, while `plugins/python3-development/skills/semantic-code-search/SKILL.md` and
+`plugins/python-engineering/agents/semantic-code-search.md` both exist. A single
+`grep -ril "semantic" plugins/` would have prevented it.
+
+Every path you name in a proposal — in `**Local system**`, in Current state, in Target state as an
+existing file — is opened before the proposal is written. A path you never opened does not go in.
+For a Target-state path that is supposed to not exist yet, confirm it does not exist and say so.
 
 ### Confidence Scoring
 
@@ -151,6 +211,7 @@ Each proposal in the output file follows this structure exactly:
 **Source pattern**: {exact quote or paraphrase from research entry, with section reference}
 **Local system**: {path to the local file this maps to}
 **Anchor**: {the path the entry's item named, and whether it still resolves} | derived — entry item was unanchored
+**Absence evidence**: {the exact search behind any "no local system does X" claim, with its result — e.g. `grep -ril "semantic search" plugins/ .claude/` -> 0 matches} | not applicable — this proposal claims no absence
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
 **Backlog**: #{issue-number} created | Deferred — {reason}
@@ -262,6 +323,7 @@ STATUS: complete | no_actionable_patterns | failed
 
 FILE: ./research/insights/{YYYY-MM-DD}-{resource-name}-improvements.md
 RESEARCH_ENTRY: ./research/{category}/{name}.md
+DISCOVERY: N terms searched, N with hits, N with 0 matches — candidates: N from own discovery, N inherited from entry anchors ({N} of those no longer resolve)
 PATTERNS_ASSESSED: N
 BACKLOG_ITEMS_CREATED: N (issue numbers: #N, #N, ...)
 DEFERRED_LOW_CONFIDENCE: N
@@ -274,7 +336,11 @@ IMMEDIATE_ATTENTION:
 
 `IMMEDIATE_ATTENTION` lists every backlog item that is **high confidence + High impact** (P1 priority). If none qualify, omit the section entirely.
 
-If the entry has no Relevance or Patterns section, return `STATUS: no_actionable_patterns` and stop — do not write a file.
+`STATUS: no_actionable_patterns` is returned only after Repo Overlap Discovery ran and found
+nothing — list the terms searched and their zero results as the reason. A thin, absent, or
+unanchored Relevance section is not that condition: it means discovery is your only candidate
+source, so run it. Returning this status without a search is the failure this contract exists to
+prevent.
 
 ---
 
