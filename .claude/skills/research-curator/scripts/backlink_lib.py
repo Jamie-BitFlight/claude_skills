@@ -49,19 +49,38 @@ _TABLE_SEPARATOR_MIN_PIPES = 2
 # There used to be a verb-substitution table here (INVERSE_VERBS) that tried to
 # invert forward relationship prose into a reciprocal claim -- e.g. "provides X"
 # became "consumes X provided by". Removed per #3524: measuring it against the
-# real vault corpus (823 asymmetric edges) showed 802/823 forward phrases never
-# even matched a verb (real rows rarely open with a bare directional verb), so
-# the table's only real-world effect was to route almost everything to the
-# generic fallback it was supposed to be an alternative to. Of the phrases it
-# did match, at least one produced a confidently-worded but false integration
-# claim (a "provides AST graph context ... through MCP" row inverted into an
-# MCP integration that does not exist). A human hand-inverting the same corpus
-# for PR #3510, working file by file with full context, made the identical
-# class of mistake twice out of seven tries. If careful manual inversion has a
-# two-in-seven false-claim rate, a fixed verb table applied blindly across 823
-# pairs is not going to do better. A deterministic transform has no way to
-# verify whether a described integration is real, so it must not assert one --
-# see transform_to_backlink_description below.
+# real vault corpus (823 asymmetric edges) showed 767/823 forward phrases never
+# matched a verb at all, 21/823 matched a verb and got inverted, and 35/823 hit
+# the same-category "shares" rule. Of the 21 verb-matched rows, at least one
+# produced a confidently-worded but false integration claim (a "provides AST
+# graph context ... through MCP" row inverted into an MCP integration that does
+# not exist). A human hand-inverting the same corpus for PR #3510, working file
+# by file with full context, made the identical class of mistake twice out of
+# seven tries. If careful manual inversion has a two-in-seven false-claim rate,
+# a fixed verb table applied blindly across 823 pairs is not going to do better.
+#
+# The next attempt replaced verb inversion with verbatim attribution -- quote
+# the forward phrase under a "cites this entry:" prefix instead of inverting
+# it. That is *also* unsound, for a different reason: cross-reference-format.md
+# establishes the Entry column as the relationship phrase's grammatical
+# subject ("provides the embedding layer this tool queries" -- Entry is the
+# provider). A forward phrase living in source's table, in the row whose Entry
+# is target, describes target, not source. Copying that phrase verbatim into a
+# new row written into target's file, with Entry set to source, keeps the same
+# words attached to the wrong subject -- e.g. Syft's row about Hound
+# ("complements SBOM generation with hypothesis-driven security analysis")
+# describes Hound's capability; quoting it back into hound.md under
+# Entry=Syft reads as attributing hypothesis-driven security analysis to
+# Syft. Measured: 27/788 attributed rows lead with an active capability verb
+# and 63/788 name the target's own display name -- both patterns that read as
+# a claim about the wrong entity once relocated. Only a phrase that is true
+# regardless of which side is named as subject (a mutual "shares" relation) is
+# safe to reuse verbatim; see the same-category "shares" rule below.
+#
+# A deterministic transform has no way to verify whether a described
+# integration is real, and no way to safely re-subject arbitrary prose written
+# for a different Entry -- so it must not assert either. See
+# transform_to_backlink_description below.
 # ---------------------------------------------------------------------------
 
 
@@ -324,17 +343,19 @@ def category_of(entry_path: pathlib.Path, vault_root: pathlib.Path) -> str:
 
 
 def bare_reference_description(source_name: str, source_category: str) -> str:
-    """Return the relationship text used when no forward phrase is available at all.
+    """Return the relationship text used when no more specific description is safe.
 
-    This is the single source of truth for that one literal string -- callers that
-    hit an asymmetric edge with no parseable forward row (e.g. a malformed or
-    unresolvable Cross-References table) must call this instead of inlining the
-    template, so the wording only ever needs to change in one place.
+    This is the single source of truth for that one literal string. It covers two
+    distinct situations, both of which have no true, specific relationship claim
+    available:
 
-    This is a genuinely different situation from "could not confidently invert a
-    forward phrase" (handled by transform_to_backlink_description): here there is no
-    forward phrase to attribute at all, so naming the source entry is the only true
-    statement available.
+    - transform_to_backlink_description falls back here for any forward phrase it
+      cannot safely reuse (i.e. anything that isn't a mutual "shares" relation) --
+      reusing the phrase's own words under a different Entry would misattribute
+      whatever it describes to the wrong entity (see that function's docstring).
+    - A caller with no parseable forward row at all (e.g. a malformed or
+      unresolvable Cross-References table) has no phrase to work from in the first
+      place.
 
     Args:
         source_name: Display name of the source entry (the one adding the backlink).
@@ -351,23 +372,34 @@ def transform_to_backlink_description(
 ) -> str:
     """Transform a forward relationship phrase into a backlink relationship phrase.
 
-    This function never invents a new directional relationship claim. Earlier versions
-    tried to invert the forward phrase's verb (e.g. "provides X" -> "consumes X"), but
-    a deterministic transform has no way to verify that a described integration is
-    real, and measuring that approach against the actual research vault showed it
-    producing false claims -- see the module-level comment above transform section for
-    the evidence. The only transformations applied here are ones that cannot fabricate
-    a relationship that doesn't already hold:
+    This function never invents a new directional relationship claim, and never
+    reattributes an existing one to the wrong entity. cross-reference-format.md
+    establishes the Entry column as the relationship phrase's grammatical subject:
+    a phrase living in source's table, in the row whose Entry is target, describes
+    target -- not source. Quoting that phrase verbatim into a new row written into
+    target's file, with Entry set to source, would keep the same words attached to
+    a different subject than the one they were written about (see the module-level
+    comment above this section for a worked example and the corpus measurement).
+    Verb inversion has the same problem plus an unverifiable direction change on
+    top. Neither is safe for arbitrary prose.
+
+    Exactly one category of forward phrase is safe to reuse as-is: a phrase whose
+    truth does not depend on which side is named as subject. "Shares" is the only
+    such case this function recognizes:
 
     1. If source_category == target_category and "shares" appears in forward_phrase,
        append "(bidirectional)". Sharing is symmetric by definition -- if the source
-       shares something with the target, the target shares it right back -- so marking
-       the existing phrase as bidirectional asserts nothing new.
-    2. Otherwise, attribute the forward phrase without changing its claimed direction:
-       "cites this entry: {forward_phrase}". This carries the real, specific content
-       from the forward row (satisfying the "no generic label" bar in
-       cross-reference-format.md) while asserting only the one fact that is always
-       true: the source entry's own file contains that phrase, citing this entry.
+       shares something with the target, the target shares it right back -- so the
+       phrase reads the same regardless of which entry is named as Entry, and
+       marking it bidirectional asserts nothing new.
+    2. Otherwise, fall back to bare_reference_description(). This is a deliberate
+       floor, not a placeholder: cross-reference-format.md's "no generic label" bar
+       governs human/agent-authored forward rows, where a specific phrase is
+       achievable by reading both entries. A machine transform working from one
+       already-written phrase cannot safely produce a specific claim about a
+       *different* entity than the one that phrase was written about, so naming
+       the source entry and its category -- with no relationship content beyond
+       that -- is the only description this function can guarantee is true.
 
     Args:
         forward_phrase: The relationship description from the forward cross-reference row.
@@ -382,7 +414,7 @@ def transform_to_backlink_description(
     if source_category == target_category and "shares" in forward_phrase.lower():
         return f"{forward_phrase} (bidirectional)"
 
-    return f"cites this entry: {forward_phrase}"
+    return bare_reference_description(source_name, source_category)
 
 
 def backlink_exists(target_entry_markdown: str, source_entry_path_link: str) -> bool:

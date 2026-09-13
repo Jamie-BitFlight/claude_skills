@@ -1,12 +1,19 @@
 """Tests for transform_to_backlink_description and bare_reference_description.
 
-Covers #3524: the function must never fabricate a directional relationship claim
-from arbitrary forward-phrase prose. It only marks an already-symmetric "shares"
-phrase as bidirectional, or attributes the forward phrase verbatim -- it never
-inverts a verb.
+Covers #3524. The function must never fabricate a directional relationship claim
+from arbitrary forward-phrase prose (verb inversion), and must never reattribute
+an existing claim to the wrong entity by quoting it verbatim under a different
+Entry (cross-reference-format.md fixes the Entry column as the phrase's
+grammatical subject, so a phrase written about target is false, or at least
+misleading, once relocated to a row whose Entry is source). The only phrase this
+function ever reuses as-is is a mutual "shares" relation, which is true
+regardless of which side is named as subject; everything else falls back to
+bare_reference_description.
 """
 
 from __future__ import annotations
+
+from hypothesis import given, strategies as st
 
 import backlink_lib as bl
 
@@ -16,7 +23,7 @@ import backlink_lib as bl
 
 
 class TestSharesBidirectionalPattern:
-    """Sharing is symmetric by definition, so marking it bidirectional asserts nothing new."""
+    """Sharing is symmetric by definition, so reusing the phrase asserts nothing new."""
 
     def test_shares_same_category_bidirectional(self) -> None:
         """Same-category 'shares pattern' -> 'shares pattern (bidirectional)'."""
@@ -25,13 +32,14 @@ class TestSharesBidirectionalPattern:
         )
         assert result == "shares async-first design (bidirectional)"
 
-    def test_shares_cross_category_falls_through_to_attribution(self) -> None:
-        """Cross-category 'shares X' does not get '(bidirectional)' -- category differs."""
+    def test_shares_cross_category_falls_back_to_bare_reference(self) -> None:
+        """Cross-category 'shares X' does not get '(bidirectional)' -- category differs,
+        so it takes the same conservative fallback as any other non-matching phrase."""
         result = bl.transform_to_backlink_description(
             "shares async-first design", "AgentB", "agent-frameworks", "tools"
         )
         assert "bidirectional" not in result
-        assert result == "cites this entry: shares async-first design"
+        assert result == bl.bare_reference_description("AgentB", "agent-frameworks")
 
     def test_shares_case_insensitive(self) -> None:
         """The 'shares' check is case-insensitive."""
@@ -42,32 +50,33 @@ class TestSharesBidirectionalPattern:
 
 
 # ---------------------------------------------------------------------------
-# Rule 2: attribution fallback -- no verb inversion, ever
+# Rule 2: bare_reference_description fallback -- no verb inversion, no verbatim
+# reattribution, ever
 # ---------------------------------------------------------------------------
 
 
-class TestAttributionFallback:
-    """Every non-'shares' phrase is attributed verbatim, never inverted."""
+class TestBareReferenceFallback:
+    """Every non-'shares' phrase falls back to bare_reference_description."""
 
     def test_fallback_on_unknown_phrase(self) -> None:
-        """Unrecognized phrase -> attributed verbatim, no invented direction."""
+        """Unrecognized phrase -> bare reference, no invented direction or reused content."""
         result = bl.transform_to_backlink_description(
             "is adjacent to deployment pipeline", "Alpha", "agent-frameworks", "tools"
         )
-        assert result == "cites this entry: is adjacent to deployment pipeline"
+        assert result == "referenced by Alpha (agent-frameworks)"
 
-    def test_fallback_preserves_forward_phrase_verbatim(self) -> None:
-        """The forward phrase is never altered -- only prefixed with attribution."""
+    def test_fallback_does_not_reuse_forward_phrase_content(self) -> None:
+        """The forward phrase's words never appear in the fallback output."""
         result = bl.transform_to_backlink_description(
             "totally unknown relationship", "SomeTool", "tools", "coding-agents"
         )
-        assert result == "cites this entry: totally unknown relationship"
+        assert "totally unknown relationship" not in result
+        assert result == "referenced by SomeTool (tools)"
 
-    def test_fallback_does_not_restate_source_name_or_category(self) -> None:
-        """Attribution never duplicates the Entry/Category columns already in the row."""
+    def test_fallback_delegates_to_bare_reference_description(self) -> None:
+        """The fallback is bare_reference_description itself, not a duplicated template."""
         result = bl.transform_to_backlink_description("some relationship", "AuthSvc", "tools", "api-frameworks")
-        assert "AuthSvc" not in result
-        assert "tools" not in result
+        assert result == bl.bare_reference_description("AuthSvc", "tools")
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +99,7 @@ class TestNoVerbInversionRegression:
         result = bl.transform_to_backlink_description("provides embedding layer", "Alpha", "agent-frameworks", "tools")
         assert not result.startswith("consumes")
         assert "provided by" not in result
-        assert result == "cites this entry: provides embedding layer"
+        assert result == "referenced by Alpha (agent-frameworks)"
 
     def test_issue_reproduction_cgc_skylos_case(self) -> None:
         """The exact #3524 reproduction case: no fabricated MCP integration claim."""
@@ -98,25 +107,15 @@ class TestNoVerbInversionRegression:
             "provides AST graph context and dead-code analysis through MCP", "Skylos", "code-auditing", "mcp-ecosystem"
         )
         assert "consumes" not in result
-        assert not result.endswith("provided by")
-        assert result == "cites this entry: provides AST graph context and dead-code analysis through MCP"
-
-    def test_complements_does_not_collapse_to_category_restatement(self) -> None:
-        """'complements X' must not become 'is complemented by {name} ({category})' -- that
-        discards the actual relationship content and restates columns already in the row."""
-        result = bl.transform_to_backlink_description(
-            "complements drift detection", "Logfire", "ai-observability", "ai-observability"
-        )
-        assert "Logfire" not in result
-        assert "ai-observability" not in result
-        assert "complements drift detection" in result
+        assert "AST graph context" not in result
+        assert result == "referenced by Skylos (code-auditing)"
 
     def test_extends_is_not_inverted(self) -> None:
         """'extends X' must not become 'is extended by X'."""
         result = bl.transform_to_backlink_description(
             "extends tree-sitter parsing", "SoulForge", "coding-agents", "tools"
         )
-        assert result == "cites this entry: extends tree-sitter parsing"
+        assert result == "referenced by SoulForge (coding-agents)"
 
     def test_inverse_verbs_table_removed(self) -> None:
         """The INVERSE_VERBS verb-substitution table no longer exists in the module."""
@@ -124,14 +123,83 @@ class TestNoVerbInversionRegression:
 
 
 # ---------------------------------------------------------------------------
-# bare_reference_description: single source of truth for the no-forward-phrase case
+# Regression: verbatim reattribution must not misattribute the target's own
+# capability to the source entry (second root cause found in PR #3525 review)
+# ---------------------------------------------------------------------------
+
+
+class TestNoVerbatimReattributionRegression:
+    """A forward phrase describes whoever is named as Entry in its *original* row --
+    per cross-reference-format.md, the Entry column is the phrase's grammatical
+    subject. Reusing that phrase verbatim in a new row whose Entry is a different
+    entity keeps the words attached to the wrong subject. This function must never
+    do that for a non-"shares" phrase.
+    """
+
+    def test_syft_hound_case_does_not_attribute_hound_capability_to_syft(self) -> None:
+        """Real #3525-review case: syft.md's row about Hound ('complements SBOM
+        generation with hypothesis-driven security analysis...') describes Hound,
+        not Syft. The backlink written into hound.md (Entry=Syft) must not carry
+        that description forward as if it were about Syft."""
+        forward_phrase = (
+            "Complements SBOM generation with hypothesis-driven security analysis "
+            "and knowledge graph-based vulnerability reasoning"
+        )
+        result = bl.transform_to_backlink_description(forward_phrase, "Syft", "code-auditing", "code-auditing")
+        assert "hypothesis-driven security analysis" not in result
+        assert result == "referenced by Syft (code-auditing)"
+
+    def test_phrase_naming_targets_own_display_name_is_not_reused(self) -> None:
+        """A phrase describing the target by name is not safe to reuse under a
+        different Entry -- it still describes the same entity by name, now
+        misleadingly placed under the source's row."""
+        result = bl.transform_to_backlink_description(
+            "OmniRoute routes requests to this backend", "LocalAI", "llm-infrastructure", "api-frameworks"
+        )
+        assert "OmniRoute" not in result
+        assert result == "referenced by LocalAI (llm-infrastructure)"
+
+
+# ---------------------------------------------------------------------------
+# bare_reference_description: single source of truth for the conservative floor
 # ---------------------------------------------------------------------------
 
 
 class TestBareReferenceDescription:
-    """Used only when no forward phrase exists at all (distinct from low-confidence inversion)."""
+    """Used both as transform_to_backlink_description's fallback and when no
+    forward phrase exists at all (no parseable forward row)."""
 
     def test_bare_reference_names_source_and_category(self) -> None:
         """Bare reference names the source entry and its category."""
         result = bl.bare_reference_description("Alpha", "agent-frameworks")
         assert result == "referenced by Alpha (agent-frameworks)"
+
+
+# ---------------------------------------------------------------------------
+# Property: no non-"shares" phrase ever leaks into the output (generalizes the
+# two named regressions above to arbitrary prose, per PR #3525 review point 3 --
+# exact-string assertions on known bad inputs would not catch a new phrase shape
+# that reintroduces verbatim reattribution)
+# ---------------------------------------------------------------------------
+
+
+class TestNeverLeaksForwardPhraseContent:
+    """For any forward phrase that does not trigger the "shares" rule, the output
+    must be exactly bare_reference_description(source_name, source_category) --
+    none of the forward phrase's own words may appear in it, regardless of verb,
+    proper nouns, or phrasing."""
+
+    @given(
+        forward_phrase=st.text(min_size=1, max_size=200).filter(lambda s: "shares" not in s.lower()),
+        source_name=st.sampled_from(["Alpha", "Syft", "LocalAI", "Skylos"]),
+        source_category=st.sampled_from(["tools", "code-auditing", "llm-infrastructure"]),
+        target_category=st.sampled_from(["tools", "code-auditing", "llm-infrastructure", "mcp-ecosystem"]),
+    )
+    def test_non_shares_phrase_never_appears_in_output(
+        self, forward_phrase: str, source_name: str, source_category: str, target_category: str
+    ) -> None:
+        """No forward-phrase content reaches the output unless it hit the "shares" rule."""
+        result = bl.transform_to_backlink_description(forward_phrase, source_name, source_category, target_category)
+        # Equality against the fixed bare-reference template is the property itself: it can
+        # only hold if none of forward_phrase's content survived into the output.
+        assert result == bl.bare_reference_description(source_name, source_category)

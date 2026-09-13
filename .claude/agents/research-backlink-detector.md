@@ -74,9 +74,11 @@ Or write a small inline driver that imports and calls the public API functions d
 
 All transform rules and fallback logic are defined exclusively in
 [backlink_lib.py](./../skills/research-curator/scripts/backlink_lib.py). Do not duplicate or
-inline any of that logic here. The transform never inverts a relationship verb — it only ever
-marks an already-symmetric phrase as bidirectional or attributes the forward phrase verbatim; see
-that module's docstrings for why (#3524).
+inline any of that logic here. The transform never inverts a relationship verb, and never
+reuses the forward phrase's own wording under a different Entry (doing so would attribute a
+description to the wrong entity — see that module's docstrings). It emits a plain
+"referenced by {entry} ({category})" for almost every row, except a mutual "shares" phrase,
+which is marked `(bidirectional)` instead (#3524, #3525).
 
 ---
 
