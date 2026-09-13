@@ -414,8 +414,11 @@ the Commit step stages exactly that list, nothing else.
    uv run prek run --files ./research/README.md [tracked file list from steps 1-2]
    ```
 
-4. **Commit** -- stage and commit exactly the tracked file list -- never a blanket `git add -A`
-   or a directory-wide `git add ./research/`:
+4. **Commit** -- if the tracked file list is empty (nothing was created, refreshed, or repaired
+   this run -- e.g. a clean Validate Mode pass where the backlink repair also found nothing
+   writable to fix), skip this step and step 5: there is nothing to commit, and this is not a
+   failure. Otherwise, stage and commit exactly the tracked file list -- never a blanket
+   `git add -A` or a directory-wide `git add ./research/`:
 
    ```bash
    git add ./research/README.md ./research/{category}/{name}.md [...tracked file list]
