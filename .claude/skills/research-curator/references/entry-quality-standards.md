@@ -1,11 +1,6 @@
 # Research Entry Quality Standards
 
-The content contract every research entry under `./research/` must satisfy, whoever writes it.
-
-Two halves, always consulted together:
-
-- **Fidelity Rules** govern each individual claim — where it came from, how precisely it is stated, and how confident the entry is in it.
-- **Depth Requirements** govern each section's coverage — how much a section must say before it counts as written.
+The content contract every research entry under `./research/` must satisfy, whoever writes it. Fidelity Rules govern each claim; Depth Requirements govern each section's coverage. Both apply to every entry.
 
 Reviewing a finished entry rather than writing one? Use [Entry Review Rubric](./entry-review-rubric.md), which turns both halves into discrete checks.
 
@@ -36,11 +31,8 @@ Popularity metrics (stars, downloads, forks) are out of scope entirely — see R
 ### Rule 2a: No Popularity Statistics
 
 Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
-These describe how popular a resource is, not what it does, how it does it, or why it's
-valuable — they don't inform the review or utility judgments this entry exists to support,
-and a reader can query them programmatically at any time via `gh api repos/{owner}/{repo}`
-if genuinely needed. There is no "Key Statistics" section in the entry template; do not
-add one, and do not fold this data into another section.
+There is no "Key Statistics" section in the entry template; do not add one, and do not fold
+this data into another section.
 
 This rule binds gathering as well as writing: it applies whether the repository is in the
 session's authorized GitHub scope or out of it, and no fallback source (web search, package
@@ -82,8 +74,6 @@ SOURCE: Confidence scoring methodology from [fidelity-rules.md](./../../../../pl
 ## Depth Requirements
 
 <depth_requirements>
-
-Research entries MUST go beyond surface-level feature lists. Each entry section has a minimum depth requirement.
 
 ### Architecture Section — REQUIRED depth
 

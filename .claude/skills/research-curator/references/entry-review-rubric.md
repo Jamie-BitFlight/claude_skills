@@ -88,7 +88,7 @@ Ask: **could this text have been written about any Python repository without ope
 - **Passes** when the analysis names specific files, skills, agents, or workflows of this repo and says something about them that is true here and would be false elsewhere.
 - **FAILS** when the analysis would survive a find-and-replace of this repo's name — generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
 
-A gate 5 failure is a defect even when every individual sentence in gate 4 verified: correct-but-generic analysis is the failure mode this gate exists to catch.
+A gate 5 failure is a defect even when every individual sentence in gate 4 verified.
 
 ---
 
