@@ -4,7 +4,11 @@ Extract before abstracting. Every claim in a research entry traces back to a pas
 verbatim from a primary source, recorded before any prose is written. Writing a section from
 memory, from inference, or from a model's prior knowledge of the resource is FORBIDDEN.
 
-The phases run in order: Phase 1 → Doc-Sufficiency Check → (Phase 1b, conditional) → Phase 2.
+The phases run in order: Phase 1 → Doc-Sufficiency Check → (Phase 1b, conditional) → Phase 1c → Phase 2.
+
+Phases 1 and 1b extract from the resource being researched. Phase 1c extracts from this repo. A
+`Relevance to Claude Code Development` section written without Phase 1c has nothing real to name,
+and degrades into claims true of any repository and checkable against none.
 
 The content bar each written section must then clear is in [Entry Quality Standards](./entry-quality-standards.md).
 
@@ -125,6 +129,130 @@ Entries carrying code-derived claims cite them inline and qualify their confiden
 
 ---
 
+## Phase 1c: Repo Anchor Pass
+
+Unconditional — runs for every entry, after Phase 1 (and Phase 1b when it triggered) and before
+Phase 2. It produces the anchor records that the `Relevance to Claude Code Development` section is
+written from, and nothing else in the entry depends on it.
+
+Read this repo the same way Phase 1 read the resource: extract first, characterise second. Three
+steps. Searching is unbudgeted — `git grep` is a Bash call, so search every term. Reading is
+capped at six Read calls, and the cap falls entirely on step 3.
+
+1. Derive 3-6 **capabilities** from your own Phase 1 extracts — the mechanisms named in
+   `Problem Addressed` and `Key Features`, not the resource's brand name, which by definition will
+   not appear here. Record which extract each came from; a capability with no extract behind it was
+   guessed, not derived, and its result anchors nothing.
+
+   Give each capability two search terms: the narrow, resource-specific one and a broader one for
+   the same idea — `similarity search` with `embedding`, `reranking` with `vector`, `playwright`
+   with `browser`. Both are terms and both get searched, so 3-6 capabilities means 6-12 searches.
+   The narrow term is the more defensible description of the resource and the less likely to appear
+   here, so searched alone it manufactures absences: `similarity search` and `reranking` both
+   return zero in a repo that ships
+   `plugins/python3-development/skills/semantic-code-search/SKILL.md`.
+
+2. Search every term — both halves of every capability, no exceptions and no budget:
+
+   ```bash
+   git grep --full-name -il "{term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md
+   ```
+
+   The `:/` on every pathspec and the `--full-name` are load-bearing. Git resolves a bare pathspec
+   against the current directory, so the same command without `:/`, run anywhere below the
+   repository root, resolves all six paths to nothing and exits 1 printing no message — a
+   manufactured absence on every term, indistinguishable in the output from a real one. `:/`
+   anchors each path to the repository root wherever the command runs, and `--full-name` makes the
+   output repo-relative so an anchor record's path is usable exactly as printed.
+
+   `git grep`, never plain `grep`, and the scope is those six paths and no others — two separate
+   constraints, neither doing the other's job. Measured on the term `refusal` in the primary
+   checkout: plain `grep -ril` over `plugins/ .claude/ rules/ docs/ AGENTS.md` returns 73 files,
+   `git grep -il` over that same over-broad scope returns 3, and the command above returns 1. The
+   73→3 is plain `grep` descending into gitignored `.claude/worktrees/`, which holds more files
+   than the rest of the repo combined — paths no clone has, and a route for the entry being
+   written to match itself. The 3→1 is the narrowed scope dropping `.claude/agent-memory/`,
+   `.claude/audits/`, and `.claude/plan/`: agent scratch output recording what some past agent did,
+   not what this repo instructs, and containing tracked files, so `git grep` reaches them and only
+   the pathspec excludes them. Over the six paths alone both commands return the same single file,
+   so do not read the `git grep` rule as covering the narrowing — it is the backstop that keeps an
+   untracked file from becoming an anchor.
+
+   `research/` needs no exclusion and gets none: it lies under none of the six paths, so the corpus
+   is already out of scope and an entry cannot anchor to another entry.
+
+   Record the match count for every term, matched or not.
+
+3. Read matched files and quote one exact line from each. At most six Reads, and selection is
+   fixed, not a preference:
+
+   - Work capabilities in the order derived, at most one anchor each. Six Reads is the only
+     budget; a capability is not separately capped at one, because the rejection rule below can
+     spend a Read on a file that yields no usable line. Stop at the sixth Read; report any
+     capability left unanchored and why.
+   - A capability whose narrow term matched uses the narrow term's match list. When only the
+     broader term matched, use the broader term's list, and the quoted line must then contain the
+     broader term — whichever term produced the list is the term the line must carry.
+   - Within that list take paths in `git grep`'s own output order, preferring a `.md` file over a
+     script or data file, and among `.md` files preferring `AGENTS.md`, then `rules/*.md`, then
+     `SKILL.md` and agent definitions, then any other `.md` (`docs/`, `references/`). Skip any path
+     an earlier capability already consumed. Never anchor two capabilities to the same file: four
+     anchors drawn from one document that merely shares CI vocabulary is one observation wearing
+     four hats.
+   - A capability whose list holds no unconsumed `.md` path yields no anchor. Record it as
+     unanchored and move on; do not fall back to a script or to a file already read.
+
+   The quoted line must contain the term that produced the list. A line that does not is evidence
+   about something else: a GUI `widget` anchored to a tmux menu widget, or an SDL2 `simulator`
+   anchored to an iOS Simulator, clears every other check and states nothing true.
+
+   Reject a line and take the next line *in the same file* when it is a frontmatter field
+   (`description:`, `name:`, `allowed-tools:`), a bullet in a link list or index table, or a sample
+   argument inside a code fence — each carries the term without asserting anything about this
+   repo's behaviour. Reject it too when it is not a unique locator: `true`, `3`, or a lone heading
+   word cannot be re-found by the reader checking it. When no line in the file qualifies, that file
+   is spent: move to the next path in the list, which costs another Read against the six.
+
+Record anchors alongside the Phase 1 extracts, in this format:
+
+```text
+REPO ANCHORS — {resource-name}
+
+A1. Capability: {capability}  From: {the Phase 1 extract it came from}
+    Term matched: {the term that produced this match list — narrow or broader}
+    Path: {repo-relative path}
+    Today: "{exact line read from that path, containing that term}"
+    Feeds: {which Relevance item}
+
+A2. Capability: {capability}  From: {the Phase 1 extract it came from}
+    Today: git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
+           git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
+    Feeds: {which Relevance item}
+```
+
+Write both commands into an A2 record in full, every `:/` prefix included. A recorded scope that
+does not reproduce the command actually run is not re-runnable, which is the only property an
+absence anchor has — and a reader who re-runs a copy with the `:/` prefixes stripped, from a
+subdirectory, gets a clean zero that confirms nothing.
+
+An absence anchor needs both the narrow term and its broader pair at zero. When the broader term
+matches, there is no absence to record — read that file and write a presence anchor instead. An
+absence anchor reports that these two terms returned nothing in this scope; it never reports that
+the capability is missing here. Asserting nonexistence from a keyword search is the defect this
+pass exists to stop reproducing, not a shortcut it licenses one layer up.
+
+An A-record carrying neither a quoted line nor a search command is not an anchor. Drop it rather
+than writing it into the entry.
+
+Scope of this pass versus the downstream analysis agents: `research-insight-extractor` and
+`research-utilization-assessor` run after the entry is written and do the deep repo-grounded work
+— gap assessment, confidence scoring, backlog items, integration sketches. This pass does not
+duplicate them and must not try to. It finds the paths and quotes the lines; six Reads is its
+whole budget. Its output is what those agents start from instead of re-deriving the mapping from
+an entry that named nothing.
+
+---
+
 ## Phase 2: Write From Extracts
 
 Write each entry section by organizing the extracted passages for that section, then composing prose or structured content grounded in those extracts.
@@ -142,5 +270,8 @@ REQUIRED verification step: Before finalizing a section, confirm that every fact
 - Architectural assertions ("uses a DAG-based task graph")
 - Installation commands (verify against official docs, not inferred)
 - Compatibility statements ("requires Python 3.11+")
+- Any statement about this repository ("`rules/` has no worktree guidance", "`parallel-work`
+  already covers fan-out") — sourced by a Phase 1c anchor, quoted line or search command, never by
+  recall of what a repo like this usually contains
 
 SOURCE: "Extract before abstracting" methodology from [fidelity-rules.md](./../../../../plugins/summarizer/skills/summarizer/references/fidelity-rules.md) Rule 2 (accessed 2026-03-06). Quote-grounding technique from Anthropic prompt engineering documentation (<https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips>, accessed 2026-02-06).

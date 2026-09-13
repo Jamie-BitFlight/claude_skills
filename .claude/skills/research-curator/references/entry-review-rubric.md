@@ -46,7 +46,7 @@ Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separa
 | **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
 | **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
 | **Rule 2a — No Popularity Statistics** | Is the entry free of star, download, fork, and contributor counts? | Any such figure anywhere in the entry, including inside a badge, a quoted README passage, or a "Key Statistics" section that should not exist |
-| **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}" |
+| **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". Applies to the entry's repo claims too: `-> nothing in {scope}` reports that these search terms matched nothing in that scope, and an item reading it as "this repo has no X" is a Rule 3 defect |
 | **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
 
 ---
@@ -80,6 +80,9 @@ For each repo claim, in order:
 2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
+5. **Quoted line contains the matched term** — each present-anchor Relevance item carries a `Term:` line naming the term that produced its match list ([Entry Template](./entry-template.md)'s Relevance item shape). Check that the quoted line contains that term. A quote that does not is evidence about something else, and is a defect no matter how real the path is: a GUI `widget` anchored to a tmux menu widget, an SDL2 `simulator` anchored to an iOS Simulator. An item with no `Term:` line is itself the defect — record it as one and check the quote against both of the capability's terms; do not mark this rule NOT RUN for a missing field the entry was required to write.
+6. **Quote is an assertion and a locator** — reject a quoted line that is a frontmatter field (`description:`, `name:`, `allowed-tools:`), a bullet in a link list or index table, or a sample argument inside a code fence. Each carries the term without asserting anything about this repo's behaviour. Reject one that cannot be re-found either — `true`, `3`, a lone heading word.
+7. **Paths are distinct** — no two Relevance items anchor to the same file. Repeated paths multiply one observation into several findings; count them as one and record the rest as defects.
 
 Record each verified claim with the path you read. A gate 4 pass asserts you opened the files; it cannot be reached by reading the proposal alone.
 
@@ -89,10 +92,15 @@ Record each verified claim with the path you read. A gate 4 pass asserts you ope
 
 Judgment check, applied to the entry's "Relevance to Claude Code Development" section and to both analysis files.
 
-Ask: **could this text have been written about any Python repository without opening this one?**
+Ask: **was this text produced by running something against this repository?**
 
-- **Passes** when the analysis names specific files, skills, agents, or workflows of this repo and says something about them that is true here and would be false elsewhere.
-- **FAILS** when the analysis would survive a find-and-replace of this repo's name — generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
+Two item shapes pass, and they pass for different reasons.
+
+- A **presence anchor** passes when it names a specific file, skill, agent, or workflow of this repo and says something about it that is true here and would be false elsewhere.
+- An **absence anchor** passes when you re-run **both** of its search commands — the narrow term and the broader term — and get zero from each. Its `→ 0 matches` is true of most repositories, so it never satisfies the would-be-false-elsewhere test; re-running the commands is what makes it a finding rather than a claim, and running them is the check. An anchor whose commands you did not re-run is `NOT RUN`, not a pass. An anchor recording only one command is a defect — one term at zero is the manufactured absence Phase 1c exists to prevent, not an anchor. An anchor whose commands now return matches is also a defect: what the entry recorded as searched-and-empty is neither, so the item rests on nothing. Report it as a stale anchor, and do not restate it as "the entry claims this repo has no X" — per Gate 2 Rule 3, the entry claims no such thing.
+- **FAILS** when an item carries neither shape — text that would survive a find-and-replace of this repo's name, generic advice ("could improve code quality", "useful for agent workflows", "fits well with this project's architecture") dressed as repo-specific findings.
+
+An entry whose Relevance section is entirely absence anchors passes this gate when every command re-runs to zero. It is a thin entry, not a failing one; record the count so the thinness is visible.
 
 A gate 5 failure is a defect even when every individual sentence in gate 4 verified.
 

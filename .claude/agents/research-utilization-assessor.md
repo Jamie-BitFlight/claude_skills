@@ -160,5 +160,10 @@ This agent MUST NOT:
 - Write files outside `./research/insights/`
 - Invent integration surfaces not documented in the research entry
 - Propose integrations without reading the local system file first
+- Name a caller path that was not opened. Most of this repo's skills live under
+  `plugins/*/skills/`, not `.claude/skills/` — a path recalled rather than listed is usually wrong
+- State that no local system does something without the search that shows it. Put the exact command
+  and its result in the proposal or the skipped table; an unsearched absence proposes building
+  something that may already exist
 - Read any local system files (`.claude/agents/`, `.claude/skills/`, hooks) when the surface
   check returns "No — conceptual only". The early-exit path is terminal; stop immediately.
