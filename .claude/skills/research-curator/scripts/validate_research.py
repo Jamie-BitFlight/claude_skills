@@ -14,10 +14,13 @@ Both formats are valid. The ``format`` key in each result reports which was dete
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date
 from io import StringIO
@@ -783,10 +786,10 @@ def collect_files(path: Path) -> list[Path]:
 #   this repo (see Gate 4's own scope statement), so a path cited there is far
 #   more likely to be a genuine self-referential claim. Gating on an
 #   "already exists" assertion phrase (`_EXISTING_STATE_MARKER`) and excluding
-#   negated/aspirational phrasing (`_NEGATION_OR_PROPOSAL_MARKER`) brought the
-#   measured false-positive rate in this scope to zero across the corpus
-#   sample manually reviewed while implementing this check (see
-#   validation-rules.md for the full measurement writeup).
+#   negated/aspirational phrasing (`_NEGATION_OR_PROPOSAL_MARKER`) brings the
+#   measured false-positive rate in this scope down to a few percent (3 of the
+#   142 hits on the real corpus). Warning severity, never blocking, because of
+#   that residue -- validation-rules.md lists the three known FP shapes.
 # ---------------------------------------------------------------------------
 
 _ANALYSIS_DIRS = frozenset({"insights", "utilization"})
@@ -799,8 +802,12 @@ def _is_analysis_file(file: Path) -> bool:
     ``research/utilization/`` compare a researched tool against this repository. They
     do not follow the entry template (see ``_is_research_entry``) but are still subject
     to the ``repo_path_unresolved`` check (see ``validate_analysis_file``).
+
+    Directory-level AI-facing navigation files (``_NON_ENTRY_FILENAMES``) are excluded
+    here for the same reason ``_is_research_entry`` excludes them: they describe the
+    directory, they are not gap analyses of a researched tool.
     """
-    return bool(_ANALYSIS_DIRS.intersection(file.parts))
+    return file.name not in _NON_ENTRY_FILENAMES and bool(_ANALYSIS_DIRS.intersection(file.parts))
 
 
 def collect_analysis_files(path: Path) -> list[Path]:
@@ -815,7 +822,8 @@ def collect_analysis_files(path: Path) -> list[Path]:
     return [f for f in files if _is_analysis_file(f)]
 
 
-def _find_repo_root() -> Path:
+@functools.cache
+def _find_repo_root() -> Path | None:
     """Locate the repository root by walking up from this script's own location.
 
     Uses ``pyproject.toml`` as the root marker rather than the research root a
@@ -823,29 +831,101 @@ def _find_repo_root() -> Path:
     repository tree regardless of which subdirectory is being validated.
 
     Returns:
-        The repository root directory.
-
-    Raises:
-        RuntimeError: If no ``pyproject.toml`` is found in any parent directory.
+        The repository root directory, or ``None`` when this script sits outside any
+        project tree (a standalone copy of the skill). The ``repo_path_unresolved``
+        check is then skipped; every other check still runs, so a copied script stays
+        usable instead of failing at import.
     """
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "pyproject.toml").is_file():
             return candidate
-    msg = f"Could not locate repo root (pyproject.toml) above {__file__}"
-    raise RuntimeError(msg)
+    return None
 
 
-_REPO_ROOT = _find_repo_root()
-_TOP_LEVEL_REPO_ENTRIES = frozenset(p.name for p in _REPO_ROOT.iterdir() if p.is_dir() and p.name != ".git")
-_SKILL_DIR_NAMES = frozenset(p.parent.name for p in _REPO_ROOT.rglob("SKILL.md"))
+@functools.cache
+def _tracked_repo_paths(root: Path) -> tuple[str, ...]:
+    """Return every git-tracked path in ``root``, or ``()`` when git cannot answer.
 
-# Matches an optionally ``./``-prefixed repo-relative path whose first segment is a real
-# top-level entry of this repo (e.g. ``.claude/rules/x.md``, ``plugins/foo/skills/bar/``).
-# The negative lookbehind stops this from matching a path segment embedded inside a URL or
-# a longer identifier (``https://x.com/docs/y`` -- "docs" is preceded by "/", excluded).
-_REPO_PATH_CANDIDATE = re.compile(
-    r"(?<![\w./-])(?:\./)?(" + "|".join(re.escape(d) for d in sorted(_TOP_LEVEL_REPO_ENTRIES)) + r")(/[\w.*-]+)+"
-)
+    Tracked paths rather than a filesystem walk: a walk also sees gitignored and
+    transient directories (``.venv/``, ``.tmp/``, nested ``git worktree`` checkouts),
+    so the sets derived below would differ between a developer machine and a fresh CI
+    clone and the same file would then validate differently in the two environments.
+
+    Args:
+        root: Repository root to enumerate.
+
+    Returns:
+        Tuple of repo-relative, ``/``-separated tracked paths; empty when git is
+        unavailable or the directory is not a git work tree (callers fall back to a
+        filesystem scan).
+    """
+    git = shutil.which("git")
+    if git is None:
+        return ()
+    try:
+        proc = subprocess.run(
+            [git, "-C", str(root), "ls-files", "-z"], capture_output=True, text=True, check=False, timeout=120
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ()
+    if proc.returncode != 0:
+        return ()
+    return tuple(p for p in proc.stdout.split("\0") if p)
+
+
+@functools.cache
+def _top_level_repo_entries(root: Path) -> frozenset[str]:
+    """Return the names of the repo's top-level directories.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Directory names used to decide whether a token in prose is a repo-relative path.
+    """
+    tracked = _tracked_repo_paths(root)
+    if tracked:
+        return frozenset(p.split("/", 1)[0] for p in tracked if "/" in p)
+    return frozenset(p.name for p in root.iterdir() if p.is_dir() and p.name != ".git")
+
+
+@functools.cache
+def _skill_dir_names(root: Path) -> frozenset[str]:
+    """Return every directory name that is the parent of a ``SKILL.md`` in the repo.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Skill slugs that ``_BARE_SKILL_CITATION`` matches are resolved against.
+    """
+    tracked = _tracked_repo_paths(root)
+    if tracked:
+        return frozenset(p.rsplit("/", 2)[-2] for p in tracked if p.endswith("/SKILL.md"))
+    return frozenset(p.parent.name for p in root.rglob("SKILL.md"))
+
+
+@functools.cache
+def _repo_path_candidate_re(root: Path) -> re.Pattern[str]:
+    """Build the repo-relative path pattern for ``root``.
+
+    Matches an optionally ``./``-prefixed path whose first segment is a real top-level
+    entry of this repo (e.g. ``.claude/rules/x.md``, ``plugins/foo/skills/bar/``). The
+    negative lookbehind stops this from matching a path segment embedded inside a URL or
+    a longer identifier (``https://x.com/docs/y`` -- "docs" is preceded by "/", excluded).
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Compiled pattern; a never-matching pattern when the repo has no top-level
+        directories, so an empty alternation cannot match every ``/segment`` in prose.
+    """
+    entries = sorted(_top_level_repo_entries(root))
+    if not entries:
+        return re.compile(r"(?!)")
+    return re.compile(r"(?<![\w./-])(?:\./)?(" + "|".join(re.escape(d) for d in entries) + r")(/[\w.*-]+)+")
+
 
 # Matches a backtick-quoted bare skill reference such as `` `swarm-operations/SKILL.md` ``
 # or `` `swarm-operations SKILL.md` `` -- the corpus's shorthand for citing a skill without
@@ -873,13 +953,14 @@ _NEGATION_OR_PROPOSAL_MARKER = re.compile(
     re.IGNORECASE,
 )
 
-_TRAILING_PUNCTUATION = ".,;:)]}'\">`"
+_TRAILING_PUNCTUATION = ".,;:/)]}'\">`"
 
 
-def _resolves_in_repo(candidate: str) -> bool:
+def _resolves_in_repo(root: Path, candidate: str) -> bool:
     """Return whether a repo-relative path (or glob) candidate resolves to a real path.
 
     Args:
+        root: Repository root to resolve against.
         candidate: A repo-relative path, already stripped of any leading ``./``. May
             contain a ``*`` wildcard (e.g. ``plugins/dh/skills/code-review-*/``), in
             which case it resolves when the glob matches at least one path.
@@ -888,8 +969,14 @@ def _resolves_in_repo(candidate: str) -> bool:
         True when the candidate exists (or, for a glob, matches something) in the repo.
     """
     if "*" in candidate:
-        return any(_REPO_ROOT.glob(candidate))
-    return (_REPO_ROOT / candidate).exists()
+        try:
+            return any(root.glob(candidate))
+        except ValueError:
+            # Candidate text comes from the corpus, not from a vetted pattern. An
+            # invalid glob (e.g. "**" inside a segment, rejected before Python 3.13)
+            # is an unresolvable citation, not a reason to abort the whole run.
+            return False
+    return (root / candidate).exists()
 
 
 def _check_repo_path_citations(lines: list[str]) -> list[Issue]:
@@ -905,16 +992,22 @@ def _check_repo_path_citations(lines: list[str]) -> list[Issue]:
 
     Returns:
         List of ``repo_path_unresolved`` Issue dicts, one per unresolved citation.
+        Empty when this script sits outside a repository (see ``_find_repo_root``).
     """
+    root = _find_repo_root()
+    if root is None:
+        return []
+    path_candidate = _repo_path_candidate_re(root)
+    skill_names = _skill_dir_names(root)
+
     issues: list[Issue] = []
     for lineno, line in enumerate(lines, start=1):
         if not _EXISTING_STATE_MARKER.search(line) or _NEGATION_OR_PROPOSAL_MARKER.search(line):
             continue
 
-        for match in _REPO_PATH_CANDIDATE.finditer(line):
-            candidate = match.group(0).rstrip(_TRAILING_PUNCTUATION)
-            clean = candidate.removeprefix("./")
-            if not _resolves_in_repo(clean):
+        for match in path_candidate.finditer(line):
+            candidate = match.group(0).rstrip(_TRAILING_PUNCTUATION).removeprefix("./")
+            if not _resolves_in_repo(root, candidate):
                 issues.append({
                     "check": "repo_path_unresolved",
                     "severity": "warning",
@@ -924,7 +1017,7 @@ def _check_repo_path_citations(lines: list[str]) -> list[Issue]:
 
         for skill_match in _BARE_SKILL_CITATION.finditer(line):
             slug = skill_match.group(1)
-            if slug not in _SKILL_DIR_NAMES:
+            if slug not in skill_names:
                 issues.append({
                     "check": "repo_path_unresolved",
                     "severity": "warning",

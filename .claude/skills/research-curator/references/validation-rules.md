@@ -34,9 +34,9 @@ Checks performed by `./scripts/validate_research.py` and severity mapping for th
 
 ### What counts as a citation
 
-A candidate is a repository-relative path whose first path segment is a real top-level entry of this repo (`.claude`, `plugins`, `research`, `rules`, `docs`, `scripts`, `tests`, …, computed at runtime from the repo tree rather than hardcoded, so it never drifts out of sync with the actual directory layout) followed by at least one more `/segment`. This distinguishes a path citation from:
+A candidate is a repository-relative path whose first path segment is a real top-level entry of this repo (`.claude`, `plugins`, `research`, `rules`, `docs`, `scripts`, `tests`, …) followed by at least one more `/segment`. That top-level set is derived at runtime from `git ls-files` rather than hardcoded, so it never drifts out of sync with the actual directory layout. Tracked paths, not a filesystem walk: a walk also sees gitignored and transient directories (`.venv/`, `.tmp/`, `plan/`, nested `git worktree` checkouts), which would make the same file validate differently on a developer machine and in a fresh CI clone. When `git` is unavailable the code falls back to a filesystem scan. This distinguishes a path citation from:
 
-- **A URL** — `_REPO_PATH_CANDIDATE`'s negative lookbehind refuses to start a match when the preceding character is a path/URL character (`/`, `.`, a word character, `-`), so `https://github.com/x/research/y` never matches at `research` (it is preceded by `/`).
+- **A URL** — the candidate pattern's negative lookbehind refuses to start a match when the preceding character is a path/URL character (`/`, `.`, a word character, `-`), so `https://github.com/x/research/y` never matches at `research` (it is preceded by `/`).
 - **A code identifier** — a bare word with no `/` after the top-level segment never matches; `research-curator` alone is not a candidate, `research/x` is.
 - **An illustrative/template example** — a placeholder like `research/{category}/{name}.md` cannot match because `{` is not in the segment character class, so template text in reference docs is inert by construction.
 
@@ -44,7 +44,7 @@ A second, narrower pattern (`_BARE_SKILL_CITATION`) catches the corpus's shortha
 
 ### Severity
 
-Warning, matching the existing scheme's other heuristic/regex-based checks (`access_dates`, `url_format`, `freshness_tracking`) rather than `section_completeness`/`empty_sections`' error tier — this check can produce a false negative (it misses some genuine bad citations that don't carry a recognized marker phrase) but is designed to produce zero false positives in its measured scope (see below), so it is safe to surface as a report-only signal without blocking the file.
+Warning, matching the existing scheme's other heuristic/regex-based checks (`access_dates`, `url_format`, `freshness_tracking`) rather than `section_completeness`/`empty_sections`' error tier. The check produces false negatives (it misses genuine bad citations that don't carry a recognized marker phrase) and a small residual false-positive rate (see below), so it is a report-only signal that never blocks a file — every hit still needs a human or agent to confirm before a fix is applied.
 
 ### Scope: analysis files, not entries
 
@@ -53,7 +53,15 @@ This check runs on `research/insights/*.md` and `research/utilization/*.md` gap-
 This is a deliberate scoping decision, not an oversight, based on measuring both scopes against the real corpus while designing this check:
 
 - **Entries mix description of the researched tool with commentary about this repo in the same paragraph** ("their `tests/skill-triggering/` dir offers a pattern for our skill tests"). Restricting the scan to an entry's `## Relevance to Claude Code Development` section and checking every path mention there still produced a measured **~86% false-positive rate** (19 of 22 flagged entries cited the *researched* tool's own paths — e.g. `docs/architecture.md` describing the subject tool, not this repo). Telling "our path" from "their analogous path" needs semantic judgment a regex cannot carry. Entries are left to the manual "Path exists" step in `entry-review-rubric.md`'s Gate 4, which already covers this exact question with human judgment.
-- **`-improvements.md` / `-utilization.md` files exist only to compare a researched tool against this repo** (this is Gate 4's own stated scope: "the entry's 'Relevance to Claude Code Development' section and every proposal in the `-improvements.md` and `-utilization.md` files"). A path cited there is far more likely to be a genuine self-referential claim. Gating further on an existing-state assertion phrase and excluding negated/aspirational phrasing (below) brought the measured false-positive rate in this scope to zero across the corpus sample manually reviewed while implementing this check — a run against the full real corpus (506 files) found 142 `repo_path_unresolved` issues across 67 files, all traced during review to genuine drift (a moved/renamed/never-existed path) rather than a misread of an external tool's own structure.
+- **`-improvements.md` / `-utilization.md` files exist only to compare a researched tool against this repo** (this is Gate 4's own stated scope: "the entry's 'Relevance to Claude Code Development' section and every proposal in the `-improvements.md` and `-utilization.md` files"). A path cited there is far more likely to be a genuine self-referential claim. Gating further on an existing-state assertion phrase and excluding negated/aspirational phrasing (below) drops the false-positive rate in this scope from ~86% to a few percent: a run against the full real corpus (506 files) finds 142 `repo_path_unresolved` issues across 67 files, of which a manual audit traced all but three to genuine drift (a moved/renamed/never-existed path).
+
+The three known residual false-positive shapes, which reviewers should expect and dismiss rather than "fix":
+
+| Shape | Corpus example | Why the regex misreads it |
+|---|---|---|
+| External tool's own path on a mixed line | `2026-04-29-mattpocock-skills-improvements.md:146` cites `docs/adr/` as *mattpocock/skills*' layout; the line is scanned only because a later clause says "already exists" | Marker gating is per line, so one existing-state clause pulls in every path on the line |
+| Path relative to a skill or plugin, not to the repo root | `2026-05-02-claude-brain-improvements.md:8` cites `scripts/session_query.py` — real, at `.claude/skills/session-historian/scripts/session_query.py` | Resolution is always repo-root-relative |
+| Prose `word/word` where the first word is a top-level directory name | "tasks grouped by plan/feature slug" reads as a path when a `plan/` directory exists | Generic directory names (`docs`, `data`, `plan`, `tests`, `scripts`) collide with ordinary English |
 
 ### Avoiding false positives within scope: existing-state and negation/aspirational gating
 
@@ -61,7 +69,9 @@ Even within `insights/`/`utilization/`, a bare path mention is not necessarily a
 
 ### Path/skill resolution
 
-A path candidate resolves via `Path.exists()` against the real repository root (located by walking up from the script's own file location to the directory containing `pyproject.toml` — not the `research/` root a caller passes in, since a citation must resolve against the real tree regardless of which subdirectory is being validated). A candidate containing a `*` wildcard (e.g. `plugins/development-harness/skills/code-review-*/`, used in the corpus to reference a family of skills) resolves via `Path.glob()`, succeeding if the glob matches at least one real path. A bare skill citation resolves against the set of every directory name that is the parent of a `SKILL.md` anywhere in the repo, computed once at startup.
+A path candidate resolves via `Path.exists()` against the real repository root (located by walking up from the script's own file location to the directory containing `pyproject.toml` — not the `research/` root a caller passes in, since a citation must resolve against the real tree regardless of which subdirectory is being validated). A candidate containing a `*` wildcard (e.g. `plugins/development-harness/skills/code-review-*/`, used in the corpus to reference a family of skills) resolves via `Path.glob()`, succeeding if the glob matches at least one real path; a candidate that is not a valid glob pattern counts as unresolved rather than aborting the run. A bare skill citation resolves against the set of every tracked directory name that is the parent of a `SKILL.md`.
+
+Repo-root lookup, the top-level entry set, and the skill-name set are all computed lazily on the first citation check and cached, not at import. A copy of this script placed outside any project tree therefore still runs every other check; `repo_path_unresolved` alone is skipped when no `pyproject.toml` is found above the script.
 
 ---
 

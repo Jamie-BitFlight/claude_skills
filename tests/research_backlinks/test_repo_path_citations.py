@@ -58,7 +58,13 @@ def _run_json(args: list[str]) -> dict[str, Any]:
     """Run ``validate_research.py main --json`` and parse the result."""
     cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", *args, "--json"]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    return json.loads(result.stdout)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        # A crashing script prints nothing on stdout; surface stderr instead of an
+        # opaque "Expecting value: line 1 column 1".
+        msg = f"validate_research.py exited {result.returncode} without JSON.\nstderr:\n{result.stderr}"
+        raise AssertionError(msg) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +163,46 @@ class TestPathResolution:
         lines = [f"Already covered by `{_VALIDATE_SCRIPT.relative_to(_REPO_ROOT)}`."]
         assert vr._check_repo_path_citations(lines) == []
 
+    def test_invalid_glob_pattern_does_not_raise(self) -> None:
+        """Corpus text is not a vetted glob: an invalid pattern is unresolved, not a crash.
+
+        ``Path.glob`` rejects ``**`` inside a path segment before Python 3.13, and the
+        script declares ``requires-python = ">=3.11"``, so an unguarded call aborts the
+        whole validation run on one malformed citation.
+        """
+        assert vr._resolves_in_repo(_REPO_ROOT, "plugins/foo**bar/x") is False
+
+    def test_reported_path_is_the_path_that_was_resolved(self) -> None:
+        """The warning message quotes the normalised candidate, not the raw ``./`` match."""
+        lines = ["Already covered: `./plugins/definitely-fake-plugin/SKILL.md`"]
+        issues = vr._check_repo_path_citations(lines)
+        assert len(issues) == 1
+        assert issues[0]["message"].endswith("plugins/definitely-fake-plugin/SKILL.md")
+        assert "./" not in issues[0]["message"]
+
+
+class TestRepoRootIndependence:
+    """The script stays usable when it is not sitting inside a project tree."""
+
+    def test_script_copied_outside_a_repo_still_runs(self, tmp_path: Path) -> None:
+        """A standalone copy must not fail at import.
+
+        Regression: computing the repo root at module scope raised ``RuntimeError`` on a
+        copy with no ``pyproject.toml`` above it, so even ``--help`` and the unrelated
+        ``check-backlinks`` command died.
+        """
+        copied = tmp_path / "validate_research.py"
+        copied.write_text(_VALIDATE_SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+
+        result = subprocess.run(
+            [_uv_path(), "run", "--script", str(copied), "--help"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, result.stderr
+
 
 class TestBareSkillCitation:
     """Backtick-quoted `{slug}/SKILL.md` and `{slug} SKILL.md` shorthand citations."""
@@ -204,6 +250,13 @@ class TestAnalysisFileScope:
         f.parent.mkdir(parents=True)
         f.write_text("content\n", encoding="utf-8")
         assert vr._is_analysis_file(f) is True
+
+    def test_navigation_file_in_insights_is_not_analysis_file(self, tmp_path: Path) -> None:
+        """README.md/CLAUDE.md/AGENTS.md describe the directory, they are not gap analyses."""
+        f = tmp_path / "research" / "insights" / "README.md"
+        f.parent.mkdir(parents=True)
+        f.write_text("content\n", encoding="utf-8")
+        assert vr._is_analysis_file(f) is False
 
     def test_entry_file_is_not_analysis_file(self, tmp_path: Path) -> None:
         f = tmp_path / "research" / "agent-frameworks" / "foo.md"
