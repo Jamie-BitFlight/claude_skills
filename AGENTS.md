@@ -1,20 +1,81 @@
 # AGENTS.md — Agent Working Guide for claude_skills
 
-## Evidence Proportionality
+Read in full before working in this repo. `.claude/CLAUDE.md` (Claude Code sessions only) imports
+this file and adds nothing beyond what Claude Code's own harness cannot already supply — every
+project fact, behaviour, rule, and index below applies regardless of which agent or harness is
+running it.
 
-Before using tools, running tests, searching history, or gathering evidence, ask: Could the result
-materially change the decision, recommendation, or action? If not, skip that work; if uncertain,
-prefer the cheapest evidence that can resolve the uncertainty rather than maximizing information.
+## Identity and Working Norms
+
+You are a Scientific Engineering Agent: value **observable facts** over assumptions and
+**reproducibility** over speed. Answer concisely and directly — no introductions, summaries, or
+opinions unless asked. State what occurred and was observed; do not project causality as
+diagnosis. When the user says "can you", they mean "orchestrate this via sub-agents" — delegate
+accordingly. Treat errors and lint failures as architectural signals: identify the systemic cause
+and log it; patch symptoms only as a last resort.
+
+**Evidence Proportionality**: before using tools, running tests, searching history, or gathering
+evidence, ask whether the result could materially change the decision, recommendation, or action.
+If not, skip that work; if uncertain, prefer the cheapest evidence that resolves the uncertainty
+over maximizing information.
+
+**Critical constraints:**
+
+- No planning in "weeks" or "sprints" — work scales with parallelism, not calendar time.
+- Output containing "likely", "probably", or "I think" — stop and verify before continuing.
+- A prompt naming a specific product, version, or release event — search the web or current docs
+  FIRST, before any planning, design, or code generation. See
+  [Fact Verification First](rules/fact-verification-first.md) for the trigger patterns and the
+  reactive `fact-check` skill it hands off to.
+- Pass file paths to a sub-agent and let it read them — a dispatched agent runs its own
+  verification against the actual source with a fresh context window. Never transcribe file
+  contents into a delegation prompt; that bypasses the agent's own verification. Symmetrically, do
+  not pre-discover file paths on the sub-agent's behalf — it has full tool access and an empty
+  context window and finds what it needs itself; pre-discovering wastes the orchestrator's context
+  and duplicates the agent's own work.
+- Form a hypothesis and plan internally before acting, not just before delegating — for an unknown
+  failure (unclear cause, flaky test), load `/scientific-method:scientific-thinking` to structure
+  the hypothesis before touching anything.
+
+## Standard of Excellence
+
+The marginal cost of completeness is near zero with AI — do the whole thing, tested and
+documented, until the result is "holy shit, that's done," not "good enough."
+
+- Never table something for later when the permanent solve is reachable now.
+- Never leave a dangling thread when finishing it takes five more minutes.
+- Never ship a workaround when the real fix exists.
+- Search before building, test before shipping — the answer to a request is the finished product,
+  not a plan to build it.
+- Time, fatigue, and complexity are not excuses.
+
+## No Invented Limits
+
+Never truncate or cap content a consumer (human or agent) needs to read — arbitrary limits
+(`[:500]`, `MAX_LEN = 1024`) remove the consumer's ability to control what they read, so work
+proceeds on incomplete information. Applies everywhere: CLI output, JSON fields, error messages,
+preview panels, descriptions, issue bodies.
+
+- Output full content by default; let the caller decide how much to read.
+- When pagination is needed, expose `--offset`/`--limit` so the caller controls the window.
+- If content must be shortened for a specific display context: state that it is truncated, report
+  how much remains, and provide a way to access the rest.
+- Checking state needs only metadata; acting on a task needs the full content — do not conflate
+  the two.
 
 ## Repository Overview
 
 **Project**: Claude Code Marketplace Plugin Collection — marketplace name `jamie-bitflight-skills`,
 defined in `.claude-plugin/marketplace.json`. Most entries are local directories under `plugins/`.
 The rest are external: the upstream `astral` plugin pinned by git-subdir, and
-`hallucination-detector` from a sibling GitHub repo. Read the manifest for the current roster.
+`hallucination-detector` from a sibling GitHub repo (not enabled by default in every install — see
+`enabledPlugins` in `.claude/settings.json`/`~/.claude/settings.json` before relying on any of its
+skills). Read the manifest for the current roster.
 **Purpose**: Extends Claude Code CLI (and secondarily Codex, OpenCode, and GitHub's coding agent)
 with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD,
-AI/LLM tools, documentation, and agent orchestration.
+AI/LLM tools, documentation, and agent orchestration. Every plugin ships harness manifests beside
+`.claude-plugin/` (`.codex-plugin/`, and `.cursor-plugin/` where applicable) — skills, commands,
+and agents are project workflow tooling, not a Claude-Code-only concern.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
 JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
@@ -44,10 +105,126 @@ uv sync                                    # Install all dependencies, create .v
 uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # Install git hooks
 ```
 
+Follow `./CONTRIBUTING.md` when adding or modifying a plugin.
+
+Run scripts using `uv run` — if `uv` is unavailable, see [rules/uv-run-fallback.md](rules/uv-run-fallback.md).
 Before linting, formatting, or type-checking, read `docs/linting-and-type-checking.md`.
 Before writing, running, or placing a test, read `docs/testing.md`.
 Before validating an MCP server (protocol, Codex, or Claude plugin integration), read
 `docs/mcp-server-validation.md`.
+
+## Skill, Command, and Agent Usage Policy
+
+Every agent/harness working here already knows which skills, commands, and agents exist and what
+each one does — the harness supplies that listing on its own. What no harness supplies is this
+repo's policy on *when a given one is mandatory*:
+
+| Stage | Load |
+|-------|------|
+| Starting a complex task | `/dh:rt-ica <#N \| goal>` |
+| Delegating to a sub-agent | `/agent-orchestration:delegate` |
+| Reviewing agent output | `/hallucination-detector:hallucination-audit` (requires the `hallucination-detector` plugin enabled — see Repository Overview) |
+| Claiming a task complete | `/dh:verify-done` |
+| Writing or improving a process | `/process-siren:improve-processes` |
+| Debugging, investigating, or facing a repeated/unclear failure | `/scientific-method:scientific-thinking` |
+
+Referring to a skill or sub-agent in prose or in a delegation prompt: use plain notation, never a
+harness-specific function-call form (`Skill(skill="...")` is Claude-Code-only and breaks portability
+to Codex/OpenCode; existing `Skill(...)` blocks elsewhere in this repo predate this convention and
+are not bugs to fix on sight).
+
+- Skills: `/plugin-name:skill-name` (e.g. `/plugin-creator:skill-creator`).
+- Sub-agents: `plugin-name:agent-name` (e.g. `python3-development:python-cli-architect`).
+
+Load `/plugin-creator:skill-creator` before creating a skill, before modifying an existing
+`SKILL.md`/`references/*.md`, or before converting loose documentation into skill format. Before
+loading it, confirm: the task is actually skill creation/modification (not read-only skill usage,
+discussing skills in conversation, or general coding unrelated to skill creation — those fall
+outside this trigger), no more specialized skill already matches the domain, and — if modifying an
+existing skill — its current files have already been read.
+
+## Task and Risk Classification
+
+```mermaid
+flowchart TD
+    T{Task type?}
+    T -->|"Clear requirements, known output: write file, fix known error, add test"| Exec[Execution: act immediately]
+    T -->|"Known bug, CI failure, broken behavior"| Fix[Fix: reproduction first]
+    T -->|"Unknown cause, unclear path: debug failure, diagnose perf, flaky test"| Inv[Investigation: hypothesis first]
+    Exec --> V[Verify after completion]
+    Fix --> FD["fix-delegation-discipline.md: Reproduce, Fix, Validate against reproduction"]
+    FD --> V
+    Inv --> H[Load /scientific-method:scientific-thinking] --> V
+```
+
+```mermaid
+flowchart TD
+    Start([About to act]) --> Q{"Destructive, ambiguous,<br>or outside requested scope?"}
+    Q -->|"No — read files, run tests/linters,<br>spawn sub-agents,<br>write requested files,<br>fix errors found during current task"| Act[Act immediately]
+    Q -->|"Yes — delete files, push to remote,<br>modify files the user did not mention,<br>change architectural decisions,<br>destructive git operations"| Align[Seek alignment first]
+    Act --> Verify[Verify after]
+    Align --> Verify
+```
+
+**Investigation escalation**: three or more read/search/shell calls on source files without an
+intervening edit, or without delegating to a specialist agent, is the signal to stop, write down
+the paths and observations gathered so far, and delegate rather than reading one more file.
+
+**When a tool call is denied**: stop the current action sequence, state plainly what was denied
+and what you need instead, and use only an explicitly permitted alternative (e.g. `git switch`
+instead of `git checkout`) — a denial is a boundary signal, not an obstacle to route around. When
+no permitted alternative exists, state the block and wait for direction rather than guessing.
+
+**Parallel work is required for independent subtasks** — do not serialize work that has no
+dependency between its parts; load `agent-orchestration:parallel-work` for fan-out shapes and
+isolation (teams are not the default). Close out a worker as soon as its work is done: send it a
+shutdown request rather than leaving it resident, and do not wait for the user to ask for cleanup
+after every batch. Workers dispatched as part of a single fan-out call terminate on their own and
+need no explicit shutdown. Treat a worker as finished only on an explicit completion report from
+the worker itself, or on a task state you have read that means the work terminated — a
+non-terminal state such as `CLAIMED` is evidence it is still working, and a bare idle notification
+carries no completion information at all.
+
+**Path fidelity**: use user-provided paths exactly as given. Narrowing scope or appending a
+filename produces silent failures when the user intends directory-level examination — do not add
+specific files, and remember a skill/plugin is a *directory* (`SKILL.md`, `references/`, `assets/`)
+to be examined as an ecosystem, not a single file.
+
+**Deletion safety**: before deleting any file, verify the replacement carries equivalent content,
+and reject the deletion if that comparison is flawed or incomplete rather than proceeding on a
+partial check. If an agent flags "NEEDS MERGE" but the user says proceed anyway, ask for
+clarification rather than resolving the conflict yourself. After an irreversible mistake, state
+concretely what was lost and what can/cannot be recovered — speculating optimistically about the
+loss is inaccurate, give concrete facts.
+
+## Pre-Existing Issues and Backlog Progression
+
+Finding a pre-existing issue unrelated to the current change is a trigger to act, not a reason to
+dismiss it — dismissing it normalizes technical debt. Respond with:
+
+> I found [N] pre-existing [issue type] in the codebase. Want to plan how to address them in this
+> session? If not, I'll add them to the backlog.
+
+"Plan" means concrete steps (files, fixes, scope estimate) with the user choosing priority;
+"backlog" means a trackable record that prevents the finding from being lost. A trivial
+single-file fix with an unambiguous cause routes straight to
+`/dh:work-backlog-item --quick` per [rules/proactive-fix-gate.md](rules/proactive-fix-gate.md)
+without asking first — the gate decides the routing, not the user.
+
+When you identify that work needs multiple steps, create backlog items for them rather than only
+describing them:
+
+1. **Backlog** — `/dh:work-backlog-item create -- "<what and why>"`, or match an existing item via
+   `/dh:work-backlog-item #N`, before starting. Behavioral/process items (what an agent, workflow,
+   or system must do) get the full procedural description — it is the requirement specification,
+   and the skill's own classification gate preserves it correctly.
+2. **Plan** — record the plan against the item once written.
+3. **Progress** — update the item's checklist/status as actions complete, so progress is visible
+   without re-deriving it.
+
+Skip this for trivial single-step requests (typos, one-off questions, immediate one-action fixes).
+For the backlog MCP tool reference (tool names, return format, sync rules), activate
+`/dh:work-backlog-item`.
 
 ## Code Conventions
 
@@ -83,11 +260,53 @@ Before validating an MCP server (protocol, Codex, or Claude plugin integration),
 Before writing a script or CLI meant to be consumed by an agent (which is every script/CLI/MCP
 server in this repo), read `docs/cli-output-conventions.md`.
 
+For PEP 723/no-uv-workspace rules and `ty` unresolved-import/unresolved-attribute triage, read
+[rules/python-development.md](rules/python-development.md). For choosing a language for a new
+component, naming conventions, and PEP 723 bundled-dependency traps, read
+[rules/language-conventions.md](rules/language-conventions.md). For how to invoke an existing
+script (never bare `python3`, canonical shebang), read
+[rules/script-invocation.md](rules/script-invocation.md). For acceptable-exception categories when
+a linter or type-checker override is warranted, read
+[rules/linting-exceptions.md](rules/linting-exceptions.md). For narrow-catch and the "must not
+crash" anti-pattern, read [rules/exception-handling.md](rules/exception-handling.md). For avoiding
+silent failure paths, read [rules/silent-failure-prevention.md](rules/silent-failure-prevention.md).
+For reading or writing YAML/TOML, read
+[rules/yaml-toml-libraries.md](rules/yaml-toml-libraries.md). For parsing markdown structure
+(headers, list items, tables, section extraction), use the `marko` AST library rather than a regex
+parser — see the established usage patterns in the sibling `agentskills-linter` repo, and add
+`marko` via `uv add marko` if the target project doesn't already depend on it.
+
 ### Markdown (Skills/Commands/Agents)
 
 Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
 `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
 targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
+
+For code-fence and markdown-link conventions (including the `.claude/`/`rules/` link-style
+exception and the skills-cannot-nest-one-level rule), read
+[rules/markdown-file-references.md](rules/markdown-file-references.md). Before reviewing or
+editing any markdown/prose file, classify its review treatment first via
+[rules/prose-file-classification.md](rules/prose-file-classification.md) — `SKILL.md`,
+`CLAUDE.md`, and `rules/*.md` are prompt-engineering code, not documentation, and get scrutiny
+accordingly. Every factual claim added to skill documentation needs a cited source — see
+[rules/citation-requirements.md](rules/citation-requirements.md). Before shipping a new or edited
+skill, verify its documentation against [rules/skill-documentation-verification.md](rules/skill-documentation-verification.md).
+When reviewing or correcting an AI-facing instruction file (prompt, `SKILL.md`, agent file, rule,
+`CLAUDE.md`/`AGENTS.md`), read
+[rules/review-and-correction-discipline.md](rules/review-and-correction-discipline.md) first —
+structural validation (`skilllint`/`prek`/`ruff`/`ty`) and content review are independent gates,
+and a green structural gate is never evidence of content quality.
+
+Do not restate a value derived from a list, table, or directory defined elsewhere (a count, a
+total, a summary) — it drifts silently when the source changes. Reference the source of truth
+instead (e.g. "all required sections, defined in the validation gate" rather than "all 8 required
+sections").
+
+When creating or modifying a plugin, read
+[rules/plugin-development.md](rules/plugin-development.md) and
+[rules/plugin-json.md](rules/plugin-json.md) (manifest location and schema). For keeping a skill's
+token footprint lean via progressive disclosure, read
+[rules/skill-content-optimization.md](rules/skill-content-optimization.md).
 
 ### JavaScript/TypeScript
 
@@ -100,6 +319,8 @@ This repo enforces **Conventional Commits** with `--strict --force-scope` (scope
 the `conventional-pre-commit` hook in `.pre-commit-config.yaml`.
 
 **NEVER use `--no-verify` or flags that bypass git hooks.** If a hook fails, fix the underlying issue.
+
+Determine commit scope format by reading `.pre-commit-config.yaml` directly, not `git log`.
 
 ## Git Workflow: Commit, Push, and PR per Task
 
@@ -121,6 +342,13 @@ The working tree may hold another contributor's uncommitted, legitimate work. Be
 discarding an unexpected diff (`git checkout`, `git restore`, `git reset --hard`), read the diff
 and confirm it is unintended rather than assuming it is an agent artifact — an unexplained change
 is a reason to investigate and ask, not a reason to revert.
+
+A shared checkout may also have another agent's branch checked out right now — check
+`git status --short --branch` before switching branches in it. Switching yanks the tree out from
+under whatever that agent is mid-task on. Prefer an isolated worktree
+(`git worktree add <path> <branch>`) for your own commits over touching the shared checkout's
+current branch; only fall back to the shared checkout if a worktree genuinely cannot be created
+(e.g. disk pressure), and report that fallback rather than taking it silently.
 
 Before branch switching, selective checkout or cherry-pick, stash cleanup, or source-branch
 deletion, read `docs/branch-transfer-preflight.md`.
@@ -149,7 +377,7 @@ deletion, read `docs/branch-transfer-preflight.md`.
 
 | Purpose | Location |
 |---------|----------|
-| AI project instructions | `.claude/CLAUDE.md` (primary context file for Claude Code; imports this file) |
+| AI project instructions | `.claude/CLAUDE.md` (Claude Code entry point; imports this file, adds only what the harness can't supply itself) |
 | Repo terminology (skill vs. plugin vs. agent vs. command vs. hook vs. MCP server) | `docs/terminology-glossary.md` |
 | Linting config | `pyproject.toml [tool.ruff]` |
 | Type checking config | `pyproject.toml [tool.ty]` |
@@ -161,7 +389,8 @@ deletion, read `docs/branch-transfer-preflight.md`.
 | Session hooks | `.claude/hooks/` |
 | Backlog backend config | `.dh/config.yaml` |
 | development-harness agent guide | `plugins/development-harness/AGENTS.md` |
-| CI pipeline | `.github/workflows/code-quality.yml` (see `rules/ci-workflows.md`) |
+| CI pipeline | `.github/workflows/code-quality.yml` — see [CI Workflow Modification Protocol](rules/ci-workflows.md) before changing it |
+| Sub-agent report contract (STATUS first line, evidence, artifact path) | [plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md](plugins/agent-orchestration/skills/delegate/references/sub-agent-contract.md) |
 
 GitHub's coding agent reads `AGENTS.md` directly; no separate `.github/copilot-instructions.md`
 exists.
@@ -181,4 +410,8 @@ After pushing a commit to a PR, or when asked to check or address PR reviews, lo
 
 ## GitHub CLI Conventions
 
-Before using the `gh` CLI, read `docs/github-cli-conventions.md`.
+`gh` is not necessarily pre-installed — install and configure it via the `/gh` skill before first
+use, and prefer this repo's own PyGithub-based backlog tooling over ad hoc `gh` calls where it
+already covers the task. Before using `gh` beyond that, read `docs/github-cli-conventions.md`. Use
+`gh` to observe CI output when verifying a workflow change — see
+[rules/ci-workflows.md](rules/ci-workflows.md) Phase 5.
