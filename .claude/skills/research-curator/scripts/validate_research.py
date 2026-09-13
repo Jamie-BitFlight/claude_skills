@@ -828,7 +828,7 @@ def _repair_one_asymmetric_pair(bl: types.ModuleType, source: Path, target: Path
             forward_rel, source_name, source_category, bl.category_of(target, vault_path)
         )
     else:
-        backlink_relationship = f"referenced by {source_name} ({source_category})"
+        backlink_relationship = bl.bare_reference_description(source_name, source_category)
 
     backlink_row = CrossRefRow(
         entry_name=source_name, link_path=backlink_str, category=source_category, relationship=backlink_relationship
