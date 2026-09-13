@@ -415,9 +415,8 @@ below.
    backlink-target file that was already dirty in the pre-mode baseline before step 3 ever
    excludes that file from this run's commit -- the exclusion happens after the write, not before
    it (tracked in backlog #3516; fixing it requires a change to `check-backlinks` itself, outside
-   this skill). Running research-curator from an isolated worktree when another contributor may be
-   editing `./research/` concurrently avoids the collision entirely -- see
-   `rules/commit-cadence-and-worktrees.md`.
+   this skill). See step 3's known limitation below for the general timing gap this is one case
+   of, and its mitigation.
 
 3. **Compute the filtered file list** -- diff the current working tree against the pre-mode
    baseline (see [Mode Routing](#mode-routing)) to get every file under `./research/` this run
@@ -433,6 +432,15 @@ below.
    `{path} -- pre-existing uncommitted changes, not touched this run`. Call what remains **the
    filtered list**; steps 4-6 below use it and nothing else, so a pre-existing dirty file is never
    linted, staged, or committed by this run.
+
+   **Known limitation**: this only protects against a file that was already dirty *when the
+   baseline was captured*. A concurrent edit that starts on a previously-clean file after the
+   baseline but before this step runs is indistinguishable from this run's own write once it shows
+   up in the diff -- there is no locking primitive here to detect or prevent it. This is the same
+   underlying gap as step 2's check-backlinks limitation, just from the opposite timing direction.
+   Running research-curator from an isolated worktree when another contributor may be editing
+   `./research/` concurrently avoids the collision entirely, in both directions -- see
+   `rules/commit-cadence-and-worktrees.md`.
 
    If the filtered list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
    clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
