@@ -163,6 +163,7 @@ for field in ('keep-coding-instructions', 'force-for-plugin'):
 for key, value in getattr(yaml.compose(front), 'value', []):
     if key.value == 'description':
         assert value.start_mark.line == value.end_mark.line, 'description must occupy a single line'
+assert not re.search(r'[\r\n]', data.get('description', '')), 'description must not contain a newline'
 " "$STYLE_PATH"
 ```
 
