@@ -10,9 +10,9 @@ The purpose and explicit goals of the skill output-style-creator:
    imperative instructions to Claude rather than third-person description of the style, no
    project-specific facts, stated exceptions for anything the style suppresses, and
    `keep-coding-instructions` set from whether the session is still software engineering.
-3. Place and package the style at the correct scope — user, project, managed policy, or plugin — and
-   bundle a plugin style without breaking Claude Code's default `output-styles/` scan by declaring
-   the `outputStyles` manifest key.
+3. Place and package the style at the correct scope — user, project, managed policy, or plugin —
+   and, for a plugin style in the default `output-styles/` directory, leave the `outputStyles`
+   manifest key out, because declaring it replaces that scan and hides every style not listed.
 4. Activate the style through a current mechanism (`/config` or the `outputStyle` setting, never the
    removed `/output-style`), account for startup-time file reads, and test it against out-of-domain
    and error or destructive cases rather than only its happy path.

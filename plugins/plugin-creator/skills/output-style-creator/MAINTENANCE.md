@@ -4,9 +4,9 @@
 
 - Claude Code output styles
   - Source: <https://code.claude.com/docs/en/output-styles>
-  - Governs: built-in style roster, frontmatter fields, install levels, and every version threshold
-    quoted in `SKILL.md` and `references/output-style-schema.md` (v2.1.73, v2.1.91, v2.1.237,
-    v2.1.251, v2.1.257, v2.1.261)
+  - Governs: built-in style roster, frontmatter fields, install levels, and every Claude Code
+    version threshold quoted in `SKILL.md` and `references/output-style-schema.md` — grep those
+    files for `v2.` to enumerate them rather than trusting a copy of the list kept here
   - Version/ref: live documentation
   - Accessed: 2026-09-13
   - Refresh when: a built-in style is added or renamed, or a quoted version threshold is superseded

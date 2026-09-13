@@ -17,8 +17,9 @@ retains the built-in software engineering instructions on top of it.
 | `keep-coding-instructions` | Keep Claude Code's built-in software engineering instructions | `false` |
 | `force-for-plugin` | Plugin styles only: apply automatically whenever the plugin is enabled, overriding the user's `outputStyle` setting. When several enabled plugins set it, the first plugin loaded wins | `false` |
 
-Keep `description` on a single line. Multiline YAML indicators (`>-`, `|-`) are a repository
-convention for plugin content; no tooling validates output-style frontmatter, so check it by hand.
+Keep `description` on a single line. The skill's own `scripts/validate_output_style.py check`
+enforces this, along with the field types above — run it rather than checking by hand. It rejects
+every multiline YAML encoding, a folded or literal indicator included.
 
 ## Install Locations
 

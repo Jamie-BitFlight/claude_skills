@@ -1,6 +1,6 @@
 ---
 name: output-style-creator
-description: 'Create, validate, and ship Claude Code output styles — the markdown files that replace Claude Code default system instructions with a chosen role, tone, and response format. Use when asked to "create an output style", "make a custom output style", "change how Claude responds every turn", "add an output style to a plugin", "bundle output styles", "write keep-coding-instructions", "force an output style for a plugin", or when deciding between an output style, CLAUDE.md, a skill, or an agent for persistent behavior change.'
+description: 'Create, validate, and ship Claude Code output styles — the markdown files that replace Claude Code default system instructions with a chosen role, tone, and response format. Use when asked to "create an output style", "make a custom output style", "change how Claude responds every turn", "add an output style to a plugin", "bundle output styles", "write keep-coding-instructions", "force an output style for a plugin", when an output style "is not taking effect", "does not show up in /config", or applies the wrong style, or when deciding between an output style, CLAUDE.md, a skill, or an agent for persistent behavior change.'
 user-invocable: true
 ---
 
@@ -62,7 +62,7 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
    uv run ./scripts/validate_output_style.py discover --plugin '{plugin-path}'
    ```
 
-   Run both commands from this skill's own directory. Substitute each path inside single quotes, as above, so whitespace, `$` and a backtick reach the script intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
+   Run both commands from this skill's own directory. Substitute each path inside single quotes, as above, so whitespace, `$` and a backtick reach the script intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
 
 2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
@@ -83,23 +83,7 @@ SOURCE: [Output styles — Create a custom output style](https://code.claude.com
 
 ### Phase 3: Authoring
 
-WRITE the file as frontmatter plus instructions. The filename becomes the style name unless `name` is set.
-
-```markdown
----
-name: Diagrams first
-description: Lead every explanation with a diagram
-keep-coding-instructions: true
----
-
-When explaining code, architecture, or data flow, start with a Mermaid diagram showing the
-structure, then explain in prose.
-
-## Diagram conventions
-
-Use `flowchart TD` for control flow and `sequenceDiagram` for request paths. Keep diagrams under
-15 nodes.
-```
+WRITE the file as frontmatter plus instructions. The filename becomes the style name unless `name` is set. Start from a worked style in [output-style-templates.md](./references/output-style-templates.md) rather than a blank file — six cover both `keep-coding-instructions` values and the forced-plugin case.
 
 Authoring rules:
 
@@ -121,7 +105,7 @@ Full field semantics and defaults: [output-style-schema.md](./references/output-
 | Managed policy | `.claude/output-styles/` inside the managed settings directory | Every user under the policy |
 | Plugin | `{plugin-path}/output-styles/{name}.md` | Selectable in every session with the plugin enabled; applied without selection only with `force-for-plugin: true` |
 
-Project styles load from every `.claude/output-styles/` between the working directory and the repository root; on a name collision the directory closest to the working directory wins.
+Project styles load from every `.claude/output-styles/` between the working directory and the repository root; on a name collision the directory closest to the working directory wins. Exact per-scope paths: [output-style-schema.md](./references/output-style-schema.md#install-locations).
 
 For a plugin style, the `output-styles/` directory is auto-discovered. Do NOT add the `outputStyles` key to `plugin.json` for styles in that default directory — declaring the key replaces the default scan entirely and makes every style outside the declared paths invisible. Add the key only for non-default locations, and then list `./output-styles/` explicitly alongside them.
 
@@ -144,9 +128,8 @@ uvx skilllint@latest check {plugin-path}
 claude plugin validate {plugin-path}
 ```
 
-Checklist:
+The script covers the frontmatter only. A style with valid frontmatter and an empty body exits 0, so READ the remaining checks yourself — the script cannot make any of them:
 
-- [ ] Frontmatter is valid YAML with a single-line `description`
 - [ ] `name` matches the intended display name, or is omitted deliberately so the filename supplies it
 - [ ] `keep-coding-instructions` reflects whether the session still does engineering work
 - [ ] `force-for-plugin` appears only in a plugin style, and only when automatic application is intended
@@ -156,21 +139,9 @@ Checklist:
 
 ### Phase 6: Activation and Testing
 
-ACTIVATE the style:
+ACTIVATE the style through `/config` in the terminal, the `/` command menu in the VS Code extension, or the `outputStyle` setting anywhere else. Never the standalone `/output-style` command, which was removed in v2.1.91 — do not document or script it. Per-surface steps, version floors, and the settings-precedence chain: [output-style-schema.md](./references/output-style-schema.md#selecting-a-style).
 
-- Terminal: run `/config`, select Output style. The selection is saved to `.claude/settings.local.json`.
-- VS Code extension: open the command menu with `/` and select Output styles (requires v2.1.257 or later).
-- Desktop app or scripted setup: set the `outputStyle` field in a settings file.
-
-```json
-{
-  "outputStyle": "Diagrams first"
-}
-```
-
-The standalone `/output-style` command was deprecated in v2.1.73 and removed in v2.1.91 — do not document or script it.
-
-A style switch applies starting with the next message. Before v2.1.251 it applied only after `/clear` or a new session. In the terminal, style files are read at startup, so restart Claude Code after creating or editing a file mid-session. For a plugin-bundled style, `/reload-plugins` picks up the change without a restart.
+A style switch applies from the next message. In the terminal, style files are read at startup, so restart after creating or editing one mid-session; for a plugin-bundled style, `/reload-plugins` picks it up without a restart.
 
 TEST with prompts that exercise the style's rules, not just its happy path:
 
@@ -180,6 +151,12 @@ TEST with prompts that exercise the style's rules, not just its happy path:
 4. If `keep-coding-instructions: true` — does Claude still scope changes and verify work?
 
 SOURCE: [Output styles — Change your output style](https://code.claude.com/docs/en/output-styles) (accessed 2026-09-13)
+
+### Phase 7: Diagnosis
+
+When a style does not take effect, DIAGNOSE it before re-authoring anything. Re-run Phase 1 discovery first — it shows every style in scope at every level, which settles most cases on its own: a second style of the same name in a nearer directory, or a managed-policy or plugin style you were not accounting for.
+
+Then match the symptom in the troubleshooting table in [output-style-schema.md](./references/output-style-schema.md#troubleshooting). It covers a style absent from the picker, a style selected but with no behavior change, the wrong same-named style winning, a user selection overridden by `force-for-plugin`, plugin styles vanishing after a manifest edit, and Claude no longer scoping or verifying code changes.
 
 </workflow>
 

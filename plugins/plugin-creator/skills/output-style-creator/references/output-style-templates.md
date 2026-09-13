@@ -159,3 +159,6 @@ Deliver error text, security warnings, and destructive-action confirmations in f
 ## Adaptation Checklist
 
 - [ ] Every rule is observable in a response — a reader could tell whether it was followed
+
+The rest of the adaptation checks live in the skill's Phase 5, which also says which of them
+`scripts/validate_output_style.py` enforces and which stay manual.
