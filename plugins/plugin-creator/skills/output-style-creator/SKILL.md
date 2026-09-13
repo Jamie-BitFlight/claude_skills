@@ -63,9 +63,9 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
    uv run "$SKILL_DIR/scripts/validate_output_style.py" discover --plugin '{plugin-path}'
    ```
 
-   Substitute **absolute** paths, inside single quotes as above. Do not change the working directory to run the script: a relative `--plugin`, `--start` or style path resolves against wherever the caller stands, so a `cd` into this skill silently repoints it and discovery reports nothing. Single quotes keep whitespace, `$` and a backtick intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `plugin`, and `plugin_declared_paths` keys.
+   Substitute **absolute** paths, inside single quotes as above. Do not change the working directory to run the script: a relative `--plugin`, `--start` or style path resolves against wherever the caller stands, so a `cd` into this skill silently repoints it and discovery reports nothing. Single quotes keep whitespace, `$` and a backtick intact; a path containing an apostrophe needs each `'` written as `'\''`. Omit `--plugin` when no plugin is in scope. Add `--start <directory>` to walk up from somewhere other than the working directory. Output is compact JSON with `user`, `managed`, `project`, `plugin`, `plugin_declared_paths`, and `plugin_rejected_paths` keys.
 
-2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`.
+2. READ the styles it lists. Claude Code loads every ancestor `.claude/output-styles/`, so a root-level style is in scope even when you start in a subdirectory. A managed-policy style is in scope too, and explains a style that is available or in force without appearing at the user or project level. A plugin's `outputStyles` key replaces the default directory scan, so a plugin shipping styles in `./extras/` has none in `output-styles/`. A non-empty `plugin_rejected_paths` means the manifest declared a path outside the plugin root — a plugin cannot ship files there, so discovery does not search it and you must not read what such an entry points at. Treat it as a defect in that plugin's manifest.
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering
@@ -126,10 +126,14 @@ For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
 uvx skilllint@latest check '{plugin-path}'
-command -v claude >/dev/null && claude plugin validate '{plugin-path}'
+if command -v claude >/dev/null; then
+  claude plugin validate '{plugin-path}'
+else
+  echo 'SKIPPED: claude plugin validate — Claude Code CLI not installed'
+fi
 ```
 
-`skilllint` runs anywhere. `claude plugin validate` needs the Claude Code CLI, which a Codex, Hermes or Kimi session may not have — the guard skips it rather than failing the workflow. When it is skipped, say so in the completion report and record that the manifest check is still outstanding.
+`skilllint` runs anywhere. `claude plugin validate` needs the Claude Code CLI, which a Codex, Hermes or Kimi session may not have. The `if` form exits zero when the CLI is absent, so the phase reads as skipped rather than failed, and still surfaces a real `claude plugin validate` failure when the CLI is present. When it is skipped, say so in the completion report and record that the manifest check is still outstanding.
 
 The script covers the frontmatter only. A style with valid frontmatter and an empty body exits 0, so READ the remaining checks yourself — the script cannot make any of them:
 

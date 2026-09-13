@@ -236,6 +236,40 @@ def test_non_object_manifest_root_does_not_crash(tmp_path: Path) -> None:
     assert [p.rsplit("/", 1)[-1] for p in v.discover(tmp_path, plugin).plugin] == ["default.md"]
 
 
+def test_declared_path_escaping_the_plugin_root_is_rejected(tmp_path: Path) -> None:
+    """A declared ../outside/ entry is not searched, and is reported as rejected.
+
+    Phase 1 tells the agent to read every reported style, so an escaping entry in an untrusted
+    manifest would feed it unrelated file content.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    write_style(outside, "not-mine", "name: A\ndescription: fine")
+    plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": "./../outside/"}, {})
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_rejected_paths == ["./../outside/"]
+
+
+def test_absolute_declared_path_is_rejected(tmp_path: Path) -> None:
+    """An absolute declared path is outside the plugin root by definition."""
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    write_style(outside, "not-mine", "name: A\ndescription: fine")
+    plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": str(outside)}, {})
+    result = v.discover(tmp_path, plugin)
+    assert result.plugin == []
+    assert result.plugin_rejected_paths == [str(outside)]
+
+
+def test_declared_path_inside_the_root_is_not_rejected(tmp_path: Path) -> None:
+    """The confinement check does not reject a legitimate nested directory."""
+    plugin = make_plugin(tmp_path / "plug", {"name": "p", "outputStyles": "./deep/nested/"}, {"deep/nested": "ok"})
+    result = v.discover(tmp_path, plugin)
+    assert [p.rsplit("/", 1)[-1] for p in result.plugin] == ["ok.md"]
+    assert result.plugin_rejected_paths == []
+
+
 def test_project_scan_walks_ancestors_to_the_repository_root(tmp_path: Path) -> None:
     """Every .claude/output-styles between the start and the repo root is in scope."""
     (tmp_path / ".git").mkdir()
@@ -275,4 +309,4 @@ def test_managed_directory_differs_per_platform(monkeypatch: pytest.MonkeyPatch)
 def test_discovery_result_reports_every_scope(tmp_path: Path) -> None:
     """discover always returns all five keys, so a caller can rely on the shape."""
     payload = json.loads(v.discover(tmp_path, None).model_dump_json())
-    assert set(payload) == {"user", "managed", "project", "plugin", "plugin_declared_paths"}
+    assert set(payload) == {"user", "managed", "project", "plugin", "plugin_declared_paths", "plugin_rejected_paths"}

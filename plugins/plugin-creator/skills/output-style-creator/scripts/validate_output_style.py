@@ -64,6 +64,8 @@ class DiscoveryResult(BaseModel):
         project: Styles under every ``.claude/output-styles/`` from ``start`` up to the repo root.
         plugin: Styles under the plugin's default directory and every ``outputStyles`` path it declares.
         plugin_declared_paths: The raw ``outputStyles`` entries read from the plugin manifest.
+        plugin_rejected_paths: Declared entries that resolve outside the plugin root, and were
+            therefore not searched. A plugin cannot reference files outside its own directory.
     """
 
     user: list[str]
@@ -71,6 +73,7 @@ class DiscoveryResult(BaseModel):
     project: list[str]
     plugin: list[str]
     plugin_declared_paths: list[str]
+    plugin_rejected_paths: list[str]
 
 
 def read_frontmatter(path: Path) -> tuple[str, dict[str, Any]]:
@@ -274,6 +277,27 @@ def declared_output_style_paths(plugin: Path) -> list[str] | None:
     return None
 
 
+def confine_to_root(root: Path, entry: str) -> Path | None:
+    """Resolve a declared manifest path, rejecting anything outside the plugin root.
+
+    A plugin cannot reference files outside its own directory, so a declared ``../outside/`` or an
+    absolute path is not a path this plugin ships. Discovery's output is read by an agent, so an
+    escaping entry would hand it unrelated file content from an untrusted plugin.
+
+    Args:
+        root: The plugin root directory.
+        entry: One raw ``outputStyles`` entry.
+
+    Returns:
+        The resolved directory when it lies at or beneath the root, otherwise None.
+    """
+    candidate = (root / entry.removeprefix("./")).resolve()
+    resolved_root = root.resolve()
+    if candidate != resolved_root and resolved_root not in candidate.parents:
+        return None
+    return candidate
+
+
 def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
     """Collect every output style visible from a starting directory.
 
@@ -296,15 +320,21 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
 
     plugin_styles: list[str] = []
     declared: list[str] = []
+    rejected: list[str] = []
     if plugin is not None:
         found = declared_output_style_paths(plugin)
         declared = found if found is not None else []
         # An absent key leaves the default scan in place; any declaration replaces it, empty included.
-        searched = (
-            [plugin / entry.removeprefix("./") for entry in declared]
-            if found is not None
-            else [plugin / "output-styles"]
-        )
+        if found is None:
+            searched = [plugin / "output-styles"]
+        else:
+            searched = []
+            for entry in declared:
+                confined = confine_to_root(plugin, entry)
+                if confined is None:
+                    rejected.append(entry)
+                else:
+                    searched.append(confined)
         for directory in searched:
             plugin_styles.extend(styles_in(directory) or ([str(directory)] if directory.is_file() else []))
 
@@ -314,6 +344,7 @@ def discover(start: Path, plugin: Path | None) -> DiscoveryResult:
         project=project,
         plugin=plugin_styles,
         plugin_declared_paths=declared,
+        plugin_rejected_paths=rejected,
     )
 
 
