@@ -19,7 +19,11 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 
 ## Mode Routing
 
-Parse `<mode_args/>` to select operating mode.
+Parse `<mode_args/>` to select operating mode. Before executing any mode below, capture a
+`git status --porcelain -- ./research/` baseline -- this is the invocation's pre-write state,
+taken before this run's own README update, curator agent, or analysis agent writes anything.
+Post-Actions' Backlink Repair step compares against this baseline, not a fresh snapshot, to tell
+this run's own writes apart from another contributor's pre-existing uncommitted work.
 
 The following diagram is the authoritative procedure for mode routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
@@ -379,22 +383,23 @@ the Commit step stages exactly that list, nothing else.
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched (asymmetric edges can persist from any
-   prior run that predates this check). First snapshot which vault files are already dirty, so a
-   pre-existing uncommitted edit from another contributor is never folded into this run's commit:
+   prior run that predates this check):
 
    ```bash
-   git status --porcelain -- ./research/
    uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
    Each printed `{source} -> {target}` line preceding the `backlinks_repaired:` count names a
    `{target}` file this command may have modified.
 
-   - If `{target}` was **not** in the `git status` snapshot above (clean before this step): add it
-     to the tracked file list.
-   - If `{target}` **was** already dirty in that snapshot: leave it out of the tracked file list --
-     do not stage someone else's in-progress work alongside the repair -- and report it to the user
-     as `{path} -- pre-existing uncommitted changes, backlink repair not committed this run`.
+   - If `{target}` was **not** dirty in the pre-write baseline captured before this mode started
+     (see [Mode Routing](#mode-routing)): add it to the tracked file list. This includes an entry
+     this run itself just created or refreshed, even though it is now dirty by the time this step
+     runs -- it was clean at baseline, so it is this run's own write, not someone else's.
+   - If `{target}` **was** already dirty in that baseline (present before this run wrote anything):
+     leave it out of the tracked file list -- do not stage someone else's in-progress work alongside
+     the repair -- and report it to the user as `{path} -- pre-existing uncommitted changes, backlink
+     repair not committed this run`.
 
    This command exits non-zero whenever any asymmetric edge remains after the fix pass, including
    edges it cannot structurally repair (a dangling link to a missing target, or a manually authored
