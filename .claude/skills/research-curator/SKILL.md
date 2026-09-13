@@ -294,18 +294,29 @@ exist for it. It is reviewed by whichever later `--rerun` clears its validation 
 
 Relay each verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules) --
 every gate line and every defect, quoted as the agent wrote them, under an `### Entry Review
-Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
+Verdicts` heading in the mode's [Output Format](#output-format) report.
+
+Then branch on the block's `VERDICT:` line and on nothing else. The words below also appear on the
+per-gate lines above it, where they describe one gate rather than the entry -- `GATE 2 repo claims:
+NOT RUN (no analysis file written)` is the ordinary result when the utilization agent found no
+surface, and an orchestrator that matched the bare string `NOT RUN` anywhere in the block would
+withhold the README row of an entry that passed every gate. Read the `VERDICT:` line:
 
 - **USABLE** -- continue to Post-Actions unchanged, defects and all. The entry points at a live,
   dated source, which is what nothing else in the repo provides; a wrong repo claim inside it is a
   repair to schedule, not grounds for hiding the entry from the index. Report every defect and leave
-  the README row in place.
+  the README row in place. When the Gate 1 line reads `UNVERIFIED`, the verdict is still `USABLE`
+  and the README row still stands: the source URL could not be probed this run -- no network,
+  blocked egress, a rate limit, a timeout -- which says nothing about the entry. Relay the gate line
+  as the agent wrote it so the unconfirmed pointer is visible, and leave re-probing to a later run.
 - **UNUSABLE** -- mark the entry "created with issues" (or "refreshed with issues") and continue to
   Post-Actions, which then withholds this entry's README row and date (step 1), keeping it out of the
   index until a later run re-sources it. Correction belongs to a later `--rerun` rather than to
-  `--fix`: `--fix` takes validator issues, and an unreachable or absent source URL needs re-research.
-- **NOT RUN** -- report the reason verbatim and treat the entry exactly as **UNUSABLE**: an unrun
-  review is not evidence the entry is sound.
+  `--fix`: `--fix` takes validator issues, and an absent or server-confirmed-gone source URL needs
+  re-research.
+- **NOT RUN** -- on the `VERDICT:` line this means the review never started: the entry path did not
+  exist, or the rubric could not be loaded. Report the reason verbatim and treat the entry exactly
+  as **UNUSABLE**: an unrun review is not evidence the entry is sound.
 
 </entry_review>
 
@@ -432,7 +443,7 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
 **README Updated**: Yes | No -- entry marked with issues, row withheld
-**Entry Review**: USABLE | UNUSABLE -- N defects
+**Entry Review**: USABLE | UNUSABLE -- N defects [-- source URL UNVERIFIED: {verbatim curl write-out}]
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -455,7 +466,7 @@ YYYY-MM-DD
 **Refreshed**: Z existing entries
 **Failed**: W
 **README Updated**: Yes -- rows withheld for R entries marked with issues
-**Entry Review**: A USABLE (D defects), R UNUSABLE
+**Entry Review**: A USABLE (D defects, U with source URL UNVERIFIED), R UNUSABLE
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -474,7 +485,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A USABLE (D defects), R UNUSABLE
+**Entry Review**: A USABLE (D defects, U with source URL UNVERIFIED), R UNUSABLE
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}
