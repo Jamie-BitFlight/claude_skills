@@ -279,6 +279,7 @@ opens the local file behind every proposal.
 ```text
 Agent tool parameters:
   agent: .claude/agents/research-curator.md
+  model: sonnet
   prompt: "--review ./research/{category}/{name}.md
 Analysis files written this run:
   improvements: {path from the insight agent result, or none}
