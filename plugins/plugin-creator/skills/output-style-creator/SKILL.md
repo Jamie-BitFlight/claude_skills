@@ -73,9 +73,12 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 2. READ any plugin-bundled styles in scope. A plugin's `outputStyles` manifest key replaces the default directory scan, so read the manifest and inspect every path it declares as well as the default directory — a plugin that ships its styles in `./extras/` has none in `output-styles/`:
 
    ```bash
-   ls "{plugin-path}/output-styles/" 2>/dev/null
-   uv run python -c "import json,sys,pathlib; v=json.loads(pathlib.Path(sys.argv[1]).read_text()).get('outputStyles') or []; print('\n'.join([v] if isinstance(v, str) else v))" "{plugin-path}/.claude-plugin/plugin.json" 2>/dev/null
+   PLUGIN_PATH='{plugin-path}'
+   ls "$PLUGIN_PATH/output-styles/" 2>/dev/null
+   uv run python -c "import json,sys,pathlib; v=json.loads(pathlib.Path(sys.argv[1]).read_text()).get('outputStyles') or []; print('\n'.join([v] if isinstance(v, str) else v))" "$PLUGIN_PATH/.claude-plugin/plugin.json" 2>/dev/null
    ```
+
+   Substitute every path inside **single** quotes, as above. Double quotes still let the shell expand `$`, a backtick, or `\` in the path, so a style named `style-$USER.md` is looked up under the expanded name. If a path itself contains a single quote, replace each `'` with `'\''`.
 
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
@@ -141,9 +144,10 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 
 ### Phase 5: Validation
 
-RUN this check on every style, at any scope:
+RUN this check on every style, at any scope. Substitute the path inside **single** quotes, as below:
 
 ```bash
+STYLE_PATH='{style-path}'
 uv run --with pyyaml python -c "
 import re, sys, yaml
 text = open(sys.argv[1], encoding='utf-8').read()
@@ -159,14 +163,15 @@ for field in ('keep-coding-instructions', 'force-for-plugin'):
 for key, value in getattr(yaml.compose(front), 'value', []):
     if key.value == 'description':
         assert value.start_mark.line == value.end_mark.line, 'description must occupy a single line'
-" "{style-path}"
+" "$STYLE_PATH"
 ```
 
 For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
-uvx skilllint@latest check "{plugin-path}"
-claude plugin validate "{plugin-path}"
+PLUGIN_PATH='{plugin-path}'
+uvx skilllint@latest check "$PLUGIN_PATH"
+claude plugin validate "$PLUGIN_PATH"
 ```
 
 Checklist:
