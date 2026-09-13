@@ -408,12 +408,15 @@ def reference_date_yaml(
     Prefers the body Freshness Tracking section's Last Verified -- the value a
     rerun actually updates -- over any frontmatter date field, matching the
     precedence ``reference_date_text`` already applies for the text-header
-    format. Falls back to frontmatter's ``freshness_tracking.last_verified``,
-    the legacy corpus's bare ``metadata.verified`` spelling, then
-    ``research_date``/``date``, for entries with no body section at all.
-    Checking frontmatter first would let a stale frontmatter value -- one a
-    rerun updated only in the body -- wrongly exempt an entry that is actually
-    past the cutoff; the corpus already has entries in this exact state (e.g.
+    format. Falls back to frontmatter's ``freshness_tracking.last_verified``
+    (and its ``date_last_reviewed`` alias from the second historical schema --
+    see ``_YAML_FRESHNESS_ALIASES``), the legacy corpus's bare
+    ``metadata.verified`` spelling, then ``research_date``/``date`` (and their
+    ``date_created`` alias -- see ``_YAML_HEADER_ALIASES``), for entries with
+    no body section at all. Checking frontmatter first would let a stale
+    frontmatter value -- one a rerun updated only in the body -- wrongly
+    exempt an entry that is actually past the cutoff; the corpus already has
+    entries in this exact state (e.g.
     ``research/context-management/claude-mem.md``: frontmatter ``2026-01-31``,
     body ``2026-05-08``).
 
@@ -424,7 +427,7 @@ def reference_date_yaml(
     if body_date:
         return body_date
     flat = flatten_yaml_items(frontmatter)
-    for key in ("last_verified", "verified", "research_date", "date"):
+    for key in ("last_verified", "date_last_reviewed", "verified", "research_date", "date", "date_created"):
         value = flat.get(key)
         if value:
             return str(value)

@@ -290,6 +290,150 @@ class TestYamlEntryVerifiedOnlyFallback:
         assert issues[0]["severity"] == "warning"
 
 
+def write_yaml_entry_second_schema_only(path: Path, *, research_date: str, cross_references: bool) -> None:
+    """Write a YAML-frontmatter entry using the second historical schema's flat date keys.
+
+    Mirrors the live corpus shape (e.g. ``research/coding-agents/claude-codepro.md``):
+    root-level ``date_created``/``date_last_reviewed`` keys (not nested under
+    ``metadata``, and not the first schema's ``research_date``/``last_verified``
+    spellings) with no body ``## Freshness Tracking`` section, so resolution
+    depends entirely on ``reference_date_yaml`` recognizing ``date_last_reviewed``
+    as an alias.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frontmatter = f"""\
+---
+title: "Example"
+category: "developer-tools"
+resource_url: "https://example.com/example"
+date_created: "{research_date}"
+date_last_reviewed: "{research_date}"
+status: published
+---
+
+# Example
+
+## Overview
+
+Example test entry.
+
+## Problem Addressed
+
+Test.
+
+## Key Features
+
+- Feature A
+
+## Technical Architecture
+
+Simple.
+
+## Installation & Usage
+
+```bash
+pip install example
+```
+
+## Relevance to Claude Code Development
+
+Test.
+
+## References
+
+- [Example](https://example.com) (accessed {research_date})
+"""
+    if cross_references:
+        frontmatter += """
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Other](../other/other.md) | other | related |
+"""
+    path.write_text(frontmatter, encoding="utf-8")
+
+
+class TestYamlEntrySecondSchemaDateAliases:
+    """A YAML entry using the second schema's ``date_last_reviewed``/``date_created`` keys.
+
+    Regression guard for the deferred item recorded on PR #3508: once
+    ``_YAML_HEADER_ALIASES``/``_YAML_FRESHNESS_ALIASES`` accept
+    ``date_created``/``date_last_reviewed`` for field-completeness checks,
+    ``reference_date_yaml``'s own precedence list must also recognize those
+    spellings, or the ``cross_references_absent`` exemption never resolves a
+    date for entries using the second schema with no body Freshness Tracking
+    section.
+    """
+
+    def test_pre_cutoff_date_last_reviewed_exempts_yaml_entry(self, tmp_path: Path) -> None:
+        """A pre-cutoff ``date_last_reviewed`` exempts the entry with no body date at all."""
+        entry = tmp_path / "example.md"
+        write_yaml_entry_second_schema_only(entry, research_date="2026-01-15", cross_references=False)
+        result = _run_json(entry)
+        assert result["entries"][0]["format"] == "yaml_frontmatter"
+        assert _issues_for(result, "cross_references_absent") == []
+
+    def test_post_cutoff_date_last_reviewed_still_warns_yaml_entry(self, tmp_path: Path) -> None:
+        """The ``date_last_reviewed`` alias must not suppress the warning for a post-cutoff entry."""
+        entry = tmp_path / "example.md"
+        write_yaml_entry_second_schema_only(entry, research_date="2026-06-01", cross_references=False)
+        result = _run_json(entry)
+        issues = _issues_for(result, "cross_references_absent")
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "warning"
+
+    def test_pre_cutoff_date_created_alone_exempts_yaml_entry(self, tmp_path: Path) -> None:
+        """``date_created`` alone (no ``date_last_reviewed``) also resolves and exempts a pre-cutoff entry."""
+        entry = tmp_path / "example.md"
+        frontmatter = """\
+---
+title: "Example"
+category: "developer-tools"
+resource_url: "https://example.com/example"
+date_created: "2026-01-15"
+status: published
+---
+
+# Example
+
+## Overview
+
+Example test entry.
+
+## Problem Addressed
+
+Test.
+
+## Key Features
+
+- Feature A
+
+## Technical Architecture
+
+Simple.
+
+## Installation & Usage
+
+```bash
+pip install example
+```
+
+## Relevance to Claude Code Development
+
+Test.
+
+## References
+
+- [Example](https://example.com) (accessed 2026-01-15)
+"""
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_text(frontmatter, encoding="utf-8")
+        result = _run_json(entry)
+        assert result["entries"][0]["format"] == "yaml_frontmatter"
+        assert _issues_for(result, "cross_references_absent") == []
+
+
 def _write_yaml_entry_stale_frontmatter(path: Path, *, frontmatter_date: str, body_date: str) -> None:
     """Write a YAML entry whose frontmatter ``verified`` predates a fresher body Last Verified.
 
