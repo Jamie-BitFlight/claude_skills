@@ -330,3 +330,4 @@ Not mentioned in reviewed sources: compatibility with Python 3.14 beta features,
 | [grepai](../developer-tools/grepai.md) | developer-tools | Complements rope's transformation capabilities with semantic code search and call graph analysis |
 | [kythe](../developer-tools/kythe.md) | developer-tools | Language-agnostic code intelligence platform; rope provides Python-specific refactoring alternative to Kythe's multi-language semantic analysis |
 | [cocoindex-code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | AST-based semantic code search via MCP; pairs with rope for find-and-refactor workflows |
+| [skylos](./skylos.md) | code-auditing | shares Python AST and symbol analysis for safe code changes (bidirectional) |

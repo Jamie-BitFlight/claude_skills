@@ -175,3 +175,11 @@ snyk monitor --unmanaged --project-name=my-c-project
 - [Snyk CLI GitHub repository](https://github.com/snyk/snyk) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [skylos](./skylos.md) | code-auditing | generalizes dependency checking across many languages where this tool specializes in unmanaged C/C++ |
