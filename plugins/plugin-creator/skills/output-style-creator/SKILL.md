@@ -57,7 +57,8 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 1. RUN discovery:
 
    ```bash
-   uv run "${CLAUDE_SKILL_DIR}/scripts/validate_output_style.py" discover --plugin '{plugin-path}'
+   SKILL_DIR='<absolute path of the directory holding this SKILL.md>'
+   uv run "$SKILL_DIR/scripts/validate_output_style.py" discover --plugin '{plugin-path}'
    ```
 
    Omit `--plugin` when no plugin is in scope.
@@ -113,7 +114,8 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 RUN this check on every style, at any scope:
 
 ```bash
-uv run "${CLAUDE_SKILL_DIR}/scripts/validate_output_style.py" check '{style-path}'
+SKILL_DIR='<absolute path of the directory holding this SKILL.md>'
+uv run "$SKILL_DIR/scripts/validate_output_style.py" check '{style-path}'
 ```
 
 For a plugin-bundled style, also validate the containing plugin:
