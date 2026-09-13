@@ -2,8 +2,8 @@
 
 **Research entry**: ./research/code-auditing/skylos.md
 **Generated**: 2026-09-13
-**Integration surfaces found**: 3 (CLI | pip dependency | MCP)
-**Proposals written**: 2
+**Integration surfaces found**: 3 (CLI | Python package | MCP)
+**Proposals written**: 4
 **Skipped**: 3 — resolver duplicates the execution gate; cognitive pre-action verification has no code-scan role; agent-definition generation is not an executable agent codebase
 
 ---
@@ -14,8 +14,8 @@
 **Caller**: `./plugins/development-harness/skills/execution/SKILL.md`
 **Integration mechanism**: CLI subprocess
 **Replaces or adds**: Adds a changed-work static-analysis gate for dead code, security, secrets, dependency, configuration, quality, and AI-code-defect checks; it does not replace format, lint, typecheck, or tests.
-**Setup cost**: Low (package installation; no API key required for documented local static analysis)
-**Integration surface**: `pip install skylos`; `skylos . -a --diff origin/main`
+**Setup cost**: Low (no API key required for documented local static analysis)
+**Integration surface**: `uvx skylos . -a --diff origin/main`
 
 ### Why this caller
 
@@ -25,11 +25,8 @@
 
 ```bash
 # Run after the existing format, lint, typecheck, and test gates.
-# Install once in the project's verification environment.
-pip install skylos
-
 # Scan changed work with Skylos's documented combined analysis surface.
-skylos . -a --diff origin/main
+uvx skylos . -a --diff origin/main
 ```
 
 ## Utilization 2: Development Harness feature verifier → Skylos deterministic code verification
@@ -38,8 +35,8 @@ skylos . -a --diff origin/main
 **Caller**: `./plugins/development-harness/agents/feature-verifier.md`
 **Integration mechanism**: CLI subprocess
 **Replaces or adds**: Adds deterministic local/workspace API, dependency, and phantom-symbol proof for supported changed source files; it does not replace the agent's goal-backward observable-truth, artifact, key-link, edge-case, or live-delivery checks.
-**Setup cost**: Low (package installation; no API key required for documented local verification)
-**Integration surface**: `skylos verify . --file src/app.py --range 40:75 --project-context`
+**Setup cost**: Low (no API key required for documented local verification)
+**Integration surface**: `uvx skylos verify . --file src/app.py --range 40:75 --project-context`
 
 ### Why this caller
 
@@ -50,12 +47,59 @@ skylos . -a --diff origin/main
 ```bash
 # For each changed Python, TypeScript/JavaScript, Go, or Java source range
 # whose API and dependency claims need deterministic local proof:
-skylos verify . --file src/app.py --range 40:75 --project-context
+uvx skylos verify . --file src/app.py --range 40:75 --project-context
 
 # Interpret the documented result states as evidence:
 # pass       -> attach completed coverage to feature-verification evidence
 # fail       -> report a feature-verification gap
 # incomplete -> record unsupported or missing proof; do not claim verification passed
+```
+
+## Utilization 3: Development Harness security reviewer → Skylos combined static scan
+
+**Research entry**: ./research/code-auditing/skylos.md
+**Caller**: `./plugins/development-harness/agents/reviewer-security.md`
+**Integration mechanism**: CLI subprocess
+**Replaces or adds**: Adds deterministic detection for the secret, injection, insecure-deserialization, unsafe-subprocess, and dependency findings the agent currently derives from grep patterns; it does not replace the agent's authentication and authorization reading, its false-positive triage, or its prompt-injection check on agent and skill Markdown.
+**Setup cost**: Low (no API key required for documented local static analysis)
+**Integration surface**: `uvx skylos . -a --diff origin/main`
+
+### Why this caller
+
+`reviewer-security.md` states that its "task body contains a newline-separated list of changed files (relative paths from the repo root). Use this list as your scan target." Its in-scope list covers hardcoded secrets, injection vectors, insecure deserialization, dependency CVEs, and unsafe subprocess usage — all classes the Skylos entry documents within the combined `-a` scan, which it also documents as scopable to changed work via `--diff origin/main`. The agent reaches those findings through pattern matches plus surrounding-context reading; Skylos documents deterministic checks for the same classes. This is a diff-level review gate, distinct from the per-task post-edit gate in Utilization 1, and it is a detection step rather than the remediation ownership that keeps `linting-root-cause-resolver.md` out of scope.
+
+Three constraints bind the caller. The agent's scan target is the changed-files list in its task body, not a git ref, so Skylos's diff-scoped output must be intersected with that list rather than widening the agent's scope. `-a` also emits dead-code and quality findings that this agent's definition places out of scope; those belong to the quality perspective and must not enter the security verdict. Authentication and authorization gaps have no documented Skylos equivalent for general application code — `skylos defend`'s guardrail checks target an LLM-agent implementation — and the agent's prompt-injection check on Claude agent and skill Markdown is out of Skylos's documented reach for the same reason recorded against `agent-creator.md` below.
+
+### Integration sketch
+
+```bash
+# Run alongside the agent's own reading, not in place of it.
+# Keep only findings in this perspective's categories, and only for files
+# present in the task body's changed-files list.
+uvx skylos . -a --diff origin/main
+```
+
+## Utilization 4: Development Harness quality reviewer → Skylos dead-code scan
+
+**Research entry**: ./research/code-auditing/skylos.md
+**Caller**: `./plugins/development-harness/agents/reviewer-quality.md`
+**Integration mechanism**: CLI subprocess
+**Replaces or adds**: Adds unreferenced-symbol dead-code detection for changed files; it does not replace the agent's naming, exception-swallowing, test-coverage, or SOLID checks, none of which the research entry documents as Skylos checks.
+**Setup cost**: Low (no API key required for documented local static analysis)
+**Integration surface**: `uvx skylos . --diff origin/main`
+
+### Why this caller
+
+`reviewer-quality.md` receives "a list of changed files embedded in your task body (newline-separated relative paths, as returned by `git diff --name-only`)" and scans each for, among other classes, "**Dead code**: commented-out blocks, unreachable branches, debug print/log statements left in production paths". Those signals are lexical; the agent has no step that establishes a function, class, or import is unreferenced. Skylos documents dead-code analysis as the behaviour of its default scan and `--diff origin/main` as the changed-work scoping flag, so it supplies a form of proof the agent's documented method does not produce, at the agent's existing scan location.
+
+Use the default scan rather than `-a`. The default is already scoped to this perspective's category; `-a` would add the security and secret findings that `reviewer-security.md` owns and that this agent's verdict must not carry. The agent's other four checks stay with the agent: the research entry names "quality regressions" as a scan category without enumerating its checks, which is not sufficient to claim coverage of naming, exception swallowing, test-coverage gaps, or SOLID violations.
+
+### Integration sketch
+
+```bash
+# Default scan is the documented dead-code analysis; -a is deliberately omitted
+# so security findings stay with the security perspective.
+uvx skylos . --diff origin/main
 ```
 
 ---

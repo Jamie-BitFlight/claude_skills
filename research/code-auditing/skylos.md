@@ -1,5 +1,7 @@
 ---
 name: skylos
+title: Skylos
+subtitle: Local-first multi-language static analysis with deterministic AI-code verification
 research_date: 2026-09-13
 source_url: https://github.com/duriantaco/skylos
 github_repository: https://github.com/duriantaco/skylos
