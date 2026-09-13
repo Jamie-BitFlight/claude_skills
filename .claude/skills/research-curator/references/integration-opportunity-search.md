@@ -1,12 +1,25 @@
 # Integration Opportunity Search (preserved procedure — not currently wired)
 
-This is Phase 2 of the deleted `research-context-agent`'s three-phase process, carried forward
-verbatim per the "Deletion safety" rule in [AGENTS.md](../../../../AGENTS.md): the agent
-itself was removed (#3529) because its Phase 3 write path (`/process-research-integration`) never
-wrote a byte and had no other invocation path, but this search procedure is the closest existing
-relative of a cross-repo integration search a future redesign would need, and nothing else in the
-corpus reproduces it. Nothing currently invokes this file — it is reference material for that
-redesign, not an active workflow step.
+This is Phase 2 of the deleted `research-context-agent`'s process, carried forward verbatim. It is
+a **partial** carry-forward, not an equivalent-content replacement: PR #3529 deleted the agent,
+and only the Phase 2 search procedure (the six-dimension table and the five-step search order) plus
+Critical Rules 1 and 3 are reproduced below. Everything else in that agent is recoverable only from
+git — Phase 1 (Absorb), Phase 3 (Append) and its `## Integration Opportunities` output schema,
+Critical Rules 2, 4, 5 and 6, Input Format, Output Format, Quality Gates, Error Handling, the
+worked Example Workflow, and Related.
+
+The dropped Phase 3 schema is in live use: six entries under `./research/` carry an
+`## Integration Opportunities` section written to it, so regenerating one means recovering that
+schema from the git blob cited below first.
+
+Why the agent was removed: its Phase 3 write path — `/process-research-integration`, whose script
+`process_file()` returned `status="not_implemented"` — never wrote a byte, and no skill, command,
+or workflow in the repo spawned the agent. It was a registered subagent type, so it remained
+directly spawnable by name via the Agent tool; what it lacked was an automated caller, not every
+invocation path.
+
+Nothing currently invokes this file — it is reference material for a future redesign of the
+integration search, not an active workflow step.
 
 The deleted agent's own framing: search the repository for connections between one research file's
 content and this repo's existing skills, agents, hooks, commands, and MCP servers, across the six
