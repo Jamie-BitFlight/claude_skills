@@ -558,3 +558,13 @@ libtmux self-describes as pre-1.0. Upstream recommends pinning to a minor versio
 14. **src/libtmux/__init__.py** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/__init__.py> (accessed 2026-03-01): public API surface: Server, Session, Window, Pane
 15. **src/libtmux/pytest_plugin.py** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/src/libtmux/pytest_plugin.py> (accessed 2026-03-01): server, session, window, pane fixtures
 16. **CHANGES (Changelog)** - <https://raw.githubusercontent.com/tmux-python/libtmux/master/CHANGES> (accessed 2026-03-01): v0.53.1 race condition fix, v0.53.0 breaking change in Session.attach()
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |

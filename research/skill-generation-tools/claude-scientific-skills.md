@@ -253,6 +253,7 @@ Source: scientific-skills/scanpy/SKILL.md — Quick Start section (accessed 2026
 | [Obsidian Skills Repository](./obsidian-skills.md) | skill-generation-tools | Reference implementation of Agent Skills specification with multi-format support (Markdown, YAML, JSON); demonstrates skill decomposition pattern applicable to scientific domain skills |
 | [Anthropic Agent Skills Repository](./anthropics-skills.md) | skill-generation-tools | Official Anthropic skill repository with skill-creator and mcp-builder skills; provides production skill examples and authorship guidance applicable to scientific skill development |
 | [Docs MCP Server (Grounded Docs)](../mcp-ecosystem/docs-mcp-server.md) | mcp-ecosystem | Provides versioned documentation indexing for Python, JavaScript, and other scientific libraries; complements claude-scientific-skills' database access with on-demand documentation context |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
 
 ---
 

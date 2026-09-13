@@ -133,3 +133,12 @@ Access via browser:
 - [Hedra Official Website](https://www.hedra.com) (accessed 2026-02-20)
 - [Hedra Twitter/X Account](https://twitter.com/hedra_labs) (accessed 2026-02-20)
 - Website metadata description: "The visual creation platform for video, image, and audio. Create professional content with AI-powered tools — no design skills needed."
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |

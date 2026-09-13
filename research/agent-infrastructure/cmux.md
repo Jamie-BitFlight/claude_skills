@@ -159,6 +159,7 @@ cmux notify --title "Done" --body "Task complete"
 | [byobu.md](../developer-tools/byobu.md) | developer-tools | terminal multiplexer wrapper with status bar UI; cmux replaces this pattern with native macOS app and agent-focused notifications |
 | [yume.md](../developer-tools/yume.md) | developer-tools | native Tauri+Rust GUI for Claude Code CLI parallelizing agents; cmux focuses on terminal pane organization and visual agent attention signals |
 | [orbstack.md](../developer-tools/orbstack.md) | developer-tools | native macOS VM and container management with resource optimization; cmux applies similar efficiency principles to terminal workspace organization |
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
 
 ---
 

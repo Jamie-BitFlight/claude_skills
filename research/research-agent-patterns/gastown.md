@@ -307,3 +307,18 @@ SOURCE: [gastown/README.md](https://github.com/steveyegge/gastown/blob/main/READ
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [Trellis](../agent-frameworks/Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [orchestra](../agent-frameworks/orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | referenced by fleet (agent-infrastructure) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
+| [claude-code-cli-power-patterns](../developer-tools/claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [no-mistakes](../developer-tools/no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [sidecar](../developer-tools/sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |

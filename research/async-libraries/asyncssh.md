@@ -497,3 +497,12 @@ imported = asyncssh.import_private_key(open("~/.ssh/id_ed25519").read())
 | Last Verified | 2026-03-01 |
 | Version at Verification | v2.22.0 |
 | Next Review Recommended | 2026-06-01 |
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [aiomqtt](./aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |
+| [tori-cli](../developer-tools/tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |

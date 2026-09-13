@@ -420,6 +420,15 @@ The following features are documented as not yet supported in wrkflw:
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [no-mistakes](./no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+
 ## References
 
 - **GitHub Repository**: <https://github.com/bahdotsh/wrkflw> (accessed 2026-04-25)

@@ -370,6 +370,13 @@ All factual claims in this entry are traceable to extracted passages from the of
 | [Gitnexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | Graph-based code intelligence MCP with 13-language support; provides semantic code analysis layer compatible with Ruflo's knowledge graph integration |
 | [Motherduck](../data-infrastructure/motherduck.md) | data-infrastructure | Serverless DuckDB with native MCP integration and Dual Execution engine; provides memory backend alternative to AgentDB for pattern storage |
 | [Dolt](../data-infrastructure/dolt.md) | data-infrastructure | Version-controlled SQL database with Git semantics and Beads agentic memory; provides persistent memory layer for Ruflo's ReasoningBank pattern storage |
+| [gitagent](./gitagent.md) | agent-frameworks | referenced by gitagent (agent-frameworks) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | Enterprise multi-agent orchestration with 215+ MCP tools; shares MCP ecosystem integration and swarm coordination patterns (bidirectional) |
+| [iii](../agent-infrastructure/iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [OpenSpace](../ai-research-tools/OpenSpace.md) | ai-research-tools | referenced by OpenSpace (ai-research-tools) |
+| [opencut](../coding-agents/opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [takt](../research-agent-patterns/takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
 
 ---
 

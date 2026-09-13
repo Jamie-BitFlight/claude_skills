@@ -254,3 +254,13 @@ func main() {
 **Research Method**: Information gathered from official website, GitHub repository README and go.mod source, GitHub API (stars, forks, language, creation date, latest release), official documentation (collections, authentication), and latest release page. Shallow clone of repository at ./.worktrees/pocketbase used for version verification.
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | referenced by fleet (agent-infrastructure) |
+| [robyn](./robyn.md) | api-frameworks | Go-based backend alternative; shares realtime and auth patterns with Robyn's WebSocket and SSE support (bidirectional) |
+| [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |

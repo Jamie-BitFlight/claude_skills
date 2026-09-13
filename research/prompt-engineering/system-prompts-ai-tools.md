@@ -190,3 +190,13 @@ Each contribution should include:
 - [ZeroLeaks — Related AI security audit service referenced in README](https://zeroleaks.ai/) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [anything_about_game_ai_resources](../developer-tools/anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [open-spdd](./open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [prompt-optimizer](./prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

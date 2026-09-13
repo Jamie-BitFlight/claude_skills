@@ -280,6 +280,7 @@ Create `gen-context.config.json` in project root:
 | [GrepAI](../developer-tools/grepai.md) | developer-tools | Semantic code search with call graph analysis; shares SigMap's goal of AI-friendly code retrieval with embedding-based approach vs TF-IDF |
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Context compression tool using Tree-sitter that achieves ~70% reduction; parallel compression approach to SigMap's signature extraction strategy |
 | [Claude Mem](../context-management/claude-mem.md) | context-management | Persistent memory compression for Claude Code agents; shares SigMap's session context pattern (4-hour TTL) and token optimization focus |
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |
 
 ---
 

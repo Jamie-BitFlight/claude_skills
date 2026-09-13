@@ -310,3 +310,12 @@ Claude Code Harness is directly relevant to Claude Code development in these are
 | [Orchestrator Agent Creation Guide](../research-agent-patterns/orchestrator-agent-creation-guide.md) | research-agent-patterns | Multi-agent routing, chaining, and delegation patterns applicable to harness design |
 | [TAKT](../research-agent-patterns/takt.md) | research-agent-patterns | YAML-defined multi-agent workflows with state machines and AI judge routing |
 | [Mission Control](./mission-control.md) | agent-frameworks | 24/7 autonomous product engine: research → ideation → build → PR workflow automation |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
+| [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
+| [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [everything-claude-code](../developer-tools/everything-claude-code.md) | developer-tools | referenced by everything-claude-code (developer-tools) |
+| [open-spdd](../prompt-engineering/open-spdd.md) | prompt-engineering | referenced by open-spdd (prompt-engineering) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |

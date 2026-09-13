@@ -285,3 +285,14 @@ docker run -it --rm byobu:6.14
 - [GitHub — Tmux Help File (help.tmux.txt)](https://github.com/dustinkirkland/byobu/blob/master/usr/share/doc/byobu/help.tmux.txt) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |

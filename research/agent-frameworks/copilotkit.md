@@ -253,3 +253,10 @@ export const POST = copilotRuntimeNextJSAppRouterEndpoint({
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Cursor Cookbook](cursor-cookbook.md) | agent-frameworks | referenced by Cursor Cookbook (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [solace-agent-mesh](./solace-agent-mesh.md) | agent-frameworks | referenced by solace-agent-mesh (agent-frameworks) |
+| [omma-build](../ai-design-tools/omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [samuraizer](../ai-research-tools/samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |
+| [boneyard](../developer-tools/boneyard.md) | developer-tools | referenced by boneyard (developer-tools) |
+| [gridland](../developer-tools/gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [the-delegation](../research-agent-patterns/the-delegation.md) | research-agent-patterns | referenced by the-delegation (research-agent-patterns) |

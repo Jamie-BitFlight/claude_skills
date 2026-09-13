@@ -264,3 +264,5 @@ From reviewed sources:
 | [ZeroClaw](../zeroclaw.md) | agent-infrastructure | similar infrastructure constraint optimization: sub-5MB resource footprint for edge deployment scenarios |
 | [Kernel.sh](../kernel-sh.md) | agent-infrastructure | complementary execution environment isolation: VM-per-browser model parallels Fleet's device isolation and MDM agent sandboxing |
 | [Plano](../plano.md) | agent-infrastructure | multi-agent orchestration proxy with data plane abstraction; similar to Fleet's service router pattern for managing heterogeneous client types |
+| [zeroboot](./zeroboot.md) | agent-infrastructure | referenced by zeroboot (agent-infrastructure) |
+| [openbao](../llm-infrastructure/openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |

@@ -211,3 +211,4 @@ Ponytail is directly applicable to Claude Code plugins and agents:
 | [Liteagents](./liteagents.md) | agent-frameworks | shared token-budget constraint; both address latency and cost via instruction-first design |
 | [Superpowers](./superpowers.md) | agent-frameworks | paired skill approach: superpowers teach agents to do things well; ponytail teaches them to do less |
 | [GitAgent](./gitagent.md) | agent-frameworks | framework-agnostic agent portability; ponytail's 13-platform support mirrors gitagent's "clone a repo, get an agent" philosophy |
+| [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |

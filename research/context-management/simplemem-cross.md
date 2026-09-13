@@ -325,5 +325,10 @@ SimpleMem-Cross is directly applicable to Claude Code's agent systems:
 | [Microsoft GraphRAG](./microsoft-graphrag.md) | context-management | Knowledge graph extraction and retrieval for RAG; complements SimpleMem-Cross's vector-based cross-session retrieval with structured knowledge representation |
 | [Agno](../agent-frameworks/agno.md) | agent-frameworks | Multi-agent framework with built-in learning system persisting user profiles and knowledge across sessions using Agno's storage backends (Postgres, SQLite, DynamoDB, etc.) |
 | [LiteAgents - Multi-Tool AI Development Toolkit](../agent-frameworks/liteagents.md) | agent-frameworks | Hot Memory pipeline (`/stash` → `/friction` → `/remember`) consolidates session context and learning into persistent `MEMORY.md`, sharing SimpleMem-Cross's session lifecycle and consolidation approach |
+| [compression-monitor](../ai-observability/compression-monitor.md) | ai-observability | referenced by compression-monitor (ai-observability) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [mex](./mex.md) | context-management | Persistent cross-conversation memory with automatic session lifecycle and context injection — shares heuristic observation extraction with mex's decision logging (bidirectional) |
+| [chroma](../data-infrastructure/chroma.md) | data-infrastructure | referenced by chroma (data-infrastructure) |
 
 ---

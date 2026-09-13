@@ -337,6 +337,7 @@ SOURCE: pyproject.toml (accessed 2026-05-25), .devcontainer/devcontainer.json (a
 | [OpenSpec MCP](../mcp-ecosystem/openspec-mcp.md) | mcp-ecosystem | specification-driven MCP server integration approaches |
 | [Everything Claude Code](../developer-tools/everything-claude-code.md) | developer-tools | comprehensive Claude Code resource and capability reference |
 | [Research Agent Patterns](../research-agent-patterns/agent-execution-and-environment.md) | research-agent-patterns | agent environment isolation and context management strategies |
+| [pilot](./pilot.md) | coding-agents | referenced by pilot (coding-agents) |
 
 ---
 

@@ -252,3 +252,13 @@ SOURCE: [INSTALLING.md](https://github.com/steveyegge/beads/blob/main/docs/INSTA
 - [PyPI package beads-mcp](https://pypi.org/project/beads-mcp/) (accessed 2026-02-26)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [honker](../data-infrastructure/honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |
+| [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |

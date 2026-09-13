@@ -366,3 +366,13 @@ trio.run(main)
 | PyPI Stats                      | <https://pypistats.org/packages/trio>                                                       | 2026-02-04 |
 
 **Research Method**: Information gathered from GitHub API (repository metadata, releases, contributors), PyPI API (package info, download statistics), official documentation at trio.readthedocs.io, and README.rst from the repository.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [robyn](../api-frameworks/robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
+| [violit](../api-frameworks/violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [aiomqtt](./aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |

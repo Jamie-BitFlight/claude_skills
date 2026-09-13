@@ -470,3 +470,15 @@ gh run list --limit 5
 - [GitHub REST API Documentation](https://docs.github.com/en/rest) (accessed 2026-02-20)
 - [GitHub CLI Extension Development](https://docs.github.com/en/github-cli/github-cli/creating-github-cli-extensions) (accessed 2026-02-20)
 - [Claude Skills Repository - gh CLI Usage](https://github.com/Jamie-BitFlight/claude_skills/blob/main/.claude/CLAUDE.md#github-cli-gh-usage) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-code-cli-power-patterns](./claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
+| [awesome-codex-skills-issue-triage](../skill-generation-tools/awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
+| [composio-codebase-migrate](../skill-generation-tools/composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |

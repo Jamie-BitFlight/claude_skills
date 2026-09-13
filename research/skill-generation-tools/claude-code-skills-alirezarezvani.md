@@ -274,3 +274,13 @@ CLAUDE.md states "No build system or test frameworks — intentional design choi
 - [GitHub API — Releases](https://api.github.com/repos/alirezarezvani/claude-skills/releases) (latest tag v2.9.0, published 2026-05-28, accessed 2026-08-11)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [graphify](./graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | 170 modular skills across 9 domains with identical architecture (SKILL.md + references); shares vertical-slice and deep-module philosophy (bidirectional) |

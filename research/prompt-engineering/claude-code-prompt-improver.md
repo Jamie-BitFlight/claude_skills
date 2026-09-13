@@ -263,3 +263,12 @@ For Claude Code plugin developers, this repository demonstrates best practices f
 - [scripts/improve-prompt.py](https://github.com/severity1/claude-code-prompt-improver/blob/main/scripts/improve-prompt.py) (accessed 2026-03-07)
 - [hooks/hooks.json](https://github.com/severity1/claude-code-prompt-improver/blob/main/hooks/hooks.json) (accessed 2026-03-07)
 - [.claude-plugin/plugin.json](https://github.com/severity1/claude-code-prompt-improver/blob/main/.claude-plugin/plugin.json) (accessed 2026-03-07)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [stop-slop](../ai-writing-tools/stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |
+| [ctxforge](./ctxforge.md) | prompt-engineering | referenced by ctxforge (prompt-engineering) |

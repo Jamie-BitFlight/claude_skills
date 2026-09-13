@@ -195,3 +195,4 @@ API differs significantly from Pandas, requiring relearning common patterns (gro
 | [pandera.md](./pandera.md) | data-infrastructure | data validation layer for DataFrame quality assurance after Polars processing |
 | [dolt.md](./dolt.md) | data-infrastructure | version-controlled data store enabling Git-based data versioning for ML pipelines |
 | [chroma.md](./chroma.md) | data-infrastructure | vector storage for embeddings extracted from structured data processing |
+| [duckdb-python-client](../database-libraries/duckdb-python-client.md) | database-libraries | referenced by duckdb-python-client (database-libraries) |

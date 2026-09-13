@@ -213,3 +213,7 @@ executor:
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude CodePro](./claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
+| [1code](./1code.md) | coding-agents | referenced by 1code (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [pilot-shell](./pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |

@@ -325,3 +325,12 @@ Open <http://localhost:5173/eclair> and load your graph JSON file.
 - [Sample Architecture: ecommerce-complete.json](https://raw.githubusercontent.com/NTCoding/living-architecture/main/apps/eclair/public/ecommerce-complete.json) (accessed 2026-02-20)
 - [GitHub API Repository Metadata](https://api.github.com/repos/NTCoding/living-architecture) (accessed 2026-02-20)
 - [npm Downloads Statistics](https://api.npmjs.org/downloads/point/last-month/@living-architecture/riviere-cli) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [codewiki-google](../ai-research-tools/codewiki-google.md) | ai-research-tools | referenced by codewiki-google (ai-research-tools) |
+| [graphify](../skill-generation-tools/graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |

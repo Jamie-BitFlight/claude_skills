@@ -324,6 +324,15 @@ git-cliff demonstrates that structured commit messages (conventional commits) en
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+
 ## Related Tools
 
 | Tool                                                      | Relationship                                         |

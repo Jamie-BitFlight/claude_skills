@@ -355,3 +355,14 @@ result = trainer.fit()
 | Anyscale (Managed Ray)      | <https://www.anyscale.com/>                                        | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, issues, contributors), PyPI statistics API, and official documentation. Statistics verified via direct API calls on 2026-02-05.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [jax](./jax.md) | ml-infrastructure | referenced by jax (ml-infrastructure) |
+| [slime](./slime.md) | ml-infrastructure | referenced by slime (ml-infrastructure) |
+| [zvec](./zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |

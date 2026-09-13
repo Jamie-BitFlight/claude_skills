@@ -273,3 +273,12 @@ npx @biomejs/biome migrate prettier --write
 - [Biome Configuration Reference](https://biomejs.dev/reference/configuration) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |

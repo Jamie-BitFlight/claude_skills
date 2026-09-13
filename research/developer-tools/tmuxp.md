@@ -437,3 +437,14 @@ Concrete applications:
 - [GitHub API — Repository Metadata](https://api.github.com/repos/tmux-python/tmuxp) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |

@@ -246,3 +246,11 @@ asyncio.run(main())
 - [GitHub API: repos/Retio-ai/Retio-pagemap](https://api.github.com/repos/Retio-ai/Retio-pagemap) (accessed 2026-02-18)
 - [GitHub API: releases/latest](https://api.github.com/repos/Retio-ai/Retio-pagemap/releases/latest) (accessed 2026-02-18)
 - [Smithery MCP Registry Configuration](https://smithery.ai/docs/config#smitheryyaml) (accessed 2026-02-18)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [vibium](../agent-infrastructure/vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |

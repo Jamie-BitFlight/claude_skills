@@ -306,3 +306,12 @@ Source: [NotebookLM usage limits](https://support.google.com/notebooklm/answer/1
 | The Verge: Project Tailwind   | <https://www.theverge.com/2023/5/10/23719866/google-project-tailwind-ai-notebook>       | 2026-01-31 |
 
 **Research Method**: Information gathered from Wikipedia article (citing multiple primary sources), Google official blog posts, official NotebookLM website, and Google Play Store listing. Feature timeline and version numbers verified via Wikipedia citations to TechCrunch, The Verge, 9to5Google, and official Google announcements.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [codewiki-google](./codewiki-google.md) | ai-research-tools | referenced by codewiki-google (ai-research-tools) |
+| [samuraizer](./samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |

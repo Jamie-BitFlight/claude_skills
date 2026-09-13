@@ -254,3 +254,13 @@ Trigger.dev is highly relevant for autonomous AI agents and multi-step workflows
 - Specific performance benchmarks not documented in reviewed sources
 - Detailed pricing information for cloud platform not included in repository
 - Advanced integration patterns beyond SDK documentation scope
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [iii](./iii.md) | agent-infrastructure | referenced by iii (agent-infrastructure) |
+| [honker](../data-infrastructure/honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |

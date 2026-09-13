@@ -308,3 +308,9 @@ bunx @every-env/compound-plugin install compound-engineering --to codex
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |
+| [opencut](../coding-agents/opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [claude-code-cli-power-patterns](../developer-tools/claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |
+| [agent-skills](../skill-generation-tools/agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |

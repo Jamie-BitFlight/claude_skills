@@ -228,3 +228,11 @@ Skills follow the [Agent Skills](https://agentskills.io/) format, ensuring porta
 | Gepetto Skill             | skills/gepetto/SKILL.md (via raw GitHub)                            | 2026-01-31 |
 
 **Research Method**: Information gathered from GitHub repository README via GitHub API raw content endpoint, GitHub API for repository metadata (stars, forks, license, dates, contributors), directory structure via GitHub contents API, and skill counting via API directory listing. Statistics verified via direct API calls on 2026-02-20.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |

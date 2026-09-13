@@ -391,3 +391,14 @@ Tornado has been deployed in production at scale by major organizations:
 | User's Guide                | <https://www.tornadoweb.org/en/stable/guide.html>                  | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, issues, contributors), PyPI metadata, official documentation, and release notes. Download statistics from PyPI Stats API.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [robyn](./robyn.md) | api-frameworks | Python async web framework with networking primitives; shares concurrent I/O model and async/await patterns with Robyn (bidirectional) |
+| [violit](./violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [aiomqtt](../async-libraries/aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |
+| [pocketbase](../data-infrastructure/pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

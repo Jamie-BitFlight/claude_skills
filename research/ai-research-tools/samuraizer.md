@@ -435,3 +435,6 @@ GET /chat/sessions/<id>/messages
 | [Claude-Mem](../context-management/claude-mem.md) | context-management | Hybrid semantic+keyword search and progressive disclosure pattern mirrors Samuraizer's vector search architecture |
 | [MCPJam Inspector](../mcp-ecosystem/mcpjam.md) | mcp-ecosystem | Local testing tool for MCP servers; Samuraizer knowledge base could be exposed as MCP backend for integration |
 | [CopilotKit](../agent-frameworks/copilotkit.md) | agent-frameworks | Agentic UI framework with bi-directional state sync applicable to knowledge base frontend patterns |
+| [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
+| [zvec-grep](./zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [graphify](../skill-generation-tools/graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |

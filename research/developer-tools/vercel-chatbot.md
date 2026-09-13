@@ -264,3 +264,11 @@ The `entitlements.ts` pattern (per-user-type rate limits stored as config) is a 
 **Research Method**: GitHub API for metadata (stars, forks, contributors, file contents). Repository source files read directly via `gh api repos/vercel/chatbot/contents/{path}`. README, `package.json`, `lib/ai/models.ts`, `lib/ai/providers.ts`, `lib/db/schema.ts`, `lib/ai/entitlements.ts`, `artifacts/code/server.ts`, and `app/(chat)/api/chat/route.ts` inspected directly.
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |

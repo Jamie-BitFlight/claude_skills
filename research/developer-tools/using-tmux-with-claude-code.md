@@ -192,3 +192,17 @@ tmux capture-pane -t 0 -p -S -10000 | v
 - [Interactive Terminal Workarounds — rules/interactive-terminal-workarounds.md](./../../rules/interactive-terminal-workarounds.md) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [sidecar](./sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |

@@ -442,6 +442,10 @@ SOURCES: April 7 author note (lines 52–83), README.md limitations section (not
 | [mimir-mcp.md](./mcp-ecosystem/mimir-mcp.md) | mcp-ecosystem | Git-backed memory with graph associations; similar version-controlled persistence, alternative to ChromaDB |
 | [trustgraph.md](./agent-infrastructure/trustgraph.md) | agent-infrastructure | Event-driven knowledge graph platform; temporal triple model similar to mempalace temporal KG, both track entity validity windows |
 | [sourcesyncai-mcp.md](./mcp-ecosystem/sourcesyncai-mcp.md) | mcp-ecosystem | 28-tool MCP bridge for knowledge bases; transport layer for multi-source data ingest into mempalace palace |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
+| [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [tolaria](../developer-tools/tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
 
 ---
 

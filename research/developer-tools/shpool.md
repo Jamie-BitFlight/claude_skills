@@ -220,3 +220,15 @@ action = "detach"
 - [GitHub Releases — v0.9.3](https://github.com/shell-pool/shpool/releases/tag/v0.9.3) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [abtop](./abtop.md) | developer-tools | referenced by abtop (developer-tools) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |

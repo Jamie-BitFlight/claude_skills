@@ -154,3 +154,14 @@ SOURCE: Multiple sources confirm three-line SDK and OpenAI API compatibility (ac
 - [Y Combinator Launch Post](https://www.ycombinator.com/launches/Msf-trainloop-unlock-next-level-reasoning-through-fine-tuning) (accessed 2026-03-12)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [hyperagents](../coding-agents/hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+| [airllm](../llm-infrastructure/airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [jax](./jax.md) | ml-infrastructure | referenced by jax (ml-infrastructure) |

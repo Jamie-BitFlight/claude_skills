@@ -229,3 +229,6 @@ npm run build && npx next start -p 4000
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
+| [flue](./flue.md) | agent-frameworks | referenced by flue (agent-frameworks) |
+| [octogent](./octogent.md) | agent-frameworks | Autonomous product engine combining research, ideation, and build phases shares orchestration patterns for multi-agent workflows (bidirectional) |

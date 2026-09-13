@@ -337,3 +337,11 @@ The repository includes sample prompts for AI assistants:
 4. **Sample MCP Prompt**: <https://raw.githubusercontent.com/tejzpr/mimir-mcp/main/SAMPLE_MCP_PROMPT.md> (accessed 2026-02-04)
 5. **Sample Cursor Rule**: <https://raw.githubusercontent.com/tejzpr/mimir-mcp/main/SAMPLE_CURSOR_RULE.md> (accessed 2026-02-04)
 6. **GitHub API Repository Data**: <https://api.github.com/repos/tejzpr/mimir-mcp> (accessed 2026-02-04)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |

@@ -282,3 +282,14 @@ Conductor is a direct peer to the claude_skills repository: both are Claude Code
 5. **GitHub API - Repository metadata**: <https://api.github.com/repos/rbarcante/claude-conductor> (accessed 2026-02-17)
 6. **GitHub API - Contributors**: <https://api.github.com/repos/rbarcante/claude-conductor/contributors> (accessed 2026-02-17)
 7. **Original upstream project (Gemini CLI)**: <https://github.com/gemini-cli-extensions/conductor> (referenced in README NOTICE section)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [stop-slop](../ai-writing-tools/stop-slop.md) | ai-writing-tools | referenced by stop-slop (ai-writing-tools) |
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |

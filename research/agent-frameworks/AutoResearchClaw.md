@@ -177,6 +177,8 @@ researchclaw run --topic "Your research idea" --mode custom
 | [Claude-Mem](../context-management/claude-mem.md) | context-management | persistent memory compression across sessions with progressive disclosure; applicable to AutoResearchClaw's cross-run learning and MetaClaw integration for retaining lessons |
 | [OpenHands](../coding-agents/openhands.md) | coding-agents | model-agnostic coding agent platform with sandboxed execution and self-healing; shares sandbox isolation and autonomous repair patterns with AutoResearchClaw's experiment execution |
 | [OpenSpec MCP](../mcp-ecosystem/openspec-mcp.md) | mcp-ecosystem | spec-driven workflow with approval state machine and quality gates; parallels AutoResearchClaw's multi-stage pipeline with structured gating and verification logic |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
 
 ---
 

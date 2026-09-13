@@ -251,3 +251,11 @@ agent = LlmAgent(
 - [Google ADK in AI Agents Frameworks Benchmark](./../../agent-frameworks/ai-agents-frameworks.md) — existing research entry
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [AutoResearchClaw](../agent-frameworks/AutoResearchClaw.md) | agent-frameworks | referenced by AutoResearchClaw (agent-frameworks) |

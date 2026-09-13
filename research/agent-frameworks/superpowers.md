@@ -340,3 +340,20 @@ The `writing-skills` skill treats skill creation as TDD for documentation:
 2. **Marketplace Repository**: <https://github.com/obra/superpowers-marketplace> (accessed 2026-01-31)
 3. **Author Blog Post**: <https://blog.fsck.com/2025/10/09/superpowers/> (referenced in README)
 4. **Release Notes**: <https://github.com/obra/superpowers/blob/main/RELEASE-NOTES.md> (accessed 2026-01-31)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [Trellis](./Trellis.md) | agent-frameworks | referenced by Trellis (agent-frameworks) |
+| [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
+| [gstack](./gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [orchestra](./orchestra.md) | agent-frameworks | referenced by orchestra (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | Structured orchestration with specialized agent roles and two-stage verification; shares TDD enforcement and agent pool architecture patterns (bidirectional) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [pilot-shell](../coding-agents/pilot-shell.md) | coding-agents | referenced by pilot-shell (coding-agents) |
+| [agent-skills-eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

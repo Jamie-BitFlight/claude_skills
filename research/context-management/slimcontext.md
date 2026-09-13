@@ -317,3 +317,8 @@ See [examples/OPENAI_EXAMPLE.md](https://github.com/agentailor/slimcontext/blob/
 | [SourceSync.ai](./sourcesyncai.md) | context-management | multi-source RAG platform with hybrid search and namespace-based knowledge isolation |
 | [Straion](./straion.md) | context-management | dynamic context injection with task-scoped rules and token budget awareness |
 | [ctxforge](../prompt-engineering/ctxforge.md) | prompt-engineering | context engineering framework with protocol-based token budget management and discovery workflows |
+| [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
+| [claude-brain](./claude-brain.md) | context-management | referenced by claude-brain (context-management) |
+| [mempalace](./mempalace.md) | context-management | referenced by mempalace (context-management) |
+| [mex](./mex.md) | context-management | referenced by mex (context-management) |
+| [abtop](../developer-tools/abtop.md) | developer-tools | referenced by abtop (developer-tools) |

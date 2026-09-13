@@ -269,3 +269,6 @@ OpenBao is relevant to Claude Code development in these scenarios:
 | [Stakpak-Agent](../coding-agents/stakpak-agent.md) | coding-agents | includes secret substitution and mTLS credential handling for DevOps workflows |
 | [Dify](../agent-frameworks/dify.md) | agent-frameworks | provides per-workspace access control and tool permission management |
 | [Fleet](../agent-infrastructure/fleet.md) | agent-infrastructure | device management platform requiring authentication and authorization mechanisms |
+| [airllm](./airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [quantum-free-router](./quantum-free-router.md) | llm-infrastructure | referenced by quantum-free-router (llm-infrastructure) |
+| [tessera](../security-tools/tessera.md) | security-tools | referenced by tessera (security-tools) |

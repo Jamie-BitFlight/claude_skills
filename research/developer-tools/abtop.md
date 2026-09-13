@@ -324,5 +324,6 @@ tmux new -s work
 | [Logfire](../ai-observability/logfire.md) | ai-observability | full-stack observability for AI agents with token tracking; provides backend telemetry while abtop provides terminal-level session metrics |
 | [SlimContext](../context-management/slimcontext.md) | context-management | context window optimization for multi-turn conversations; applies same token awareness as abtop's rate limit and context monitoring |
 | [TUI Studio](./tui-studio.md) | developer-tools | visual TUI design tool; abtop's dashboard could be redesigned visually using TUI Studio's component export workflow |
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |
 
 ---

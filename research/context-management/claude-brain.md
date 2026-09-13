@@ -355,6 +355,7 @@ SOURCE: README.md FAQ section, src/hooks/post-tool-use.ts timeout configurations
 | [Jina AI](./jina-ai.md) | context-management | Search foundation platform providing Reader API and embedding/reranking infrastructure used by memory systems |
 | [SlimContext](./slimcontext.md) | context-management | Zero-dependency TypeScript library for chat history compression; complements memory systems with token optimization |
 | [SourceSync.ai](./sourcesyncai.md) | context-management | Managed RAG platform with auto-syncing connectors and hybrid search; alternative to single-file memory stores |
+| [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
 
 ---
 

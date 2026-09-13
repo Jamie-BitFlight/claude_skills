@@ -257,6 +257,7 @@ Flue serves as a production-grade reference implementation for building autonomo
 | [claude-code-harness](./claude-code-harness.md) | agent-frameworks | Agent harness framework for Claude Code with guardrails and execution model |
 | [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | TypeScript multi-agent orchestration with skill system and model routing |
 | [mission-control](./mission-control.md) | agent-frameworks | Autonomous product engine with durable workflows and structured task execution |
+| [deepseek-harness](./deepseek-harness.md) | agent-frameworks | referenced by deepseek-harness (agent-frameworks) |
 
 ---
 

@@ -277,3 +277,13 @@ The README explicitly warns: "GraphRAG indexing can be an expensive operation." 
 | Architecture Documentation | <https://microsoft.github.io/graphrag/index/architecture/>                                                  | 2026-01-31 |
 
 **Research Method**: Information gathered from official GitHub repository README, RAI transparency document, documentation pages (query overview, index overview, architecture), GitHub API for statistics, PyPI API for package info and download statistics. All claims verified against primary sources.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [simplemem-cross](./simplemem-cross.md) | context-management | referenced by simplemem-cross (context-management) |
+| [slimcontext](./slimcontext.md) | context-management | referenced by slimcontext (context-management) |
+| [graphify](../skill-generation-tools/graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |

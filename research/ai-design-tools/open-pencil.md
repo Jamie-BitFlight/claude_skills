@@ -493,5 +493,11 @@ The CLI and MCP server both support headless operation — no desktop UI require
 | [Google Stitch](./google-stitch.md) | ai-design-tools | Complementary AI design tool: Stitch generates UI from text/images, OpenPencil edits and exports native .fig files |
 | [UI UX Pro Max Skill](./ui-ux-pro-max-skill.md) | skill-generation-tools | Injects design system context into AI agents; pairs with OpenPencil's code export for consistent UI generation |
 | [Browser MCP](../mcp-ecosystem/browsermcp-mcp.md) | mcp-ecosystem | Reference architecture for MCP server design: both expose domain tools (design vs browser automation) as structured resources |
+| [dark-design](./dark-design.md) | ai-design-tools | referenced by dark-design (ai-design-tools) |
+| [godly](./godly.md) | ai-design-tools | referenced by godly (ai-design-tools) |
+| [huashu-design](./huashu-design.md) | ai-design-tools | referenced by huashu-design (ai-design-tools) |
+| [omma-build](./omma-build.md) | ai-design-tools | referenced by omma-build (ai-design-tools) |
+| [opencut](../coding-agents/opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |
 
 ---

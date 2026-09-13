@@ -237,3 +237,11 @@ router.post('/console-log', asyncHandler(async (req, res) => {
 - [GGPrompts/Opustrator — parent project](https://github.com/GGPrompts/opustrator) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [scrapling-skill](./scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

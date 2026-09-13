@@ -273,3 +273,15 @@ print(transcript.text)
 | v3.10.0 Release Notes | <https://github.com/mudler/LocalAI/releases/tag/v3.10.0> | 2026-02-22 |
 
 **Research Method**: Data gathered from GitHub API (stars, forks, issues, contributors, release metadata), official documentation site (localai.io), and GitHub README. Statistics verified via direct API calls on 2026-02-22.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [omniroute](../api-frameworks/omniroute.md) | api-frameworks | referenced by omniroute (api-frameworks) |
+| [airllm](./airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [glm5-exacto](./glm5-exacto.md) | llm-infrastructure | referenced by glm5-exacto (llm-infrastructure) |
+| [openbao](./openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
+| [quantum-free-router](./quantum-free-router.md) | llm-infrastructure | referenced by quantum-free-router (llm-infrastructure) |

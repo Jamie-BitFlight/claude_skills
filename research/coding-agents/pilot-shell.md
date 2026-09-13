@@ -527,4 +527,6 @@ N/A — initial research entry.
 | [Superpowers](../agent-frameworks/superpowers.md) | agent-frameworks | Agentic skills framework with 14 skills for TDD, debugging, and subagent-driven development |
 | [Get Shit Done](../agent-frameworks/get-shit-done.md) | agent-frameworks | Spec-driven development system with 11 agents for Claude Code, OpenCode, and Gemini |
 | [Everything Claude Code](../agent-frameworks/everything-claude-code.md) | agent-frameworks | Comprehensive performance optimization system with 16 agents, 65+ skills, and hook-based automation |
+| [claude-codepro](./claude-codepro.md) | coding-agents | referenced by claude-codepro (coding-agents) |
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
 

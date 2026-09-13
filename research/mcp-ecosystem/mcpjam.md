@@ -301,3 +301,12 @@ MCPJam fills a testing and development tooling gap:
 11. **MCP Protocol Specification**: <https://modelcontextprotocol.io/> (accessed 2026-01-26)
 12. **ChatGPT Apps SDK**: <https://developers.openai.com/apps-sdk/> (accessed 2026-01-26)
 13. **MCP Apps SEP-1865**: <https://github.com/modelcontextprotocol/modelcontextprotocol/pull/1865> (accessed 2026-01-26)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [agentscope](../agent-frameworks/agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [samuraizer](../ai-research-tools/samuraizer.md) | ai-research-tools | referenced by samuraizer (ai-research-tools) |

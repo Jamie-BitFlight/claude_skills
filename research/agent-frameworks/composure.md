@@ -448,5 +448,9 @@ Composure is a reference implementation for several Claude Code agent patterns:
 | [GrepAI](../developer-tools/grepai.md) | developer-tools | semantic code search and call graph analysis for multi-language codebases |
 | [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | AST-based code indexing and semantic search across 30+ languages |
 | [Gstack](./gstack.md) | agent-frameworks | specialized code review skills with language-aware analysis patterns |
+| [agentscope](./agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |
 
 ---

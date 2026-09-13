@@ -299,3 +299,12 @@ imports:
 - [GitHub API release v1.11.2](https://github.com/cachix/devenv/releases/tag/v1.11.2) (accessed 2026-02-26)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [tori-cli](./tori-cli.md) | developer-tools | referenced by tori-cli (developer-tools) |

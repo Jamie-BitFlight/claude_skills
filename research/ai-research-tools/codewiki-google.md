@@ -179,5 +179,6 @@ CodeWiki combines text, diagrams, and interactive chat to explain code. Claude C
 | [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | embedded semantic code search via MCP reduces token usage in code exploration workflows |
 | [Living Architecture](../documentation-tools/living-architecture.md) | documentation-tools | automatic architecture extraction and visualization shares CodeWiki's anti-drift documentation pattern |
 | [NotebookLM](./notebooklm.md) | ai-research-tools | Gemini-backed document understanding and chat interface parallels CodeWiki's AI-powered exploration agent |
+| [gitnexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |
 
 ---

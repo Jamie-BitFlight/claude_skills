@@ -194,3 +194,6 @@ Zvec is relevant to Claude Code development in two key areas:
 | [Jina AI](../context-management/jina-ai.md) | context-management | Provides embeddings and rerankers that serve as input data for Zvec's vector similarity operations |
 | [SourceSync.ai](../context-management/sourcesyncai.md) | context-management | Managed RAG platform using vector databases (Pinecone); Zvec offers embedded alternative deployment model |
 | [CocoIndex Code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | Semantic code search using embeddings and vector similarity; alternative MCP-based semantic retrieval approach |
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [jax](./jax.md) | ml-infrastructure | referenced by jax (ml-infrastructure) |

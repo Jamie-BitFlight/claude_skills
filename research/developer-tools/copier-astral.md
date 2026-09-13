@@ -320,6 +320,16 @@ copier-astral demonstrates the modern Python tooling stack that Claude Code-rela
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [rope](../code-auditing/rope.md) | code-auditing | referenced by rope (code-auditing) |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+
 ## Related Tools
 
 | Tool | Relationship |

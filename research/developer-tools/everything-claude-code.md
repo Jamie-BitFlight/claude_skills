@@ -411,3 +411,9 @@ This repository is the closest peer project to `claude_skills` in the Claude Cod
 |-------|----------|--------------|
 | [Claude Code Harness](../agent-frameworks/claude-code-harness.md) | agent-frameworks | referenced by Claude Code Harness (agent-frameworks) |
 | [Claude CodePro](./../coding-agents/claude-codepro.md) | coding-agents | referenced by Claude CodePro (coding-agents) |
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [ponytail](../agent-frameworks/ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [agent-deck](./agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
+| [claude-code-cli-power-patterns](./claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [tolaria](./tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |

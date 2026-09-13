@@ -331,3 +331,6 @@ Not mentioned in reviewed sources: compatibility with Python 3.14 beta features,
 | [kythe](../developer-tools/kythe.md) | developer-tools | Language-agnostic code intelligence platform; rope provides Python-specific refactoring alternative to Kythe's multi-language semantic analysis |
 | [cocoindex-code](../mcp-ecosystem/cocoindex-code.md) | mcp-ecosystem | AST-based semantic code search via MCP; pairs with rope for find-and-refactor workflows |
 | [skylos](./skylos.md) | code-auditing | shares Python AST and symbol analysis for safe code changes (bidirectional) |
+| [brooks-lint](../coding-agents/brooks-lint.md) | coding-agents | referenced by brooks-lint (coding-agents) |
+| [TheAlgorithms-Python](../learning-resources/TheAlgorithms-Python.md) | learning-resources | referenced by TheAlgorithms-Python (learning-resources) |
+| [graphify](../skill-generation-tools/graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |

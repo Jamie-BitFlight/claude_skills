@@ -259,5 +259,11 @@ SOURCE: Analysis of repository contents (2026-03-06); [Equipping agents for the 
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [Agent Skills Eval](../evaluation-testing/agent-skills-eval.md) | evaluation-testing | referenced by Agent Skills Eval (evaluation-testing) |
+| [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |
+| [maverick](../coding-agents/maverick.md) | coding-agents | referenced by maverick (coding-agents) |
+| [agent-skills](./agent-skills.md) | skill-generation-tools | referenced by agent-skills (skill-generation-tools) |
+| [claude-scientific-skills](./claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
+| [graphify](./graphify.md) | skill-generation-tools | referenced by graphify (skill-generation-tools) |
+| [mattpocock-skills](./mattpocock-skills.md) | skill-generation-tools | referenced by mattpocock-skills (skill-generation-tools) |
 
 ---

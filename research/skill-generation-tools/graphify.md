@@ -301,3 +301,4 @@ SOURCE: README.md lines 217-219 (accessed 2026-04-08) + inferred from code struc
 | [SkillKit](./skillkit.md) | skill-generation-tools | universal package manager translating skills across 32 agents; shared architecture for multi-platform deployment |
 | [Claude Code Skills Library (alirezarezvani)](./claude-code-skills-alirezarezvani.md) | skill-generation-tools | production skill ecosystem; 9-phase quality gates and stdlib-only Python validation matching graphify's multimodal approach |
 | [Rope](../code-auditing/rope.md) | code-auditing | AST-based Python refactoring library; shared tree-sitter foundation and scope-aware symbol resolution patterns |
+| [codebase-recon-skill](./codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |

@@ -172,3 +172,15 @@ Usage workflow:
 - [JIK-A-4 Metro City character pack](https://jik-a-4.itch.io/metrocity-free-topdown-character-pack) (referenced in README, not accessed directly)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [claude-replay](../coding-agents/claude-replay.md) | coding-agents | referenced by claude-replay (coding-agents) |
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [pretext](./pretext.md) | developer-tools | referenced by pretext (developer-tools) |
+| [tui-studio](./tui-studio.md) | developer-tools | referenced by tui-studio (developer-tools) |

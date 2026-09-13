@@ -211,3 +211,11 @@ SOURCE: [Superset Installation Docs](https://superset.sh/docs) (accessed 2026-03
 - [GitHub Releases — superset-sh/superset](https://github.com/superset-sh/superset/releases) (accessed 2026-03-04)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [1code](../coding-agents/1code.md) | coding-agents | referenced by 1code (coding-agents) |

@@ -171,3 +171,18 @@ kythe xrefs --graphstore=/tmp/gs --signature="java.lang.String#length()"
 - [Kythe Schema Documentation](https://kythe.io/docs/schema/) (accessed 2026-02-20)
 - [Kythe Getting Started](https://kythe.io/getting-started) (accessed 2026-02-20)
 - [GitHub API - kythe/kythe metadata](https://api.github.com/repos/kythe/kythe) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [codewiki-google](../ai-research-tools/codewiki-google.md) | ai-research-tools | referenced by codewiki-google (ai-research-tools) |
+| [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [rope](../code-auditing/rope.md) | code-auditing | referenced by rope (code-auditing) |
+| [codegraphcontext](../mcp-ecosystem/codegraphcontext.md) | mcp-ecosystem | referenced by codegraphcontext (mcp-ecosystem) |
+| [gitnexus](../mcp-ecosystem/gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |
+| [repowise](../mcp-ecosystem/repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [codebase-recon-skill](../skill-generation-tools/codebase-recon-skill.md) | skill-generation-tools | referenced by codebase-recon-skill (skill-generation-tools) |

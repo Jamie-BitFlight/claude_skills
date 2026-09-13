@@ -316,3 +316,14 @@ The repository includes complete runnable examples:
 | Example: Agentic RAG     | <https://github.com/tensorzero/tensorzero/tree/main/examples/rag-retrieval-augmented-generation> | 2026-01-31 |
 
 **Research Method**: Information gathered from official GitHub repository README, GitHub API (stars, forks, issues, contributors, releases), PyPI package metadata, PyPI download statistics API, and Cargo.toml workspace configuration. Statistics verified via direct API calls on 2026-01-31.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [airllm](./airllm.md) | llm-infrastructure | referenced by airllm (llm-infrastructure) |
+| [glm5-exacto](./glm5-exacto.md) | llm-infrastructure | referenced by glm5-exacto (llm-infrastructure) |
+| [openbao](./openbao.md) | llm-infrastructure | referenced by openbao (llm-infrastructure) |
+| [quantum-free-router](./quantum-free-router.md) | llm-infrastructure | referenced by quantum-free-router (llm-infrastructure) |

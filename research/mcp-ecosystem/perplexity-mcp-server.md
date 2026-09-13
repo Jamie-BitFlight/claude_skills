@@ -427,3 +427,12 @@ export PERPLEXITY_TIMEOUT_MS=900000  # 15 minutes
 4. **Perplexity API Portal**: <https://www.perplexity.ai/account/api/group> (accessed 2026-02-20)
 5. **Perplexity Community Forum**: <https://community.perplexity.ai> (accessed 2026-02-20)
 6. **MCP Protocol Specification**: <https://modelcontextprotocol.io/> (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ruflo](../agent-frameworks/ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [prompt-optimizer](../prompt-engineering/prompt-optimizer.md) | prompt-engineering | referenced by prompt-optimizer (prompt-engineering) |

@@ -198,3 +198,11 @@ bun run scripts/generate-plugin.ts ~/.human-compiler/<name>/profile.yaml
 - [HumanCompiler interviewer.md agent](https://github.com/Gerstep/HumanCompiler/blob/master/agents/interviewer.md) (accessed 2026-02-19)
 - [HumanCompiler plugin.json manifest](https://github.com/Gerstep/HumanCompiler/blob/master/.claude-plugin/plugin.json) (accessed 2026-02-19)
 - [HumanCompiler package.json](https://github.com/Gerstep/HumanCompiler/blob/master/package.json) (accessed 2026-02-19)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [raincast](../coding-agents/raincast.md) | coding-agents | referenced by raincast (coding-agents) |

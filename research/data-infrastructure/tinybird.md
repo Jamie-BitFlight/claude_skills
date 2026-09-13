@@ -281,3 +281,12 @@ curl -X POST 'https://api.tinybird.co/v0/events?name=events' \
 8. **Analytics Agents Documentation**: <https://www.tinybird.co/docs/forward/analytics-agents> (accessed 2026-01-31)
 9. **MCP Server Documentation**: <https://www.tinybird.co/docs/forward/analytics-agents/mcp> (accessed 2026-01-31)
 10. **Best Practices for AI Agents**: <https://www.tinybird.co/blog/md/tinybird-best-practices-for-ai-agents> (published 2026-01-27)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [pocketbase](./pocketbase.md) | data-infrastructure | referenced by pocketbase (data-infrastructure) |

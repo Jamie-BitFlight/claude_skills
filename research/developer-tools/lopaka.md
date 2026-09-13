@@ -241,3 +241,11 @@ void drawIcon(TFT_eSPI &tft, int x, int y) {
 - [TFT_eSPI Library](https://github.com/Bodmer/TFT_eSPI) (accessed 2026-02-20)
 - [U8g2 Library](https://github.com/olikraus/u8g2) (accessed 2026-02-20)
 - [AdafruitGFX Library](https://github.com/adafruit/Adafruit-GFX-Library) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [tui-studio](./tui-studio.md) | developer-tools | Visual-to-code editor for embedded displays; shares design-then-export pattern and multi-framework code generation strategy (bidirectional) |

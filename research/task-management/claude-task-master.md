@@ -362,3 +362,13 @@ Task Master provides a Claude Code plugin for native integration:
 4. **npm Package**: <https://www.npmjs.com/package/task-master-ai> (accessed 2026-01-26)
 5. **Configuration Guide**: <https://github.com/eyaltoledano/claude-task-master/blob/main/docs/configuration.md> (accessed 2026-01-26)
 6. **Claude Code Integration**: <https://github.com/eyaltoledano/claude-task-master/blob/main/docs/examples/claude-code-usage.md> (accessed 2026-01-26)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [unblocked](../context-management/unblocked.md) | context-management | referenced by unblocked (context-management) |
+| [sidecar](../developer-tools/sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
+| [xyops](./xyops.md) | task-management | referenced by xyops (task-management) |

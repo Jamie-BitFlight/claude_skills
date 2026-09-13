@@ -593,6 +593,15 @@ jira.js demonstrates that comprehensive API client libraries can make complex ex
 
 ---
 
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [awesome-codex-skills-issue-triage](../skill-generation-tools/awesome-codex-skills-issue-triage.md) | skill-generation-tools | referenced by awesome-codex-skills-issue-triage (skill-generation-tools) |
+
 ## Related Tools
 
 | Tool | Relationship |

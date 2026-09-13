@@ -431,3 +431,14 @@ Launches the Electron-based desktop application UI (available at `chatgpt.com/co
 - [GitHub Releases: openai/codex](https://github.com/openai/codex/releases) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [nemoclaw](../agent-infrastructure/nemoclaw.md) | agent-infrastructure | referenced by nemoclaw (agent-infrastructure) |
+| [1code](./1code.md) | coding-agents | Codex binary bundled inside 1Code; shares dual MCP client+server role and AGENTS.md context (bidirectional) |
+| [hyperagents](./hyperagents.md) | coding-agents | referenced by hyperagents (coding-agents) |
+| [maverick](./maverick.md) | coding-agents | Competing autonomous agent platform with OS sandbox; shares multi-provider support and workspace isolation patterns (bidirectional) |

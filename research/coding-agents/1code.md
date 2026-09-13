@@ -244,5 +244,8 @@ Pre-built releases and background agent support require a subscription at `https
 | [OpenHands](./openhands.md) | coding-agents | alternative cloud coding agent platform addressing same goal of autonomous software development |
 | [Pilot](./pilot.md) | coding-agents | alternative Claude Code wrapper with ticket-to-PR automation and autonomous development pipeline |
 | [OpenAI Symphony](./openai-symphony.md) | coding-agents | alternative autonomous coding agent platform with workspace sandboxing and issue-tracker-driven workflows |
+| [opencut](./opencut.md) | coding-agents | referenced by opencut (coding-agents) |
+| [raincast](./raincast.md) | coding-agents | referenced by raincast (coding-agents) |
+| [agent-deck](../developer-tools/agent-deck.md) | developer-tools | referenced by agent-deck (developer-tools) |
 
 ---

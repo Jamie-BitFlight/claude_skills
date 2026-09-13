@@ -311,3 +311,15 @@ The project documentation references large codebase and enterprise scenarios han
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
+| [agentscope](../agent-frameworks/agentscope.md) | agent-frameworks | referenced by agentscope (agent-frameworks) |
+| [composure](../agent-frameworks/composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [codewiki-google](../ai-research-tools/codewiki-google.md) | ai-research-tools | referenced by codewiki-google (ai-research-tools) |
+| [zvec-grep](../ai-research-tools/zvec-grep.md) | ai-research-tools | referenced by zvec-grep (ai-research-tools) |
+| [rope](../code-auditing/rope.md) | code-auditing | referenced by rope (code-auditing) |
+| [helix-db](../data-infrastructure/helix-db.md) | data-infrastructure | referenced by helix-db (data-infrastructure) |
+| [tolaria](../developer-tools/tolaria.md) | developer-tools | referenced by tolaria (developer-tools) |
+| [codegraphcontext](./codegraphcontext.md) | mcp-ecosystem | referenced by codegraphcontext (mcp-ecosystem) |
+| [gitnexus](./gitnexus.md) | mcp-ecosystem | referenced by gitnexus (mcp-ecosystem) |
+| [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [zvec](../ml-infrastructure/zvec.md) | ml-infrastructure | referenced by zvec (ml-infrastructure) |
+| [github-patterns](../research-agent-patterns/github-patterns.md) | research-agent-patterns | referenced by github-patterns (research-agent-patterns) |

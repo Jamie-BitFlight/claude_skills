@@ -292,5 +292,9 @@ Source: README.md — Sandboxed Execution.
 | [Anime.js](./animejs.md) | developer-tools | Animation engine patterns applicable to Gridland's interactive component system |
 | [Piebald](./piebald.md) | developer-tools | Cross-platform desktop UI framework; shares Gridland's goal of unified rendering across environments |
 | [Using tmux with Claude Code](./using-tmux-with-claude-code.md) | developer-tools | Terminal UI orchestration patterns applicable to Gridland's TUI rendering context |
+| [boneyard](./boneyard.md) | developer-tools | Shares multi-environment rendering challenge: responsive layout snapshot extraction at multiple breakpoints mirrors Gridland's write-once-deploy-anywhere rendering strategy (bidirectional) |
+| [pretext](./pretext.md) | developer-tools | Shares React + Canvas rendering pattern for multi-environment output; Gridland's TextBuffer abstraction parallels Pretext's text measurement system for terminal/browser layout (bidirectional) |
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |
+| [tui-studio](./tui-studio.md) | developer-tools | Shares React-based TUI framework approach with write-once, deploy-anywhere multi-environment rendering (bidirectional) |
 
 ---

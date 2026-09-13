@@ -267,3 +267,16 @@ Downloads available from the official website:
 1. **Yume Official Website** - <https://aofp.github.io/yume/> (accessed 2026-02-15)
 2. **Yume GitHub Pages Host** - <https://github.com/aofp> (inferred from GitHub Pages domain, accessed 2026-02-15)
 3. **Claude Code CLI Flickering Issue** - Referenced by Yume website as having 700+ upvotes (accessed 2026-02-15; original GitHub issue URL not provided by source)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [cmux](../agent-infrastructure/cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |
+| [happycapy](../agent-infrastructure/happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
+| [gridland](./gridland.md) | developer-tools | referenced by gridland (developer-tools) |
+| [tabularis](./tabularis.md) | developer-tools | Shares Tauri + Rust cross-platform desktop architecture; Yume focuses on multi-agent orchestration UI (bidirectional) |

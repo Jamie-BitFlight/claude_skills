@@ -369,6 +369,7 @@ The tool is particularly valuable for the Claude Skills repository because plugi
 | [tmuxp](../developer-tools/tmuxp.md) | developer-tools | freezes and restores tmux session state via YAML; replay serves similar archival purpose at transcript level with interactive playback |
 | [Claude Conductor](../developer-tools/claude-conductor.md) | developer-tools | context-driven plugin for Claude Code; generated session replays serve as demonstration and teaching artifacts for plugin capabilities |
 | [libtmux](../developer-tools/libtmux.md) | developer-tools | Python API for tmux session control and pane output capture; underlying technology for programmatic session interaction that replay automates for documentation |
+| [sidecar](../developer-tools/sidecar.md) | developer-tools | referenced by sidecar (developer-tools) |
 
 ---
 

@@ -291,3 +291,17 @@ Socket path: ${TMPDIR:-/tmp}/clawdbot-tmux-sockets/clawdbot.sock
 2. **Don't Sleep On AI (Publisher)** - <https://dontsleeponai.com> (accessed 2026-02-15)
 3. **BMAD Method** - Referenced as story-driven workflow integration within the Claw Loop; methodology for create-story / dev-story / code-review cycles (accessed 2026-02-15 via [1])
 4. **GSD (Get Shit Done) Method** - Referenced as phase-based workflow integration within the Claw Loop; methodology for discuss / plan / execute / verify cycles (accessed 2026-02-15 via [1])
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [octogent](../agent-frameworks/octogent.md) | agent-frameworks | referenced by octogent (agent-frameworks) |
+| [AutoResearchClaw](../agent-infrastructure/AutoResearchClaw.md) | agent-infrastructure | referenced by AutoResearchClaw (agent-infrastructure) |
+| [holyclaude](../agent-infrastructure/holyclaude.md) | agent-infrastructure | referenced by holyclaude (agent-infrastructure) |
+| [oh-my-claudecode](../agent-orchestration/oh-my-claudecode.md) | agent-orchestration | referenced by oh-my-claudecode (agent-orchestration) |
+| [claude-code-cli-power-patterns](../developer-tools/claude-code-cli-power-patterns.md) | developer-tools | referenced by claude-code-cli-power-patterns (developer-tools) |
+| [no-mistakes](../developer-tools/no-mistakes.md) | developer-tools | referenced by no-mistakes (developer-tools) |
+| [takt](./takt.md) | research-agent-patterns | referenced by takt (research-agent-patterns) |

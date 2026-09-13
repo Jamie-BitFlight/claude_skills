@@ -172,3 +172,11 @@ worker.onmessage = (e) => console.log('Loss:', e.data.loss);
 - [Karpathy's microgpt.py Dissected](https://blog.sotaaz.com/post/microgpt-en) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [jax](./jax.md) | ml-infrastructure | referenced by jax (ml-infrastructure) |

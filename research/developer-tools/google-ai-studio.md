@@ -231,3 +231,12 @@ print(response.text)
 - [Batch API Documentation](https://ai.google.dev/gemini-api/docs/batch-api) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [ghost-desk](./ghost-desk.md) | developer-tools | referenced by ghost-desk (developer-tools) |
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |

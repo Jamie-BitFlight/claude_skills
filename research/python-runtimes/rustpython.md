@@ -355,3 +355,11 @@ result = compute(1000000)
 | EuroPython 2018 Talk        | <https://www.youtube.com/watch?v=YMmio0JHy_Y>                      | 2026-02-05 |
 
 **Research Method**: Information gathered from official GitHub repository README, architecture documentation, WASM documentation, Cargo.toml workspace configuration, and GitHub API for statistics. All statistics verified via direct API calls on 2026-02-05.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [jax](../ml-infrastructure/jax.md) | ml-infrastructure | referenced by jax (ml-infrastructure) |

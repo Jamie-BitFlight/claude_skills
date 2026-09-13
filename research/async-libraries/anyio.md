@@ -316,3 +316,13 @@ async def main():
 8. **AnyIO Synchronization Documentation** - <https://raw.githubusercontent.com/agronholm/anyio/master/docs/synchronization.rst> (accessed 2026-02-04)
 9. **GitHub API** - Repository statistics via api.github.com (accessed 2026-02-04)
 10. **PyPI Stats API** - <https://pypistats.org/api/packages/anyio/recent> (accessed 2026-02-04)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [robyn](../api-frameworks/robyn.md) | api-frameworks | referenced by robyn (api-frameworks) |
+| [violit](../api-frameworks/violit.md) | api-frameworks | referenced by violit (api-frameworks) |
+| [aiomqtt](./aiomqtt.md) | async-libraries | referenced by aiomqtt (async-libraries) |

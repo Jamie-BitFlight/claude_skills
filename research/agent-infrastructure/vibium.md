@@ -434,3 +434,5 @@ No official documentation explicitly lists performance limitations, browser comp
 | [claude-quickstarts.md](../developer-tools/claude-quickstarts.md) | developer-tools | reference implementation for browser automation with Claude; overlapping use case in agent workflows |
 | [retio-pagemap.md](../mcp-ecosystem/retio-pagemap.md) | mcp-ecosystem | complements browser automation: token-efficient page representation for LLM processing |
 | [gstack.md](../agent-frameworks/gstack.md) | agent-frameworks | similar element selection pattern: accessibility-based vs semantic text/label finding for agent browser QA |
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [cmux](./cmux.md) | agent-infrastructure | referenced by cmux (agent-infrastructure) |

@@ -262,3 +262,12 @@ npm run build
 4. **Google Gemini API Documentation** - <https://ai.google.dev/docs> (accessed 2026-02-15)
 5. **GitLab Merge Request API** - <https://docs.gitlab.com/ee/api/merge_requests.html> (accessed 2026-02-15)
 6. **GitLab Suggestion Blocks** - <https://docs.gitlab.com/ee/user/project/merge_requests/reviews/suggestions.html> (accessed 2026-02-15)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |

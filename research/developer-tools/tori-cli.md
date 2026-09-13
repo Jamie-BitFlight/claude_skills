@@ -395,5 +395,6 @@ tori --socket /run/tori/tori.sock
 | [AsyncSSH](../async-libraries/asyncssh.md) | async-libraries | SSH transport layer complement; tori's Unix socket + SSH tunnel model parallels asyncssh's reverse tunnel and port forwarding patterns for firewalled agent access |
 | [Orbstack](./orbstack.md) | developer-tools | Docker infrastructure alternative; tori monitors Docker deployments while orbstack optimizes Docker runtime for macOS development environments |
 | [devenv](./devenv.md) | developer-tools | Infrastructure-as-code philosophy; both provide single-binary/declarative configuration approaches to managing distributed server and development environments without external dependencies |
+| [emqutiti](./emqutiti.md) | developer-tools | referenced by emqutiti (developer-tools) |
 
 ---

@@ -478,3 +478,9 @@ Monitor for:
 | [Claude Quickstarts](../developer-tools/claude-quickstarts.md) | developer-tools | Official reference for multi-session agents and browser automation (Playwright) patterns underlying gstack's /browse and /qa infrastructure |
 | [Niteni](../developer-tools/niteni.md) | developer-tools | Automated code review with severity classification and inline suggestions, analogous to gstack's /review skill structural audit approach |
 | [Harness Engineering (OpenAI)](../evaluation-testing/harness-engineering-openai.md) | evaluation-testing | Production engineering discipline for AI agents: gstack's philosophy of role-specific cognitive modes echoes the harness approach of building scaffolding before expecting complex agent output |
+| [composure](./composure.md) | agent-frameworks | referenced by composure (agent-frameworks) |
+| [omnigent](./omnigent.md) | agent-frameworks | referenced by omnigent (agent-frameworks) |
+| [ponytail](./ponytail.md) | agent-frameworks | referenced by ponytail (agent-frameworks) |
+| [ruflo](./ruflo.md) | agent-frameworks | referenced by ruflo (agent-frameworks) |
+| [vibium](../agent-infrastructure/vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |
+| [research-mode](../ai-observability/research-mode.md) | ai-observability | referenced by research-mode (ai-observability) |

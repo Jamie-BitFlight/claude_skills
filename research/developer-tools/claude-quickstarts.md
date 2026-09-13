@@ -261,3 +261,15 @@ npm run dev:chat      # chat-only variant
 | GitHub API (contributors)  | `gh api repos/anthropics/claude-quickstarts/contributors?per_page=1&anon=true`  | 2026-02-19 |
 
 **Research Method**: GitHub API for repository metadata, language breakdown, and contributor count (Link header pagination). README and sub-project READMEs decoded from base64 GitHub contents API. CLAUDE.md read for development patterns.
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [vibium](../agent-infrastructure/vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |
+| [anything_about_game_ai_resources](./anything_about_game_ai_resources.md) | developer-tools | referenced by anything_about_game_ai_resources (developer-tools) |
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |
+| [scrapling-skill](./scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

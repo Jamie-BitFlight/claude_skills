@@ -227,3 +227,14 @@ Design these tasks so their output PRs are reviewable in under one minute and el
 - [Beyond rate limits: scaling access to Codex and Sora](https://openai.com/index/scaling-codex-and-sora/) (related article, accessed 2026-02-21)
 - [Inside OpenAI's in-house data agent](https://openai.com/index/in-house-data-agent/) (related article, accessed 2026-02-21)
 - [AGENTS.md -- Codex documentation on repository context files](https://platform.openai.com/docs/codex/agents-md) (referenced in article, accessed 2026-02-21)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [merly-mentor](../ai-research-tools/merly-mentor.md) | ai-research-tools | referenced by merly-mentor (ai-research-tools) |
+| [meta-harness](../ai-research-tools/meta-harness.md) | ai-research-tools | referenced by meta-harness (ai-research-tools) |
+| [agent-skills-eval](./agent-skills-eval.md) | evaluation-testing | referenced by agent-skills-eval (evaluation-testing) |

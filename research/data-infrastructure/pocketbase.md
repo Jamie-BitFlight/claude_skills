@@ -310,3 +310,6 @@ PocketBase is highly relevant for Claude Code workflows that need to:
 | [Modelence](../api-frameworks/modelence.md) | api-frameworks | AI-native TypeScript backend with MongoDB; MongoDB alternative to PocketBase for schema-less data, contrasts embedded SQLite with cloud database models |
 | [Tornado](../api-frameworks/tornado.md) | api-frameworks | WebSocket and long-polling support; shares async networking approach for realtime subscriptions beyond SSE |
 | [Local Memory](../context-management/local-memory.md) | context-management | Persistent agent memory infrastructure; uses SQLite + Qdrant similar to PocketBase's embedded-database-first philosophy for stateful agents |
+| [honker](./honker.md) | data-infrastructure | referenced by honker (data-infrastructure) |
+| [pandera](./pandera.md) | data-infrastructure | referenced by pandera (data-infrastructure) |
+| [tabularis](../developer-tools/tabularis.md) | developer-tools | referenced by tabularis (developer-tools) |

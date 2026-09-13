@@ -210,3 +210,12 @@ results = response.json()  # list of {title, content, url}
 - [Apache-2.0 License](https://github.com/jina-ai/reader/blob/main/LICENSE) (accessed 2026-02-23)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [rtk](./rtk.md) | developer-tools | referenced by rtk (developer-tools) |
+| [scrapling-skill](./scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |

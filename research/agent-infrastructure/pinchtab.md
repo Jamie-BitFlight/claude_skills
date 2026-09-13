@@ -265,3 +265,15 @@ Note: 3-second wait is required after navigation — Chrome's accessibility tree
 - [v0.7.6 Release Notes](https://github.com/pinchtab/pinchtab/releases/tag/v0.7.6) (accessed 2026-03-01)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [browser-harness-js](../agent-frameworks/browser-harness-js.md) | agent-frameworks | referenced by browser-harness-js (agent-frameworks) |
+| [gstack](../agent-frameworks/gstack.md) | agent-frameworks | referenced by gstack (agent-frameworks) |
+| [cua](./cua.md) | agent-infrastructure | referenced by cua (agent-infrastructure) |
+| [happycapy](./happycapy.md) | agent-infrastructure | referenced by happycapy (agent-infrastructure) |
+| [vibium](./vibium.md) | agent-infrastructure | referenced by vibium (agent-infrastructure) |

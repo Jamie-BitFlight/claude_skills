@@ -283,6 +283,8 @@ This library is particularly relevant for AI-assisted development in several con
 | [Pixel Agents](./pixel-agents.md) | developer-tools | Both use Canvas 2D API for measurement and rendering; shared performance optimization pattern of caching measurements to avoid repeated browser API calls |
 | [Anime.js](./animejs.md) | developer-tools | Complementary library for animating text properties (color, opacity) calculated via Pretext's layout; both prioritize performance through cached state and minimal DOM access |
 | [LVGL](../embedded-ui-libraries/lvgl.md) | embedded-ui-libraries | Text rendering and font metrics management for embedded displays; overlapping font measurement challenge (emoji width correction, multi-language support, layout performance) solved differently per platform |
+| [boneyard](./boneyard.md) | developer-tools | referenced by boneyard (developer-tools) |
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |
 
 ## Freshness Tracking
 

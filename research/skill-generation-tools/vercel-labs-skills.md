@@ -275,3 +275,11 @@ Describe the scenarios where this skill should be used.
 - [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills) (accessed 2026-02-20)
 - [Vercel Agent Skills Repository](https://github.com/vercel-labs/agent-skills) (accessed 2026-02-20)
 - [npm Package](https://www.npmjs.com/package/skills) (accessed 2026-02-20)
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [composio-codebase-migrate](./composio-codebase-migrate.md) | skill-generation-tools | referenced by composio-codebase-migrate (skill-generation-tools) |

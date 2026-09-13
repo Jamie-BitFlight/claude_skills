@@ -219,3 +219,11 @@ console.log(photo.webPath);
 - [ionic-team/capacitor GitHub Repository](https://github.com/ionic-team/capacitor) (accessed 2026-03-05)
 
 ---
+
+---
+
+## Cross-References
+
+| Entry | Category | Relationship |
+|-------|----------|--------------|
+| [pyscript](./pyscript.md) | developer-tools | referenced by pyscript (developer-tools) |
