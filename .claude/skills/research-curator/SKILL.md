@@ -369,10 +369,10 @@ Validation complete:
 
 ## Post-Actions
 
-Shared by all modes. Execute after any mode completes successfully. Step 4 (Commit)
-derives exactly which files this run touched by diffing the current working tree against the
-pre-mode baseline captured in [Mode Routing](#mode-routing) -- no file path needs manual
-tracking through the steps below.
+Shared by all modes. Execute after any mode completes successfully. Step 3 derives exactly
+which files this run touched by diffing the current working tree against the pre-mode baseline
+captured in [Mode Routing](#mode-routing) -- no file path needs manual tracking through the steps
+below.
 
 1. **README Update** -- add or update entries in `./research/README.md` category tables. This is
    a shared restatement of the mode-specific README step each mode's own flow already gates
@@ -396,38 +396,45 @@ tracking through the steps below.
    Otherwise, a non-zero exit here reports asymmetric edges the script cannot structurally repair
    (a dangling link to a missing target, or a manually authored row with a different description
    it refuses to overwrite) -- continue to step 3 regardless of this exit code. Which files, if
-   any, this command actually modified is determined by step 4's diff, not by this step -- do not
+   any, this command actually modified is determined by step 3's diff, not by this step -- do not
    parse the printed `{source} -> {target}` lines to guess at modified files, since they list every
    asymmetric edge found *before* repair is attempted, not which repairs succeeded.
 
-3. **Lint** -- run formatting checks on every file this run touched (the same diff step 4 uses):
+3. **Compute the filtered file list** -- diff the current working tree against the pre-mode
+   baseline (see [Mode Routing](#mode-routing)) to get every file under `./research/` this run
+   touched:
 
    ```bash
    git diff --name-only -- ./research/
    git ls-files --others --exclude-standard -- ./research/
-   uv run prek run --files ./research/README.md [files from the two commands above]
    ```
 
-4. **Commit** -- diff the current working tree against the pre-mode baseline (see
-   [Mode Routing](#mode-routing)) to get the exact list of files under `./research/` this run
-   touched: modified paths from `git diff --name-only -- ./research/`, plus new paths from
-   `git ls-files --others --exclude-standard -- ./research/`. Exclude any path that was **already**
-   dirty in the baseline -- that is another contributor's pre-existing uncommitted work, not
-   something this run produced -- and report it to the user as `{path} -- pre-existing uncommitted
-   changes, not committed this run` instead of staging it.
+   Exclude any path that was **already** dirty in the baseline -- that is another contributor's
+   pre-existing uncommitted work, not something this run produced -- and report it to the user as
+   `{path} -- pre-existing uncommitted changes, not touched this run`. Call what remains **the
+   filtered list**; steps 4 and 5 below use it and nothing else, so a pre-existing dirty file is
+   never linted, staged, or committed by this run.
 
-   If the resulting list is empty (nothing was created, refreshed, or repaired this run -- e.g. a
-   clean Validate Mode pass where the backlink repair also found nothing writable to fix), skip
-   this step and step 5: there is nothing to commit, and this is not a failure. Otherwise, stage
-   and commit exactly that list -- never a blanket `git add -A` or a directory-wide
-   `git add ./research/`:
+4. **Lint** -- run formatting checks on exactly the filtered list:
 
    ```bash
-   git add ./research/README.md ./research/{category}/{name}.md [...files from the diff above]
-   git commit -m "docs(research): [action] [resource names]"
+   uv run prek run --files [the filtered list]
    ```
 
-5. **Push** -- push to current branch:
+5. **Commit** -- if the filtered list is empty (nothing was created, refreshed, or repaired this
+   run -- e.g. a clean Validate Mode pass where the backlink repair also found nothing writable to
+   fix), skip this step and step 6: there is nothing to commit, and this is not a failure.
+   Otherwise, stage and commit **exactly** the filtered list, immune to whatever else might already
+   be staged in the working tree -- never a blanket `git add -A`, a directory-wide
+   `git add ./research/`, or a pathless `git commit -m` (which commits the entire index, not just
+   these paths):
+
+   ```bash
+   git add [the filtered list]
+   git commit [the filtered list] -m "docs(research): [action] [resource names]"
+   ```
+
+6. **Push** -- push to current branch:
 
    ```bash
    git push -u origin HEAD
