@@ -66,9 +66,6 @@ _VIOLATION_SAMPLE_LIMIT = 5
 def _discover_default_files(plugin_dir: Path, subdir: str, shape: str) -> set[str]:
     """Return the set of relative paths that auto-discovery would register.
 
-    Each path is in the same canonical form that ``auto_sync_manifests.py``
-    emits.
-
     Args:
         plugin_dir: Plugin root directory.
         subdir: Default auto-discovery subdirectory name.

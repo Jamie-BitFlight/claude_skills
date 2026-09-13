@@ -30,6 +30,3 @@ after the read-back assertion, before any other real invocation of `plan list`/`
 tooling can observe it. Always verify cleanup by re-listing the target path/branch's tree
 afterward (`gh api repos/.../git/trees/<branch>?recursive=true`) rather than assuming the
 delete call succeeded.
-
-See also [[project_auto_sync_manifests]] for other auto_sync_manifests-adjacent live-repo
-gotchas; unrelated system but same "live repo is not a sandbox" lesson.

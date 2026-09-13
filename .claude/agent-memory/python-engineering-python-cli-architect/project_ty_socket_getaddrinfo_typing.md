@@ -34,8 +34,7 @@ a wrong answer for `getaddrinfo` specifically.
 precision), do not trust a grep of the vendored typeshed cache or of memory/training data for
 the "declared" type. Confirm the actual type `ty` will check against by running a throwaway
 `reveal_type(socket.getaddrinfo)` through `ty check` (or the analogous pattern for other
-functions) — see [[project_auto_sync_manifests]] for the sibling pattern of verifying seam
-contracts against real tool output rather than assumed shapes.
+functions).
 
 **Where this recurs**: `plugins/development-harness/conftest.py`'s `_guarded_getaddrinfo`
 was fixed to this exact type. `plugins/frustration-analyzer/tests/conftest.py` has an

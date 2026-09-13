@@ -4,7 +4,7 @@ Every script has a shebang and executable permission (enforced by pre-commit).
 
 Run scripts directly, not as library modules and not via bare `python3`:
 
-1. `./plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile --dry-run`
+1. `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py`
 2. If direct execution fails, `uv run plugins/plugin-creator/scripts/check_agent_auto_discovery.py`
 
 Never `python3 script.py` — it skips PEP 723 dependency resolution and may use the wrong

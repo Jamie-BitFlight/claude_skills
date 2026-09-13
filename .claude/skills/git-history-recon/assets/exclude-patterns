@@ -18,9 +18,9 @@
 #     | grep -v '^$' | wc -l
 
 # Claude Code plugin manifest — plugins/*/.claude-plugin/plugin.json is
-# rewritten by this repo's `manifest-sync` pre-commit hook
-# (plugins/plugin-creator/scripts/auto_sync_manifests.py, function
-# `_plugin_manifest_paths`) on every commit that touches any component inside
+# rewritten by this repo's agent-marketplace-versioner pre-commit hook
+# (https://github.com/Jamie-BitFlight/agent-marketplace-versioner) on
+# every commit that touches any component inside
 # that plugin, bumping the version field regardless of whether the commit
 # fixed a defect. Confirmed via git log: plugins/development-harness's
 # plugin.json is consistently among the top hotspot file-change counts in a
@@ -28,18 +28,18 @@
 # hand-edited plugin.json content — reproduce with the command above.
 **/.claude-plugin/plugin.json
 
-# Codex/Cursor plugin manifest variants — auto_sync_manifests.py's
-# `_plugin_manifest_paths` globs `.*-plugin/plugin.json` under each plugin
-# root, so `.codex-plugin/plugin.json` and `.cursor-plugin/plugin.json` are
+# Codex/Cursor plugin manifest variants — the versioner bumps every
+# `.*-plugin/plugin.json` under a plugin root, so `.codex-plugin/plugin.json`
+# and `.cursor-plugin/plugin.json` are
 # bumped in lockstep with `.claude-plugin/plugin.json` by the same hook, for
 # the same mechanical reason.
 **/.codex-plugin/plugin.json
 **/.cursor-plugin/plugin.json
 
-# Marketplace manifest — auto_sync_manifests.py bumps
-# .claude-plugin/marketplace.json's metadata.version on unrelated commits
-# (dedicated "chore: bump marketplace version [skip ci]" commits), and
-# bump-marketplace.yml does the same on every push to main. Confirmed via git
+# Marketplace manifest — bump-marketplace.yml bumps
+# .claude-plugin/marketplace.json's metadata.version after plugin changes
+# merge to main, through a repair pull request that lands as its own
+# version-bump commit. Confirmed via git
 # log as one of the single largest hotspot file-change counts in a 1-year
 # window, with sampled commit messages showing pure version bumps rather
 # than content changes — reproduce with the command above.

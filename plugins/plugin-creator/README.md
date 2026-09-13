@@ -443,8 +443,9 @@ Routing summary:
 | `fix_tool_formats.py` | Fix invalid tool field formats across the codebase | `./plugins/plugin-creator/scripts/fix_tool_formats.py` |
 | `normalize_frontmatter.py` | Strip unnecessary YAML quotes from all frontmatter | `./plugins/plugin-creator/scripts/normalize_frontmatter.py` |
 | `check_agent_auto_discovery.py` | Detect `plugin.json` arrays that silently mask auto-discovered components | `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py` |
-| `auto_sync_manifests.py` | Legacy compatibility script | Not the active pre-commit hook; see [Marketplace versioning](../../docs/marketplace-versioning.md) |
 | `validate-task-file.sh` | Validate refactoring task file format | `./plugins/plugin-creator/scripts/validate-task-file.sh <path>` |
+
+Plugin and marketplace manifest versions are managed by [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action.
 
 See [scripts/README.md](./scripts/README.md) for full documentation of each script.
 

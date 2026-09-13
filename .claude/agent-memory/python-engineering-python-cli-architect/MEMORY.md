@@ -1,6 +1,5 @@
 # Memory Index
 
-- [project_auto_sync_manifests.md](./project_auto_sync_manifests.md) — auto_sync_manifests.py base-ref refactor patterns and seam contracts
 - [project_ty_socket_getaddrinfo_typing.md](./project_ty_socket_getaddrinfo_typing.md) — ty's real socket.getaddrinfo return type is Literal-keyed, not the flat typeshed-cache shape; verify with reveal_type
 - [feedback_cli_output_not_logging.md](./feedback_cli_output_not_logging.md) — primary CLI output goes through typer.echo()/print(), never logging; logging is for debug/forensic traces only
 - [project_typer_echo_dynamic_stream.md](./project_typer_echo_dynamic_stream.md) — typer.echo()/rich Console resolve sys.stdout dynamically per call (CliRunner-safe); a bound logging.StreamHandler does not
@@ -26,5 +25,4 @@
 - [project_github_sync_provider_replay_preserves_revision_pre_existing_fail.md](./project_github_sync_provider_replay_preserves_revision_pre_existing_fail.md) — same pre-existing test failure as backlog #2922, surfaced again during PR #2934 validation
 - [project_read_tool_stale_cache_multiagent_worktree.md](./project_read_tool_stale_cache_multiagent_worktree.md) — Read tool returned a stale pre-session file version in a shared multi-agent worktree; wc -l/python3 read showed current disk state when Read did not
 - [project_two_distinct_memory_md_conventions.md](./project_two_distinct_memory_md_conventions.md) — AGENTS.md's "do NOT use MEMORY.md" rule targets the deprecated project-root backlog convention, not this sanctioned .claude/agent-memory/{agent}/MEMORY.md index
-- [project_manifest_sync_ci_staged_diff_noop.md](./project_manifest_sync_ci_staged_diff_noop.md) — manifest-sync CI ran a staged-git-diff check on a plain checkout (always empty, always passed); fixed via check_plugin_version_bump.py base-ref diff + git-show-needs-relative-path gotcha
 - [project_pr_merged_underneath_push_race.md](./project_pr_merged_underneath_push_race.md) — a PR can get squash-merged mid-session; `gh pr checks` after your push may show stale pre-merge results — verify state/mergedAt before trusting it, cherry-pick onto a fresh main-based branch if it happened

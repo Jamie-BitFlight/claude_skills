@@ -106,9 +106,10 @@ flowchart TD
 |--------|---------|
 | `create_plugin.py` | Interactive plugin scaffolding — creates `.claude-plugin/`, `plugin.json` |
 | `plugin_validator.py` | Removed — replaced by `uvx skilllint@latest check` |
-| `auto_sync_manifests.py` | Legacy compatibility script; the shared `agent-marketplace-versioner` hook owns active synchronization |
 | `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |
+
+Manifest sync and plugin version bumps come from [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action, not a script in this plugin.
 
 ---
 

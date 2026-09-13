@@ -35,6 +35,3 @@ Codex PR review comment's suggested fix (`uv run backlog sync` → `uv run sam b
 correctly identified the missing `backlog` script but its own replacement was still cwd-dependent
 and would have failed identically in the CLI's actual real-world invocation context. Always
 falsification-test a review-suggested fix against the real invocation context before trusting it.
-
-See also [[project_auto_sync_manifests]] for other PEP 723 self-resolving script gotchas in this
-plugin.
