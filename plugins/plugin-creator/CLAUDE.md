@@ -68,6 +68,7 @@ flowchart TD
 | `/agent-creator` | Yes | Create agents from scratch or templates; handles scope (project/user/plugin) |
 | `/skill-creator` | Yes | Create skills from scratch or templates; handles scope and validation |
 | `/skill-goal-extractor` | Yes | Extract a skill's small set of explicit goals by reading it in full — for characterizing a skill's purpose before refactoring or reviewing it |
+| `/write-frontmatter-description` | Yes | Write or tighten a skill or agent `description` — the context pointer that decides whether the component loads; branch counting, third person, single-line YAML, model-invoked vs user-invoked |
 | `/skill-sync` | Yes | Sync skill content against upstream documentation — update STALE SOURCE: URLs, add NEW upstream claims, enforce progressive-disclosure structure via /refactor-skill |
 | `/output-style-creator` | Yes | Create, validate, and ship Claude Code output styles — mechanism selection, frontmatter, scope placement, plugin packaging, activation and testing |
 | `/claude-skills-overview-2026` | Yes | Complete reference for Claude Code skills system (January 2026) |
