@@ -293,44 +293,6 @@ def _check_access_dates(lines: list[str], sections: dict[str, tuple[int, int]]) 
     return issues
 
 
-def _check_formatting_suggestions(lines: list[str]) -> list[Issue]:
-    """Check for minor markdown formatting issues (MD031: blank lines around fences).
-
-    Returns:
-        List of Issue dicts with severity 'info' for each formatting issue found.
-    """
-    issues: list[Issue] = []
-    in_fence = False
-
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("```"):
-            if not in_fence:
-                in_fence = True
-                if i > 0:
-                    prev = lines[i - 1].strip()
-                    if prev and not prev.startswith("#") and prev != "---":
-                        issues.append({
-                            "check": "formatting_suggestions",
-                            "severity": "info",
-                            "message": f"Missing blank line before code fence on line {i + 1}",
-                            "line": i + 1,
-                        })
-            else:
-                in_fence = False
-                if i + 1 < len(lines):
-                    next_line = lines[i + 1].strip()
-                    if next_line and not next_line.startswith("#") and next_line != "---":
-                        issues.append({
-                            "check": "formatting_suggestions",
-                            "severity": "info",
-                            "message": f"Missing blank line after code fence on line {i + 1}",
-                            "line": i + 1,
-                        })
-
-    return issues
-
-
 def _check_url_format(lines: list[str]) -> list[Issue]:
     """Check for malformed URLs throughout the document.
 
@@ -705,7 +667,6 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_access_dates(body_lines, sections))
         all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
         all_issues.extend(_check_url_format(body_lines))
-        all_issues.extend(_check_formatting_suggestions(body_lines))
         all_issues.extend(check_cross_references(sections, reference_date_yaml(frontmatter, body_lines, sections)))
     else:
         header_lines, _ = _get_header_block(lines)
@@ -719,7 +680,6 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_access_dates(lines, sections))
         all_issues.extend(_check_freshness_tracking_text(lines, sections))
         all_issues.extend(_check_url_format(lines))
-        all_issues.extend(_check_formatting_suggestions(lines))
         all_issues.extend(check_cross_references(sections, reference_date_text(header_lines, lines, sections)))
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
@@ -878,13 +838,17 @@ def _print_text_report(entries: list[dict[str, Any]], total_errors: int, total_w
     else:
         print(f"  {total_warnings} warnings")
     if verbose:
-        print()
         for entry in entries:
+            if not entry["issues"]:
+                continue
+            print()
             marker = "✓" if entry["status"] == "pass" else "✗"
             print(f"{marker} {entry['file']} [{entry['format']}]")
             for issue in entry["issues"]:
                 severity_label = issue["severity"].upper()
-                print(f"  {severity_label}: {issue['message']}")
+                line = issue.get("line")
+                locator = f"{entry['file']}:{line}" if line else entry["file"]
+                print(f"  {severity_label} {locator} [{issue['check']}] {issue['message']}")
 
 
 @app.command()
@@ -915,17 +879,10 @@ def main(
     passed = sum(1 for e in entries if e["status"] == "pass")
     total_errors = sum(1 for e in entries for i in e["issues"] if i["severity"] == "error")
     total_warnings = sum(1 for e in entries for i in e["issues"] if i["severity"] == "warning")
-    total_info = sum(1 for e in entries for i in e["issues"] if i["severity"] == "info")
 
     if output_json:
         result = {
-            "summary": {
-                "total": total,
-                "passed": passed,
-                "errors": total_errors,
-                "warnings": total_warnings,
-                "info": total_info,
-            },
+            "summary": {"total": total, "passed": passed, "errors": total_errors, "warnings": total_warnings},
             "entries": entries,
         }
         print(json.dumps(result, indent=2))

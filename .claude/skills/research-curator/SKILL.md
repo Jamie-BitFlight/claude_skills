@@ -353,7 +353,11 @@ in [Mode Routing](#mode-routing).
    4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
       structural non-zero exit (a dangling link to a missing target) and a
       `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
-      e.g. a Cross-References row with no markdown link). Do not parse the printed
+      e.g. a Cross-References row with no markdown link). A `warning: scan-skipped, ...` line
+      belongs here too: that file was dropped from the graph before it could be compared, so the
+      printed `asymmetric_cross_references: N` undercounts by whatever it holds. Report each
+      scan-skipped path and its reason verbatim -- the file is repairable and nothing else in the
+      repo will name it -- then continue. Do not parse the printed
       `{source} -> {target}` lines to guess which files were modified -- they list every asymmetric
       edge found *before* repair was attempted, not which repairs succeeded. Step 3's diff
       determines what this command actually changed.

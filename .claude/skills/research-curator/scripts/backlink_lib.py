@@ -17,7 +17,7 @@ import marko.inline
 
 if TYPE_CHECKING:
     import pathlib
-
+import sys
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -548,18 +548,24 @@ def build_cross_reference_graph(vault_root: pathlib.Path) -> dict[pathlib.Path, 
 
         try:
             text = md_file.read_text(encoding="utf-8")
-        except OSError:
+        except OSError as exc:
+            print(f"warning: scan-skipped, could not read {abs_file}: {exc}", file=sys.stderr)
             continue
 
         try:
             rows = parse_cross_references_table(text)
-        except ValueError:
+        except ValueError as exc:
+            print(f"warning: scan-skipped, could not parse {abs_file}: {exc}", file=sys.stderr)
             continue
 
         for row_item in rows:
             try:
                 target = resolve_link_path(abs_file, row_item.link_path)
-            except (OSError, ValueError):
+            except (OSError, ValueError) as exc:
+                print(
+                    f"warning: scan-skipped, could not resolve {row_item.link_path!r} in {abs_file}: {exc}",
+                    file=sys.stderr,
+                )
                 continue
             if target.exists():
                 graph[abs_file].append(target)
