@@ -73,7 +73,7 @@ For debugging, investigation, problem solving, unknowns, or repeated errors: use
 |-------|---------|---------|
 | Starting complex task | `/dh:rt-ica <#N \| goal>` | Works backward from the goal through the prerequisite chain, classifying each as available/derivable/missing, and blocks planning until nothing is missing |
 | Delegating to sub-agent | `/agent-orchestration:delegate` | Decompose, dispatch, adjudicate |
-| Reviewing agent output | `/hallucination-detector:hallucination-audit` | Checks hallucinations, unverified causality |
+| Writing or reviewing an agent-facing document | `/mattpocock-skills:writing-for-agents` | Skills, `AGENTS.md`, `CLAUDE.md`, rule files, research entries — pointer wording, information hierarchy, pruning |
 | Claiming task complete | `/dh:verify-done` | Runs "Is It Done?" checklist |
 | Writing or improving a process | `/process-siren:improve-processes` | Evaluates process completeness, improves before Mermaid conversion |
 

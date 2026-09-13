@@ -247,13 +247,11 @@ flowchart TB
         S1["scientific-thinking<br/>Hypothesis framework"]
         S2["rt-ica<br/>Prerequisites check"]
         S3["verify<br/>Conclusion verification"]
-        S4["audit<br/>Check for hallucinations"]
     end
 
     subgraph COMMANDS["Commands"]
         C1["/think<br/>Step-back reasoning"]
         C2["/scientific-thinking<br/>Activate method"]
-        C3["/audit<br/>Verify claims"]
     end
 
     subgraph AGENTS["Agents"]
@@ -295,7 +293,6 @@ sequenceDiagram
     Note over O: VERIFICATION
     O->>SK: Load /dh:verify-done skill
     SK-->>O: Checklist
-    O->>SK: Load audit skill
     O->>O: Chain-of-Verification
 
     Note over O: CONCLUSION
