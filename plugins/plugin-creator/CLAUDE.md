@@ -106,7 +106,6 @@ flowchart TD
 |--------|---------|
 | `create_plugin.py` | Interactive plugin scaffolding — creates `.claude-plugin/`, `plugin.json` |
 | `plugin_validator.py` | Removed — replaced by `uvx skilllint@latest check` |
-| `auto_sync_manifests.py` | Legacy compatibility script; the shared `agent-marketplace-versioner` hook owns active synchronization |
 | `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |
 

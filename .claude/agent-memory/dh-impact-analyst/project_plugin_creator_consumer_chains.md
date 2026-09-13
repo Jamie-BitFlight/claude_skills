@@ -14,8 +14,6 @@ Plugin-creator agents are referenced from 3+ plugins simultaneously. When assess
 
 4. **Routing note copy-paste** — the phrase "Routing within `contextual-ai-documentation-optimizer`:" appears verbatim in 15+ files across plugin-creator, the-rewrite-room, and development-harness; any agent rename creates simultaneous stale-instruction risk across all of them
 
-5. **auto_sync_manifests.py** — pre-commit hook auto-bumps plugin.json and marketplace.json on agent CRUD; agent deletion = MAJOR semver bump; `test_auto_sync_manifests.py` may assert on component counts
-
 **Why:** Discovered during impact analysis of #1899 (contextual-ai-documentation-optimizer split). 104 references found via `what_breaks` tool.
 
 **How to apply:** When analyzing any plugin-creator agent change, run `mcp__git-xray__what_breaks` on the agent file, then manually check the-rewrite-room and development-harness plugins as guaranteed consumers.

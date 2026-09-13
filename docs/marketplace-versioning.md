@@ -36,10 +36,7 @@ trigger the required downstream workflows. See the
 The workflow token itself retains only Contents read permission; the repair credential does
 not bypass branch protection, approve, or merge the PR.
 
-## Existing plugin tools
+## Changing versioning behavior
 
-The documented `plugins/plugin-creator/scripts/auto_sync_manifests.py` and
-`check_plugin_version_bump.py` remain available for existing plugin users and their tests.
-They are compatibility tools, no longer this repository's hook or CI implementation.
-New infrastructure consumers should install the shared distribution. Keep fixes to shared
-versioning behavior in that project rather than adding a consumer adapter here.
+Fix shared versioning behavior in the agent-marketplace-versioner project, then move the pin.
+This repository carries no consumer adapter.

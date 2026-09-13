@@ -4,49 +4,6 @@ Utility scripts for maintaining Claude Code plugins, skills, agents, and command
 
 ---
 
-## auto_sync_manifests.py
-
-Legacy compatibility script for existing plugin users. It is not this repository's pre-commit hook or CI implementation; those use the shared `agent-marketplace-versioner` distribution. See [Marketplace versioning](../../../docs/marketplace-versioning.md) for the active workflow.
-
-### What it does when explicitly invoked
-
-Detects CRUD operations on plugin components (skills, agents, commands) from staged git changes, then:
-
-1. Updates `plugin.json` component arrays with `./`-prefixed paths
-2. Bumps the plugin semantic version:
-   - **Major** (`X.0.0`): a component was deleted
-   - **Minor** (`0.X.0`): a component was added
-   - **Patch** (`0.0.X`): a component was modified
-3. Updates `marketplace.json` with the new version
-4. Stages the modified manifests automatically
-
-Double-bump protection prevents version inflation when a commit fails and is retried.
-
-### Usage
-
-```bash
-# Full reconcile: fix drift between filesystem and manifests
-./plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile
-
-# Preview what would change without writing
-./plugins/plugin-creator/scripts/auto_sync_manifests.py --reconcile --dry-run
-
-# Post-merge CI mode: reconcile marketplace.json and bump version
-./plugins/plugin-creator/scripts/auto_sync_manifests.py --sync-marketplace
-```
-
-### Arguments
-
-| Flag | Description |
-|---|---|
-| `--reconcile` | Full directory scan to fix drift between filesystem and manifests |
-| `--dry-run` | Report drift without modifying files (requires `--reconcile`) |
-| `--sync-marketplace` | Post-merge mode: reconcile marketplace.json and bump version (for CI use) |
-
-For full documentation including edge cases and troubleshooting, see [README-auto-sync.md](./README-auto-sync.md).
-
----
-
 ## check_agent_auto_discovery.py
 
 Regression guard that detects `plugin.json` files where explicit component arrays silently mask auto-discovered agents, skills, or commands.

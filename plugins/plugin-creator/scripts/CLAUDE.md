@@ -6,19 +6,6 @@ This directory contains executable scripts for plugin development, validation, a
 
 ## Scripts Overview
 
-### auto_sync_manifests.py (legacy compatibility)
-
-This retained compatibility script is not the repository's active pre-commit hook. The shared `agent-marketplace-versioner` hook synchronizes plugin manifests and versions; marketplace version repair is deferred to the post-merge PR flow.
-
-**Complete documentation:** [README-auto-sync.md](./README-auto-sync.md)
-
-**Key behaviors:**
-
-- Returns exit code 0 (silent success, no commit interruption)
-- Auto-stages modified manifest files
-- Protects against double-bumping when commit fails and is retried
-- Only operates on staged changes (`git diff --cached`)
-
 ### skilllint
 
 Comprehensive validation tool for Claude Code plugins with token-based complexity measurement.
@@ -140,12 +127,6 @@ When running manually:
 ## Model Usage Guidelines
 
 ### When to Use These Scripts
-
-**Use auto-sync-manifests behavior as reference when:**
-
-- Documenting pre-commit hook behavior
-- Explaining version bumping rules
-- Troubleshooting manifest inconsistencies
 
 **Use validation scripts when:**
 
