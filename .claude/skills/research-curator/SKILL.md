@@ -403,21 +403,27 @@ below.
      uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
    ```
 
-   If stdout does **not** contain an `asymmetric_cross_references: N` line, the command failed
-   before completing its scan -- a `uv` dependency-resolution failure, a Python import error, a
-   `run_bounded.py` timeout (exit code 124), or any other crash -- rather than reporting a normal
-   structural result. Halt Post-Actions and report the failure to the user; do not treat this as
-   an acceptable non-zero exit.
+   Check the result in this order:
 
-   If stdout does contain that line: a stderr `warning: could not repair ...` line means an
-   operational I/O failure (permissions, disk space, an invalid path) reading or writing a target,
-   not a structural limitation -- halt Post-Actions and report the exact warning text. Otherwise, a
-   non-zero exit here reports asymmetric edges the script cannot structurally repair (a dangling
-   link to a missing target, or a manually authored row with a different description it refuses to
-   overwrite) -- continue to step 3 regardless of this exit code. Which files, if any, this command
-   actually modified is determined by step 3's diff, not by this step -- do not parse the printed
-   `{source} -> {target}` lines to guess at modified files, since they list every asymmetric edge
-   found *before* repair is attempted, not which repairs succeeded.
+   1. **Exit code 124** (`run_bounded.py`'s timeout signal): halt Post-Actions and report a
+      timeout, unconditionally -- even if `asymmetric_cross_references: N` already printed before
+      the timeout fired (e.g. during a repair write or the post-repair rescan), a terminated run's
+      partial state is not trustworthy to commit.
+   2. **Stdout does not contain an `asymmetric_cross_references: N` line**: the command failed
+      before completing its scan -- a `uv` dependency-resolution failure, a Python import error, or
+      any other crash -- rather than reporting a normal structural result. Halt Post-Actions and
+      report the failure to the user.
+   3. **Stderr contains a `warning: io-error, could not repair ...` line**: a genuine I/O failure
+      (permissions, disk space, an invalid path) reading or writing a target. Halt Post-Actions and
+      report the exact warning text.
+   4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
+      structural non-zero exit (a dangling link to a missing target) and a
+      `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
+      e.g. a Cross-References row with no markdown link -- confirmed against the real vault's one
+      persistent unrepairable edge). Which files, if any, this command actually modified is
+      determined by step 3's diff, not by this step -- do not parse the printed
+      `{source} -> {target}` lines to guess at modified files, since they list every asymmetric
+      edge found *before* repair is attempted, not which repairs succeeded.
 
    **Known limitation**: this command has no per-file exclude option, so it can write into a
    backlink-target file that was already dirty in the pre-mode baseline before step 3 ever
