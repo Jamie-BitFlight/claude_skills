@@ -434,6 +434,53 @@ def reference_date_yaml(
     return None
 
 
+RELEVANCE_SECTION = "Relevance to Claude Code Development"
+
+# Anchor evidence: a backticked repo-relative path under one of the roots the Phase 1c Repo Anchor
+# Pass searches, or a ``git grep`` command string. extraction-methodology.md's Phase 1c writes every
+# Relevance item from one or the other, so a section carrying neither did not run the pass.
+RELEVANCE_ANCHOR_PATTERN = re.compile(r"`(?:plugins/|\.claude/|rules/|docs/|AGENTS\.md)[^`\n]*`|git\s+grep")
+
+
+def check_relevance_anchored(lines: list[str], sections: dict[str, tuple[int, int]]) -> list[Issue]:
+    """Check that the Relevance section cites a repo path or a search command.
+
+    Phase 1c of references/extraction-methodology.md writes every Relevance item from an anchor:
+    a repo-relative path with a quoted line read from it, or the search command that returned
+    nothing. A section carrying neither is prose no reader can check against this repository, and
+    is the signature of a skipped anchor pass.
+
+    This detects the skip only. Whether the anchors are any good -- the quoted line contains the
+    search term, the paths are distinct, the quote is not a frontmatter field -- is Gate 4 and
+    Gate 5 of references/entry-review-rubric.md, which no regex can judge.
+
+    Args:
+        lines: Body lines of the entry.
+        sections: Section heading -> (start_line, end_line) mapping from ``_parse_sections``.
+
+    Returns:
+        A single-item list with the ``relevance_unanchored`` issue, or an empty list.
+    """
+    section = sections.get(RELEVANCE_SECTION)
+    if section is None:
+        # section_completeness already reports the section as missing; do not double-report.
+        return []
+    start, end = section
+    if RELEVANCE_ANCHOR_PATTERN.search("\n".join(lines[start - 1 : end])):
+        return []
+    return [
+        {
+            "check": "relevance_unanchored",
+            "severity": "warning",
+            "message": (
+                f"{RELEVANCE_SECTION} cites no repo-relative path and no search command "
+                "-- run the Phase 1c Repo Anchor Pass (references/extraction-methodology.md)"
+            ),
+            "line": start,
+        }
+    ]
+
+
 def check_cross_references(sections: dict[str, tuple[int, int]], reference_date: str | None) -> list[Issue]:
     """Check for a ``## Cross-References`` section, exempting older entries.
 
@@ -707,6 +754,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_url_format(body_lines))
         all_issues.extend(_check_formatting_suggestions(body_lines))
         all_issues.extend(check_cross_references(sections, reference_date_yaml(frontmatter, body_lines, sections)))
+        all_issues.extend(check_relevance_anchored(body_lines, sections))
     else:
         header_lines, _ = _get_header_block(lines)
         sections = _parse_sections(lines)
@@ -721,6 +769,7 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
         all_issues.extend(_check_url_format(lines))
         all_issues.extend(_check_formatting_suggestions(lines))
         all_issues.extend(check_cross_references(sections, reference_date_text(header_lines, lines, sections)))
+        all_issues.extend(check_relevance_anchored(lines, sections))
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
     status = "fail" if has_errors else "pass"
