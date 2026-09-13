@@ -10,8 +10,8 @@ consuming repo, which never had the authoring repo checked out. A path into that
 for the author and for nobody else, so the failure reaches real users and never reaches anyone
 testing from the authoring checkout.
 
-Runtime text is what loads with the artifact: ``SKILL.md`` bodies, agent and command
-bodies, and ``references/**``. Design-time siblings travel inside the package but never load
+Runtime text is what loads with the artifact: ``SKILL.md``, agent and command bodies, and
+``references/**``. Design-time siblings travel inside the package but never load
 (``SKILL-GOALS.md``, ``MAINTENANCE.md``, ``BENCHMARKS.md``, ``maintenance/**``, ``evals/**``);
 they are skipped, and a runtime link pointing *at* one of them is itself reported.
 
@@ -165,9 +165,8 @@ def _points_at_design_time(target: str) -> bool:
 def _escapes_plugin(target: str, rel_path: str) -> bool:
     """Return True when a relative target, resolved from the file naming it, leaves the plugin.
 
-    The target is joined to the directory of *rel_path* and normalised, so the verdict follows
-    the file's own depth: ``../../rules/x.md`` leaves the plugin from ``agents/a.md`` and lands
-    on the plugin root's ``rules/`` from ``skills/x/SKILL.md``.
+    Depth follows the file: ``../../rules/x.md`` leaves the plugin from ``agents/a.md`` and
+    reaches the plugin root's ``rules/`` from ``skills/x/SKILL.md``.
 
     Args:
         target: The link target or path token.
@@ -390,8 +389,8 @@ def render_report(escapes: list[Escape], plugin_dir: Path) -> str:
             f"({', '.join(repr(w.strip()) for w in _GUARD_WORDS)}). It triages; it does not decide."
         ),
         "- Fenced code blocks are skipped, so illustrative paths inside examples are not counted.",
-        "- A relative path is reported when, resolved from the file it appears in, it rises above",
-        "  the plugin root. A climb that stays inside the plugin is not reported.",
+        "- A relative path is reported when it resolves, from the file it appears in, above the",
+        "  plugin root.",
         "- Repo-root paths are matched lowercase and forward-slash-separated, so a backslash separator,",
         "  an uppercase directory, or a URL-encoded separator is not detected.",
         "- Same-plugin (`dh:`) references are never reported. Paths built on `${CLAUDE_PLUGIN_ROOT}` or",
