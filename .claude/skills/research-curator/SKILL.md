@@ -406,6 +406,14 @@ below.
    parse the printed `{source} -> {target}` lines to guess at modified files, since they list every
    asymmetric edge found *before* repair is attempted, not which repairs succeeded.
 
+   **Known limitation**: this command has no per-file exclude option, so it can write into a
+   backlink-target file that was already dirty in the pre-mode baseline before step 3 ever
+   excludes that file from this run's commit -- the exclusion happens after the write, not before
+   it (tracked in backlog #3516; fixing it requires a change to `check-backlinks` itself, outside
+   this skill). Running research-curator from an isolated worktree when another contributor may be
+   editing `./research/` concurrently avoids the collision entirely -- see
+   `rules/commit-cadence-and-worktrees.md`.
+
 3. **Compute the filtered file list** -- diff the current working tree against the pre-mode
    baseline (see [Mode Routing](#mode-routing)) to get every file under `./research/` this run
    touched:
