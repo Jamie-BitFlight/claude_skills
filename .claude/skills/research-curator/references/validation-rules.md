@@ -38,11 +38,11 @@ This is the authoritative procedure for what the orchestrator does with the `fix
 flowchart TD
     Start(["fix_research_formatting.py + validate_research.py --json<br>ran on an entry this invocation just created or refreshed"]) --> HasErr{"Any error-severity issue<br>in the JSON output?"}
     HasErr -->|"Yes"| MarkIssues(["Mark entry created/refreshed with issues<br>Skip analysis-agent fan-out for this entry<br>Report exact error text from JSON to user"])
-    HasErr -->|"No"| HasGatedWarn{"Any warning-severity issue from<br>header_fields, access_dates,<br>freshness_tracking, url_format,<br>or relevance_unanchored?<br>(cross_references_absent excluded)"}
+    HasErr -->|"No"| HasGatedWarn{"Any warning-severity issue from<br>header_fields, access_dates,<br>freshness_tracking, url_format,<br>relevance_unanchored, or<br>relevance_anchor_path_missing?<br>(cross_references_absent excluded)"}
     HasGatedWarn -->|"No"| Proceed(["Entry is complete — proceed to<br>analysis-agent fan-out"])
-    HasGatedWarn -->|"Yes"| SpawnFix["Spawn @research-curator with --fix flag<br>PLUS the exact warning issue list from JSON<br>(the agent already has these facts: today's<br>research/verification date, the source URL,<br>the version and access dates it just gathered)<br>relevance_unanchored is fixed by running Phase 1c,<br>not by rewording the section"]
+    HasGatedWarn -->|"Yes"| SpawnFix["Spawn @research-curator with --fix flag<br>PLUS the exact warning issue list from JSON<br>(the agent already has these facts: today's<br>research/verification date, the source URL,<br>the version and access dates it just gathered)<br>relevance_unanchored is fixed by running Phase 1c,<br>not by rewording the section;<br>relevance_anchor_path_missing is fixed by<br>re-running the search, not by editing the path"]
     SpawnFix --> Rerun["Re-run fix_research_formatting.py<br>then validate_research.py --json on the same file"]
-    Rerun --> HasErr2{"Any error-severity issue,<br>or any warning from the five<br>gated checks, remaining?"}
+    Rerun --> HasErr2{"Any error-severity issue,<br>or any warning from the gated<br>checks above, remaining?"}
     HasErr2 -->|"Yes"| MarkIssues
     HasErr2 -->|"No"| Proceed
 ```
