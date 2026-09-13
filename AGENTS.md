@@ -73,9 +73,11 @@ The rest are external: the upstream `astral` plugin pinned by git-subdir, and
 skills). Read the manifest for the current roster.
 **Purpose**: Extends Claude Code CLI (and secondarily Codex, OpenCode, and GitHub's coding agent)
 with specialized skills, commands, and agents for Python development, code quality, Git/CI-CD,
-AI/LLM tools, documentation, and agent orchestration. Every plugin ships harness manifests beside
-`.claude-plugin/` (`.codex-plugin/`, and `.cursor-plugin/` where applicable) — skills, commands,
-and agents are project workflow tooling, not a Claude-Code-only concern.
+AI/LLM tools, documentation, and agent orchestration. Skills, commands, and agents are project
+workflow tooling, not a Claude-Code-only concern — but harness coverage per plugin is uneven today:
+nearly every plugin ships a `.codex-plugin/` manifest beside `.claude-plugin/`, while `.cursor-plugin/`
+exists for only a handful. Check `harness_compatibility.json` (below) for a given plugin's actual
+manifests before assuming a skill is reachable outside Claude Code.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
 JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
@@ -115,9 +117,13 @@ Before validating an MCP server (protocol, Codex, or Claude plugin integration),
 
 ## Skill, Command, and Agent Usage Policy
 
-Every agent/harness working here already knows which skills, commands, and agents exist and what
-each one does — the harness supplies that listing on its own. What no harness supplies is this
-repo's policy on *when a given one is mandatory*:
+In Claude Code, and in any other harness that has a manifest for the named plugin (check
+`harness_compatibility.json` — coverage is currently uneven, see Repository Overview), the harness
+already knows which skills, commands, and agents exist and what each one does; it supplies that
+listing on its own. What no harness supplies is this repo's policy on *when a given one is
+mandatory*. When the current harness has no manifest for a route below, treat the named policy as
+the requirement anyway and satisfy it by reading that skill's own `SKILL.md` directly and following
+it manually, rather than skipping the stage:
 
 | Stage | Load |
 |-------|------|
