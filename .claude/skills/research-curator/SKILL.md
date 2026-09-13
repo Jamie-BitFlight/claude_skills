@@ -150,7 +150,7 @@ Apply the [Duplicate Detection](./references/duplicate-detection.md) check per U
 
 ### Wave Spawning
 
-Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries). On its "mark issues" outcome: mark entry as "created with issues", skip analysis agents for that entry, and include the exact error or warning text in the output report. On its "proceed" outcome: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents). Once an entry's analysis agents return, run [Entry Review](#entry-review) on it.
+Spawn up to 5 `@research-curator` agents per wave via Agent tool. Wait for all agents in the current wave before spawning the next. After all waves complete, for each successful entry, run the [Validation Gate for New/Refreshed Entries](./references/validation-rules.md#validation-gate-for-newrefreshed-entries). On its "mark issues" outcome: mark entry as "created with issues" (or "refreshed with issues" when the URL matched an existing entry), skip analysis agents for that entry, and include the exact error or warning text in the output report. On its "proceed" outcome: spawn concurrent analysis agents — `@research-insight-extractor`, `@research-utilization-assessor`, and `@research-cross-referencer` (up to 5 entries processed concurrently, each with its own set of analysis agents). After every analysis agent has returned and the wave counts are reported, run [Entry Review](#entry-review) on each entry that reached the analysis agents.
 
 ### Progress Reporting
 
@@ -192,12 +192,12 @@ flowchart TD
     ValidateN -->|"clean entries"| UpdateDates["Update ./research/README.md once,<br>after all waves complete — refresh freshness<br>dates for clean re-researched entries only"]
     UpdateDate --> SpawnAnalysis1["Concurrently spawn analysis agents:<br>@research-insight-extractor 'Extract improvements from ./research/category/name.md'<br>@research-utilization-assessor 'Assess utilization opportunities from ./research/category/name.md'<br>@research-cross-referencer 'Add cross-references to ./research/category/name.md'"]
     SpawnAnalysis1 --> WaitAnalysis1["Wait for all agents<br>Surface IMMEDIATE_ATTENTION items from insight result<br>Report utilization proposal count<br>Report cross-references added count"]
-    WaitAnalysis1 --> Review1["Run Entry Review on ./research/category/name.md<br>audited with the analysis files just written"]
+    WaitAnalysis1 --> Review1["Run Entry Review: backlink repair first,<br>then review ./research/category/name.md<br>naming the analysis files just written"]
     Review1 --> PostActions(["Execute Post-Actions — lint, commit, push"])
     Issues1 --> PostActions
     UpdateDates --> SpawnAnalysisN["For each updated entry (concurrent, up to 5 entries)<br>spawn analysis agents per entry:<br>@research-insight-extractor<br>@research-utilization-assessor<br>@research-cross-referencer"]
     SpawnAnalysisN --> WaitAnalysisN["Wait for all analysis agents<br>Collect IMMEDIATE_ATTENTION items<br>Report total utilization proposals and cross-references added"]
-    WaitAnalysisN --> ReviewN["Run Entry Review on each entry that reached analysis<br>one review per entry, in waves of 5"]
+    WaitAnalysisN --> ReviewN["Run Entry Review: backlink repair once,<br>then review each entry that reached analysis<br>one review per entry, in waves of 5"]
     ReviewN --> PostActions
     IssuesN --> PostActions
 ```
@@ -261,26 +261,40 @@ Issues to fix (from validator JSON):
 
 ## Entry Review
 
-Runs in Default, Batch, and Rerun Mode, after that mode's analysis agents return and before
-Post-Actions. Audits each entry this run created or refreshed, together with the analysis files
-written for it, against [Entry Review Rubric](./references/entry-review-rubric.md) -- the rubric is
-the method and the agent loads it, so the prompt carries a path and nothing else.
+Runs in Default, Batch, and Rerun Mode, once that mode's analysis agents have all returned and
+before Post-Actions. Audits each entry this run created or refreshed, with the analysis files
+written for it, against [Entry Review Rubric](./references/entry-review-rubric.md), which the agent loads.
 
-Spawn one `@research-curator` per entry, in waves of 5 -- the concurrency the analysis fan-out
-already uses. One review per entry, never one across a batch: the verdict block is per-entry, and
-the repo-claims gate opens the local file behind every proposal.
+**Repair reciprocity first.** `@research-cross-referencer` writes forward links only, so the vault is
+asymmetric the moment it returns, and the rubric's Gate 1 scores an asymmetric pair as a defect
+against the citing entry -- reviewing now fails every entry on a defect this run is about to repair.
+Run the [Post-Actions](#post-actions) step 2 backlink repair, handling its four result cases exactly
+as step 2 specifies, before spawning any review. Step 2 still runs in its own place afterwards: the
+repair is idempotent, and Validate Mode reaches it without passing through here.
+
+Then spawn one `@research-curator` per entry, in waves of 5, matching the analysis fan-out. One
+review per entry, never one across a batch: the verdict block is per-entry, and the repo-claims gate
+opens the local file behind every proposal.
 
 ```text
 Agent tool parameters:
   agent: .claude/agents/research-curator.md
-  prompt: "--review ./research/{category}/{name}.md"
+  prompt: "--review ./research/{category}/{name}.md
+Analysis files written this run:
+  {improvements file path from the insight agent result, when it wrote one}
+  {utilization FILE path from the utilization agent result, when it wrote one}"
 ```
 
-An entry the validation gate already marked "created with issues" or "refreshed with issues" is
-reviewed by a later run: it never reached the analysis agents, and it carries that mark already.
+Name those paths: they carry a date the agent cannot derive from the entry name, and the rubric puts
+them in scope for gates 4, 5 and 6. Omitting them costs three gates.
+
+An entry the validation gate already marked "created with issues" or "refreshed with issues" is not
+reviewed this run -- it never reached the analysis agents, so most of the rubric's scope does not
+exist for it. It is reviewed by whichever later `--rerun` clears its validation issues.
 
 Relay each verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules) --
-every gate line and every defect, quoted as the agent wrote them. Then:
+every gate line and every defect, quoted as the agent wrote them, under an `### Entry Review
+Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
 
 - **APPROVE** -- continue to Post-Actions unchanged.
 - **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
@@ -306,13 +320,16 @@ in [Mode Routing](#mode-routing).
    run's README update will not be committed` before proceeding -- the update below still needs to
    happen so the mode's own entry is recorded, but step 3 will exclude README.md from this run's
    commit. Otherwise, add or update entries in `./research/README.md` category tables as usual.
-   This restates the README step each mode's own flow already gates (Default/Batch step 6d, Rerun
-   `UpdateDate(s)`) -- do not run it as a fresh, ungated pass. Do not add a row, or refresh the
-   Last Updated date on an existing row, for any entry marked "created with issues" or "refreshed
-   with issues" earlier in this run; that entry's README state stays exactly as it was before this
-   run started. [Entry Review](#entry-review) sets that mark after this run already wrote the row
-   -- for an entry it marks, delete the row this run added, or restore the Last Updated date this
-   run overwrote, so the same end state holds
+   This restates the README step each mode's own flow already gates (Default step 6d, Batch
+   `UpdateAll`/`Partial`, Rerun `UpdateDate(s)`) -- do not run it as a fresh, ungated pass. Do not
+   add a row, or refresh the Last Updated date on an existing row, for any entry marked "created
+   with issues" or "refreshed with issues" earlier in this run; that entry's README state stays
+   exactly as it was before this run started. [Entry Review](#entry-review) sets that mark after
+   this run already wrote the row, so for an entry it marks, restore that entry's row to the
+   version in `git show HEAD:./research/README.md` -- deleting the row outright when that version
+   has none. That command is the pre-run state only when README.md was clean in the baseline; when
+   it was already dirty, this run's README changes are excluded from the commit by this step
+   anyway, so report the mark and leave the file alone
 
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched:
@@ -410,8 +427,8 @@ Report to user after any mode completes. Apply the [Agent Result Relay Rules](#a
 **Resource**: {name}
 **Category**: {category}
 **File**: ./research/{category}/{filename}.md
-**README Updated**: Yes
-**Entry Review**: APPROVE | REQUEST CHANGES -- N defects, verdict block below
+**README Updated**: Yes | No -- entry marked with issues, row withheld
+**Entry Review**: APPROVE | REQUEST CHANGES -- N defects
 **Cross-References Added**: N
 **Utilization Proposals**: N (file: ./research/insights/YYYY-MM-DD-{name}-utilization.md)
 
@@ -433,8 +450,8 @@ YYYY-MM-DD
 **Created**: Y new entries
 **Refreshed**: Z existing entries
 **Failed**: W
-**README Updated**: Yes
-**Entry Review**: A APPROVE, R REQUEST CHANGES -- verdict blocks below
+**README Updated**: Yes -- rows withheld for R entries marked with issues
+**Entry Review**: A APPROVE, R REQUEST CHANGES
 
 ### Entries Created
 - ./research/{category}/{name}.md
@@ -453,7 +470,7 @@ YYYY-MM-DD
 
 **Refreshed**: N entries
 **Changes Detected**: M entries had updated data
-**Entry Review**: A APPROVE, R REQUEST CHANGES -- verdict blocks below
+**Entry Review**: A APPROVE, R REQUEST CHANGES
 
 ### Updated Entries
 - ./research/{category}/{name}.md -- {what changed}

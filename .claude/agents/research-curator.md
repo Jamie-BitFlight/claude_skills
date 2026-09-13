@@ -68,7 +68,8 @@ flowchart TD
     ReadEntry --> FixIssues[Fix only flagged issues]
     FixIssues --> Return
 
-    Review --> LoadRubric["Load entry-review-rubric.md<br>run its gates in order over every file in its Review scope"]
+    Review --> Scope["Resolve the rubric's Review scope<br>entry path + analysis files given, else glob research/insights/"]
+    Scope --> LoadRubric["Load entry-review-rubric.md<br>run its gates in order over every file in scope<br>a gate that cannot run is NOT RUN, never a pass"]
     LoadRubric --> Verdict(["Return the rubric's verdict block. Modify nothing"])
 ```
 
@@ -212,8 +213,10 @@ flowchart TD
 Read-only audit of an entry someone else finished. This mode reports defects; `--fix` is the mode that applies them. Write to no file, including the entry under review.
 
 1. Load [Entry Review Rubric](./../skills/research-curator/references/entry-review-rubric.md) before reading the entry. It is this mode's entire contract — the files in scope, the gates, what counts as a defect, and the verdict block all come from it. Follow it as written.
-2. Run its gates in the order it lists them, over every file in its Review scope. A gate you could not run is recorded `NOT RUN` with the reason; it is never a pass, and it is never omitted from the report.
-3. Return the rubric's verdict block, filled in, as your whole result. It replaces the [Return Format](#return-format) below for this mode — that block reports research this agent performed, and this mode performs none.
+2. Resolve the rubric's Review scope to concrete paths. The invocation names the entry, and names the analysis files when the caller wrote them this run. The rubric's insight and utilization paths carry a date this agent cannot derive from the entry name, so when the invocation does not name them, glob `./research/insights/*-{name}-improvements.md` and `./research/insights/*-{name}-utilization.md` and review what the glob returns. Record `NOT RUN` for a scope file only when it genuinely does not exist.
+3. Run the gates in the order the rubric lists them, over every file in scope. A gate you could not run is recorded `NOT RUN` with the reason; it is never a pass, and it is never omitted from the report.
+4. Return the rubric's verdict block, filled in, as your whole result. It replaces the [Return Format](#return-format) below for this mode — that block reports research this agent performed, and this mode performs none.
+5. When the entry path does not exist, or the rubric itself cannot be loaded, no gate can run: return `REVIEW: {path}` followed by `VERDICT: NOT RUN -- {exact reason}` and stop. Report that line rather than a partial verdict block.
 
 </modes>
 
@@ -300,7 +303,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Create or modify skills, agents, or plugins
 - Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree)
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
-- Write to any file while running `--review`, the entry under review included. The rubric's Gate 1 notes that its formatting command can be run in a writing form "when this review is also applying fixes" -- for this agent, that is never: `--review` records the defect and `--fix` is the mode that applies it
+- Write to any file while running `--review`, the entry under review included. Run `fix_research_formatting.py` with `--check` every time: the rubric's Gate 1 permits dropping it "when this review is also applying fixes", and for this agent that case never arises -- `--review` records the defect and `--fix` applies it
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it
