@@ -290,7 +290,7 @@ class TestYamlEntryVerifiedOnlyFallback:
         assert issues[0]["severity"] == "warning"
 
 
-def _write_yaml_entry_second_schema_only(path: Path, *, research_date: str, cross_references: bool) -> None:
+def write_yaml_entry_second_schema_only(path: Path, *, research_date: str, cross_references: bool) -> None:
     """Write a YAML-frontmatter entry using the second historical schema's flat date keys.
 
     Mirrors the live corpus shape (e.g. ``research/coding-agents/claude-codepro.md``):
@@ -369,7 +369,7 @@ class TestYamlEntrySecondSchemaDateAliases:
     def test_pre_cutoff_date_last_reviewed_exempts_yaml_entry(self, tmp_path: Path) -> None:
         """A pre-cutoff ``date_last_reviewed`` exempts the entry with no body date at all."""
         entry = tmp_path / "example.md"
-        _write_yaml_entry_second_schema_only(entry, research_date="2026-01-15", cross_references=False)
+        write_yaml_entry_second_schema_only(entry, research_date="2026-01-15", cross_references=False)
         result = _run_json(entry)
         assert result["entries"][0]["format"] == "yaml_frontmatter"
         assert _issues_for(result, "cross_references_absent") == []
@@ -377,7 +377,7 @@ class TestYamlEntrySecondSchemaDateAliases:
     def test_post_cutoff_date_last_reviewed_still_warns_yaml_entry(self, tmp_path: Path) -> None:
         """The ``date_last_reviewed`` alias must not suppress the warning for a post-cutoff entry."""
         entry = tmp_path / "example.md"
-        _write_yaml_entry_second_schema_only(entry, research_date="2026-06-01", cross_references=False)
+        write_yaml_entry_second_schema_only(entry, research_date="2026-06-01", cross_references=False)
         result = _run_json(entry)
         issues = _issues_for(result, "cross_references_absent")
         assert len(issues) == 1
