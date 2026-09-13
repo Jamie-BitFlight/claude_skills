@@ -111,11 +111,12 @@ First, run the validator over each analysis file the invocation named:
 uv run --script .claude/skills/research-curator/scripts/validate_research.py main --json {analysis-file-path}
 ```
 
-Treat every `repo_path_unresolved` issue it reports as a confirmed step-2 defect below: record it and
-do not re-derive it. That check reaches only existing-state assertions inside `research/insights/`
-and `research/utilization/` — never the entry itself, and not every claim even in those files — so a
-clean run means nothing was flagged mechanically, not that the claims are verified. Everything the
-validator did not flag is judgment, below.
+That run gives you the analysis file's own structural issues. It resolves no repository path: the
+checks this validator emits are `section_completeness`, `empty_sections`, `access_dates`,
+`formatting_suggestions`, `url_format`, `cross_references_absent`, `header_fields` and
+`freshness_tracking`, and not one of them opens a path a claim names. Every step below is therefore
+yours to run by hand — a clean validator run is not partial evidence about any claim, and must not
+be reported as though it were.
 
 Then enumerate every claim the scoped text makes about **this** repository and walk the steps in
 order, stopping at the first failure:
@@ -125,8 +126,18 @@ order, stopping at the first failure:
    improve code quality" fail here: they name nothing, so nothing can falsify them, and they would
    be equally true of any repository. A claim that survives a find-and-replace of this repo's name
    is a defect no matter how many sentences around it verify.
-2. **Exists** — open the path. Not in the repo is a defect, full stop. Do not repair a near-miss on
-   the writer's behalf; record what was named and what is actually there.
+2. **Exists** — open the path, after deciding which of two claims it is making.
+   A claim about **what is there now** — "`X` already does Y", "the hook in `Z` writes the field" —
+   is a defect when the path does not open. Record what was named and what is actually there; do not
+   repair a near-miss on the writer's behalf.
+   A path named as a **place to create something** is not a defect for being absent — that is the
+   entire purpose of an Integration Opportunities section. "Integration point:
+   `.claude/hooks/pre-push.js`", "New skill in `plugins/developer-tools/skills/ci-debugger/`", "new
+   file at", "target state", "could add", "consider adding", "propose adding", and "a new `{path}`"
+   are all this second kind. For one of these, check instead that the parent location it would go
+   into exists, and let step 4 settle whether something already implements it.
+   Deciding which kind a claim is comes before opening anything: a creation target scored as a
+   missing file is a manufactured defect, and most paths in a Relevance section are creation targets.
 3. **Described correctly** — the file's real contents match what the claim says about them. Naming a
    real path and misdescribing it is the same severity as inventing one.
 4. **Gap is real** — where the claim says this repo lacks a capability, the file confirms the
@@ -194,7 +205,7 @@ GATE 1 pointer:     PASS | FAIL | UNVERIFIED | NOT RUN ({reason})
   source URL: {url} — LIVE | DEAD | UNVERIFIED — {the verbatim curl write-out line}
   verified: {date | absent}
 GATE 2 repo claims: {N} claims checked, {N} defective | NOT RUN ({reason})
-  repo_path_unresolved: {N}
+  paths opened: {N} existing-state, {N} creation targets (not scored for absence)
 GATE 3 analysis reasoning: {N} candidates read, {N} defective | NOT RUN ({reason})
 
 DEFECTS: {N}

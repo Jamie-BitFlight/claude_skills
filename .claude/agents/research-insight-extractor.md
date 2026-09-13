@@ -40,7 +40,7 @@ flowchart TD
     MorePatterns -->|Yes| Gap
     MorePatterns -->|No| CheckBacklog[Check existing backlog items<br>to avoid duplicate proposals]
     CheckBacklog --> WriteFile[Write all proposals to<br>./research/insights/YYYY-MM-DD-resource-name-improvements.md]
-    WriteFile --> Gate[Filing gate, per proposal:<br>test -e every repo path the proposal names<br>run and record the search behind every absence claim]
+    WriteFile --> Gate[Filing gate, per proposal:<br>test -e every path the proposal says exists now<br>target-state creation paths exempt<br>run and record the search behind every absence claim]
     Gate --> GateQ{Did both checks pass<br>for this proposal?}
     GateQ -->|"No — a path is MISSING,<br>or an absence was never searched for"| Defer[Record Backlog: Deferred with the reason<br>in the improvements file. File no item]
     GateQ -->|"Yes — output pasted into **Verified**"| CreateItems[Create backlog items for high-confidence proposals<br>that are not already tracked]
@@ -139,7 +139,7 @@ Each proposal in the output file follows this structure exactly:
 **Local system**: {path to the local file this maps to}
 **Confidence**: High | Medium | Low
 **Impact**: High | Medium | Low
-**Verified**: {verbatim output of the filing gate's path check, one line per path, plus the search command and output behind any absence claim}
+**Verified**: {verbatim output of the filing gate's path check over the paths this proposal says exist now, one line per path, plus the search command and output behind any absence claim}
 **Backlog**: #{issue-number} created | Deferred — {reason}
 
 ### Current state
@@ -180,15 +180,21 @@ Every claim a proposal rests on is therefore settled here, before the item exist
 re-reading the proposal, but by running these two checks and pasting their output into the
 proposal's `**Verified**` field.
 
-**1. Every repo path the proposal names must open.** Confidence prose is not this check; a
-proposal can read as high-confidence and still cite a path that was never opened. Run the paths
-through a single command and keep the result:
+**1. Every path the proposal says is already there must open.** That is the `**Local system**`
+field and every path in `### Current state` — the paths the proposal asserts exist now and describes
+the contents of. Confidence prose is not this check; a proposal can read as high-confidence and
+still cite a path that was never opened. Run them through a single command and keep the result:
 
 ```bash
-for p in {every repo path this proposal names}; do
+for p in {every path the proposal asserts exists now}; do
   if [ -e "$p" ]; then echo "OK      $p"; else echo "MISSING $p"; fi
 done
 ```
+
+A path in `### Target state` is exempt and must not go in this list: a proposal's target state names
+the file the work would create, so its absence is the reason the proposal exists. Checking a
+creation target for existence manufactures a defect out of the proposal's whole point. Verify
+instead that the parent directory it would go into exists.
 
 Any `MISSING` line disqualifies the proposal from filing. Record it in the improvements file as
 `Backlog: Deferred — cited path does not exist: {path}` and move to the next proposal. Do not repair
