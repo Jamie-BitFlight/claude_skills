@@ -69,10 +69,13 @@ accepts `include`/`exclude`/`rules`/`analysis`). `uv run ty check` already works
 sets `VIRTUAL_ENV`. The Astral plugin's bundled language server does not: its `lspServers.ty` entry
 launches `uvx ty@latest server` with no ambient `uv run`, no CLI flags (`ty server --help` takes
 only `-h`), and no supported way to override or add args to a single plugin-provided LSP server
-without disabling the whole plugin. This repo's fix is `.claude/settings.json`'s `env.VIRTUAL_ENV =
-".venv"` — a relative path so it resolves correctly from whichever project root Claude Code (or a
-`.claude/worktrees/*` worktree) launches the server from, once `uv sync` has created that
-directory's own `.venv` per the Environment Setup step in `AGENTS.md`. See
+without disabling the whole plugin. The fix is to add `"VIRTUAL_ENV": ".venv"` to
+`.claude/settings.json`'s `env` block — a relative path so it resolves correctly from whichever
+project root Claude Code (or a `.claude/worktrees/*` worktree) launches the server from, once
+`uv sync` has created that directory's own `.venv` per the Environment Setup step in `AGENTS.md`.
+**Check whether that key is actually present before assuming the mitigation is live** — it needs a
+`.claude/settings.json` write, which some agent sessions are not permitted to make, so the entry
+can be absent even though this rule describes it. See
 [`docs/linting-and-type-checking.md`](docs/linting-and-type-checking.md) for the trustworthy-channel
 guidance and [`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py) for the
 regression coverage.
