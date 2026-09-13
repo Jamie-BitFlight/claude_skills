@@ -56,13 +56,21 @@ SOURCE: [Output styles — Built-in output styles](https://code.claude.com/docs/
 
 ### Phase 1: Discovery
 
-1. READ existing styles at the three levels before writing a new one:
+1. READ existing styles before writing a new one. Claude Code loads every `.claude/output-styles/` between the working directory and the repository root, so walk the ancestors — checking only the working directory misses a root-level style and produces a duplicate or an unintended same-name override:
 
    ```bash
-   ls ~/.claude/output-styles/ .claude/output-styles/ 2>/dev/null
+   ls ~/.claude/output-styles/ 2>/dev/null
+   root=$(git rev-parse --show-toplevel 2>/dev/null || echo /)
+   d=$PWD
+   while true; do
+     ls "$d/.claude/output-styles/" 2>/dev/null
+     [ "$d" = "$root" ] && break
+     [ "$d" = / ] && break
+     d=$(dirname "$d")
+   done
    ```
 
-2. READ any plugin-bundled styles in scope: `ls {plugin-path}/output-styles/`
+2. READ any plugin-bundled styles in scope: `ls "{plugin-path}/output-styles/"`
 3. IDENTIFY whether the request is already served by a built-in style or an existing custom style. Adapting an existing style beats adding a near-duplicate.
 
 ### Phase 2: Requirements Gathering
@@ -130,14 +138,14 @@ SOURCE: [Plugins reference — outputStyles](https://code.claude.com/docs/en/plu
 RUN this check on every style, at any scope:
 
 ```bash
-uv run --with pyyaml python -c "import re,sys,yaml; t=open(sys.argv[1]).read().split('---')[1]; d=yaml.safe_load(t); assert isinstance(d.get('description'), str), 'description must be a string'; assert not re.search(r'^description:\s*[|>]', t, re.M), 'description must not use a multiline YAML indicator'" {style-path}
+uv run --with pyyaml python -c "import re,sys,yaml; t=open(sys.argv[1]).read().split('---')[1]; d=yaml.safe_load(t) or {}; assert 'description' not in d or isinstance(d['description'], str), 'description must be a string when present'; assert not re.search(r'^description:\s*[|>]', t, re.M), 'description must not use a multiline YAML indicator'" "{style-path}"
 ```
 
 For a plugin-bundled style, also validate the containing plugin:
 
 ```bash
-uvx skilllint@latest check {plugin-path}
-claude plugin validate {plugin-path}
+uvx skilllint@latest check "{plugin-path}"
+claude plugin validate "{plugin-path}"
 ```
 
 Checklist:
