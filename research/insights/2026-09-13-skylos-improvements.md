@@ -2,10 +2,7 @@
 
 **Research entry**: ./research/code-auditing/skylos.md
 **Generated**: 2026-09-13
-**Patterns assessed**: 4
-**Backlog items created**: 1 (issues: #3509)
-**Deferred (confidence too low to backlog)**: 3
-**Skipped (already covered or tracked)**: 0
+**Backlog items opened**: #3509
 
 ---
 
@@ -69,25 +66,25 @@ If a project chooses Skylos and supports its proof scope, a language manifest ca
 
 A sample language manifest and final-verification record show the optional gate's command, applicability conditions, and result-to-routing mapping; an unsupported-language fixture records `incomplete` rather than `pass`.
 
-## Improvement 4: Extend the review-verdict contract to cover tool calls, refusals, and source references
+## Improvement 4: Make agent tool calls, refusals, and source references checkable against a declared contract
 
 **Source pattern**: Agent behavior contracts can require or forbid tool calls, constrain an exact tool sequence and call count, require response substrings and source IDs, and require an explicit refusal. (Key Features → Agent verification and behavior testing)
 **Local system**: `plugins/development-harness/skills/review-verdict-contract/references/verdict-schema.md`; `plugins/development-harness/skills/subagent-contract/SKILL.md`; `plugins/development-harness/skills/dispatch-contract/SKILL.md`
 **Confidence**: Medium
 **Impact**: Medium
-**Backlog**: Deferred — the extension point is identified and the gap is real, but two scoping questions precede an item: whether the tool-call and refusal axes belong in `verdict-schema.md` alongside the existing per-perspective blocks or in a separate scenario file, and whether the three-state result this needs is the same one #3509 introduces at Stage 7. Settle the overlap with #3509 first; splitting them produces two competing result taxonomies.
+**Backlog**: Deferred — the gap is real and the carrier for two of the three axes is identified, but two questions precede an item. First, the refusal axis needs an observed-response contract that has no local precedent at all, so it is a larger piece of work than extending `verdict-schema.md` and should not be bundled with the other two. Second, whether the result taxonomy this needs is the same one #3509 introduces at Stage 7 — settle that overlap first, since splitting it produces two competing taxonomies.
 
 ### Current state
 
-Each of Skylos's three behavior-contract axes already has a local precedent, but they are declared in three separate places and none of them is executable as a scenario. Refusals appear twice — `verdict-schema.md` §2.1 requires a `skip_reason` field when `verdict == SKIP` and §2.3 defines the detection rule that selects SKIP, and `subagent-contract/SKILL.md` requires a first-line `STATUS: DONE` or `STATUS: BLOCKED` and says to "Return BLOCKED when a required input is missing, rather than inferring it." Source references appear as `verdict-schema.md`'s conservation invariant and its check that a finding's description appear "verbatim in some `entries[].descriptions`", which exists to catch a synthesizer altering attributions. Tool calls appear as `dispatch-contract/SKILL.md`'s prose rule that a dispatched specialist's "declared tools reach every operation handed over", and as `subagent-contract/SKILL.md`'s "Report every command you ran with its outcome." The first is a selection-time rule and the second a reporting duty; neither is a post-hoc check that the agent called only what it was scoped to.
+Skylos's three behavior-contract axes are unevenly covered here. Two have local precedents, declared in separate places and none executable as a scenario; the third has none. Refusal in Skylos's sense — an agent declining a prohibited request in its own response — has no local precedent at all. The two nearest constructs are orchestration statuses about whether work ran, not about what an agent answered: `verdict-schema.md` §2.3 selects `SKIP` when "none of the changed files matches the UI file pattern list", which marks a perspective inapplicable, and `subagent-contract/SKILL.md` says to "Return BLOCKED when a required input is missing, rather than inferring it." Neither can express "this input should have been refused, and was", so this axis needs an observed-behavior contract rather than an extension of the verdict schema. Source references appear as `verdict-schema.md`'s conservation invariant and its check that a finding's description appear "verbatim in some `entries[].descriptions`", which exists to catch a synthesizer altering attributions. Tool calls appear as `dispatch-contract/SKILL.md`'s prose rule that a dispatched specialist's "declared tools reach every operation handed over", and as `subagent-contract/SKILL.md`'s "Report every command you ran with its outcome." The first is a selection-time rule and the second a reporting duty; neither is a post-hoc check that the agent called only what it was scoped to.
 
 ### Target state
 
-One declared contract covers all three axes for a dispatched agent, in the schema idiom `verdict-schema.md` already uses and already invites extending ("Future perspectives may define additional SKIP detection rules using the same pattern-list structure in this file"). A contract can state which tools an agent must or must not call, which refusal state is the correct outcome for a given input, and which source identifiers its findings must carry — and a run can be checked against it rather than reviewed as prose.
+The tool-call and source-reference axes are declared in one place and checked after a run rather than reviewed as prose. `verdict-schema.md` is the candidate carrier for those two: it already holds the source-reference conservation checks and already invites extension ("Future perspectives may define additional SKIP detection rules using the same pattern-list structure in this file"). The refusal axis needs a different vehicle — a contract over an agent's observed response, which no local artifact currently models — so it is scoped separately rather than forced into a verdict block that describes whether a review ran.
 
 ### Measurable signal
 
-A contract file declares required and forbidden tool calls, an expected refusal state, and required source identifiers for at least one dispatched `dh:` agent; a run that calls an undeclared tool or omits a required source identifier is reported as a contract violation rather than passing review, and one that correctly refuses is distinguished from one that failed.
+A contract declares required and forbidden tool calls and required source identifiers for at least one dispatched `dh:` agent, and a run that calls an undeclared tool or omits a required source identifier is reported as a contract violation rather than passing review. Separately, for the refusal axis: a recorded agent response that should have declined a prohibited request is distinguished from one that failed the task, by a check over the response itself rather than by its `STATUS` line.
 
 ---
 
@@ -97,7 +94,7 @@ A contract file declares required and forbidden tool calls, an expected refusal 
 |---|---|---|
 | Attested deterministic verification evidence | medium | Verify artifact-provider revision and immutability semantics before defining a new digest format. |
 | `verify_change` as an optional gate | low | Confirm Skylos installation, target-language support, and the desired `incomplete` policy in a consuming project. |
-| Behavioral contracts for agent tool calls, refusals, and source references | medium | Extension point identified (Improvement 4); resolve the result-taxonomy overlap with #3509 before opening an item. |
+| Behavioral contracts for agent tool calls, refusals, and source references | medium | Carrier identified for the tool-call and source-reference axes (Improvement 4); the refusal axis has no local precedent and needs separate scoping, and the result-taxonomy overlap with #3509 must be resolved first. |
 
 ---
 

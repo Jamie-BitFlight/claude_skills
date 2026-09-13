@@ -518,6 +518,6 @@ Matching patterns prevent files and directories from being indexed.
 | [GrepAI](../developer-tools/grepai.md) | developer-tools | Go-based MCP server for semantic code search and call graph analysis; shares Tree-sitter parsing and MCP integration patterns |
 | [Repomix](../developer-tools/repomix.md) | developer-tools | Codebase packaging tool using Tree-sitter for code extraction; shares language-agnostic parsing approach and generates agent skills |
 | [SigMap](../developer-tools/sigmap.md) | developer-tools | referenced by SigMap (developer-tools) |
-| [skylos](../code-auditing/skylos.md) | code-auditing | comparable MCP-delivered dead-code analysis, exposed as verify_change and verify_agent rather than graph queries |
+| [skylos](../code-auditing/skylos.md) | code-auditing | analyses dead code on its CLI scan rather than over MCP, exposing only generated-code and agent verification to MCP clients |
 
 ---

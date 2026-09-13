@@ -2,9 +2,7 @@
 
 **Research entry**: ./research/code-auditing/skylos.md
 **Generated**: 2026-09-13
-**Integration surfaces found**: 2 (CLI | MCP)
-**Proposals written**: 4
-**Skipped**: 3 — resolver duplicates the execution gate; cognitive pre-action verification has no code-scan role; agent-definition generation is not an executable agent codebase
+**Integration surfaces assessed**: CLI and MCP
 
 ---
 
