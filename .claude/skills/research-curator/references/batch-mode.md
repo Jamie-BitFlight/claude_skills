@@ -4,12 +4,6 @@ Processing multiple URLs in parallel via `--batch`.
 
 ---
 
-## Layer Filter
-
-When `--layer 0|1|2` is also present, apply the layer filter to scope category selection. Pass the layer value to each `@research-curator` agent as context so it classifies entries within the appropriate SDLC layer.
-
----
-
 ## URL Parsing
 
 Extract URLs from the `--batch` argument. Input format:

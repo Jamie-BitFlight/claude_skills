@@ -19,21 +19,17 @@ Orchestrate research entry creation, maintenance, and validation in `./research/
 
 ## Mode Routing
 
-Parse `<mode_args/>` to select operating mode. Optional `--layer 0|1|2` filters discovery by SDLC layer when used with knowledge-explorer or refresh-research.
+Parse `<mode_args/>` to select operating mode.
 
 The following diagram is the authoritative procedure for mode routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
 ```mermaid
 flowchart TD
     Start(["Parse <mode_args/>"]) --> Q1{"Does <mode_args/> contain --batch?"}
-    Q1 -->|"Yes — batch flag present"| Q1Layer{"Does <mode_args/> also contain --layer 0, 1, or 2?"}
+    Q1 -->|"Yes — batch flag present"| Batch(["Execute Batch Mode"])
     Q1 -->|"No — batch flag absent"| Q2{"Does <mode_args/> contain --rerun?"}
-    Q1Layer -->|"Yes — layer filter present"| BatchLayer(["Execute Batch Mode with layer filter applied"])
-    Q1Layer -->|"No — no layer filter"| Batch(["Execute Batch Mode"])
-    Q2 -->|"Yes — rerun flag present"| Q2Layer{"Does <mode_args/> also contain --layer 0, 1, or 2?"}
+    Q2 -->|"Yes — rerun flag present"| Rerun(["Execute Rerun Mode"])
     Q2 -->|"No — rerun flag absent"| Q3{"Does <mode_args/> contain --validate?"}
-    Q2Layer -->|"Yes — layer filter present"| RerunLayer(["Execute Rerun Mode with layer filter applied"])
-    Q2Layer -->|"No — no layer filter"| Rerun(["Execute Rerun Mode"])
     Q3 -->|"Yes — validate flag present"| Validate(["Execute Validate Mode"])
     Q3 -->|"No — no flags matched — <mode_args/> contains a URL only"| Default(["Execute Default Mode — single URL"])
 ```
