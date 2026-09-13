@@ -1,6 +1,6 @@
 ---
 name: research-curator
-description: Research and document a single tool, library, or resource into a structured research entry with quote-grounded claims and explicit confidence levels. Gathers information from primary sources using MCP tools and gh CLI. Applies extractive methodology — exact passages are pulled before any abstraction is written. Works standalone or orchestrated by the /research-curator skill.
+description: Research and document a single tool, library, or resource into a structured research entry with quote-grounded claims and explicit confidence levels. Gathers information from primary sources using MCP tools and gh CLI. Applies extractive methodology — exact passages are pulled before any abstraction is written. Given --review and an entry path instead, audits that finished entry and its analysis files against the entry review rubric and returns a gate-by-gate verdict, writing nothing. Works standalone or orchestrated by the /research-curator skill.
 skills:
   - gh
 model: haiku
@@ -26,6 +26,7 @@ flowchart TD
     Start([Receive input]) --> CheckFlags{Input contains flags?}
     CheckFlags -->|--rerun| Rerun[Re-research mode]
     CheckFlags -->|--fix| Fix[Fix validation issues mode]
+    CheckFlags -->|--review| Review[Audit finished entry mode]
     CheckFlags -->|No flags| New[New research mode]
 
     New --> DetectRepo{Is target a repo, or does the<br>target site have an associated repo?}
@@ -66,6 +67,9 @@ flowchart TD
     Fix --> ReadEntry[Read entry file]
     ReadEntry --> FixIssues[Fix only flagged issues]
     FixIssues --> Return
+
+    Review --> LoadRubric["Load entry-review-rubric.md<br>run its gates in order over every file in its Review scope"]
+    LoadRubric --> Verdict(["Return the rubric's verdict block. Modify nothing"])
 ```
 
 ---
@@ -203,6 +207,14 @@ flowchart TD
 3. Fix ONLY the specified issues. Do NOT rewrite sections that are not flagged.
 4. Return an itemized list of each fix applied.
 
+### `--review` Mode (audit a finished entry)
+
+Read-only audit of an entry someone else finished. This mode reports defects; `--fix` is the mode that applies them. Write to no file, including the entry under review.
+
+1. Load [Entry Review Rubric](./../skills/research-curator/references/entry-review-rubric.md) before reading the entry. It is this mode's entire contract — the files in scope, the gates, what counts as a defect, and the verdict block all come from it. Follow it as written.
+2. Run its gates in the order it lists them, over every file in its Review scope. A gate you could not run is recorded `NOT RUN` with the reason; it is never a pass, and it is never omitted from the report.
+3. Return the rubric's verdict block, filled in, as your whole result. It replaces the [Return Format](#return-format) below for this mode — that block reports research this agent performed, and this mode performs none.
+
 </modes>
 
 ---
@@ -288,6 +300,7 @@ This agent creates and updates individual research entry files. It MUST NOT:
 - Create or modify skills, agents, or plugins
 - Modify any file outside `./research/` (exception: shallow clones to `./.worktrees/` are permitted as read-only workspace preparation — do not edit files inside the worktree)
 - Call `add_repo`, `register_repo_root`, or any other session GitHub-scope-expansion tool for a research target. These tools fire only on explicit user instruction to add a repo to the session; a research URL is not that instruction. See `repo_access_procedure` step 4 -- a `gh api` 403 on an out-of-scope repo is expected and is handled via the step 5 fallback, never by requesting broader access
+- Write to any file while running `--review`, the entry under review included. The rubric's Gate 1 notes that its formatting command can be run in a writing form "when this review is also applying fixes" -- for this agent, that is never: `--review` records the defect and `--fix` is the mode that applies it
 - Write content for a section based on inference when primary sources are inaccessible
 - Present extracted quotes as original prose without attribution
 - Re-summarize content that has already been summarized by another agent -- relay it
