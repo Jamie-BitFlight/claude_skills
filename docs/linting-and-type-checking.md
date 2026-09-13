@@ -26,6 +26,21 @@ relaxation allowed only for the categories in `linting-exceptions.md`) and its r
 both load on any `*.py`/`pyproject.toml`/`uv.lock` edit. The current override list itself lives in
 `pyproject.toml [tool.ty]`, not restated here.
 
+### Trustworthy channel: `uv run ty check` / CI, not the live LSP squiggle on PEP 723 files
+
+CI and `prek` gate on `uv run ty check`, which sets `VIRTUAL_ENV` via `uv run` and passes clean.
+The bundled Astral **language server** (`uvx ty@latest server`, no ambient `uv run`) has one known,
+upstream-confirmed blind spot: any `.py` file with a PEP 723 `# /// script … # ///` block — every
+standalone script in this repo per `rules/python-development.md` — gets checked as an isolated
+single-file project that ignores `[tool.ty.environment]` entirely, so a live `unresolved-import`
+squiggle on a PEP 723 script's own declared third-party dependency is a known false positive, not a
+real regression. Do not add `extra-paths` entries to chase it and do not add a rule-level
+suppression. Confirm with `uv run ty check <path>` (or `prek run ty --files <path>`) before treating
+any ty diagnostic as real; if that passes clean, trust it over the editor's live diagnostic. Full
+root cause, the upstream tracking issue, and the `.claude/settings.json` mitigation live in
+[`rules/python-development.md`](../rules/python-development.md#unresolved-import-on-a-pep-723-script-specifically-in-the-language-server).
+Regression coverage: [`tests/test_ty_pep723_environment.py`](../tests/test_ty_pep723_environment.py).
+
 ### Common ty failure patterns
 
 - **`unresolved-attribute` on a `ModuleType`**: almost always means the module's directory is
