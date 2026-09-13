@@ -2428,13 +2428,13 @@ class TestUpdateItemTitleAndDescription:
         from backlog_core.operations import update_item
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="123")
+        _write_item(fake_dir, title="Reconcile Desc Item", topic="reconcile-desc-item", issue="#123")
 
         result = update_item(selector="Reconcile Desc Item", description="Amended description.")
 
         assert result.get("description_updated") is True
         backend = cast("Any", get_config().backend)
-        assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["123"])
+        assert backend.reconcile_requests[-1] == ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#123"])
 
     def test_update_item_description_without_issue_skips_reconcile(self) -> None:
         """update_item with description= on an item with no linked issue never reconciles.
@@ -2457,6 +2457,28 @@ class TestUpdateItemTitleAndDescription:
 
         backend = cast("Any", get_config().backend)
         assert backend.reconcile_requests == []
+
+    def test_update_item_description_refreshes_callers_item_object(self) -> None:
+        """_update_item_description refreshes the item object it was handed.
+
+        Tests: _update_item_description's in-place ``item.description`` refresh.
+        How: Seed an item, then pass a *separate* BacklogItem carrying the same
+             reference -- what a backend that parses a fresh object per read (the
+             GitHub file cache) hands update_item -- and assert that object sees
+             the new description.
+        Why: update_item renders a newly created GitHub issue's body from this same
+             object (_create_issue_and_update_item -> create_issue_for_item), so a
+             stale copy publishes the pre-update description while the call reports
+             description_updated: true (#2985).
+        """
+        import backlog_core.models as models
+
+        fake_dir: Path = models.get_backlog_dir()
+        filepath = _write_item(fake_dir, title="Detached Desc Item", topic="detached-desc-item")
+        detached = BacklogItem(title="Detached Desc Item", description="Stale text.", reference=str(filepath))
+
+        assert ops._update_item_description(detached, "Fresh text.") is True
+        assert detached.description == "Fresh text."
 
 
 # ---------------------------------------------------------------------------

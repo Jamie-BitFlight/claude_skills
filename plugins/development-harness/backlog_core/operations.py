@@ -727,14 +727,21 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 def _update_item_description(item: BacklogItem, description: str, output: Output | None = None) -> bool:
     """Update the backend-owned item description and reconcile immediately.
 
-    Mirrors _rename_item_title/grooming/striking's immediate-reconcile
-    behavior. Without the ``_reconcile_item`` call below, the description
-    write was only queued to the offline mutation cache and became visible
-    at whatever unbounded delay some *unrelated* later reconcile happened to
-    run at (#3458) -- on a GitHub-backed checkout, that could mean never,
-    since nothing else in this write path triggers one. See
-    ``_reconcile_item`` for what "reconcile" durably records (a GitHub
-    audit-comment, not the issue's raw ``body`` field).
+    Mirrors grooming's and striking's immediate-reconcile behavior. Without
+    the ``_reconcile_item`` call below, the description write was only queued
+    to the offline mutation cache and became visible at whatever unbounded
+    delay some *unrelated* later reconcile happened to run at (#3458) -- on a
+    GitHub-backed checkout, that could mean never, since nothing else in this
+    write path triggers one. See ``_reconcile_item`` for what "reconcile"
+    durably records (a GitHub audit-comment, not the issue's raw ``body``
+    field).
+
+    ``item`` is also refreshed in place: ``update_item_metadata`` writes
+    through its own freshly-loaded copy of the record, so on a backend that
+    returns a new object per read (the GitHub file cache) the caller's
+    ``item`` would otherwise keep the pre-update description -- and
+    ``update_item`` renders a *newly created* issue's body from that same
+    object when the item had no issue yet, publishing the stale text.
 
     Returns:
         True if updated, False if no backend reference on item.
@@ -744,6 +751,7 @@ def _update_item_description(item: BacklogItem, description: str, output: Output
     if not reference:
         return False
     update_item_metadata(reference, {"description": description}, output=out)
+    item.description = description
     _reconcile_item(item, out)
     return True
 
@@ -1160,11 +1168,14 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
 def _reconcile_item(item: BacklogItem, output: Output) -> None:
     """Trigger an immediate targeted reconcile for one item's queued mutation.
 
-    Shared by every write path that must not leave its mutation sitting in the
-    offline queue at an unbounded delay (#3458): title rename, single/batch
-    grooming, striking, and description updates all call this right after
-    ``put_work_item``. A GitHub-backed reconcile posts the audit-comment
-    record backing ``backlog_view``'s rendered body/description immediately
+    Shared by the write paths that must not leave their mutation sitting in
+    the offline queue at an unbounded delay (#3458): single/batch grooming and
+    description updates call this right after persisting the mutation.
+    ``strike_entry`` runs the same targeted reconcile inline (it reports a
+    strike-specific message); ``_rename_item_title`` does not reconcile at all
+    -- it edits the GitHub issue title directly over GraphQL. A GitHub-backed
+    reconcile posts the audit-comment record backing ``backlog_view``'s
+    rendered body/description immediately
     (see ``backlog_core/ARCHITECTURE.md`` "GitHub writable records") -- it
     never edits the issue's raw ``body`` field, which stays human-owned by
     design, so a caller comparing against ``gh issue view --json body``
@@ -1173,7 +1184,7 @@ def _reconcile_item(item: BacklogItem, output: Output) -> None:
     Args:
         item: The work item whose queued mutation should be reconciled. Only
             ``item.issue`` is read; the mutation content itself was already
-            persisted via ``put_work_item`` before this call.
+            persisted by the caller before this call.
         output: Output aggregator that receives a reconciled/queued/
             unsupported status message.
 
