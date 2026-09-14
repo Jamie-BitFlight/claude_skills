@@ -738,7 +738,12 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
         Issue number if created, None otherwise.
     """
     out = output or Output()
-    repository = try_get_github(repo)
+    try:
+        repository = try_get_github(repo)
+    except BackendUnavailableError:
+        # GitHub reachable-but-failing is still a local-only-create fallback
+        # here, same as no token configured — same as before #3546's fix.
+        return None
     if repository is None:
         return None
     try:
@@ -780,7 +785,12 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
             # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
             # Backend-owned title was already updated above; no GitHub sync needed.
             return True
-        repository = try_get_github(repo)
+        try:
+            repository = try_get_github(repo)
+        except BackendUnavailableError:
+            # GitHub reachable-but-failing keeps the same local-only-update
+            # fallback as no token configured — same as before #3546's fix.
+            repository = None
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
@@ -851,7 +861,12 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
             # String-ID backend (e.g. beads): issue ref is a nanoid, not a GitHub number.
             # Local plan metadata was already updated above; no GitHub sync needed.
             return True
-        repository = try_get_github(repo)
+        try:
+            repository = try_get_github(repo)
+        except BackendUnavailableError:
+            # GitHub reachable-but-failing keeps the same local-only-update
+            # fallback as no token configured — same as before #3546's fix.
+            repository = None
         if repository is not None:
             try:
                 num = parse_issue_number(issue_ref)
@@ -1600,7 +1615,12 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
         so callers see it in the response's ``errors`` list rather than only
         a discardable warning (#3182).
     """
-    repository = try_get_github(repo)
+    try:
+        repository = try_get_github(repo)
+    except BackendUnavailableError:
+        # GitHub reachable-but-failing keeps the same local-only-create
+        # fallback as no token configured — same as before #3546's fix.
+        repository = None
     if repository is None:
         out.warn("  WARNING: GitHub unavailable — creating local-only item")
         return None
