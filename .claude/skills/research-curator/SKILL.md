@@ -294,8 +294,8 @@ reviewed this run -- it never reached the analysis agents, so most of the rubric
 exist for it. It is reviewed by whichever later `--rerun` clears its validation issues.
 
 Relay each verdict block verbatim under the [Agent Result Relay Rules](#agent-result-relay-rules) --
-every gate line and every defect, quoted as the agent wrote them, under an `### Entry Review
-Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
+every gate line, every defect, and every repair, quoted as the agent wrote them, under an
+`### Entry Review Verdicts` heading in the mode's [Output Format](#output-format) report. Then:
 
 - **APPROVE** -- continue to Post-Actions unchanged.
 - **REQUEST CHANGES** -- mark the entry "created with issues" (or "refreshed with issues") and
