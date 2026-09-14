@@ -32,11 +32,14 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from backlog_core import operations
+from backlog_core.models import BackendUnavailableError, BacklogItem
 from backlog_core.sync_state import SyncStatus, get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+    from backlog_core.models import IssueStatus
     from backlog_core.operations import BacklogListItem, ListItemsResult
 
 
@@ -62,6 +65,54 @@ def _make_list_items_result(items: list[BacklogListItem]) -> ListItemsResult:
         "warnings": [],
         "errors": [],
     }
+
+
+def _item(issue: str, title: str = "An item") -> BacklogItem:
+    """Build a minimal open backlog item carrying the given issue reference."""
+    return BacklogItem(title=title, issue=issue, section="P1", status="status:in-progress")
+
+
+class _StatusRefusedBackend:
+    """Backend stub whose batch status fetch genuinely fails (real ``BackendUnavailableError``).
+
+    Unlike ``mock_list_items_empty``/``mock_list_items_populated`` (which patch
+    ``dh_core.operations.list_items`` wholesale and never run the real function
+    body), this stub is installed via ``operations.get_config`` so the real
+    ``list_items``/``batch_fetch_statuses`` code path executes — including the
+    ``except BackendUnavailableError`` clause that calls ``out.warn()`` — which
+    is exactly the code path the wholesale-patch pattern does not exercise
+    (B-critique.md §4.5).
+    """
+
+    supports_batch_status_fetch = True
+
+    def __init__(self, items: list[BacklogItem]) -> None:
+        self._items = items
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self._items
+
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+        raise BackendUnavailableError("simulated GitHub batch status refusal")
+
+
+class _NoReconcileBackend:
+    """Backend stub with no ``reconcile()`` — not a ``SyncProvider``.
+
+    A ``refresh=True`` call against this backend takes
+    ``refresh_local_cache_from_github``'s "Active backend does not support
+    reconciliation." branch, which calls ``out.info()`` on a genuinely healthy
+    read (B-critique.md §2.3's own cited example of the healthy-path
+    ``out.info()`` case).
+    """
+
+    supports_batch_status_fetch = False
+
+    def __init__(self, items: list[BacklogItem]) -> None:
+        self._items = items
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self._items
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +377,13 @@ class TestBacklogListCountOnlyIdleState:
         This is the regression guard: a healthy zero-match must not grow a sync_state
         block.  The sync_state block is reserved for non-IDLE states that indicate
         stale or incomplete data.
+
+        Kept as-is per B-critique.md §4.5: ``sync_state`` is a sync-lifecycle key, not
+        a result-size key — that is the actual reason this stays green (the mocked
+        ``list_items`` result hard-codes empty messages/warnings/errors, so this test
+        was never exercising, and does not need to exercise, the count_only
+        warnings/errors merge added for #3546 B4;
+        ``test_count_only_surfaces_a_genuine_degradation_warning`` below covers that).
         """
         from backlog_core.server import backlog_list
 
@@ -348,6 +406,9 @@ class TestBacklogListCountOnlyIdleState:
 
         Regression guard for the normal-case response shape.  Adding sync_state to
         a healthy response wastes context window and creates caller confusion.
+
+        Kept as-is per B-critique.md §4.5: sync_state is sync-lifecycle, not
+        result-size — unaffected by the count_only warnings/errors merge (#3546 B4).
         """
         from backlog_core.server import backlog_list
 
@@ -380,6 +441,68 @@ class TestBacklogListCountOnlyIdleState:
             "A genuine zero-match against a healthy cache must NOT include sync_state. "
             "Only offline/error/running state adds sync_state -- not the search result."
         )
+
+
+# ---------------------------------------------------------------------------
+# #3546 B4 -- count_only must surface operations-layer output, without
+# leaking routine info() prose into the documented bare-count shape.
+# ---------------------------------------------------------------------------
+
+
+class TestCountOnlyPreservesOperationsLayerOutput:
+    """``count_only`` must surface a genuine operations-layer degradation
+    (``out.warnings``/``out.errors``) while keeping the documented bare-count
+    shape on a healthy call that only produced routine ``out.info()`` prose.
+
+    Unlike the fixtures above, these tests do not patch
+    ``dh_core.operations.list_items`` wholesale — B-critique.md §4.5 found
+    that pattern is exactly why the count_only/out-merge bug went
+    unexercised, since the mock ignores the ``output=`` kwarg entirely and
+    the real ``list_items`` body (where ``out.warn()``/``out.info()`` are
+    actually called) never runs. Instead ``operations.get_config`` is
+    patched to a stub backend, so the real ``list_items`` (and, in the
+    second test, ``refresh_local_cache_from_github``) code path executes.
+    """
+
+    async def test_count_only_surfaces_a_genuine_degradation_warning(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        """A real BackendUnavailableError from batch_fetch_statuses (B1's swallow-point
+        fix) reaches out.warn() and must now be visible on the count_only response."""
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(count_only=True))
+
+        assert response.get("count") == 1
+        warnings = cast("list[str]", response.get("warnings", []))
+        assert any("Live status unavailable" in w for w in warnings), (
+            f"count_only must surface the operations-layer degradation warning (#3546 B4). Got response: {response!r}"
+        )
+
+    async def test_count_only_healthy_refresh_stays_bare_despite_info_messages(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        """A healthy refresh populates out.info() (routine reconcile prose) but that
+        must NOT leak into count_only's documented bare-count-only shape."""
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_NoReconcileBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(refresh=True, count_only=True))
+
+        assert response.get("count") == 1
+        assert "messages" not in response, (
+            "A healthy refresh's routine out.info() reconcile summary must not leak "
+            f"into count_only's documented bare-count shape (#3546 B4). Got: {response!r}"
+        )
+        assert "warnings" not in response
+        assert "errors" not in response
 
 
 # ---------------------------------------------------------------------------
