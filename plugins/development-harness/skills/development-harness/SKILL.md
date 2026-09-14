@@ -39,15 +39,15 @@ flowchart TD
 
     Q1 -->|Prepare an item for planning —<br>verify claims, map impact, estimate effort| Groom["/dh:work-backlog-item groom {title|section|all}<br>RT-ICA + parallel swarm: fact-checker,<br>impact-analyst, rtica-assessor, classifier, groomer<br>Requires: item exists in backlog"]
 
-    Q1 -->|Plan AND execute a backlog item<br>end-to-end through closure| Work["/dh:work-backlog-item {title|#N|--auto}<br>Handles: auto-groom, RT-ICA gate, SAM planning,<br>GitHub sync, close, resolve<br>STOPS if item already has a Plan field"]
+    Q1 -->|Plan AND execute a backlog item<br>end-to-end through closure| Work["/dh:work-backlog-item {title|#N|--auto}<br>Handles: auto-groom, RT-ICA gate, SAM planning,<br>GitHub sync, close, resolve<br>STOPS if item already has a plan address"]
 
     Q1 -->|Plan a feature — produce SAM artifacts<br>without executing| Plan["/dh:add-new-feature {feature description}<br>Phases: discovery → codebase analysis →<br>architecture spec → task decomposition →<br>validation → context manifest<br>Output: feature slug + P{id} task plan"]
 
-    Q1 -->|Execute an existing plan —<br>task plan already produced| Execute["/dh:implement-feature {plan path or slug}<br>Loops ready tasks, dispatches agents,<br>calls complete-implementation when all tasks COMPLETE"]
+    Q1 -->|Execute an existing plan —<br>task plan already produced| Execute["/dh:implement-feature {plan address or slug}<br>Loops ready tasks, dispatches agents,<br>calls complete-implementation when all tasks COMPLETE"]
 
-    Q1 -->|Work a single specific task<br>inside an existing plan| Single["/dh:start-task {plan path} --task {task-id}<br>Used by implement-feature per-task dispatch —<br>invoke directly to target one task"]
+    Q1 -->|Work a single specific task<br>inside an existing plan| Single["/dh:start-task {plan-address} --task {task-id}<br>Used by implement-feature per-task dispatch —<br>invoke directly to target one task"]
 
-    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan path|#N}<br>7-task SAM path (with plan): multi-perspective review →<br>code review → verification → integration →<br>doc drift → doc update → context refinement<br>or 5-task proportional path (issue only), which omits<br>multi-perspective review and context refinement"]
+    Q1 -->|Run quality gates after<br>all tasks are COMPLETE| QG["/dh:complete-implementation {plan address|#N}<br>7-task SAM path (with plan): multi-perspective review →<br>code review → verification → integration →<br>doc drift → doc update → context refinement<br>or 5-task proportional path (issue only), which omits<br>multi-perspective review and context refinement"]
 
     Q1 -->|Work a full milestone<br>in parallel isolated worktrees| Milestone["/dh:work-milestone<br>Wave-based parallel execution — each item<br>gets its own worktree. Use /dh:groom-milestone first."]
 ```
@@ -58,22 +58,25 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Capture["/dh:work-backlog-item create<br>Per-item file in ~/.dh/.../backlog/"] --> Groom
-    Groom["/dh:work-backlog-item groom<br>RT-ICA + impact radius + fact-check<br>Item status: needs-grooming → groomed"] --> Work
-    Work["/dh:work-backlog-item<br>Auto-groom gate → RT-ICA gate →<br>SAM planning via /add-new-feature<br>Attaches plan to backlog item"] --> Execute
-    Execute["/dh:implement-feature<br>SAM dispatch loop — ready tasks →<br>agents → hooks update task status"] --> QG
-    QG["/dh:complete-implementation<br>7 quality gate phases → status:verified label<br>Fixes #N commit — issue closure"] --> Done(["Item resolved"])
+    Capture["/dh:work-backlog-item create<br>Stores the item in the configured backend<br>(default backend: GitHub issue)<br>Status: needs-grooming"] --> Groom
+    Groom["/dh:work-backlog-item groom<br>Swarm: impact-analyst, fact-checker,<br>rtica-assessor, classifier, groomer<br>Status: needs-grooming → groomed"] --> Work
+    Work["/dh:work-backlog-item work<br>Status: in-progress → discovery gate →<br>groom check → RT-ICA gate → feasibility gate →<br>dh:add-new-feature → plan address on the item"] -->|auto mode| Execute
+    Execute["/dh:implement-feature<br>Work loop per ready task: dispatch →<br>runner runs finish → orchestrator settles →<br>orchestrator accepts or reclaims"] --> QG
+    QG["/dh:complete-implementation<br>Quality gate plan (7 tasks; 5 without a plan) →<br>status:verified → final commit with Fixes #N, push →<br>backlog resolve"] --> Done(["Status: done"])
 
-    Work -.->|item already has Plan field| Execute
-    Work -.->|close or resolve mode| Done
+    Work -.->|item already has a plan address| Execute
+    Work -.->|interactive mode| Stop(["Stops after planning"])
+    Close["/dh:work-backlog-item close<br>Dismiss with a reason"] --> Closed(["Status: closed"])
+    Resolve["/dh:work-backlog-item resolve<br>Needs status:verified when the item has a plan"] --> Done
 ```
 
 **Key invariants:**
 
-- `/dh:work-backlog-item` stops immediately when the item already has a `Plan` field — use `/dh:implement-feature` instead
-- `/dh:work-backlog-item` stops at the RT-ICA gate when MISSING conditions remain unresolved
-- Task-level commits produced during `/dh:implement-feature` must NOT include `Fixes #N` — that trailer is reserved for the final commit in `/dh:complete-implementation`
-- The `status:verified` label applied by `/dh:complete-implementation` is a prerequisite for `/dh:work-backlog-item resolve`
+- When the item already has a plan address, `/dh:work-backlog-item` runs `/dh:implement-feature` with that address and stops.
+- When the RT-ICA gate returns BLOCKED, `/dh:work-backlog-item` sets the item status to `blocked` and stops.
+- Only the final commit in `/dh:complete-implementation` carries the `Fixes #N` trailer; task-level commits during `/dh:implement-feature` omit it.
+- The SubagentStop hook settles an attempt that the orchestrator did not settle. The hook writes no task status.
+- For an item with a plan, `/dh:work-backlog-item resolve` requires the `status:verified` label. The `--force` flag bypasses this check.
 
 ---
 
@@ -84,9 +87,9 @@ flowchart TD
 | Item does not exist yet | `/dh:work-backlog-item create` |
 | Item exists, not yet groomed | `/dh:work-backlog-item groom {title}` |
 | Item is groomed, no plan yet | `/dh:work-backlog-item {title}` |
-| Item has a Plan field | `/dh:implement-feature {plan path or slug}` |
+| Item has a plan address | `/dh:implement-feature {plan address or slug}` |
 | Plan is executing, one task needs focus | `/dh:start-task {plan} --task {id}` |
-| All tasks complete, run quality gates | `/dh:complete-implementation {plan path}` |
+| All tasks complete, run quality gates | `/dh:complete-implementation {plan address}` |
 | Issue number, no plan | `/dh:complete-implementation #{N}` (proportional gates) |
 | Groomed item, skip to planning directly | `/dh:add-new-feature {description}` then `/dh:implement-feature` |
 | Full milestone in parallel worktrees | `/dh:groom-milestone` then `/dh:work-milestone` |

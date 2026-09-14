@@ -46,15 +46,12 @@ mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="T0-basel
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}
 ```
 
-`plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. On
-the work ledger, `plan status` returns the plan row and every task row with its derived columns. On
-the content store, `plan status` returns plan-level counts and no task rows.
+`plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. It
+answers from the work ledger once the plan is in it, and from the content store otherwise, so the
+same command is right at either point in the plan's life. Read without `--attempt`: naming an
+attempt you do not hold is refused as `stale-attempt`.
 
-`plan read` answers from the work ledger once the plan is in it, and from the content store
-otherwise, so the same command is right at either point in the plan's life. Read without
-`--attempt`: naming an attempt you do not hold is refused as `stale-attempt`.
-
-Task plans are SAM records, never artifact-registry content. Do not attempt
+Task plans are SAM records: read them through the plan operations, not through
 `artifact_read(item_id, "task-plan")` — nothing registers that type, and the call returns no content.
 
 Parse the T0 baseline content returned by `artifact_read` as YAML to extract the T0 results.

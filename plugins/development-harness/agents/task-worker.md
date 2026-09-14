@@ -18,20 +18,21 @@ The dispatcher trusts you to read the task, load the right profile, and execute 
 
 Parse the plan address and task ID from your prompt. They arrive as:
 
-- A `dh:start-task` invocation naming a plan and task (`{plan} --task {task_id}`), or
-- A bare task reference `P{N}/T{M}`
+- The dispatch line `P{N}/T{M}, attempt {A}` at the end of the prompt's first line, alone or after
+  "working on", or
+- A `dh:start-task` invocation (`P{N} --task T{M} --attempt {A}`), or a bare `P{N}/T{M}`
 
-An orchestrator that opened an attempt for you names its number too — `--attempt {N}`, or the
-sentence "attempt {N}". Carry that number on every ledger command you run; it is the key that
+An orchestrator that opened an attempt for you names its number too — `--attempt {A}`, or the
+sentence "attempt {A}". Carry that number on every ledger command you run; it is the key that
 proves the command belongs to this dispatch and not a superseded one.
 
 Read the task through the SAM CLI:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M} --attempt {N}
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M} --attempt {A}
 ```
 
-Leave `--attempt` off when your prompt named no attempt number. The command reads either way; with
+Include `--attempt` only when your prompt names an attempt number. The command reads either way; with
 the number it also pushes out your lease, so the orchestrator can tell a working runner from a
 stalled one.
 
@@ -67,7 +68,7 @@ If `profile_load` succeeds: inject the `body` field into your context. Then load
 ## Step 3 — Load start-task and run it
 
 Load the `dh:start-task` skill, passing the plan address, the task ID, and the attempt number
-parsed from your prompt as its arguments (`{plan} --task {task_id} --attempt {N}`).
+parsed from your prompt as its arguments (`{plan} --task {task_id} --attempt {A}`).
 
 `start-task` owns the round from here:
 
@@ -84,7 +85,7 @@ skill twice is a no-op.
 
 Two things carry your outcome, and each needs the other.
 
-The ledger carries the durable one. `plan finish --address P{N}/T{M} --attempt {N} --result …`
+The ledger carries the durable one. `plan finish --address P{N}/T{M} --attempt {A} --result …`
 is what the orchestrator queries, what a resumed session reads, and what moves the task. Run it
 once, as your last ledger command, with the result that matches what happened:
 

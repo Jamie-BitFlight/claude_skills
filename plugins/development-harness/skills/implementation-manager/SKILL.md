@@ -1,6 +1,6 @@
 ---
 name: implementation-manager
-description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, claiming tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing tasks or configuring hook profiles.
+description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, dispatching tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing tasks or configuring hook profiles.
 user-invocable: false
 disable-model-invocation: false
 ---
@@ -111,7 +111,7 @@ sections its attempts recorded:
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1/T01
 ```
 
-Add `--attempt {n}` only when you hold that attempt; naming one you do not is refused as
+Add `--attempt {A}` only when you hold that attempt; naming one you do not is refused as
 `stale-attempt`. For every task row with its derived columns, use `plan status --plan-address P1`
 on a ledger plan.
 
@@ -202,9 +202,9 @@ launch ended, and nothing else:
 
 1. Reads the sub-agent's own initial prompt from `agent_transcript_path` and takes the plan
    address, the task id and the attempt number from it. The dispatch contract requires all three
-   in the prompt (`{plan}/{task}, attempt {n}`), and the transcript is per-sub-agent, so parallel
+   in the prompt (`{plan}/{task}, attempt {A}`), and the transcript is per-sub-agent, so parallel
    workers correlate to distinct attempts.
-2. Runs `plan settle --address {plan}/{task} --attempt {n} --return-text "{the final message}"`.
+2. Runs `plan settle --address {plan}/{task} --attempt {A} --return-text "{the final message}"`.
 
 It writes no task status. The runner's own `plan finish --result` records the outcome and the
 orchestrator's `plan accept` / `plan reclaim` records the verdict — see
@@ -212,8 +212,8 @@ orchestrator's `plan accept` / `plan reclaim` records the verdict — see
 one fact would drift from both. The worker's final message is stored verbatim as the attempt's
 return text, which is evidence the judge reads.
 
-Nothing it cannot do is absorbed: a prompt naming no attempt, a plan the ledger does not hold,
-and a settle the CLI refused are each reported on stderr. The hook still exits 0, because the
+Every failure is reported on stderr, never absorbed: a prompt naming no attempt, a plan the ledger
+does not hold, and a settle the CLI refused. The hook still exits 0, because the
 SubagentStop critical path must not be blocked.
 
 The orchestrator settles as its own next step too, and whichever gets there first wins — the

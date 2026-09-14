@@ -60,10 +60,10 @@ Consequences the design draws, each a claim in its own right:
   (#3431: 13 sub-agent transcripts under one parent session carry 1 distinct `sessionId` and 13
   distinct `agentId` values) and re-read 2026-09-15 (two `subagents/agent-*.jsonl` transcripts,
   each `sessionId` equal to its parent session directory). Codex: its hooks documentation states
-  "Subagent hooks use the parent session id" (read 2026-09-06, quoted in #3431). Confidence:
-  measured on local transcripts for Claude Code, no documentation statement found; source for
-  Codex. Re-check: compare `sessionId` in a fresh `subagents/agent-*.jsonl` with its parent
-  session directory name.
+  "Subagent hooks use the parent session id" (read 2026-09-06, quoted in #3431). Confidence: for
+  Claude Code, no defined term fits — the evidence is a direct transcript read (#3431), not a
+  documentation statement; source for Codex. Re-check: compare `sessionId` in a fresh
+  `subagents/agent-*.jsonl` with its parent session directory name.
 - **The hook this repository ships reaches four harnesses:** Claude Code, Codex, Cursor and
   Kimi, each of which loads hooks from a plugin manifest this marketplace already publishes. On
   Hermes a shell hook comes from user config; on OpenCode and Kilo Code it is a JavaScript or

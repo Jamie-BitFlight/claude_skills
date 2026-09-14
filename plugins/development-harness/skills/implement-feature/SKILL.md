@@ -164,7 +164,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{plan_
 - Launch the chosen agent with the task reference and the attempt number as its entire prompt:
 
 ```text
-{plan_ref}/{task_id}, attempt {attempt}
+{plan_ref}/{task_id}, attempt {A}
 ```
 
 - The dispatch carries a task reference and the receiver resolves what to load from it.
@@ -188,7 +188,7 @@ in progress. Execute the full check — crash/idle/active branches and re-spawn 
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
-  --address "{plan_ref}/{task_id}" --attempt {attempt} --return-text "{the agent's response}"
+  --address "{plan_ref}/{task_id}" --attempt {A} --return-text "{the agent's response}"
 ```
 
 Run `settle` as soon as a launch returns, including when the response is empty or the agent
@@ -368,7 +368,7 @@ Note: under `"per_task"`, per-task gates already fire for each task; no addition
 > step 4 yourself is never wrong. The hook covers the case where this session ends before step 4
 > does. A settle it could not perform is printed to stderr, never absorbed.
 >
-> Do not treat the hook as the thing that moves the task. It writes no status at all. A task
+> The hook only records that the launch ended — it writes no status at all. A task
 > reaches its outcome because the worker ran `plan finish` and you ran `plan accept` — the loop
 > above reads the ledger for that, not the hook's exit.
 

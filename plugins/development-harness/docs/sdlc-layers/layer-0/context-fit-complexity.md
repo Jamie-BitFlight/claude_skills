@@ -46,6 +46,14 @@ Unknown unknowns become known unknowns through structured prerequisite enumerati
 
 RT-ICA is the intake and uncertainty-resolution method inside this broader model — it handles steps 2-3 of the operational loop.
 
+### 6. Reuse Over Rediscovery
+
+Some knowledge is the same for many items, for example the test framework of the project. Keep it in a single source of truth. Load it by reference.
+
+Some knowledge is specific to one item, for example the acceptance criteria of a task. Send this knowledge through the artifacts of that item. Keep it scoped to that item.
+
+Some knowledge has a stable structure and volatile details. Store the structure. Get the details when the step needs them.
+
 ## Operational Loop
 
 1. Start from the goal
