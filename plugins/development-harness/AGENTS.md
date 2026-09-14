@@ -257,7 +257,9 @@ that change depends on.
 **Modifying data structures, domain models, or task/plan schemas:**
 
 - Load [Domain model source](./sam_schema/core/models.py) — authoritative `Task` and `Plan` Pydantic models. This is the source of truth for all field definitions. Notable plan-level fields: `autonomy` (enum `full_auto` | `checkpoint` | `per_task`, default `full_auto`) controls implement-feature dispatch gating — see `Plan` class and [implement-feature SKILL.md](./skills/implement-feature/SKILL.md) for how it is consumed.
-- Load [Workflow Architecture Diagram](./docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, SAM state machine, hook trigger conditions
+- Load [Work ledger specification](./dh_core/ledger_spec.py) — the ledger's commands, columns, events and task-state transitions
+- Load [ARCHITECTURE.md](./ARCHITECTURE.md) § "What a hook may write" — which actor writes each task fact, and what the SubagentStop hook records
+- Load [plan status shapes](./skills/implement-feature/references/plan-status-shapes.md) — the two `plan status` response shapes, ledger and content store
 
 **Modifying the backlog lifecycle, grooming, or issue state machine:**
 
@@ -307,7 +309,7 @@ A completed change in one of these categories carries a documentation obligation
 |---|---|
 | Process change (new stage, changed sequencing, new touchpoint) | Yes — update Default Development Flow |
 | Data structure change (new field, changed type, new entity) | Yes — update `models.py` first |
-| New or removed MCP tool | Yes — update Workflow Architecture Diagram; run `/dh:meta-workflow-graph-refresh` to update G8 layer |
+| New or removed MCP tool | Yes — run `/dh:meta-workflow-graph-refresh` to update G8 layer |
 | New artifact type | Yes — add the `ArtifactType` member in `backlog_core/models.py` and, unless no agent registers it, the row in [dh_core/artifact_registry.py](./dh_core/artifact_registry.py); the gate accepts the type only once both exist |
 | Changed artifact lifecycle | Yes — update Artifact Conventions and Plan Artifact Lifecycle; run `/dh:meta-workflow-graph-refresh` to update G2 layer |
 | New skill, agent, or Mermaid decision fork added | Yes — run `/dh:meta-workflow-graph-refresh` to update L0/L1 or G4 layer |

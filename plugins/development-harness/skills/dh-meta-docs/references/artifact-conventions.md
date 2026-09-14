@@ -296,7 +296,6 @@ Beads providers store their native records directly and do not require that cach
 Read these together to get the full system picture:
 
 - [Default Development Flow](./default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
-- [Workflow Architecture Diagram](../../../docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
 - [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
 - [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)

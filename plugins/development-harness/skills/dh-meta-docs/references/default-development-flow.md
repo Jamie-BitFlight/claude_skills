@@ -306,7 +306,6 @@ When a flow override is present, the harness loads the custom flow instead of th
 Read these together to get the full system picture:
 
 - [Artifact Conventions](./artifact-conventions.md) — naming, file layout, cross-referencing
-- [Workflow Architecture Diagram](../../../docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
 - [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
 - [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
 - [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
