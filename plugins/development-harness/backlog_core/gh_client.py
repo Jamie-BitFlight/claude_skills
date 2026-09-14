@@ -14,7 +14,7 @@ import contextlib
 import logging
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Final, Protocol
 
 from github import GithubException
 from typing_extensions import TypedDict
@@ -40,6 +40,7 @@ from .models import (
     ContentConflictError,
     ContentUnavailableError,
     GitHubUnavailableError,
+    GraphQLUnavailableError,
     IssueLocalFields,
     IssueStatus,
     MilestoneInfo,
@@ -501,6 +502,51 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 # ---------------------------------------------------------------------------
 
 
+#: Message fragments that mark a 403 as "this environment refuses GraphQL", rather than
+#: "this token may not do that". Matched case-insensitively against the response message.
+#: Observed verbatim from a Claude Code sandbox on 2026-09-14:
+#:   "GitHub GraphQL is not available from Claude Code sessions; use the REST API ..."
+GRAPHQL_UNAVAILABLE_MARKERS: Final[tuple[str, ...]] = ("graphql is not available",)
+
+
+def _github_exception_message(exc: GithubException) -> str:
+    """Return the human-readable message a GithubException carries.
+
+    Args:
+        exc: The exception PyGithub raised.
+
+    Returns:
+        The ``message`` value from the response body when present, else the string form
+        of the whole body. PyGithub puts the parsed JSON body on ``data``, which is a
+        dict for GitHub's error responses and occasionally a bare string.
+    """
+    data = exc.data
+    if isinstance(data, dict):
+        message = data.get("message")
+        if isinstance(message, str):
+            return message
+    return str(data)
+
+
+def is_graphql_unavailable(exc: GithubException) -> bool:
+    """Report whether this failure means GraphQL is refused environment-wide.
+
+    A 403 alone is not enough. A token missing a scope also returns 403, and that is a
+    permissions problem a REST fallback cannot fix either. Only a 403 whose message
+    carries one of GRAPHQL_UNAVAILABLE_MARKERS identifies the environment-level refusal.
+
+    Args:
+        exc: The exception PyGithub raised from a GraphQL call.
+
+    Returns:
+        True when the status is 403 and the message marks an environment-wide refusal.
+    """
+    if exc.status != _HTTP_FORBIDDEN:
+        return False
+    message = _github_exception_message(exc).casefold()
+    return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
+
+
 def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
@@ -520,11 +566,15 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         The ``data`` dict from the GraphQL response.
 
     Raises:
+        GraphQLUnavailableError: When the environment refuses GraphQL outright.
         BacklogError: On GraphQL errors, NOT_FOUND (404), or network/auth failures.
     """
     try:
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
+        if is_graphql_unavailable(exc):
+            msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
+            raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc
     if "errors" in response:
