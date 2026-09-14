@@ -715,7 +715,7 @@ flowchart TD
 3. Selects task (from `--task` argument or first `not-started` with resolved deps)
 4. Loads task-level skills via `Skill(skill="{skill-name}")` for each name in `task.skills`
 5. `sam_task(plan="P{N}", task="T{M}", config={"action":"claim"})` — if `claimed: false`, STOP (do not implement). The configured backend transitions status to `in-progress`; serialize claims for the same task.
-6. Registers active-task context with `sam_active_task(config={"action":"set","plan":"P{N}","task":"T{M}"})` (required for hook-driven updates)
+6. Registers active-task context for the PostToolUse hook's `last-activity` updates
 7. Implements against acceptance criteria and verification steps
 8. Commits (prohibition on `Fixes #N` trailers — only `/dh:complete-implementation` Final Step may include these)
 
