@@ -1277,14 +1277,25 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Try to get GitHub repo, return None when no token or GitHub errors.
+    """Try to get GitHub repo, return None only when no token is configured.
 
-    Use this for operations where local-only fallback is acceptable.
+    Use this for operations where a missing-token, local-only fallback is
+    acceptable. A missing ``GITHUB_TOKEN`` is a configuration state, not a
+    failure, so it is folded into ``None``. Anything ``get_repo`` itself
+    raises — a network failure, a rate limit, a 5xx — is a genuine failure;
+    folding it into the same ``None`` made it indistinguishable from "GitHub
+    is not configured here" (#3546). It is raised instead, so a caller that
+    needs to tell the two apart can — and every caller for whom the old
+    blanket local-only fallback is still the right response must catch
+    ``GitHubUnavailableError`` explicitly around this call.
 
     Returns:
-        Repository object, or None when no GitHub token is available (check
-        TOKEN_ENV_VARS), or GitHub returned an error (authentication failure,
-        rate limit, or server error).
+        Repository object, or None if no ``GITHUB_TOKEN`` is configured.
+
+    Raises:
+        GitHubUnavailableError: If the GitHub API call itself fails for a
+            reason other than a missing token (network error, rate limit,
+            5xx, etc.).
     """
     repo = resolve_repo(repo)
     try:
@@ -1302,10 +1313,7 @@ def try_get_github(repo: str = "") -> Repository | None:
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
-        return None
-    except OSError as exc:
-        logger.warning("try_get_github: network or transport error for repo %r: %s", repo, exc)
-        return None
+        raise GitHubUnavailableError(f"GitHub repository {repo!r} unavailable: {exc}") from exc
 
 
 def probe_backend_status(repo: str = "") -> BackendStatus:
@@ -1330,7 +1338,14 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
             availability=BackendAvailability.NEEDS_AUTHENTICATION, error=f"No GitHub token found. Set one of: {names}"
         )
 
-    if (repo_obj := try_get_github(repo)) is None:
+    try:
+        repo_obj = try_get_github(repo)
+    except GitHubUnavailableError as exc:
+        return BackendStatus(
+            availability=BackendAvailability.ERROR,
+            error=f"GitHub repository unavailable — token set but connection failed: {exc}",
+        )
+    if repo_obj is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
             error="GitHub token set but GitHub returned an error (authentication failure, rate limit, or server error)",
@@ -1520,6 +1535,10 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
     An empty map means "the query succeeded and no item carries a status", so no
     failed query may produce one. The caller catches availability failures and
     decides whether to continue from cached statuses.
+
+    The same applies to a missing token, network error, rate limit, or GitHub
+    5xx: each is raised as a ``BackendUnavailableError`` rather than folded
+    into the same empty map.
 
     Returns:
         Dict mapping issue_number -> IssueStatus model.
@@ -1881,24 +1900,31 @@ def view_enrich_from_github(
     back to the raw issue body rather than failing the whole view.
 
     Returns:
-        True if GitHub data was fetched, False if unavailable or errored.
+        True if GitHub data was fetched, False if no ``GITHUB_TOKEN`` is
+        configured — a configuration state, not a failure.
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
             API outright. ``view_item`` reads ``False`` as "this issue does not
             exist" and raises ``ItemNotFoundError``, so a refused query must not
             return it — the issue may exist and simply be unaskable.
+        GitHubUnavailableError: When the GitHub API call fails for any other
+            reason (network error, rate limit, 5xx, etc.) once a token is
+            configured — same rationale as the GraphQL refusal: ``False``
+            would read as "no such issue", which is not what happened.
     """
     gh_repo = try_get_github(repo)
     if gh_repo is None:
+        # No GITHUB_TOKEN configured. A genuine try_get_github failure raises
+        # GitHubUnavailableError instead of reaching this line.
         return False
     try:
         owner, repo_name = gh_repo.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(gh_repo, owner, repo_name, int(issue_num))
     except GraphQLUnavailableError:
         raise
-    except (BacklogError, GithubException):
-        return False
+    except (BacklogError, GithubException) as exc:
+        raise GitHubUnavailableError(f"GitHub issue enrichment failed for issue {issue_num!r}: {exc}") from exc
     body = gh_issue["body"]
     if resolve_version is not None:
         with contextlib.suppress(BacklogError, ContentConflictError, ContentUnavailableError):

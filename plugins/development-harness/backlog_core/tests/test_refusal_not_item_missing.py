@@ -9,6 +9,14 @@ shaped exactly like an empty one.
 
 Neither read is made fatal here. A cached record still answers a view, and a list
 still renders. What changes is that the answer names its own limits.
+
+A third read told a quieter version of the same lie: ``view_enrich_from_github``
+folded a genuine failure (network error, 500, rate limit) into the identical
+``False`` a missing token produces (#3546), so a real outage rendered exactly like
+"GitHub is not configured here". Only the actually-benign case — no
+``GITHUB_TOKEN`` configured at all — keeps that ``False``/local-fallback behaviour
+now; a genuine failure propagates as ``GitHubUnavailableError`` instead, which
+``view_item``'s existing ``except BackendUnavailableError`` clause already catches.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
+    GitHubUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
@@ -58,7 +67,8 @@ def _item(issue: str, title: str = "An item") -> BacklogItem:
 
 
 class TestViewEnrichSurfacesTheRefusal:
-    """``False`` from this function means "no such issue", so a refusal must not return it."""
+    """``False`` from this function means "no such issue", so neither a refusal nor a
+    genuine failure may return it."""
 
     def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
@@ -67,14 +77,15 @@ class TestViewEnrichSurfacesTheRefusal:
         with pytest.raises(GraphQLUnavailableError):
             gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
-    def test_a_generic_backlog_error_still_returns_false(self, mocker: MockerFixture) -> None:
-        """An ordinary failure keeps the existing local-only fallback."""
+    def test_a_generic_backlog_error_now_propagates_instead_of_hiding_as_false(self, mocker: MockerFixture) -> None:
+        """A non-refusal failure must not read as "issue #519 does not exist"."""
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(gh_client, "_fetch_issue_graphql", side_effect=BacklogError("query rejected"))
 
-        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
-    def test_a_github_exception_still_returns_false(self, mocker: MockerFixture) -> None:
+    def test_a_github_exception_now_propagates_instead_of_hiding_as_false(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(
             gh_client,
@@ -82,9 +93,25 @@ class TestViewEnrichSurfacesTheRefusal:
             side_effect=GithubException(status=404, data={"message": "Not Found"}, headers={}),
         )
 
-        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
+
+    def test_a_try_get_github_failure_propagates_as_github_unavailable(self, mocker: MockerFixture) -> None:
+        """A network error/500/rate limit resolving the repo itself is not a refusal either.
+
+        This is the earlier of the two swallow points #3546 fixed: ``try_get_github``
+        itself used to fold *any* ``GithubException`` from ``get_repo`` — not just a
+        missing token — into the same ``None`` a missing token produces.
+        """
+        mocker.patch.object(
+            gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
     def test_an_unreachable_backend_still_returns_false(self, mocker: MockerFixture) -> None:
+        """``try_get_github`` returning None is the no-token config state, not a failure."""
         mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
         assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False

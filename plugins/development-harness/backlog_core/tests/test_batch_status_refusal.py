@@ -23,6 +23,7 @@ from backlog_core.models import (
     BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    GitHubUnavailableError,
     GraphQLUnavailableError,
     IssueStatus,
     Output,
@@ -48,7 +49,7 @@ class _Repo:
 
 
 class TestBatchFetchStatusesSurfacesTheRefusal:
-    """The GraphQL refusal must not arrive at the caller disguised as an empty map."""
+    """Neither the GraphQL refusal nor a genuine failure may arrive disguised as an empty map."""
 
     def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
@@ -93,6 +94,20 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=RuntimeError("invalid response shape"))
 
         with pytest.raises(RuntimeError, match="invalid response shape"):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_a_try_get_github_failure_propagates_as_github_unavailable(self, mocker: MockerFixture) -> None:
+        """A network error/500/rate limit resolving the repo itself is not a refusal either.
+
+        This is the earlier of the two swallow points #3546 fixed: ``try_get_github``
+        itself used to fold *any* ``GithubException`` from ``get_repo`` — not just a
+        missing token — into the same ``None`` a missing token produces.
+        """
+        mocker.patch.object(
+            gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+        )
+
+        with pytest.raises(GitHubUnavailableError):
             gh_client.batch_fetch_statuses([_item("#42")])
 
     def test_an_unreachable_backend_is_an_availability_failure(self, mocker: MockerFixture) -> None:
