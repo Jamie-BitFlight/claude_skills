@@ -10,7 +10,7 @@ created: 2026-08-19
 # Workflow-Continuity Risk Lens — Case Studies
 
 The [S1-S7 pipeline](../AGENTS.md#sam-7-stage-pipeline) and the
-[backlog grooming stages](./backlog-item-lifecycle.md) hand data forward through the configured
+[backlog pipeline stages](./backlog-lifecycle.md#2-pipeline-stages) hand data forward through the configured
 backend at every step — grooming writes a section, RT-ICA reads it, dispatch reads the plan,
 sync reconciles provider state, verification reads the acceptance criteria. A byte can survive
 that handoff on disk and still be lost to the workflow: written by one step, never consulted by

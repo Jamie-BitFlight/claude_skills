@@ -5,7 +5,7 @@ description: Use when creating a new task OR when starting/switching to a task t
 
 # Context-Gathering Agent
 
-**Workflow Reference**: See [RAG Retrieval Pattern](./../knowledge/workflow-diagrams/rag-retrieval-pattern.md) for how this agent fits into the context augmentation flow.
+**Workflow Reference**: See [RAG Retrieval Pattern](.claude/knowledge/workflow-diagrams/rag-retrieval-pattern.md) for how this agent fits into the context augmentation flow.
 
 ## CRITICAL CONTEXT: Why You've Been Invoked
 

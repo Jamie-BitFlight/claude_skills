@@ -78,15 +78,9 @@ Read the plan record through the plan operations — task plans are SAM state, n
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
 ```
 
-`plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. On
-the work ledger, `plan status` returns the plan row and every task row with its derived columns. On
-the content store, `plan status` returns plan-level counts and no task rows.
-
-`plan read` answers from the work ledger once the plan is in it, and from the content store
-otherwise, so the same command is right at either point in the plan's life. Read without
-`--attempt`: naming an attempt you do not hold is refused as `stale-attempt`.
-
-> **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.
+`plan status` returns the plan row and every task row on the work ledger, or plan-level counts
+with no task rows on the content store. Reading a `plan status` response: activate the
+`dh:implement-feature` skill for which shape a response answered in.
 
 **Build provides/consumes map:**
 

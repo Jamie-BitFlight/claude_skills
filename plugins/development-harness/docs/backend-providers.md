@@ -320,5 +320,5 @@ durable only when the caller supplies a persistent database path.
 ## Related documents
 
 - [Plan and artifact lifecycle](./plan-artifact-lifecycle.md) — creation, mutation, divergence, and completion rules.
-- [Backlog item lifecycle](./backlog-item-lifecycle.md) — end-to-end work-item state transitions.
+- [Backlog lifecycle](./backlog-lifecycle.md) — item state machine and stage transitions.
 - [Task field reference](../sam_schema/core/models.py) — authoritative field definitions; verify current fields against the active backend contract.

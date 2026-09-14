@@ -297,7 +297,7 @@ Read these together to get the full system picture:
 
 - [Default Development Flow](./default-development-flow.md) — S1-S7 stage sequencing, ARL touchpoint gates
 - [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
-- [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Backlog Lifecycle](../../../docs/backlog-lifecycle.md) — item states and stage transitions from creation to closure
 - [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
 
 ## Sources

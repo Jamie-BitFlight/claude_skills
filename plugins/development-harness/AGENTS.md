@@ -258,12 +258,12 @@ that change depends on.
 
 - Load [Domain model source](./sam_schema/core/models.py) — authoritative `Task` and `Plan` Pydantic models. This is the source of truth for all field definitions. Notable plan-level fields: `autonomy` (enum `full_auto` | `checkpoint` | `per_task`, default `full_auto`) controls implement-feature dispatch gating — see `Plan` class and [implement-feature SKILL.md](./skills/implement-feature/SKILL.md) for how it is consumed.
 - Load [Work ledger specification](./dh_core/ledger_spec.py) — the ledger's commands, columns, events and task-state transitions
-- Load [ARCHITECTURE.md](./ARCHITECTURE.md) § "What a hook may write" — which actor writes each task fact, and what the SubagentStop hook records
+- Load [plugin ARCHITECTURE.md](./ARCHITECTURE.md) § "What a hook may write" — which actor writes each task fact, and what the SubagentStop hook records
 - Load [plan status shapes](./skills/implement-feature/references/plan-status-shapes.md) — the two `plan status` response shapes, ledger and content store
 
 **Modifying the backlog lifecycle, grooming, or issue state machine:**
 
-- Load [Backlog Item Lifecycle](./docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation through closure
+- Load [Backlog Lifecycle](./docs/backlog-lifecycle.md) — item states, stage transitions, and the gates that block them
 - Load [Backend Providers](./docs/backend-providers.md) — pluggable backend abstractions, GitHub/GitLab/Linear capabilities
 
 **Modifying markdown consumption, content pagination, table-of-contents/section addressing, or response sizing:**
