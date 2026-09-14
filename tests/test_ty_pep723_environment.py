@@ -10,11 +10,10 @@ Astral shipped an experimental, opt-in fix against that issue on 2026-08-28 (req
 uv >= 0.12.3): ty can shell out to `uv` to synchronise a PEP 723 script's own inline
 dependencies, in both the CLI (`TY_UV=scripts`) and the language server (the `useUv`
 initialization option). This repo's checked-in configuration for the language-server side is
-`.vscode/settings.json`'s `"ty.experimental.useUv"` key -- see
-`rules/python-development.md#unresolved-import-on-a-pep-723-script-specifically-in-the-language-server`
-for the full narrative, including the still-open Claude Code language-server gap: that consumer
-needs `"TY_UV": "scripts"` added to `.claude/settings.json`'s `env` block by a human, and this
-suite does not gate it.
+`.vscode/settings.json`'s `"ty.experimental.useUv"` key -- see the `python-engineering:ty` skill for
+what that key does and why `"scripts"` is its only working value.
+Claude Code's bundled Astral-plugin language server stays uncovered: its fix belongs in that
+plugin's own `lspServers.ty` entry upstream, and this suite does not gate it.
 
 This suite reads that repo configuration file rather than restating its value, so deleting the
 config entry it guards fails `test_repo_configures_ty_experimental_use_uv`, and drifting its value
@@ -62,10 +61,10 @@ def _bare_environment() -> dict[str, str]:
     prepended. Without this, `subprocess.run` would silently inherit the test runner's `PATH`
     (which already has the project environment first) and every case would resolve correctly
     regardless of what this function's caller sets afterward -- exactly the false-negative this
-    helper exists to prevent. `TY_UV` matters for the same reason and is easy to miss: the
-    `.claude/settings.json` `env` entry this repo asks for puts `TY_UV=scripts` into every process
-    Claude Code spawns, pytest included, which would make the `_run_ty_check(ty_uv=None)` case
-    resolve cleanly and silently turn the #691 canary into a skip. This reproduces what a bare
+    helper exists to prevent. `TY_UV` matters for the same reason and is easy to miss: any ambient
+    `TY_UV=scripts` in the launching shell reaches pytest too, which would make the
+    `_run_ty_check(ty_uv=None)` case resolve cleanly and silently turn the #691 canary into a skip.
+    This reproduces what a bare
     language server launch (e.g. `uvx ty@latest server`) actually experiences: no project
     environment on `PATH`. `uv`/`uvx` themselves are deliberately left reachable on `PATH`,
     matching reality -- `TY_UV=scripts` needs `uv` on `PATH` to shell out to, and a real editor

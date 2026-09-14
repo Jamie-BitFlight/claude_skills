@@ -24,9 +24,7 @@ over maximizing information.
 - No planning in "weeks" or "sprints" — work scales with parallelism, not calendar time.
 - Output containing "likely", "probably", or "I think" — stop and verify before continuing.
 - A prompt naming a specific product, version, or release event — search the web or current docs
-  FIRST, before any planning, design, or code generation. See
-  [Fact Verification First](rules/fact-verification-first.md) for the trigger patterns and the
-  reactive `fact-check` skill it hands off to.
+  FIRST, before any planning, design, or code generation.
 - Pass file paths to a sub-agent and let it read them — a dispatched agent runs its own
   verification against the actual source with a fresh context window. Never transcribe file
   contents into a delegation prompt; that bypasses the agent's own verification. Symmetrically, do
@@ -109,7 +107,6 @@ uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # I
 
 Follow `./CONTRIBUTING.md` when adding or modifying a plugin.
 
-Run scripts using `uv run` — if `uv` is unavailable, see [rules/uv-run-fallback.md](rules/uv-run-fallback.md).
 Before linting, formatting, or type-checking, read `docs/linting-and-type-checking.md`.
 Before writing, running, or placing a test, read `docs/testing.md`.
 Before validating an MCP server (protocol, Codex, or Claude plugin integration), read
@@ -216,8 +213,7 @@ dismiss it — dismissing it normalizes technical debt. Respond with:
 
 "Plan" means concrete steps (files, fixes, scope estimate) with the user choosing priority;
 "backlog" means a trackable record that prevents the finding from being lost. A trivial
-single-file fix with an unambiguous cause routes straight to
-`/dh:work-backlog-item --quick` per [rules/proactive-fix-gate.md](rules/proactive-fix-gate.md)
+single-file fix with an unambiguous cause routes straight to `/dh:work-backlog-item --quick`
 without asking first — the gate decides the routing, not the user.
 
 When you identify that work needs multiple steps, create backlog items for them rather than only
@@ -269,21 +265,10 @@ For the backlog MCP tool reference (tool names, return format, sync rules), acti
 Before writing a script or CLI meant to be consumed by an agent (which is every script/CLI/MCP
 server in this repo), read `docs/cli-output-conventions.md`.
 
-For PEP 723/no-uv-workspace rules and `ty` unresolved-import/unresolved-attribute triage, read
-[rules/python-development.md](rules/python-development.md). For choosing a language for a new
-component, naming conventions, and PEP 723 bundled-dependency traps, read
-[rules/language-conventions.md](rules/language-conventions.md). For how to invoke an existing
-script (never bare `python3`, canonical shebang), read
-[rules/script-invocation.md](rules/script-invocation.md). For acceptable-exception categories when
-a linter or type-checker override is warranted, read
-[rules/linting-exceptions.md](rules/linting-exceptions.md). For narrow-catch and the "must not
-crash" anti-pattern, read [rules/exception-handling.md](rules/exception-handling.md). For avoiding
-silent failure paths, read [rules/silent-failure-prevention.md](rules/silent-failure-prevention.md).
-For reading or writing YAML/TOML, read
-[rules/yaml-toml-libraries.md](rules/yaml-toml-libraries.md). For parsing markdown structure
-(headers, list items, tables, section extraction), use the `marko` AST library rather than a regex
-parser — see the established usage patterns in the sibling `agentskills-linter` repo, and add
-`marko` via `uv add marko` if the target project doesn't already depend on it.
+For parsing markdown structure (headers, list items, tables, section extraction), use the `marko`
+AST library rather than a regex parser — see the established usage patterns in the sibling
+`agentskills-linter` repo, and add `marko` via `uv add marko` if the target project doesn't already
+depend on it.
 
 ### Markdown (Skills/Commands/Agents)
 
@@ -291,31 +276,10 @@ Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
 `Skill(skill="...")` — that syntax is Claude-Code-only and this repo's plugin content also
 targets Codex and OpenCode. Existing `Skill(...)` blocks are pre-convention, not bugs.
 
-For code-fence and markdown-link conventions (including the `.claude/`/`rules/` link-style
-exception and the skills-cannot-nest-one-level rule), read
-[rules/markdown-file-references.md](rules/markdown-file-references.md). Before reviewing or
-editing any markdown/prose file, classify its review treatment first via
-[rules/prose-file-classification.md](rules/prose-file-classification.md) — `SKILL.md`,
-`CLAUDE.md`, and `rules/*.md` are prompt-engineering code, not documentation, and get scrutiny
-accordingly. Every factual claim added to skill documentation needs a cited source — see
-[rules/citation-requirements.md](rules/citation-requirements.md). Before shipping a new or edited
-skill, verify its documentation against [rules/skill-documentation-verification.md](rules/skill-documentation-verification.md).
-When reviewing or correcting an AI-facing instruction file (prompt, `SKILL.md`, agent file, rule,
-`CLAUDE.md`/`AGENTS.md`), read
-[rules/review-and-correction-discipline.md](rules/review-and-correction-discipline.md) first —
-structural validation (`skilllint`/`prek`/`ruff`/`ty`) and content review are independent gates,
-and a green structural gate is never evidence of content quality.
-
 Do not restate a value derived from a list, table, or directory defined elsewhere (a count, a
 total, a summary) — it drifts silently when the source changes. Reference the source of truth
 instead (e.g. "all required sections, defined in the validation gate" rather than "all 8 required
 sections").
-
-When creating or modifying a plugin, read
-[rules/plugin-development.md](rules/plugin-development.md) and
-[rules/plugin-json.md](rules/plugin-json.md) (manifest location and schema). For keeping a skill's
-token footprint lean via progressive disclosure, read
-[rules/skill-content-optimization.md](rules/skill-content-optimization.md).
 
 ### JavaScript/TypeScript
 
@@ -338,8 +302,7 @@ branch, and open a pull request for it. Do not wait for interactive approval bef
 pushing in this repository — this overrides Claude Code's own default "ask before committing"
 behavior here.
 
-- Follow `rules/commit-cadence-and-worktrees.md` for commit hygiene: small, file-scoped commits
-  via an explicit file list, never `git add -A`.
+- Commit small and file-scoped, naming each file explicitly on the `git commit` command.
 - One PR per discrete task or unit of work, not one PR per session. Push the branch and run
   `gh pr create` once a task's commit(s) land.
 - **Never leave a PR in draft state.** Open every PR ready for review, and mark any PR you did
@@ -378,14 +341,9 @@ deletion, read `docs/branch-transfer-preflight.md`.
 ## Gotchas & Non-Obvious Patterns
 
 1. **prek not pre-commit**: This repo uses `prek` (Rust-based), not `pre-commit`. Same config, different binary.
-2. **Symlink issues on Windows**: Git symlinks (mode 120000) become plain files on Windows. The `repair-symlinks` pre-commit hook fixes this. Both `ruff` and `ty` have `extend-exclude` entries for symlinked directories.
-3. **`.claude/` vs `docs/`**: `.claude/` is Claude Code configuration; `docs/` is project documentation. Check for an existing directory convention (`ls` the likely parent) before choosing where to create a new file.
-4. **No `git stash` on the primary checkout**: compare against a clean baseline in an isolated worktree instead — other agents may be mid-write there.
-5. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
-6. **Dependency security upgrades**: use `uv add "pkg>=X.Y.Z"` (updates `pyproject.toml` and `uv.lock` atomically with explicit version output) rather than `uv lock --upgrade-package pkg` (silent) or manually verifying line numbers in `uv.lock` (4000+ lines — line numbers do not correspond reliably to package versions). Confirm with `uv tree | grep pkg`.
-7. **PEP 723 scripts**: Standalone scripts use `#!/usr/bin/env -S uv run --quiet --script` with inline metadata blocks. This allows `uv run script.py` to auto-install dependencies. Never add `--active` — see `rules/script-invocation.md` for the isolation rationale.
-8. **Bounded subprocess execution**: `scripts/run_bounded.py` runs a command with a timeout and terminates its full process group (POSIX process-group signals; `taskkill /T /F` on Windows) on expiry, including descendants a bare `subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may hang or spawn children with `uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
-9. **ty PEP 723 script resolution — experimental `TY_UV`/`useUv`, not `VIRTUAL_ENV`**: ty (through at least 0.0.80) type-checks any `.py` file with a `# /// script ... # ///` block as an isolated single-file project and, by default, never consults `[tool.ty.environment]` for it — `extra-paths`, `root`, and `python` are all silently ignored (upstream, open: https://github.com/astral-sh/ty/issues/691). Astral shipped an experimental, opt-in fix on 2026-08-28 (requires uv ≥0.12.3): setting the `TY_UV` environment variable (or the LSP-protocol equivalent `initialization_options.experimental.useUv`) to `scripts` makes ty shell out to `uv` to sync the script's own inline dependencies. Verified by direct LSP JSON-RPC probe (`textDocument/didOpen` + `publishDiagnostics`) against `uvx ty@latest server` — the exact command this repo's Astral plugin launches — that plain `TY_UV=scripts` in that process's environment clears the diagnostic with no `initializationOptions` needed at all. This repo's CLI usage (`uv run ty check`, prek, CI) already resolves PEP 723 scripts correctly without it, because their dependencies are mirrored into the root `[dependency-groups] dev` group. Two separate consumers, two separate fixes: VS Code's `astral-sh.ty` extension is covered by `"ty.experimental.useUv": "scripts"` in the checked-in `.vscode/settings.json`. Claude Code's own bundled Astral-plugin language server (`uvx ty@latest server`, launched from a `plugin.json` this repo doesn't vendor — see `rules/python-development.md`) is a **separate, still-open gap**: its env is set by `.claude/settings.json`'s top-level `env` block, confirmed by observing the live `ty server` process's own environment (`ps -E`) already carrying that file's two existing keys — but no agent may write `"TY_UV": "scripts"` there, since that file is denied to agents as security-sensitive. A human with write access needs to add it. See `rules/python-development.md`'s PEP 723 language-server section for the full coverage breakdown and `tests/test_ty_pep723_environment.py` for the CLI-level regression coverage.
+2. **Compare against a clean baseline in an isolated worktree**, never with `git stash`: the stash stack is shared across every worktree on this machine, so a stash here pops somebody else's work.
+3. **prek stash conflict**: prek stashes unstaged changes before running hooks. If a formatter hook (ruff-format, etc.) modifies staged files and the stash cannot restore cleanly, prek rolls back the hook's changes and the commit fails ("Stashed changes conflicted..."). Fix: `git add -u` to stage the hook's auto-fixes, then retry the commit — the second attempt has nothing left to stash.
+4. **Bounded subprocess execution**: `scripts/run_bounded.py` runs a command with a timeout and terminates its full process group on expiry, including descendants a bare `subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may hang or spawn children with `uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
 
 ## File Locations Quick Reference
 
