@@ -40,9 +40,13 @@ def test_github_reconcile_initial_establishes_durable_snapshot_checkpoint(tmp_pa
     # When: the initial reconciliation completes successfully
     backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
 
-    # Then: the global snapshot watermark survives reopening the cache
+    # Then: the global snapshot watermark survives reopening the cache, tagged
+    # with the unlabeled scope that actually observed it (a genuine empty
+    # repo, per A-critique.md Sec 3.1's open question -- see
+    # test_github_reconcile_label_scoped_zero_items_does_not_advance_checkpoint
+    # for the artificial-zero case this must not be confused with)
     assert FileCache(tmp_path)._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(
-        watermark="2026-08-12T01:00:00Z"
+        watermark="2026-08-12T01:00:00Z", scope="initial", label="", items_observed=0
     )
 
 
@@ -130,8 +134,139 @@ def test_github_reconcile_incremental_uses_durable_snapshot_checkpoint(tmp_path:
     # Then: the backend supplies the durable watermark to its private snapshot adapter
     assert backend._fetch_snapshot.call_args.args[0].since == "2026-08-12T01:00:00Z"
     assert FileCache(tmp_path)._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(
-        watermark="2026-08-12T02:00:00Z"
+        watermark="2026-08-12T02:00:00Z", scope="incremental", label="", items_observed=0
     )
+
+
+def test_github_reconcile_label_scoped_zero_items_does_not_advance_checkpoint(tmp_path: Path) -> None:
+    """Reproduces A-critique.md Sec 3.1: a label-scoped reconcile against a provider that
+    durably observes zero items (e.g. a typo'd ``--label``) must not mark a cold cache as
+    if it held the provider's full item set. Pre-fix, ``_advance_snapshot_checkpoint``
+    gated only on ``outcome.advance_snapshot_checkpoint and outcome.result.conflicts == 0
+    and scope in {INITIAL, INCREMENTAL}`` -- all three hold here even though the reconcile
+    covered only a nonexistent label's slice -- so it durably wrote a fresh watermark over
+    an empty cache sitting in front of a repository that may hold hundreds of open issues.
+    """
+    # Given: a cold cache (never synced) and a repository whose *labeled* slice is empty
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
+    )
+
+    # When: a label-scoped reconcile (e.g. `dh backlog refresh --label nonexistent-label`)
+    # completes cleanly with zero items observed
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
+
+    # Then: the reconcile itself reports success (it is not an error to observe zero items
+    # under a label filter) ...
+    assert result.failures == 0
+    assert result.fetched_items == 0
+    # ... but the checkpoint must stay unset: a label-scoped observation can never speak for
+    # the full unlabeled item set a bare `snapshot_checkpoint is not None` read is trusted to
+    # mean, so the cache must remain honestly "never synced" rather than falsely "synced empty"
+    assert FileCache(tmp_path)._get_snapshot_checkpoint() is None
+
+
+def test_github_reconcile_label_scoped_populated_snapshot_does_not_advance_checkpoint(tmp_path: Path) -> None:
+    # Given: a cold cache and a label-scoped reconcile that *does* observe items
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Bug 1",
+                    body="body",
+                    state="OPEN",
+                    labels=["bug"],
+                    revision="rev-1",
+                )
+            ],
+            sync_started_at="2026-08-12T01:00:00Z",
+            pages_fetched=1,
+        )
+    )
+
+    # When: `dh backlog refresh --label bug` reconciles cleanly
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="bug"))
+
+    # Then: the checkpoint still does not advance -- a labeled reconcile only ever covers
+    # that label's slice, never the full repository a bare checkpoint is read to mean,
+    # regardless of whether that slice happened to be empty or not (A-critique.md Sec 3.4)
+    assert result.failures == 0
+    assert FileCache(tmp_path)._get_snapshot_checkpoint() is None
+
+
+def test_github_reconcile_unlabeled_empty_repo_still_produces_usable_checkpoint(tmp_path: Path) -> None:
+    """The legitimate-zero case (A-approach.md Sec 1.3, A-critique.md Sec 7 open question 1)
+    must not regress: an unlabeled reconcile against a genuinely empty repository still
+    needs to leave a durable, honest checkpoint behind so the caller is not forced to
+    refetch on every list.
+    """
+    # Given: a cold cache and a repository with genuinely zero open issues (no label filter)
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1)
+    )
+
+    # When: an unlabeled initial reconcile completes cleanly
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    # Then: the checkpoint advances and honestly records what it covered -- an unlabeled
+    # scope, over zero items, so a later reader can tell this from the label-scoped and
+    # populated cases above without re-deriving it from the watermark alone
+    assert result.failures == 0
+    assert FileCache(tmp_path)._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(
+        watermark="2026-08-12T01:00:00Z", scope="initial", label="", items_observed=0
+    )
+
+
+def test_github_reconcile_checkpoint_records_items_observed_for_populated_snapshot(tmp_path: Path) -> None:
+    # Given: a cold cache and an unlabeled reconcile that observes a populated repository
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body="body",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+                ProviderItem(
+                    provider_id="node-2",
+                    reference="#2",
+                    title="Issue 2",
+                    body="body",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+            ],
+            sync_started_at="2026-08-12T01:00:00Z",
+            pages_fetched=1,
+        )
+    )
+
+    # When: the unlabeled initial reconcile completes cleanly
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+
+    # Then: the durable checkpoint records the real count actually observed, not just that
+    # "a reconcile happened" -- available to a future reader/discriminator without this
+    # method needing to change again
+    checkpoint = FileCache(tmp_path)._get_snapshot_checkpoint()
+    assert checkpoint is not None
+    assert checkpoint.items_observed == 2
+    assert checkpoint.label == ""
+    assert checkpoint.scope == "initial"
 
 
 def test_github_reconcile_fetch_failure_preserves_snapshot_checkpoint(tmp_path: Path) -> None:
