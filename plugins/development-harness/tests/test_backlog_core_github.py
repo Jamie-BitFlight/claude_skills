@@ -41,11 +41,13 @@ from backlog_core.gh_client import (
     try_get_github,
     view_enrich_from_github,
 )
+from backlog_core.github_client import TOKEN_ENV_VARS
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubUnavailableError,
     Output,
     ViewItemResult,
 )
@@ -1213,23 +1215,23 @@ class TestViewEnrichFromGithub:
         # Assert
         assert enriched is False
 
-    def test_returns_false_on_backlog_error(self, mocker: MockerFixture) -> None:
-        """view_enrich_from_github returns False when _graphql_request raises BacklogError.
+    def test_raises_github_unavailable_on_backlog_error(self, mocker: MockerFixture) -> None:
+        """view_enrich_from_github raises GitHubUnavailableError when _graphql_request raises BacklogError.
 
         Tests: view_enrich_from_github error handling
         How: Raise BacklogError from _graphql_request.
-        Why: Errors must not crash the view command; False is the correct signal.
+        Why: A genuine query failure is not "issue #999 does not exist" (#3546)
+            — False used to mean both, so it is raised instead and the caller
+            (view_item's existing except BackendUnavailableError) decides.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
         mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
         result = ViewItemResult()
 
-        # Act
-        enriched = view_enrich_from_github(result, "999")
-
-        # Assert
-        assert enriched is False
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError):
+            view_enrich_from_github(result, "999")
 
     def test_uses_resolve_version_body_when_provided(self, mocker: MockerFixture) -> None:
         """A successful resolve_version callback's body wins over the raw issue body.
@@ -1291,21 +1293,34 @@ class TestViewEnrichFromGithub:
 
 
 class TestTryGetGithub:
-    """try_get_github returns None gracefully when GitHub is unavailable.
+    """try_get_github returns None only for the config state; it raises for a real failure.
 
-    Tests: try_get_github returns None on missing token or GithubException.
-    Why: All callers that use try_get_github must handle None safely.
+    Tests: try_get_github returns None on a missing token, and raises
+        GitHubUnavailableError on a GithubException from get_repo.
+    Why: A missing token is a configuration state a caller may legitimately
+        fall back on. A GithubException from get_repo (network error, rate
+        limit, 5xx) is a genuine failure that must not collapse into the same
+        None — that indistinguishability was #3546's bug: it made a real
+        outage look identical to "GitHub is not configured here". Callers for
+        whom the old blanket local-only fallback is still correct must catch
+        GitHubUnavailableError explicitly.
     """
 
     def test_returns_none_when_no_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when GITHUB_TOKEN env var is not set.
+        """try_get_github returns None when no token env var is set.
 
         Tests: try_get_github missing token
-        How: Remove GITHUB_TOKEN from environment; call function.
+        How: Remove every TOKEN_ENV_VARS entry from the environment, not just
+            GITHUB_TOKEN — resolve_token() falls through to GH_TOKEN and
+            GITHUB_PERSONAL_ACCESS_TOKEN, either of which (e.g. an ambient
+            GH_TOKEN in a session with its own GitHub access) would otherwise
+            let make_github_client() succeed and this test would instead be
+            exercising a real network call.
         Why: No token is the most common offline scenario.
         """
         # Arrange
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        for env_var in TOKEN_ENV_VARS:
+            monkeypatch.delenv(env_var, raising=False)
 
         # Act
         result = try_get_github("test-owner/test-repo")
@@ -1313,26 +1328,28 @@ class TestTryGetGithub:
         # Assert
         assert result is None
 
-    def test_returns_none_on_github_exception(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when PyGithub raises GithubException.
+    def test_raises_github_unavailable_on_github_exception(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """try_get_github raises GitHubUnavailableError when PyGithub raises GithubException.
 
         Tests: try_get_github API failure handling
         How: Patch the shared client factory so its client's get_repo raises GithubException.
-        Why: Auth failures and network errors must not crash callers.
+        Why: A genuine API failure (auth revoked mid-session, network error, rate
+            limit, 5xx) is not the same condition as no token configured, and
+            silently returning None for both hid that #3546 was fixing.
         """
         # Arrange
         from github import GithubException
 
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = GithubException(
-            status=401, data="Bad credentials", headers={}
-        )
+        underlying = GithubException(status=401, data="Bad credentials", headers={})
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = underlying
 
-        # Act
-        result = try_get_github("test-owner/test-repo")
-
-        # Assert
-        assert result is None
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError) as exc_info:
+            try_get_github("test-owner/test-repo")
+        assert exc_info.value.__cause__ is underlying
 
 
 # ---------------------------------------------------------------------------
