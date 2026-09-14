@@ -160,11 +160,18 @@ class TestSslContextKeepsVerification:
         assert context.get_ca_certs(), "expected the CA bundle to load as a trust anchor"
 
     def test_no_other_verify_flag_is_cleared(self, ca_file):
-        """Only VERIFY_X509_STRICT differs from the library default."""
+        """Nothing but VERIFY_X509_STRICT is dropped from the library default.
+
+        Whether the default sets VERIFY_X509_STRICT varies by Python and urllib3
+        version, so this asserts the subset relation rather than equality: on a build
+        where the default already omits the flag, clearing it is a no-op and the
+        difference is empty, which this still accepts.
+        """
         default_flags = create_urllib3_context().verify_flags
         actual_flags = _build_ssl_context(str(ca_file)).verify_flags
+        cleared = default_flags & ~actual_flags
 
-        assert default_flags & ~actual_flags == ssl.VERIFY_X509_STRICT
+        assert not cleared & ~ssl.VERIFY_X509_STRICT, f"cleared a flag beyond VERIFY_X509_STRICT: {cleared!r}"
 
 
 class TestInstallProxyTlsSupport:
