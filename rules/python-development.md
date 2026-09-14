@@ -45,14 +45,9 @@ resolution. Load `python-engineering:python3-typing` for the boundary-validation
 When `ty` reports `unresolved-import` for a module that genuinely exists on disk, the module's
 directory is almost always missing from `[tool.ty.environment] extra-paths` in `pyproject.toml`.
 Add the directory there, then re-verify with `uv run ty check <path>` before investigating the
-importing code itself. A root-level `ty.toml`, if one exists, takes precedence over
-`pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths` addition doesn't
-resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
+importing code itself. A PEP 723 script is the exception: when its editor diagnostics and
+`uv run ty check <path>` disagree, the CLI is right. A root-level `ty.toml`, if one exists, takes
+precedence over `pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths`
+addition doesn't resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see
 [docs/linting-and-type-checking.md](docs/linting-and-type-checking.md#common-ty-failure-patterns).
-
-### `unresolved-import` on a PEP 723 script, in the language server only
-
-Trust `uv run ty check <path>` over live editor diagnostics when the two disagree on a PEP 723
-script. Load `python-engineering:ty` before changing any configuration in response — `extra-paths`
-and `root` do not govern inline dependency resolution.
