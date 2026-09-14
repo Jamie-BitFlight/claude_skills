@@ -223,3 +223,125 @@ class TestEmptyCacheIsDistinguishableFromAnEmptyBacklog:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any(_EMPTY_CACHE_MARKER in w for w in warnings)
+
+
+class _CheckpointedBackend:
+    """Backend stub that also implements ``SnapshotCheckpointProvider``.
+
+    Unlike ``_CacheBackend`` above (whose ``reconcile`` is documented "never
+    called by ``list_items``"), this stub reports its checkpoint state via
+    ``has_synced_snapshot`` so ``list_items``'s one-shot cold-cache
+    read-through (A-critique.md Sec 5, ALT-5) is reachable in a test.
+    """
+
+    supports_batch_status_fetch = False
+
+    def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
+        self._items = items
+        self._synced = synced
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self._items
+
+    def has_synced_snapshot(self) -> bool:
+        return self._synced
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        """Satisfy the ``SyncProvider`` protocol; tests patch the wrapper instead."""
+        raise NotImplementedError
+
+
+class TestColdCacheReadsThroughOnce:
+    """A never-synced cache triggers one automatic refresh instead of only naming
+    the ambiguity (A-critique.md Sec 5, ALT-5)."""
+
+    def test_a_cold_cache_triggers_exactly_one_refresh_attempt(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(output=Output())
+
+        refresh_mock.assert_called_once()
+
+    def test_a_warm_cache_does_not_trigger_a_spurious_refresh(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=True)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(output=Output())
+
+        refresh_mock.assert_not_called()
+
+    def test_an_explicit_refresh_request_does_not_also_trigger_the_automatic_path(self, mocker: MockerFixture) -> None:
+        """``refresh=True`` must not cause two refresh attempts in one call."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(refresh=True, output=Output())
+
+        refresh_mock.assert_called_once()
+
+    def test_a_failed_refresh_does_not_loop_and_the_existing_warning_still_fires(self, mocker: MockerFixture) -> None:
+        """A refusal/offline failure (no token, still refused) is swallowed: it must
+        not raise for a caller who never asked for a refresh, and the existing
+        never-synced-cache warning must still fire, unchanged, because the
+        checkpoint honestly stays ``None``."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations,
+            "refresh_local_cache_from_github",
+            side_effect=GithubException(status=401, data={"message": "Bad credentials"}, headers={}),
+        )
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_second_cold_but_explained_call_attempts_again_without_looping(self, mocker: MockerFixture) -> None:
+        """Each call against a cache that never manages to sync tries exactly once
+        per call -- never a retry loop within a single call -- and a later call is
+        not suppressed just because an earlier one already failed: the checkpoint
+        is still honestly ``None``, so "we tried and could not" is what every
+        subsequent listing should keep attempting to upgrade to real data, not a
+        cost paid once and then silently given up on."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BacklogError("no token configured")
+        )
+
+        operations.list_items(output=Output())
+        operations.list_items(output=Output())
+
+        assert refresh_mock.call_count == 2
+
+    def test_a_successful_refresh_returns_real_data_not_just_a_provenance_note(self, mocker: MockerFixture) -> None:
+        """The caller of a cold-cache listing that resolves gets real items back --
+        A1's honest checkpoint plus this read-through, not merely an annotation
+        that the emptiness was explained."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        def _do_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            backend._synced = True
+            backend._items = [_item("#1", title="Freshly synced")]
+            return {"refreshed": 1, "reconciled": 0, "pending_mutations": 0, "rejected_mutations": 0}
+
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_do_refresh)
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert result["count"] == 1
+        items = result["items"]
+        assert isinstance(items, list)
+        first_item = items[0]
+        assert isinstance(first_item, dict)
+        assert first_item["title"] == "Freshly synced"
+        assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))

@@ -200,6 +200,14 @@ class GitHubBackend:
         """
         return self._reconciliation.get_work_item(reference)
 
+    def has_synced_snapshot(self) -> bool:
+        """Report whether a durable, honest provider snapshot has ever completed.
+
+        Returns:
+            ``True`` once a reconcile has durably advanced the snapshot checkpoint.
+        """
+        return self._reconciliation.has_synced_snapshot()
+
     def put_work_item(self, item: BacklogItem) -> None:
         """Persist a work-item intent for provider reconciliation."""
         self._reconciliation.put_work_item(item)

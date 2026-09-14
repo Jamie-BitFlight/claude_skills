@@ -285,6 +285,26 @@ class SyncProvider(Protocol):
 
 
 @runtime_checkable
+class SnapshotCheckpointProvider(Protocol):
+    """Optional capability: report whether a cache has ever completed a sync.
+
+    Deliberately a separate protocol rather than a second method on
+    :class:`SyncProvider`: a backend can implement ``reconcile`` (to satisfy
+    ``SyncProvider`` structurally, e.g. a test double whose ``reconcile`` is
+    never meant to be invoked) without exposing checkpoint state at all.
+    Folding this into ``SyncProvider`` would make every existing
+    ``isinstance(x, SyncProvider)`` gate in this codebase (the
+    never-synced-cache warning in ``operations.list_items`` among them) also
+    require this method, silently changing their behaviour for any backend
+    or test double that does not implement it. Callers that want the
+    one-shot cold-cache read-through in ``operations.list_items`` gate on
+    *both* protocols.
+    """
+
+    def has_synced_snapshot(self) -> bool: ...
+
+
+@runtime_checkable
 class ContentProvider(Protocol):
     """Optional logical plan and artifact content capability."""
 

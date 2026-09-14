@@ -457,6 +457,23 @@ class _GitHubReconciliation:
         """
         return [record.item for record in self.load_records()]
 
+    def has_synced_snapshot(self) -> bool:
+        """Report whether a durable, honest provider snapshot has ever completed.
+
+        Backed by the same checkpoint ``_with_snapshot_checkpoint`` reads to
+        pick ``INITIAL`` vs ``INCREMENTAL`` scope -- ``None`` means no
+        reconcile has ever advanced it (A-critique.md Sec 4.1: "the
+        checkpoint records that a reconcile happened, not what it covered",
+        but a ``None`` checkpoint unambiguously means "never"). Callers use
+        this to distinguish a never-synced cache, worth one automatic
+        read-through, from a warm cache that happens to hold nothing right
+        now.
+
+        Returns:
+            ``True`` once a reconcile has durably advanced the checkpoint.
+        """
+        return self._cache._get_snapshot_checkpoint() is not None
+
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
 
