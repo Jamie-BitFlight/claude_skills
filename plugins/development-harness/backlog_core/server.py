@@ -2597,7 +2597,8 @@ async def backlog_update(
         ),
     ],
     plan: Annotated[
-        str | None, Field(description="Plan address to record on the item, such as P12. The item stores it verbatim.")
+        str | None,
+        Field(description="Plan address to record on the item, such as Pa1b2c3d4. The item stores it verbatim."),
     ] = None,
     status: Annotated[
         str | None,

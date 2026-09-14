@@ -202,7 +202,7 @@ CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --sele
 ```text
 Parameters:
   selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  plan            str|null  optional  Plan address to record on the item, such as P12. The item stores it verbatim.  (default: null)
+  plan            str|null  optional  Plan address to record on the item, such as Pa1b2c3d4. The item stores it verbatim.  (default: null)
   status          str|null  optional  "in-progress" | "groomed" | etc.  (default: null)
   section         str|null  optional  Section name for content update (use with content)  (default: null)
   content         str|null  optional  Content for the named section  (default: null)
