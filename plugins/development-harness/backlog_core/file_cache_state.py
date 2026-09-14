@@ -54,9 +54,25 @@ class CacheCheckpoint(BaseModel):
 
 
 class _ProviderSnapshotCheckpoint(BaseModel):
+    """Durable record of the last reconcile that advanced the global snapshot watermark.
+
+    ``watermark`` alone answers "when did a reconcile last complete without
+    failure" -- not "does the local cache hold the provider's full item set",
+    which is what a caller reading ``snapshot_checkpoint is not None`` as
+    "the cache is trustworthy" actually needs (see A-critique.md Sec 3.1: a
+    label-typo'd reconcile against a populated repo durably observes zero
+    items and, pre-fix, still advanced the watermark). ``scope``, ``label``,
+    and ``items_observed`` record what the advancing reconcile actually
+    covered, so a later reader is not left inferring full coverage from a
+    watermark that only ever meant "a reconcile ran".
+    """
+
     model_config = ConfigDict(frozen=True)
 
     watermark: str = Field(min_length=1)
+    scope: str = ""
+    label: str = ""
+    items_observed: int = 0
 
 
 class _PendingWorkItemMutation(BaseModel):
