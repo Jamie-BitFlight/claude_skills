@@ -2536,7 +2536,9 @@ async def backlog_resolve(
         ),
     ],
     summary: Annotated[str, Field(description="What was done — 1-2 sentence completion summary (required)")],
-    plan: Annotated[str | None, Field(description="Plan path or completion reference")] = None,
+    plan: Annotated[
+        str | None, Field(description="Plan address or completion reference. The item stores it verbatim.")
+    ] = None,
     method: Annotated[str | None, Field(description="How the work was done — approach taken")] = None,
     notes: Annotated[str | None, Field(description="Problems found, surprises, or other comments")] = None,
     follow_ups: Annotated[str | None, Field(description="Created follow-up tickets (comma-separated refs)")] = None,
@@ -2594,7 +2596,9 @@ async def backlog_update(
             description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
         ),
     ],
-    plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
+    plan: Annotated[
+        str | None, Field(description="Plan address to record on the item, such as P12. The item stores it verbatim.")
+    ] = None,
     status: Annotated[
         str | None,
         Field(description="Set item status (e.g. 'in-progress'). Updates the backend's status labels when applicable."),

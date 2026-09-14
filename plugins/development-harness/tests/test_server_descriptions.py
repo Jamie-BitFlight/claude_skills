@@ -11,6 +11,9 @@ string for each of the seven beads-capable tools and asserts:
    by a whole-file substring search.
 
 Each tool is an independent parametrized case so failures name the offending tool.
+
+The same walk reads the ``plan`` parameter of ``backlog_update`` and ``backlog_resolve``,
+which store the value verbatim as a plan address.
 """
 
 from __future__ import annotations
@@ -107,6 +110,25 @@ def _extract_selector_descriptions(source: str) -> dict[str, str]:
     return results
 
 
+def _param_description(source: str, tool: str, param: str) -> str:
+    """Return the ``Field(description=...)`` string of *param* on the MCP tool *tool*."""
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.AsyncFunctionDef) and node.name == tool):
+            continue
+        for arg in node.args.args:
+            if arg.arg != param:
+                continue
+            assert isinstance(arg.annotation, ast.Subscript), f"{tool}.{param}: annotation is not Annotated[...]"
+            assert isinstance(arg.annotation.slice, ast.Tuple), f"{tool}.{param}: Annotated slice is not a Tuple"
+            field_call = arg.annotation.slice.elts[1]
+            assert isinstance(field_call, ast.Call), f"{tool}.{param}: second Annotated element is not a Call"
+            for kw in field_call.keywords:
+                if kw.arg == "description" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                    return kw.value.value
+    msg = f"{tool}.{param}: no Field description found in server.py"
+    raise AssertionError(msg)
+
+
 # Module-level parse — done once, shared across parametrized cases.
 _SOURCE = SERVER_PY.read_text(encoding="utf-8")
 _SELECTOR_DESCRIPTIONS: dict[str, str] = _extract_selector_descriptions(_SOURCE)
@@ -149,3 +171,11 @@ def test_selector_description_not_bare_generic(tool_name: str) -> None:
         "  Fix: restore 'or beads nanoid (e.g. bd-a3f8)' in the selector Field "
         f"description for {tool_name}() in backlog_core/server.py."
     )
+
+
+@pytest.mark.parametrize("tool_name", ["backlog_update", "backlog_resolve"])
+def test_plan_description_names_a_plan_address(tool_name: str) -> None:
+    """The ``plan`` value is stored verbatim as a plan address, so its description names one and no file path."""
+    desc = _param_description(_SOURCE, tool_name, "plan")
+    assert "plan address" in desc.lower(), f"{tool_name}.plan description does not name a plan address: {desc!r}"
+    assert "path" not in desc.lower(), f"{tool_name}.plan description still describes a file path: {desc!r}"

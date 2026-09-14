@@ -185,13 +185,12 @@ CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close --select
 Parameters:
   selector    str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   summary     str       required  What was done — 1-2 sentence completion summary
-  plan        str|null  optional  Plan path or completion reference  (default: null)
+  plan        str|null  optional  Plan address or completion reference. The item stores it verbatim.  (default: null)
   method      str|null  optional  How the work was done — approach taken  (default: null)
   notes       str|null  optional  Problems found, surprises, or other comments  (default: null)
   follow_ups  str|null  optional  Created follow-up tickets (comma-separated refs)  (default: null)
   findings    str|null  optional  Retrospective learnings from this work  (default: null)
-  cleanup     bool      optional  Remove local file after resolve; index link becomes GitHub issue URL
-                                  (default: false)
+  cleanup     bool      optional  Reserved; currently has no effect  (default: false)
   force       bool      optional  Resolve even if open PRs reference the issue  (default: false)
 
 Returns: {title, summary, issue?, messages, warnings}
@@ -203,7 +202,7 @@ CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --sele
 ```text
 Parameters:
   selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  plan            str|null  optional  Path to a plan file to attach to the item  (default: null)
+  plan            str|null  optional  Plan address to record on the item, such as P12. The item stores it verbatim.  (default: null)
   status          str|null  optional  "in-progress" | "groomed" | etc.  (default: null)
   section         str|null  optional  Section name for content update (use with content)  (default: null)
   content         str|null  optional  Content for the named section  (default: null)
