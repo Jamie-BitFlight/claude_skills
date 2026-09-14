@@ -189,17 +189,25 @@ class TestLiveLifecycle:
             },
         )
 
-        assert result["title"] == f"{prefix} Live Test Item"
         # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
         assert "item_ref" in result, f"Expected item_ref in result, got: {list(result.keys())}"
         item_ref: str = result["item_ref"]
         assert item_ref.startswith("#"), f"Expected item_ref like '#N', got: {item_ref!r}"
         issue_num = int(item_ref.lstrip("#"))
+        # Track the issue for cleanup before any further assertion: a failure between here
+        # and the fixture teardown would otherwise leave the live issue open, and only the
+        # workflow's always-run sweeper would catch it.
+        live_items["issues"].append(issue_num)
+
         assert issue_num > 0
+        # backlog_add reports the title as stored, which BacklogAddResponse.title documents.
+        # create_issue_for_item prefixes it with the item's conventional-commit type for the
+        # live issue, so assert containment rather than equality — the test states the
+        # contract without duplicating gh_client's type-prefix map.
+        assert f"{prefix} Live Test Item" in result["title"], f"Expected the raw title within: {result['title']!r}"
         assert isinstance(result["file_path"], str)
         assert isinstance(result["messages"], list)
-        # Track for cleanup and later tests
-        live_items["issues"].append(issue_num)
+        # Track for later tests
         live_items["item_title"] = result["title"]
         live_items["item_filepath"] = result["file_path"]
         live_items["item_issue_num"] = issue_num
@@ -318,8 +326,9 @@ class TestLiveLifecycle:
         # backlog_add returns item_ref="#N" (str); parse to int for tracking/cleanup.
         assert "item_ref" in create_result, f"Expected item_ref, got: {list(create_result.keys())}"
         l11_issue_num = int(create_result["item_ref"].lstrip("#"))
-        assert l11_issue_num > 0
+        # Track before asserting, so a later failure cannot leave the live issue open.
         live_items["issues"].append(l11_issue_num)
+        assert l11_issue_num > 0
 
         # Resolve it
         resolve_result = await _call(
