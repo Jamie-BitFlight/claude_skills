@@ -1794,8 +1794,11 @@ async def backlog_list(
         next_call provides the suggested follow-up call string.
         When match_context=True, match_pages contains current_page, total_pages,
         tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, only the count key (and, when a background sync
-        is running, sync_state/warnings) is present.
+        When count_only=True, only the count key is present on a healthy call.
+        warnings/errors are added when the operations layer recorded a genuine
+        degradation (e.g. a refused live-status batch); sync_state/warnings
+        are added when a background sync is not IDLE. Routine operational
+        info (e.g. a reconcile summary) never appears in this shape.
         On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1851,8 +1854,26 @@ async def backlog_list(
     # Output's messages/warnings/errors, whose Field(default_factory=list) default
     # is [] rather than None, so exclude_none alone would leave them in the
     # response and contradict this branch's documented minimal shape.
+    #
+    # `out` (the operations-layer Output collector `list_items` wrote into) is
+    # merged here on its `warnings`/`errors` channels only — never `messages`.
+    # `list_items(refresh=True)` populates `out.info()` (routine reconcile
+    # prose, e.g. "Reconciled N provider item(s)...") on a HEALTHY call too
+    # (#3546 B-critique.md §2.3), so merging `messages` unconditionally would
+    # leak routine operational prose into what is documented and tested as a
+    # bare-count-only response on a healthy call. `warnings`/`errors` are the
+    # channels the operations layer already reserves for genuine degradation
+    # (BackendUnavailableError-derived reads via out.warn()/out.error() — see
+    # e.g. the "Live status unavailable" warning at batch_fetch_statuses'
+    # except clause above), so gating the merge on those two channels
+    # surfaces a real degradation without breaking the healthy-path contract
+    # (B-critique.md §4.5).
     if count_only:
         count_resp: dict[str, object] = {"count": total}
+        if out.warnings:
+            count_resp["warnings"] = list(out.warnings)
+        if out.errors:
+            count_resp["errors"] = list(out.errors)
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
         return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
 
