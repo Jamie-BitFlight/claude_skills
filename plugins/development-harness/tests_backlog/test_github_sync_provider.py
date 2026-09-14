@@ -285,7 +285,7 @@ def test_github_backend_reconcile_owns_snapshot_cache_and_engine(tmp_path: Path)
     assert result.changed_references == ["#1"]
     assert not hasattr(backend, "fetch_snapshot")
     assert not hasattr(backend, "apply_patches")
-    assert cache._work_item_snapshots()[0][1].metadata.sync_fingerprint
+    assert cache._work_item_snapshots().snapshots[0][1].metadata.sync_fingerprint
 
 
 def test_github_content_provider_creates_plan_in_native_contents(tmp_path: Path) -> None:

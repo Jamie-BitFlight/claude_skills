@@ -563,7 +563,8 @@ class _GitHubReconciliation:
             One logical cache record per work-item reference.
         """
         records_by_reference = {
-            item.reference: LogicalCacheRecord(key=key, item=item) for key, item in self._cache._work_item_snapshots()
+            item.reference: LogicalCacheRecord(key=key, item=item)
+            for key, item in self._cache._work_item_snapshots().snapshots
         }
         for mutation in (
             pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
