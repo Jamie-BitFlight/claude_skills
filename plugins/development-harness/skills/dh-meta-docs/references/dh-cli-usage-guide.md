@@ -20,10 +20,6 @@ plan ready --plan-address Pc7d8e9f0
 plan status --plan-address Pc7d8e9f0
 plan validate --address Pc7d8e9f0
 plan migrate --plan-address tasks-3-integrate-sam-schema.md
-active-task set --address Pc7d8e9f0/T04
-active-task get
-active-task update --set-fields-json '{"priority": 1}'
-active-task clear
 ```
 
 For a task-bearing plan, repeat the validated named options shown by `plan create --help`
