@@ -82,7 +82,21 @@ class ProviderMemoryBackend(InMemoryBackend):
 
 
 @pytest.fixture(autouse=True)
-def _isolated_backend(monkeypatch: pytest.MonkeyPatch) -> object:
+def _isolated_backend(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> object:
+    """Install an in-memory backend for every non-e2e test.
+
+    Skips tests marked ``@pytest.mark.e2e``, which install their own live
+    backend from a higher-scoped fixture. This fixture is function-scoped, so
+    without the exemption it runs after that class-scoped setup and replaces
+    the live backend with the in-memory double for every e2e test body —
+    ``try_get_github()`` then returns ``None`` and ``add_item`` falls back to a
+    local-only item with ``item_ref == ""`` instead of creating a real issue
+    (#3546). The teardown ``reset_config()`` compounds it by discarding the
+    class-scoped config after the first test in the class.
+    """
+    if request.node.get_closest_marker("e2e"):
+        yield None
+        return
     backend = ProviderMemoryBackend()
     set_config(BacklogConfig(backend=backend))
     yield backend

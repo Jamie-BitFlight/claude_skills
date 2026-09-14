@@ -45,6 +45,9 @@ sessions/.archived/
 # Network guard subprocess probe scratch (test_network_guard.py)
 **/.guard_probes/
 
+# Backend isolation subprocess probe scratch (test_backend_isolation_fixture.py)
+**/.backend_probes/
+
 
 # Local settings with machine-specific paths
 .claude/settings.local.json

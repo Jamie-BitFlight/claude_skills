@@ -222,8 +222,8 @@ def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.Fixtu
     monkeypatch.setattr(_server, "_startup_sync_enabled", lambda: False)
 
 
-@pytest.fixture(autouse=True)
-def _network_policy(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item: pytest.Item, nextitem: pytest.Item | None) -> Iterator[None]:
     """Compute the per-test network policy from the e2e marker + env var.
 
     No public ``allow_network`` fixture is exposed. The guard is armed by
@@ -232,15 +232,23 @@ def _network_policy(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPa
     but the env var is not, the guard stays armed so the first attempted
     connection fails with a message naming the required env var.
 
+    This is a protocol hookwrapper rather than an autouse fixture so the policy
+    spans the whole setup-call-teardown protocol for the item. A function-scoped
+    fixture finalises before any higher-scoped fixture whose last consumer this
+    item is, which re-armed the guard while a class- or module-scoped e2e
+    fixture was still tearing down — an e2e fixture that closes the GitHub
+    issues its tests created then died on the guard instead (#3546). The policy
+    is still recomputed per item, so it never leaks into a non-e2e test.
+
     Args:
-        request: The pytest fixture request for the current test.
-        monkeypatch: Unused; present because autouse fixtures in this conftest
-            frequently need it and listing it keeps the signature stable.
+        item: The test item about to run.
+        nextitem: The item scheduled after it (unused; part of the hook
+            signature).
 
     Yields:
         None, with the guard armed (or lifted under the double gate).
     """
-    marked_e2e = request.node.get_closest_marker("e2e") is not None
+    marked_e2e = item.get_closest_marker("e2e") is not None
     explicitly_enabled = os.environ.get("DH_ALLOW_TEST_NETWORK") == "1"
     _state["allowed"] = marked_e2e and explicitly_enabled
     try:

@@ -174,6 +174,48 @@ def test_double_gate_opens_with_env_var() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_double_gate_stays_open_through_class_scoped_teardown() -> None:
+    """The gate stays open while a class-scoped e2e fixture tears down.
+
+    A class-scoped fixture finalises after every function-scoped fixture of the
+    last test in the class. Computing the policy in a function-scoped fixture
+    re-armed the guard before that point, so an e2e fixture that cleans up the
+    GitHub issues its tests created died on the guard (#3546). Asserts the
+    state via the test-only ``_state`` hook, contacting no external service.
+    """
+    with plugin_root_probe(
+        """
+        import pytest
+        from conftest import _state
+
+        pytestmark = pytest.mark.e2e
+
+        @pytest.fixture(scope="class")
+        def class_fixture():
+            yield
+            assert _state["allowed"] is True, "guard must stay lifted during class teardown"
+
+
+        class TestProbe:
+            def test_one(self, class_fixture) -> None:
+                assert _state["allowed"] is True
+
+            def test_two(self, class_fixture) -> None:
+                assert _state["allowed"] is True
+        """
+    ) as probe:
+        result = subprocess.run(
+            [*_probe_command(probe), "-m", "e2e"],
+            capture_output=True,
+            text=True,
+            cwd=str(_PLUGIN_ROOT),
+            env={**os.environ, "DH_ALLOW_TEST_NETWORK": "1", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"},
+            timeout=15,
+            check=False,
+        )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_guard_restores_sockets_after_session() -> None:
     """After a pytest subprocess finishes, the parent process sockets are intact.
 
