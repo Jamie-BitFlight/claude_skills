@@ -2,7 +2,7 @@
 title: "Improvement Proposals: Trellis -- Multi-Platform AI Coding Framework"
 ---
 
-<!-- removed-call-citations -->
+<!-- removed-skill-citations -->
 > **Removed-call citation:** the `TeamCreate` call cited below no longer exists in Claude Code. Since v2.1.178, naming a teammate on an `Agent` call under `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` spawns it directly, with no separate setup step (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` § "Agent teams"). This file stands as the dated record of what was analysed and is not rewritten; re-verify any conclusion below that rests on `TeamCreate` — "already covered", "already implemented", or a proposed dispatch — against the current tree before acting on it.
 
 ## Skipped Patterns
