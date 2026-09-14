@@ -440,7 +440,7 @@ gh run list --limit 5
 - New skill that uses `gh run list`, `gh run view --log-failed`, `gh workflow view`
 - Analyzes workflow failures and suggests fixes based on error patterns
 - Downloads artifacts for local inspection with `gh run download`
-- Integration point: New skill in `plugins/developer-tools/skills/ci-debugger/`
+- Integration point: unsupported as written — the host plugin it names, plugins/developer-tools, has never existed in this marketplace (`git log --all --full-history -- plugins/developer-tools` returns nothing, and `.claude-plugin/marketplace.json` lists no such entry). Pick a host plugin before building this skill.
 
 **Issue Tracking from Session Context**:
 - Hook that creates issues for unresolved errors at session end
