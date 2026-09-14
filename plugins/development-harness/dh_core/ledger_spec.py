@@ -683,7 +683,7 @@ COMMANDS: list[Command] = [
             Flag(name="--task-title", required=True, value="text"),
             Flag(name="--conflict-group", value="name"),
         ],
-        summary="task.added on a drafting plan",
+        summary="task.added on a plan that is not archived",
     ),
     Command(name="finalize", scope=Scope.PLAN, flags=[PLAN_ADDRESS], summary="plan.fields: state ready"),
     Command(name="validate", scope=Scope.PLAN, flags=[PLAN_ADDRESS], summary="reads; prints structural findings"),

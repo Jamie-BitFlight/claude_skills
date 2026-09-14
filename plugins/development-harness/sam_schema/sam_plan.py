@@ -111,6 +111,7 @@ from sam_schema.cli_inputs import (
 from sam_schema.core.action_models import CreatePlanConfig, TaskDefinition, UpdatePlanConfig
 from sam_schema.core.addressing import (
     AddressingError,
+    canonical_plan_id,
     parse_address,
     resolve_plan_address,
     resolve_provider_plan_address,
@@ -332,7 +333,7 @@ def ledger_holds(plan: str) -> bool:
     repository that has no ledger writes nothing and leaves no database behind.
 
     Args:
-        plan: The plan id as the caller wrote it.
+        plan: The canonical plan id, as raw_plan_of returns it.
 
     Returns:
         Whether the ledger holds a plan row with that id.
@@ -388,19 +389,20 @@ def store_for(
 def raw_plan_of(address: str | None) -> str | None:
     """Read the plan id out of an address without resolving it against a store.
 
-    Routing runs before a store is chosen, so it reads the address as written rather than through
-    ``resolve_provider_plan_address``, which would reach the content store to answer.
+    Routing runs before a store is chosen, so it does not use ``resolve_provider_plan_address``,
+    which reads the content store. It gives the plan id in canonical form (``canonical_plan_id``),
+    which is the form both stores record.
 
     Args:
         address: A ``P`` or ``P/T`` address, or None.
 
     Returns:
-        The plan id as written, or None when there is no address or no plan part.
+        The canonical plan id, or None when the address is absent or has no plan part.
     """
     if address is None:
         return None
     plan_ref, _, _ = address.partition("/")
-    return plan_ref.strip() or None
+    return canonical_plan_id(plan_ref) or None
 
 
 # ---------------------------------------------------------------------------
@@ -651,7 +653,7 @@ def _plan_of(value: str) -> str:
         _error("--plan-address must identify a plan, not a task")
     if not plan_ref.strip():
         _error("--plan-address must name a plan")
-    return plan_ref.strip()
+    return canonical_plan_id(plan_ref)
 
 
 def _task_of(value: str) -> tuple[str, str]:
@@ -667,7 +669,7 @@ def _task_of(value: str) -> tuple[str, str]:
     if not plan_ref.strip() or not task_ref.strip():
         _error(f"Address '{value}' must name a plan and a task, as P/T")
     task = task_ref.strip()
-    return plan_ref.strip(), f"T{task}" if task.isdigit() else task
+    return canonical_plan_id(plan_ref), f"T{task}" if task.isdigit() else task
 
 
 def _optional_task_of(value: str | None) -> tuple[str | None, str | None]:
@@ -1202,7 +1204,7 @@ def append_task(
     stdin: Annotated[bool, typer.Option("--stdin", help="Read the full task definition as YAML from stdin")] = False,
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
 ) -> None:
-    """Append one task to a drafting plan, from typed options or a YAML mapping on stdin.
+    """Append one task to a plan that is not archived, from typed options or a YAML mapping on stdin.
 
     ``--stdin`` accepts the full ``Task`` field set (body, description, acceptance criteria,
     verification steps, handoff, skills, etc.) that the scalar typed options do not expose. It
@@ -1579,7 +1581,7 @@ def update(
         _emit_transition(
             ledger.update(
                 conn,
-                plan_ref.strip(),
+                canonical_plan_id(plan_ref),
                 task,
                 attempt=attempt,
                 section=append_section,
@@ -1607,7 +1609,7 @@ def read(
         plan_part, _, task_part = address.partition("/")
         if attempt is None and not task_part.strip():
             with _ledger() as conn:
-                plan = Plan.model_validate(ledger.projection(conn, plan_part.strip()))
+                plan = Plan.model_validate(ledger.projection(conn, canonical_plan_id(plan_part)))
             _emit(ReadResult(plan=plan, source_format="ledger", source_path=Path()))
             return
         plan_ref, task_ref = _task_of(address)

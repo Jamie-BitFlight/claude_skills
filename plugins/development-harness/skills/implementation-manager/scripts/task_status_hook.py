@@ -93,8 +93,8 @@ those two documents, not a proof that no such channel can exist.
 
 So this is containment, not a fix for the root cause. What it does: the launch reference must be
 the *whole* of the prompt's first line. That is where the dispatch contract puts it and nothing
-follows it — ``implement-feature/SKILL.md`` makes the reference the agent's "entire prompt", and
-``dispatch/SKILL.md`` wraps it in one sentence ending at the attempt. Prose that mentions an
+follows it — ``implement-feature/SKILL.md`` and ``qg-dispatch-step.md`` make the reference the
+agent's entire prompt. ``dispatch/SKILL.md`` puts it in one sentence that ends at the attempt. Prose that mentions an
 attempt in passing keeps going after it, so requiring the line to end there is what separates a
 launch from a mention.
 
@@ -327,8 +327,10 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
     prompt. See the module docstring for why the prompt is read this way and what that does not
     close. Four shapes are recognised, in this order:
 
-    1. ``/start-task <plan> [--task <id>] [--attempt <n>]`` — the literal slash command.
-    2. ``Skill(skill="start-task", args="<plan> [--task <id>] [--attempt <n>]")``.
+    1. ``/start-task <plan> [--task <id>] [--attempt <n>]``, with or without the ``dh:`` plugin
+       prefix. This is the slash command.
+    2. ``Skill(skill="start-task", args="<plan> [--task <id>] [--attempt <n>]")``, with or without
+       the ``dh:`` plugin prefix.
     3. ``[<lead-in> working on ]<plan-address>/<task-id>[,] attempt <n>`` — the shape
        ``implement-feature/SKILL.md`` and ``dispatch/SKILL.md`` launch with, the latter inside a
        sentence that ends at the attempt. The line must end there; prose that mentions an
@@ -350,9 +352,9 @@ def extract_launch_from_prompt(prompt: str) -> Launch | None:
         return None
 
     command_forms = (
-        rf"/start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?{_ATTEMPT_FLAG_RE}",
+        rf"/(?:dh:)?start-task\s+{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?{_ATTEMPT_FLAG_RE}",
         (
-            rf'Skill\(\s*skill\s*=\s*["\']start-task["\']\s*,\s*args\s*=\s*["\']'
+            rf'Skill\(\s*skill\s*=\s*["\'](?:dh:)?start-task["\']\s*,\s*args\s*=\s*["\']'
             rf"{_PLAN_ARG_RE}(?:\s+--task\s+(?P<task_id>{_TASK_ID_RE}))?{_ATTEMPT_FLAG_RE}"
             rf'["\']'
         ),
