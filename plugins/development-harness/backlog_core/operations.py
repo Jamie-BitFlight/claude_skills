@@ -34,6 +34,7 @@ from .models import (
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     CacheStateCorruptError,
@@ -195,6 +196,12 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
 
     Returns:
         Mapping of issue number to IssueStatus.
+
+    Raises:
+        BackendUnavailableError: When the backend cannot serve the query — for
+            GitHub, a ``GraphQLUnavailableError`` when the environment refuses
+            GraphQL. An empty mapping is reserved for "no item carries a
+            status", so an unavailable backend never returns one.
     """
     return get_config().backend.batch_fetch_statuses(items, repo)
 
@@ -2006,10 +2013,14 @@ def list_items(
     # empty map.  _item_derived_status falls back to item.status when the map is
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
+    status_map: dict[int, IssueStatus] = {}
     if get_config().backend.supports_batch_status_fetch:
-        status_map = batch_fetch_statuses(open_items, repo)
-    else:
-        status_map: dict[int, IssueStatus] = {}
+        try:
+            status_map = batch_fetch_statuses(open_items, repo)
+        except BackendUnavailableError as exc:
+            # An empty map renders every numeric-issue item with a blank status.
+            # Name the cause, so a reader does not take the blanks for "no status set".
+            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
     open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
