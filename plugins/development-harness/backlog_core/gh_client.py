@@ -18,8 +18,10 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
-from github import Auth, Github, GithubException
+from github import GithubException
 from typing_extensions import TypedDict
+
+from backlog_core.github_client import MissingGitHubTokenError, make_github_client
 
 from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .entry_blocks import wrap_entry
@@ -82,6 +84,10 @@ logger = logging.getLogger(__name__)
 
 _HTTP_FORBIDDEN = 403
 _HTTP_NOT_FOUND = 404
+
+#: Seconds before try_get_github gives up. Shorter than the shared default, because its
+#: callers accept a local-only fallback rather than waiting on a slow or absent backend.
+_TRY_GET_TIMEOUT = 10
 
 # ---------------------------------------------------------------------------
 # DH label taxonomy — canonical label set with colours
@@ -1175,11 +1181,10 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
         GitHubUnavailableError: If GITHUB_TOKEN is not set.
     """
     repo = resolve_repo(repo)
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        msg = "GITHUB_TOKEN not set"
-        raise GitHubUnavailableError(msg)
-    gh = Github(auth=Auth.Token(token), timeout=timeout)
+    try:
+        gh = make_github_client(timeout=timeout)
+    except MissingGitHubTokenError as exc:
+        raise GitHubUnavailableError(str(exc)) from exc
     return gh.get_repo(repo)
 
 
@@ -1192,12 +1197,12 @@ def try_get_github(repo: str = "") -> Repository | None:
         Repository object or None if GitHub is unavailable.
     """
     repo = resolve_repo(repo)
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        logger.error("try_get_github: GITHUB_TOKEN not set in environment — GitHub operations will be skipped")
+    try:
+        gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
+    except MissingGitHubTokenError:
+        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
-        gh = Github(auth=Auth.Token(token), timeout=10)
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)

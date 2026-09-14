@@ -1317,14 +1317,14 @@ class TestTryGetGithub:
         """try_get_github returns None when PyGithub raises GithubException.
 
         Tests: try_get_github API failure handling
-        How: Patch Github.get_repo to raise GithubException.
+        How: Patch the shared client factory so its client's get_repo raises GithubException.
         Why: Auth failures and network errors must not crash callers.
         """
         # Arrange
         from github import GithubException
 
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = GithubException(
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = GithubException(
             status=401, data="Bad credentials", headers={}
         )
 

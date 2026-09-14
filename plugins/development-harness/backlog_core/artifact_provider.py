@@ -30,7 +30,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, TypeAlias, TypeGuard, runtime_checkable
 
-from github import Auth, Github, GithubException, InputFileContent
+from github import Github, GithubException, InputFileContent
+
+from backlog_core.github_client import make_github_client
 
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
@@ -131,13 +133,15 @@ _GIST_FORBIDDEN_STATUS = 403
 
 
 def _make_github_client() -> Github:
-    """Create a PyGithub :class:`~github.Github` client from ``GITHUB_TOKEN``.
+    """Create a PyGithub :class:`~github.Github` client through the shared factory.
 
     Returns:
         Authenticated ``Github`` client instance.
+
+    Raises:
+        MissingGitHubTokenError: No environment variable supplies a GitHub token.
     """
-    token = os.environ.get("GITHUB_TOKEN", "")
-    return Github(auth=Auth.Token(token))
+    return make_github_client()
 
 
 def _require_int_item_id(cls_name: str, item_id: ItemId) -> int:
