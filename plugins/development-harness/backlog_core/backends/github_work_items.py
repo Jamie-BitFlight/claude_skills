@@ -507,7 +507,9 @@ class _GitHubReconciliation:
         outcome = finalize_reconciliation(
             plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
         )
-        self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
+        self._advance_snapshot_checkpoint(
+            effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome
+        )
         if not effective_request.dry_run:
             snapshot_by_reference = {item.reference: item for item in snapshot.items}
             patch_statuses = {patch.reference: "pending" for patch in plan.provider_patches}
@@ -587,10 +589,50 @@ class _GitHubReconciliation:
             case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 return request
 
-    def _advance_snapshot_checkpoint(self, scope: ReconcileScope, watermark: str, outcome: ReconcileOutcome) -> None:
-        if (
+    def _advance_snapshot_checkpoint(
+        self, scope: ReconcileScope, label: str, watermark: str, outcome: ReconcileOutcome
+    ) -> None:
+        """Advance the durable global snapshot watermark, but only when it is honest.
+
+        A reconcile that observed zero items and finished without failure is
+        not the same fact as "the local cache holds the provider's full item
+        set" -- it only means "a reconcile ran" (A-critique.md Sec 3.1, Sec
+        3.4: a ``dh backlog refresh --label <typo>`` reconcile durably
+        observes zero items and, without this guard, marks the checkpoint as
+        if it covered the whole repository). A label-scoped reconcile can
+        only ever speak for that label's slice of the provider's items, so it
+        must never advance the checkpoint a bare, unlabeled read treats as
+        covering everything -- refuse outright rather than record a
+        watermark a later unlabeled ``since=`` lookup would wrongly trust.
+
+        A separate "zero items with nothing to explain the zero" gate is not
+        implemented here: within the two scopes eligible to advance the
+        checkpoint (``INITIAL``/``INCREMENTAL``), ``fetch_snapshot``
+        (``_GitHubWorkItemSync.fetch_snapshot``) either completes a real
+        GraphQL round trip or raises before a ``ProviderSnapshot`` is ever
+        constructed -- there is currently no in-tree path that reaches this
+        method with an *unlabeled* zero that was not a genuine round trip.
+        ``ProviderSnapshot.pages_fetched`` was evaluated as that
+        discriminator and rejected: ``fetch_snapshot`` hard-codes
+        ``pages_fetched=1`` for every scope, including ``LINKED``/
+        ``TARGETED``, which never fetch a page at all (``issues = []`` is
+        assigned directly) -- so the field carries no real pagination signal
+        to gate on today. ``items_observed`` is still recorded below so a
+        future discriminator (or a diagnostic reader) has the count without
+        this method needing to change again.
+        """
+        if not (
             outcome.advance_snapshot_checkpoint
             and outcome.result.conflicts == 0
             and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
         ):
-            self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
+            return
+        if label:
+            # A label-scoped observation never covers the full unlabeled item
+            # set a bare checkpoint is read to mean -- see the docstring above.
+            return
+        self._cache._set_snapshot_checkpoint(
+            _ProviderSnapshotCheckpoint(
+                watermark=watermark, scope=scope.value, label=label, items_observed=outcome.result.fetched_items
+            )
+        )
