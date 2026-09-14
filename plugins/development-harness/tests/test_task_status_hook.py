@@ -360,122 +360,6 @@ def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
     mock_update.assert_called_once()
 
 
-def test_call_sam_active_task_clear_passes_sam_active_task_target(mocker: MockerFixture) -> None:
-    """_call_sam_active_task_clear calls the SAM CLI's ``active-task clear`` subcommand.
-
-    A bug where the wrapper routes to the wrong subcommand would leave stale
-    active-task context, causing the next SubagentStop to read a ghost task.
-    """
-    # Arrange — clear response; wrapper only checks stdout is not None
-    clear_data = {"cleared": True}
-    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps(clear_data), stderr="")
-
-    mocker.patch("shutil.which", return_value="/usr/bin/uv")
-    mocker.patch.object(Path, "exists", return_value=True)
-    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
-
-    # Act
-    _hook_mod._call_sam_active_task_clear("test-session-id")
-
-    # Assert
-    mock_popen.assert_called_once()
-    cmd: list[str] = mock_popen.call_args[0][0]
-    assert _argv_after(cmd, "active-task") == ["active-task", "clear", "--session-id", "test-session-id"]
-
-
-# ---------------------------------------------------------------------------
-# _cleanup_active_task_context suppresses FileNotFoundError only
-# ---------------------------------------------------------------------------
-
-
-def test_cleanup_active_task_context_propagates_permission_error(mocker: MockerFixture, tmp_path: Path) -> None:
-    """_cleanup_active_task_context lets PermissionError propagate from fallback unlink.
-
-    The old code used suppress(OSError), which swallowed PermissionError (an OSError
-    subclass). The new code uses suppress(FileNotFoundError). PermissionError is NOT
-    a FileNotFoundError, so it must propagate — a filesystem access problem is a real
-    failure that must be observable, not silently discarded.
-    """
-    # Arrange — session_id=None forces the fallback filesystem path (skips the SAM CLI clear)
-    local_record = tmp_path / "active-task-sess.json"
-    local_record.write_text("{}")
-    mocker.patch.object(Path, "unlink", side_effect=PermissionError("read-only filesystem"))
-
-    # Act & Assert — PermissionError must propagate; suppress(FileNotFoundError) does not catch it
-    with pytest.raises(PermissionError):
-        _hook_mod._cleanup_active_task_context(session_id=None, local_record=local_record)
-
-
-def test_cleanup_active_task_context_suppresses_file_not_found(mocker: MockerFixture, tmp_path: Path) -> None:
-    """_cleanup_active_task_context silently ignores FileNotFoundError during fallback unlink.
-
-    FileNotFoundError means the context file was removed by a concurrent process
-    between the existence check and the unlink — expected during parallel agent
-    teardown, and not a failure.
-    """
-    # Arrange — the record exists at check time (otherwise cleanup short-circuits before
-    # the unlink), and session_id=None forces the fallback filesystem path.
-    local_record = tmp_path / "active-task-sess.json"
-    local_record.write_text("{}")
-    mocker.patch.object(Path, "unlink", side_effect=FileNotFoundError("already gone"))
-
-    # Act — must not raise; FileNotFoundError is a legitimate concurrent-removal scenario
-    _hook_mod._cleanup_active_task_context(session_id=None, local_record=local_record)
-
-
-# ---------------------------------------------------------------------------
-# _cleanup_active_task_context — no subprocess when the local record is absent
-#
-# This hook fires on every sub-agent stop in every installed plugin, and most
-# stopping agents hold no task at all. On the local backend `active-task clear`
-# unlinks exactly `active-task-{session_id}.json` and touches nothing else, so
-# for an absent record the `uv run` subprocess can only answer `cleared: false`.
-# ---------------------------------------------------------------------------
-
-
-def test_cleanup_spawns_no_subprocess_when_the_local_record_is_absent(mocker: MockerFixture, tmp_path: Path) -> None:
-    """An absent local record means there is nothing to clear, so nothing is spawned."""
-    mock_popen = mocker.patch("subprocess.Popen")
-
-    _hook_mod._cleanup_active_task_context(
-        session_id="sub-agent-session", local_record=tmp_path / "active-task-sub-agent-session.json"
-    )
-
-    mock_popen.assert_not_called()
-
-
-def test_cleanup_clears_through_the_cli_when_the_local_record_exists(mocker: MockerFixture, tmp_path: Path) -> None:
-    """A record that is there is cleared through the CLI, not unlinked behind its back."""
-    local_record = tmp_path / "active-task-sub-agent-session.json"
-    local_record.write_text("{}", encoding="utf-8")
-    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps({"cleared": True}), stderr="")
-    mocker.patch("shutil.which", return_value="/usr/bin/uv")
-    mocker.patch.object(Path, "exists", return_value=True)
-    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
-
-    _hook_mod._cleanup_active_task_context(session_id="sub-agent-session", local_record=local_record)
-
-    cmd: list[str] = mock_popen.call_args[0][0]
-    assert _argv_after(cmd, "active-task") == ["active-task", "clear", "--session-id", "sub-agent-session"]
-
-
-def test_cleanup_asks_the_cli_when_the_backend_keeps_the_record_out_of_reach(mocker: MockerFixture) -> None:
-    """A None local record is not an absent record — the CLI is the only way to know.
-
-    _local_active_task_file returns None for every context backend other than ``local``,
-    which is a statement about reachability, not about whether a task is active. Treating
-    it as "nothing to clear" would leave stale context on every non-local backend.
-    """
-    response = CompletedProcess(args=[], returncode=0, stdout=json.dumps({"cleared": True}), stderr="")
-    mocker.patch("shutil.which", return_value="/usr/bin/uv")
-    mocker.patch.object(Path, "exists", return_value=True)
-    mock_popen = mocker.patch("subprocess.Popen", return_value=_popen_from_completed(response))
-
-    _hook_mod._cleanup_active_task_context(session_id="sub-agent-session", local_record=None)
-
-    mock_popen.assert_called_once()
-
-
 # ---------------------------------------------------------------------------
 # read_task_context — local backend shape (both plan and task_file_path present)
 # ---------------------------------------------------------------------------
@@ -620,7 +504,6 @@ def test_timeout_defaults_are_below_outer_hook_deadline() -> None:
         _hook_mod._call_sam_plan_settle,
         _hook_mod._call_sam_task_update,
         _hook_mod._call_sam_task_status,
-        _hook_mod._call_sam_active_task_clear,
     ]
     for func in funcs:
         default = inspect.signature(func).parameters["timeout"].default
@@ -795,8 +678,8 @@ def test_subagent_stop_hook_is_not_restricted_to_task_worker() -> None:
     execution/SKILL.md dispatches a named specialist whenever one matches the task and
     only falls back to dh:task-worker otherwise. A name-based matcher therefore decides
     task-state tracking by which specialist got picked, and a specialist's task is never
-    marked at all. The hook gates on whether an active SAM task resolves, so it is safe
-    to run for every sub-agent.
+    marked at all. The hook settles only the launch the stopping agent's own prompt names and
+    writes nothing else, so running it for every sub-agent adds no status writes.
 
     A matcher cannot express "dh dispatched this" either way: a SubagentStop matcher takes
     the *agent type name* and nothing else (claude-subagent-reference's cached
@@ -1010,17 +893,13 @@ def test_subagent_stop_settles_the_attempt_the_prompt_names(tmp_path: Path, monk
         "last_assistant_message": "STATUS: DONE\nall criteria met",
     }
 
-    with (
-        patch.object(_hook_mod, "_call_sam_plan_settle", return_value=True) as mock_settle,
-        patch.object(_hook_mod, "_cleanup_active_task_context") as mock_cleanup,
-    ):
+    with patch.object(_hook_mod, "_call_sam_plan_settle", return_value=True) as mock_settle:
         handle_subagent_stop(hook_input)
 
     settled_launch, return_text = mock_settle.call_args[0]
     assert settled_launch.address == "Pf4281187/T1"
     assert settled_launch.attempt == 2
     assert return_text == "STATUS: DONE\nall criteria met"
-    mock_cleanup.assert_called_once()
 
 
 def test_subagent_stop_writes_no_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1041,7 +920,6 @@ def test_subagent_stop_writes_no_status(tmp_path: Path, monkeypatch: pytest.Monk
 
     with (
         patch.object(_hook_mod, "_get_uv_executable", return_value="/usr/bin/uv"),
-        patch.object(_hook_mod, "_cleanup_active_task_context"),
         patch(
             "subprocess.Popen", return_value=_popen_from_completed(_cli_success_response({"command": "settle"}))
         ) as mock_popen,
@@ -1071,10 +949,7 @@ def test_subagent_stop_settles_a_launch_that_returned_nothing(tmp_path: Path, mo
     )
     hook_input = {"hook_event_name": "SubagentStop", "agent_transcript_path": str(transcript)}
 
-    with (
-        patch.object(_hook_mod, "_call_sam_plan_settle", return_value=True) as mock_settle,
-        patch.object(_hook_mod, "_cleanup_active_task_context"),
-    ):
+    with patch.object(_hook_mod, "_call_sam_plan_settle", return_value=True) as mock_settle:
         handle_subagent_stop(hook_input)
 
     assert mock_settle.call_args[0][1] == _NO_FINAL_MESSAGE
@@ -1088,10 +963,7 @@ def test_subagent_stop_says_why_it_could_not_settle_without_an_attempt(
     transcript = _launch_transcript(tmp_path, "Pf4281187/T1")
     hook_input = {"hook_event_name": "SubagentStop", "agent_transcript_path": str(transcript)}
 
-    with (
-        patch.object(_hook_mod, "_call_sam_plan_settle") as mock_settle,
-        patch.object(_hook_mod, "_cleanup_active_task_context"),
-    ):
+    with patch.object(_hook_mod, "_call_sam_plan_settle") as mock_settle:
         handle_subagent_stop(hook_input)
 
     mock_settle.assert_not_called()
@@ -1099,24 +971,34 @@ def test_subagent_stop_says_why_it_could_not_settle_without_an_attempt(
 
 
 def test_subagent_stop_stays_quiet_for_an_unrelated_sub_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A sub-agent of another plugin reaches this hook too, and must cost it no subprocess.
+    """A sub-agent of another plugin reaches this hook too, and leaves the session's record alone.
 
     hooks.json registers SubagentStop with no matcher, so every stopping sub-agent in the session
     arrives here. Whether it is a dispatched worker is decided by whether its prompt names a
-    launch, not by its agent name.
+    launch, not by its agent name. The active-task record is keyed by the parent session's id,
+    which every sub-agent shares (CLAIMS-REGISTER.md). The hook only settles, so an unrelated
+    sub-agent's stop runs no subprocess and leaves that record in place.
     """
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    transcript = _launch_transcript(tmp_path, "Please review the README for typos.")
+    monkeypatch.setenv("CONTEXTBACKEND", "local")
+    import dh_paths
+
+    context_dir = dh_paths.context_dir()
+    context_dir.mkdir(parents=True, exist_ok=True)
+    record = context_dir / "active-task-sess-1.json"
+    record.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T2"}))
+    transcript = _launch_transcript(tmp_path, "Please review the README for typos.", session_id="sess-1")
     hook_input = {
         "hook_event_name": "SubagentStop",
         "agent_transcript_path": str(transcript),
         "last_assistant_message": "STATUS: VERIFIED",
     }
 
-    with patch("subprocess.Popen") as mock_popen, patch.object(_hook_mod, "_cleanup_active_task_context"):
+    with patch("subprocess.Popen") as mock_popen:
         handle_subagent_stop(hook_input)
 
     mock_popen.assert_not_called()
+    assert record.exists()
 
 
 def test_subagent_stop_without_a_transcript_path_reports_it(capsys: pytest.CaptureFixture[str]) -> None:

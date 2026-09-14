@@ -363,7 +363,7 @@ Note: under `"per_task"`, per-task gates already fire for each task; no addition
 
 > **Hook behavior on SubagentStop**: when a sub-agent finishes, `task_status_hook.py` runs
 > `plan settle` for the attempt named in that sub-agent's own launch prompt, with its final
-> message as the return text, then clears the active-task context. That is the same settle step 4
+> message as the return text. That is the same settle step 4
 > asks of you; whichever runs first wins and the other is answered `already-settled`, so running
 > step 4 yourself is never wrong. The hook covers the case where this session ends before step 4
 > does. A settle it could not perform is printed to stderr, never absorbed.

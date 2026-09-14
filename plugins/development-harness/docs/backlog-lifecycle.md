@@ -256,7 +256,7 @@ reconstruct a provider record from a path.
 | SQLite provider | Local SQLite work-item/content records | Native local provider; no remote reconciliation is implied |
 | Memory provider | Process-local work-item/content records | Test-only durability; data ends with the provider instance |
 | Configured backend plan/task capability | Plan content, task state, and progress | Use `sam_plan`/`sam_task` or `plan` CLI with the returned opaque plan address; do not select a second provider |
-| Active-task context | Ephemeral execution context | Written by `/dh:start-task`; delete after completion |
+| Active-task context | Ephemeral execution context | Written by `/dh:start-task`; removed by `active-task clear` |
 
 ### Backend selection
 

@@ -205,7 +205,6 @@ launch ended, and nothing else:
    in the prompt (`{plan}/{task}, attempt {n}`), and the transcript is per-sub-agent, so parallel
    workers correlate to distinct attempts.
 2. Runs `plan settle --address {plan}/{task} --attempt {n} --return-text "{the final message}"`.
-3. Clears the session-scoped active-task context.
 
 It writes no task status. The runner's own `plan finish --result` records the outcome and the
 orchestrator's `plan accept` / `plan reclaim` records the verdict — see
