@@ -113,7 +113,7 @@ class TestSymmetricGraph:
         )
         b = _make_vault_entry(vault, "agent-frameworks/beta.md", [("../tools/alpha.md", "tools", "consumes X")])
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         assert a in graph
@@ -129,7 +129,7 @@ class TestSymmetricGraph:
         _make_vault_entry(vault, "tools/alpha.md")
         _make_vault_entry(vault, "tools/beta.md")
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         assert asymmetric == []
@@ -149,7 +149,7 @@ class TestSingleAsymmetricEdge:
         )
         b = _make_vault_entry(vault, "agent-frameworks/beta.md")
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         assert len(asymmetric) == 1
@@ -172,7 +172,7 @@ class TestSingleAsymmetricEdge:
         )
         # gamma → beta but beta does not have gamma in its refs
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         # Only gamma→beta is asymmetric
@@ -195,7 +195,7 @@ class TestThreeNodeCycle:
         c_dir.mkdir(exist_ok=True)
         c = _make_vault_entry(vault, "coding-agents/c.md", [("../tools/a.md", "tools", "consumes Z")])
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         # A→B: B does not cite A → asymmetric
@@ -231,7 +231,7 @@ class TestThreeNodeCycle:
         c_dir.mkdir(exist_ok=True)
         c = _make_vault_entry(vault, "coding-agents/c.md")  # no refs back to a
 
-        graph = bl.build_cross_reference_graph(vault)
+        graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         # Only a→c is asymmetric
@@ -249,7 +249,7 @@ class TestRealVaultScan:
         if not real_vault.exists():
             pytest.skip("Real vault not present — skipping informational test")
 
-        graph = bl.build_cross_reference_graph(real_vault)
+        graph = bl.build_cross_reference_graph(real_vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
         # Informational: log the baseline count (not an assertion)
@@ -263,7 +263,7 @@ class TestRealVaultScan:
         if not real_vault.exists():
             pytest.skip("Real vault not present")
 
-        graph = bl.build_cross_reference_graph(real_vault)
+        graph = bl.build_cross_reference_graph(real_vault).graph
         for path in graph:
             assert path.name != "README.md", f"README.md should not be in graph: {path}"
 

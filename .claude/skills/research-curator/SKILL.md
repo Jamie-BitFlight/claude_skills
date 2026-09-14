@@ -334,9 +334,17 @@ in [Mode Routing](#mode-routing).
 2. **Backlink Repair** -- deterministically repair the bidirectional cross-reference graph across
    the whole vault, not just entries this run touched:
 
+   Pass `--exclude {path}` once per path that was **already** dirty in the pre-mode baseline
+   (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*
+   entry, so without this it can write into another contributor's uncommitted work. An excluded
+   file is still scanned and its asymmetric pairs are still reported -- only the write is withheld,
+   counted on stdout as `backlinks_excluded: N`. Step 3 below still filters those paths out of the
+   commit; `--exclude` is what keeps them unmodified on disk in the first place.
+
    ```bash
    uv run scripts/run_bounded.py --timeout-seconds 180 -- \
-     uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix
+     uv run .claude/skills/research-curator/scripts/validate_research.py check-backlinks ./research --fix \
+       --exclude {baseline-dirty-path} ...
    ```
 
    Check the result in this order:
@@ -352,11 +360,14 @@ in [Mode Routing](#mode-routing).
    4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
       structural non-zero exit (a dangling link to a missing target) and a
       `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
-      e.g. a Cross-References row with no markdown link). A `warning: scan-skipped, ...` line
-      belongs here too: that file was dropped from the graph before it could be compared, so the
-      printed `asymmetric_cross_references: N` undercounts by whatever it holds. Report each
-      scan-skipped path and its reason verbatim -- the file is repairable and nothing else in the
-      repo will name it -- then continue. Do not parse the printed
+      e.g. a Cross-References row with no markdown link). A non-zero `scan_skipped_files: N`
+      line belongs here too: those files were dropped from the graph before they could be
+      compared, so the printed `asymmetric_cross_references: N` undercounts by whatever they hold,
+      and `N > 0` is on its own enough to make this command exit non-zero. Read the
+      `{path} ({reason})` lines printed under that count and report each verbatim -- the files are
+      repairable and nothing else in the repo will name them -- then continue. Pass
+      `--allow-partial-scan` only when a run must exit 0 despite that hole in its coverage; this
+      step never needs it, because it already continues past a non-zero exit. Do not parse the printed
       `{source} -> {target}` lines to guess which files were modified -- they list every asymmetric
       edge found *before* repair was attempted, not which repairs succeeded. Step 3's diff
       determines what this command actually changed.

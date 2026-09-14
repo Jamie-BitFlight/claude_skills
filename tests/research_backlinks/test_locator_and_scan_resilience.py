@@ -168,7 +168,7 @@ class TestScanResilience:
         (vault / "entry.md").write_text("# Entry\n", encoding="utf-8")
         (vault / "escape.md").symlink_to(outside / "target.md")
 
-        graph = backlink_lib.build_cross_reference_graph(vault, quiet=True)
+        graph = backlink_lib.build_cross_reference_graph(vault, quiet=True).graph
 
         assert (vault / "entry.md").resolve() in graph
 
