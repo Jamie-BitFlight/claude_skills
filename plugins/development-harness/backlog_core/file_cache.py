@@ -10,6 +10,7 @@ import warnings
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
+from typing import NamedTuple
 
 from ruamel.yaml import YAML, YAMLError
 
@@ -35,6 +36,27 @@ _log = logging.getLogger(__name__)
 
 class LegacyMigrationError(ValueError):
     """Legacy item cannot be migrated without data loss."""
+
+
+class WorkItemSnapshotBatch(NamedTuple):
+    """Result of enumerating every durable work-item snapshot beneath the cache root.
+
+    ``skipped`` names every snapshot file that existed but failed to load,
+    relative to the cache's ``items/`` root, in the same sorted order they
+    were discovered. A warm ``snapshot_checkpoint`` only records that a
+    reconcile ran, never that the item files it should have produced are
+    still readable (A-critique.md Sec 2.5, Sec 3.2): a cache whose files were
+    truncated, restored from a partial backup, or otherwise made unreadable
+    keeps its checkpoint but silently returns an empty snapshot set unless a
+    caller inspects ``skipped``. ``bool(skipped)`` is the discoverable flag;
+    ``len(skipped)`` is the count. This is the load-path signal a later
+    provenance check (backlog #3546 task A4) needs to distinguish "warm
+    checkpoint, complete snapshot set" from "warm checkpoint, partial or
+    corrupted snapshot set" -- neither of which this batch alone decides.
+    """
+
+    snapshots: list[tuple[str, BacklogItem]]
+    skipped: list[str]
 
 
 class FileCache:
@@ -433,34 +455,40 @@ class FileCache:
             relative_path = Path(f"{relative_path}.yaml")
         self._save_item_snapshot(item, relative_path)
 
-    def _work_item_snapshots(self) -> list[tuple[str, BacklogItem]]:
+    def _work_item_snapshots(self) -> WorkItemSnapshotBatch:
         """Return every durable work-item snapshot beneath the cache root.
 
         An orphaned :meth:`_save_item_snapshot` temp file never reaches this
         method at all -- see that method's own comment on why. A snapshot
         that still fails to load (bad YAML, invalid UTF-8, a symlink
-        escaping the cache root, or any other ``OSError``) is logged and
-        skipped rather than letting it take the whole batch offline,
-        mirroring the per-entry salvage policy
-        :meth:`_CacheStateStore._salvage_field` already applies to the
+        escaping the cache root, or any other ``OSError``) is logged *and*
+        recorded in the returned batch's ``skipped`` list rather than letting
+        it take the whole batch offline, mirroring the per-entry salvage
+        policy :meth:`_CacheStateStore._salvage_field` already applies to the
         durable mutation queue. ``ValueError`` alone covers pydantic and
-        Unicode decode failures too, since both are its subclasses.
+        Unicode decode failures too, since both are its subclasses. Logging
+        alone is not enough: a caller needs a value it can act on to tell a
+        complete snapshot set from a partial one, not just a log line it may
+        never see (A-critique.md Sec 2.5, Sec 3.2).
 
         Returns:
-            Ordered ``(logical_key, item)`` pairs for every snapshot that
-            loaded successfully.
+            A :class:`WorkItemSnapshotBatch` of the ordered ``(logical_key,
+            item)`` pairs for every snapshot that loaded successfully, plus
+            the relative paths of every snapshot that did not.
         """
         item_root = self._root / "items"
         if not item_root.exists():
-            return []
+            return WorkItemSnapshotBatch(snapshots=[], skipped=[])
         snapshots: list[tuple[str, BacklogItem]] = []
+        skipped: list[str] = []
         for path in sorted(item_root.rglob("*.yaml")):
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
             except (ValueError, YAMLError, OSError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
-        return snapshots
+                skipped.append(relative.as_posix())
+        return WorkItemSnapshotBatch(snapshots=snapshots, skipped=skipped)
 
     @staticmethod
     def _serialize_item(item: BacklogItem) -> str:
