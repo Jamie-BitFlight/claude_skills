@@ -226,7 +226,7 @@ SOURCE: [INSTALLING.md](https://github.com/steveyegge/beads/blob/main/docs/INSTA
 - The `bd prime` pattern: a single command that generates a compact, structured context briefing — applicable to any stateful tool that needs to inject context into an agent session
 - Atomic claim semantics (`--claim` flag) as the standard pattern for multi-agent work queue consumption
 - Semantic compaction: summarizing completed work rather than deleting it preserves audit trail while managing context window size
-- The CLI-first, MCP-optional design philosophy described in `docs/CLAUDE_INTEGRATION.md`: CLI + hooks adds 1-2k tokens overhead vs. 10-50k for MCP tool schemas
+- The CLI-first, MCP-optional design philosophy described in beads' own `CLAUDE_INTEGRATION.md` (steveyegge/beads, under its docs directory — see References): CLI + hooks adds 1-2k tokens overhead vs. 10-50k for MCP tool schemas. This is a path in the beads repository, not in this one.
 
 ### Integration Opportunities
 

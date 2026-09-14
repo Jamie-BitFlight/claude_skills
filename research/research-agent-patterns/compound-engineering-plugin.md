@@ -268,7 +268,7 @@ bunx @every-env/compound-plugin install compound-engineering --to codex
 
 1. **Plugin Architecture Reference**: The plugin structure (agents/, commands/, skills/, mcp-servers/) demonstrates best practices for Claude Code plugin development
 2. **Multi-Agent Orchestration**: The parallel agent execution pattern in `/workflows:review` shows effective orchestration strategies
-3. **Knowledge Management**: The `docs/solutions/` pattern with YAML frontmatter provides a reusable knowledge base architecture
+3. **Knowledge Management**: The docs/solutions/ pattern with YAML frontmatter provides a reusable knowledge base architecture — that directory is what the plugin's `/workflows:compound` command writes into a project it runs against, not a path this repository carries
 4. **Cross-Platform Conversion**: The CLI tool for converting plugins to OpenCode/Codex demonstrates portable skill formats
 
 ### Patterns Worth Adopting
@@ -276,7 +276,7 @@ bunx @every-env/compound-plugin install compound-engineering --to codex
 1. **80/20 Planning-Execution Split**: Heavy investment in planning and review, minimal execution time
 2. **Parallel Agent Execution**: Run 14 review agents simultaneously for comprehensive coverage
 3. **Smart Research Decision Logic**: Context-aware research triggering based on risk and familiarity
-4. **Compound Documentation**: Structured `docs/solutions/` with YAML frontmatter for searchability
+4. **Compound Documentation**: The structured docs/solutions/ tree described above, with YAML frontmatter for searchability
 5. **Worktree Integration**: Git worktrees for parallel development without context switching
 6. **Category-Based Agent Organization**: Agents grouped by domain (Review, Research, Design, Workflow, Docs)
 7. **Interactive Q&A Refinement**: Iterative clarification before plan generation

@@ -359,7 +359,7 @@ GitNexus is **directly relevant** to Claude Code in three ways:
 
 1. **MCP Integration**: GitNexus implements the MCP protocol, enabling deep codebase awareness in Claude Code. When indexed, AI agents get `query`, `context`, `impact`, and `detect_changes` tools that understand execution flows and symbol dependencies—not just raw file/symbol search.
 
-2. **Agent Skills**: Generates agent skills (`.claude/skills/generated/`) describing functional areas (communities) of a codebase. These are readable by Claude Code workflows and support exploration, debugging, impact analysis, and refactoring.
+2. **Agent Skills**: Generates agent skills describing functional areas (communities) of a codebase, writing them into a .claude/skills/generated/ directory it creates in whichever project it indexes — a GitNexus output path, not one this repository carries. These are readable by Claude Code workflows and support exploration, debugging, impact analysis, and refactoring.
 
 3. **Claude Code Hooks**: Full integration with Claude Code's PreToolUse and PostToolUse hooks:
    - **PreToolUse**: Enrich searches with graph context (e.g., auto-expand queries to include related functions in same execution flow)
