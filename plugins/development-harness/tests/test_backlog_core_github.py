@@ -39,12 +39,14 @@ from backlog_core.gh_client import (
     create_issue_for_item,
     fetch_github_issue_body,
     issue_to_local_fields,
+    probe_backend_status,
     sync_groomed_to_github_issue,
     try_get_github,
     view_enrich_from_github,
 )
 from backlog_core.github_client import TOKEN_ENV_VARS
 from backlog_core.models import (
+    BackendAvailability,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -1467,7 +1469,70 @@ class TestTryGetGithub:
 
 
 # ---------------------------------------------------------------------------
+<<<<<<< HEAD
 # apply_status_in_progress — fetch-then-update label pattern
+=======
+# probe_backend_status — backend availability summary
+# ---------------------------------------------------------------------------
+
+
+class TestProbeBackendStatus:
+    """probe_backend_status agrees with the client factory about what counts as a token.
+
+    Tests: probe_backend_status authentication gate over every accepted token variable.
+    Why: The probe reporting NEEDS_AUTHENTICATION while every real call succeeds sends
+         callers down an offline path they do not need.
+    """
+
+    def test_reports_needs_authentication_when_no_variable_supplies_a_token(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No token anywhere is the one case that is genuinely unauthenticated.
+
+        Tests: probe_backend_status missing-token verdict
+        How: Clear every name in TOKEN_ENV_VARS; call the probe.
+        Why: The verdict must still fire when it is actually true.
+        """
+        # Arrange
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+
+        # Act
+        status = probe_backend_status("test-owner/test-repo")
+
+        # Assert
+        assert status.availability is BackendAvailability.NEEDS_AUTHENTICATION
+
+    @pytest.mark.parametrize("token_var", TOKEN_ENV_VARS)
+    def test_accepts_every_token_variable_the_client_accepts(
+        self, token_var: str, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Any variable that authenticates a real call also passes the probe.
+
+        Tests: probe_backend_status token sources
+        How: Set one token variable at a time, with try_get_github mocked so no request leaves.
+        Why: make_github_client accepts all three, so a probe that only reads GITHUB_TOKEN
+             reports NEEDS_AUTHENTICATION for a session whose calls all succeed.
+        """
+        # Arrange
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv(token_var, "fake-token")
+        mock_repo = mocker.patch("backlog_core.gh_client.try_get_github").return_value
+        mock_repo.open_issues_count = 3
+        mock_repo.get_issues.return_value.totalCount = 7
+
+        # Act
+        status = probe_backend_status("test-owner/test-repo")
+
+        # Assert
+        assert status.availability is BackendAvailability.REACHABLE
+        assert (status.open_count, status.total_count) == (3, 7)
+
+
+# ---------------------------------------------------------------------------
+# apply_status_in_progress — ADR-003 fetch-then-update label pattern
+>>>>>>> 794f682f5 (fix(backlog-core): make probe_backend_status accept every token variable)
 # ---------------------------------------------------------------------------
 
 

@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from backlog_core.gh_client import probe_backend_status
+from backlog_core.github_client import TOKEN_ENV_VARS
 from backlog_core.models import BackendAvailability, BackendStatus
 from backlog_core.server import mcp
 from github import GithubException
@@ -327,33 +328,39 @@ class TestProbeBackendStatusNoToken:
     """
 
     def test_no_token_returns_needs_authentication(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """GITHUB_TOKEN absent -> availability=NEEDS_AUTHENTICATION.
+        """No token variable set -> availability=NEEDS_AUTHENTICATION.
 
         Tests: probe_backend_status() with no token
-        How: Remove GITHUB_TOKEN env var; call probe; check availability
-        Why: Correct classification prevents misleading 'ERROR' messages
+        How: Remove every name in TOKEN_ENV_VARS; call probe; check availability
+        Why: Correct classification prevents misleading 'ERROR' messages. Clearing
+             only GITHUB_TOKEN left GH_TOKEN or GITHUB_PERSONAL_ACCESS_TOKEN live in
+             some environments, which made this a real, ambiently-authenticated
+             request to api.github.com instead of the no-token case under test.
         """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
 
         result = probe_backend_status()
 
         assert result.availability == BackendAvailability.NEEDS_AUTHENTICATION
 
     def test_no_token_error_contains_github_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """GITHUB_TOKEN absent -> error field contains 'GITHUB_TOKEN'.
+        """No token variable set -> error field names GITHUB_TOKEN among the options.
 
         Tests: probe_backend_status() error message with no token
-        How: Remove GITHUB_TOKEN; check result.error contains 'GITHUB_TOKEN'
-        Why: Users need actionable error text pointing to the missing variable
+        How: Remove every name in TOKEN_ENV_VARS; check result.error contains 'GITHUB_TOKEN'
+        Why: Users need actionable error text pointing to the missing variables.
         """
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
 
         result = probe_backend_status()
 
         assert "GITHUB_TOKEN" in result.error
 
     def test_no_token_uses_provider_status_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
 
         result = probe_backend_status()
 

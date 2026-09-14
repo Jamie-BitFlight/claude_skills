@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client
+from backlog_core.github_client import MissingGitHubTokenError, make_github_client, resolve_token
 
 from .backend_types import (
     AddedCommentNode,
@@ -1248,8 +1247,10 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         BackendStatus with availability and live issue counts. Cache fields retain
         their defaults because the provider owns cache observation.
     """
-    if not os.environ.get("GITHUB_TOKEN"):
-        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
+    try:
+        resolve_token()
+    except MissingGitHubTokenError as exc:
+        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error=str(exc))
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
