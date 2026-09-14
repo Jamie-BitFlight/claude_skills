@@ -1626,7 +1626,12 @@ def add_item(
         Dict with title, priority, logical reference, compatibility ``file_path``,
         ``item_ref`` (the backend issue ref, or ``""`` when creation failed or
         was skipped), and the ``messages``/``warnings``/``errors`` lists from
-        ``Output``. ``item_ref`` is always present: its emptiness, not its
+        ``Output``. ``title`` is the title as stored, which is the raw ``title``
+        argument prefixed with its conventional-commit type (``"feat: {title}"``)
+        when a real GitHub issue was created — the same value ``list_items`` and
+        ``view_item`` return for this item on every later read, so a caller can
+        use it as a selector. ``item_ref`` is always present: its emptiness, not
+        its
         absence, is the local-only-create signal, matching the already-persisted
         ``BacklogItem.issue`` field and the ``issue`` key that ``list_items``/
         ``view_item`` return for this same item on every later read (see
@@ -1702,13 +1707,23 @@ def add_item(
         item_to_write.metadata.last_synced = now_iso()
     get_config().backend.put_work_item(item_to_write)
 
-    out.info(f"Backlog item created.\n  Title: {title}\n  Priority: {priority}\n  Reference: {item_reference}")
+    # Report the stored title, not the raw argument. When a real GitHub issue was
+    # created, gh_client.create_issue_for_item prefixed item_data.title with the
+    # conventional-commit type ("feat: {title}"), and that prefixed value is what
+    # item_to_write persisted and what the live issue carries. Echoing the raw
+    # argument instead hands the caller a title that matches neither, so an
+    # add-then-update-by-title sequence resolves the item and gets back a
+    # different title than add reported (#3546). Without a GitHub issue no
+    # prefixing happens and this is the raw title unchanged.
+    stored_title = item_to_write.title
+
+    out.info(f"Backlog item created.\n  Title: {stored_title}\n  Priority: {priority}\n  Reference: {item_reference}")
     if issue_ref:
         out.info(f"  Issue: {issue_ref}")
-    out.info(f"Next steps: /groom-backlog-item {title}  /work-backlog-item {title}")
+    out.info(f"Next steps: /groom-backlog-item {stored_title}  /work-backlog-item {stored_title}")
 
     result: dict[str, str | int | bool | list[str]] = {
-        "title": title,
+        "title": stored_title,
         "priority": priority,
         "reference": item_reference,
         "file_path": item_reference,
