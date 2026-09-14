@@ -1800,7 +1800,7 @@ def refresh_local_cache_from_github(
     }
 
 
-def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
+def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True) -> str:
     """Return the effective status string for an item.
 
     For items with a numeric issue reference, looks up the live status
@@ -1810,17 +1810,32 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     backends from always returning ``"needs-grooming"`` when the status map is
     empty (ADR-002).
 
+    Args:
+        item: The backlog item whose effective status is wanted.
+        status_map: Live statuses keyed by issue number.
+        status_live: Whether *status_map* is the result of a query that
+            answered.  When ``False`` the map is empty because nobody asked or
+            because the backend refused, and a missing key says nothing about
+            the issue.
+
     Returns:
         Status string — either the provider status value from *status_map* or
         the local ``item.status`` value, defaulting to ``"needs-grooming"``
-        when neither is available.
+        when neither is available and ``""`` when the live status is simply
+        unknown.
     """
     num = parse_issue_number(item.issue)
-    if num is not None:
-        info = status_map.get(num)
-        return info.status if info is not None else "needs-grooming"
-    # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
-    return item.status or "needs-grooming"
+    if num is None:
+        # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
+        return item.status or "needs-grooming"
+    if not status_live:
+        # The live query never answered, so "this issue carries no status label"
+        # was never established. Report the cached value, and report nothing when
+        # there is none — an invented "needs-grooming" would make every such item
+        # match a --status needs-grooming filter and none match any other.
+        return item.status
+    info = status_map.get(num)
+    return info.status if info is not None else "needs-grooming"
 
 
 def _filter_open_items(
@@ -1831,6 +1846,8 @@ def _filter_open_items(
     status_map: dict[int, IssueStatus],
     type_: str | None = None,
     topic: str | None = None,
+    *,
+    status_live: bool = True,
 ) -> list[BacklogItem]:
     """Apply section, title, status, type, and topic filters to open_items.
 
@@ -1852,7 +1869,9 @@ def _filter_open_items(
         title_lower = title.lower()
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
-        open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+        open_items = [
+            it for it in open_items if _item_derived_status(it, status_map, status_live=status_live) == status
+        ]
     if type_:
         type_lower = type_.lower()
         open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
@@ -1908,8 +1927,17 @@ def _build_item_search_body(item: BacklogItem) -> str:
     return " ".join(parts)
 
 
-def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> dict[str, str | bool]:
+def _build_list_entry(
+    item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True
+) -> dict[str, str | bool]:
     """Build the result dict for a single backlog item.
+
+    Args:
+        item: The backlog item to render.
+        status_map: Live statuses keyed by issue number.
+        status_live: Whether *status_map* is the result of a query that
+            answered.  When ``False`` a missing key means the status is
+            unknown, not absent, so the cached value is rendered instead.
 
     Returns:
         Dict with section, title, issue, plan, type, topic, body, state,
@@ -1935,8 +1963,16 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
         num = parse_issue_number(item.issue)
         if num is not None:
             info = status_map.get(num)
-            entry["status"] = info.status if info is not None else ""
-            entry["milestone"] = info.milestone if info is not None else ""
+            if info is not None:
+                entry["status"] = info.status
+                entry["milestone"] = info.milestone
+            else:
+                # No live answer for this issue. When the query ran, that means the
+                # issue carries no status label. When it did not, the cached value is
+                # the only thing known — render it rather than a blank that reads as
+                # "no status set". Milestone is never cached locally, so it stays "".
+                entry["status"] = "" if status_live else item.status
+                entry["milestone"] = ""
         else:
             # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
             # cannot be keyed by int, so use the locally cached status field.
@@ -2010,19 +2046,29 @@ def list_items(
     # batch_fetch_statuses because their issue IDs are strings with no integer
     # representation (BacklogBackend.supports_batch_status_fetch == False).
     # The backend-owned status field is authoritative for such backends — pass an
-    # empty map.  _item_derived_status falls back to item.status when the map is
-    # empty, but _build_list_entry does NOT: for numeric-issue items it falls
-    # back to "" instead (see _duplicate_candidates, which filters around this).
+    # empty map with status_live False, which is also what a refused query leaves
+    # behind. Both mean "the map answers nothing", and neither licenses the
+    # "needs-grooming" default a successful query's missing key does.
     status_map: dict[int, IssueStatus] = {}
+    status_live = False
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
         except BackendUnavailableError as exc:
-            # An empty map renders every numeric-issue item with a blank status.
-            # Name the cause, so a reader does not take the blanks for "no status set".
-            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
-    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
-    result_items = [_build_list_entry(it, status_map) for it in open_items]
+            # Statuses now come from the local cache, which is thinner than the live
+            # answer: items with nothing cached carry no status and so match no
+            # --status filter. Name the cause and the consequence, because a reader
+            # who takes the result for a live one draws a false conclusion from it.
+            out.warn(
+                f"  WARNING: Live status unavailable ({exc}); statuses come from the local cache, "
+                "so a --status filter may under-report."
+            )
+        else:
+            status_live = True
+    open_items = _filter_open_items(
+        open_items, section, title, status, status_map, type_=type_, topic=topic, status_live=status_live
+    )
+    result_items = [_build_list_entry(it, status_map, status_live=status_live) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:

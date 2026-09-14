@@ -1,0 +1,166 @@
+"""Tests for what a ``--status`` filter means when the live status query never answered.
+
+An empty status map has two causes that read identically at the call site: the
+query ran and found no status labels, or the query never ran — the backend has
+no batch status fetch, or refused the one it was given. Only the first licenses
+the ``"needs-grooming"`` default, because only the first established anything
+about the issue.
+
+Deriving that default from the second inverted every ``--status`` filter in a
+sandbox that rejects GraphQL: ``--status status:in-progress`` matched nothing
+and ``--status needs-grooming`` matched everything, against a backlog where the
+opposite was true. The listing stays non-fatal — the cached status answers the
+filter, and the warning says so.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from backlog_core import operations
+from backlog_core.models import BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from pytest_mock import MockerFixture
+
+_REFUSAL_MESSAGE = "GitHub GraphQL is not available from Claude Code sessions; use the REST API"
+
+
+def _item(issue: str, title: str = "An item", status: str = "status:in-progress") -> BacklogItem:
+    """Build an open backlog item carrying the given issue reference and cached status."""
+    return BacklogItem(title=title, issue=issue, section="P1", status=status)
+
+
+class _Backend:
+    """Backend stub exposing only what ``list_items`` reads."""
+
+    def __init__(self, items: list[BacklogItem], *, supports_batch_status_fetch: bool = True) -> None:
+        self._items = items
+        self.supports_batch_status_fetch = supports_batch_status_fetch
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self._items
+
+
+def _patch_backend(mocker: MockerFixture, items: list[BacklogItem], *, batch: bool = True) -> None:
+    """Point ``operations.get_config()`` at a backend serving *items*."""
+    backend = _Backend(items, supports_batch_status_fetch=batch)
+    mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+
+def _refuse(mocker: MockerFixture) -> None:
+    """Make the live status query raise the environment-wide refusal."""
+    mocker.patch.object(operations, "batch_fetch_statuses", side_effect=GraphQLUnavailableError(_REFUSAL_MESSAGE))
+
+
+def _statuses(result: Mapping[str, object]) -> list[str]:
+    """Narrow the heterogeneous ``list_items`` result to its per-item status strings."""
+    raw = result.get("items", [])
+    return [str(entry.get("status", "")) for entry in raw] if isinstance(raw, list) else []
+
+
+class TestDerivedStatusWithoutALiveAnswer:
+    """``_item_derived_status`` must not invent a status for an issue nobody asked about."""
+
+    def test_a_missing_key_in_a_live_map_is_still_needs_grooming(self) -> None:
+        """The query ran and returned no label for this issue — that is a real answer."""
+        assert operations._item_derived_status(_item("#42"), {}, status_live=True) == "needs-grooming"
+
+    def test_a_missing_key_without_a_live_map_uses_the_cached_status(self) -> None:
+        assert operations._item_derived_status(_item("#42"), {}, status_live=False) == "status:in-progress"
+
+    def test_a_missing_key_without_a_live_map_or_a_cached_status_is_unknown(self) -> None:
+        """Unknown must stay unknown: it matches no filter rather than matching the wrong one."""
+        assert operations._item_derived_status(_item("#42", status=""), {}, status_live=False) == ""
+
+    def test_a_live_map_entry_still_wins(self) -> None:
+        status_map = {42: IssueStatus(status="status:done", milestone="")}
+
+        assert operations._item_derived_status(_item("#42"), status_map, status_live=True) == "status:done"
+
+    def test_a_string_issue_reference_keeps_its_needs_grooming_default(self) -> None:
+        """ADR-002: beads nanoids never key the map, and their default is unchanged."""
+        assert operations._item_derived_status(_item("bd-a3f8", status=""), {}, status_live=False) == "needs-grooming"
+
+
+class TestStatusFilterUnderARefusal:
+    """The filter has to answer from the cache, not from a fabricated default."""
+
+    def test_the_real_status_still_matches(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42"), _item("#43", title="Another")])
+        _refuse(mocker)
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 2
+
+    def test_needs_grooming_no_longer_matches_everything(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42"), _item("#43", title="Another")])
+        _refuse(mocker)
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert result["count"] == 0
+
+    def test_an_item_with_no_cached_status_matches_no_filter(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42", status="")])
+        _refuse(mocker)
+
+        assert operations.list_items(status="needs-grooming", output=Output())["count"] == 0
+        assert operations.list_items(status="status:in-progress", output=Output())["count"] == 0
+
+    def test_an_unfiltered_listing_still_returns_every_item(self, mocker: MockerFixture) -> None:
+        """The refusal degrades the answer, it does not shrink the backlog."""
+        _patch_backend(mocker, [_item("#42"), _item("#43", title="Another")])
+        _refuse(mocker)
+
+        assert operations.list_items(output=Output())["count"] == 2
+
+
+class TestRenderedStatusUnderARefusal:
+    """A filter that matched on the cached status must render that same status."""
+
+    def test_the_cached_status_is_rendered(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42")])
+        _refuse(mocker)
+
+        assert _statuses(operations.list_items(output=Output())) == ["status:in-progress"]
+
+    def test_a_live_miss_still_renders_blank(self, mocker: MockerFixture) -> None:
+        """The query ran and named no label for this issue, so blank is the honest render."""
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+
+        assert _statuses(operations.list_items(output=Output())) == [""]
+
+    def test_the_warning_names_the_cause_and_the_consequence(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42")])
+        _refuse(mocker)
+
+        raw = operations.list_items(output=Output()).get("warnings", [])
+        warnings = [str(entry) for entry in raw] if isinstance(raw, list) else []
+
+        assert any(_REFUSAL_MESSAGE in w for w in warnings)
+        assert any("local cache" in w and "under-report" in w for w in warnings)
+
+
+class TestBackendsWithoutABatchStatusFetch:
+    """A backend that never queries is in the same position as one that was refused."""
+
+    def test_a_numeric_issue_falls_back_to_the_backend_owned_status(self, mocker: MockerFixture) -> None:
+        """No query ran, so the backend-owned field is authoritative — not "needs-grooming"."""
+        _patch_backend(mocker, [_item("#42")], batch=False)
+
+        assert operations.list_items(status="needs-grooming", output=Output())["count"] == 0
+        assert operations.list_items(status="status:in-progress", output=Output())["count"] == 1
+
+    def test_no_refusal_warning_is_emitted(self, mocker: MockerFixture) -> None:
+        """Nothing degraded: this backend has no live statuses to lose."""
+        _patch_backend(mocker, [_item("#42")], batch=False)
+
+        raw = operations.list_items(output=Output()).get("warnings", [])
+        warnings = [str(entry) for entry in raw] if isinstance(raw, list) else []
+
+        assert not any("Live status unavailable" in w for w in warnings)
