@@ -30,6 +30,11 @@ own documented pipeline explicitly names a scratch path as the input to its next
 passing a change plan or a draft-output path from one stage to a validator or verifier stage within
 that same skill), that skill's stage definitions govern and the handoff is allowed.
 
+## Where a committed file goes
+
+`.claude/` holds Claude Code configuration; `docs/` holds project documentation. Before creating a
+file in either, `ls` the likely parent — an existing directory convention decides the location.
+
 ## Hard rule
 
 Never write agent output to `.claude/` — every write to that directory triggers a security

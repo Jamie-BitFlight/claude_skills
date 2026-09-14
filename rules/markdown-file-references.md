@@ -49,3 +49,4 @@ Skills in subdirectories under `skills/` silently fail to register. Subdirectory
 - `skills/analyze-test-failures/SKILL.md` → `/plugin:analyze-test-failures` — correct
 
 All skill directories must sit directly under `skills/` — one level deep only. Do not create grouping subdirectories.
+

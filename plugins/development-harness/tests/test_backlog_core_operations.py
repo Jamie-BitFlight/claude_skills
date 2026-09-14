@@ -286,6 +286,36 @@ class TestAddItemCreatesLocalFile:
         stored = _stored_item(str(result["file_path"]))
         assert stored.title == "refactor: Split the parser module"
 
+    def test_add_item_returns_type_prefixed_title_from_github_creation(self, mocker: MockerFixture) -> None:
+        """Verify add_item reports the stored title, not the raw title argument (#3546).
+
+        Tests: result["title"] reuses item_to_write.title after GitHub issue creation.
+        How: Mock create_issue_for_item with a side_effect that mutates item.title in place
+             (matching gh_client.create_issue_for_item's real behavior) and returns an issue
+             number; assert the returned title carries the same prefix as the persisted one.
+        Why: The persisted title and the live issue both carry the "{type}: " prefix, so a
+             response echoing the raw argument matches neither. A caller that stores the
+             returned title and later passes it back as a selector — as the live-validation
+             suite's add-then-update sequence does — then gets back a title that differs from
+             the one add reported. normalize_issue_title() exists for comparisons that must
+             ignore the prefix; the response itself reports what was stored.
+        """
+        mock_repo = mocker.Mock()
+        mocker.patch("backlog_core.operations.try_get_github", return_value=mock_repo)
+
+        def fake_create_issue_for_item(
+            repository: object, item: BacklogItem, dry_run: bool = False, output: object = None
+        ) -> int:
+            item.title = f"refactor: {item.title}"
+            return 315
+
+        mocker.patch("backlog_core.operations.create_issue_for_item", side_effect=fake_create_issue_for_item)
+
+        result = add_item(title="Split the parser module", description="desc", priority="P1", type_="Refactor")
+
+        assert result["title"] == "refactor: Split the parser module"
+        assert result["title"] == _stored_item(str(result["file_path"])).title
+
     def test_backfill_issue_creation_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
         """Verify _create_issue_and_update_item persists the type-prefixed title too (#2963).
 
