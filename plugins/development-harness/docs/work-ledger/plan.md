@@ -210,8 +210,7 @@ the red run against an exporter without the divergence re-read recorded in the p
    "Provider-owned artifacts and plans" heading's claim.
 2. `backlog_core/ARCHITECTURE.md` "Module: dispatch_state.py" and
    `docs/component-architecture.md` each cite the ADR that retires what they describe.
-3. Both copies of `workflow-architecture-diagram.md`, the plugin's and `.claude/docs/`, and the
-   plugin `README.md` line saying a SubagentStop hook marks tasks complete, each describe
+3. The plugin `README.md` line saying a SubagentStop hook marks tasks complete describes
    `finish` and `settle`.
 4. The plugin `AGENTS.md` carries, beside its `dh_core/operations.py` line: "The CLI is the PEP
    723 script `sam_schema/cli.py`, run as `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"

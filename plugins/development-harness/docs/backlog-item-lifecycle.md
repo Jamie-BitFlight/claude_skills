@@ -1136,7 +1136,7 @@ Neither `implement-feature` nor `start-task` documents an explicit procedure for
 
 ## Related Documents
 
-- [Workflow Architecture Diagram (SAM pipeline detail)](./workflow-architecture-diagram.md)
+- [Work loop (dispatch, finish, settle, accept)](./work-ledger/work-loop.md)
 - [Plan Artifact Lifecycle Policy](./plan-artifact-lifecycle.md)
 - For the S1-S7 pipeline and stage handoffs, or artifact naming and file layout — load
   `dh:dh-meta-docs`, which routes to both.
