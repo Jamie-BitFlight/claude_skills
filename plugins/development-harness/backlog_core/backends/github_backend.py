@@ -539,6 +539,12 @@ class GitHubBackend:
 
         Returns:
             Dict mapping issue_number to IssueStatus model.
+
+        Raises:
+            GraphQLUnavailableError: When the environment refuses GitHub's
+                GraphQL API outright. An empty map means "no item carries a
+                status", so the refusal reaches the caller rather than
+                disguising itself as that answer.
         """
         return gh_client.batch_fetch_statuses(items, repo or self._repo)
 
