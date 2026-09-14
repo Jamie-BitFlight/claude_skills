@@ -262,7 +262,7 @@ the issue, enabling worktree-isolated agents to read provider-owned content thro
 
 **Pre-Phase 1b: Process Accumulated Concerns** — checks the backlog item for a `## Concerns` section accumulated during `/implement-feature` and routes unresolved concerns to the QG plan.
 
-After all pre-phases complete, the skill builds the SAM-enforced QG plan (phases defined by `build_quality_gate_plan` in `sam_schema/core/quality_gates.py`).
+After all pre-phases complete, the skill creates the QG plan from the task list in its "Step 2: Create QG plan" section. Step 2a then puts that plan in the ledger.
 
 For the full pre-phase logic, see the `complete-implementation` skill: `/dh:complete-implementation`.
 
