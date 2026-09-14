@@ -5,10 +5,15 @@
 refusal used to be converted into that same empty mapping, so every listing rendered
 blank statuses and reported no reason.
 
-Two guarantees are protected here. The refusal reaches the caller as a distinct
-exception, and the caller that chooses to continue with blank statuses says so in
-its output. Every other failure keeps its existing local-fallback behaviour, so an
-offline read still serves the cache rather than raising.
+Three guarantees are protected here. The GraphQL refusal reaches the caller as a
+distinct exception; a genuine failure (network error, 500, rate limit, or anything
+else that is not the refusal marker) reaches the caller as ``GitHubUnavailableError``
+instead of the same silent empty map (#3546 — ``try_get_github`` used to fold every
+``GithubException`` into the identical ``None``/``{}`` a missing token produces,
+making a real outage indistinguishable from "GitHub is not configured here"); and
+only the actually-benign case — no ``GITHUB_TOKEN`` configured at all, a
+configuration state rather than a failure — keeps the local-fallback empty-map
+behaviour, so an offline read still serves the cache rather than raising.
 """
 
 from __future__ import annotations
@@ -19,7 +24,14 @@ import pytest
 from github import GithubException
 
 from backlog_core import gh_client, operations
-from backlog_core.models import BacklogError, BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+from backlog_core.models import (
+    BacklogError,
+    BacklogItem,
+    GitHubUnavailableError,
+    GraphQLUnavailableError,
+    IssueStatus,
+    Output,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -41,7 +53,7 @@ class _Repo:
 
 
 class TestBatchFetchStatusesSurfacesTheRefusal:
-    """The GraphQL refusal must not arrive at the caller disguised as an empty map."""
+    """Neither the GraphQL refusal nor a genuine failure may arrive disguised as an empty map."""
 
     def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
@@ -50,14 +62,16 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         with pytest.raises(GraphQLUnavailableError):
             gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_generic_backlog_error_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """Offline continuity is deliberate: an ordinary failure keeps serving the cache."""
+    def test_a_generic_backlog_error_now_propagates_instead_of_hiding_as_empty(self, mocker: MockerFixture) -> None:
+        """A non-refusal failure is a genuine degradation, not the same answer as "no status set"."""
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=BacklogError("query rejected"))
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_github_exception_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
+    def test_a_github_exception_now_propagates_instead_of_hiding_as_empty(self, mocker: MockerFixture) -> None:
+        """A 500/rate-limit from the status query itself must not read as a real, empty answer."""
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(
             gh_client,
@@ -65,10 +79,25 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
             side_effect=GithubException(status=500, data={"message": "Server Error"}, headers={}),
         )
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_a_try_get_github_failure_propagates_as_github_unavailable(self, mocker: MockerFixture) -> None:
+        """A network error/500/rate limit resolving the repo itself is not a refusal either.
+
+        This is the earlier of the two swallow points #3546 fixed: ``try_get_github``
+        itself used to fold *any* ``GithubException`` from ``get_repo`` — not just a
+        missing token — into the same ``None`` a missing token produces.
+        """
+        mocker.patch.object(
+            gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
     def test_an_unreachable_backend_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """``try_get_github`` returning None is the no-token/no-network path, not a refusal."""
+        """``try_get_github`` returning None is the no-token config state, not a failure."""
         mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
         assert gh_client.batch_fetch_statuses([_item("#42")]) == {}

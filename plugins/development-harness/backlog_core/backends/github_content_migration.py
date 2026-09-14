@@ -35,6 +35,7 @@ from backlog_core.backends.github_content_stores import (
 from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.file_cache import ReplayAcknowledgement
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogError,
     ContentConflictError,
     ContentKind,
@@ -244,13 +245,31 @@ class _GitHubContentCache:
         self._cache = cache
         self._provider = provider
 
+    def _provider_online(self) -> bool:
+        """Report whether the GitHub provider is reachable, without raising.
+
+        ``try_get_github()`` distinguishes "no token configured" (returns
+        ``None``, a config state this cache treats as offline) from a genuine
+        API failure (raises ``BackendUnavailableError``, e.g. network error,
+        rate limit, 5xx) — #3546. Both mean the same thing to this cache: fall
+        back to the durable local copy rather than fail the read/write.
+
+        Returns:
+            True if the provider resolved a live GitHub repository, False if
+            it is offline (no token configured or a genuine API failure).
+        """
+        try:
+            return self._provider.try_get_github() is not None
+        except BackendUnavailableError:
+            return False
+
     def list_content(self, query: ContentQuery) -> list[ContentRecord]:
         """Return a bounded discovery page, falling back to stale cached records.
 
         Returns:
             The requested page of content records.
         """
-        online = self._provider.try_get_github() is not None
+        online = self._provider_online()
         if online:
             self.replay_pending()
             try:
@@ -334,7 +353,7 @@ class _GitHubContentCache:
         """
         if is_work_item_head_ref(reference):
             raise UnsupportedCapabilityError("Content reference is provider-private")
-        if self._provider.try_get_github() is None:
+        if not self._provider_online():
             return self._cache.get_content(reference, stale=True)
         self.replay_pending()
         cached = self.cached_content(reference)
@@ -379,7 +398,7 @@ class _GitHubContentCache:
         if is_work_item_head_ref(request.reference):
             raise UnsupportedCapabilityError("Content reference is provider-private")
         cached = self.cached_content(request.reference)
-        if self._provider.try_get_github() is None:
+        if not self._provider_online():
             if request.create_only and cached is not None:
                 raise ContentConflictError("Content already exists")
             if request.expected_revision and (cached is None or cached.revision != request.expected_revision):
