@@ -9,12 +9,17 @@ directly rather than inferred from a connection succeeding.
 
 from __future__ import annotations
 
+import datetime as dt
 import os
 import ssl
 from pathlib import Path
 
 import certifi
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 from github.Requester import HTTPSRequestsConnectionClass, Requester
 from urllib3.util.ssl_ import create_urllib3_context
 
@@ -26,6 +31,7 @@ from backlog_core.github_client import (
     _build_ssl_context,
     _InstallState,
     _make_connection_class,
+    bundle_requires_relaxed_verification,
     install_proxy_tls_support,
     make_github_client,
     resolve_ca_bundle,
@@ -61,15 +67,103 @@ def restore_pygithub_classes():
     _InstallState.installed = False
 
 
+def _self_signed_ca(*, key_usage: bool, basic_constraints: bool = True, basic_critical: bool = True) -> str:
+    """Build a self-signed anchor in PEM form, with the extensions under test toggled.
+
+    Args:
+        key_usage: Include a ``keyUsage`` extension.
+        basic_constraints: Include a ``basicConstraints`` extension.
+        basic_critical: Mark ``basicConstraints`` critical.
+
+    Returns:
+        The certificate as a PEM string.
+    """
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test-anchor")])
+    now = dt.datetime.now(dt.UTC)
+    builder = (
+        x509
+        .CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - dt.timedelta(days=1))
+        .not_valid_after(now + dt.timedelta(days=1))
+    )
+    if basic_constraints:
+        builder = builder.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=basic_critical)
+    if key_usage:
+        builder = builder.add_extension(
+            x509.KeyUsage(
+                digital_signature=False,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+    return builder.sign(key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+
+def _installed_https_connection_class() -> type:
+    """Read the HTTPS connection class Requester currently builds instances from.
+
+    PyGithub sets this through name-mangled class attributes assigned only inside
+    ``injectConnectionClasses``/``resetConnectionClasses`` bodies (``cls.__httpsConnectionClass
+    = ...``), so no static type ever declares it and a type checker cannot resolve a direct
+    ``Requester._Requester__httpsConnectionClass`` access. Indexing ``__dict__`` reads the same
+    process-wide state PyGithub itself relies on without that unresolved-attribute error, and
+    without the ``getattr``-with-a-constant form ruff's B009 asks to rewrite back into the
+    direct access this exists to avoid.
+
+    Returns:
+        The class ``Requester.injectConnectionClasses``/``resetConnectionClasses`` last set.
+    """
+    return Requester.__dict__["_Requester__httpsConnectionClass"]
+
+
+def _requester_connection_class(requester: Requester) -> type:
+    """Read the HTTPS connection class one already-built Requester instance captured.
+
+    Same name-mangling rationale as ``_installed_https_connection_class``, but for the
+    per-instance copy ``Requester.__init__`` takes at construction time.
+
+    Args:
+        requester: A built Requester instance, as found on ``Github(...).requester``.
+
+    Returns:
+        The connection class that requester's constructor captured.
+    """
+    return requester.__dict__["_Requester__connectionClass"]
+
+
 @pytest.fixture
-def ca_file(tmp_path):
-    """A real, parseable CA bundle standing in for the one a proxy configures.
+def stock_store_file(tmp_path):
+    """A copy of the public trust store, which is what Nix and conda point these vars at.
 
     certifi ships with requests, which PyGithub already depends on, so this needs no new
     dependency and gives load_verify_locations genuine certificates to parse.
     """
-    bundle = tmp_path / "ca-bundle.crt"
+    bundle = tmp_path / "stock-store.crt"
     bundle.write_text(Path(certifi.where()).read_text(encoding="utf-8"), encoding="utf-8")
+    return bundle
+
+
+@pytest.fixture
+def ca_file(tmp_path, stock_store_file):
+    """A bundle shaped like the one a TLS-intercepting proxy installs.
+
+    The public roots plus one locally added anchor that carries no ``keyUsage`` extension —
+    the certificate shape that makes VERIFY_X509_STRICT reject the chain.
+    """
+    bundle = tmp_path / "ca-bundle.crt"
+    bundle.write_text(stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=False), encoding="utf-8")
     return bundle
 
 
@@ -130,6 +224,63 @@ class TestResolveCaBundle:
         monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
 
         assert resolve_ca_bundle() == str(preferred)
+
+
+class TestBundleRequiresRelaxedVerification:
+    """Only a locally added anchor that strict verification rejects earns the relaxation.
+
+    The three rejected shapes below were each observed against a loopback TLS server:
+    OpenSSL refuses them under VERIFY_X509_STRICT and accepts them once the flag is
+    cleared, which is the whole condition this predicate stands for.
+    """
+
+    def test_the_stock_trust_store_needs_nothing(self, stock_store_file):
+        """Nix and conda point these variables at a copy of the public roots.
+
+        The public store already contains anchors that strict mode rejects, so a bundle
+        is judged by what it adds, not by what it inherited.
+        """
+        assert bundle_requires_relaxed_verification(str(stock_store_file)) is False
+
+    def test_an_added_anchor_without_key_usage_requires_it(self, ca_file):
+        """The proxy CA shape this module exists for: verify code 92."""
+        assert bundle_requires_relaxed_verification(str(ca_file)) is True
+
+    def test_an_added_anchor_with_non_critical_basic_constraints_requires_it(self, tmp_path, stock_store_file):
+        """Verify code 89: Basic Constraints of CA cert not marked critical."""
+        bundle = tmp_path / "non-critical.crt"
+        bundle.write_text(
+            stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True, basic_critical=False),
+            encoding="utf-8",
+        )
+
+        assert bundle_requires_relaxed_verification(str(bundle)) is True
+
+    def test_an_added_anchor_without_basic_constraints_requires_it(self, tmp_path, stock_store_file):
+        """Verify code 79: invalid CA certificate."""
+        bundle = tmp_path / "no-basic-constraints.crt"
+        bundle.write_text(
+            stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True, basic_constraints=False),
+            encoding="utf-8",
+        )
+
+        assert bundle_requires_relaxed_verification(str(bundle)) is True
+
+    def test_a_compliant_added_anchor_needs_nothing(self, tmp_path, stock_store_file):
+        """A private CA that satisfies RFC 5280 verifies under strict mode as it is."""
+        bundle = tmp_path / "compliant-private-ca.crt"
+        bundle.write_text(
+            stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True), encoding="utf-8"
+        )
+
+        assert bundle_requires_relaxed_verification(str(bundle)) is False
+
+    def test_a_bundle_holding_no_certificates_needs_nothing(self, tmp_path):
+        """An empty or non-PEM file announces no proxy, so it must not relax anything."""
+        bundle = tmp_path / "empty.crt"
+        bundle.write_text("not a certificate\n", encoding="utf-8")
+
+        assert bundle_requires_relaxed_verification(str(bundle)) is False
 
 
 class TestSslContextKeepsVerification:
@@ -214,6 +365,50 @@ class TestInstallProxyTlsSupport:
 
         assert install_proxy_tls_support(force=True) is True
 
+    def test_a_stock_trust_store_does_not_install(self, monkeypatch, stock_store_file):
+        """A CA bundle variable is not a proxy: Nix and conda set these on ordinary networks.
+
+        Installing there would drop VERIFY_X509_STRICT and PyGithub's connection reuse on a
+        network that verifies perfectly well without either.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(stock_store_file))
+
+        assert install_proxy_tls_support() is False
+        assert _InstallState.installed is False
+        assert _installed_https_connection_class() is HTTPSRequestsConnectionClass
+
+    def test_install_substitutes_pygithubs_connection_class(self, monkeypatch, ca_file):
+        """The reported state has to mean PyGithub actually builds connections differently."""
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
+
+        install_proxy_tls_support()
+
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
+    def test_force_uninstalls_when_the_bundle_is_gone(self, monkeypatch, ca_file):
+        """A forced call that finds no proxy must leave nothing of the previous install.
+
+        Reporting False while the substituted class stays live — and the recorded state
+        stays True — leaves the process relaxed with no way to observe it.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
+        install_proxy_tls_support()
+        ca_file.unlink()
+
+        assert install_proxy_tls_support(force=True) is False
+        assert _InstallState.installed is False
+        assert _installed_https_connection_class() is HTTPSRequestsConnectionClass
+
+    def test_force_uninstalls_when_the_bundle_no_longer_announces_a_proxy(self, monkeypatch, ca_file, stock_store_file):
+        """Same requirement when the bundle still exists but no longer needs the relaxation."""
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
+        install_proxy_tls_support()
+        monkeypatch.setenv("SSL_CERT_FILE", str(stock_store_file))
+
+        assert install_proxy_tls_support(force=True) is False
+        assert _InstallState.installed is False
+        assert _installed_https_connection_class() is HTTPSRequestsConnectionClass
+
 
 class TestConnectionClassFactory:
     """The substituted class must remain a drop-in for the one PyGithub ships."""
@@ -288,6 +483,23 @@ class TestMakeGithubClient:
         client = make_github_client("t" * 40)
 
         assert "api.github.com" in client.requester.base_url
+
+    def test_only_a_client_built_after_the_install_uses_the_substituted_class(self, monkeypatch, ca_file):
+        """A Requester copies its connection class at construction, so ordering matters.
+
+        PyGithub's ``Requester.__init__`` reads the class off the Requester class and stores
+        it on the instance, which is why this factory installs before it builds anything: a
+        client built earlier keeps the stock strict class for its whole life, and no later
+        install reaches it.
+        """
+        monkeypatch.setenv("GITHUB_TOKEN", "t" * 40)
+        built_before_install = make_github_client()
+
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
+        built_after_install = make_github_client()
+
+        assert _requester_connection_class(built_before_install.requester) is HTTPSRequestsConnectionClass
+        assert _requester_connection_class(built_after_install.requester) is not HTTPSRequestsConnectionClass
 
     def test_default_timeout_is_applied(self):
         """The documented default reaches the client rather than PyGithub's own 15s."""
