@@ -90,10 +90,9 @@ stateDiagram-v2
 
 The `work` pipeline gate in `dh:work-backlog-item` stops when the item is marked BLOCKED.
 
-Milestone work changes only the GitHub milestone and Project V2 Status fields, not item status.
 `dh:group-items-to-milestone` assigns the issue to a GitHub milestone and sets Project V2 Status to
-`Backlog`. `dh:complete-milestone` closes the GitHub milestone and sets Project V2 Status to `Done`
-for closed issues.
+`Backlog`. `dh:complete-milestone` adds the `status:done` label to each issue still open in the
+milestone, closes the GitHub milestone, and sets Project V2 Status to `Done` for closed issues.
 
 ---
 
