@@ -60,10 +60,10 @@ def _bare_environment() -> dict[str, str]:
     prepended. Without this, `subprocess.run` would silently inherit the test runner's `PATH`
     (which already has the project environment first) and every case would resolve correctly
     regardless of what this function's caller sets afterward -- exactly the false-negative this
-    helper exists to prevent. `TY_UV` matters for the same reason and is easy to miss: the
-    `.claude/settings.json` `env` entry this repo asks for puts `TY_UV=scripts` into every process
-    Claude Code spawns, pytest included, which would make the `_run_ty_check(ty_uv=None)` case
-    resolve cleanly and silently turn the #691 canary into a skip. This reproduces what a bare
+    helper exists to prevent. `TY_UV` matters for the same reason and is easy to miss: any ambient
+    `TY_UV=scripts` in the launching shell reaches pytest too, which would make the
+    `_run_ty_check(ty_uv=None)` case resolve cleanly and silently turn the #691 canary into a skip.
+    This reproduces what a bare
     language server launch (e.g. `uvx ty@latest server`) actually experiences: no project
     environment on `PATH`. `uv`/`uvx` themselves are deliberately left reachable on `PATH`,
     matching reality -- `TY_UV=scripts` needs `uv` on `PATH` to shell out to, and a real editor

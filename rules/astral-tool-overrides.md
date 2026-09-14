@@ -21,7 +21,9 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
   activate a venv to work around it.
 - **Security upgrades**: raise a pinned floor with `uv add "pkg>=X.Y.Z"`, which updates
   `pyproject.toml` and `uv.lock` together and prints the resolved version. `uv lock
-  --upgrade-package pkg` does the same silently. Confirm the result with `uv tree | grep pkg`.
+  --upgrade-package pkg` moves only the lockfile, within the constraint `pyproject.toml` already
+  carries, so the vulnerable floor survives and a later resolution can return to it. Confirm the
+  result with `uv tree | grep pkg`.
 - **ty per-file relaxation**: only via `[[tool.ty.overrides]]` in `pyproject.toml`, never inline, and
   only for a category named in `linting-exceptions.md`, cited in a comment beside the override.
 - **Tool invocation**: always `uv run <tool>` — never bare `ruff`/`ty`/`pytest`, never `uvx <tool>`

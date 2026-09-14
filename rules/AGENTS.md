@@ -13,7 +13,7 @@ been added yet.
 | `agent-output-contracts.md` | agent-definition files — prohibited silent-output instructions and enforcement checklist |
 | `astral-tool-overrides.md` | Python files, `pyproject.toml`, `uv.lock` — this repo's uv/ty/ruff policy overrides |
 | `ci-workflows.md` | `.github/workflows/*.yml` — CI workflow modification protocol |
-| `citation-requirements.md` | SKILL.md/agents/commands/CLAUDE.md — factual claims need a cited source |
+| `citation-requirements.md` | SKILL.md/references/agents/commands/CLAUDE.md — factual claims need a cited source |
 | `delegation-format.md` | SKILL.md/agents/commands/references — wrong delegation-instruction formats to avoid in prose |
 | `exception-handling.md` | Python/TS/JS — narrow exception catches only, no broad `except Exception` |
 | `frontmatter-requirements.md` | SKILL.md/agents/commands — required frontmatter fields |
@@ -24,7 +24,7 @@ been added yet.
 | `plugin-json.md` | `plugin.json` — manifest schema requirements |
 | `prose-file-classification.md` | any `.md` — review-treatment decision tree for prose files |
 | `python-development.md` | Python files, `pyproject.toml`, `uv.lock` — PEP 723 scripts, no uv workspace, ty errors |
-| `review-and-correction-discipline.md` | SKILL.md/agents/commands/CLAUDE.md — structural vs content review gates |
+| `review-and-correction-discipline.md` | SKILL.md/agents/commands/CLAUDE.md, `rules/**`, AGENTS.md — structural vs content review gates, and what belongs in `AGENTS.md` |
 | `runtime-vs-design-time.md` | SKILL.md/references/agents/commands/CLAUDE.md/AGENTS.md — runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo |
 | `script-invocation.md` | scripts/, `.claude/hooks/` — shebang/execute-bit, run scripts directly |
 | `silent-failure-prevention.md` | Python/TS/JS — write operations must report what changed |

@@ -367,7 +367,12 @@ deletion, read `docs/branch-transfer-preflight.md`.
 GitHub's coding agent reads `AGENTS.md` directly; no separate `.github/copilot-instructions.md`
 exists.
 
-Rule files outside `rules/` that other harnesses read — not a full rule-file index:
+`rules/` holds this repo's path-scoped rules. Claude Code delivers each one on its own, the moment
+you touch a file matching that rule's `rules/manifest.json` glob. Every other harness reaches them
+by reading [`rules/AGENTS.md`](rules/AGENTS.md), which indexes each rule file and the paths it
+governs — read it before editing Python, a `SKILL.md`, an agent file, or a CI workflow.
+
+Rule files outside `rules/`, which no manifest glob covers:
 
 | File | Purpose |
 |------|---------|

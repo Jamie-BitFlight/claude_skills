@@ -50,7 +50,3 @@ Skills in subdirectories under `skills/` silently fail to register. Subdirectory
 
 All skill directories must sit directly under `skills/` — one level deep only. Do not create grouping subdirectories.
 
-## Where a new file goes
-
-`.claude/` holds Claude Code configuration; `docs/` holds project documentation. Before creating a
-file in either, `ls` the likely parent — an existing directory convention decides the location.

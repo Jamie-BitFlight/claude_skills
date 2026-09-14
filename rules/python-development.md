@@ -59,12 +59,10 @@ diagnostic is an editor-side artefact, not a missing `extra-paths` entry — ty 
 file as an isolated single-file project and does not consult `[tool.ty.environment]` for it.
 
 CLI, prek and CI resolve these scripts correctly because every PEP 723 script's dependencies are
-mirrored into the root `[dependency-groups] dev` group. Claude Code's bundled language server has no repo-side
-lever; that fix belongs in the astral plugin's own `lspServers.ty` entry.
-
-Set `TY_UV=scripts` only in a shell where a specific script's dependency was never mirrored. Leave it
-out of `.claude/settings.json` — that `env` block reaches every Bash call in a session, which would
-make local `ty check` disagree with CI.
+mirrored into the root `[dependency-groups] dev` group. Editors reach the same result through
+`.vscode/settings.json`'s `"ty.experimental.useUv": "scripts"`, which scopes the fix to the editor's
+own language server. Claude Code's bundled language server reads neither and has no repo-side lever;
+that fix belongs in the astral plugin's own `lspServers.ty` entry.
 
 Expires when <https://github.com/astral-sh/ty/issues/691> closes. Regression coverage:
 [`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py).
