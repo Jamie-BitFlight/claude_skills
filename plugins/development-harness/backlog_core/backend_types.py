@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -80,7 +80,18 @@ class IssueNode(TypedDict):
 
 
 class IssueCommentNode(TypedDict):
-    """Comment node returned from issue comments listing query."""
+    """Comment node returned from issue comments listing query.
+
+    ``id`` is GitHub's GraphQL node ID (``IC_kwDO...``). REST addresses the same
+    comment by its numeric identifier instead, which GraphQL exposes as
+    ``databaseId`` and is carried here as ``database_id``. Both are needed
+    together: a node that arrives over GraphQL cannot otherwise be read or
+    written over REST.
+
+    ``database_id`` is optional because only GitHub has one. The SQLite and
+    memory backends address their comments by ``id`` alone, and supplying a
+    number there would invent an identifier that resolves to nothing.
+    """
 
     id: str
     body: str
@@ -88,6 +99,7 @@ class IssueCommentNode(TypedDict):
     author: str
     created_at: str
     updated_at: str
+    database_id: NotRequired[int]
 
 
 class MilestoneFullNode(TypedDict):

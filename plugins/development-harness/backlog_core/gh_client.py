@@ -334,6 +334,7 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
+          databaseId
           body
           url
           author { login }
@@ -352,6 +353,7 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
+      databaseId
       body
       url
       author { login }
@@ -904,11 +906,15 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         node: Raw dict from GraphQL response comments.nodes[] or node() query.
 
     Returns:
-        IssueCommentNode with all fields populated.
+        IssueCommentNode with all fields populated. ``database_id`` is set only
+        when the response carries a ``databaseId`` integer — it is the numeric
+        identifier REST addresses the comment by, and a missing or non-integer
+        value is left absent rather than guessed at, so a REST caller fails
+        loudly instead of requesting a comment that does not exist.
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    return IssueCommentNode(
+    parsed = IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
         url=str(node.get("url", "")),
@@ -916,6 +922,11 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
     )
+    # bool is an int subclass, so it is excluded explicitly — True would
+    # otherwise become comment 1.
+    if isinstance(raw_database_id := node.get("databaseId"), int) and not isinstance(raw_database_id, bool):
+        parsed["database_id"] = raw_database_id
+    return parsed
 
 
 def _fetch_issue_comments_graphql(
