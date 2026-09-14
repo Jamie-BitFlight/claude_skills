@@ -70,3 +70,10 @@ state. Confirm agents are idle — token count stable across two readings — th
   inherit ~100k tokens of tool/skill/MCP descriptions). Treat agent reports as claims, not facts:
   an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
   "not found" is often a wrong-directory confabulation — verify against primary source.
+
+## What belongs in `AGENTS.md`
+
+Every agent reads `AGENTS.md` in full, for every task, so it carries only what every task needs.
+A convention that applies to one kind of work belongs to a rule file with a `rules/manifest.json`
+glob — the hook then delivers it the moment an agent touches a matching file, and it costs nothing
+on every other task.

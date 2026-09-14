@@ -19,6 +19,9 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
   `source .venv/bin/activate`. A root `uv.lock` with PEP 723 scripts never needs the pip-compatible
   lane Astral documents. For an "externally managed environment" error, run under `uv run` — don't
   activate a venv to work around it.
+- **Security upgrades**: raise a pinned floor with `uv add "pkg>=X.Y.Z"`, which updates
+  `pyproject.toml` and `uv.lock` together and prints the resolved version. `uv lock
+  --upgrade-package pkg` does the same silently. Confirm the result with `uv tree | grep pkg`.
 - **ty per-file relaxation**: only via `[[tool.ty.overrides]]` in `pyproject.toml`, never inline, and
   only for a category named in `linting-exceptions.md`, cited in a comment beside the override.
 - **Tool invocation**: always `uv run <tool>` — never bare `ruff`/`ty`/`pytest`, never `uvx <tool>`

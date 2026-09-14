@@ -33,11 +33,7 @@ with the caller's own asyncio event loop. Suppress banner/log noise with the `FA
 
 ## Bounded execution
 
-`scripts/run_bounded.py` runs a command with a timeout and terminates its full process group
-(POSIX process-group signals; `taskkill /T /F` on Windows) on expiry, including descendants a bare
-`subprocess.run(timeout=...)` would leave behind. Wrap any external command invocation that may
-hang or spawn children with
-`uv run --script scripts/run_bounded.py --timeout-seconds <n> -- <command>`.
+Wrap every command here in `scripts/run_bounded.py`.
 
 For MCP runtime tests specifically: load the active FastMCP client skill first; if it is
 unavailable, read the bundled FastMCP client guidance. Invoke the client through a `uv`-managed
