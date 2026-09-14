@@ -496,7 +496,14 @@ class ContentProviderError(Exception):
 
 
 class ContentUnavailableError(ContentProviderError):
-    """Raised when requested content is unavailable from the selected backend."""
+    """Raised when requested content cannot be retrieved from the selected backend.
+
+    Covers backend connectivity failures (authentication failure, rate
+    limiting, network blocked, or a backend server error) as well as
+    structural failures unrelated to connectivity (malformed, oversized, or
+    mismatched stored content; a backend workspace that could not be
+    resolved). The raising call site's message names which of these applies.
+    """
 
 
 class ContentNotFoundError(ContentUnavailableError):
@@ -610,7 +617,7 @@ class BackendUnavailableError(BacklogError):
 
 
 class GitHubUnavailableError(BackendUnavailableError):
-    """Raised when GITHUB_TOKEN is missing or the GitHub API is unreachable."""
+    """Raised when GITHUB_TOKEN is missing from the environment."""
 
 
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
@@ -789,7 +796,6 @@ class Section(BaseModel):
 
 _VALID_PRIORITIES = {"P0", "P1", "P2", "Ideas", "completed"}
 _VALID_TYPES = {"Feature", "Bug", "Refactor", "Docs", "Chore"}
-_VALID_STATUSES = {"open", "done", "in-progress", "needs-grooming", "closed"}
 
 # Alias maps for legacy / variant spellings found in production files.
 _PRIORITY_ALIASES: dict[str, str] = {}  # populated below via case-insensitive idea* rule
@@ -955,8 +961,8 @@ class BacklogItemMetadata(BaseModel):
     def _validate_status(cls, v: str) -> str:
         """Accept any non-empty status string, preserving unknown values verbatim.
 
-        Canonical set: open, done, in-progress, needs-grooming, closed.
-        Legacy values (resolved, groomed, etc.) are preserved as-is.
+        Writers set open, needs-grooming, groomed, in-progress, blocked, done, and closed.
+        Older items can carry other values, such as resolved. Every value is kept as-is.
 
         Args:
             v: Raw status value from input.

@@ -49,7 +49,10 @@ The cache owns all local persistence needed for remote-provider continuity:
 - `yaml_io.py` — private YAML serialisation used only by `FileCache` for backlog snapshots,
   grooming, synchronization checkpoints, and pending mutations.
 - Cached plan and artifact files plus their manifests and provider revisions.
-- The durable pending-write queue used while the provider is unreachable.
+- The durable pending-write queue, entered when the request is unauthenticated (a missing or
+  invalid `GITHUB_TOKEN`), the network path is blocked (a proxy or firewall failure, or a
+  timeout), GitHub rate-limits the request, or GitHub returns a server error. A queued write
+  replays on the next successful connection to the provider.
 
 `github_sync.py` remains a pure provider-format adapter. `render_issue_body` serialises a
 `BacklogItem` to GitHub markdown; `parse_issue_body` reconstructs a `BacklogItem` from issue body
@@ -206,7 +209,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
 - `DuplicateItemError(duplicates)` — content-based duplicate detected
-- `GitHubUnavailableError` — GITHUB_TOKEN missing or API unreachable
+- `GitHubUnavailableError` — GITHUB_TOKEN missing from the environment; retries only after a token is set
 - `ValidationError` — input validation failure
 
 ---
@@ -473,7 +476,10 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Provider snapshots for backlog items and grooming content
 - Cached plans, artifact manifests, and artifact content
 - Last acknowledged provider revision and synchronization fingerprint
-- Pending mutations created while the provider is unreachable
+- Pending mutations created when the request cannot reach the provider — unauthenticated
+  (missing or invalid `GITHUB_TOKEN`), network-blocked (proxy, firewall, or timeout),
+  rate-limited, or met with a GitHub server error; see Storage Ownership above and Reconnect
+  behavior below
 
 **On-disk layout**, under the cache root (`<state_root>/github-cache/` for the GitHub backend):
 

@@ -1287,8 +1287,10 @@ async def sync_now(
     If a sync is already in progress, returns the current progress without
     starting a new sync (singleton guarantee).
 
-    If the server is in offline or error mode, clears the state and attempts a
-    fresh sync.
+    If the last sync entered OFFLINE (a non-retryable failure — missing/invalid
+    GITHUB_TOKEN, or a filesystem/config error) or ERROR (a retryable failure —
+    network blocked, rate limited, or a GitHub server error — that exhausted
+    all retries), clears the state and attempts a fresh sync.
 
     Args:
         full_refresh: When True, ignore the provider checkpoint and perform a

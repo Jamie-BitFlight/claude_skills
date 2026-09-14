@@ -983,22 +983,21 @@ class TestCheckOpenPrsForIssue:
         # Assert
         assert result == []
 
-    def test_returns_empty_list_on_backlog_error(self, mocker: MockerFixture) -> None:
-        """check_open_prs_for_issue returns empty list when _graphql_request raises BacklogError.
+    def test_raises_backlog_error_when_search_fails(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue raises when _graphql_request raises BacklogError.
 
         Tests: check_open_prs_for_issue error handling
-        How: Raise BacklogError from _graphql_request; verify empty list returned.
-        Why: PR-check errors must not block the close/resolve flow.
+        How: Raise BacklogError from _graphql_request; verify it propagates.
+        Why: close and resolve read an empty list as "no open PRs". A failed search must
+        not look like that, or they go ahead past an open PR.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
         mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
 
-        # Act
-        result = check_open_prs_for_issue(10, "test-owner/test-repo")
-
-        # Assert
-        assert result == []
+        # Act / Assert
+        with pytest.raises(BacklogError, match="GraphQL error: timeout"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
 
     def test_filters_out_non_pr_search_nodes(self, mocker: MockerFixture) -> None:
         """check_open_prs_for_issue skips empty dicts returned for non-PR search hits.

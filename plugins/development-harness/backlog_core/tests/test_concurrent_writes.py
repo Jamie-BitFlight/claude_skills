@@ -91,11 +91,11 @@ class TestConcurrentGroomWriteRace:
         )
 
     def test_offline_fallback_emits_staleness_warning(self, mocker: MockerFixture) -> None:
-        """view_item emits a staleness warning when the backend is unreachable.
+        """view_item emits a staleness warning when the GitHub lookup fails.
 
         When view_enrich_from_github returns False (backend offline), the sections_index
         falls back to local item.sections. result.warnings must include the
-        substring 'backend unreachable' to alert callers that the stored data may be stale.
+        substring 'GitHub lookup failed' to alert callers that the stored data may be stale.
         """
         # Arrange -- item with partial local sections
         local_item = BacklogItem(title="Offline Item", sections={"Implementation Notes": Section()})
@@ -105,8 +105,8 @@ class TestConcurrentGroomWriteRace:
         result = view_item("#42", include_content=False)
 
         # Assert -- staleness warning is present
-        assert any("backend unreachable" in w for w in result.warnings), (
-            "result.warnings must contain 'backend unreachable' when view_enrich_from_github "
+        assert any("GitHub lookup failed" in w for w in result.warnings), (
+            "result.warnings must contain 'GitHub lookup failed' when view_enrich_from_github "
             "returns False. Callers must be able to detect that "
             "sections_index reflects the stored provider record, not live GitHub state."
         )

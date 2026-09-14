@@ -57,15 +57,19 @@ unbolded line with the token alone. Choose it with the same rule `rtica-assessor
 MISSING left → `APPROVED-FOR-PLANNING`; a data-deletion hard block or no planning signal at all →
 `BLOCKED-FOR-PLANNING`; otherwise → `APPROVED-WITH-GAPS`.
 
-5. Write final RT-ICA to item (replaces the initial snapshot). Store the report content as
-   `{rt_ica_final_content}` — it will be included in the batch write at the end of this workflow
-   to ensure atomic persistence with `mark_groomed=True`:
+5. Store the final report as `{rt_ica_final_content}`. Write it to the RT-ICA section with the
+   MCP call below. The rtica-assessor write already struck the snapshot entry, so the
+   rtica-assessor entry is the only active entry. This call strikes the rtica-assessor entry. A
+   write without `replace_section=True` appends, and the rtica-assessor `Decision:` line stays
+   active. `replace_section=True` requires `reason`. The `backlog groom` CLI has no replace flag.
+   Use MCP for this write:
 
-```bash
-backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{final report}"
+```text
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True, reason='RT-ICA final pass supersedes the rtica-assessor entry')
 ```
 
-   Retain `{rt_ica_final_content}` in scope for the Write Groomed Content step.
+   Keep `{rt_ica_final_content}` for the Write Groomed Content step. That batch write sends the
+   same content again. Identical content does not add an entry.
 
 6. Final decision:
 
@@ -343,14 +347,15 @@ backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{rt-ica}"
 # ... each section as it completes ...
 ```
 
-Call the final status transition together with a content write in the same call — never
-`mark_groomed=True` alone. A `mark_groomed=True` call with no `section`/`content` skips
-`update_item()` entirely and only updates the local status and remote labels, so it never
-reconciles the Hypothesis Resolution rewrite (or anything else written locally since the last
-content call) to the remote provider:
+Call the final status transition together with a content write in the same call. A
+`mark_groomed=True` call with no `section`/`content` skips `update_item()` entirely and only
+updates the local status and remote labels, so it never reconciles the Hypothesis Resolution
+rewrite (or anything else written locally since the last content call) to the remote provider.
+Step 5 already wrote this content, so this call adds no entry. It syncs the item and advances the
+status:
 
 ```text
-mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', replace_section=True, mark_groomed=True)
+mcp__plugin_dh_backlog__backlog_groom(selector='{item_ref}', section='RT-ICA', content='{rt_ica_final_content}', mark_groomed=True)
 ```
 
 #### Handoff

@@ -4,12 +4,20 @@
 
 An RT-ICA result is stale and must be re-run if either condition is true: (a) the `Date:` header in the RT-ICA section is older than 7 calendar days, or (b) the item's `metadata.updated_at` field is newer than the RT-ICA section date. A stale RT-ICA result is treated as absent — `dh:rt-ica` is re-run before proceeding to [feasibility-gate.md](./feasibility-gate.md). The 7-day threshold applies regardless of whether the item description has changed, because codebase context may have changed even if the item text has not.
 
+The section can hold struck entries left over from an earlier assessment (see
+[groom/swarm.md](../groom/swarm.md#wave-2-gate--read-the-verdict-not-the-delivery-signal) for the
+sibling gate that reads the same shape). A struck entry's text stays in the response, so the gate
+must skip it rather than reading whichever entry sits first.
+
 ```mermaid
 flowchart TD
-    RCheck(["Step 3.2: RT-ICA Freshness Check"]) --> Get["Read backlog_view(selector=title, summary=false).sections['RT-ICA']"]
-    Get --> Absent{"sections['RT-ICA'] key present and non-empty?"}
+    RCheck(["Step 3.2: RT-ICA Freshness Check"]) --> Get["Read backlog_view(selector=title, summary=false, section='RT-ICA').sections['RT-ICA'].entries"]
+    Get --> Absent{"entries list present and non-empty?"}
     Absent -->|"No"| RunRTICA(["Run dh:rt-ica — section absent"])
-    Absent -->|"Yes"| ParseDate["Extract date using regex 'Date: YYYY-MM-DD' from section<br>If no match: try first ISO date in top 3 lines of section"]
+    Absent -->|"Yes"| Last["Take the last entry whose struck is false"]
+    Last --> NoneActive{"An entry with struck false exists?"}
+    NoneActive -->|"No — every entry is struck"| RunRTICA
+    NoneActive -->|"Yes"| ParseDate["Extract date using regex 'Date: YYYY-MM-DD' from that entry<br>If no match: try first ISO date in top 3 lines of that entry"]
     ParseDate --> DateFound{"ISO date parseable?"}
     DateFound -->|"No — date not found"| RunRTICA
     DateFound -->|"Yes — date D extracted"| Check1{"D older than 7 calendar days?"}
@@ -31,8 +39,9 @@ before running — without it the skill returns BLOCKED immediately asking for c
 Log re-run reason: `RT-ICA re-run: {staleness reason — date older than 7 days / updated_at
 newer than RT-ICA date}` to the item's RT-ICA section as a prefix before the new result.
 
-- **Present and fresh** — read the plain `Decision:` line from the cached result and act on its
-  token. Carry DERIVABLE items forward as "Assumptions to confirm" in the feature request.
+- **Present and fresh** — take the last entry in `sections['RT-ICA'].entries` whose `struck` is
+  `false`, read the plain `Decision:` line from that entry, and act on its token. Carry DERIVABLE
+  items forward as "Assumptions to confirm" in the feature request.
 
 The persisted `RT-ICA` section can have been written by either sister skill, and their token sets
 are disjoint on purpose so you can tell which one wrote it:

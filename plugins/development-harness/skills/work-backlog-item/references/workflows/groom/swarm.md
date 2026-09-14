@@ -1,6 +1,6 @@
 # Groom: Swarm
 
-Parallel grooming agents sized by scope sizing from `analyze.md`.
+Grooming agents dispatched in waves after `analyze.md`.
 Each agent writes to a different `section` via MCP `backlog_groom` — no clobbering.
 Each agent's section is how the others reach its findings — an agent that must react to another's output re-reads that section rather than waiting on a message.
 
@@ -121,8 +121,10 @@ Two different signals come back from `rtica-assessor` and they mean different th
   means it could not write an assessment at all — its upstream sections never appeared. Route that
   to [error.md](./error.md) as an agent failure; there is no verdict to read.
 - Its verdict is the `Decision:` line inside the RT-ICA section it wrote. Read it with
-  `backlog_view(selector='{item_ref}', summary=False, section='RT-ICA')` and match the plain
-  `Decision: <TOKEN>` line.
+  `backlog_view(selector='{item_ref}', summary=False, section='RT-ICA')`. The response still
+  contains the struck snapshot entry and its `Decision:` line. Take the last entry in
+  `sections['RT-ICA'].entries` whose `struck` is `false`. Match the plain `Decision: <TOKEN>` line
+  in that entry.
 
 Gate on the `Decision:` token, using the vocabulary `dh:planner-rt-ica` owns:
 

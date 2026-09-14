@@ -29,7 +29,7 @@ Skill(skill="dh:planner-rt-ica")
 
 That skill owns the verdict vocabulary you emit — `APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING` — in its "Verdict Vocabulary" section, along with the emission format and the rule that only the third value stops a consumer. Read that section before computing your verdict in Phase 6. Do not paraphrase it from memory — load the skill.
 
-The condition states you assign in Phase 4 (`AVAILABLE`, `DERIVABLE`, `MISSING`) are the grooming stack's three-state spelling, shared with `groom/analyze.md`, `groom/finalize.md` and `docs/backlog-lifecycle.md`. They are narrower than the skill's own evidence-status set (`PRESENT`, `EVIDENCE-DERIVED`, `PARTIAL`, `MISSING`, `HARD-BLOCKED`); this file defines them in Phase 4 and that is the definition you apply.
+The condition states you assign in Phase 4 (`AVAILABLE`, `DERIVABLE`, `MISSING`) are the grooming stack's three-state spelling, shared with the groom workflow of the `dh:work-backlog-item` skill. They are narrower than the skill's own evidence-status set (`PRESENT`, `EVIDENCE-DERIVED`, `PARTIAL`, `MISSING`, `HARD-BLOCKED`); this file defines them in Phase 4 and that is the definition you apply.
 
 **Use `dh:planner-rt-ica`, not `dh:rt-ica`.** You run inside the grooming swarm, so a `MISSING` condition is a research task or a question for the human, not a halt-the-feature event — which is exactly why your verdict has a middle value and the implementation gate's does not. The implementation-gate variant `dh:rt-ica` is loaded by S2 planning agents that must refuse to proceed on incomplete information; it owns a separate two-value set (`APPROVED`, `BLOCKED`) that you never emit.
 
@@ -69,7 +69,7 @@ Build the list of conditions that must be known for this item to be plannable. D
 3. **The Fact-Check** — every claim checked by the fact-checker maps to a condition
 4. **The problem space** — questions the planner will need answered that have not yet been addressed anywhere
 
-Typical condition examples: "current behavior of <module> is understood", "consumers of <interface> are enumerated", "test coverage for <area> is known", "migration strategy for <existing data> is defined", "rollback plan exists". Aim for 8 to 15 conditions for a standard-scope item, more for a full-scope item, fewer for minimal-scope.
+Typical condition examples: "current behavior of <module> is understood", "consumers of <interface> are enumerated", "test coverage for <area> is known", "migration strategy for <existing data> is defined", "rollback plan exists". Aim for 8 to 15 conditions. Enumerate more when the Impact Radius section names many affected systems. Enumerate fewer when the change touches one file.
 
 ## Phase 4 — Classify each condition
 
@@ -96,7 +96,7 @@ The other agents write their findings into named sections rather than sending th
 - **Impact Radius** — a `SCOPE_EXPANSION:` line at the top of the section names systems discovered beyond the original description. Add a condition for each. Scope expansion mid-assessment is expected; do not ignore it.
 - **Fact-Check** — `REFUTED: <claim>` marks the matching condition MISSING
 - **Fact-Check** — `INCONCLUSIVE: <claim>` marks the matching condition DERIVABLE if not already in a stronger state
-- **Issue Classification** — the recorded type adjusts scope sizing. `procedural` and `missing-guardrail` typically need fewer conditions than `unbounded-design`.
+- **Issue Classification** — the recorded type indicates how many conditions to expect. `procedural` and `missing-guardrail` typically need fewer conditions than `unbounded-design`.
 
 If this re-read changes any input, re-run Phase 4 with the updated information. Do not freeze state after your Phase 2 read.
 
@@ -130,9 +130,16 @@ Write the assessment to the item via MCP:
 mcp__plugin_dh_backlog__backlog_groom(
     selector=<item_ref>,
     section="RT-ICA",
-    content=<formatted RT-ICA report>
+    content=<formatted RT-ICA report>,
+    replace_section=True,
+    reason="rtica-assessor supersedes the RT-ICA snapshot"
 )
 ```
+
+The RT-ICA section already holds the orchestrator's snapshot, which has its own `Decision:` line.
+`replace_section=True` strikes the snapshot entry, so your entry carries the one active `Decision:`
+line. A write without `replace_section=True` appends, and the snapshot verdict stays active beside
+yours. `replace_section=True` requires `reason`. The struck snapshot stays in the section history.
 
 Use this format verbatim:
 
@@ -154,11 +161,13 @@ Date: <YYYY-MM-DD>
 
 Decision: <APPROVED-FOR-PLANNING | APPROVED-WITH-GAPS | BLOCKED-FOR-PLANNING>
 
-**Changes from snapshot** (if this is a reassessment):
+**Changes from snapshot**:
 - Condition <#>: <prior state> → <new state> — <reason>
 ```
 
-If this is the second pass (final RT-ICA after all swarm output lands), compare against the first-pass snapshot if present in the section history and list state transitions in the Changes from snapshot block. On the first pass, omit that block.
+You run once, in Wave 2. The section already holds one prior entry: the orchestrator's initial
+snapshot from `analyze.md`. Compare each condition against that snapshot. List every state
+transition in the Changes from snapshot block.
 
 ## Phase 8 — Confirm the verdict is readable
 

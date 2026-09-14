@@ -671,7 +671,16 @@ plan has no owner reference and the fallback lookup in Apply status:verified fou
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "{item_ref}" --summary "Implementation complete — AC verified PASS"
 ```
 
-On failure: output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
+On failure, read the error text.
+
+When it starts with `Open-PR search failed`, GitHub rejected the token, or a proxy or firewall
+blocked the request. Fix the token or the network path, then re-run this step. Resolve through
+`/dh:work-backlog-item resolve {item_ref}` instead, which asks the user before it retries with
+`force=True`.
+
+When it starts with `Open PRs reference issue`, report the PRs listed in `warnings`. Stop.
+
+For every other error, output `COMPLETION BLOCKED — backlog_resolve failed: {error}`. Stop.
 
 ---
 
