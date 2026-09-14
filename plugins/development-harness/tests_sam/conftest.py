@@ -102,7 +102,19 @@ def seed_plan(backend: ContentTaskProvider, plan_id: str, plan: Plan) -> None:
 
 
 @pytest.fixture(autouse=True)
-def content_backend(monkeypatch: pytest.MonkeyPatch) -> Generator[ContentTaskProvider, None, None]:
+def content_backend(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Generator[ContentTaskProvider, None, None]:
+    """Give each test its own content backend and its own per-project state directory.
+
+    ``dh_paths.state_root`` honours ``DH_STATE_HOME``, and a ``sam plan`` command that resolves to
+    the work ledger opens ``dh.db`` underneath it. Setting it here keeps the suite off the
+    developer's real ledger at ``~/.dh/projects/<slug>/dh.db``.
+
+    Yields:
+        The content-backed task provider both frontends are pointed at.
+    """
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path_factory.mktemp("dh-state-home")))
     provider = InMemoryBackend()
     backend = ContentTaskProvider(provider)
     set_config(BacklogConfig(backend=provider))

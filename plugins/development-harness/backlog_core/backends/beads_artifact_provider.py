@@ -29,8 +29,8 @@ open/close sentinel pair:
 When a block with the same ``type`` and ``id`` already exists it is replaced
 in-place; otherwise it is appended to the notes.
 
-ADR-002 type widening
----------------------
+Type widening
+-------------
 The :class:`~backlog_core.artifact_provider.ArtifactBackend` Protocol defines
 ``item_id: ItemId`` parameters (``ItemId = str | int``), but the beads backend
 uses string issue IDs (e.g. ``bd-a3f8``).  The Protocol methods raise
@@ -40,8 +40,7 @@ directly.
 
 At runtime the Protocol methods accept ``str`` values transparently (type
 widening), so code that has already resolved a beads ID string and stores it
-in a variable typed as ``ItemId`` will work correctly — this matches the
-widened behaviour described in ADR-002.
+in a variable typed as ``ItemId`` will work correctly.
 """
 
 from __future__ import annotations
@@ -228,7 +227,7 @@ class BeadsArtifactProvider:
     def get_manifest(self, item_id: ItemId) -> ArtifactManifest:
         """Retrieve the artifact manifest.
 
-        Accepts a beads string ID at runtime (ADR-002 type widening).
+        Accepts a beads string ID at runtime (type widening).
         Raises when called with an actual ``int``, since beads does not use
         integer issue numbers.
 
@@ -255,7 +254,7 @@ class BeadsArtifactProvider:
     def set_manifest(self, item_id: ItemId, manifest: ArtifactManifest) -> None:
         """Persist *manifest*.
 
-        Accepts a beads string ID at runtime (ADR-002 type widening).
+        Accepts a beads string ID at runtime (type widening).
         Raises when called with an actual ``int``.
 
         Args:
@@ -298,7 +297,7 @@ class BeadsArtifactProvider:
     def store_artifact_content(self, item_id: ItemId, artifact_type: str, path: str, content: str) -> None:
         """Store artifact content in bd notes as a sentinel-delimited block.
 
-        Accepts a beads string ID at runtime (ADR-002 type widening).
+        Accepts a beads string ID at runtime (type widening).
         Raises when called with an actual ``int``.
 
         Args:
@@ -323,7 +322,7 @@ class BeadsArtifactProvider:
     def read_artifact_content_from_remote(self, item_id: ItemId, artifact_type: str, path: str) -> str | None:
         """Search bd notes for a stored artifact content block.
 
-        Accepts a beads string ID at runtime (ADR-002 type widening).
+        Accepts a beads string ID at runtime (type widening).
         Raises when called with an actual ``int``.
 
         Args:
@@ -481,7 +480,7 @@ class BeadsArtifactProvider:
     def delete_entry(self, item_id: ItemId, artifact_type: str, path: str) -> None:
         """Remove an artifact entry from the manifest and its content block from notes.
 
-        Accepts a beads string ID at runtime (ADR-002 type widening).
+        Accepts a beads string ID at runtime (type widening).
         Raises when called with an actual ``int``.
 
         Args:

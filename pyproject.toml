@@ -364,6 +364,10 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# Same PyGithub Requester transport as sync_state.py above: try_get_github and
+# check_open_prs_for_issue must catch requests.exceptions.RequestException to turn a
+# dropped connection or timeout into None / BacklogError instead of letting it escape.
+"**/backlog_core/gh_client.py" = ["banned-api"]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
 # I002 — PEP 563 stringifies annotations, so TypedDict cannot classify NotRequired at
@@ -380,6 +384,9 @@ max-complexity = 12
 # must reference requests.exceptions types to distinguish transient network-transport OSErrors
 # (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
 "**/backlog_core/sync_state.py" = ["banned-api"]
+# Regression test for close_item/resolve_item's open-PR-search refusal needs a genuine
+# requests exception instance to reproduce gh_client's except-GithubException-only gap.
+"**/backlog_core/tests/test_open_pr_search_failure.py" = ["banned-api"]
 "**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["start-process-with-partial-path"]
@@ -457,6 +464,9 @@ max-complexity = 12
     "line-too-long",                          # Line length relaxed for test data
     "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
 ]
+# Regression tests for check_open_prs_for_issue/try_get_github need genuine requests
+# exception instances to reproduce the except-GithubException-only gap they exercise.
+"**/tests/test_backlog_core_github.py" = ["banned-api"]
 # Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
 # requests exception instance to verify exact-type matching in the except clause.
 "**/tests/test_backlog_core_operations.py" = ["banned-api"]

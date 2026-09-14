@@ -1,6 +1,6 @@
 # Groom: Analyze
 
-Pre-swarm analysis: discovery gate, RT-ICA baseline, and scope sizing.
+Pre-swarm analysis: discovery gate and RT-ICA baseline.
 Runs after `intake.md` completes with PROCEED.
 
 ## Discovery Gate
@@ -90,8 +90,9 @@ confirmation.
 
 ## RT-ICA Initial Snapshot
 
-Run a quick RT-ICA pass using only information from the extract step. This is a baseline
-for scope sizing — not the final assessment.
+Run a quick RT-ICA pass using only information from the extract step. This is the baseline that
+the `finalize.md` RT-ICA Final Pass compares each condition against; that later pass performs the
+final assessment.
 
 **Categorization rule** (apply before listing any condition):
 
@@ -119,7 +120,15 @@ Conditions:
 AVAILABLE count: {N}
 DERIVABLE count: {N}
 MISSING count: {N}
+Decision: {APPROVED-FOR-PLANNING|APPROVED-WITH-GAPS|BLOCKED-FOR-PLANNING}
 ```
+
+`Decision:` carries one token from the vocabulary `dh:planner-rt-ica` owns, on a plain unbolded
+line with the token alone. Pick it with the same rule the rest of the groom uses: no MISSING →
+`APPROVED-FOR-PLANNING`; a data-deletion hard block, or every condition MISSING so there is nothing
+to plan against → `BLOCKED-FOR-PLANNING`; otherwise → `APPROVED-WITH-GAPS`. Nothing gates on the
+snapshot. It is written into the same `RT-ICA` section the later gates read, so it must be
+well-formed if the run stops before the rtica-assessor write strikes it.
 
 **Write**:
 
@@ -127,42 +136,16 @@ MISSING count: {N}
 backlog groom --selector "{item_ref}" --section "RT-ICA" --content "{snapshot}"
 ```
 
-## Scope Sizing
-
-The orchestrator determines swarm size from the RT-ICA snapshot and issue type. This is an
-orchestrator decision — not a delegation.
-
-```mermaid
-flowchart TD
-    Start([RT-ICA snapshot + item type]) --> Q1{Issue type?}
-    Q1 -->|defect / bug fix| Q2{AVAILABLE count?}
-    Q2 -->|All AVAILABLE| Minimal["MINIMAL — 2 agents"]
-    Q2 -->|Some DERIVABLE| Narrow["NARROW — 3 agents"]
-    Q2 -->|Any MISSING| Standard["STANDARD — 5 agents"]
-    Q1 -->|procedural / missing-guardrail| Q3{DERIVABLE + MISSING count?}
-    Q3 -->|Mostly AVAILABLE| Narrow
-    Q3 -->|Mixed| Standard
-    Q3 -->|Mostly DERIVABLE/MISSING| Full["FULL — 6 agents"]
-    Q1 -->|unbounded-design / new plugin| Full
-    Q1 -->|recurring-pattern| Standard
-```
-
-| Scope | Agents | Impact Radius depth |
-|---|---|---|
-| MINIMAL | fact-checker, groomer | File + direct callers |
-| NARROW | impact-analyst, fact-checker, groomer | Known files + one expansion level |
-| STANDARD | impact-analyst, fact-checker, rtica-assessor, alignment-analyst, groomer | Full expansion from known starting points |
-| FULL | all 6 (+ classifier) | Deep expansion, issue classification, full RCA |
-
-**Escalation**: If any agent discovers scope beyond current sizing (e.g., impact-analyst in
-NARROW finds 15+ affected systems), escalate to the next level by spawning additional agents.
-
 ## Outputs
 
 On success, pass to `swarm.md`:
 - All extracted fields from `intake.md`
 - RT-ICA snapshot (written to item via MCP)
-- Scope sizing decision (MINIMAL / NARROW / STANDARD / FULL)
 - Discovery artifact content (if loaded)
+
+`swarm.md` dispatches all six swarm agents on every groom: impact-analyst, fact-checker,
+classifier, rtica-assessor, alignment-analyst, and groomer. `finalize.md`'s Output Validation Gate
+requires a section from every one of them — see its Required sections table for the section each
+agent owns.
 
 On STOP (discovery gate failure): report and stop.

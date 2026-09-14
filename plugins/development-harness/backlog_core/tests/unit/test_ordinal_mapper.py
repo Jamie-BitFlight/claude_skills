@@ -774,7 +774,7 @@ def structured_entry_doc() -> list[NormalizedSection]:
 def code_only_entry_doc() -> list[NormalizedSection]:
     """Section [0] with two entries; entry 0.1 has prose + code fence, NO sub-headings.
 
-    Verifies ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+    Verifies code fences alone do NOT set has_sub_heading_children=True.
     Two entries trigger the level-2 gate so entry 0.1 receives its own ordinal.
     """
     return _make_sections(("Alpha", ["Other content.", "Prose text.\n\n```python\nprint('hi')\n```"]))
@@ -902,7 +902,7 @@ class TestRecursiveSubHeadingOrdinals:
 
 
 class TestCodeFenceOrdinals:
-    """Code fence ordinals use the N.M.code.K alphanumeric format (ADR-1)."""
+    """Code fence ordinals use the N.M.code.K alphanumeric format."""
 
     def test_code_fence_in_entry_body_gets_ordinal(self, structured_entry_doc: list[NormalizedSection]) -> None:
         """Python fence in entry 4.0 direct body receives ordinal 4.0.code.0."""
@@ -990,8 +990,8 @@ class TestCodeFenceOrdinals:
 class TestNavigateOnParentSemantics:
     """Navigate-on-parent behavior verified via the resolve() public contract.
 
-    ADR-7: when has_sub_heading_children=True, resolve(ordinal).content == ''.
-    ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+    When has_sub_heading_children=True, resolve(ordinal).content == ''.
+    Code fences alone do NOT set has_sub_heading_children=True.
 
     All assertions use resolve() or build_map() — no private attribute access —
     so T08 cannot invalidate these by renaming internal fields.
@@ -1000,7 +1000,7 @@ class TestNavigateOnParentSemantics:
     def test_entry_with_sub_headings_has_sub_heading_children_true(
         self, structured_entry_doc: list[NormalizedSection]
     ) -> None:
-        """ADR-7: entry with sub-headings returns content='' from resolve().
+        """Entry with sub-headings returns content='' from resolve().
 
         has_sub_heading_children=True is observable as resolve(ordinal).content == ''.
         """
@@ -1009,14 +1009,13 @@ class TestNavigateOnParentSemantics:
         resolved = mapper.resolve("4.0")
 
         assert resolved.content == "", (
-            f"ADR-7: resolve('4.0') must return content='' for entry with sub-heading "
-            f"children; got {resolved.content[:80]!r}."
+            f"resolve('4.0') must return content='' for entry with sub-heading children; got {resolved.content[:80]!r}."
         )
 
     def test_entry_with_code_only_has_sub_heading_children_false(
         self, code_only_entry_doc: list[NormalizedSection]
     ) -> None:
-        """ADR-4: code fences alone do NOT set has_sub_heading_children=True.
+        """Code fences alone do NOT set has_sub_heading_children=True.
 
         Entry 0.1 has prose + code fence but no sub-headings. resolve() returns
         non-empty content (prose with inline fence token) — not an empty child map.
@@ -1026,7 +1025,7 @@ class TestNavigateOnParentSemantics:
         resolved = mapper.resolve("0.1")
 
         assert resolved.content != "", (
-            "ADR-4: entry with code fence but no sub-headings must return non-empty "
+            "Entry with code fence but no sub-headings must return non-empty "
             "content from resolve(); the fence is extracted inline, not a child map."
         )
 
@@ -1063,7 +1062,7 @@ class TestNavigateOnParentSemantics:
         )
 
     def test_parent_content_is_empty_string(self, structured_entry_doc: list[NormalizedSection]) -> None:
-        """ADR-7: resolve() on a sub-heading parent returns content='' (empty string, not None).
+        """resolve() on a sub-heading parent returns content='' (empty string, not None).
 
         Entry-level prose ('Intro prose.') is not stored at the parent level.
         """
@@ -1072,7 +1071,7 @@ class TestNavigateOnParentSemantics:
         resolved = mapper.resolve("4.0")
 
         assert resolved.content == "", (
-            f"ADR-7: resolve('4.0').content must be '' (not the entry prose); got {resolved.content[:80]!r}."
+            f"resolve('4.0').content must be '' (not the entry prose); got {resolved.content[:80]!r}."
         )
         assert resolved.total_tokens == 0, (
             f"resolve('4.0').total_tokens must be 0 when content=''; got {resolved.total_tokens}."

@@ -32,8 +32,11 @@ def _isolated_state(tmp_path, monkeypatch):
     reset_context_config()
 
 
+_TEST_SESSION = "test-session-abc123"
+
+
 def _run(*args: str):
-    result = runner.invoke(app, ["active-task", *args])
+    result = runner.invoke(app, ["active-task", *args, "--session-id", _TEST_SESSION])
     assert result.exit_code == 0, result.stderr
     assert result.stderr == ""
     payload = result.stdout.strip()
@@ -95,7 +98,7 @@ def test_cli_and_mcp_share_the_same_context_store() -> None:
     _run("set", "--address", "P7/T2")
 
     set_context_config(ContextConfig(backend=create_context_backend()))
-    mcp_view = operations.get_active_task(create_context_backend(), "_default")
+    mcp_view = operations.get_active_task(create_context_backend(), _TEST_SESSION)
 
     assert mcp_view.active_task is not None
     assert mcp_view.active_task.plan == "7"
@@ -119,6 +122,38 @@ def test_backend_is_selectable_not_hardcoded_local(monkeypatch) -> None:
     assert isinstance(_context_backend(), InMemoryContextBackend)
 
 
+@pytest.mark.parametrize("command", ["get", "set", "update", "clear"])
+def test_omitted_session_id_is_a_hard_failure(command: str) -> None:
+    """Every active-task command rejects a missing --session-id.
+
+    Regression guard for the silent '_default' fallback (#3432): a shared
+    bucket that nothing meaningfully owns, keyed by whichever caller wrote
+    last. Extra required args are supplied per command so the rejection is
+    attributable to the missing session id, not to some other missing flag.
+    """
+    extra = {"set": ["--address", "P1/T3"], "get": [], "update": [], "clear": []}[command]
+    _assert_rejected(command, *extra, message="session id is required")
+
+
+@pytest.mark.parametrize("command", ["get", "set", "update", "clear"])
+def test_empty_session_id_is_a_hard_failure(command: str) -> None:
+    """An explicitly empty --session-id (an unexpanded shell variable) is rejected too.
+
+    Distinct from omission: this is what a caller sends when
+    `--session-id "${SOME_VAR}"` expands to nothing, and it must fail the
+    same way rather than silently falling back to the shared sentinel.
+    """
+    extra = {"set": ["--address", "P1/T3"], "get": [], "update": [], "clear": []}[command]
+    _assert_rejected(command, *extra, "--session-id", "", message="session id is required")
+
+
+@pytest.mark.parametrize("command", ["get", "set", "update", "clear"])
+def test_default_sentinel_passed_explicitly_is_a_hard_failure(command: str) -> None:
+    """Passing the reserved '_default' sentinel directly is rejected, not just omission."""
+    extra = {"set": ["--address", "P1/T3"], "get": [], "update": [], "clear": []}[command]
+    _assert_rejected(command, *extra, "--session-id", "_default", message="session id is required")
+
+
 def test_parser_rejects_positional_address_removed_format_and_unknown_option() -> None:
     """Data values and removed flags must use the current named-only contract."""
     _assert_rejected("set", "P1/T3", message="--address")
@@ -132,7 +167,7 @@ def test_bad_backend_reports_clean_error(monkeypatch, backend_name: str, expecte
     monkeypatch.setenv("CONTEXTBACKEND", backend_name)
     reset_context_config()
 
-    result = runner.invoke(app, ["active-task", "get"])
+    result = runner.invoke(app, ["active-task", "get", "--session-id", _TEST_SESSION])
 
     assert result.exit_code != 0
     assert result.stdout == ""

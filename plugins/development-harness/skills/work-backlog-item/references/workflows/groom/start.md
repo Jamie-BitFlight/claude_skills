@@ -13,7 +13,7 @@ flowchart TD
     Intake --> IResult{"Result?"}
     IResult -->|"SKIP"| SkipEnd(["Report reason → finally.md"])
     IResult -->|"DRIFT"| DriftSub["groom-drift.md<br>Report findings → finally.md"]
-    IResult -->|"PROCEED"| Analyze["analyze.md<br>Discovery, RT-ICA snapshot, scope sizing"]
+    IResult -->|"PROCEED"| Analyze["analyze.md<br>Discovery, RT-ICA snapshot"]
     Analyze --> AResult{"Result?"}
     AResult -->|"STOP"| ErrRoute["error.md<br>Agent Failure"]
     AResult -->|"CONTINUE"| Swarm["swarm.md<br>Parallel grooming agents"]
@@ -31,7 +31,7 @@ flowchart TD
 |---|---|---|
 | Scope | [scope.md](./scope.md) | Scope boundary — what grooming answers and does not produce |
 | Intake | [intake.md](./intake.md) | Validate <item_ref/> eligibility, extract item details |
-| Analyze | [analyze.md](./analyze.md) | Discovery gate, RT-ICA baseline, scope sizing |
+| Analyze | [analyze.md](./analyze.md) | Discovery gate, RT-ICA baseline |
 | Swarm | [swarm.md](./swarm.md) | Parallel grooming agents, output formats, contracts |
 | Finalize | [finalize.md](./finalize.md) | RT-ICA final pass, output validation gate, write with `mark_groomed` |
 | Drift | [groom-drift.md](./groom-drift.md) | Sub-workflow when item is already groomed today |
@@ -44,26 +44,30 @@ Track progress using your task list. Check off each step as it completes.
 
 1. [ ] Read `scope.md` — align all actions with the grooming scope boundary
 2. [ ] **Intake** (`intake.md`) — validate <item_ref/>, run pre-groom checks, extract item details
-   - If SKIP: report reason, stop (or next item if batch)
+   - If SKIP: report reason, stop (or next item if batch — see Batch Grooming below)
    - If DRIFT: route to `groom-drift.md`, report findings, stop
    - If PROCEED: continue
-3. [ ] **Analyze** (`analyze.md`) — run discovery gate, build RT-ICA snapshot, determine scope sizing
+3. [ ] **Analyze** (`analyze.md`) — run discovery gate, build RT-ICA snapshot
    - If STOP (discovery gate failure): report and stop
-   - If CONTINUE: carry scope sizing decision forward
-4. [ ] **Swarm** (`swarm.md`) — spawn parallel grooming agents at the determined scope size
-   - impact-analyst → Impact Radius section
-   - fact-checker → Fact-Check section
-   - rtica-assessor → RT-ICA section (blocked by impact-analyst + fact-checker)
-   - classifier → Issue Classification + Root-Cause Analysis sections
-   - groomer → all groomed subsections (blocked by rtica-assessor + classifier)
-   - Wait for all agents to complete before proceeding
+   - If CONTINUE: continue to Swarm
+4. [ ] **Swarm** (`swarm.md`) — spawn the grooming agents in waves.
+   - Wave 0: technical-researcher → Research section. Skip Wave 0 for bug and fix items.
+   - Wave 1: impact-analyst → Impact Radius section. fact-checker → Fact-Check section. classifier → Issue Classification and Root-Cause Analysis sections.
+   - Wave 2, after Wave 1: rtica-assessor → RT-ICA section. alignment-analyst → Design Intent Alignment section.
+   - Wave 2 gate: read the RT-ICA `Decision:` token. Stop on `BLOCKED-FOR-PLANNING`.
+   - Wave 3, after Wave 2: groomer → all groomed subsections.
+   - Wait for all agents to complete before you continue.
 5. [ ] **Finalize** (`finalize.md`) — run post-swarm gates and write
    - RT-ICA final pass: re-assess conditions, self-resolve DERIVABLE/MISSING, write final report
-     - If BLOCKED: present MISSING conditions to user, wait for answers, re-check
-     - If APPROVED: continue
+     - If `BLOCKED-FOR-PLANNING`: present the MISSING conditions to the user and stop
+     - If `APPROVED-WITH-GAPS`: batch the remaining MISSING conditions to the user, then continue
+       whether or not they are answered — unanswered gaps are recorded on the item
+     - If `APPROVED-FOR-PLANNING`: continue
+     - Any other token, or no `Decision:` line: route to error.md naming the token found
    - Output validation gate: verify all required sections present with minimum content (defined in finalize.md)
      - If missing: retry same model with targeted prompt (up to 3 attempts, then blocked)
      - If pass: continue
+   - Hypothesis Resolution: rewrite each resolved `**Hypothesis**` line in `description` (defined in finalize.md)
    - Write groomed content via `backlog_groom(selector='{item_ref}', sections={...}, mark_groomed=True)`
 6. [ ] **Finally** (`finally.md`) — refresh local cache (if needed), report terminal outcome, return control
 
@@ -76,7 +80,8 @@ When any step encounters an error, agent failure, or workflow block: route to [e
 | MCP tool returns error dict | System Error |
 | Agent fails to produce expected output | Agent Failure |
 | Discovery gate STOP (artifact not registered) | Agent Failure |
-| RT-ICA BLOCKED (unresolvable MISSING conditions) | Workflow Block |
+| RT-ICA `Decision: BLOCKED-FOR-PLANNING` (no planning signal, or a data-deletion hard block) | Workflow Block |
+| RT-ICA `Decision:` line absent or carrying an unrecognised token | Workflow Block, naming the token found |
 | Output validation fails after 3 attempts | Agent Failure |
 | SKIP (pre-groom check) | Not an error — report reason via [finally.md](./finally.md) |
 | DRIFT (already groomed today) | Not an error — route to [groom-drift.md](./groom-drift.md) then [finally.md](./finally.md) |
@@ -90,6 +95,12 @@ Every exit path — success, block, skip, drift, or error — ends at [finally.m
 | <item_ref/> | Backlog item to groom — `#N` format | Yes |
 | <mode/> | `auto` or `interactive` (default: `interactive`) | No |
 | <user_text/> | Additional context from the user, if any | No |
+
+## Batch Grooming
+
+When <item_ref/> resolves to more than one item (e.g. `all` from the interactive browser's
+`G all`), groom items in parallel, capped at 5 concurrent items. Batch in waves of 5 if more
+than 5 items need grooming.
 
 ## Identifier Convention
 

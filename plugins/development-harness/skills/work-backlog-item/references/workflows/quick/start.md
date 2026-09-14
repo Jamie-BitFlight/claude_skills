@@ -47,7 +47,7 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    fires when a `#N` consumes the *entire* remaining text.
 
    Derive the same `{title}` for the same raw request as consistently as you can — prefer the most
-   literal, shortest faithful label over creative rephrasing — since Step 3's lookup falls back to
+   literal, shortest faithful label over creative rephrasing — since Step 2's lookup falls back to
    matching on `{title}` (after trying `{explicit_ref}` first, when captured) to avoid creating a
    duplicate on a repeat invocation. This is best-effort, not deterministic: `{title}` is derived,
    not parsed, so exact stability across separate invocations isn't guaranteed the way it would be
@@ -64,71 +64,7 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    → hyphens. Every step below — the lookup, `--slug`, selectors, reported handoffs — uses this
    normalized `{title}`/`{slug}`.
 
-2. **In-Progress Relevance Check** — Before creating a new backlog item, determine whether this fix belongs to work already in progress. If it does, add it to the active plan instead of opening a new item.
-
-   **a. Discover active work:**
-
-   - Call `mcp__plugin_dh_sam__sam_active_task(config={"action": "get"})` — returns the currently claimed SAM task for this agent session (look for `plan` and `task_id` fields). Record as `active_task`.
-   - Call `mcp__plugin_dh_backlog__backlog_list(status="in-progress")` — lists items currently being worked. Record as `in_progress_items`.
-
-   **b. Relevance checklist** (evaluate all three):
-
-   - [ ] Is there active work? (`active_task` is non-empty OR `in_progress_items` is non-empty)
-   - [ ] Does the fix title or description overlap in scope, subject, or affected files with the active issue's goal, acceptance criteria, or description?
-   - [ ] Would addressing this fix be required — or directly unblock — the active work to be considered complete?
-
-   **c. Decision:**
-
-   If ALL three checklist items pass → Route to **step 2a** (Plan Integration Path). Skip steps 3–7.
-
-   Otherwise → Continue to step 3 (create a new backlog item as usual).
-
-2a. **Plan Integration Path** (all relevance checks passed):
-
-   Resolve the active plan ID:
-   - If `active_task` is non-empty: use its `plan` field as `active_plan_id`.
-   - Else: call `mcp__plugin_dh_backlog__backlog_view(selector="{first in_progress_items title}", summary=false)` and read the item's `plan` field as `active_plan_id`.
-   - If neither yields a plan ID: fall through to step 3 (cannot integrate without a plan reference).
-
-   Append the fix as a new task on the active plan. A SAM task is a direct execution brief for
-   whichever agent implements it, not a groomed artifact — `--quick` never grooms, so nothing ever
-   verifies `{hypothesis}` before that agent would read it. Set `description` to `{title}` plus
-   `{observations}` (factual context Step 1 already separated from any causal guess) if present —
-   never `{hypothesis}`; an unverified guess about cause has no business being handed to an agent
-   as if it were part of its brief.
-
-   ```text
-   mcp__plugin_dh_sam__sam_plan(
-     plan="{active_plan_id}",
-     config={
-       "action": "append_task",
-       "task": {
-         "id": "T{next_available_id}",
-         "title": "{title}",
-         "description": "{title, plus observations if Step 1 recorded any — never hypothesis}",
-         "status": "not-started",
-         "agent": "task-worker",
-         "dependencies": [],
-         "priority": 1,
-         "complexity": "low"
-       }
-     }
-   )
-   ```
-
-   Report to the user:
-
-   ```text
-   Fix added to active plan: {active_plan_id}
-   Task: {title}
-
-   The fix is included in the current implementation cycle.
-   To execute immediately: /dh:start-task {active_plan_id} {task_id}
-   ```
-
-   Stop — do not continue to step 3 or create a new backlog item.
-
-3. Find the item via the CLI. If Step 1 captured `{explicit_ref}`, try
+2. Find the item via the CLI. If Step 1 captured `{explicit_ref}`, try
    `backlog view --selector "{explicit_ref}"` first — this is the same item a plain `#42` lookup
    would find, just recovered from inside a longer request. If not found, or `{explicit_ref}`
    wasn't captured, fall back to `backlog view --selector "{title}"` (using the normalized
@@ -139,7 +75,7 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    `{hypothesis}` that Step 1 recorded, each on its own paragraph, in that order
    (`{title}\n\n{observations}\n\n{hypothesis}` when both are present). With neither, the
    description matches the title exactly. This full description — hypothesis included — is the
-   backlog item's own informational record; it is not what Step 5 uses as the task brief below.
+   backlog item's own informational record; it is not what Step 4 uses as the task brief below.
 
    ```bash
    backlog add \
@@ -150,20 +86,20 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
 
    Record `{item_title}` = `{title}` — the label just used to create it.
 
-   If found (by either lookup in this step), extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`) — this is the real content to use below, not just what was in `<item_ref/>` (e.g. `--quick #42` has almost nothing in the raw request itself; the existing item is where the actual problem statement lives). Record `{item_title}` = the fetched item's own `title` field — Step 5 uses this, not the derived `{title}` or `{task_brief}`, as `--task-title`.
+   If found (by either lookup in this step), extract description and acceptance criteria from the CLI's JSON output (`body`/`sections`) — this is the real content to use below, not just what was in `<item_ref/>` (e.g. `--quick #42` has almost nothing in the raw request itself; the existing item is where the actual problem statement lives). Record `{item_title}` = the fetched item's own `title` field — Step 4 uses this, not the derived `{title}` or `{task_brief}`, as `--task-title`.
 
-4. Build `{task_brief}` for Step 5, same rule as Step 2a — a SAM task is an execution brief, not a
-   groomed artifact, so it never carries `{hypothesis}`, labeled or not, from any source:
-   - Item found in Step 3 (already existed): `{task_brief}` = the fetched description, with any
+3. Build `{task_brief}` for Step 4. A SAM task is an execution brief, not a groomed artifact, so it
+   never carries `{hypothesis}`, labeled or not, from any source:
+   - Item found in Step 2 (already existed): `{task_brief}` = the fetched description, with any
      line starting `**Hypothesis` removed if present — matching both the original
      `**Hypothesis**: {text}` marker and the refuted variant `**Hypothesis (refuted — see
      Fact-Check section)**: {text}` that `finalize.md`'s Hypothesis Resolution step writes (an
      existing item can carry either, same as a freshly-created one), plus acceptance criteria if
      available.
-   - Item not found (just created in Step 3): `{task_brief}` = `{title}` plus `{observations}` from
+   - Item not found (just created in Step 2): `{task_brief}` = `{title}` plus `{observations}` from
      Step 1 — already excludes `{hypothesis}` by construction.
 
-5. Create the quick plan via the CLI using `{task_brief}` for `--goal`, but `{item_title}` (not
+4. Create the quick plan via the CLI using `{task_brief}` for `--goal`, but `{item_title}` (not
    `{task_brief}`) for `--task-title` — `Task.title` is capped at 200 characters
    (`sam_schema/core/models.py`), and `{task_brief}` for an existing item can carry its full
    fetched description plus acceptance criteria, which routinely exceeds that. `{item_title}` is
@@ -186,12 +122,12 @@ enabled" is a valid `item_ref`, not just "Login redirect loop").
    internally — do not resolve or pass a file path. Read `plan_id` (e.g. `Pe71c7cb8-{slug}`) from the JSON
    output — that is the plan reference used in the next two steps, not the `quick-{slug}` string.
 
-6. Call the CLI to record the plan reference: `backlog update --selector "{item_title}" --plan "{plan_id from step 5}"` — use `{item_title}` here too, since that's the selector guaranteed to resolve to the item Step 3 actually found or created (an existing item's real title can differ from Step 1's re-derived `{title}` guess).
+5. Call the CLI to record the plan reference: `backlog update --selector "{item_title}" --plan "{plan_id from step 4}"` — use `{item_title}` here too, since that's the selector guaranteed to resolve to the item Step 2 actually found or created (an existing item's real title can differ from Step 1's re-derived `{title}` guess).
 
-7. Report the `plan_id` returned by `plan create`:
+6. Report the `plan_id` returned by `plan create`:
 
    ```text
-   Quick plan created: {plan_id from step 5}
+   Quick plan created: {plan_id from step 4}
    Steps: {N} tasks
 
    To execute: /dh:implement-feature {plan_id}

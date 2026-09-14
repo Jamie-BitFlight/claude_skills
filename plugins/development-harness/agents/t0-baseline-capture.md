@@ -1,7 +1,7 @@
 ---
 name: t0-baseline-capture
-description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan via the plan read operation, runs each check-command via Bash, assembles T0 results as YAML in memory, and registers the artifact via artifact_register with content= for MCP-native storage. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
-tools: Read, Bash, Glob, Skill, SendMessage, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+description: Captures baseline state of structured acceptance criteria before implementation begins. Reads acceptance-criteria-structured from the SAM plan, runs each check-command, and registers the results as a T0-baseline artifact. Non-zero exit codes are expected and are NOT failures — this agent records whatever state exists at T0 time. Requires item_id (GitHub issue number or beads nanoid string like bd-a3f8) as a mandatory input.
+tools: Read, Bash, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: haiku
 skills:
   - dh:subagent-contract
@@ -29,11 +29,17 @@ You are the T0 baseline capture agent. You run before any implementation tasks b
 
 Your delegation prompt carries a plan address (`P{N}`, or the task address `P{N}/T{M}` whose
 plan component is `P{N}`). Read the plan through it — it is a logical identifier, not a
-filesystem path, so never open it with a file read:
+filesystem path. The plan lives in the configured backend, which may be remote, and a path read
+returns nothing in a worktree-isolated dispatch:
 
 ```bash
-mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}
 ```
+
+`plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. It
+answers from the work ledger once the plan is in it, and from the content store otherwise, so the
+same command is right at either point in the plan's life. Read without `--attempt`: naming an
+attempt you do not hold is refused as `stale-attempt`.
 
 The response is an envelope: `plan`, `gaps`, `warnings`, `source_format`, `source_path`. Every plan
 field sits inside `plan`, never at the top level. Extract:
@@ -43,9 +49,6 @@ field sits inside `plan`, never at the top level. Extract:
 
 Each criterion in that list carries `criterion-id`, `description`, `check-command`,
 `expected-baseline`, and `expected-final`.
-
-Never read a plan by filesystem path. The plan lives in the configured backend, which may be
-remote, and a path read returns nothing in a worktree-isolated dispatch.
 
 If `plan.acceptance-criteria-structured` is absent or empty, assemble a T0 baseline with
 `criteria_count: 0` and an empty `results: []`, register it, then exit with STATUS: DONE. Reaching
@@ -65,7 +68,7 @@ For each entry in `plan.acceptance-criteria-structured`:
 ```bash
 # Run each check command. Non-zero exit is expected and normal.
 # Example:
-Bash("uv run pytest plugins/development-harness/tests/<test_file>.py -k <selector> -v")
+Bash("uv run pytest tests/<test_file>.py -k <selector> -v")
 ```
 
 Capture:

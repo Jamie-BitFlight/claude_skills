@@ -1,6 +1,6 @@
 ---
 name: execution
-description: Executes SAM Stage 5 — dispatches a single ARTIFACT:TASK to a fresh stateless agent session, runs quality gates, and produces an ARTIFACT:EXECUTION with implementation results and verification output. Use when Stage 4 Task Decomposition is complete and tasks are ready for execution, when re-executing a task after Stage 6 returns NEEDS_WORK, or when dispatching a task to a language-appropriate specialist agent via the development harness pipeline.
+description: Executes SAM Stage 5 — opens an attempt on a single ARTIFACT:TASK, dispatches it to a fresh stateless agent session, runs quality gates, and records an ARTIFACT:EXECUTION with implementation results and verification output on the task. Use when Stage 4 Task Decomposition is complete and tasks are ready for execution, when re-executing a task after Stage 6 returns NEEDS_WORK, or when dispatching a task to a language-appropriate specialist agent via the development harness pipeline.
 user-invocable: false
 ---
 
@@ -42,11 +42,17 @@ flowchart TD
     Collect --> Done([ARTIFACT:EXECUTION])
 ```
 
-### Step 1 — Read Task (`sam_task` action=read)
+### Step 1 — Read Task
 
-Read the task via `sam_task`. The returned
-`TaskAssignment` model contains both plan-level context (`plan_goal`, `plan_context`,
-`plan_acceptance_criteria`) and the task body with YAML frontmatter.
+Read the task through the SAM CLI, which answers from the work ledger:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_address}/T{NNN}
+```
+
+The result carries the task row — title, requirements, constraints, acceptance criteria,
+verification steps, and the `skills` list — together with the sections recorded on the task,
+including any `Orchestrator Response` from a previous attempt.
 
 ### Step 2 — Resolve Role to Agent
 
@@ -59,9 +65,24 @@ If no agent's description plausibly matches, dispatch dh:task-worker. No special
 
 ### Step 3 — Dispatch to Fresh Session
 
-Launch the resolved agent in a fresh session. Pass the task body as the
-complete prompt. The agent must NOT have access to other planning artifacts
-unless the task explicitly includes relevant excerpts.
+Open the attempt first. An attempt is a ledger row, so a plan authored through the SAM plan
+operations has to be brought across before the first one — `plan import --from content
+--plan-address {plan_address}` does that, and answers `exists` when the ledger already holds it.
+
+`dispatch` then sets the task in-progress, starts its lease, and prints the attempt number the
+agent carries on every command it runs:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address {plan_address}/T{NNN}
+```
+
+`leased` means another runner already holds the task and `not-ready` means its dependencies have
+not landed; either way this task is not the one to execute now. Any other code stops and goes to
+the caller.
+
+Then launch the resolved agent in a fresh session, naming the address and the attempt. The agent
+must NOT have access to other planning artifacts unless the task explicitly includes relevant
+excerpts.
 
 ### Step 4 — Agent Executes Task
 
@@ -81,6 +102,18 @@ The agent runs the verification steps embedded in the task:
 - Completes CoVe checks if present
 - Reports results in the handoff section
 
+### Step 5a — Settle the Attempt
+
+The moment the launch returns, record what came back against the attempt:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+  --address {plan_address}/T{NNN} --attempt {attempt} --return-text "{the agent's response}"
+```
+
+Do this even when the response is empty or the agent crashed. An unsettled attempt reads as a
+worker still at work, and the caller waits on an agent that is gone.
+
 ### Step 6 — Deterministic Backpressure
 
 After the agent completes, run quality gates from the project's language
@@ -96,19 +129,23 @@ collecting results.
 
 ## Input
 
-- Single `ARTIFACT:TASK` via `sam_task`
+- Single `ARTIFACT:TASK`, read with `plan read --address {plan_address}/T{NNN}`
 
 ## Output
 
-Execution results stored via SAM:
+Execution results are recorded as a task section on the ledger, tagged with the attempt they
+belong to:
 
-```text
-sam_task(
-    plan="{plan_address}",
-    task="T{NNN}",
-    config={"action": "update", "append_section": "Execution Results", "section_content": "{execution markdown below}"}
-)
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+  --plan-address {plan_address} --task-id T{NNN} --attempt {attempt} \
+  --append-section "Execution Results" --section-content "{execution markdown below}"
 ```
+
+The executing agent closes its own attempt with `plan finish` and appends the `Completion Report`
+and `Verification Results` sections that command requires — see `/dh:start-task`. This `Execution
+Results` section is the dispatcher's record of the round, written alongside them rather than in
+place of them.
 
 The execution results follow this template:
 

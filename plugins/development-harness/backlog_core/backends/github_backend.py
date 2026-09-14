@@ -163,10 +163,12 @@ class GitHubBackend:
         return gh_client.get_github(repo or self._repo, timeout)
 
     def try_get_github(self, repo: str = "") -> Repository | None:
-        """Return a PyGithub Repository or None if unavailable.
+        """Return a PyGithub Repository, or None when GitHub cannot be used.
 
         Returns:
-            Authenticated PyGithub Repository, or None on any failure.
+            Authenticated PyGithub Repository, or None when GITHUB_TOKEN is
+            missing, or GitHub returned an error (authentication failure,
+            rate limit, or server error).
         """
         return gh_client.try_get_github(repo or self._repo)
 

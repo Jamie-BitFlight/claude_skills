@@ -4,21 +4,21 @@ This module provides :class:`GistTaskLayer`, a :class:`~sam_schema.core.task_bac
 implementation that wraps :class:`~sam_schema.core.backends.local_yaml.LocalYamlTaskProvider`
 and adds mandatory write-through to GitHub Gist on plan creation, plus Gist-first reads.
 
-Architecture (ADR-2509-1):
+Architecture:
     ``GistTaskLayer`` is used *only* in the MCP server context.  CLI callers and
     non-MCP code continue to use ``LocalYamlTaskProvider`` directly.  The local YAML
     store becomes a write-through cache; Gist is the durable, environment-independent
     source of truth for plans with an associated GitHub issue.
 
-Write-path contract (ADR-2509-5):
+Write-path contract:
     ``create_plan`` with ``issue`` set MUST upload plan YAML to Gist via
     ``ArtifactRegistryClient.store()``.  On failure, :exc:`ArtifactWriteError` is raised
     and propagates to the MCP handler — **no silent fallback**.
 
     ``create_plan`` with ``issue=None`` writes to local disk only and returns a warning
-    in the MCP response (ADR-2509-4).  No Gist upload is attempted.
+    in the MCP response.  No Gist upload is attempted.
 
-Read-path contract (ADR-2509-5):
+Read-path contract:
     ``read_plan`` resolves ``plan_id → issue`` via ``PlanIdIndex``, fetches YAML from
     Gist, and writes the content to the local filesystem cache (best-effort) so
     subsequent reads by ``get_ready_tasks`` and ``get_plan_status`` succeed without an
@@ -41,7 +41,7 @@ T3 scope (this commit):
     ``list_plans`` Gist-index + local merge.
 
 T4 scope:
-    Write-through mutations; ``claim_task`` atomicity (ADR-2509-3).
+    Write-through mutations; ``claim_task`` atomicity.
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ _yaml_safe = YAML(typ="safe")
 
 _log = logging.getLogger(__name__)
 
-#: Warnings key returned in the MCP create response for local-only plans (ADR-2509-4).
+#: Warnings key returned in the MCP create response for local-only plans.
 _LOCAL_ONLY_WARNING = (
     "Plan {plan_id} has no associated issue — stored locally only. "
     "This plan is not portable across environments and cannot be retrieved from CI "
@@ -94,7 +94,7 @@ class GistTaskLayer:
 
     - When ``issue`` is provided: uploads plan YAML to Gist and registers the
       ``plan_id → issue`` mapping in the ``PlanIdIndex``.  Failure raises
-      :exc:`ArtifactWriteError` (no silent fallback — ADR-2509-5).
+      :exc:`ArtifactWriteError` (no silent fallback).
     - When ``issue`` is ``None``: local-only creation; no Gist upload.  The
       MCP handler checks ``config.issue is None`` and adds the non-portability
       warning directly to the response.
@@ -221,7 +221,7 @@ class GistTaskLayer:
     ) -> PlanData:
         """Create a plan and upload YAML to Gist when an issue is provided.
 
-        Write-through flow (``issue`` provided — ADR-2509-5):
+        Write-through flow (``issue`` provided):
 
         1. Delegate to ``local_backend.create_plan()`` to write local YAML.
         2. Read the YAML content from the local file (``source_path``).
@@ -229,7 +229,7 @@ class GistTaskLayer:
         4. Upload YAML content to Gist via ``artifact_client.store()``.
         5. On step 3 or 4 failure: raise :exc:`ArtifactWriteError` (no fallback).
 
-        Local-only flow (``issue=None`` — ADR-2509-4):
+        Local-only flow (``issue=None``):
 
         1. Delegate to ``local_backend.create_plan()`` to write local YAML.
         2. Return :class:`PlanData` with ``_warnings`` key containing the
@@ -275,7 +275,7 @@ class GistTaskLayer:
         if issue is None:
             # Local-only plan: the MCP handler detects config.issue is None and
             # adds the non-portability warning to the response directly.
-            # No Gist upload is attempted (ADR-2509-4).
+            # No Gist upload is attempted.
             _log.info("GistTaskLayer.create_plan: plan %s has no issue — local-only, no Gist upload", plan_id)
             return plan_data
 
@@ -354,7 +354,7 @@ class GistTaskLayer:
     # ------------------------------------------------------------------
 
     def read_plan(self, plan_id: str) -> PlanData:
-        """Read a plan by identifier using Gist-first dual-read (ADR-2509-5).
+        """Read a plan by identifier using Gist-first dual-read.
 
         Read flow:
 
@@ -508,7 +508,7 @@ class GistTaskLayer:
             _log.warning("GistTaskLayer._write_local_cache: failed to write %s to %s: %s", plan_id, cache_path, exc)
 
     def list_plans(self, *, search: str | None = None, offset: int = 0, limit: int | None = None) -> list[PlanSummary]:
-        """List all plans merging Gist-registered and local plans (T3, ADR-2509-2).
+        """List all plans merging Gist-registered and local plans (T3).
 
         Merge strategy:
 
@@ -732,7 +732,7 @@ class GistTaskLayer:
         """Read the current local YAML and upload it to Gist.
 
         Implements the mandatory write-through step in mutation operations
-        (ADR-2509-5): reads the post-mutation local YAML and calls
+        reads the post-mutation local YAML and calls
         ``artifact_client.store()``.  Raises ``ArtifactWriteError`` on any
         failure — no silent fallback.
 
@@ -797,7 +797,7 @@ class GistTaskLayer:
         set_fields: dict[str, PlanUpdateValue] | None = None,
         owner_reference: str | None = None,
     ) -> None:
-        """Update top-level plan fields with mandatory Gist write-through (ADR-2509-5).
+        """Update top-level plan fields with mandatory Gist write-through.
 
         Read-modify-write flow:
 
@@ -856,7 +856,7 @@ class GistTaskLayer:
     def claim_task(self, plan_id: str, task_id: str) -> bool:
         """Claim a task, raising for local-only plans; delegating to local backend otherwise.
 
-        **Atomicity decision (ADR-2509-3 resolution — Option 3: Serialized Dispatch):**
+        **Atomicity decision (Option 3: Serialized Dispatch):**
 
         GitHub's label mutation API (``addLabels``/``removeLabels``) is idempotent and
         non-conditional as of 2026-05-30 — there is no native compare-and-swap primitive.
@@ -872,7 +872,7 @@ class GistTaskLayer:
         **Declared contract deviation**: ``GistTaskLayer.claim_task()`` does NOT provide
         exactly-once in isolation.  If two callers invoke ``claim_task`` concurrently on
         the same task, both may return ``True``.  Exactly-once is guaranteed only when the
-        caller serializes claims (Dispatch pattern, ADR-1770-1 single-writer scope).
+        caller serializes claims (Dispatch pattern, single-writer scope).
         This deviation is documented here and must be noted in CLAUDE.md (T6).
 
         **Why not Option 1 (GitHub conditional mutation)**: No such primitive exists in
@@ -922,7 +922,7 @@ class GistTaskLayer:
             # call claim_task on local-only plans via LocalYamlTaskProvider directly.
             raise ConcurrentClaimUnsupportedError(plan_id)
 
-        # Delegate claim to the local backend (non-atomic read-then-write under ADR-2509-3).
+        # Delegate claim to the local backend (non-atomic read-then-write).
         claimed = self._local.claim_task(plan_id, task_id)
 
         if claimed:
@@ -950,7 +950,7 @@ class GistTaskLayer:
         return claimed
 
     def update_task_status(self, plan_id: str, task_id: str, status: str) -> None:
-        """Update task status with mandatory Gist write-through (ADR-2509-5).
+        """Update task status with mandatory Gist write-through.
 
         Read-modify-write flow:
 
@@ -980,7 +980,7 @@ class GistTaskLayer:
         self._write_through(plan_id, issue)
 
     def update_task_fields(self, plan_id: str, task_id: str, fields: dict[str, str | int | list[str]]) -> None:
-        """Update task fields with mandatory Gist write-through (ADR-2509-5).
+        """Update task fields with mandatory Gist write-through.
 
         Read-modify-write flow:
 
@@ -1009,7 +1009,7 @@ class GistTaskLayer:
         self._write_through(plan_id, issue)
 
     def update_task(self, plan_id: str, task: Task) -> None:
-        """Replace a stored task with mandatory Gist write-through (ADR-2509-5).
+        """Replace a stored task with mandatory Gist write-through.
 
         Read-modify-write flow:
 
@@ -1036,7 +1036,7 @@ class GistTaskLayer:
         self._write_through(plan_id, issue)
 
     def append_task_section(self, plan_id: str, task_id: str, section_name: str, content: str) -> None:
-        """Append a markdown section to a task with mandatory Gist write-through (ADR-2509-5).
+        """Append a markdown section to a task with mandatory Gist write-through.
 
         Read-modify-write flow:
 
@@ -1066,11 +1066,11 @@ class GistTaskLayer:
         self._write_through(plan_id, issue)
 
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
-        """Append a task to an existing plan with mandatory Gist write-through (ADR-2509-5).
+        """Append a task to an existing plan with mandatory Gist write-through.
 
         Read-modify-write flow:
 
-        1. Delegate to ``local_backend.append_task()`` (single-writer per ADR-1770-1).
+        1. Delegate to ``local_backend.append_task()`` (single-writer scope).
         2. Resolve ``plan_id → issue`` via ``PlanIdIndex``.
         3. If issue is set: upload post-mutation local YAML to Gist (raises on failure).
         4. If issue is ``None``: log warning; local-only write.
@@ -1096,7 +1096,7 @@ class GistTaskLayer:
         return result
 
     def finalize_plan(self, plan_id: str) -> dict[str, Any]:
-        """Finalize a plan with mandatory Gist write-through (ADR-2509-5).
+        """Finalize a plan with mandatory Gist write-through.
 
         Read-modify-write flow:
 

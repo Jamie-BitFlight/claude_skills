@@ -190,7 +190,7 @@ Respect the human's attention:
 
 ## Report Back For Review
 
-Exploration for RT-ICA often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the orchestrator or supervisor agent so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
+Exploration for RT-ICA often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the dispatcher so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
 
 Create a review report for findings such as:
 
@@ -219,7 +219,7 @@ For each report-back item, record:
 - Recommended owner or destination
 - Recommended follow-up action or backlog item
 
-When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the orchestrator or supervisor can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
+When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the dispatcher can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
 
 ## RT-ICA Procedure
 
@@ -322,6 +322,29 @@ ELSE:
 
 `SAFE-DEFAULTABLE` does **not** mean "fact known." It means the agent may choose a local default and must record that choice explicitly as `SAFE-DEFAULTED`.
 
+#### Verdict vocabulary
+
+This skill owns the implementation-gate RT-ICA verdict vocabulary. It has exactly two values,
+`APPROVED` and `BLOCKED`, and it is deliberately binary: at this gate there is no "proceed with
+gaps" outcome, because proceeding on an unresolved condition is the failure the gate exists to
+prevent.
+
+Emit it as a single unbolded line carrying the token alone, so a literal-substring consumer can
+read it:
+
+```text
+Decision: APPROVED
+```
+
+A consumer gating on this line treats any other token — and an absent `Decision:` line — as an
+error and routes it to its error path, never as approval and never as a block.
+
+The planning and grooming sister `dh:planner-rt-ica` owns a separate three-value set
+(`APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING`) whose middle value has no
+counterpart here. The two sets are disjoint on purpose, so a reader of a persisted RT-ICA section
+can tell which stage wrote it. Never emit a `-FOR-PLANNING` or `-WITH-GAPS` token from this gate,
+and never emit a bare `APPROVED` or `BLOCKED` from a planning or grooming producer.
+
 ### Step 5: Action Based on Decision
 
 <decision_actions>
@@ -344,7 +367,7 @@ ELSE:
    - Then present the human with a compact batched decision packet: findings, open questions, options, constraints, risk, and recommended path
 7. If any review-worthy findings were discovered:
    - Emit them in a `<concerns>` block
-   - Hand that block back to the orchestrator or supervisor so each concern can be appended into backlog `## Concerns`
+   - Hand that block back to the dispatcher so each concern can be appended into backlog `## Concerns`
 
 **IF APPROVED:**
 
@@ -383,8 +406,7 @@ Verification:
 - [Condition 2]: Evidence=[AVAILABLE|EVIDENCE-DERIVED|UNRESOLVED] | Disposition=[N/A|SAFE-DEFAULTABLE|REQUIRES-DISCOVERY|REQUIRES-USER|HARD-BLOCK] | Basis: [citation/inference/check]
 ...
 
-Decision:
-- [APPROVED|BLOCKED]
+Decision: [APPROVED|BLOCKED]
 
 --- IF BLOCKED ---
 Missing Inputs Requested:
@@ -415,7 +437,7 @@ Safe Defaults Applied (SAFE-DEFAULTED only):
   Observation: [what was found]
   Why it matters: [impact]
   Blocks current work: [yes/no]
-  Recommended owner/destination: [owner, supervisor, backlog, or task stream]
+  Recommended owner/destination: [owner, dispatcher, backlog, or task stream]
   Recommended follow-up: [task/backlog/escalation]
 </concerns>
 ```
@@ -556,8 +578,7 @@ Verification:
 - Security requirements: Evidence=UNRESOLVED | Disposition=REQUIRES-USER | Basis: Compliance obligations are not derivable from the request and affect policy and controls
 - Deployment target: Evidence=AVAILABLE | Disposition=N/A | Basis: README specifies AWS us-east-1
 
-Decision:
-- BLOCKED
+Decision: BLOCKED
 
 Missing Inputs Requested:
 

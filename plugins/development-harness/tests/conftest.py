@@ -234,16 +234,3 @@ def _isolated_state_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reques
     if request.node.get_closest_marker("e2e"):
         return
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-
-
-# ---------------------------------------------------------------------------
-# Quality gate fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def built_plan() -> str:
-    """Standard quality gate plan used by TestBuildQualityGatePlan tests."""
-    from sam_schema.core.quality_gates import build_quality_gate_plan
-
-    return build_quality_gate_plan(slug="test-feature", issue="42", impl_plan_address="P001")

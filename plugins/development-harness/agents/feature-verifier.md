@@ -1,7 +1,7 @@
 ---
 name: feature-verifier
 description: Goal-backward verification AFTER feature implementation. Starts from expected outcomes, works backwards to verify each was achieved. Tests the feature as a user would, not just that code exists. Returns VERIFIED or GAPS_FOUND with specific failures.
-tools: Read, Write, Edit, Bash, Grep, Glob, Skill, SendMessage, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Write, Edit, Bash, Grep, Glob, Skill, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: opus
 skills:
   - dh:subagent-contract
@@ -75,15 +75,22 @@ Then verify each level against the actual codebase.
 
 Read the architecture spec and the plan record to understand:
 
-> The backlog item's Concerns section may contain `CONTRACT:` prefixed entries added by the `contract-verification` agent after each task completed. These represent method signature or type contract mismatches against the architect spec. Review them alongside task-agent concerns when verifying the feature.
-
 - What was the feature supposed to achieve (goals)?
 - What did the tasks claim to deliver (artifacts)?
 
+> The backlog item's Concerns section may contain `CONTRACT:` prefixed entries added by the `contract-verification` agent after each task completed. These represent method signature or type contract mismatches against the architect spec. Review them alongside task-agent concerns when verifying the feature.
+
 ```text
 mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="architect")
-mcp__plugin_dh_sam__sam_plan(plan="{plan_address}", config={"action": "read"})
 ```
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
+```
+
+`plan status` returns the plan row and every task row on the work ledger, or plan-level counts
+with no task rows on the content store. Reading a `plan status` response: activate the
+`dh:implement-feature` skill for which shape a response answered in.
 
 The architecture spec is registry content; the plan is a SAM record. Each is read through the
 operation that owns it — task plans are never retrieved with `artifact_read`.

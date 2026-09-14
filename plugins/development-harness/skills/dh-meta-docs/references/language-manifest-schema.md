@@ -302,7 +302,7 @@ When the harness loads a manifest, it validates:
 3. **Markers** — At least one detection marker is declared
 4. **Flow override** — If present, is valid mermaid syntax (parsed but not executed during validation)
 
-Validation failures produce warnings but do not block the pipeline. The harness falls back to `dh:task-worker` (no specialist profile) for any section that fails validation.
+Validation failures produce warnings but do not block the pipeline. A section that fails validation names no specialist, so `dh:task-worker` runs that step with no profile loaded.
 
 ---
 

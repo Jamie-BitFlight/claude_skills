@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from dh_core.known_failure_types import KNOWN_FAILURE_TYPES
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from sam_schema.core.models import CreatePlanError, Plan, TaskStatus
@@ -54,7 +55,7 @@ def plan_dir(tmp_path: Path, content_backend: ContentTaskProvider) -> Path:
 
 
 async def test_server_lists_expected_tools() -> None:
-    """Server exposes exactly the three documented tools via the MCP protocol.
+    """Server exposes exactly the documented tools via the MCP protocol.
 
     Tests: tool registration completeness through the MCP protocol.
     How: Call list_tools() via in-memory Client.
@@ -66,7 +67,7 @@ async def test_server_lists_expected_tools() -> None:
 
     # Assert
     tool_names = {t.name for t in tools}
-    assert tool_names == {"sam_plan", "sam_task", "sam_active_task"}
+    assert tool_names == {"sam_plan", "sam_task", "sam_active_task", "sam_known_failure_types"}
 
 
 def test_server_instructions_are_set() -> None:
@@ -771,7 +772,7 @@ async def test_sam_list_items_include_required_summary_fields(multi_plan_dir: Pa
 async def test_sam_list_items_include_plan_ref(multi_plan_dir: Path) -> None:
     """sam_plan list items include plan_ref with correct P-format when no issue is set.
 
-    Tests: plan_ref field in list response — global composite identifier (PR #1725).
+    Tests: plan_ref field in list response — global composite identifier.
     How: Call sam_plan list; verify each item has plan_ref matching 'P<digits>' pattern.
     Why: Callers need plan_ref to construct globally unique plan addresses without issue scope.
     """
@@ -890,3 +891,52 @@ def test_plan_model_validate_accepts_all_three_autonomy_values(autonomy_value: s
 
     # Assert
     assert plan.autonomy == autonomy_value
+
+
+# ---------------------------------------------------------------------------
+# sam_known_failure_types via MCP protocol
+# ---------------------------------------------------------------------------
+
+
+async def test_mcp_known_failure_types_returns_the_whole_table_by_default() -> None:
+    """The vocabulary is never windowed unless the caller asks for a window.
+
+    Tests: sam_known_failure_types default behaviour through the MCP protocol.
+    How: Call the tool with no arguments via in-memory Client.
+    Why: A silently truncated vocabulary would let an agent pick a worse-fitting code.
+    """
+    async with Client(mcp) as client:
+        result = await client.call_tool("sam_known_failure_types", {})
+
+    payload = result.data
+    assert payload.total == len(KNOWN_FAILURE_TYPES)
+    assert payload.returned == len(KNOWN_FAILURE_TYPES)
+    assert payload.failure_types[0].code == KNOWN_FAILURE_TYPES[0].code
+
+
+async def test_mcp_known_failure_types_windows_and_reports_the_total() -> None:
+    """A caller that asks for a window still learns how big the table is.
+
+    Tests: offset/limit handling and the total field.
+    How: Call the tool with offset and limit via in-memory Client.
+    Why: Without total, a windowed caller cannot tell it read part of the vocabulary.
+    """
+    async with Client(mcp) as client:
+        result = await client.call_tool("sam_known_failure_types", {"offset": 1, "limit": 2})
+
+    payload = result.data
+    assert payload.total == len(KNOWN_FAILURE_TYPES)
+    assert payload.offset == 1
+    assert payload.returned == 2
+
+
+async def test_mcp_known_failure_types_rejects_a_negative_window() -> None:
+    """A negative offset is an error, not a silently clamped window.
+
+    Tests: the tool's error contract through the MCP protocol.
+    How: Call with offset=-1 and assert ToolError, per docs/testing.md's SAM MCP error contract.
+    Why: Clamping would hide a caller's arithmetic bug behind plausible output.
+    """
+    async with Client(mcp) as client:
+        with pytest.raises(ToolError, match="must not be negative"):
+            await client.call_tool("sam_known_failure_types", {"offset": -1})

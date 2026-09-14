@@ -3,10 +3,14 @@
 **Audience**: Mixed overview. Use this document to orient contributors and agents to the logical
 product contract; follow linked contributor references for implementation detail.
 
+This document states what the harness is for. How it achieves that — the automation boundary,
+the logical work model, and the frontend and backend contracts — is in
+[ARCHITECTURE.md](../ARCHITECTURE.md).
+
 ## Purpose
 
 Development Harness targets a generic agent work-management system that
-preserves logical work and the evidence needed to move it from intake to
+preserves logical work and the evidence needed to move it from creation to
 validated closure.
 
 The plugin is primarily an agent-facing workflow system expressed in Markdown.
@@ -63,120 +67,55 @@ Contributor documentation may depend on consumer documentation to understand
 the product contract. Consumer documentation must not require contributor
 documentation for ordinary installation, configuration, usage, or recovery.
 
-## Automation Boundary
+## What the workflow must deliver
 
-The harness exists to turn repeatable agent instructions into reliable workflow
-capabilities. A general provider CLI or MCP server can perform many underlying
-operations, but the harness adds value by making the complete workflow
-consistent and addressable through stable logical operations.
+Stated as outcomes. The stages that produce them, what each reads and produces, and where they are
+not yet implemented, are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
-The governing rule is:
+- A requirement, feature or defect is understood as part of the whole system before anyone designs
+  for it.
+- Claims are checked and corrected rather than carried forward, and the problem is considered from
+  the right altitudes.
+- A design holds up against the problems and scenarios the groomed item states, having been
+  adversarially challenged rather than merely written.
+- A plan makes its own achievement demonstrable — against the architecture, and against the problem
+  statement it started from.
+- Claims without evidence, and functional gaps, are surfaced back to the stages that can resolve
+  them instead of being carried into the work.
+- Work is split so that what may run concurrently does, and each piece carries a goal, guardrails,
+  acceptance criteria, and a way to tell it is done.
+- An agent doing a piece of work can reach the plan and the research that justifies it when it needs
+  to, and is not told how to do the work in place of evidence it could test.
+- New information found while working — a concern, a gap, an adjacent broken system, an
+  environmental failure, a security issue — reaches whoever can act on it, and the plan and the work
+  change in response.
+- A completed change is reviewed in proportion to what changed, its documentation is updated, and
+  its effectiveness at what it set out to achieve is demonstrated rather than asserted.
+- Work closes with the evidence that it is done.
 
-- If known inputs can be mechanically parsed or transformed into a required
-  output, implement that work in a script or tool.
-- If a repeated sequence can be made more consistent, observable, or atomic,
-  expose it as one structured operation rather than a prose checklist.
-- If the work requires interpretation of unique evidence, trade-off analysis,
-  judgment, or generation of novel content, keep it in the agent reasoning
-  layer.
+Each of these answers a failure met repeatedly in agentic engineering and AI co-working. An
+assessment of this system that cannot say which outcome a defect belongs to has not understood it.
 
-Scripts and tools therefore own schema validation, stable input/output shapes,
-provider abstraction, event-driven progress updates, deterministic searches and
-filters, section addressing, artifact lookup, and other repeatable mechanics.
-Agents own research, diagnosis, synthesis, design decisions, prioritization,
-review, and other context-dependent reasoning.
+## Domain reach
 
-Prose must not require an agent to reproduce a deterministic multi-call lookup,
-grep pipeline, parsing routine, or state update when the harness can expose the
-same operation safely as a script, hook, CLI command, or MCP tool. Automation
-must simplify the agent's work without hiding the logical workflow or the
-evidence needed to reason about it.
+Domain-generic, by construction. The harness orchestrates work; it does not perform it. It carries
+scope, relationships, coordination and evidence, and what happens inside a unit of work belongs to
+the agent doing it. So the domain arrives at runtime, with whatever is asked of it — the same way a
+CI system is language-agnostic because it runs commands rather than compiling.
 
-## Target Logical Model
+There is no implementation of software work here either. Asking where the harness implements font
+work, a job search or a ranking exercise asks the wrong layer: it implements the loop, and the loop
+is the same one whatever the work is.
 
-Under the target contract, agents work only with logical objects and
-relationships:
+A unit of work may be a change to a repository, and it may equally be the validation of an external
+system — a UI test against a web page, a radio reading from a microcontroller — or work that
+produces no repository artifact at all.
 
-- backlog item;
-- research, reference, guide, or note;
-- architecture;
-- plan;
-- atomic task;
-- coordination or dispatch state;
-- review, validation, or result evidence; and
-- follow-up item.
+The default artifact-type vocabulary is named for code (`codebase-analysis`, `code-review`). That is
+vocabulary in an extensible table, and it names the types a software project happens to register
+first.
 
-An agent uses logical identifiers and relationships, not provider IDs, file
-paths, issue bodies, database rows, Gists, or API-specific objects.
-
-## Closed-Loop Work Management
-
-The system is intended to support a full closed loop:
-
-1. Intake a backlog item and groom its scope and evidence.
-2. Research and assess the existing system factually, then produce architecture.
-3. Produce a plan.
-4. Decompose work into atomic tasks; sequence, distribute, and coordinate them.
-5. Execute tasks.
-6. Append findings, workarounds, concerns, and validation evidence upstream.
-7. Revise the plan, add tasks, or create a follow-up backlog item when evidence requires it.
-8. Review the plan and architecture.
-9. Validate the product-level outcome, including documentation, tests, end-to-end checks, and CI when applicable.
-10. Close work with evidence.
-
-This model is domain-generic. It applies to software, Markdown agent and plugin
-work, design, TUI, web, and font work, job search, research, ranking, and other
-work that benefits from durable scope, relationships, coordination, and evidence.
-
-## Target Frontend Contract
-
-CLI and MCP should expose stable logical CRUD and workflow operations for:
-
-- creating, reading, updating, and deleting logical objects;
-- updating fields and sections, including append and delete operations;
-- recording and retrieving references and evidence;
-- managing architecture, plan, and task lifecycles;
-- returning task feedback upstream;
-- assigning sequence and ownership; and
-- querying by logical ID, relationship, status, capability, and provenance.
-
-The target frontend contract treats CLI and MCP as interchangeable structured
-transports for the logical operations they expose. They are not required to
-proxy every provider-native capability. Skills and agents may use an existing
-backend tool directly when it is the authoritative and capable interface (for
-example, `bd` for Beads issue graphs and readiness). Both structured surfaces
-remain supported; this document makes no retirement or deprecation claim about
-either one.
-
-The frontend contract must not depend on a selected provider's object model or
-addressing scheme.
-
-## Target Backend Guarantee
-
-Storage is an implementation detail. Logical objects may be stored together or
-across providers such as GitHub, GitLab, Linear, SQLite, Beads, local storage,
-or Gist-backed storage.
-
-The target backend contract is canonical and provider-neutral. It defines object
-and relationship semantics, content and revisions, links, append behavior,
-statuses, query capabilities, ownership, and provenance. Adding a provider must
-change only provider implementation, registration, and configuration—not CLI or
-MCP commands or workflow behavior.
-
-## Current Boundary
-
-The configured backend is the single routing decision for work items, grooming, plans, tasks,
-artifact manifests, and artifact content. MCP and CLI expose interchangeable logical operations;
-`bd` remains the native interface for Beads issue graphs and readiness where that capability is
-stronger than the structured adapter.
-
-Remote-capable providers privately own `FileCache` for stale snapshots, durable queued offline
-mutations, revisions, and provider-specific persistence. Beads, SQLite, and Memory use native
-storage directly and never read or write backlog YAML or instantiate `FileCache`. Backend failures,
-cache misses, conflicts, and unsupported capabilities are explicit results; callers do not route
-to an independent task backend, artifact provider, local filesystem fallback, or per-plan provider.
-
-Provider IDs, issue bodies, paths, database rows, and wire formats remain implementation details.
-Consumers should use logical identifiers and the supported MCP/CLI operations. The architecture
-spec marks any remaining direct YAML or independent-provider code paths as migration debt; those
-paths are not supported workflow contracts.
+One constraint is real and it belongs to automation rather than to any domain: a structured
+acceptance criterion carries an executable check command, so completion is decided by something a
+machine can run. A CI job passes on an exit code whether it compiled a binary or sent an email;
+what this excludes is work whose completion is a judgement rather than a check.

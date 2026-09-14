@@ -55,20 +55,15 @@ in your STATUS: DONE report — do NOT paste the full content.
 
 ### `artifact_type`
 
-One of the recognized type strings:
+The registry of recognised type strings, the agent permitted to register each, and which types a
+gate reads is [dh_core/artifact_registry.py](../../dh_core/artifact_registry.py). The
+decomposition-exit gate imports it, and a test holds every shipped registration against it, so it is
+the only place a type is added or its writer changed. A call naming a `(type, agent)` pair it does
+not declare fails that test. The rules governing the registry — ownership, registration, discovery —
+are in [docs/artifact-registry.md](../../docs/artifact-registry.md).
 
-| artifact_type | Producing agent | When to use |
-|---|---|---|
-| `feature-context` | feature-researcher | Discovery document: WHO/WHAT/WHEN/WHY analysis |
-| `codebase-analysis` | codebase-analyzer, code-review-architecture | Codebase pattern/architecture/testing documents and dependency graphs; several per item |
-| `code-review` | code-reviewer | Code review verdict; one per reviewed task, read by the quality gate via `artifact_id` |
-| `architect` | `{resolved_agent}` (language-plugin design-spec agent, resolved via `profile_list`) | Architecture spec with interfaces and contracts |
-| `T0-baseline` | t0-baseline-capture | Pre-implementation baseline of acceptance criteria |
-| `TN-verification` | tn-verification-gate | Post-implementation verification results |
-| `research` | any research agent | Investigation findings, coverage analysis, rationale |
-| `task-plan` | `sam_plan` (internal, auto-registered) | Never call `artifact_register` directly for this type — see [task-plan](#task-plan) below |
-| `dispatch-plan` | `dispatch_create_plan` (internal, auto-registered) | Milestone dispatch plan; created automatically by the `dispatch_create_plan` MCP tool, not by direct registration |
-| `audit-report` | doc-drift-auditor | Documentation drift audit findings for a completed work item |
+`task-plan` is in the enum and deliberately carries no registry row — see
+[task-plan](#task-plan) below.
 
 ### `artifact_id`
 
@@ -130,9 +125,14 @@ mcp__plugin_dh_backlog__artifact_register(
 
 ### task-plan
 
-`task-plan` is a valid `artifact_register` type, but it is written internally — `sam_plan(config={"action": "create", "issue": N, ...})` auto-registers it, making the plan readable via `artifact_read`/`artifact_list` for worktree-isolated agents. Never register this type directly through `artifact_register`; create plans with
-`mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve them with
-`mcp__plugin_dh_sam__sam_plan(plan="{plan_ref}", config={"action": "read"})`.
+`task-plan` is an `ArtifactType` member and a real manifest entry: `sam_plan(config={"action": "create", "issue": N, ...})`
+registers it, so a worktree-isolated reader can resolve the plan's address. That is a capability of
+the plan store, not a route an agent uses.
+
+No agent may register or read it that way, which is why the registry carries no row for it. Create
+plans with `mcp__plugin_dh_sam__sam_plan(config={"action": "create", ...})` and retrieve
+them with `mcp__plugin_dh_sam__sam_plan(plan="{plan_ref}", config={"action": "read"})`, never
+through `artifact_register` or `artifact_read`.
 
 ### research (secondary documents, rationale, coverage analysis)
 

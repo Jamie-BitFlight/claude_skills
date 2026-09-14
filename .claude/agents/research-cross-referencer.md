@@ -52,7 +52,7 @@ flowchart TD
 ## Section Format
 
 Write the table, place it, and compute its link paths per
-[Cross-Reference Format](./../skills/research-curator/references/cross-reference-format.md).
+[Cross-Reference Format](.claude/skills/research-curator/references/cross-reference-format.md).
 Load it before editing the entry — it is the single source of truth for the column shape, the
 placement anchor, the relative-path rule, and the bar the **Relationship** phrase must clear.
 

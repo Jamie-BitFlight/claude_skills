@@ -14,7 +14,7 @@ Functions under test:
   - Public API: fetch_github_issue_body, sync_groomed_to_github_issue
 
 REST-fallback operations (label create, milestone create) retain
-PyGithub REST mocks — those are documented ADR-004 exceptions.
+PyGithub REST mocks — those are documented exceptions with no GraphQL mutation equivalent.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+import requests
 from backlog_core.backends._github_work_item_versions import WorkItemVersion
 from backlog_core.gh_client import (
     _get_repo_node_id,
@@ -513,10 +514,10 @@ class TestGetRepoNodeId:
 
 
 class TestResolveLabelIdsGraphql:
-    """Tests for _resolve_label_ids_graphql() — ADR-003 label update helper.
+    """Tests for _resolve_label_ids_graphql() — label update helper.
 
     Tests: _resolve_label_ids_graphql returns {name: node_id} for existing labels.
-    Why: This function is the foundation of the ADR-003 fetch-then-update pattern
+    Why: This function is the foundation of the fetch-then-update pattern
          for label mutations. Incorrect IDs corrupt all label state.
     """
 
@@ -552,7 +553,7 @@ class TestResolveLabelIdsGraphql:
 
         Tests: _resolve_label_ids_graphql missing label handling
         How: Return None for label1 alias; verify it is absent from the result.
-        Why: Missing labels must not crash — they are silently excluded (ADR-003).
+        Why: Missing labels must not crash — they are silently excluded.
         """
         # Arrange
         repo = _make_mock_repo(mocker)
@@ -632,7 +633,7 @@ class TestResolveLabelIdsGraphql:
 
 
 # ---------------------------------------------------------------------------
-# create_issue_for_item — GraphQL mutation (ADR-003 label pattern)
+# create_issue_for_item — GraphQL mutation (label pattern)
 # ---------------------------------------------------------------------------
 
 
@@ -983,22 +984,21 @@ class TestCheckOpenPrsForIssue:
         # Assert
         assert result == []
 
-    def test_returns_empty_list_on_backlog_error(self, mocker: MockerFixture) -> None:
-        """check_open_prs_for_issue returns empty list when _graphql_request raises BacklogError.
+    def test_raises_backlog_error_when_search_fails(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue raises when _graphql_request raises BacklogError.
 
         Tests: check_open_prs_for_issue error handling
-        How: Raise BacklogError from _graphql_request; verify empty list returned.
-        Why: PR-check errors must not block the close/resolve flow.
+        How: Raise BacklogError from _graphql_request; verify it propagates.
+        Why: close and resolve read an empty list as "no open PRs". A failed search must
+        not look like that, or they go ahead past an open PR.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.get_github", return_value=_make_mock_repo(mocker))
         mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: timeout"))
 
-        # Act
-        result = check_open_prs_for_issue(10, "test-owner/test-repo")
-
-        # Assert
-        assert result == []
+        # Act / Assert
+        with pytest.raises(BacklogError, match="GraphQL error: timeout"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
 
     def test_filters_out_non_pr_search_nodes(self, mocker: MockerFixture) -> None:
         """check_open_prs_for_issue skips empty dicts returned for non-PR search hits.
@@ -1022,18 +1022,56 @@ class TestCheckOpenPrsForIssue:
         assert len(result) == 1
         assert result[0].number == 55
 
+    def test_raises_backlog_error_when_get_github_raises_connection_error(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue wraps a raw ConnectionError into BacklogError.
+
+        Tests: check_open_prs_for_issue network-failure handling (defect: only
+        GithubException was caught, so a transport-level ConnectionError from
+        get_github escaped unwrapped instead of becoming the refusal BacklogError
+        close_item/resolve_item depend on).
+        How: Patch get_github to raise requests.exceptions.ConnectionError.
+        Why: close_item and resolve_item must refuse — not crash — when the
+        open-PR search cannot reach GitHub at all (network blocked).
+        """
+        # Arrange
+        mocker.patch(
+            "backlog_core.gh_client.get_github",
+            side_effect=requests.exceptions.ConnectionError("network blocked (proxy or firewall)"),
+        )
+
+        # Act / Assert
+        with pytest.raises(BacklogError, match="network blocked"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
+
+    def test_raises_backlog_error_when_get_github_raises_timeout(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue wraps a raw Timeout into BacklogError.
+
+        Tests: check_open_prs_for_issue network-failure handling (defect: only
+        GithubException was caught, so requests.exceptions.Timeout escaped
+        unwrapped).
+        How: Patch get_github to raise requests.exceptions.Timeout.
+        Why: A timed-out search must also become the refusal BacklogError, not a
+        raw exception that crashes close_item/resolve_item.
+        """
+        # Arrange
+        mocker.patch("backlog_core.gh_client.get_github", side_effect=requests.exceptions.Timeout("request timed out"))
+
+        # Act / Assert
+        with pytest.raises(BacklogError, match="timed out"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
+
 
 # ---------------------------------------------------------------------------
-# issue_to_local_fields — accepts IssueNode (ADR-005 signature change)
+# issue_to_local_fields — accepts IssueNode
 # ---------------------------------------------------------------------------
 
 
 class TestIssueToLocalFields:
-    """issue_to_local_fields accepts IssueNode TypedDict (ADR-005 change from PyGithub Issue).
+    """issue_to_local_fields accepts IssueNode TypedDict instead of a PyGithub Issue object.
 
     Tests: issue_to_local_fields correctly maps IssueNode fields to IssueLocalFields.
-    Why: ADR-005 changed the function signature — the tests must validate the new
-         contract (dict input) not the old one (PyGithub Issue object input).
+    Why: The function accepts a dict, not a PyGithub Issue object — the tests must validate the
+         current contract (dict input), not the old one (PyGithub Issue object input).
     """
 
     def test_maps_priority_from_label(self) -> None:
@@ -1334,18 +1372,61 @@ class TestTryGetGithub:
         # Assert
         assert result is None
 
+    def test_returns_none_on_connection_error(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """try_get_github returns None when the transport raises ConnectionError.
+
+        Tests: try_get_github network-failure handling (defect: the docstring
+        promises None for "no token, network error, etc." but the implementation
+        only caught GithubException, so a raw ConnectionError escaped).
+        How: Patch Github.get_repo to raise requests.exceptions.ConnectionError.
+        Why: Callers (gh_client.probe_backend_status, gh_client.batch_fetch_statuses,
+        backends/github_backend.py) treat None as "fall back to local-only" and
+        do not expect try_get_github to ever raise.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mocker.patch(
+            "backlog_core.gh_client.Github"
+        ).return_value.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
+
+        # Act
+        result = try_get_github("test-owner/test-repo")
+
+        # Assert
+        assert result is None
+
+    def test_returns_none_on_timeout(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """try_get_github returns None when the transport raises Timeout.
+
+        Tests: try_get_github network-failure handling (defect: only
+        GithubException was caught, so requests.exceptions.Timeout escaped).
+        How: Patch Github.get_repo to raise requests.exceptions.Timeout.
+        Why: Same fallback contract as the ConnectionError case above.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = requests.exceptions.Timeout(
+            "request timed out"
+        )
+
+        # Act
+        result = try_get_github("test-owner/test-repo")
+
+        # Assert
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
-# apply_status_in_progress — ADR-003 fetch-then-update label pattern
+# apply_status_in_progress — fetch-then-update label pattern
 # ---------------------------------------------------------------------------
 
 
 class TestApplyStatusInProgress:
-    """apply_status_in_progress uses fetch-then-update GraphQL label pattern (ADR-003).
+    """apply_status_in_progress uses fetch-then-update GraphQL label pattern.
 
     Tests: apply_status_in_progress fetches issue labels, computes desired set,
            and calls _update_issue_graphql with the full label ID list.
-    Why: ADR-003 requires full label ID replacement (not additive); the test
+    Why: The label update requires full label ID replacement (not additive); the test
          verifies that the fetch-then-compute-then-update flow is followed.
     """
 
@@ -1354,7 +1435,7 @@ class TestApplyStatusInProgress:
 
         Tests: apply_status_in_progress happy path
         How: Mock get_github, _graphql_request sequence (fetch issue, resolve labels, update).
-        Why: Verifies the ADR-003 fetch-then-update pattern is used correctly.
+        Why: Verifies the fetch-then-update pattern is used correctly.
         """
         # Arrange
         issue_node = make_issue_node(
@@ -1550,17 +1631,17 @@ class TestSyncGroomedToGithubIssue:
 
 
 # ---------------------------------------------------------------------------
-# apply_status_groomed — ADR-003 fetch-then-update label pattern
+# apply_status_groomed — fetch-then-update label pattern
 # ---------------------------------------------------------------------------
 
 
 class TestApplyStatusGroomed:
-    """apply_status_groomed uses fetch-then-update GraphQL label pattern (ADR-003).
+    """apply_status_groomed uses fetch-then-update GraphQL label pattern.
 
     Tests: apply_status_groomed fetches issue labels, computes desired set
            (add status:groomed, remove status:needs-grooming), and calls
            _update_issue_graphql with the full label ID list.
-    Why: ADR-003 requires full label ID replacement (not additive); tests verify
+    Why: The label update requires full label ID replacement (not additive); tests verify
          the fetch-then-compute-then-update flow, idempotency, label creation, and
          no-issue early exit.
     """
@@ -1682,11 +1763,11 @@ class TestApplyStatusGroomed:
     def test_apply_status_groomed_creates_label_if_absent(self, mocker: MockerFixture) -> None:
         """apply_status_groomed creates status:groomed label when it does not exist.
 
-        Tests: apply_status_groomed label auto-creation (ADR-004 REST exception)
+        Tests: apply_status_groomed label auto-creation (REST exception)
         How: get_label raises GithubException(status=404); verify create_label is
              called with name='status:groomed' and color='0075ca'.
-        Why: ADR-004 — label creation stays REST; new repos need the label created
-             on first use.
+        Why: Label creation stays REST — there is no GraphQL createLabel mutation;
+             new repos need the label created on first use.
         """
         from github import GithubException
 

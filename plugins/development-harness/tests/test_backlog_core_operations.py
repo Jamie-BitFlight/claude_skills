@@ -1228,7 +1228,7 @@ class TestListItemsBeadsBackend:
     """list_items does not crash and returns correct status with BeadsBackend.
 
     BUG-1: batch_fetch_statuses raises NotImplementedError for beads because
-    beads IDs are strings with no integer representation (ADR-002).  The fix
+    beads IDs are strings with no integer representation.  The fix
     detects BeadsBackend via isinstance and passes status_map={} instead.
     _item_derived_status and _build_list_entry both fall back to item.status
     when the map is empty.
@@ -1254,8 +1254,8 @@ class TestListItemsBeadsBackend:
         Tests: BUG-1 crash prevention.
         How: Swap backend to BeadsBackend; assert batch_fetch_statuses is never
              called (it would raise NotImplementedError for beads).
-        Why: Calling batch_fetch_statuses on BeadsBackend raises NotImplementedError
-             (ADR-002).  The fix must skip that call entirely.
+        Why: Calling batch_fetch_statuses on BeadsBackend raises NotImplementedError.
+             The fix must skip that call entirely.
         """
         self._make_beads_backend_config(mocker)
         _seed_items([])
@@ -1895,7 +1895,7 @@ class TestViewItem:
         Why: 52 pre-existing tests elsewhere in the suite (via
              backlog_core/tests/_view_test_helpers.py::_configure_memory_view)
              depend on this unconditional call for numeric selectors. `refresh`
-             is additive-only (ADR-3, corrected) — it must never remove this
+             is additive-only — it must never remove this
              existing behavior.
         """
         import backlog_core.models as models
@@ -1917,14 +1917,14 @@ class TestViewItem:
         """No cached item + numeric selector + refresh=False still performs a live lookup.
 
         Tests: view_item's unconditional identity-resolution live call (Case C/D).
-             REGRESSION GUARD (ADR-3): a not-yet-synced item must still resolve via
+             REGRESSION GUARD: a not-yet-synced item must still resolve via
              a live lookup regardless of refresh, or it would raise a false
              ItemNotFoundError.
         How: Write NO local item; call view_item("999") with no refresh kwarg and
              enrich mocked to succeed; assert enrich was called with "999" and no
              exception was raised.
         Why: Gating the identity-resolution call behind refresh would break every
-             not-yet-synced item lookup — the exact bug ADR-3 exists to prevent.
+             not-yet-synced item lookup — the exact bug this guards against.
         """
         mock_enrich = mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=True)
 
@@ -1941,7 +1941,7 @@ class TestViewItem:
         Tests: view_item's guard against calling enrich with no identifier at all.
         How: Write a local item with no issue number set; call view_item by title
              with refresh=True; assert enrich was never called, no exception was
-             raised, and the "backend unreachable" warning was appended.
+             raised, and the "GitHub lookup failed" warning was appended.
         Why: _live_lookup_id() must never return an empty string, and its None
              return means the caller has no identifier to send to the backend —
              the correct outcome is a warning, not a crash or a call with an
@@ -1956,7 +1956,10 @@ class TestViewItem:
         result = view_item("No Identifier Item", refresh=True)
 
         mock_enrich.assert_not_called()
-        assert "backend unreachable — sections_index reflects provider-backed record, may be stale" in result.warnings
+        assert (
+            "GitHub lookup failed (authentication failure, rate limit, GitHub server error, "
+            "or issue not found) — sections_index reflects provider-backed record, may be stale" in result.warnings
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -2068,6 +2071,40 @@ class TestCloseItem:
 
         with pytest.raises(BacklogError, match="Open PRs"):
             close_item(selector="PR Blocked Close", reason="superseded", force=False)
+
+    def test_close_item_with_open_pr_warns_pr_mentions_issue_not_auto_close(self, mocker: MockerFixture) -> None:
+        """Verify the open-PR warning states the PR mentions the issue, not that it auto-closes.
+
+        Tests: close_item's open-PR warning text accuracy.
+        How: Mock find_item/check_open_prs_for_issue as in the sibling guard test above,
+             pass an Output collector, and inspect its warnings after the raise.
+        Why: check_open_prs_for_issue (gh_client._SEARCH_PRS_QUERY) matches any open PR whose
+             title or body mentions "#N" — with or without a closing keyword like "Fixes #N".
+             A listed PR only auto-closes the issue on merge if it carries a closing keyword,
+             so the warning must not claim every listed PR will do so.
+        """
+        import backlog_core.models as models
+        from backlog_core.models import BacklogError
+
+        fake_dir: Path = models.get_backlog_dir()
+        filepath = _write_item(fake_dir, title="PR Warning Text Close", priority="P1", topic="pr-warning-text-close")
+        item_with_issue = BacklogItem(
+            title="PR Warning Text Close", section="P1", issue="#5", file_path=str(filepath), reference=str(filepath)
+        )
+        mocker.patch("backlog_core.operations.find_item", return_value=item_with_issue)
+        mocker.patch(
+            "backlog_core.operations.check_open_prs_for_issue",
+            return_value=[PullRequestRef(number=10, title="WIP: feature", url="https://github.com/t/10")],
+        )
+        out = Output()
+
+        with pytest.raises(BacklogError, match="Open PRs"):
+            close_item(selector="PR Warning Text Close", reason="superseded", force=False, output=out)
+
+        warning_text = "\n".join(out.warnings)
+        assert "auto-close" not in warning_text
+        assert "mention" in warning_text.lower()
+        assert "#5" in warning_text
 
     def test_close_item_force_bypasses_open_pr_guard(self, mocker: MockerFixture) -> None:
         """Verify close_item with force=True succeeds despite open PRs.

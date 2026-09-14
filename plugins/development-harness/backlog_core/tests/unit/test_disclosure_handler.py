@@ -16,7 +16,7 @@ Architecture reference:
   - Architect spec §4.4 — handler API + ``_handle_*`` methods
   - Architect spec §5.2 — ``total_est_tokens`` level-1 only
   - Architect spec §5.7 — ``next_call`` format
-  - ADR-5 — un-gated ``operations.view_item()`` call path
+  - Un-gated ``operations.view_item()`` call path (see disclosure_handler.py)
 
 Test strategy:
   TC-H1: MAP ``total_est_tokens`` is LEVEL-1 only (#2495 double-count regression guard).
@@ -415,7 +415,7 @@ class TestExtractModeRTICA:
     - RT-ICA entry in #2515 is ~560 tokens (2,422 chars), single entry.
     - ``head=100 < 560`` → ``truncated=True``, ``returned_tokens ≤ 100``.
     - ``next_call`` uses ``skip_tokens=``, NOT ``offset=`` (AC-5).
-    - ``next_call`` is on ``BoundedResponse``, NOT on ``BoundedContent`` (ADR-5).
+    - ``next_call`` is on ``BoundedResponse``, NOT on ``BoundedContent``.
     - ``total_tokens > 400`` confirms full pre-truncation content (~560 tokens).
 
     The RT-ICA ordinal is derived at runtime via ``_find_rt_ica_ordinal()``.
@@ -539,7 +539,7 @@ class TestExtractModeRTICA:
 
         ``BoundedContent`` is the internal intermediate produced by
         ``TokenBoundedExtractor`` — it carries no ``next_call`` field and no
-        ``selector`` (ADR-5).  The handler assembles ``next_call`` on
+        ``selector``.  The handler assembles ``next_call`` on
         ``BoundedResponse`` where the selector is in scope.
         """
         mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
@@ -704,7 +704,7 @@ class TestUngatedViewItemPath:
 class TestNavigateMiss:
     """Handler surfaces ``OrdinalNotFoundError`` for unknown ordinals.
 
-    Regression guard for the silent-fallback bug (ADR-3): old code fell back to
+    Regression guard for the silent-fallback bug: old code fell back to
     full content when a section name was not found.  The handler MUST NOT return
     a ``NavigateResponse`` with full content for an unknown ordinal.
 
@@ -718,7 +718,7 @@ class TestNavigateMiss:
     ) -> None:
         """handle() with unknown ordinal does NOT return a ``NavigateResponse``.
 
-        Silent full-content fallback is prohibited (ADR-3).  The result must be
+        Silent full-content fallback is prohibited.  The result must be
         either a raised ``OrdinalNotFoundError`` or a non-``NavigateResponse`` value.
         """
         mocker.patch("backlog_core.operations.view_item", return_value=multi_entry_view_result)
@@ -730,7 +730,7 @@ class TestNavigateMiss:
             result = handler.handle("synthetic-selector", request)
             assert not isinstance(result, NavigateResponse), (
                 "handle() must NOT return NavigateResponse for unknown ordinal '99.99'. "
-                "Returning full content as a silent fallback violates ADR-3."
+                "Returning full content as a silent fallback is prohibited."
             )
         except OrdinalNotFoundError:
             # Raising OrdinalNotFoundError is the preferred behaviour.
@@ -806,10 +806,10 @@ class TestNavigateOnParentResponse:
     side-effect returns a ``MagicMock`` shaped like ``SubtreeNode`` (§6.1),
     driving the handler branching logic under test.
 
-    CoVe assertions (§7.3 revision rule — aligned to §4.4 and ADR-4 / ADR-7):
+    CoVe assertions (§7.3 revision rule — aligned to §4.4):
     - Code-block content must NOT contain ``[code:...]`` tokens (raw fence body).
     - Leaf content DOES contain ``[code:...]`` tokens (mapper replaced fence inline).
-    - ``content=""`` (not ``None``) when ``has_children=True`` (ADR-7).
+    - ``content=""`` (not ``None``) when ``has_children=True``.
 
     TDD state: tests 1 and 4 are unconditionally RED until T10 implements the
     navigate-on-parent branch; tests 2 and 3 verify the leaf/code paths remain
@@ -824,7 +824,7 @@ class TestNavigateOnParentResponse:
         §4.4 contract when ``SubtreeNode.has_sub_heading_children=True``:
         - ``NavigateResponse.has_children`` must be ``True``
         - ``NavigateResponse.child_map`` must not be ``None``
-        - ``NavigateResponse.content`` must be ``""`` (ADR-7)
+        - ``NavigateResponse.content`` must be ``""``
 
         TDD RED: ``_handle_navigate`` currently returns ``has_children=False``
         (dataclass default) for every node type — navigate-on-parent branch absent.
@@ -889,7 +889,7 @@ class TestNavigateOnParentResponse:
             "RED: current handler always returns has_children=False."
         )
         assert result.child_map is not None, "child_map must not be None for a sub-heading parent (§4.4)."
-        assert result.content == "", f"content must be '' when has_children=True (ADR-7); got {result.content!r}."
+        assert result.content == "", f"content must be '' when has_children=True; got {result.content!r}."
 
     def test_navigate_to_leaf_returns_prose_with_tokens(
         self, multi_entry_view_result: ViewItemResult, mocker: MockerFixture
@@ -938,7 +938,7 @@ class TestNavigateOnParentResponse:
         assert isinstance(result, NavigateResponse), (
             f"Navigate to leaf must return NavigateResponse; got {type(result).__name__}."
         )
-        assert result.has_children is False, "has_children must be False for a leaf node (ADR-4)."
+        assert result.has_children is False, "has_children must be False for a leaf node."
         assert result.child_map is None, "child_map must be None for a leaf node (§4.4)."
         assert "[code:" in result.content, (
             "content must contain '[code:...]' navigation token(s) — mapper replaces "
@@ -998,7 +998,7 @@ class TestNavigateOnParentResponse:
         assert isinstance(result, NavigateResponse), (
             f"Navigate to code block must return NavigateResponse; got {type(result).__name__}."
         )
-        assert result.has_children is False, "has_children must be False for a code-block node (ADR-4)."
+        assert result.has_children is False, "has_children must be False for a code-block node."
         assert result.child_map is None, "child_map must be None for a code-block node (§4.4)."
         assert "[code:" not in result.content, (
             "Code-block content must NOT contain '[code:...]' tokens — "

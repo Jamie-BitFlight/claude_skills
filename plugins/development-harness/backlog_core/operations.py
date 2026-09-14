@@ -133,10 +133,12 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Return PyGithub Repository or None if unavailable.
+    """Return PyGithub Repository, or None when GitHub cannot be used.
 
     Returns:
-        Repository object, or None if the backend is unavailable.
+        Repository object, or None when GITHUB_TOKEN is missing, or GitHub
+        returned an error (authentication failure, rate limit, or server
+        error).
     """
     return get_config().backend.try_get_github(repo)
 
@@ -224,6 +226,32 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
         List of PullRequestRef objects for matching open PRs.
     """
     return get_config().backend.check_open_prs_for_issue(issue_num, repo)
+
+
+def _search_open_prs(issue_ref: str, repo: str) -> list[PullRequestRef]:
+    """Return the open PRs whose title or body mentions ``issue_ref``.
+
+    Args:
+        issue_ref: Linked issue reference, such as ``#5``.
+        repo: Repository in ``owner/repo`` format.
+
+    Returns:
+        Matching open PRs. Empty when ``issue_ref`` has no issue number or no open PR matches.
+
+    Raises:
+        BacklogError: When the search fails — authentication failure, rate
+            limiting, or a GitHub server error (5xx). close_item and
+            resolve_item refuse on it instead of reading a failed search as
+            "no open PRs".
+    """
+    issue_num = parse_issue_number(issue_ref)
+    if issue_num is None:
+        return []
+    try:
+        return check_open_prs_for_issue(issue_num, repo)
+    except BacklogError as exc:
+        msg = f"Open-PR search failed for issue {issue_ref}: {exc}. Use force=True to skip the open-PR check."
+        raise BacklogError(msg) from exc
 
 
 def close_github_issue(
@@ -490,7 +518,7 @@ def unknown_key_to_heading(key: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# TypedDicts for operations.py return shapes (ADR-002: not in models.py)
+# TypedDicts for operations.py return shapes — not in models.py
 # ---------------------------------------------------------------------------
 
 
@@ -760,7 +788,8 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
     """Apply plan update through GitHub and the configured backend.
 
     Posts a plan comment on the linked GitHub Issue before updating the backend-owned record.
-    If GitHub is unavailable, the backend update still succeeds.
+    If GITHUB_TOKEN is missing or GitHub returns an error (authentication
+    failure, rate limit, or server error), the backend update still succeeds.
 
     Returns:
         True if updated, False otherwise.
@@ -884,7 +913,7 @@ def _apply_groomed_entries(
         added_date: ISO date string used as id prefix for legacy seeding.
 
     Raises:
-        ValueError: When ``replace_section`` is ``True`` but ``reason`` is empty.
+        ValidationError: When ``replace_section`` is ``True`` but ``reason`` is empty.
         EntryNotFoundError: When ``entry_id`` is set but matches no entry in
             ``section`` (see :func:`_resolve_section_entry`). backlog_update
             and backlog_groom document this as the contract: an id matching no
@@ -896,7 +925,7 @@ def _apply_groomed_entries(
     if replace_section:
         if not reason:
             msg = "reason is required when replace_section=True"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         struck_at = now_iso()
         for entry in section.entries:
             if not entry.struck:
@@ -1529,7 +1558,10 @@ def _try_create_github_issue(item_data: BacklogItem, repo: str, out: Output) -> 
     """
     repository = try_get_github(repo)
     if repository is None:
-        out.warn("  WARNING: GitHub unavailable — creating local-only item")
+        out.warn(
+            "  WARNING: GITHUB_TOKEN missing or GitHub returned an error "
+            "(authentication failure, rate limit, or server error) — creating local-only item"
+        )
         return None
     try:
         return create_issue_for_item(repository, item_data, dry_run=False, output=out)
@@ -1720,7 +1752,7 @@ def add_item(
     out.info(f"Backlog item created.\n  Title: {stored_title}\n  Priority: {priority}\n  Reference: {item_reference}")
     if issue_ref:
         out.info(f"  Issue: {issue_ref}")
-    out.info(f"Next steps: /groom-backlog-item {stored_title}  /work-backlog-item {stored_title}")
+    out.info(f"Next steps: /work-backlog-item groom {stored_title}  /work-backlog-item work {stored_title}")
 
     result: dict[str, str | int | bool | list[str]] = {
         "title": stored_title,
@@ -1801,7 +1833,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     beads nanoid ``"bd-a3f8"``) or no issue at all, falls back to the locally
     cached ``item.status`` field.  This prevents beads and other string-ID
     backends from always returning ``"needs-grooming"`` when the status map is
-    empty (ADR-002).
+    empty.
 
     Returns:
         Status string — either the provider status value from *status_map* or
@@ -3136,7 +3168,9 @@ def view_item(
             enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
             if not enriched:
                 out.warnings.append(
-                    "backend unreachable — sections_index reflects provider-backed record, may be stale"
+                    "GitHub lookup failed (authentication failure, rate limit, GitHub server "
+                    "error, or issue not found) — sections_index reflects provider-backed "
+                    "record, may be stale"
                 )
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
@@ -3354,14 +3388,13 @@ def close_item(
         raise ItemNotFoundError(selector)
     issue_ref = item.issue
     if issue_ref and not force:
-        issue_num_val = parse_issue_number(issue_ref)
-        open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
+        open_prs = _search_open_prs(issue_ref, repo)
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
             for pr in open_prs:
                 out.warn(f"  - PR #{pr.number}: {pr.title}")
                 out.warn(f"    {pr.url}")
-            out.warn(f"\nIssue {issue_ref} will auto-close when a PR merges with 'Fixes {issue_ref}'.")
+            out.warn(f"\nThese open PRs mention issue {issue_ref}. Closing the item leaves them open.")
             out.warn("Use force=True to close anyway.")
             msg = f"Open PRs reference issue {issue_ref}. Use force=True to close anyway."
             raise BacklogError(msg)
@@ -3441,8 +3474,7 @@ def resolve_item(
         raise ItemNotFoundError(selector)
     issue_ref = item.issue
     if issue_ref and not force:
-        issue_num_val = parse_issue_number(issue_ref)
-        open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
+        open_prs = _search_open_prs(issue_ref, repo)
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
             for pr in open_prs:
@@ -4515,7 +4547,7 @@ def list_labels(repo: str = "", limit: int = 100, output: Output | None = None) 
         ``count`` (int), and output messages/warnings.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
     """
     out = output or Output()
     repository = get_github(repo)
@@ -4556,8 +4588,7 @@ def list_merged_prs(
         ``count`` (int), and output messages/warnings.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is
-            unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GitHub API errors.
     """
     out = output or Output()
@@ -4631,8 +4662,7 @@ def list_milestones(
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``state`` is not one of ``open``, ``closed``, ``all``.
-        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
-            set or GitHub is unreachable.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not set.
     """
     out = output or Output()
     valid_states = {"open", "closed", "all"}
@@ -4665,8 +4695,7 @@ def get_soonest_milestone(repo: str = "", output: Output | None = None) -> dict[
 
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
-        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
-            set or GitHub is unreachable.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not set.
     """
     out = output or Output()
     backend = require_milestone_support(get_config().backend, "get_soonest_milestone")
@@ -4706,8 +4735,7 @@ def create_milestone(
     Raises:
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         ValidationError: If ``title`` is empty or ``due_on`` cannot be parsed.
-        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
-            set or GitHub is unreachable.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not set.
     """
     out = output or Output()
     if not title.strip():
@@ -4748,8 +4776,7 @@ def assign_item_to_milestone(
         UnsupportedBackendCapabilityError: If the active backend does not support milestones.
         BacklogError: If ``issue_number`` or ``milestone_number`` is unknown to the
             backend, or on other GitHub API failures.
-        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not
-            set or GitHub is unreachable.
+        GitHubUnavailableError: On the GitHub backend, if GITHUB_TOKEN is not set.
     """
     out = output or Output()
     backend = require_milestone_support(get_config().backend, "assign_item_to_milestone")
@@ -4867,7 +4894,7 @@ def list_issues(
 
     Raises:
         ValidationError: If ``state`` is not one of the valid values.
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GitHub API errors.
     """
     out = output or Output()
@@ -4904,7 +4931,7 @@ def comment_issue(
 
     Raises:
         ValidationError: If ``issue_number`` is not positive or ``body`` is empty.
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GitHub API errors.
     """
     out = output or Output()
@@ -4952,7 +4979,7 @@ def list_comments(
 
     Raises:
         ValidationError: If ``issue_number`` is not positive.
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GitHub API errors.
     """
     out = output or Output()
@@ -5023,7 +5050,7 @@ def read_comment(
 
     Raises:
         ValidationError: If ``issue_number`` or ``comment_id`` is not positive.
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GitHub API errors or if the comment is not found.
     """
     out = output or Output()
@@ -5191,7 +5218,7 @@ def list_projects(
         (int), and output messages/warnings.
 
     Raises:
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GraphQL errors or unexpected response structure.
     """
     out = output or Output()
@@ -5306,7 +5333,7 @@ def create_project(
 
     Raises:
         ValidationError: If ``title`` is empty.
-        GitHubUnavailableError: If GITHUB_TOKEN is not set or GitHub is unreachable.
+        GitHubUnavailableError: If GITHUB_TOKEN is not set.
         BacklogError: On GraphQL errors or unexpected response structure.
     """
     out = output or Output()

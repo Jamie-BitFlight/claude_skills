@@ -1,13 +1,16 @@
 """Tests for hook profile controls added to task_status_hook.py.
 
 Tests: Profile resolution (CLAUDE_SKILLS_HOOK_PROFILE), disabled-hook parsing
-(CLAUDE_SKILLS_DISABLED_HOOKS), skip decision logic, strict pre-completion
-checks, and main() integration paths.
+(CLAUDE_SKILLS_DISABLED_HOOKS), skip decision logic, and main() integration paths.
+
+The profile decides whether a handler runs, not what it does. SubagentStop settles an
+attempt, which records evidence rather than deciding an outcome, so there is no verdict
+for a stricter profile to scrutinise before it is written — the judge scrutinises the
+report instead, per docs/work-ledger/work-loop.md.
 
 Strategy:
-- Unit tests for resolve_profile, parse_disabled_hooks, should_skip_hook,
-  and run_strict_pre_completion_checks use monkeypatch for env var control
-  and mocker for sam_schema isolation.
+- Unit tests for resolve_profile, parse_disabled_hooks and should_skip_hook use
+  monkeypatch for env var control and mocker for sam_schema isolation.
 - Integration tests for main() patch parse_hook_input (avoids stdin) and
   the two handlers (avoids disk I/O). main() always calls sys.exit(0) which
   raises SystemExit; tests assert on the exit code and whether handlers were
@@ -21,7 +24,6 @@ Implementation: plugins/development-harness/skills/implementation-manager/script
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -38,7 +40,6 @@ from task_status_hook import (
     HookProfile,
     parse_disabled_hooks,
     resolve_profile,
-    run_strict_pre_completion_checks,
     should_skip_hook,
 )
 
@@ -178,7 +179,7 @@ class TestResolveProfile:
 
         Tests: resolve_profile() case sensitivity.
         How: Set env var to 'MINIMAL', call resolve_profile().
-        Why: ADR-004 mandates case-sensitive lowercase values; uppercase triggers warning.
+        Why: Profile values are case-sensitive lowercase; uppercase triggers warning.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_HOOK_PROFILE", "MINIMAL")
         result = resolve_profile()
@@ -193,7 +194,7 @@ class TestResolveProfile:
 
         Tests: resolve_profile() case sensitivity with title case.
         How: Set env var to 'Standard', call resolve_profile().
-        Why: Consistent with ADR-004 case-sensitivity requirement.
+        Why: Profile values are case-sensitive.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_HOOK_PROFILE", "Standard")
         result = resolve_profile()
@@ -309,7 +310,7 @@ class TestParseDisabledHooks:
 
         Tests: parse_disabled_hooks() unknown ID forward compatibility.
         How: Set env var to an unrecognized hook ID.
-        Why: ADR-003 mandates no validation — unknown IDs silently never match.
+        Why: No validation is performed — unknown IDs silently never match.
         """
         monkeypatch.setenv("CLAUDE_SKILLS_DISABLED_HOOKS", "future-hook:some-handler")
         result = parse_disabled_hooks()
@@ -325,7 +326,7 @@ class TestShouldSkipHook:
     """Unit tests for should_skip_hook().
 
     Tests: All combinations of event x profile x disabled set covering the
-    behavior matrix and ADR-002 (disabled takes precedence over profile).
+    behavior matrix, including that disabled takes precedence over profile.
     """
 
     def test_post_tool_use_minimal_skipped(self) -> None:
@@ -383,7 +384,7 @@ class TestShouldSkipHook:
 
         Tests: should_skip_hook() strict profile runs SubagentStop.
         How: Call with SubagentStop event and strict profile.
-        Why: SubagentStop runs in all profiles (strict adds checks inside the handler).
+        Why: SubagentStop runs in every profile — the profile gates the handler, not its behaviour.
         """
         result = should_skip_hook("SubagentStop", HookProfile.STRICT, set())
         assert result is False
@@ -393,7 +394,7 @@ class TestShouldSkipHook:
 
         Tests: should_skip_hook() disabled set takes precedence.
         How: Pass PostToolUse with standard profile but disable its hook ID.
-        Why: Explicit disable is a stronger signal than profile (ADR-002).
+        Why: Explicit disable is a stronger signal than profile.
         """
         disabled = {HOOK_ID_POST_TOOL_USE}
         result = should_skip_hook("PostToolUse", HookProfile.STANDARD, disabled)
@@ -442,151 +443,6 @@ class TestShouldSkipHook:
         disabled = {HOOK_ID_POST_TOOL_USE, HOOK_ID_SUBAGENT_STOP}
         assert should_skip_hook("PostToolUse", HookProfile.STANDARD, disabled) is True
         assert should_skip_hook("SubagentStop", HookProfile.STANDARD, disabled) is True
-
-
-# ---------------------------------------------------------------------------
-# Unit: run_strict_pre_completion_checks()
-# ---------------------------------------------------------------------------
-
-
-class TestRunStrictPreCompletionChecks:
-    """Unit tests for run_strict_pre_completion_checks().
-
-    Tests: Status checks, acceptance criteria checks, error handling.
-    All sam_get_task calls are mocked to avoid real file I/O.
-    """
-
-    def _make_task_mock(
-        self, *, status: str = "in-progress", acceptance_criteria: str = "- [ ] Must work"
-    ) -> MagicMock:
-        """Build a minimal Task-like mock for sam_get_task return value.
-
-        Args:
-            status: SamTaskStatus value string.
-            acceptance_criteria: Acceptance criteria string (empty = unconfigured).
-
-        Returns:
-            MagicMock with status and acceptance_criteria attributes set.
-        """
-        from sam_schema.core.models import TaskStatus as SamTaskStatus
-
-        task = MagicMock()
-        task.status = SamTaskStatus(status)
-        task.acceptance_criteria = acceptance_criteria
-        return task
-
-    def test_in_progress_with_criteria_returns_empty(self) -> None:
-        """IN_PROGRESS + non-empty criteria -> empty warnings list (all checks pass).
-
-        Tests: run_strict_pre_completion_checks() happy path.
-        How: Pass IN_PROGRESS task with criteria directly (no I/O mocking needed).
-        Why: No warnings means strict mode adds no output when everything is correct.
-        """
-        task = self._make_task_mock(status="in-progress", acceptance_criteria="- [ ] Must pass")
-        result = run_strict_pre_completion_checks(task, "T01")
-        assert result == []
-
-    def test_not_started_status_returns_warning(self) -> None:
-        """NOT_STARTED status -> warning about unclaimed task.
-
-        Tests: run_strict_pre_completion_checks() check #1 (status).
-        How: Pass NOT_STARTED task directly.
-        Why: Task should be claimed before completion; strict mode flags this.
-        """
-        task = self._make_task_mock(status="not-started", acceptance_criteria="- [ ] Must pass")
-        warnings = run_strict_pre_completion_checks(task, "T01")
-        assert len(warnings) >= 1
-        assert any("not-started" in w or "claimed" in w for w in warnings)
-
-    def test_empty_acceptance_criteria_returns_warning(self) -> None:
-        """Empty acceptance criteria -> warning about missing criteria.
-
-        Tests: run_strict_pre_completion_checks() check #2 (acceptance criteria).
-        How: Pass IN_PROGRESS task with empty criteria directly.
-        Why: Tasks without acceptance criteria cannot be verified; strict mode flags this.
-        """
-        task = self._make_task_mock(status="in-progress", acceptance_criteria="")
-        warnings = run_strict_pre_completion_checks(task, "T01")
-        assert len(warnings) >= 1
-        assert any("acceptance" in w.lower() or "criteria" in w.lower() for w in warnings)
-
-    def test_whitespace_only_criteria_returns_warning(self) -> None:
-        """Whitespace-only acceptance criteria -> warning (treated as empty).
-
-        Tests: run_strict_pre_completion_checks() whitespace-only criteria.
-        How: Pass task with whitespace-only criteria directly.
-        Why: Whitespace is semantically empty; should trigger the same warning.
-        """
-        task = self._make_task_mock(status="in-progress", acceptance_criteria="   ")
-        warnings = run_strict_pre_completion_checks(task, "T01")
-        assert len(warnings) >= 1
-
-    def test_both_checks_fail_returns_two_warnings(self) -> None:
-        """NOT_STARTED + empty criteria -> two warnings (both checks fail).
-
-        Tests: run_strict_pre_completion_checks() dual failure.
-        How: Pass NOT_STARTED task with empty criteria directly.
-        Why: Both checks are independent; both failures must be reported.
-        """
-        task = self._make_task_mock(status="not-started", acceptance_criteria="")
-        warnings = run_strict_pre_completion_checks(task, "T01")
-        assert len(warnings) == 2
-
-    def test_none_acceptance_criteria_treated_as_empty_returns_warning(self) -> None:
-        """acceptance_criteria=None (falsy) is treated as empty — triggers criteria warning.
-
-        Tests: run_strict_pre_completion_checks() None criteria handling.
-        How: Set acceptance_criteria to None on mock task after construction.
-        Why: `or ""` fallback must treat None the same as empty string.
-        """
-        task = self._make_task_mock(status="in-progress", acceptance_criteria="")
-        task.acceptance_criteria = None
-        result = run_strict_pre_completion_checks(task, "T01")
-        assert len(result) >= 1
-        assert any("criteria" in w.lower() or "acceptance" in w.lower() for w in result)
-
-    def test_task_id_included_in_status_warning(self) -> None:
-        """Status warning message includes the task_id for traceability.
-
-        Tests: run_strict_pre_completion_checks() status warning content.
-        How: Pass NOT_STARTED task with task_id='T42', check warning contains 'T42'.
-        Why: Warnings must be actionable — task_id identifies which task to investigate.
-        """
-        task = self._make_task_mock(status="not-started", acceptance_criteria="- [ ] Must pass")
-        result = run_strict_pre_completion_checks(task, "T42")
-        assert len(result) == 1
-        assert "T42" in result[0]
-
-    def test_task_id_included_in_criteria_warning(self) -> None:
-        """Criteria warning message includes the task_id for traceability.
-
-        Tests: run_strict_pre_completion_checks() criteria warning content.
-        How: Pass in-progress task with empty criteria, task_id='T99'.
-        Why: Warnings must be actionable — task_id identifies which task to investigate.
-        """
-        task = self._make_task_mock(status="in-progress", acceptance_criteria="")
-        result = run_strict_pre_completion_checks(task, "T99")
-        assert len(result) == 1
-        assert "T99" in result[0]
-
-    def test_return_type_is_always_list_of_str(self) -> None:
-        """Function always returns list[str] regardless of status/criteria combination.
-
-        Tests: run_strict_pre_completion_checks() return type invariant.
-        How: Call with multiple status/criteria combinations, verify type each time.
-        Why: Callers iterate warnings as strings; type must be stable across all inputs.
-        """
-        cases = [
-            ("in-progress", "- [x] Works"),
-            ("not-started", ""),
-            ("in-progress", "   "),
-            ("not-started", "- [ ] Pending"),
-        ]
-        for status, criteria in cases:
-            task = self._make_task_mock(status=status, acceptance_criteria=criteria)
-            result = run_strict_pre_completion_checks(task, "T01")
-            assert isinstance(result, list)
-            assert all(isinstance(w, str) for w in result)
 
 
 # ---------------------------------------------------------------------------
@@ -722,7 +578,7 @@ class TestMainIntegration:
 
         Tests: main() disabled hook early exit.
         How: Disable subagent-stop hook ID, provide SubagentStop event.
-        Why: Explicit disable must prevent handler from running (ADR-002).
+        Why: Explicit disable must prevent handler from running.
         """
         monkeypatch.delenv("CLAUDE_SKILLS_HOOK_PROFILE", raising=False)
         monkeypatch.setenv("CLAUDE_SKILLS_DISABLED_HOOKS", HOOK_ID_SUBAGENT_STOP)
@@ -770,7 +626,7 @@ class TestMainIntegration:
     ) -> None:
         """profile=strict + DISABLED_HOOKS=subagent-stop -> disabled wins, handler skipped.
 
-        Tests: main() disabled takes precedence over strict profile (ADR-002).
+        Tests: main() disabled takes precedence over strict profile.
         How: Set HOOK_PROFILE=strict and disable subagent-stop. Handler must not run.
         Why: Explicit disable overrides profile semantics in all cases.
         """

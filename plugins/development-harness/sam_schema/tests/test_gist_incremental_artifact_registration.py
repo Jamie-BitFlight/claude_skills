@@ -1,13 +1,13 @@
-"""AC5/AC6 coverage for #2658: sam_plan incremental artifact registration.
+"""AC5/AC6 coverage for sam_plan incremental artifact registration.
 
 This file lives in the beads-scoped ``sam_schema/tests/`` directory because
-AC5 and AC6 of #2658 literally require coverage under this path (the plan's
-requirements name this exact file location).
+AC5 and AC6 of the originating plan literally require coverage under this
+path (the plan's requirements name this exact file location).
 
 The fixture stack below (``_InMemoryArtifactStore``, ``_make_fake_client``,
 ``_make_fake_plan_index``, the ``store`` fixture, and the ``gist_layer``
 fixture) is an intentionally MINIMAL, INDEPENDENT duplicate of the fixtures
-in ``tests_sam/test_gist_write_through.py`` (ADR-1) -- it is a copy, not an
+in ``tests_sam/test_gist_write_through.py`` -- it is a copy, not an
 import. Both copies must be updated in lockstep whenever the
 ``GistTaskLayer`` / ``ArtifactRegistryClient`` interface changes. This
 duplication is an accepted, documented trade-off in exchange for keeping
@@ -54,7 +54,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Deterministic in-memory fakes (minimal, independent duplicate -- ADR-1)
+# Deterministic in-memory fakes (minimal, independent duplicate)
 # ---------------------------------------------------------------------------
 
 _SENTINEL_ISSUE = 42

@@ -110,6 +110,44 @@ class TestBacklogAddErrorContract:
         assert json.loads(result.stdout) == {"title": "new item", "priority": "P1", "item_ref": ""}
 
 
+def _open_pr_refusal(verb: str) -> object:
+    """Build a side effect that warns and raises like the operations-layer open-PR refusal."""
+
+    def _refuse(**kwargs: object) -> dict[str, object]:
+        output = cast("Output", kwargs["output"])
+        output.warn("WARNING: Open PRs reference issue #1:")
+        output.warn("  - PR #9: Fixes #1")
+        raise BacklogError(f"Open PRs reference issue #1. Use force=True to {verb} anyway.")
+
+    return _refuse
+
+
+class TestBacklogCloseResolveErrorContract:
+    """``backlog close`` and ``backlog resolve`` report the open-PR refusal as JSON."""
+
+    def test_close_open_pr_refusal_emits_json_error_with_warnings(self, mocker: MockerFixture) -> None:
+        """The open-PR ``BacklogError`` from ``close_item`` reaches stdout as JSON with its PR warnings."""
+        mocker.patch("sam_schema.backlog.operations.close_item", side_effect=_open_pr_refusal("close"))
+
+        result = runner.invoke(app, ["backlog", "close", "--selector", "#1", "--reason", "wontfix"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout)
+        assert payload["error"] == "Open PRs reference issue #1. Use force=True to close anyway."
+        assert "  - PR #9: Fixes #1" in payload["warnings"]
+
+    def test_resolve_open_pr_refusal_emits_json_error_with_warnings(self, mocker: MockerFixture) -> None:
+        """The open-PR ``BacklogError`` from ``resolve_item`` reaches stdout as JSON with its PR warnings."""
+        mocker.patch("sam_schema.backlog.operations.resolve_item", side_effect=_open_pr_refusal("resolve"))
+
+        result = runner.invoke(app, ["backlog", "resolve", "--selector", "#1", "--summary", "done"], env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout)
+        assert payload["error"] == "Open PRs reference issue #1. Use force=True to resolve anyway."
+        assert "  - PR #9: Fixes #1" in payload["warnings"]
+
+
 class TestBacklogViewRefreshForwarding:
     """``backlog view`` forwards the ``--refresh`` flag to ``operations.view_item``."""
 

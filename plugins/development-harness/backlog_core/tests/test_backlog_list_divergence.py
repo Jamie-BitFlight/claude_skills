@@ -415,3 +415,43 @@ class TestSyncStateBlockShape:
             "sync_state.cache_warning must be a non-empty string when OFFLINE. "
             "Design section 7.2 specifies: 'serving stale cache -- backend sync failed'."
         )
+
+
+# ---------------------------------------------------------------------------
+# Behaviour 5g -- ERROR state warning must name last_error, not just offline_reason
+# ---------------------------------------------------------------------------
+
+
+class TestSyncStateBlockNamesErrorCause:
+    """The injected warning must name the sync failure's cause, not just offline_reason.
+
+    ERROR-state syncs (retries exhausted) set ``last_error``, not ``offline_reason`` --
+    ``offline_reason`` is only ever populated for the OFFLINE (non-retryable) path. A
+    warning built only from ``offline_reason`` is silently empty for every ERROR-state
+    sync, so a caller reading the warning has no idea why the cache is stale.
+    """
+
+    async def test_error_state_warning_names_last_error_when_offline_reason_empty(
+        self, reset_state: None, mock_list_items_empty: None, mock_probe_not_checked: None
+    ) -> None:
+        """The ERROR-state warning text names last_error, not a blank offline_reason.
+
+        Design reference: sync_state.py SyncState.last_error is the field populated for
+        ERROR; offline_reason stays "" on that path. The warning must still say why the
+        cache is stale.
+        """
+        from backlog_core.server import backlog_list
+
+        state = get_sync_state()
+        state.status = SyncStatus.ERROR
+        state.last_error = "boom"
+        assert not state.offline_reason  # precondition: ERROR path leaves this empty
+
+        response = cast("dict[str, object]", await backlog_list())
+
+        warnings = cast("list[str]", response.get("warnings", []))
+        assert any("boom" in w for w in warnings), (
+            f"No warning names the sync failure cause (last_error='boom'). Got: {warnings}. "
+            "_build_sync_state_block() only reads sync_state.offline_reason, which the ERROR "
+            "path never populates -- last_error is dropped."
+        )

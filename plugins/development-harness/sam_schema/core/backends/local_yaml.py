@@ -684,8 +684,8 @@ class LocalYamlTaskProvider:
     def append_task(self, plan_id: str, task: Task) -> dict[str, Any]:
         """Append a single validated Task to an existing plan.
 
-        Duplicate-ID check via ``validate_appended_task``; see ADR-1770-1 for the
-        single-writer contract (callers must serialise writes to the same plan).
+        Duplicate-ID check via ``validate_appended_task``. Single-writer
+        contract: callers must serialise writes to the same plan.
 
         Args:
             plan_id: Plan identifier.
@@ -719,8 +719,8 @@ class LocalYamlTaskProvider:
         """Finalize a drafting plan by setting its state to ready.
 
         Loads the plan, sets ``state="ready"``, writes back via ``write_plan``.
-        See ADR-1770-1 for the single-writer contract (callers must serialise
-        writes to the same plan).
+        Single-writer contract: callers must serialise
+        writes to the same plan.
 
         Args:
             plan_id: Plan identifier.

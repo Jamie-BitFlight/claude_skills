@@ -10,7 +10,7 @@ created: 2026-08-19
 # Workflow-Continuity Risk Lens — Case Studies
 
 The [S1-S7 pipeline](../AGENTS.md#sam-7-stage-pipeline) and the
-[backlog grooming stages](./backlog-item-lifecycle.md) hand data forward through the configured
+[backlog pipeline stages](./backlog-lifecycle.md#2-pipeline-stages) hand data forward through the configured
 backend at every step — grooming writes a section, RT-ICA reads it, dispatch reads the plan,
 sync reconciles provider state, verification reads the acceptance criteria. A byte can survive
 that handoff on disk and still be lost to the workflow: written by one step, never consulted by
@@ -64,12 +64,12 @@ plausible continuity gap must still be checked against which path is actually re
 reported as a finding — grep for the consuming reference, or list both candidates and confirm
 which one is live, the way this case was resolved.
 
-## Case 3 — `claim_task` atomicity (issue #3002) — verify against existing decisions, not just code
+## Case 3 — `claim_task` atomicity — verify against existing decisions, not just code
 
 **Wrong-lens framing**: "no compare-and-swap on `claim_task` — a race condition, should be
 fixed." Filed as a P2 defect proposing a CAS rewrite.
 
-**Verification finding**: `sam_schema/core/gist_task_layer.py` (`ADR-2509-3`) documents that this
+**Verification finding**: `sam_schema/core/gist_task_layer.py` documents that this
 repo's architecture *already* made this decision deliberately — `claim_task` delegates
 exactly-once claiming to caller-side serialization specifically because GitHub's label API has no
 CAS primitive to build one on. The proposal doesn't identify a new defect; it argues against a

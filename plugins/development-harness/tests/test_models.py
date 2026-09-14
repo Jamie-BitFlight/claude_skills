@@ -236,8 +236,8 @@ class TestBacklogItemMetadataStatusValidator:
         m = BacklogItemMetadata(status="resolved")
         assert m.status == "resolved"
 
-    def test_legacy_groomed_accepted(self) -> None:
-        """Legacy 'groomed' status is accepted verbatim."""
+    def test_groomed_status_accepted(self) -> None:
+        """The 'groomed' status that backlog_groom(mark_groomed=True) writes is accepted verbatim."""
         m = BacklogItemMetadata(status="groomed")
         assert m.status == "groomed"
 

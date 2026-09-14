@@ -171,7 +171,7 @@ Respect the human's attention:
 
 ## Report Back For Review
 
-Exploration for planning often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the orchestrator or supervisor agent so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
+Exploration for planning often surfaces issues beyond the current scoped task. These do not automatically block the current work, but they must be reported back to the dispatcher so they can be tracked, reviewed, and converted into follow-up tasks or backlog items when appropriate.
 
 Create a review report for findings such as:
 
@@ -200,7 +200,7 @@ For each report-back item, record:
 - Recommended owner or destination
 - Recommended follow-up action or backlog item
 
-When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the orchestrator or supervisor can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
+When such findings exist, emit them in a literal `<concerns>...</concerns>` block so the dispatcher can append them into backlog `## Concerns` using the plugin's existing concern-ingestion flow. Do not bury these findings only inside prose.
 
 ---
 
@@ -228,18 +228,53 @@ whether the following are PRESENT, EVIDENCE-DERIVED, PARTIAL, MISSING, or HARD-B
 
 ---
 
+## Verdict Vocabulary
+
+This skill owns the planning- and grooming-phase RT-ICA verdict vocabulary. It has exactly three
+values. Every producer and every consumer on the planning and grooming path uses this set and no
+other.
+
+| Verdict | Emit when | What the consumer does |
+|---|---|---|
+| `APPROVED-FOR-PLANNING` | No condition is `PARTIAL`, `MISSING`, or `HARD-BLOCKED`. | Proceed. Nothing to carry forward. |
+| `APPROVED-WITH-GAPS` | At least one condition is `PARTIAL` or `MISSING`, and planning signal exists. | Proceed, carrying every gap forward as an unblock task, a batched clarification question, or a task annotation. |
+| `BLOCKED-FOR-PLANNING` | No planning signal exists at all, or a `HARD-BLOCKED` condition applies. | Stop. Present the blocking conditions. |
+
+`APPROVED-WITH-GAPS` is the expected and normal outcome for brownfield, refactor, and discovery
+scenarios. The middle value is the load-bearing one: it separates "cannot plan at all" from "can
+plan, with known gaps". A gap that reaches the next stage as recorded information is the purpose of
+this skill; a gap that halts the pipeline is a defect in the consumer, not a correct reading of
+this verdict.
+
+**Emission format.** Producers write the verdict as a single unbolded line carrying the token
+alone:
+
+```text
+Decision: APPROVED-WITH-GAPS
+```
+
+Consumers match on that line. Do not bold the field name, do not put the token on the line below
+it, and do not wrap it in brackets — each of those breaks a literal-substring consumer.
+
+**Unrecognised verdicts.** A consumer that gates on this line treats any token outside the three
+above — and an absent `Decision:` line — as an error and routes it to its error path. It must not
+be read as approval and must not be read as a block. An unknown token silently read as "blocked"
+is how a producer/consumer split stays invisible.
+
+**Do not mix the two sisters' sets.** `dh:rt-ica` owns a separate two-value set for the
+implementation gate. The token sets are disjoint on purpose, so a reader of a persisted RT-ICA
+section can tell which stage wrote it. A planning or grooming producer never emits the
+implementation-gate tokens, and the implementation gate never emits these three.
+
+---
+
 ## Output Contract (Planning-Oriented)
 
 Produce a structured analysis with the following sections:
 
 ### 1. Completeness Summary
 
-- APPROVED-FOR-PLANNING
-- APPROVED-WITH-GAPS
-- BLOCKED-FOR-PLANNING (only if literally no planning signal exists)
-
-> APPROVED-WITH-GAPS is the expected and normal outcome for brownfield,
-> refactor, and discovery scenarios.
+One `Decision:` line carrying one token from the [Verdict Vocabulary](#verdict-vocabulary) above.
 
 ---
 
@@ -291,7 +326,7 @@ Emit the final review findings as:
   Observation: [what was found]
   Why it matters: [impact]
   Blocks current work: [yes/no]
-  Recommended owner/destination: [owner, supervisor, backlog, or task stream]
+  Recommended owner/destination: [owner, dispatcher, backlog, or task stream]
   Recommended follow-up: [task/backlog/escalation]
 </concerns>
 ```

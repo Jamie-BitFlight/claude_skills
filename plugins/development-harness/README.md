@@ -92,7 +92,7 @@ What happens:
 - Queries the plan for ready tasks (not-started with all dependencies complete)
 - When 2 or more tasks are ready simultaneously, dispatches one parallel `Agent()` call per task
 - Each task runs through `/dh:start-task`, which claims the task, executes it, and records divergence notes when implementation differs from plan
-- A SubagentStop hook automatically marks tasks complete
+- A SubagentStop hook automatically settles the attempt when a worker's launch ends
 - Bookend tasks run automatically: T0 captures baseline state before implementation begins, TN verifies acceptance criteria after all implementation tasks finish
 
 #### `/dh:complete-implementation`
@@ -156,33 +156,15 @@ Workflow modes:
 |------|-------------|
 | *(no args)* | Interactive browser — pick an item from your backlog |
 | `#N` or title | Load and work a specific item end-to-end |
-| `create -- "description"` | Capture a new item, then proceed through grooming and planning |
+| `create -- "description"` | Capture a new item in the selected backend (a GitHub issue in the default deployment; supports priorities P0-P2 and Ideas, and types Feature/Bug/Refactor/Docs/Chore), then proceed through grooming and planning |
 | `--quick {title}` | One-file fixes and trivial patches — skip the full pipeline |
 | `--auto {title}` | Autonomous mode — no interactive prompts, decisions logged |
-| `groom {title}` | Run grooming only |
+| `groom {title}` | Run grooming only — fact-checks claims, maps required resources, identifies gaps, estimates effort, and writes structured acceptance criteria |
 | `close {title}` | Dismiss without completing (requires reason) |
 | `resolve {title}` | Mark done with an evidence trail |
 | `progress` | Show current item progress |
 | `resume` | Resume interrupted work |
 | `setup-github` | Initialize labels, project, and milestone for a GitHub-backed repo |
-
-#### `/dh:create-backlog-item`
-
-Creates a new backlog item in the selected backend (a GitHub issue in the default deployment).
-
-```text
-/dh:create-backlog-item "Add rate limiting to the auth endpoints"
-```
-
-Supports priorities P0 through P2 and Ideas. Types: Feature, Bug, Refactor, Docs, Chore.
-
-#### `/dh:groom-backlog-item`
-
-Grooms a backlog item: fact-checks claims, maps required resources, identifies gaps, estimates effort, and writes structured acceptance criteria.
-
-```text
-/dh:groom-backlog-item #42
-```
 
 ### Milestone Management
 
@@ -452,7 +434,7 @@ workflow state does not pollute your working tree.
 
 ## SDLC Layer Architecture
 
-The harness is organized in three layers:
+The harness is organized in layers:
 
 | Layer | Owns | Examples |
 |---|---|---|

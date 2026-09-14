@@ -2,7 +2,7 @@
 name: integration-checker
 description: Verifies cross-module integration and end-to-end flows. Checks that new code connects properly with existing modules - exports used, imports work, data flows complete. Existence is not integration.
 model: haiku
-tools: Read, Bash, Grep, Glob, Write, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Bash, Grep, Glob, Write, Skill, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:subagent-contract
   - dh:validation-protocol
@@ -74,11 +74,13 @@ For each module in the feature, extract what it provides and what it should cons
 
 Read the plan record through the plan operations — task plans are SAM state, not registry content:
 
-```text
-mcp__plugin_dh_sam__sam_plan(plan="{plan_address}", config={"action": "read"})
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
 ```
 
-> **Backend note**: When `BACKLOG_BACKEND=beads`, `issue_number` is a bead ID (string, e.g. `bd-a3f8`), not a GitHub issue number (integer). The MCP layer accepts both types transparently.
+`plan status` returns the plan row and every task row on the work ledger, or plan-level counts
+with no task rows on the content store. Reading a `plan status` response: activate the
+`dh:implement-feature` skill for which shape a response answered in.
 
 **Build provides/consumes map:**
 
