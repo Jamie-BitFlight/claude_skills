@@ -69,12 +69,12 @@ For every change, document these four things:
 | | Question | Where to find the answer |
 |---|---|---|
 | **Input** | What exact fields does my change receive? From which prior stage? | Read the prior stage's Outputs section |
-| **Derivation** | If my change needs data that isn't passed directly, how is it derived? | Read the item's structure, RT-ICA conditions, scope sizing output |
+| **Derivation** | If my change needs data that isn't passed directly, how is it derived? | Read the item's structure, RT-ICA conditions |
 | **Output** | What does my change write? To which section? In what format? | Define this before touching any file |
 | **Failure** | If my change fails (BLOCKED, error, no findings), what does the downstream stage do? | Read the downstream stage's handling for missing sections |
 
 The wave-0 change required resolving all four:
-- **Input**: item description, RT-ICA DERIVABLE/MISSING conditions, scope sizing decision, item_ref — all from `analyze.md` outputs
+- **Input**: item description, RT-ICA DERIVABLE/MISSING conditions, item_ref — all from `analyze.md` outputs
 - **Derivation**: `technology` and `concern` must be derived from the item description and RT-ICA conditions (not passed as named fields)
 - **Output**: Research section written to backlog item via `backlog_groom`
 - **Failure**: if BLOCKED, Wave 1 proceeds without research prior context — finalize.md must not require Research and must not block the groom on its absence
@@ -155,7 +155,7 @@ If your change involves skills invoked from within the pipeline:
 | File | Stage | Primary output |
 |---|---|---|
 | `intake.md` | Validate and extract item | Item fields: title, description, priority, labels, groomed, research_first, suggested_location |
-| `analyze.md` | Discovery gate, RT-ICA baseline, scope sizing | Feature-context artifact, RT-ICA snapshot, scope sizing decision (MINIMAL/NARROW/STANDARD/FULL) |
+| `analyze.md` | Discovery gate, RT-ICA baseline | Feature-context artifact, RT-ICA snapshot |
 | `swarm.md` | Parallel grooming agents + Wave 0 research | Research section (Wave 0), Impact Radius, Fact-Check, RT-ICA, Issue Classification, groomed subsections |
 | `finalize.md` | RT-ICA final pass, validation gate, write | Groomed item with `mark_groomed=True`, terminal state |
 

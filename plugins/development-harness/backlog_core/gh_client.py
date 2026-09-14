@@ -1298,12 +1298,14 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Try to get GitHub repo, return None if unavailable (no token, network error, etc.).
+    """Try to get GitHub repo, return None when GITHUB_TOKEN is missing or GitHub errors.
 
     Use this for operations where local-only fallback is acceptable.
 
     Returns:
-        Repository object or None if GitHub is unavailable.
+        Repository object, or None when GITHUB_TOKEN is missing, or GitHub
+        returned an error (authentication failure, rate limit, or server
+        error).
     """
     repo = resolve_repo(repo)
     try:
@@ -1338,7 +1340,7 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
-            error="GitHub repository unavailable — token set but connection failed",
+            error="GITHUB_TOKEN set but GitHub returned an error (authentication failure, rate limit, or server error)",
         )
 
     try:
@@ -1483,22 +1485,29 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
 
     Returns:
         List of PullRequestRef models for each matching PR.
-        Empty list if no open PRs found or GitHub is unavailable.
+        Empty list only when the search completes and no open PR matches.
+
+    Raises:
+        BacklogError: When the search request fails — authentication failure,
+            rate limiting, or a GitHub server error (5xx). A failed search is
+            never returned as an empty list, because close and resolve read
+            an empty list as "no open PRs" and go ahead.
     """
     repo = resolve_repo(repo)
     try:
         repository = get_github(repo)
         search_query = f"repo:{repo} is:pr is:open #{issue_num}"
         data = _graphql_request(repository, _SEARCH_PRS_QUERY, {"query": search_query, "first": 20})
-        nodes = (data.get("search") or {}).get("nodes") or []
-        prs: list[PullRequestRef] = []
-        for raw in nodes:
-            if isinstance(raw, dict):
-                parsed = _parse_search_pr_node(raw)
-                if parsed is not None:
-                    prs.append(PullRequestRef(number=parsed["number"], title=parsed["title"], url=parsed["url"]))
-    except (BacklogError, GithubException):
-        return []
+    except GithubException as exc:
+        msg = f"GitHub PR search failed: {exc}"
+        raise BacklogError(msg) from exc
+    nodes = (data.get("search") or {}).get("nodes") or []
+    prs: list[PullRequestRef] = []
+    for raw in nodes:
+        if isinstance(raw, dict):
+            parsed = _parse_search_pr_node(raw)
+            if parsed is not None:
+                prs.append(PullRequestRef(number=parsed["number"], title=parsed["title"], url=parsed["url"]))
     return prs
 
 

@@ -124,7 +124,7 @@ The scenario target is a short narrative of the form `<observed bad outcome> →
 
 Your classification reaches the rest of the swarm through the sections you wrote, not through your response text. Re-read the item with `backlog_view` and confirm the Issue Classification section carries the type and rationale — and, for a `defect` or `recurring-pattern` item, that the Root-Cause Analysis section carries the evidence chain.
 
-The rtica-assessor agent reads the Issue Classification section to adjust RT-ICA scope sizing. The groomer agent reads both sections after Wave 2 completes and uses them to shape the groomed Description and Acceptance Criteria subsections. A section that is absent leaves both of them working from the ungroomed description.
+The rtica-assessor agent reads the Issue Classification section to gauge how many RT-ICA conditions to expect for the item's type. The groomer agent reads both sections after Wave 2 completes and uses them to shape the groomed Description and Acceptance Criteria subsections. A section that is absent leaves both of them working from the ungroomed description.
 
 ## Behavioral Constraints
 

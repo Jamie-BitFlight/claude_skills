@@ -128,8 +128,8 @@ class TestViewItemSectionsCoherence:
         )
 
         # Assert — staleness warning present
-        assert any("backend unreachable" in w for w in result.warnings), (
-            "result.warnings must contain 'backend unreachable' when view_enrich_from_github "
+        assert any("GitHub lookup failed" in w for w in result.warnings), (
+            "result.warnings must contain 'GitHub lookup failed' when view_enrich_from_github "
             "returns False.  Callers must be able to detect that "
             "sections_index reflects the stored provider record, not live GitHub state."
         )

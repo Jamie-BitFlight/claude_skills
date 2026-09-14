@@ -16,7 +16,7 @@ The `backlog_view` response is the single source of truth for item lookup. Do no
 
 - If the returned dict contains an `error` key with "not found": report "No backlog item found matching: <item_ref/>" and stop.
 - If multiple candidates are returned: list all matches and ask user to pick one.
-- If the item status is already `completed`: report "Item already closed on {Completed date}" and stop.
+- If the item `status` is `closed`, `done`, or `resolved`: report "Item is already {status}." and stop.
 
 ## Step 5.3: Close path — dismiss without completion
 
@@ -33,14 +33,18 @@ If operation is `close`:
 
 3. Optionally ask for additional context: "Any additional comment?" (free text, can be skipped).
 
-4. Call `backlog close`:
+4. Call `mcp__plugin_dh_backlog__backlog_close`:
 
-   - `--selector`: `"{title}"` or `"#{N}"`
-   - `--reason`: `"{selected reason}"`
-   - `--reference`: `"{reference}"` (if provided)
-   - `--comment`: `"{comment}"` (if provided)
+   - `selector`: `"{title}"` or `"#{N}"`
+   - `reason`: `"{selected reason}"`
+   - `reference`: `"{reference}"` (if provided)
+   - `comment`: `"{comment}"` (if provided)
 
-5. Check the returned dict for an `error` key. Report the result to the user.
+5. Check the returned dict for an `error` key.
+   - If `error` starts with `Open PRs reference issue`, the item is not closed. The `warnings` list names each open PR. Report those PRs to the user. Use `AskUserQuestion` to ask: "Close the item anyway? The open PRs stay open." If the user confirms, call `mcp__plugin_dh_backlog__backlog_close` again with the same parameters and `force=True`. Report that result.
+   - If `error` starts with `Open-PR search failed`, the item is not closed. The search could not reach GitHub, so the open PRs are unknown. The `error` message names the cause: unauthenticated (`GITHUB_TOKEN` is missing, invalid, or expired) does not retry away — fix the token first. Network blocked (a proxy or firewall blocks the request, or the connection times out) is retryable — try again. Report the cause text from `error` to the user. Use `AskUserQuestion` to ask: "Close the item without the open-PR check?" `force=True` skips the open-PR check completely. If the user confirms, call `mcp__plugin_dh_backlog__backlog_close` again with the same parameters and `force=True`. Report that result.
+   - For any other `error`, report the error.
+   - With no `error` key, report the result.
 
 Then stop.
 
@@ -175,25 +179,7 @@ If operation is `resolve`:
 
 ## Step 5.7: Invoke backlog resolve
 
-7. If the item has a linked GitHub Issue (`#N`), check whether an open PR already references it:
-
-   ```bash
-   git log --oneline -20 --grep="Fixes #N\|Closes #N"
-   ```
-
-   - **Open PR found**: The PR body contains `Fixes #N` — the issue will auto-close on merge. Update only the backlog item status (do NOT close the GitHub Issue):
-
-     Call `backlog update --selector "{title}" --status "in-progress"`.
-
-     Report:
-
-     ```text
-     Backlog item "{title}" verified. GitHub Issue #{N} will auto-close when PR #{pr_number} merges.
-     ```
-
-     Then stop.
-
-   - **No open PR / no linked issue**: proceed to invoke backlog resolve below.
+7. `mcp__plugin_dh_backlog__backlog_resolve` searches for open PRs whose title or body contains the item's linked issue number. It refuses to resolve when the search finds one. It also refuses when the search fails. Step 11 handles both refusals. Commit messages in `git log` do not show open PRs, so use the resolve refusal as the open-PR check.
 
 8. Use `AskUserQuestion` to ask: "Summarize what was done (1-2 sentences):" (free text — this is the required `summary` field).
 
@@ -203,17 +189,29 @@ If operation is `resolve`:
     - `follow_ups` — "Any follow-up tickets created?" (comma-separated refs)
     - `findings` — "Any retrospective learnings?"
 
-10. Call `backlog resolve`:
+10. Call `mcp__plugin_dh_backlog__backlog_resolve`. Leave `force` at its default of `false`:
 
-    - `--selector`: `"{title}"` or `"#{N}"`
-    - `--summary`: `"{summary}"`
-    - `--plan`: `"{plan_address}"` (if present — e.g., `"P{id}"`)
-    - `--method`: `"{method}"` (if provided)
-    - `--notes`: `"{notes}"` (if provided)
-    - `--follow-ups`: `"{follow_ups}"` (if provided)
-    - `--findings`: `"{findings}"` (if provided)
+    - `selector`: `"{title}"` or `"#{N}"`
+    - `summary`: `"{summary}"`
+    - `plan`: `"{plan_address}"` (if present — e.g., `"P{id}"`)
+    - `method`: `"{method}"` (if provided)
+    - `notes`: `"{notes}"` (if provided)
+    - `follow_ups`: `"{follow_ups}"` (if provided)
+    - `findings`: `"{findings}"` (if provided)
 
-11. Check the returned dict for an `error` key. Report the result to the user.
+11. Check the returned dict for an `error` key.
+    - If `error` starts with `Open PRs reference issue`, one or more open PRs contain the linked issue number in the title or body. The `warnings` list names each PR. A PR that mentions the issue does not always close it. Resolving now closes the issue and leaves those PRs pointing at a closed issue. Call `backlog update --selector "{title}" --status "in-progress"`. Report, pairing each `PR #{number}: {title}` line in `warnings` with the URL line immediately following it:
+
+      ```text
+      Backlog item "{title}" verified. Resolve stopped: these open PRs reference GitHub Issue #{N}:
+      - PR #{number}: {PR title} ({PR url})
+      Resolve the item again after these PRs merge or close.
+      ```
+
+      Then stop.
+    - If `error` starts with `Open-PR search failed`, the item is not resolved. The search could not reach GitHub, so the open PRs are unknown. The `error` message names the cause: unauthenticated (`GITHUB_TOKEN` is missing, invalid, or expired) does not retry away — fix the token first. Network blocked (a proxy or firewall blocks the request, or the connection times out) is retryable — try again. Report the cause text from `error` to the user. Use `AskUserQuestion` to ask: "Resolve the item without the open-PR check?" `force=True` skips the open-PR check completely. If the user confirms, call `mcp__plugin_dh_backlog__backlog_resolve` again with the same parameters and `force=True`. Report that result. If the user does not confirm, stop.
+    - For any other `error`, report the error and stop.
+    - With no `error` key, report the result.
 
 12. Before emitting Handoff E, determine whether all milestone issues are resolved:
 
@@ -237,9 +235,10 @@ If operation is `resolve`:
 
 ## --force flag
 
-The `--force` flag bypasses the Step 5.4 `status:verified` gate only (see Step 5.4 above for the
-warning text and when to use it). It has no effect on Step 5.7 — the open-PR check there has no
-bypass branch; it either stops (open PR found) or proceeds (no open PR), regardless of `--force`.
+The `--force` flag bypasses the Step 5.4 `status:verified` gate only. See Step 5.4 for the warning
+text and when to use it. `force=True` on `backlog_resolve` is a separate switch: it skips the
+open-PR search, and Step 11 sets it only after that search failed and the user confirmed the
+resolve without it.
 
 Usage:
 
