@@ -408,7 +408,7 @@ The monitor exits immediately on first detection — it does not continue watchi
 
 ## Team Health Check
 
-Inspect a running Claude Code session's live team state — last JSONL tool calls per member and current tmux pane snapshot. Every session gets one implicit team automatically (no `TeamCreate` call needed) as soon as it spawns an `Agent()`; use this to see what dispatched agents are doing without waiting for message delivery.
+Inspect a running Claude Code session's live team state — last JSONL tool calls per member and current tmux pane snapshot. Every session gets one implicit team automatically as soon as it spawns an `Agent()`; use this to see what dispatched agents are doing without waiting for message delivery.
 
 **Script**: `${CLAUDE_SKILL_DIR}/scripts/monitor.py health`
 
