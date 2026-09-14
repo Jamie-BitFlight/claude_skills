@@ -746,9 +746,9 @@ class ActiveTaskContext(BaseModel):
     The record carries no attempt number, and does not identify which sub-agent wrote it:
     ``session_id`` inside a sub-agent is the parent session's, so one wave's workers share a
     record. It is therefore not a correlation key for anything per-attempt. The SubagentStop
-    hook reads the address and attempt from the sub-agent's own launch prompt instead, and
-    touches this record only to clear it when the session stops; the PostToolUse handler reads
-    it for the ``last-activity`` timestamp, which needs no attempt.
+    hook reads the address and attempt from the sub-agent's own launch prompt instead, and never
+    touches this record; the PostToolUse handler reads it for the ``last-activity`` timestamp,
+    which needs no attempt.
 
     Schema note: new fields (session_id, feature_slug, started_at) are additive.
     Existing files without these fields remain valid — all new fields default to None.

@@ -403,13 +403,12 @@ Processing sequence:
 2. Take the plan address, task ID and attempt number from it — `{plan}/{task}, attempt {n}`, or a `/start-task` or `Skill(skill="start-task", …)` invocation carrying `--attempt`.
 3. If the prompt names no launch, exit 0 silently (not a dispatched worker). If it names one but no attempt, or a plan the ledger does not hold, say so on stderr and settle nothing.
 4. Call `sam plan settle --address {plan_address}/{task_address} --attempt {n} --return-text "{the final message}"` via the SAM CLI subprocess (`scripts/run_sam_cli.py`). `already-settled` means the orchestrator got there first, and is success. A failure is printed to stderr; the hook still exits 0.
-5. Clear the session-scoped active-task context.
 
 The hook writes no task status. Which actor may write what is settled in [ARCHITECTURE.md](../ARCHITECTURE.md) § "What a hook may write".
 
 Backend synchronization is the responsibility of the configured backend (see [Backend Providers](./backend-providers.md)) — not the hook. The hook is backend-agnostic and routes its one write through the provider-neutral SAM CLI.
 
-Fields written: `status: complete`, `completed: <ISO timestamp>`
+Fields written: none. `settle` records the attempt's return text in the ledger.
 
 ### 6.2 PostToolUse (Write|Edit|Bash)
 

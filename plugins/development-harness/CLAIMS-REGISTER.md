@@ -54,6 +54,16 @@ Consequences the design draws, each a claim in its own right:
   reported for Cursor. For Claude Code: looked in the three cached documentation pages, found no
   statement either way, so this is unmeasured there and M1 of the plan measures it.
   Re-check: section 6 of each measurement file.
+- **A sub-agent's session id is its parent session's id.** So a record keyed by session id is
+  shared by every sub-agent of one session, and the SubagentStop hook reads the attempt from the
+  stopping agent's own prompt rather than from such a record. Claude Code: measured 2026-09-06
+  (#3431: 13 sub-agent transcripts under one parent session carry 1 distinct `sessionId` and 13
+  distinct `agentId` values) and re-read 2026-09-15 (two `subagents/agent-*.jsonl` transcripts,
+  each `sessionId` equal to its parent session directory). Codex: its hooks documentation states
+  "Subagent hooks use the parent session id" (read 2026-09-06, quoted in #3431). Confidence:
+  measured on local transcripts for Claude Code, no documentation statement found; source for
+  Codex. Re-check: compare `sessionId` in a fresh `subagents/agent-*.jsonl` with its parent
+  session directory name.
 - **The hook this repository ships reaches four harnesses:** Claude Code, Codex, Cursor and
   Kimi, each of which loads hooks from a plugin manifest this marketplace already publishes. On
   Hermes a shell hook comes from user config; on OpenCode and Kilo Code it is a JavaScript or

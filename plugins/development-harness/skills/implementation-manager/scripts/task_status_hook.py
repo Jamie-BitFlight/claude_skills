@@ -68,8 +68,9 @@ The session-scoped active-task record is deliberately not used for this. It is k
 ``${CLAUDE_CODE_SESSION_ID}``, which inside a sub-agent is the parent session's id, so every
 sub-agent of one wave writes to one record and only the last survives; and it carries no attempt
 number at all (``ActiveTaskContext`` in ``sam_schema/core/models.py`` declares none, and
-``active-task set`` exposes no ``--attempt`` flag). It is still cleared here, because the record
-is session state and the session stopped.
+``active-task set`` exposes no ``--attempt`` flag). This hook does not clear it either: a
+sub-agent stopping is not the session stopping, and the stopping agent may be a helper unrelated
+to the task the record names. Settling is the whole of this hook (``ARCHITECTURE.md``).
 
 When the prompt names no attempt, no settle is possible and the hook says so on stderr rather
 than absorbing it.
@@ -116,7 +117,6 @@ Exit Codes:
 
 from __future__ import annotations
 
-import contextlib
 import enum
 import json
 import os
@@ -142,7 +142,6 @@ if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
 
 import dh_paths as _dh_paths
-from dh_config import DHConfig
 
 _HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
 _HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
@@ -462,27 +461,6 @@ def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | Non
     return None, None
 
 
-def _call_sam_active_task_clear(session_id: str, timeout: float = 8) -> bool:
-    """Clear active task context via the SAM CLI's ``active-task clear`` subcommand.
-
-    Best-effort cleanup after SubagentStop completes. Never raises.
-
-    Args:
-        session_id: Sub-agent session identifier. Required: ``dh_core.operations.require_session_id``
-            rejects an empty one and the reserved ``"_default"`` sentinel, so an empty id is
-            answered here rather than spent on a subprocess that can only fail.
-        timeout: Subprocess timeout in seconds.
-
-    Returns:
-        ``True`` if the active task was successfully cleared, ``False`` otherwise.
-    """
-    resolved = session_id
-    if not resolved:
-        return False
-    stdout = _call_sam_cli(["active-task", "clear", "--session-id", resolved], timeout=timeout)
-    return stdout is not None
-
-
 def _get_uv_executable() -> str | None:
     """Return the path to the uv executable, or None if not found on PATH.
 
@@ -680,43 +658,6 @@ def _call_sam_task_status(plan_id: str, task_id: str, timeout: float = 8) -> Sam
     return None
 
 
-def _cleanup_active_task_context(session_id: str | None, local_record: Path | None) -> None:
-    """Clean up active task context after SubagentStop completes.
-
-    Primary path: call the SAM CLI's ``active-task clear`` subcommand.
-    Fallback: delete the filesystem context file if the CLI clear fails or is unavailable.
-
-    Short-circuits when *local_record* names a file that is not there. On the ``local``
-    context backend ``active-task clear`` deletes exactly that path and touches nothing
-    else (``LocalContextBackend.clear_active_task`` unlinks
-    ``context_dir()/active-task-{session_id}.json`` and returns whether it existed), so
-    for an absent record the ``uv run`` subprocess can only report ``cleared: false``.
-    This hook fires on every sub-agent stop in every installed plugin and most stopping
-    agents hold no task, so that is the common path — the subprocess cost it avoids was
-    measured at ~1.3s of a ~1.75s total. A ``None`` *local_record* is not a short
-    circuit: it means the backend keeps the record where this process cannot see it, so
-    the CLI is the only way to know.
-
-    Args:
-        session_id: Sub-agent session identifier for the CLI clear call. ``None``
-            skips that path entirely.
-        local_record: The ``local``-backend record for this session, as resolved by
-            :func:`_local_active_task_file`, or ``None`` when the backend keeps it out
-            of this process's reach. Also the file deleted if the CLI clear fails or
-            *session_id* is ``None``.
-    """
-    if local_record is not None and not local_record.exists():
-        return
-
-    cli_cleared = False
-    if session_id:
-        cli_cleared = _call_sam_active_task_clear(session_id)
-
-    if not cli_cleared and local_record is not None:
-        with contextlib.suppress(FileNotFoundError):
-            local_record.unlink()
-
-
 def get_iso_timestamp() -> str:
     """Return the current UTC time as an ISO-8601 string, truncated to whole seconds.
 
@@ -809,83 +750,6 @@ def _extract_prompt_from_transcript(transcript_path: Path) -> str | None:
     return None
 
 
-def _extract_session_id_from_transcript(transcript_path: Path) -> str | None:
-    """Extract the sub-agent's session_id from the first parseable line of a JSONL transcript.
-
-    The transcript file contains newline-delimited JSON objects. Each line may have
-    a top-level ``sessionId`` field (camelCase, as written by Claude Code) that
-    identifies the sub-agent's own session.
-    Reading only the first few lines avoids loading the entire (potentially large) file.
-
-    Args:
-        transcript_path: Path to the sub-agent's JSONL transcript file.
-
-    Returns:
-        The session_id string if found, or None if the file is missing,
-        unreadable, or contains no parseable session_id in the first 10 lines.
-    """
-    if not transcript_path.exists():
-        print(f"[hook] transcript not found: {transcript_path}", file=sys.stderr)
-        return None
-
-    try:
-        with transcript_path.open(encoding="utf-8") as fh:
-            # Read at most 10 lines — session_id appears in the first message.
-            for _ in range(10):
-                line = fh.readline()
-                if not line:
-                    break
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record: dict[str, Any] = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if not isinstance(record, dict):
-                    continue
-                session_id = record.get("sessionId") or record.get("session_id")
-                if isinstance(session_id, str) and session_id:
-                    return session_id
-    except OSError as e:
-        print(f"[hook] could not read transcript {transcript_path}: {e}", file=sys.stderr)
-
-    return None
-
-
-def _local_active_task_file(session_id: str) -> Path | None:
-    """Return the local-backend active-task record for *session_id*, or None.
-
-    The default ``local`` context backend stores each record at
-    ``context_dir()/active-task-{session_id}.json``, so this hook can stat the exact
-    file the SAM CLI would read. :func:`_cleanup_active_task_context` does exactly
-    that, and skips the ``active-task clear`` subprocess when the file is not there.
-
-    Returns None — meaning "ask the CLI instead" — when the configured backend is
-    anything else, because those keep the record where this process cannot see it.
-
-    The key is not unique. Every sub-agent of one parent session carries that parent's
-    session id, so several agents share one record and only the last write survives. A
-    hit here does not prove the record belongs to the agent that just stopped.
-
-    Args:
-        session_id: Sub-agent session identifier.
-
-    Returns:
-        Path to the record for a local backend, or None to fall back to the CLI.
-    """
-    if DHConfig().get_backend(subsystem="context") != "local":
-        return None
-
-    try:
-        context_dir = _dh_paths.context_dir()
-    except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError):
-        # No resolvable project root — fall back to the CLI, as _resolve_context_file_from_transcript does.
-        return None
-
-    return context_dir / f"active-task-{session_id}.json"
-
-
 def _resolve_return_text(hook_input: dict[str, Any], transcript_path: Path | None) -> str:
     """Return what the launch came back with, for ``settle --return-text``.
 
@@ -973,7 +837,6 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
        address, task id and attempt number from it. The transcript is per-sub-agent, so parallel
        workers do not collide here.
     2. ``plan settle --address P/T --attempt N --return-text "<what came back>"``.
-    3. Clear the session's active-task context.
 
     Every failure is printed to stderr and none is fatal: the SubagentStop critical path must not
     be blocked, so this returns normally however the settle went and :func:`main` exits 0. It never
@@ -998,13 +861,9 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
         )
         return
 
-    sub_agent_session_id = _extract_session_id_from_transcript(transcript_path)
-    local_record = _local_active_task_file(sub_agent_session_id) if sub_agent_session_id else None
-
     launch = _resolve_launch(transcript_path)
     if launch is not None:
         _call_sam_plan_settle(launch, _resolve_return_text(hook_input, transcript_path))
-    _cleanup_active_task_context(sub_agent_session_id, local_record)
 
 
 def _resolve_launch(transcript_path: Path) -> Launch | None:

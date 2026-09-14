@@ -261,9 +261,9 @@ class TestPlanFileWriteReadCycle:
 class TestContextFileLifecycle:
     """Context file write, read, and delete lifecycle.
 
-    Strategy: Simulate the task_status_hook.py lifecycle — write an
+    Strategy: Simulate the active-task record lifecycle — write an
     active-task JSON context file to context_dir(), read it back, then
-    delete it to simulate SubagentStop cleanup.
+    delete it, as `active-task clear` does.
     """
 
     def test_context_file_written_to_state_root_not_dot_claude(self, project_with_dirs: tuple[Path, Path]) -> None:
@@ -314,10 +314,10 @@ class TestContextFileLifecycle:
         assert loaded["task_id"] == payload["task_id"]
         assert loaded["parent_issue_number"] == payload["parent_issue_number"]
 
-    def test_context_file_deletion_simulates_subagent_stop_cleanup(self, project_with_dirs: tuple[Path, Path]) -> None:
+    def test_context_file_deletion_leaves_no_file(self, project_with_dirs: tuple[Path, Path]) -> None:
         """Verify context file can be deleted after task completion.
 
-        Tests: SubagentStop hook cleanup removes the active-task context file
+        Tests: deleting the active-task context file removes it from context_dir()
         How: Write context file; delete it; assert it no longer exists
         Why: Stale context files must not persist beyond task execution
         """
