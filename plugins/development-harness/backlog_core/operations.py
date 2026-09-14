@@ -27,7 +27,14 @@ from typing_extensions import TypedDict
 from . import models as _models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import (
+    ContentProvider,
+    IssueCommentNode,
+    IssueNode,
+    MilestoneFullNode,
+    SnapshotCheckpointProvider,
+    SyncProvider,
+)
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
@@ -1980,8 +1987,41 @@ def list_items(
         file_path, groomed, status, and milestone fields for items with a GitHub issue).
     """
     out = output or Output()
+    backend = get_config().backend
     if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
+    elif (
+        isinstance(backend, SyncProvider)
+        and isinstance(backend, SnapshotCheckpointProvider)
+        and not backend.has_synced_snapshot()
+    ):
+        # A never-synced cache is shaped exactly like an empty backlog and,
+        # per A1, the checkpoint is now an honest "never" (A-critique.md
+        # Sec 5, ALT-5: "list_items already takes refresh: bool ... Make a
+        # never-synced cache trigger that path once, rather than returning
+        # an annotated zero"). Read through once for a caller that has not
+        # asked for a refresh, instead of only describing the ambiguity
+        # below. This fires whenever the checkpoint is genuinely
+        # uninitialized -- never on a warm cache, since
+        # has_synced_snapshot() then reports True -- and a successful
+        # refresh durably advances the checkpoint, so it cannot recur for
+        # this cache once it has synced. It is not the same cost as probing
+        # on every list regardless of cache state (rejected in
+        # A-critique.md Sec 6.2): a healthy repeat call never re-fetches.
+        # A failed attempt (no token, offline, still refused) is swallowed
+        # here -- an implicit read-through a caller did not ask for must
+        # never turn an unaware listing into a hard error -- and the
+        # existing "cache holds no items" warning below still fires,
+        # unchanged, since the checkpoint is honestly still None. The
+        # checkpoint staying None also means a *later* list_items() call
+        # against a cache that never manages to sync tries again -- one
+        # attempt per call, never a retry loop within one -- which the
+        # critique frames as complementary, not a defect: "we tried and
+        # could not" is a sharper answer than "we never tried".
+        try:
+            refresh_local_cache_from_github(repo, label, output=out)
+        except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
+            out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
     items = get_config().backend.list_work_items()
     if not items and isinstance(get_config().backend, SyncProvider):
         # A provider-backed cache holding nothing reads exactly like an empty
