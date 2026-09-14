@@ -1888,6 +1888,12 @@ def view_enrich_from_github(
 
     Returns:
         True if GitHub data was fetched, False if unavailable or errored.
+
+    Raises:
+        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
+            API outright. ``view_item`` reads ``False`` as "this issue does not
+            exist" and raises ``ItemNotFoundError``, so a refused query must not
+            return it — the issue may exist and simply be unaskable.
     """
     gh_repo = try_get_github(repo)
     if gh_repo is None:
@@ -1895,6 +1901,8 @@ def view_enrich_from_github(
     try:
         owner, repo_name = gh_repo.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(gh_repo, owner, repo_name, int(issue_num))
+    except GraphQLUnavailableError:
+        raise
     except (BacklogError, GithubException):
         return False
     body = gh_issue["body"]
