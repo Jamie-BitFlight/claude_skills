@@ -364,6 +364,43 @@ def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
     assert "feature" in data["plan"]
 
 
+def test_read_plan_only_address_reads_the_ledger_once_it_holds_the_plan(plan_dir: Path) -> None:
+    """A plan-only read of an imported plan answers from the ledger, in the content read's shape.
+
+    ``implement-feature`` imports every plan before running it. After that, ``store_for`` routes an
+    address naming that plan to the ledger unless ``--plan-dir`` is passed. A plan-only address
+    there must return the plan, not the P/T address error, and must return the ledger's copy: the
+    title set below exists only in the ledger, so the content store cannot supply it.
+    """
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+    updated = runner.invoke(
+        app, ["plan", "update", "--plan-address", plan_id, "--task-id", "T3", "--set", "title=ledger-only title"]
+    )
+    assert updated.exit_code == 0, updated.output
+
+    result = runner.invoke(app, ["plan", "read", "--address", plan_id])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["source_format"] == "ledger"
+    titles = {task["id"]: task["title"] for task in data["plan"]["tasks"]}
+    assert titles["T3"] == "ledger-only title"
+
+
+def test_read_plan_only_address_with_an_attempt_is_refused_on_the_ledger(plan_dir: Path) -> None:
+    """An attempt belongs to a task, so ``--attempt`` with a plan-only address exits 1 instead of reading the plan."""
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+
+    result = runner.invoke(app, ["plan", "read", "--address", plan_id, "--attempt", "1"])
+
+    assert result.exit_code == 1
+    assert "must name a plan and a task" in result.output
+
+
 def test_read_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
     """Read P99/T1 (no matching plan number) exits 1."""
     result = runner.invoke(app, ["plan", "read", "--address", "P99/T1", "--plan-dir", str(plan_dir)])

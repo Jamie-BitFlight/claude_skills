@@ -292,7 +292,7 @@ and configuration.
 Create plans with `sam_plan(config={"action":"create", "slug":"<slug>", "goal":"<goal>", "tasks":[...]})` (MCP) or `plan create` (CLI),
 then use the same configured backend for plan content, task state, and progress. Read a task
 with `sam_task(plan="{plan_address}", task="{task_address}", config={"action":"read"})` (MCP)
-or `plan read --address {plan_address}` (CLI). Discover plans with
+or `plan read --address {plan_address}/{task_address}` (CLI). Discover plans with
 `sam_plan(config={"action":"list","search":"{search_term}"})` or `plan list --search
 {search_term}`. These tools resolve addresses; do not inspect or infer filesystem paths.
 (`sam_read`/`sam_list` are deprecated names.)

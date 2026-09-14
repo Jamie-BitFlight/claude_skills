@@ -751,7 +751,10 @@ COMMANDS: list[Command] = [
         flags=[ADDRESS, ATTEMPT],
         renews=True,
         key="attempt",
-        summary="reads one task, headed by the authority preamble, its current-attempt sections and response",
+        summary=(
+            "reads one task, headed by the authority preamble, its current-attempt sections and response; "
+            "a plan-only address reads the plan projection, renews nothing and records no event"
+        ),
     ),
     Command(
         name="dispatch",

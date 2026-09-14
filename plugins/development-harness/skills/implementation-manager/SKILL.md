@@ -104,16 +104,16 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P1
 
 #### read
 
-`plan read` names a plan and a task together, as `P/T`, and reads that task with the sections its
-attempts recorded:
+With `P` alone, `plan read` reads the plan document. With `P/T`, it reads that task with the
+sections its attempts recorded:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1/T01
 ```
 
 Add `--attempt {n}` only when you hold that attempt; naming one you do not is refused as
-`stale-attempt`. For the plan itself — its fields plus every task row — use `plan status
---plan-address P1`.
+`stale-attempt`. For every task row with its derived columns, use `plan status --plan-address P1`
+on a ledger plan.
 
 #### dispatch
 
