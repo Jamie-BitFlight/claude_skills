@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Claude Code Harness"
 ---
 
+<!-- removed-call-citations -->
+> **Removed-call citation:** the `TeamCreate` call cited below no longer exists in Claude Code. Since v2.1.178, naming a teammate on an `Agent` call under `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` spawns it directly, with no separate setup step (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` § "Agent teams"). This file stands as the dated record of what was analysed and is not rewritten; re-verify any conclusion below that rests on `TeamCreate` — "already covered", "already implemented", or a proposed dispatch — against the current tree before acting on it.
+
 ## Improvement 1: PreToolUse Bash guardrail rules for destructive commands
 
 **Source pattern**: Guardrail Engine R01-R13 — Key Features section. R01 denies `sudo`, R05 asks on `rm -rf`, R06 denies `git push --force`, R10 denies `--no-verify`/`--no-gpg-sign`, R11 denies `git reset --hard main/master`. Sub-10ms PreToolUse evaluation.
