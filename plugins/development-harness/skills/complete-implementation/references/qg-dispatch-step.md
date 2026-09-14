@@ -9,19 +9,24 @@ run, settled and judged. Steps 1 and 3 stay in the skill body.
 flowchart TD
     Ready["Next ready task_id"] --> IsT0{task_id == 'T0'?}
     IsT0 -->|"Yes"| Direct["Run T0 directly — see below"]
-    IsT0 -->|"No"| Delegate["Run the start-task workflow<br>against {qg_plan_address} --task {task_id}"]
+    IsT0 -->|"No"| Delegate["Launch dh:task-worker with the prompt<br>{qg_plan_address}/{task_id}, attempt {A}"]
 ```
 
-**T1-T6 — delegate:** open the attempt, then run the `dh:start-task` workflow (name it in prose —
-a harness-specific invocation form reaches only the harness that defines it):
+**T1-T6 — delegate:** open the attempt, then launch `dh:task-worker`:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{qg_plan_address}/{task_id}"
 ```
 
-`dispatch` prints the attempt number and is what sets the task in-progress and starts its lease.
-Run `start-task` against `{qg_plan_address} --task {task_id} --attempt {attempt}`; it appends the
-report sections and closes the attempt with `plan finish`.
+`dispatch` prints the attempt number, sets the task in-progress and starts its lease. Launch
+`dh:task-worker` with the dispatch line as its entire prompt:
+
+```text
+{qg_plan_address}/{task_id}, attempt {A}
+```
+
+The worker runs `dh:start-task`, which appends the report sections and closes the attempt with
+`plan finish`. The SubagentStop hook reads the dispatch line to settle the attempt. Send only the dispatch line as the prompt.
 
 `leased` means a runner already holds this task and `not-ready` means its dependencies have not
 landed — either way take the next ready task. Any other code stops the loop.
@@ -30,7 +35,7 @@ When the delegated run returns, record what came back and judge it:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
-  --address "{qg_plan_address}/{task_id}" --attempt {attempt} --return-text "{what came back}"
+  --address "{qg_plan_address}/{task_id}" --attempt {A} --return-text "{what came back}"
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address "{qg_plan_address}/{task_id}"
 ```
 
@@ -84,13 +89,13 @@ Afterwards, append the two report sections for that attempt and close it:
 
 ```bash
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
-  --plan-address "{qg_plan_address}" --task-id T0 --attempt {attempt} \
+  --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
   --append-section "Completion Report" --section-content "{the review summary}"
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
-  --plan-address "{qg_plan_address}" --task-id T0 --attempt {attempt} \
+  --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
   --append-section "Verification Results" --section-content "{per-perspective verdicts, or none}"
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan finish \
-  --address "{qg_plan_address}/T0" --attempt {attempt} --result complete --note "{the verdict}"
+  --address "{qg_plan_address}/T0" --attempt {A} --result complete --note "{the verdict}"
 ```
 
 Then continue to Step 3 of the Dispatch Loop exactly as for any other completed task. Moving the status directly

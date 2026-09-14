@@ -721,6 +721,8 @@ def test_subagent_stop_hook_is_not_restricted_to_task_worker() -> None:
         ("no comma", "Pdec8934d/T01 attempt 3"),
         ("slash command", "/start-task Pdec8934d --task T01 --attempt 3"),
         ("Skill() wrapper", 'Skill(skill="start-task", args="Pdec8934d --task T01 --attempt 3")'),
+        ("namespaced slash command", "/dh:start-task Pdec8934d --task T01 --attempt 3"),
+        ("namespaced Skill() wrapper", 'Skill(skill="dh:start-task", args="Pdec8934d --task T01 --attempt 3")'),
     ],
 )
 def test_every_shipped_launch_shape_yields_address_and_attempt(label: str, prompt: str) -> None:
@@ -766,6 +768,15 @@ def test_an_address_mentioned_in_passing_is_not_a_launch() -> None:
             "slash command quoted in a task description",
             "Document what /start-task Pdec8934d --task T01 --attempt 3 does for a reader.",
         ),
+        (
+            "namespaced slash command quoted in a task description",
+            "Document what /dh:start-task Pdec8934d --task T01 --attempt 3 does for a reader.",
+        ),
+        (
+            "namespaced slash command on a line after other text",
+            "Investigate the failing test.\n\n/dh:start-task Pdec8934d --task T01 --attempt 3",
+        ),
+        ("a different plugin's namespaced slash command", "/other:start-task Pdec8934d --task T01 --attempt 3"),
     ],
 )
 def test_an_attempt_clause_in_free_text_is_not_a_launch(label: str, prompt: str) -> None:
@@ -775,7 +786,8 @@ def test_an_attempt_clause_in_free_text_is_not_a_launch(label: str, prompt: str)
     that is still live tells the work loop a worker is gone while it is still working. The
     containment is positional: the launch reference must be the whole of the prompt's first
     line, which is where the dispatch contract writes it and nothing follows it. Free text
-    mentioning an attempt runs on past it or sits below the opening line.
+    mentioning an attempt runs on past it or sits below the opening line, and a command shape
+    naming a plugin other than ``dh`` never matched the ``(?:dh:)?`` prefix in the first place.
 
     It is containment, not a closure — see the hook module docstring for the residual case
     and for the search that found no dispatcher-owned channel to replace this with.

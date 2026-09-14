@@ -601,6 +601,28 @@ def one_task_plan(conn: sqlite3.Connection) -> str:
     return str(transitions.create(conn, slug="feature", goal="goal", tasks=[{"id": "T1", "title": "one"}]).plan)
 
 
+def test_append_task_on_a_ready_plan_adds_the_task(tmp_path: Path) -> None:
+    """``append-task`` refuses only an archived plan, so a ready plan takes a new task.
+
+    The transition table checks ``archived`` alone, and the content store also appends to a ready
+    plan. This test fails if a drafting-only check is added without a change to the specification.
+
+    Args:
+        tmp_path: pytest's per-test directory.
+    """
+    conn = store.open_ledger(tmp_path / store.DATABASE_NAME)
+    try:
+        plan = one_task_plan(conn)
+        assert store.fetch_plan(conn, plan)["state"] == "ready"
+
+        result = transitions.append_task(conn, plan, task_id="T2", task_title="two")
+
+        assert result.events == ["task.added"]
+        assert [row["id"] for row in store.plan_tasks(conn, plan)] == ["T1", "T2"]
+    finally:
+        conn.close()
+
+
 def test_dispatch_behind_a_writer_grants_a_lease_that_has_not_expired(tmp_path: Path) -> None:
     """``dispatch`` leaves ``expires`` at ``now + ttl_seconds``, so ``expired`` is false.
 
