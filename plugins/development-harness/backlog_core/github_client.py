@@ -17,9 +17,15 @@ module brings PyGithub to the same posture and no further: the certificate chain
 and the hostname are both still verified, and only the strict extension checks are
 cleared. Verification is never disabled.
 
-The relaxation applies only when a CA bundle environment variable names a real
-file, which is how an interception proxy announces itself. On an ordinary network
-the strict default stays in force.
+The relaxation applies only when a CA bundle environment variable names a real file
+*and* that file adds at least one anchor beyond the public trust store this process
+already ships — bundle_requires_relaxed_verification decides that by certificate
+shape, not by the variable's mere presence. Nix and conda export these same variables
+on an ordinary network, pointed at an unmodified copy of the public roots; treating
+that presence alone as proxy evidence would drop VERIFY_X509_STRICT and PyGithub's
+connection reuse for every session on such a machine, whether or not a proxy is
+actually there. On an ordinary network, once judged this way, the strict default
+stays in force.
 
 Why this module imports ``requests``
 ------------------------------------
@@ -29,6 +35,17 @@ PyGithub drives its HTTP through ``requests``, not ``httpx``: its
 that adapter, so this module must speak the same library. It introduces no new HTTP
 client of its own. ``backlog_core/sync_state.py`` carries the same exception for the
 same reason.
+
+Why this module imports ``cryptography`` and ``certifi``
+----------------------------------------------------------
+Deciding whether a bundle actually needs the relaxation means parsing the
+certificates it adds and inspecting their extensions, which only a certificate
+library provides — ``ssl``/urllib3 load and use anchors but expose no extension
+introspection. ``cryptography`` is not an incidental choice: PyGithub already
+requires ``pyjwt[crypto]`` for its own auth, which pulls it in unconditionally, so
+this adds no new dependency either. ``certifi`` is the baseline a bundle is compared
+against, and ``requests`` — already a hard dependency for the reason above — pulls
+that in the same way.
 """
 
 from __future__ import annotations
@@ -39,7 +56,10 @@ import ssl
 import threading
 from typing import TYPE_CHECKING, Final
 
+import certifi
 import requests.adapters
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from github import Auth, Github
 from github.Requester import HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass, Requester
 from urllib3.util.ssl_ import create_urllib3_context
@@ -55,6 +75,7 @@ __all__ = [
     "DEFAULT_TIMEOUT",
     "TOKEN_ENV_VARS",
     "MissingGitHubTokenError",
+    "bundle_requires_relaxed_verification",
     "install_proxy_tls_support",
     "make_github_client",
     "resolve_ca_bundle",
@@ -122,6 +143,65 @@ def resolve_ca_bundle() -> str | None:
         if candidate and pathlib.Path(candidate).is_file():
             return candidate
     return None
+
+
+def _cert_fails_strict_checks(cert: x509.Certificate) -> bool:
+    """Report whether cert has the shape ``VERIFY_X509_STRICT`` rejects as a CA anchor.
+
+    Mirrors the three OpenSSL strict-mode checks this module exists to work around:
+    a missing ``keyUsage`` extension (verify code 92), a missing ``basicConstraints``
+    extension (verify code 79), and one present but not marked critical (verify code 89).
+
+    Args:
+        cert: A parsed certificate to test.
+
+    Returns:
+        True when strict verification would reject cert as a trust anchor.
+    """
+    try:
+        cert.extensions.get_extension_for_class(x509.KeyUsage)
+    except x509.ExtensionNotFound:
+        return True
+    try:
+        basic_constraints = cert.extensions.get_extension_for_class(x509.BasicConstraints)
+    except x509.ExtensionNotFound:
+        return True
+    return not basic_constraints.critical
+
+
+def bundle_requires_relaxed_verification(ca_bundle: str) -> bool:
+    """Decide whether ca_bundle adds an anchor that VERIFY_X509_STRICT would reject.
+
+    A bundle is judged by what it adds beyond the public trust store this process
+    already ships (certifi, which requests — already a hard dependency — pulls in):
+    that store itself carries a small number of certificates that fail these checks in
+    isolation, so scanning every certificate in a full bundle would flag an unmodified
+    copy of the public roots, which Nix and conda hand these variables on an ordinary
+    network. Only a certificate genuinely new to the bundle can be the interception
+    proxy's own CA, so only those are tested.
+
+    Args:
+        ca_bundle: Path to a PEM-encoded CA bundle.
+
+    Returns:
+        True when at least one certificate in ca_bundle, absent from the baseline
+        store, fails the checks in ``_cert_fails_strict_checks``. False when ca_bundle
+        cannot be read or parsed, holds no certificates, or every added certificate
+        passes those checks.
+    """
+    try:
+        candidate_certs = x509.load_pem_x509_certificates(pathlib.Path(ca_bundle).read_bytes())
+    except (OSError, ValueError):
+        return False
+    try:
+        baseline_certs = x509.load_pem_x509_certificates(pathlib.Path(certifi.where()).read_bytes())
+    except (OSError, ValueError):
+        baseline_certs = []
+    baseline_fingerprints = {cert.fingerprint(hashes.SHA256()) for cert in baseline_certs}
+    return any(
+        cert.fingerprint(hashes.SHA256()) not in baseline_fingerprints and _cert_fails_strict_checks(cert)
+        for cert in candidate_certs
+    )
 
 
 def _build_ssl_context(ca_bundle: str) -> ssl.SSLContext:
@@ -275,18 +355,26 @@ def install_proxy_tls_support(*, force: bool = False) -> bool:
     reuse therefore stays off, on purpose, and this module stays on public API only.
 
     Args:
-        force: Install again even when a previous call already installed.
+        force: Re-evaluate and install (or uninstall) again even when a previous call
+            already decided. Without it, a previous installed=True short-circuits, so a
+            bundle that starts, stops, or changes needing relaxation after the first
+            call is picked up only when this is set.
 
     Returns:
         True when the proxy-aware classes are now installed. False when no CA bundle
-        variable names a real file, which means no interception proxy is configured and
-        PyGithub's own strict default stays in force.
+        variable names a real file, or the file it names adds nothing that strict
+        verification would reject — in both cases no interception proxy is judged to be
+        configured, PyGithub's own strict default and connection reuse stay in force,
+        and (under force) a previous install is undone.
     """
     with _InstallState.lock:
         if _InstallState.installed and not force:
             return True
         ca_bundle = resolve_ca_bundle()
-        if ca_bundle is None:
+        if ca_bundle is None or not bundle_requires_relaxed_verification(ca_bundle):
+            if _InstallState.installed:
+                Requester.injectConnectionClasses(HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass)
+                _InstallState.installed = False
             return False
         Requester.injectConnectionClasses(HTTPRequestsConnectionClass, _make_connection_class(ca_bundle))
         _InstallState.installed = True
