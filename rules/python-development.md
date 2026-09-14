@@ -53,16 +53,6 @@ symptom, same environment-resolution root cause), see
 
 ### `unresolved-import` on a PEP 723 script, in the language server only
 
-When a PEP 723 script (a `# /// script … # ///` block) shows `unresolved-import` in live editor
-diagnostics while `uv run ty check <path>` passes clean on the same file, trust the CLI result. The
-diagnostic is an editor-side artefact, not a missing `extra-paths` entry — ty checks a `# /// script`
-file as an isolated single-file project and does not consult `[tool.ty.environment]` for it.
-
-CLI, prek and CI resolve these scripts correctly because every PEP 723 script's dependencies are
-mirrored into the root `[dependency-groups] dev` group. Editors reach the same result through
-`.vscode/settings.json`'s `"ty.experimental.useUv": "scripts"`, which scopes the fix to the editor's
-own language server. Claude Code's bundled language server reads neither and has no repo-side lever;
-that fix belongs in the astral plugin's own `lspServers.ty` entry.
-
-Expires when <https://github.com/astral-sh/ty/issues/691> closes. Regression coverage:
-[`tests/test_ty_pep723_environment.py`](tests/test_ty_pep723_environment.py).
+Trust `uv run ty check <path>` over live editor diagnostics when the two disagree on a PEP 723
+script. Load `python-engineering:ty` before changing any configuration in response — `extra-paths`
+and `root` do not govern inline dependency resolution.

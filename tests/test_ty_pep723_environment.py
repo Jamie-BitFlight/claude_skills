@@ -10,7 +10,8 @@ Astral shipped an experimental, opt-in fix against that issue on 2026-08-28 (req
 uv >= 0.12.3): ty can shell out to `uv` to synchronise a PEP 723 script's own inline
 dependencies, in both the CLI (`TY_UV=scripts`) and the language server (the `useUv`
 initialization option). This repo's checked-in configuration for the language-server side is
-`.vscode/settings.json`'s `"ty.experimental.useUv"` key -- see `rules/python-development.md`.
+`.vscode/settings.json`'s `"ty.experimental.useUv"` key -- see the `python-engineering:ty` skill for
+what that key does and why `"scripts"` is its only working value.
 Claude Code's bundled Astral-plugin language server stays uncovered: its fix belongs in that
 plugin's own `lspServers.ty` entry upstream, and this suite does not gate it.
 
