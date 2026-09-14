@@ -65,4 +65,4 @@ Running `/git-history-recon` on a repo where a file is high-churn and high-compl
 
 ## Notes
 
-- repowise is delivered as an installable MCP server (`/plugin marketplace add repowise-dev/repowise`). The two proposals above deliberately extract repowise's *patterns* into local systems rather than proposing a dependency on repowise itself — that direct-integration question is the research-utilization-assessor's scope, not this insight pass.
+- repowise is delivered as an installable MCP server (`/plugin marketplace add repowise-dev/repowise`). The two proposals above deliberately extract repowise's *patterns* into local systems rather than proposing a dependency on repowise itself — that direct-integration question belongs to a utilization assessment, not to this insight pass.
