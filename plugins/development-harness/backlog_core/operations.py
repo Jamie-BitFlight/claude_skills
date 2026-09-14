@@ -1805,7 +1805,9 @@ def refresh_local_cache_from_github(
     }
 
 
-def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
+def _item_derived_status(
+    item: BacklogItem, status_map: dict[int, IssueStatus], status_map_unavailable: bool = False
+) -> str | None:
     """Return the effective status string for an item.
 
     For items with a numeric issue reference, looks up the live status
@@ -1815,13 +1817,36 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     backends from always returning ``"needs-grooming"`` when the status map is
     empty (ADR-002).
 
+    Args:
+        item: The backlog item whose effective status to resolve.
+        status_map: Live status lookup, keyed by numeric issue number. An
+            empty map is ambiguous on its own — it means either "the fetch
+            succeeded and genuinely found nothing to report for this item" or
+            "the fetch failed outright and nothing was learned about anyone".
+            *status_map_unavailable* is what tells those two apart; the map's
+            contents alone cannot.
+        status_map_unavailable: True when the live status batch fetch itself
+            failed (see ``list_items``'s ``BackendUnavailableError`` handling)
+            rather than succeeding with no entry for this item. When True, a
+            numeric-issue item's live status was never learned at all — there
+            is no genuine "no status label" answer to fall back on, and
+            defaulting to ``"needs-grooming"`` here would assert a match that
+            was never verified (#3546 — a degraded status batch must not
+            fabricate matches). Ignored for items without a numeric issue
+            reference, since those never depend on *status_map* to begin with.
+
     Returns:
         Status string — either the provider status value from *status_map* or
         the local ``item.status`` value, defaulting to ``"needs-grooming"``
-        when neither is available.
+        when neither is available. ``None`` for a numeric-issue item when
+        *status_map_unavailable* is True: its true live status was never
+        learned, so no requested filter value can be honestly compared
+        against it — the caller must treat it as "unknown", never as a match.
     """
     num = parse_issue_number(item.issue)
     if num is not None:
+        if status_map_unavailable:
+            return None
         info = status_map.get(num)
         return info.status if info is not None else "needs-grooming"
     # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
@@ -1836,6 +1861,7 @@ def _filter_open_items(
     status_map: dict[int, IssueStatus],
     type_: str | None = None,
     topic: str | None = None,
+    status_map_unavailable: bool = False,
 ) -> list[BacklogItem]:
     """Apply section, title, status, type, and topic filters to open_items.
 
@@ -1844,6 +1870,14 @@ def _filter_open_items(
 
     topic performs a case-insensitive substring match against metadata.topic.
     Items missing metadata.topic are excluded when topic filter is active.
+
+    status_map_unavailable, when True, means the live status batch fetch
+    itself failed (see ``list_items``): a numeric-issue item's status was
+    never learned, so it can never satisfy a ``status`` filter — comparing
+    against a fabricated default would assert a match that is not true
+    (#3546). ``_item_derived_status`` returns ``None`` for such items, which
+    the ``==`` comparison below naturally excludes since *status* is always a
+    non-``None`` string when this filter is active.
 
     Filters compose with AND logic.
 
@@ -1857,7 +1891,7 @@ def _filter_open_items(
         title_lower = title.lower()
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
-        open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+        open_items = [it for it in open_items if _item_derived_status(it, status_map, status_map_unavailable) == status]
     if type_:
         type_lower = type_.lower()
         open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
@@ -2029,14 +2063,38 @@ def list_items(
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
     status_map: dict[int, IssueStatus] = {}
+    status_map_unavailable = False
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
         except BackendUnavailableError as exc:
-            # An empty map renders every numeric-issue item with a blank status.
-            # Name the cause, so a reader does not take the blanks for "no status set".
-            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
-    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
+            # The fetch failed outright -- nothing was learned about ANY
+            # numeric-issue item's live status. status_map_unavailable tells
+            # _item_derived_status/_filter_open_items apart from the
+            # legitimate case (fetch succeeded, map has no entry for this
+            # item), so a status= filter never fabricates or silently
+            # mis-reports a match against data that was never received
+            # (#3546). Name the cause either way, so a reader does not take
+            # the blanks/exclusions for "no status set"/"genuinely no match".
+            status_map_unavailable = True
+            if status:
+                out.warn(
+                    f"  WARNING: Live status unavailable ({exc}); the status={status!r} filter "
+                    "cannot be evaluated against unavailable data, so no numeric-issue item can be "
+                    "confirmed to match or excluded — matching items may be missing from this result."
+                )
+            else:
+                out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
+    open_items = _filter_open_items(
+        open_items,
+        section,
+        title,
+        status,
+        status_map,
+        type_=type_,
+        topic=topic,
+        status_map_unavailable=status_map_unavailable,
+    )
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
