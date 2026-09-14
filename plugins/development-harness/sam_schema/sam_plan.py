@@ -118,7 +118,16 @@ from sam_schema.core.addressing import (
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider, plan_id_from_path
 from sam_schema.core.exceptions import BookendValidationError, PlanNotFoundError, TaskNotFoundError
-from sam_schema.core.models import AcceptanceCriterion, Complexity, CreatePlanError, PlanState, Priority, TaskStatus
+from sam_schema.core.models import (
+    AcceptanceCriterion,
+    Complexity,
+    CreatePlanError,
+    Plan,
+    PlanState,
+    Priority,
+    ReadResult,
+    TaskStatus,
+)
 from sam_schema.readers.detect import FormatDetectionError
 from sam_schema.writers.yaml_writer import write_plan
 
@@ -1586,9 +1595,21 @@ def read(
     attempt: Annotated[int | None, typer.Option("--attempt", min=1)] = None,
     plan_dir: Annotated[Path | None, typer.Option("--plan-dir")] = None,
 ) -> None:
-    """Read a plan or a task, renewing the lease when an attempt is named."""
+    """Read a task, or the whole plan when the address names no task.
+
+    On the ledger, a task read renews the lease when an attempt is named. A plan-only address returns
+    the plan's projection as a ``ReadResult``, the content store's shape, without task sections. It
+    renews nothing and records no event. A plan ``implement-feature`` imported therefore still
+    answers a plan-only read.
+    """
     store = store_for("read", legacy={"--plan-dir": plan_dir}, spec={"--attempt": attempt}, plan=raw_plan_of(address))
     if store is Store.LEDGER:
+        plan_part, _, task_part = address.partition("/")
+        if attempt is None and not task_part.strip():
+            with _ledger() as conn:
+                plan = Plan.model_validate(ledger.projection(conn, plan_part.strip()))
+            _emit(ReadResult(plan=plan, source_format="ledger", source_path=Path()))
+            return
         plan_ref, task_ref = _task_of(address)
         with _ledger() as conn:
             _emit_transition(ledger.read(conn, plan_ref, task_ref, attempt=attempt))

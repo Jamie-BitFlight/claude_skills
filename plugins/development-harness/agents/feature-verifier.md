@@ -88,9 +88,9 @@ mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="arc
 uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
 ```
 
-`plan read` names a plan and a task together, as `P/T`. For the plan itself, `plan status` is the
-command: its result carries the plan row and every task row, and it answers from the work ledger
-once the plan is in it and from the content store otherwise.
+`plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. On
+the work ledger, `plan status` returns the plan row and every task row with its derived columns. On
+the content store, `plan status` returns plan-level counts and no task rows.
 
 `plan read` answers from the work ledger once the plan is in it, and from the content store
 otherwise, so the same command is right at either point in the plan's life. Read without
