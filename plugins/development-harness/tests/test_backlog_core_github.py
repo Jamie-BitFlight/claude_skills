@@ -19,6 +19,7 @@ PyGithub REST mocks — those are documented exceptions with no GraphQL mutation
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -42,6 +43,7 @@ from backlog_core.gh_client import (
     try_get_github,
     view_enrich_from_github,
 )
+from backlog_core.github_client import TOKEN_ENV_VARS
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
@@ -1337,20 +1339,67 @@ class TestTryGetGithub:
     """
 
     def test_returns_none_when_no_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when GITHUB_TOKEN env var is not set.
+        """try_get_github returns None when no token variable supplies a token.
 
         Tests: try_get_github missing token
-        How: Remove GITHUB_TOKEN from environment; call function.
-        Why: No token is the most common offline scenario.
+        How: Remove every name in TOKEN_ENV_VARS from the environment; call function.
+        Why: No token is the most common offline scenario. Clearing GITHUB_TOKEN alone
+             left GH_TOKEN and GITHUB_PERSONAL_ACCESS_TOKEN live, so an ambient token
+             turned this into a real request to api.github.com.
         """
         # Arrange
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
 
         # Act
         result = try_get_github("test-owner/test-repo")
 
         # Assert
         assert result is None
+
+    def test_missing_token_builds_no_client(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The missing-token path stops at token resolution and opens no connection.
+
+        Tests: try_get_github performs no network I/O when no token is configured
+        How: Clear every token variable and spy on the PyGithub class the factory builds.
+        Why: A test that reaches the network passes or fails on whichever token and proxy
+             the session happens to export, which is what this suite's network guard exists
+             to prevent.
+        """
+        # Arrange
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+        github_class = mocker.patch("backlog_core.github_client.Github")
+
+        # Act
+        result = try_get_github("test-owner/test-repo")
+
+        # Assert
+        assert result is None
+        github_class.assert_not_called()
+
+    def test_missing_token_is_logged_as_a_warning_without_a_traceback(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A missing token is reported at WARNING and carries no exception info.
+
+        Tests: try_get_github log level for the no-token state
+        How: Clear every token variable, capture the log, inspect the record.
+        Why: This function exists to tolerate a missing token, so the routine case must not
+             surface as an ERROR-level traceback that reads like a crash.
+        """
+        # Arrange
+        for name in TOKEN_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+
+        # Act
+        with caplog.at_level(logging.DEBUG, logger="backlog_core.gh_client"):
+            try_get_github("test-owner/test-repo")
+
+        # Assert
+        records = [record for record in caplog.records if "try_get_github" in record.getMessage()]
+        assert [record.levelno for record in records] == [logging.WARNING]
+        assert records[0].exc_info is None
 
     def test_returns_none_on_github_exception(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
         """try_get_github returns None when PyGithub raises GithubException.

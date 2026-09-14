@@ -1225,7 +1225,7 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
     except MissingGitHubTokenError:
-        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
+        logger.warning("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
         return gh.get_repo(repo)
