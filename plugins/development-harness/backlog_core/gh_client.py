@@ -14,7 +14,7 @@ import contextlib
 import logging
 import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Final, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from github import GithubException
 from typing_extensions import TypedDict
@@ -40,7 +40,6 @@ from .models import (
     ContentConflictError,
     ContentUnavailableError,
     GitHubUnavailableError,
-    GraphQLUnavailableError,
     IssueLocalFields,
     IssueStatus,
     MilestoneInfo,
@@ -270,7 +269,7 @@ mutation UpdateIssue(
 _ADD_COMMENT_MUTATION = """
 mutation AddComment($subjectId: ID!, $body: String!) {
   addComment(input: {subjectId: $subjectId, body: $body}) {
-    commentEdge { node { id fullDatabaseId url } }
+    commentEdge { node { id url } }
   }
 }
 """
@@ -342,7 +341,6 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
-          fullDatabaseId
           body
           url
           author { login }
@@ -361,7 +359,6 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
-      fullDatabaseId
       body
       url
       author { login }
@@ -504,51 +501,6 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 # ---------------------------------------------------------------------------
 
 
-#: Message fragments that mark a 403 as "this environment refuses GraphQL", rather than
-#: "this token may not do that". Matched case-insensitively against the response message.
-#: Observed verbatim from a Claude Code sandbox on 2026-09-14:
-#:   "GitHub GraphQL is not available from Claude Code sessions; use the REST API ..."
-GRAPHQL_UNAVAILABLE_MARKERS: Final[tuple[str, ...]] = ("graphql is not available",)
-
-
-def _github_exception_message(exc: GithubException) -> str:
-    """Return the human-readable message a GithubException carries.
-
-    Args:
-        exc: The exception PyGithub raised.
-
-    Returns:
-        The ``message`` value from the response body when present, else the string form
-        of the whole body. PyGithub puts the parsed JSON body on ``data``, which is a
-        dict for GitHub's error responses and occasionally a bare string.
-    """
-    data = exc.data
-    if isinstance(data, dict):
-        message = data.get("message")
-        if isinstance(message, str):
-            return message
-    return str(data)
-
-
-def is_graphql_unavailable(exc: GithubException) -> bool:
-    """Report whether this failure means GraphQL is refused environment-wide.
-
-    A 403 alone is not enough. A token missing a scope also returns 403, and that is a
-    permissions problem a REST fallback cannot fix either. Only a 403 whose message
-    carries one of GRAPHQL_UNAVAILABLE_MARKERS identifies the environment-level refusal.
-
-    Args:
-        exc: The exception PyGithub raised from a GraphQL call.
-
-    Returns:
-        True when the status is 403 and the message marks an environment-wide refusal.
-    """
-    if exc.status != _HTTP_FORBIDDEN:
-        return False
-    message = _github_exception_message(exc).casefold()
-    return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
-
-
 def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, object] | None = None) -> dict[str, Any]:
     """Execute a raw GraphQL query using PyGithub's requester.
 
@@ -568,15 +520,11 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         The ``data`` dict from the GraphQL response.
 
     Raises:
-        GraphQLUnavailableError: When the environment refuses GraphQL outright.
         BacklogError: On GraphQL errors, NOT_FOUND (404), or network/auth failures.
     """
     try:
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
-        if is_graphql_unavailable(exc):
-            msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
-            raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc
     if "errors" in response:
@@ -943,7 +891,6 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    database_id = _parse_full_database_id(node.get("fullDatabaseId"))
     return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
@@ -951,7 +898,6 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         author=author,
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
-        database_id=database_id,
     )
 
 
@@ -1528,30 +1474,15 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
 
     Single GraphQL call replaces N+1 per-item get_issue() calls.
 
-    An empty map means "no item carries a status", so a refused query must never
-    produce one. In an environment that serves REST but rejects GraphQL, every
-    listing would otherwise render blank statuses and report no reason. The
-    refusal is raised instead, and the caller decides whether to continue.
-
     Returns:
         Dict mapping issue_number -> IssueStatus model.
-
-    Raises:
-        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
-            API outright.
     """
-    if not any(parse_issue_number(item.issue) is not None for item in items):
-        # Nothing to look up. Returning early keeps an all-local item list from
-        # spending a network round trip to build a map no caller can read.
-        return {}
     if (repo_obj := try_get_github(repo)) is None:
         return {}
     try:
         owner, repo_name = repo_obj.full_name.split("/", 1)
         all_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN")
         issue_map = {iss["number"]: iss for iss in all_issues}
-    except GraphQLUnavailableError:
-        raise
     except (BacklogError, GithubException):
         return {}
     result: dict[int, IssueStatus] = {}
@@ -1892,12 +1823,6 @@ def view_enrich_from_github(
 
     Returns:
         True if GitHub data was fetched, False if unavailable or errored.
-
-    Raises:
-        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
-            API outright. ``view_item`` reads ``False`` as "this issue does not
-            exist" and raises ``ItemNotFoundError``, so a refused query must not
-            return it — the issue may exist and simply be unaskable.
     """
     gh_repo = try_get_github(repo)
     if gh_repo is None:
@@ -1905,8 +1830,6 @@ def view_enrich_from_github(
     try:
         owner, repo_name = gh_repo.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(gh_repo, owner, repo_name, int(issue_num))
-    except GraphQLUnavailableError:
-        raise
     except (BacklogError, GithubException):
         return False
     body = gh_issue["body"]
