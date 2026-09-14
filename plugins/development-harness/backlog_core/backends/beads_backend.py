@@ -121,7 +121,7 @@ def _beads_workspace_path(runner: _BdRunnerLike) -> Path:
     try:
         workspace = runner.run_json(["where"])
     except (BdInvocationError, BdJsonDecodeError, BdNotInstalledError) as exc:
-        raise ContentUnavailableError("Beads content store is unavailable") from exc
+        raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
     if not isinstance(workspace, dict) or not isinstance(path := workspace.get("path"), str) or not path:
         raise ContentUnavailableError("Beads workspace could not be resolved")
     return Path(path).resolve()
@@ -136,7 +136,7 @@ def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
         try:
             lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
         except OSError as exc:
-            raise ContentUnavailableError("Beads content store is unavailable") from exc
+            raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
         try:
             try:
                 if sys.platform == "win32":
@@ -144,7 +144,7 @@ def _beads_content_lock(runner: _BdRunnerLike) -> Iterator[None]:
                 else:
                     fcntl.flock(lock_fd, fcntl.LOCK_EX)
             except OSError as exc:
-                raise ContentUnavailableError("Beads content store is unavailable") from exc
+                raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
             try:
                 yield
             finally:
@@ -392,7 +392,7 @@ class BeadsBackend:
         try:
             raw = self._runner.run_json(["kv", "list"])
         except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
-            raise ContentUnavailableError("Beads content store is unavailable") from exc
+            raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
         if not isinstance(raw, dict):
             raise ContentUnavailableError("Beads content store returned an invalid listing")
         records: list[ContentRecord] = []
@@ -455,7 +455,7 @@ class BeadsBackend:
                     json.dumps(record.model_dump(mode="json"), separators=(",", ":")),
                 ])
             except (BdNotInstalledError, BdInvocationError, BdJsonDecodeError) as exc:
-                raise ContentUnavailableError("Beads content store is unavailable") from exc
+                raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
             return record
 
     def _find_content(self, reference: ContentRef) -> ContentRecord | None:
@@ -463,13 +463,13 @@ class BeadsBackend:
             raw = self._runner.run_json(["kv", "get", self._content_key(reference)])
         except BdInvocationError as exc:
             if exc.returncode != 1:
-                raise ContentUnavailableError("Beads content store is unavailable") from exc
+                raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
             try:
                 raw = json.loads(exc.stdout)
             except json.JSONDecodeError as decode_error:
-                raise ContentUnavailableError("Beads content store is unavailable") from decode_error
+                raise ContentUnavailableError(f"Beads content store is unavailable: {decode_error}") from decode_error
         except (BdNotInstalledError, BdJsonDecodeError) as exc:
-            raise ContentUnavailableError("Beads content store is unavailable") from exc
+            raise ContentUnavailableError(f"Beads content store is unavailable: {exc}") from exc
         if not isinstance(raw, dict):
             raise ContentUnavailableError("Beads content store returned an invalid record")
         if raw.get("found") is False:

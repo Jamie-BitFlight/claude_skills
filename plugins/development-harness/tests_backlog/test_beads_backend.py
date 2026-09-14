@@ -90,6 +90,33 @@ def test_beads_workspace_path_uses_native_workspace_resolution(tmp_path: Path) -
     runner.run_json.assert_called_once_with(["where"])
 
 
+@pytest.mark.unit
+def test_beads_workspace_path_names_bd_invocation_cause_on_failure() -> None:
+    """_beads_workspace_path's ContentUnavailableError names the original bd failure.
+
+    Why: server.py's dispatch/artifact tool handlers report ContentUnavailableError
+    to the caller via str(exc) (see server.py's `except (ContentUnavailableError,
+    ValueError) as exc: ... {"error": str(exc), ...}`) -- they do not inspect
+    __cause__. Wrapping BdInvocationError into a bare "Beads content store is
+    unavailable" with no cause text in the message loses the original bd error
+    (e.g. "bd where exited 1: permission denied") for anyone reading str(exc).
+    """
+    from backlog_core.backends.bd_runner import BdInvocationError
+    from backlog_core.models import ContentUnavailableError
+
+    runner = MagicMock()
+    runner.run_json.side_effect = BdInvocationError(
+        "bd where exited 1: permission denied", argv=["where"], returncode=1, stdout="", stderr="permission denied"
+    )
+
+    with pytest.raises(ContentUnavailableError) as exc_info:
+        _beads_workspace_path(runner)
+
+    assert "permission denied" in str(exc_info.value), (
+        f"ContentUnavailableError message dropped the original bd cause. Got: {exc_info.value!s}"
+    )
+
+
 class _ProcessKvRunner:
     def __init__(self, state_path: Path, write_barrier: ProcessBarrier) -> None:
         self._state_path = state_path
