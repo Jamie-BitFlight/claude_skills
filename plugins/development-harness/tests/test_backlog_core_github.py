@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+import requests
 from backlog_core.backends._github_work_item_versions import WorkItemVersion
 from backlog_core.gh_client import (
     _get_repo_node_id,
@@ -1021,6 +1022,44 @@ class TestCheckOpenPrsForIssue:
         assert len(result) == 1
         assert result[0].number == 55
 
+    def test_raises_backlog_error_when_get_github_raises_connection_error(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue wraps a raw ConnectionError into BacklogError.
+
+        Tests: check_open_prs_for_issue network-failure handling (defect: only
+        GithubException was caught, so a transport-level ConnectionError from
+        get_github escaped unwrapped instead of becoming the refusal BacklogError
+        close_item/resolve_item depend on).
+        How: Patch get_github to raise requests.exceptions.ConnectionError.
+        Why: close_item and resolve_item must refuse — not crash — when the
+        open-PR search cannot reach GitHub at all (network blocked).
+        """
+        # Arrange
+        mocker.patch(
+            "backlog_core.gh_client.get_github",
+            side_effect=requests.exceptions.ConnectionError("network blocked (proxy or firewall)"),
+        )
+
+        # Act / Assert
+        with pytest.raises(BacklogError, match="network blocked"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
+
+    def test_raises_backlog_error_when_get_github_raises_timeout(self, mocker: MockerFixture) -> None:
+        """check_open_prs_for_issue wraps a raw Timeout into BacklogError.
+
+        Tests: check_open_prs_for_issue network-failure handling (defect: only
+        GithubException was caught, so requests.exceptions.Timeout escaped
+        unwrapped).
+        How: Patch get_github to raise requests.exceptions.Timeout.
+        Why: A timed-out search must also become the refusal BacklogError, not a
+        raw exception that crashes close_item/resolve_item.
+        """
+        # Arrange
+        mocker.patch("backlog_core.gh_client.get_github", side_effect=requests.exceptions.Timeout("request timed out"))
+
+        # Act / Assert
+        with pytest.raises(BacklogError, match="timed out"):
+            check_open_prs_for_issue(10, "test-owner/test-repo")
+
 
 # ---------------------------------------------------------------------------
 # issue_to_local_fields — accepts IssueNode
@@ -1325,6 +1364,49 @@ class TestTryGetGithub:
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
         mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = GithubException(
             status=401, data="Bad credentials", headers={}
+        )
+
+        # Act
+        result = try_get_github("test-owner/test-repo")
+
+        # Assert
+        assert result is None
+
+    def test_returns_none_on_connection_error(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """try_get_github returns None when the transport raises ConnectionError.
+
+        Tests: try_get_github network-failure handling (defect: the docstring
+        promises None for "no token, network error, etc." but the implementation
+        only caught GithubException, so a raw ConnectionError escaped).
+        How: Patch Github.get_repo to raise requests.exceptions.ConnectionError.
+        Why: Callers (gh_client.probe_backend_status, gh_client.batch_fetch_statuses,
+        backends/github_backend.py) treat None as "fall back to local-only" and
+        do not expect try_get_github to ever raise.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mocker.patch(
+            "backlog_core.gh_client.Github"
+        ).return_value.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
+
+        # Act
+        result = try_get_github("test-owner/test-repo")
+
+        # Assert
+        assert result is None
+
+    def test_returns_none_on_timeout(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """try_get_github returns None when the transport raises Timeout.
+
+        Tests: try_get_github network-failure handling (defect: only
+        GithubException was caught, so requests.exceptions.Timeout escaped).
+        How: Patch Github.get_repo to raise requests.exceptions.Timeout.
+        Why: Same fallback contract as the ConnectionError case above.
+        """
+        # Arrange
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = requests.exceptions.Timeout(
+            "request timed out"
         )
 
         # Act

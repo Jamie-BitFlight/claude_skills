@@ -17,6 +17,7 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol
 
+import requests
 from github import Auth, Github, GithubException
 from typing_extensions import TypedDict
 
@@ -1189,9 +1190,10 @@ def try_get_github(repo: str = "") -> Repository | None:
     Use this for operations where local-only fallback is acceptable.
 
     Returns:
-        Repository object, or None when GITHUB_TOKEN is missing, or GitHub
+        Repository object, or None when GITHUB_TOKEN is missing, GitHub
         returned an error (authentication failure, rate limit, or server
-        error).
+        error), or the request failed at the transport level (connection
+        refused, network blocked by proxy or firewall, or timeout).
     """
     repo = resolve_repo(repo)
     token = os.environ.get("GITHUB_TOKEN")
@@ -1203,6 +1205,9 @@ def try_get_github(repo: str = "") -> Repository | None:
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
+        return None
+    except requests.exceptions.RequestException as exc:
+        logger.warning("try_get_github: network error for repo %r: %s", repo, exc)
         return None
 
 
@@ -1375,9 +1380,11 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
 
     Raises:
         BacklogError: When the search request fails — authentication failure,
-            rate limiting, or a GitHub server error (5xx). A failed search is
-            never returned as an empty list, because close and resolve read
-            an empty list as "no open PRs" and go ahead.
+            rate limiting, a GitHub server error (5xx), or a transport-level
+            failure (connection refused, network blocked by proxy or
+            firewall, or timeout). A failed search is never returned as an
+            empty list, because close and resolve read an empty list as
+            "no open PRs" and go ahead.
     """
     repo = resolve_repo(repo)
     try:
@@ -1386,6 +1393,9 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
         data = _graphql_request(repository, _SEARCH_PRS_QUERY, {"query": search_query, "first": 20})
     except GithubException as exc:
         msg = f"GitHub PR search failed: {exc}"
+        raise BacklogError(msg) from exc
+    except requests.exceptions.RequestException as exc:
+        msg = f"GitHub PR search failed: network blocked (proxy, firewall or timeout): {exc}"
         raise BacklogError(msg) from exc
     nodes = (data.get("search") or {}).get("nodes") or []
     prs: list[PullRequestRef] = []

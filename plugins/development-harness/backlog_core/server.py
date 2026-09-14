@@ -1541,6 +1541,7 @@ def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] |
         cache_warning = "serving stale cache — backend sync failed"
         warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
 
+    failure_reason = sync_state.offline_reason or sync_state.last_error
     block: dict[str, object] = {
         "status": str(sync_state.status),
         "offline_reason": sync_state.offline_reason,
@@ -1549,7 +1550,7 @@ def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] |
     }
     warning = (
         warning_lead
-        + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
+        + (f" ({failure_reason})" if failure_reason else "")
         + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
     )
     return block, [warning]
