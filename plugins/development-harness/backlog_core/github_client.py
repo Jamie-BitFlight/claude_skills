@@ -77,6 +77,56 @@ concatenated PEM file, needs the same detection and loading this module already
 gives a single bundle file — resolve_ca_bundle accepts either shape, and
 _build_ssl_context loads a directory through ``capath`` instead of ``cafile``.
 
+Why a missing SubjectKeyIdentifier also forces relaxation
+-------------------------------------------------------------
+OpenSSL 3.0 added a fourth ``X509_V_FLAG_X509_STRICT`` check beyond the three this
+module already mirrored: a CA certificate with no ``SubjectKeyIdentifier`` extension
+now fails with verify code 86, ``X509_V_ERR_MISSING_SUBJECT_KEY_IDENTIFIER``
+(``check_extensions()`` in ``crypto/x509/x509_vfy.c``, gated the same way as the
+``keyUsage``/``basicConstraints`` checks on ``ctx->param->flags &
+X509_V_FLAG_X509_STRICT``; confirmed against the current ``openssl/openssl`` header
+and source, and against `openssl/openssl#13283
+<https://github.com/openssl/openssl/issues/13283>`_, which documents that OpenSSL
+1.1.1 accepted a CA cert missing this extension even under ``-x509_strict`` and 3.0
+stopped accepting it). A custom CA that predates this stricter check — carrying a
+critical ``basicConstraints`` and a ``keyUsage`` extension, the two properties the
+pre-existing checks already require, but no ``SubjectKeyIdentifier`` — passed both of
+this module's prior checks and kept ``VERIFY_X509_STRICT`` enabled, failing every
+connection through that CA on Python 3.13/OpenSSL 3 with the same verify code.
+``_cert_fails_strict_checks`` now tests for this extension the same way it tests for
+the other two.
+
+Why a TRUSTED CERTIFICATE PEM block still counts as an anchor
+-------------------------------------------------------------
+OpenSSL's ``x509 -trustout``/``-addtrust`` writes a non-standard, OpenSSL-specific PEM
+variant: the block is labeled ``BEGIN/END TRUSTED CERTIFICATE`` instead of
+``BEGIN/END CERTIFICATE``, and — critically — the base64 body itself decodes to more
+than a certificate. ``d2i_X509_AUX``/``i2d_X509_AUX`` (see ``x_x509a.c`` and the
+``d2i_X509`` manual page's description of the ``_AUX`` variants) encode the ordinary
+X.509 certificate DER immediately followed, in the same blob, by a second top-level
+DER ``SEQUENCE`` carrying trust/reject key-usage OIDs and an optional alias. Verified
+empirically in this session: converting a certificate with ``openssl x509 -in
+test.crt -addtrust serverAuth -out test-trusted.pem`` grows the decoded body by
+exactly the bytes of that trailing ``SEQUENCE`` (14 bytes, for one trust OID), with
+the leading bytes identical to the untrusted certificate's own DER. ``SSLContext.
+load_verify_locations()`` loads this file without complaint — OpenSSL's own
+``PEM_read_bio_X509_AUX`` understands the format — but ``cryptography``'s
+``load_pem_x509_certificate(s)`` only recognizes the plain ``CERTIFICATE`` label and,
+even once that label is substituted, its ASN.1 parser rejects the trailing
+``SEQUENCE`` as extra data (also verified empirically in this session; substituting
+just the label is a workaround reported to succeed in `pyca/cryptography#4794
+<https://github.com/pyca/cryptography/issues/4794>`_ for a certificate carrying no
+such trailer, but it does not hold once one is present). ``load_pem_x509_certificates``
+(plural) additionally raises for the *entire* input the instant one block fails to
+parse, so a single ``TRUSTED CERTIFICATE`` block anywhere in an otherwise compliant
+bundle previously made every other certificate in that bundle disappear too, not only
+the one in the incompatible block. ``_parse_pem_certificate_blocks`` locates each PEM
+block by hand instead of delegating to that function, decodes a ``TRUSTED
+CERTIFICATE`` block's body, and discards everything past the leading DER ``SEQUENCE``
+(``_strip_trusted_certificate_trailer``) before handing the remainder to
+``load_der_x509_certificate`` — so a bundle in this format is parsed, not silently
+treated as holding zero certificates.
+
 Why this module imports ``requests``
 ------------------------------------
 PyGithub drives its HTTP through ``requests``, not ``httpx``: its
@@ -100,6 +150,8 @@ that in the same way.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import pathlib
 import re
@@ -155,6 +207,32 @@ _OPENSSL_HASH_FILENAME: Final = re.compile(r"^[0-9a-f]{8}\.\d+$")
 See the module docstring's "Why a CA bundle variable may also name a directory"
 section.
 """
+
+_PEM_CERTIFICATE_BLOCK: Final = re.compile(
+    rb"-----BEGIN (?P<label>(?:TRUSTED )?CERTIFICATE)-----(?P<body>.*?)-----END (?P=label)-----", re.DOTALL
+)
+"""Matches one PEM certificate block, capturing the optional ``TRUSTED`` prefix.
+
+See the module docstring's "Why a TRUSTED CERTIFICATE PEM block still counts as an
+anchor" section: ``cryptography.x509.load_pem_x509_certificates`` accepts only the
+plain ``CERTIFICATE`` label, and even a relabeled ``TRUSTED CERTIFICATE`` block still
+fails that function's stricter DER parsing — so each block is located and decoded by
+hand instead of delegating to it.
+"""
+
+_DER_SEQUENCE_TAG: Final = 0x30
+"""ASN.1 universal tag for SEQUENCE, the DER construct every X.509 certificate (and
+OpenSSL's appended X509_CERT_AUX trailer) begins with.
+"""
+
+_DER_SHORT_FORM_LENGTH_LIMIT: Final = 0x80
+"""Below this value, a DER length octet encodes its content length directly (X.690
+section 8.1.3.4's "short form"); at or above it, the low seven bits count how many
+following octets hold the length instead ("long form").
+"""
+
+_DER_MINIMUM_TLV_HEADER_LENGTH: Final = 2
+"""Smallest possible DER tag-length header: one tag octet, one length octet."""
 
 
 class MissingGitHubTokenError(RuntimeError):
@@ -239,9 +317,11 @@ def resolve_ca_bundle() -> str | None:
 def _cert_fails_strict_checks(cert: x509.Certificate) -> bool:
     """Report whether cert has the shape ``VERIFY_X509_STRICT`` rejects as a CA anchor.
 
-    Mirrors the three OpenSSL strict-mode checks this module exists to work around:
-    a missing ``keyUsage`` extension (verify code 92), a missing ``basicConstraints``
-    extension (verify code 79), and one present but not marked critical (verify code 89).
+    Mirrors the four OpenSSL strict-mode checks this module exists to work around: a
+    missing ``keyUsage`` extension (verify code 92), a missing ``basicConstraints``
+    extension (verify code 79), one present but not marked critical (verify code 89),
+    and a missing ``SubjectKeyIdentifier`` extension (verify code 86 — see the module
+    docstring's "Why a missing SubjectKeyIdentifier also forces relaxation" section).
 
     Args:
         cert: A parsed certificate to test.
@@ -257,7 +337,110 @@ def _cert_fails_strict_checks(cert: x509.Certificate) -> bool:
         basic_constraints = cert.extensions.get_extension_for_class(x509.BasicConstraints)
     except x509.ExtensionNotFound:
         return True
-    return not basic_constraints.critical
+    if not basic_constraints.critical:
+        return True
+    try:
+        cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier)
+    except x509.ExtensionNotFound:
+        return True
+    return False
+
+
+def _der_sequence_length(data: bytes) -> int | None:
+    """Length in bytes of the leading DER SEQUENCE TLV that data begins with.
+
+    Reads a definite-length BER/DER header (the only form DER permits) by hand: X.509
+    never uses indefinite-length encoding, so a two-branch definite-length reader is
+    sufficient. Used to find where a ``TRUSTED CERTIFICATE`` block's own X.509
+    certificate ends and OpenSSL's appended trust-info ``SEQUENCE`` begins — see the
+    module docstring's "Why a TRUSTED CERTIFICATE PEM block still counts as an anchor"
+    section.
+
+    Args:
+        data: DER-encoded bytes expected to begin with a SEQUENCE tag (0x30).
+
+    Returns:
+        The total byte length of the tag, length, and content octets of the leading
+        SEQUENCE in data (its self-contained TLV size), or None when data does not
+        begin with a SEQUENCE tag, its length encoding is truncated, or the declared
+        content length runs past the end of data.
+    """
+    if len(data) < _DER_MINIMUM_TLV_HEADER_LENGTH or data[0] != _DER_SEQUENCE_TAG:
+        return None
+    first_length_byte = data[1]
+    if first_length_byte < _DER_SHORT_FORM_LENGTH_LIMIT:
+        content_length = first_length_byte
+        header_length = _DER_MINIMUM_TLV_HEADER_LENGTH
+    else:
+        length_octet_count = first_length_byte & 0x7F
+        header_length = _DER_MINIMUM_TLV_HEADER_LENGTH + length_octet_count
+        if length_octet_count == 0 or len(data) < header_length:
+            return None
+        content_length = int.from_bytes(data[2:header_length], "big")
+    total_length = header_length + content_length
+    return total_length if total_length <= len(data) else None
+
+
+def _strip_trusted_certificate_trailer(der: bytes) -> bytes | None:
+    """Return just the X.509 certificate TLV from a decoded TRUSTED CERTIFICATE body.
+
+    OpenSSL's ``d2i_X509_AUX``/``i2d_X509_AUX`` format (see the module docstring's
+    "Why a TRUSTED CERTIFICATE PEM block still counts as an anchor" section) is the
+    ordinary X.509 certificate DER immediately followed, in the same blob, by a second
+    top-level ``SEQUENCE`` carrying trust/reject OIDs and an optional alias.
+    ``cryptography``'s parser rejects that trailing ``SEQUENCE`` as extra data, so it
+    is located and discarded here, leaving only the bytes an ordinary DER certificate
+    parser accepts.
+
+    Args:
+        der: Base64-decoded body of a ``BEGIN TRUSTED CERTIFICATE`` PEM block.
+
+    Returns:
+        Just the leading certificate TLV, or None when der does not begin with a
+        well-formed DER SEQUENCE (see ``_der_sequence_length``).
+    """
+    length = _der_sequence_length(der)
+    return der[:length] if length is not None else None
+
+
+def _parse_pem_certificate_blocks(data: bytes) -> list[x509.Certificate]:
+    """Parse every certificate PEM block in data, including TRUSTED CERTIFICATE blocks.
+
+    ``x509.load_pem_x509_certificates`` raises ``ValueError`` for the *entire* input
+    the instant one block fails to parse — its own documented behavior — so a single
+    ``BEGIN TRUSTED CERTIFICATE`` block anywhere in an otherwise compliant bundle would
+    make every other certificate in that bundle disappear too. This function parses
+    each block independently instead, so one incompatible or malformed block costs
+    only itself. See the module docstring's "Why a TRUSTED CERTIFICATE PEM block still
+    counts as an anchor" section.
+
+    Args:
+        data: Raw bytes of a PEM file, or one hash-named entry in an OpenSSL CA
+            directory.
+
+    Returns:
+        Every certificate this function could parse from an individual ``CERTIFICATE``
+        or ``TRUSTED CERTIFICATE`` block. A block whose body cannot be base64-decoded,
+        whose ``TRUSTED CERTIFICATE`` trailer cannot be located, or whose resulting DER
+        is not a valid certificate contributes nothing and does not stop the rest from
+        being parsed.
+    """
+    certificates: list[x509.Certificate] = []
+    for match in _PEM_CERTIFICATE_BLOCK.finditer(data):
+        try:
+            der = base64.b64decode(match["body"], validate=False)
+        except binascii.Error:
+            continue
+        if match["label"] == b"TRUSTED CERTIFICATE":
+            stripped = _strip_trusted_certificate_trailer(der)
+            if stripped is None:
+                continue
+            der = stripped
+        try:
+            certificates.append(x509.load_der_x509_certificate(der))
+        except ValueError:
+            continue
+    return certificates
 
 
 def _load_certificates(ca_bundle: str) -> list[x509.Certificate]:
@@ -279,13 +462,13 @@ def _load_certificates(ca_bundle: str) -> list[x509.Certificate]:
             if not _OPENSSL_HASH_FILENAME.match(entry.name):
                 continue
             try:
-                certificates.extend(x509.load_pem_x509_certificates(entry.read_bytes()))
-            except (OSError, ValueError):
+                certificates.extend(_parse_pem_certificate_blocks(entry.read_bytes()))
+            except OSError:
                 continue
         return certificates
     try:
-        return x509.load_pem_x509_certificates(path.read_bytes())
-    except (OSError, ValueError):
+        return _parse_pem_certificate_blocks(path.read_bytes())
+    except OSError:
         return []
 
 
@@ -303,8 +486,8 @@ def _new_anchors(ca_bundle: str) -> list[x509.Certificate]:
     if not candidate_certs:
         return []
     try:
-        baseline_certs = x509.load_pem_x509_certificates(pathlib.Path(certifi.where()).read_bytes())
-    except (OSError, ValueError):
+        baseline_certs = _parse_pem_certificate_blocks(pathlib.Path(certifi.where()).read_bytes())
+    except OSError:
         baseline_certs = []
     baseline_fingerprints = {cert.fingerprint(hashes.SHA256()) for cert in baseline_certs}
     return [cert for cert in candidate_certs if cert.fingerprint(hashes.SHA256()) not in baseline_fingerprints]
