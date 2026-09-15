@@ -1509,48 +1509,34 @@ class TestTryGetGithub:
             try_get_github("test-owner/test-repo")
         assert exc_info.value.__cause__ is underlying
 
-    def test_returns_none_on_connection_error(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when the transport raises ConnectionError.
+    def test_raises_github_unavailable_on_transport_exception(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """try_get_github raises GitHubUnavailableError when get_repo raises a transport exception.
 
-        Tests: try_get_github network-failure handling (defect: the docstring
-        promises None for "no token, network error, etc." but the implementation
-        only caught GithubException, so a raw ConnectionError escaped).
-        How: Mock make_github_client to return a repo object whose get_repo raises ConnectionError.
-        Why: Callers (gh_client.probe_backend_status, gh_client.batch_fetch_statuses,
-        backends/github_backend.py) treat None as "fall back to local-only" and
-        do not expect try_get_github to ever raise.
+        Tests: try_get_github transport failure handling
+        How: Patch the shared client factory so its client's get_repo raises
+            ``requests.exceptions.ConnectionError`` — one of sync_state.py's
+            RETRYABLE_TRANSIENT_EXCEPTIONS — instead of a GithubException.
+        Why: PyGithub's requester raises a transport exception directly, not a
+            GithubException, when get_repo fails before an HTTP response is
+            received at all (a dropped connection). That case bypassed the
+            GithubException-only handling this session's B1 work added, so a
+            network outage would crash callers instead of degrading to the
+            same GitHubUnavailableError/cache-fallback path a GithubException
+            failure already triggers (Codex review on PR #3570).
         """
         # Arrange
+        import requests
+
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mock_repo = mocker.MagicMock()
-        mock_repo.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
-        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
+        underlying = requests.exceptions.ConnectionError("Connection refused")
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = underlying
 
-        # Act
-        result = try_get_github("test-owner/test-repo")
-
-        # Assert
-        assert result is None
-
-    def test_returns_none_on_timeout(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when the transport raises Timeout.
-
-        Tests: try_get_github network-failure handling (defect: only
-        GithubException was caught, so requests.exceptions.Timeout escaped).
-        How: Mock make_github_client to return a repo object whose get_repo raises Timeout.
-        Why: Same fallback contract as the ConnectionError case above.
-        """
-        # Arrange
-        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mock_repo = mocker.MagicMock()
-        mock_repo.get_repo.side_effect = requests.exceptions.Timeout("request timed out")
-        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
-
-        # Act
-        result = try_get_github("test-owner/test-repo")
-
-        # Assert
-        assert result is None
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError) as exc_info:
+            try_get_github("test-owner/test-repo")
+        assert exc_info.value.__cause__ is underlying
 
 
 # ---------------------------------------------------------------------------
