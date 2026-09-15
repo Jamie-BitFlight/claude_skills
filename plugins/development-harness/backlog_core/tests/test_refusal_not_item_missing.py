@@ -24,6 +24,15 @@ text, so GitHub's GraphQL error for an inaccessible or incorrect repository
 ('Could not resolve to a Repository with the name ...') was misclassified as
 the requested issue being not found (#3570 Finding). ``_is_not_found_error``
 now only matches an error that specifically names the issue as unresolvable.
+
+A fifth read told the same lie once more, this time triggered by naming: the
+prior fix's 'issue' + not-found substring check still matched a
+repository-not-found error whenever the repository or owner name itself
+contained the literal substring "issue" (e.g. 'owner/issue-tracker'), because
+it scanned the whole message rather than anchoring on the exact
+issue-not-found form (#3570 Finding B). ``_is_not_found_error`` now matches
+only the exact prefix ``_fetch_issue_graphql`` synthesizes, so no repository
+or owner name can influence the result.
 """
 
 from __future__ import annotations
@@ -305,6 +314,31 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
             gh_client,
             "_fetch_issue_graphql",
             side_effect=BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'."),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            operations.view_item("#999", output=Output())
+
+    def test_a_repository_named_with_issue_substring_raises_github_unavailable(self, mocker: MockerFixture) -> None:
+        """End-to-end regression for #3570 Finding B.
+
+        Mirrors ``test_a_repository_not_found_error_raises_github_unavailable_not_item_not_found``
+        above, but the unresolvable repository's name itself contains the
+        literal substring "issue" (``owner/issue-tracker``). A predicate that
+        scans the whole error message for 'issue' alongside a not-found
+        phrase would misclassify this as the requested issue being absent;
+        the exact-prefix match must not be swayed by the repository's name.
+        Asserts the result is ``GitHubUnavailableError``, not
+        ``ItemNotFoundError``.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError(
+                "GraphQL error: Could not resolve to a Repository with the name 'owner/issue-tracker'."
+            ),
         )
 
         with pytest.raises(GitHubUnavailableError):
