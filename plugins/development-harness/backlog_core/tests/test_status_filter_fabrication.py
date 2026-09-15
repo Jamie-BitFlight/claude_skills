@@ -16,6 +16,13 @@ This mirrors ``scratchpad/design/proofs/test_critique_proofs.py``'s P1/P2 reprod
 shape (three items, two genuinely ``in-progress``, one genuinely ``needs-grooming``),
 adapted to patch ``operations.batch_fetch_statuses`` with the typed exception B1
 introduced rather than the pre-B1 empty-map behaviour the original proof used.
+
+A second trigger for the same ambiguity was found by review after B2 landed: an
+absent ``GITHUB_TOKEN`` makes ``gh_client.batch_fetch_statuses`` return the same empty
+``{}`` *without* raising (a deliberate local-only fallback, not a failure — see its
+own docstring), so B2's exception-only handling left that path reproducing the exact
+fabrication bug via a different trigger. ``TestStatusFilterMissingTokenDoesNotFabricateMatches``
+and ``TestStatusMapEmptyDueToMissingToken`` cover that trigger.
 """
 
 from __future__ import annotations
@@ -56,6 +63,7 @@ class _Backend:
     """Minimal provider-backed backend stand-in exposing only what list_items reads."""
 
     supports_batch_status_fetch = True
+    supports_github_extras = True
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items
@@ -64,8 +72,8 @@ class _Backend:
         return list(self._items)
 
 
-def _patch_backend(mocker: MockerFixture) -> None:
-    mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_Backend(ITEMS)))
+def _patch_backend(mocker: MockerFixture, items: list[BacklogItem] | None = None) -> None:
+    mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_Backend(items or ITEMS)))
 
 
 def _titles(result: Mapping[str, object]) -> list[str]:
@@ -154,6 +162,60 @@ class TestStatusFilterDegradationIsDisclosedNotSilent:
         assert not any("unavailable" in w.lower() for w in _warnings(result))
 
 
+class TestStatusFilterMissingTokenDoesNotFabricateMatches:
+    """The missing-token trigger for the same ambiguity B2 fixed for a raised refusal.
+
+    ``gh_client.batch_fetch_statuses`` returns ``{}`` — with no exception — when no
+    ``GITHUB_TOKEN`` is configured, by design (a local-only fallback, not a failure).
+    That is the exact same empty map a genuinely-answered, empty live fetch would also
+    return, so ``list_items`` must tell the two apart via ``try_get_github`` rather than
+    letting a numeric-issue item's status default to ``"needs-grooming"`` as though the
+    fetch had genuinely answered.
+    """
+
+    def test_missing_token_does_not_fabricate_needs_grooming_matches(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(operations, "try_get_github", return_value=None)
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert result["count"] == 0, "a missing token must not fabricate needs-grooming matches"
+        assert _titles(result) == []
+
+    def test_missing_token_does_not_silently_drop_in_progress_matches(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(operations, "try_get_github", return_value=None)
+        out = Output()
+
+        result = operations.list_items(status="in-progress", output=out)
+
+        assert result["count"] == 0, "the live status was never learned -- a match cannot be asserted either"
+        warnings = _warnings(result)
+        assert warnings, "a missing-token result must not look like a confident zero"
+        assert any("GITHUB_TOKEN" in w for w in warnings), f"warning must name the missing token, got: {warnings}"
+
+    def test_genuinely_empty_live_result_with_token_present_is_not_reported_unavailable(
+        self, mocker: MockerFixture
+    ) -> None:
+        """A real GitHub connection that genuinely found nothing must stay a confident zero.
+
+        ``try_get_github`` returning a (mock) repository rather than ``None`` signals a
+        token is configured, so the empty map must be trusted as a real answer instead
+        of triggering the missing-token disambiguation.
+        """
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(operations, "try_get_github", return_value=mocker.Mock())
+        out = Output()
+
+        result = operations.list_items(status="in-progress", output=out)
+
+        assert result["count"] == 0
+        assert not any("unavailable" in w.lower() for w in _warnings(result))
+
+
 class TestItemDerivedStatusUnavailableMap:
     """Unit-level coverage of the discriminator itself."""
 
@@ -188,3 +250,42 @@ class TestItemDerivedStatusUnavailableMap:
             == operations._item_derived_status(beads_item, {}, status_map_unavailable=False)
             == "in-progress"
         )
+
+
+class TestStatusMapEmptyDueToMissingToken:
+    """Unit-level coverage of ``_status_map_empty_due_to_missing_token``'s guard conditions."""
+
+    def test_true_when_no_token_and_a_numeric_issue_item_exists(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "try_get_github", return_value=None)
+
+        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is True
+
+    def test_false_when_token_is_present(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "try_get_github", return_value=mocker.Mock())
+
+        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is False
+
+    def test_false_when_no_numeric_issue_item_present(self, mocker: MockerFixture) -> None:
+        """A beads-style item never reads status_map_unavailable, so the disambiguation
+        would be pure unnecessary GitHub-connection overhead for no observable effect.
+        """
+        beads_item = BacklogItem(title="Beads item", section="P1", skip=False, issue="bd-a3f8")
+        _patch_backend(mocker, items=[beads_item])
+        mocker.patch.object(operations, "try_get_github", return_value=None)
+
+        assert operations._status_map_empty_due_to_missing_token([beads_item], "") is False
+
+    def test_false_when_backend_has_no_github_connection_concept(self, mocker: MockerFixture) -> None:
+        """A backend like beads/SQLite/in-memory always returns None from try_get_github
+        regardless of token state -- that must never be misread as "unavailable".
+        """
+
+        class _NoGitHubBackend(_Backend):
+            supports_github_extras = False
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_NoGitHubBackend(ITEMS)))
+        mocker.patch.object(operations, "try_get_github", return_value=None)
+
+        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is False
