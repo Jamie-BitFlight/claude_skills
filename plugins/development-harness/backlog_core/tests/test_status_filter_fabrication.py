@@ -30,6 +30,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from backlog_core import operations
+from backlog_core.github_client import MissingGitHubTokenError
 from backlog_core.models import BacklogItem, GraphQLUnavailableError, IssueStatus, Output
 
 if TYPE_CHECKING:
@@ -168,7 +169,7 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
     ``gh_client.batch_fetch_statuses`` returns ``{}`` — with no exception — when no
     ``GITHUB_TOKEN`` is configured, by design (a local-only fallback, not a failure).
     That is the exact same empty map a genuinely-answered, empty live fetch would also
-    return, so ``list_items`` must tell the two apart via ``try_get_github`` rather than
+    return, so ``list_items`` must tell the two apart via ``resolve_token()`` rather than
     letting a numeric-issue item's status default to ``"needs-grooming"`` as though the
     fetch had genuinely answered.
     """
@@ -176,7 +177,7 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
     def test_missing_token_does_not_fabricate_needs_grooming_matches(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker)
         mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
-        mocker.patch.object(operations, "try_get_github", return_value=None)
+        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token"))
 
         result = operations.list_items(status="needs-grooming", output=Output())
 
@@ -186,7 +187,7 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
     def test_missing_token_does_not_silently_drop_in_progress_matches(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker)
         mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
-        mocker.patch.object(operations, "try_get_github", return_value=None)
+        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token"))
         out = Output()
 
         result = operations.list_items(status="in-progress", output=out)
@@ -201,19 +202,40 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
     ) -> None:
         """A real GitHub connection that genuinely found nothing must stay a confident zero.
 
-        ``try_get_github`` returning a (mock) repository rather than ``None`` signals a
-        token is configured, so the empty map must be trusted as a real answer instead
-        of triggering the missing-token disambiguation.
+        ``resolve_token()`` succeeding (rather than raising ``MissingGitHubTokenError``)
+        signals a token is configured, so the empty map must be trusted as a real answer
+        instead of triggering the missing-token disambiguation.
         """
         _patch_backend(mocker)
         mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
-        mocker.patch.object(operations, "try_get_github", return_value=mocker.Mock())
+        mocker.patch.object(operations, "resolve_token", return_value="ghp_fake-token")
         out = Output()
 
         result = operations.list_items(status="in-progress", output=out)
 
         assert result["count"] == 0
         assert not any("unavailable" in w.lower() for w in _warnings(result))
+
+    def test_genuinely_empty_live_result_does_not_re_probe_github(self, mocker: MockerFixture) -> None:
+        """A successful, genuinely-empty status batch must not trigger a second live
+        GitHub lookup (#3572).
+
+        ``batch_fetch_statuses`` already performed the live ``try_get_github`` repository
+        lookup before completing its GraphQL query and returning the (legitimately
+        empty) map. The missing-token disambiguation must resolve the token locally
+        instead of repeating that lookup -- a redundant network call on every listing
+        that, if it hit a rate limit or timed out, would mark an already-successful
+        result unavailable and wrongly exclude numeric-issue items from a status filter.
+        """
+        _patch_backend(mocker)
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(operations, "resolve_token", return_value="ghp_fake-token")
+        try_get_github_spy = mocker.patch.object(operations, "try_get_github")
+
+        result = operations.list_items(status="in-progress", output=Output())
+
+        assert result["count"] == 0
+        try_get_github_spy.assert_not_called()
 
 
 class TestItemDerivedStatusUnavailableMap:
@@ -253,39 +275,51 @@ class TestItemDerivedStatusUnavailableMap:
 
 
 class TestStatusMapEmptyDueToMissingToken:
-    """Unit-level coverage of ``_status_map_empty_due_to_missing_token``'s guard conditions."""
+    """Unit-level coverage of ``_status_map_empty_due_to_missing_token``'s guard conditions.
+
+    The helper resolves the token locally via ``resolve_token()`` (#3572) rather than
+    re-probing GitHub through ``try_get_github`` -- these tests patch ``resolve_token``
+    to stand in for token presence/absence, and assert ``try_get_github`` is left
+    untouched wherever the guard short-circuits before token resolution would matter.
+    """
 
     def test_true_when_no_token_and_a_numeric_issue_item_exists(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker)
-        mocker.patch.object(operations, "try_get_github", return_value=None)
+        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token"))
 
-        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is True
+        assert operations._status_map_empty_due_to_missing_token(ITEMS) is True
 
     def test_false_when_token_is_present(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker)
-        mocker.patch.object(operations, "try_get_github", return_value=mocker.Mock())
+        mocker.patch.object(operations, "resolve_token", return_value="ghp_fake-token")
 
-        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is False
+        assert operations._status_map_empty_due_to_missing_token(ITEMS) is False
 
     def test_false_when_no_numeric_issue_item_present(self, mocker: MockerFixture) -> None:
         """A beads-style item never reads status_map_unavailable, so the disambiguation
-        would be pure unnecessary GitHub-connection overhead for no observable effect.
+        would be pure unnecessary token-resolution overhead for no observable effect.
         """
         beads_item = BacklogItem(title="Beads item", section="P1", skip=False, issue="bd-a3f8")
         _patch_backend(mocker, items=[beads_item])
-        mocker.patch.object(operations, "try_get_github", return_value=None)
+        resolve_token_spy = mocker.patch.object(
+            operations, "resolve_token", side_effect=MissingGitHubTokenError("no token")
+        )
 
-        assert operations._status_map_empty_due_to_missing_token([beads_item], "") is False
+        assert operations._status_map_empty_due_to_missing_token([beads_item]) is False
+        resolve_token_spy.assert_not_called()
 
     def test_false_when_backend_has_no_github_connection_concept(self, mocker: MockerFixture) -> None:
-        """A backend like beads/SQLite/in-memory always returns None from try_get_github
-        regardless of token state -- that must never be misread as "unavailable".
+        """A backend like beads/SQLite/in-memory has no token concept at all -- that must
+        never be misread as "unavailable".
         """
 
         class _NoGitHubBackend(_Backend):
             supports_github_extras = False
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_NoGitHubBackend(ITEMS)))
-        mocker.patch.object(operations, "try_get_github", return_value=None)
+        resolve_token_spy = mocker.patch.object(
+            operations, "resolve_token", side_effect=MissingGitHubTokenError("no token")
+        )
 
-        assert operations._status_map_empty_due_to_missing_token(ITEMS, "") is False
+        assert operations._status_map_empty_due_to_missing_token(ITEMS) is False
+        resolve_token_spy.assert_not_called()
