@@ -24,7 +24,7 @@ from sam_schema.core.exceptions import PlanNotFoundError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 from sam_schema.core.plan_id_index import PlanIdIndex
-from sam_schema.server import _get_backend
+from sam_schema.server_backend import get_backend
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -167,7 +167,7 @@ def test_server_backend_does_not_fallback_to_local_plan(tmp_path: Path) -> None:
         plan_dir, "warning-plan", [Task(id="T1", title="Task", status=TaskStatus.NOT_STARTED)]
     )
 
-    backend = _get_backend(str(plan_dir))
+    backend = get_backend(str(plan_dir))
 
     assert isinstance(backend, ContentTaskProvider)
     with pytest.raises(PlanNotFoundError):

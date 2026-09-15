@@ -403,9 +403,11 @@ max-complexity = 12
 # present in the module's global namespace even with `from __future__ import annotations`.
 # TC001/TC002 would move these to TYPE_CHECKING, making them unavailable at runtime.
 # TC001/TC002 — action model types must be present at runtime for discriminated union dispatch (from __future__ import annotations bypasses this)
-# PLR0911 — match-case action dispatch in sam_plan/sam_task produces one return per case; guard-clause refactoring would obscure intent
+# PLR0911 — match-case action dispatch in sam_plan_impl produces one return per case; guard-clause refactoring would obscure intent
 # C901/PLR0912 — discriminated union dispatch with per-arm isinstance type-narrowing guards is intentional; complexity metrics do not apply to inherently branching dispatch patterns
-"**/sam_schema/server.py" = [
+# Lives on server_plan_ops.py (not server.py) because that is where sam_plan's eight-action
+# dispatch body lives; server.py itself is now a thin @mcp.tool registration surface (#3449).
+"**/sam_schema/server_plan_ops.py" = [
     "complex-structure",
     "too-many-branches",
     "too-many-return-statements",

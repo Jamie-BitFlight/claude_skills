@@ -2,10 +2,11 @@
 
 ``dh_core.ledger.store.open_ledger`` raises ``Refusal("network-filesystem")`` when the ledger's
 mount cannot share WAL's index (``check_local_filesystem``) -- a real, documented refusal, not a
-hypothetical. Before this fix, ``sam_schema.server._on_ledger`` opened the connection outside its
-own guarded block, and every ``_ledger_holds``-style routing check called ``dh_core.ledger.holds``
+hypothetical. Before the fix this test guards, ``sam_schema.server._on_ledger`` opened the
+connection outside its own guarded block, and every routing check called ``dh_core.ledger.holds``
 directly, so a ``Refusal`` raised while opening escaped both untranslated instead of surfacing as
-the ``ToolError`` every other ledger refusal surfaces as.
+the ``ToolError`` every other ledger refusal surfaces as. Both now live in
+``sam_schema.server_ledger_routing``.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import pytest
 from dh_core import ledger
 from dh_core.ledger import store
 from fastmcp.exceptions import ToolError
-from sam_schema import server
+from sam_schema import server_ledger_routing
 
 
 def _raise_network_filesystem(_path: Path) -> None:
@@ -42,17 +43,17 @@ def _create_plan() -> str:
 
 
 def test_ledger_holds_translates_a_refusal_raised_while_opening(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``_ledger_holds`` must translate a ``Refusal`` the ledger raises while opening into ``ToolError``."""
+    """``route``'s routing check must translate a ``Refusal`` the ledger raises while opening into ``ToolError``."""
     plan_id = _create_plan()
     monkeypatch.setattr(store, "check_local_filesystem", _raise_network_filesystem)
 
     with pytest.raises(ToolError, match="network-filesystem"):
-        server._ledger_holds(plan_id)
+        server_ledger_routing.route(plan_id, on_ledger_call=lambda _canonical, _conn: None, on_content=lambda: None)
 
 
 def test_on_ledger_translates_a_refusal_raised_while_opening(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``_on_ledger`` must translate a ``Refusal`` ``open_ledger`` itself raises, not just one *fn* raises."""
+    """``on_ledger`` must translate a ``Refusal`` ``open_ledger`` itself raises, not just one *fn* raises."""
     monkeypatch.setattr(store, "check_local_filesystem", _raise_network_filesystem)
 
     with pytest.raises(ToolError, match="network-filesystem"):
-        server._on_ledger(lambda conn: None)
+        server_ledger_routing.on_ledger(lambda conn: None)

@@ -119,7 +119,7 @@ def content_backend(
     backend = ContentTaskProvider(provider)
     set_config(BacklogConfig(backend=provider))
     set_task_config(TaskConfig(backend=backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: backend)
     monkeypatch.setattr("sam_schema.sam_plan._backend", lambda: backend)
     yield backend
     reset_task_config()

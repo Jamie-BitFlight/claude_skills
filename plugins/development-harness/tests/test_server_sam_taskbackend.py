@@ -12,7 +12,9 @@ from fastmcp.exceptions import ToolError
 from pytest_mock import MockerFixture  # ruff: ignore[unused-import] — available for future use
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.exceptions import PlanNotFoundError, TaskNotFoundError
-from sam_schema.server import _get_backend, _sam_plan_read, mcp
+from sam_schema.server import mcp
+from sam_schema.server_backend import get_backend
+from sam_schema.server_plan_ops import _sam_plan_read
 
 from tests.helpers import call_mcp_tool
 
@@ -120,7 +122,7 @@ def backend_mock(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     mock_backend.update_task_fields.return_value = None
     mock_backend.append_task_section.return_value = None
 
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: mock_backend)
     return mock_backend
 
 
@@ -148,7 +150,7 @@ async def test_sam_read_plan_only_routes_through_backend_read_plan(backend_mock:
 def test_sam_plan_read_keeps_flat_plan_shape(monkeypatch: pytest.MonkeyPatch) -> None:
     backend = MagicMock()
     backend.read_plan.return_value = _PLAN_DATA
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: backend)
 
     response = _sam_plan_read("P1", "plan")
 
@@ -343,7 +345,7 @@ async def test_sam_create_persists_opaque_owner_in_one_content_write(monkeypatch
         return original_put(request)
 
     monkeypatch.setattr(provider, "put_content", record_write)
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: ContentTaskProvider(provider))
 
     # When: the MCP create action receives an opaque owner reference.
     result = await _call(
@@ -392,7 +394,7 @@ async def test_sam_update_persists_fields_and_owner_in_one_content_write(monkeyp
         return original_put(request)
 
     monkeypatch.setattr(provider, "put_content", record_write)
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: ContentTaskProvider(provider))
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: ContentTaskProvider(provider))
 
     # When: the MCP update action changes context and ownership.
     result = await _call(
@@ -547,17 +549,17 @@ async def test_sam_claim_raises_tool_error_when_backend_raises_plan_not_found(ba
 
 
 def test_server_module_uses_backlog_content_provider() -> None:
-    import sam_schema.server as server_module
+    import sam_schema.server_backend as server_backend_module
 
-    source = inspect.getsource(server_module)
+    source = inspect.getsource(server_backend_module)
     assert "get_backlog_config" in source
     assert "ContentProvider" in source
 
 
 def test_server_module_constructs_content_task_provider() -> None:
-    import sam_schema.server as server_module
+    import sam_schema.server_backend as server_backend_module
 
-    source = inspect.getsource(server_module)
+    source = inspect.getsource(server_backend_module)
     assert "ContentTaskProvider(provider)" in source
 
 
@@ -847,7 +849,7 @@ def test_task_model_dump_default_now_emits_kebab_case_aliases() -> None:
 async def test_sam_update_kebab_case_field_roundtrips_through_provider() -> None:
     from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 
-    backend = _get_backend("ignored")
+    backend = get_backend("ignored")
     minimal_task = Task(
         id="T01",
         title="Task One",
@@ -868,7 +870,7 @@ async def test_sam_update_kebab_case_field_roundtrips_through_provider() -> None
     )
 
     assert "error" not in update_result, f"sam_task update failed: {update_result}"
-    assert _get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
+    assert get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
 
 
 async def test_sam_update_snake_case_field_roundtrips_through_provider() -> None:
@@ -884,7 +886,7 @@ async def test_sam_update_snake_case_field_roundtrips_through_provider() -> None
     """
     from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
 
-    backend = _get_backend("ignored")
+    backend = get_backend("ignored")
     minimal_task = Task(
         id="T01",
         title="Task One",
@@ -905,11 +907,11 @@ async def test_sam_update_snake_case_field_roundtrips_through_provider() -> None
     )
 
     assert "error" not in update_result, f"sam_task update failed: {update_result}"
-    assert _get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
+    assert get_backend("ignored").read_task(plan_id, "T01")["parallelize_with"] == ["T01", "T02"]
 
 
 async def test_sam_plan_update_persists_list_model_fields_as_dicts() -> None:
-    backend = _get_backend("ignored")
+    backend = get_backend("ignored")
     plan_id = backend.create_plan("acstest", "Goal", [])["plan_id"]
     ac_value = [
         {
@@ -930,7 +932,7 @@ async def test_sam_plan_update_persists_list_model_fields_as_dicts() -> None:
     )
 
     assert "error" not in update_result, f"sam_plan update failed: {update_result}"
-    acs = _get_backend("ignored").read_plan(plan_id).get("acceptance_criteria_structured") or []
+    acs = get_backend("ignored").read_plan(plan_id).get("acceptance_criteria_structured") or []
     assert isinstance(acs, list), f"Expected list but got {type(acs).__name__!r}: {acs!r}"
     assert len(acs) == 1, f"Expected 1 criterion but got {len(acs)}: {acs!r}"
     first = acs[0]

@@ -1035,7 +1035,7 @@ def test_sam_append_task_routes_through_backend_append_task(tmp_path: Path, monk
         "state": "drafting",
     }
     set_task_config(TaskConfig(backend=mock_backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: mock_backend)
 
     try:
         task_def = TaskDefinition(
@@ -1077,7 +1077,7 @@ def test_sam_append_task_returns_success_acknowledgment(tmp_path: Path, monkeypa
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: backend)
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="append-test", goal="Append goal", tasks=[]))
@@ -1122,7 +1122,7 @@ def test_sam_append_task_plan_not_found_raises(tmp_path: Path, monkeypatch: pyte
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: backend)
 
     try:
         task_def = TaskDefinition(id="T1", title="Task", agent="a")
@@ -1150,7 +1150,7 @@ def test_sam_append_task_duplicate_task_id_raises(tmp_path: Path, monkeypatch: p
 
     backend = InMemoryTaskProvider()
     set_task_config(TaskConfig(backend=backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: backend)
 
     try:
         create_result = sam_plan(config=CreatePlanConfig(slug="dup-task", goal="Goal", tasks=[]))
@@ -1193,7 +1193,7 @@ def test_sam_finalize_routes_through_backend_finalize_plan(tmp_path: Path, monke
     mock_backend.finalize_plan.return_value = {"finalized": True, "state": "ready"}
     mock_backend.update_plan_fields.return_value = {"updated": True}
     set_task_config(TaskConfig(backend=mock_backend))
-    monkeypatch.setattr("sam_schema.server._get_backend", lambda _plan_dir: mock_backend)
+    monkeypatch.setattr("sam_schema.server_backend.get_backend", lambda _plan_dir: mock_backend)
 
     try:
         # Act
