@@ -87,6 +87,33 @@ def test_file_cache_round_trips_provider_snapshot_checkpoint(tmp_path: Path) -> 
     assert reopened._get_snapshot_checkpoint() == _ProviderSnapshotCheckpoint(watermark="2026-08-12T01:00:00Z")
 
 
+def test_provider_snapshot_checkpoint_from_legacy_data_lacks_scope_metadata() -> None:
+    # Given: a checkpoint deserialized from data that predates task A1's
+    # scope/label/items_observed fields -- e.g. a cache.json a pre-A1 plugin
+    # version wrote, carrying only "watermark"
+    legacy = _ProviderSnapshotCheckpoint.model_validate({"watermark": "2026-08-12T01:00:00Z"})
+
+    # Then: Pydantic backfills the new fields to their falsy defaults, but
+    # has_scope_metadata still reports that they were never actually observed
+    assert legacy.scope == ""
+    assert legacy.label == ""
+    assert legacy.items_observed == 0
+    assert legacy.has_scope_metadata is False
+
+
+def test_provider_snapshot_checkpoint_with_explicit_falsy_label_has_scope_metadata() -> None:
+    # Given: a checkpoint constructed the way current code always constructs one --
+    # every field passed explicitly, even when label is the falsy empty string
+    # (see _GitHubReconciliation._advance_snapshot_checkpoint)
+    current = _ProviderSnapshotCheckpoint(
+        watermark="2026-08-12T01:00:00Z", scope="incremental", label="", items_observed=0
+    )
+
+    # Then: it is distinguishable from a legacy checkpoint despite sharing every
+    # field's value with one
+    assert current.has_scope_metadata is True
+
+
 def test_file_cache_coalesces_work_item_intent_and_reopens_it(tmp_path: Path) -> None:
     # Given: two offline edits for one provider-linked work item
     cache = FileCache(tmp_path)

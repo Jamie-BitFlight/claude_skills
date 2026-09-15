@@ -6,7 +6,7 @@ from threading import Barrier, Lock, Thread
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core.backend_types import IssueCommentNode
+from backlog_core.backend_types import AddedCommentNode, IssueCommentNode
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     parse_work_item_comment,
@@ -98,8 +98,8 @@ def test_github_work_item_sibling_heads_preserve_common_parent_and_distinct_audi
     ("comment", "error"),
     [
         (None, "missing"),
-        ({**_comment("comment-1", "root", "rendered"), "body": "forged"}, "invalid"),
-        ({**_comment("comment-1", "root", "rendered"), "id": "other"}, "identity"),
+        (_comment("comment-1", "root", "rendered").model_copy(update={"body": "forged"}), "invalid"),
+        (_comment("comment-1", "root", "rendered").model_copy(update={"id": "other"}), "identity"),
     ],
 )
 def test_github_work_item_rejects_missing_forged_or_replaced_audit_comment(
@@ -198,7 +198,7 @@ def _backend(
 
     lock = comment_lock or Lock()
 
-    def add_comment(_repo: object, _issue_id: str, body: str) -> str:
+    def add_comment(_repo: object, _issue_id: str, body: str) -> AddedCommentNode:
         with lock:
             comment_id = f"comment-{len(comments) + 1}"
             comments[comment_id] = IssueCommentNode(
@@ -209,7 +209,7 @@ def _backend(
                 created_at="2026-08-12T00:00:00Z",
                 updated_at="2026-08-12T00:00:00Z",
             )
-        return comment_id
+        return AddedCommentNode(id=comment_id, database_id=None)
 
     backend._add_comment_graphql = MagicMock(side_effect=add_comment)
     return backend
@@ -232,7 +232,7 @@ def test_github_work_item_backend_publishes_initial_then_subsequent_contents_hea
 
     # Then: Contents SHAs become revisions and both append-only audit comments remain intact
     assert (first.status, second.status, second.revision) == ("applied", "applied", "head-2")
-    assert [(comment_id, comment["body"].split("\n", 1)[1]) for comment_id, comment in comments.items()] == [
+    assert [(comment_id, comment.body.split("\n", 1)[1]) for comment_id, comment in comments.items()] == [
         ("comment-1", "first"),
         ("comment-2", "second"),
     ]
@@ -330,4 +330,4 @@ def test_github_work_item_backend_concurrent_initial_cas_has_one_winner_and_two_
 
     # Then: one Contents head wins, while both comments remain forensic evidence
     assert sorted(result.status for result in results) == ["applied", "conflict"]
-    assert sorted(comment["body"].split("\n", 1)[1] for comment in comments.values()) == ["one", "two"]
+    assert sorted(comment.body.split("\n", 1)[1] for comment in comments.values()) == ["one", "two"]
