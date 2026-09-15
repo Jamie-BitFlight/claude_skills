@@ -45,10 +45,4 @@ Build this string for `add-new-feature`:
 - [ ] Every stale document updated
 - [ ] Old interface deprecated or removed (if replacing)
 - [ ] CI/config files updated and validated
-
-### Stack Profile (optional)
-
-{stack profile name if --stack specified, e.g., python-fastapi}
 ```
-
-If `--stack` was specified, append a "Stack profile" line. If `--language` was specified and is not `python`, invoke the corresponding language plugin (e.g., `/typescript-development:add-new-feature` for `typescript`).

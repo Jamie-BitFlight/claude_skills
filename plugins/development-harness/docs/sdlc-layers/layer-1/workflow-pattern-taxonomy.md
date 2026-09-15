@@ -23,9 +23,3 @@ Each language plugin documents how common workflows map to agent chains and qual
 - **Code Review**: Standalone review; no implementation
 - **Refactoring**: Architect approves structure; tests verify behavior preserved
 - **Debugging**: Focus on test pass; minimal architect involvement
-
----
-
-## Per-Language Variation
-
-Language plugins may document stack-specific variations (e.g., Python + pytest vs Python + unittest). See Layer 2 stack profiles for stack-specific patterns.

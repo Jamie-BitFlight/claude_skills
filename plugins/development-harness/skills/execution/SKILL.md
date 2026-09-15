@@ -116,8 +116,7 @@ worker still at work, and the caller waits on an agent that is gone.
 
 ### Step 6 — Deterministic Backpressure
 
-After the agent completes, run quality gates from the project's language
-manifest or standard tooling:
+After the agent completes, run the project's quality gates. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence to find each command. Run these gates:
 
 - **Format** — code formatting check
 - **Lint** — static analysis

@@ -50,7 +50,7 @@ Beyond the standard checklist:
 ## Analysis Process
 
 1. **Gather test files** in specified path
-2. **Run coverage analysis** with `{test command from language manifest}`
+2. **Run coverage analysis** with the project's test command. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence if the command isn't already known.
 3. **Check each test** against the standard checklist
 4. **Identify gaps** in coverage and quality
 5. **Generate recommendations** prioritized by impact

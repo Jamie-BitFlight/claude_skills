@@ -1,7 +1,7 @@
 ---
 name: work-backlog-item
-description: "Use when creating, grooming, planning, or closing a backlog item. Bridges backlog items to SAM planning with issue, project, and milestone tracking against the configured backend. Activates on interactive browsing with no arguments, loading an item by issue reference or title match to run grooming and SAM planning, autonomous unattended runs that substitute evidence-derived decisions for clarifying questions, a quick path for one-file fixes where full grooming is disproportionate, dismissing an item without completion under a required reason (duplicate, out of scope, superseded, wontfix, blocked), marking an item done with an evidence trail and required summary, initializing GitHub tracking infrastructure for a project, or selecting a language/stack profile for planning. Stops when the item already has a plan or is blocked on missing information."
-argument-hint: '[#N | --auto {title} | --language {lang} | --stack {stack} | item-title-substring | close {title} | resolve {title} [--force] | setup-github | --quick {title} | progress | resume [{title}]]'
+description: "Use when creating, grooming, planning, or closing a backlog item. Bridges backlog items to SAM planning with issue, project, and milestone tracking against the configured backend. Activates on interactive browsing with no arguments, loading an item by issue reference or title match to run grooming and SAM planning, autonomous unattended runs that substitute evidence-derived decisions for clarifying questions, a quick path for one-file fixes where full grooming is disproportionate, dismissing an item without completion under a required reason (duplicate, out of scope, superseded, wontfix, blocked), marking an item done with an evidence trail and required summary, or initializing GitHub tracking infrastructure for a project. Stops when the item already has a plan or is blocked on missing information."
+argument-hint: '[#N | --auto {title} | item-title-substring | close {title} | resolve {title} [--force] | setup-github | --quick {title} | progress | resume [{title}]]'
 user-invocable: true
 ---
 <provided_arguments>
@@ -23,7 +23,7 @@ Argument vocabulary:
 - **Route** — the first positional word only, when it matches one of the keys registered in [command-routes.json](./scripts/parser/command-routes.json): `create`, `groom`, `work`, `close`, `resolve`, `setup-github`, `progress`, `resume`. Because only the first positional is ever checked, at most one route keyword can ever be found in a single invocation — there is no such thing as a "two routes" conflict. The same word appearing later (e.g. inside a title) is not a route. No match on the first positional → `route` is `title_substring` (positionals or freetext remain) or `none` (nothing at all — no flags, no positionals, no freetext).
 - **item_ref discriminator** — any positional matching `#N`, bare digits, or a GitHub issue URL (`https://github.com/{owner}/{repo}/issues/N`) → normalize to `#N` (keep a URL verbatim). Checked across *all* positionals, not just the first — including one embedded inside an otherwise-ordinary title (verified: `Fix bug on line 42` → `{"route":"issue","item_ref":"#42","user_text":"Fix bug on line"}` — the "42" is consumed as `item_ref` and removed from `user_text`, and `route` becomes `issue` rather than `title_substring`; be alert to this when a title happens to end in a number). When it is the *only* discriminator found (no registry route word present), `route` is the literal string `issue` — not `title_substring` — and no `reference` key is set (verified: `#42` alone → `{"mode":"interactive","route":"issue","item_ref":"#42"}`). A route word and one item_ref may both be present (e.g. `groom #50`, `close #42`) — that is `route` + `item_ref` together (registry route wins as `route`, `reference` is set per the route table above), not a conflict. **Two or more item_ref discriminators** in one invocation (e.g. `close #42 #55`) is the one real conflict case — ask the user to disambiguate rather than picking one.
 - **Freetext delimiter** — `--`, or a bare `—`/`–` (em/en dash — a mobile-autocorrect artifact; normalize a leading `—`/`–` on any token to `--`). Everything after the delimiter is `user_text` verbatim, regardless of content (quotes, code, punctuation — do not further tokenize it). No delimiter → `user_text` is whatever positionals remain after removing the route/item_ref tokens, space-joined. **Exception when `flags.quick` is present**: do not apply this delimiter rule — positionals before a `--` are otherwise discarded (captured nowhere, since they don't match `item_ref`'s pattern), which would silently drop part of the supplied request. Still remove recognized flags and their values first (per the Flags rule below — e.g. `--quick --auto Fix login` strips `--auto`, not just its own name), and still apply the `item_ref` discriminator only when it consumes the *entire* remaining text (e.g. `--quick #42` alone → `item_ref="#42"`, nothing left for `user_text`) — a discriminator match embedded in a longer request (e.g. `--quick #42 fails on SSO`) does not fire, since the surrounding text is exactly what [quick/start.md](./references/workflows/quick/start.md) Step 1 needs to derive title/observations from. After flags and a whole-text-only item_ref are handled, set `user_text` to whatever remains verbatim (any embedded `--` is literal text, not a delimiter). Step 1 derives its own title and observations from that raw text — it is not pre-split here.
-- **Flags** — `--language <value>`, `--stack <value>`: both take the *next* token as their value, but only when that next token does not itself start with `-` — a next token starting with `-` (including no next token at all) means the value is missing, a stop-and-ask condition, not "consume the next flag as this flag's value" (verified: `--language --stack python-fastapi` treats `--language` as missing its value; it does not consume `--stack` as the value). `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
+- **Flags** — `--force`, `--auto`, `--quick` (boolean, no value). `mode` is `auto` only when `--auto` is present, otherwise `interactive`.
 - `--help`/`-h` present → show usage (this vocabulary plus `argument-hint` in the frontmatter) and stop; do not route.
 
 Route → reference file: see [command-routes.json](./scripts/parser/command-routes.json) — one JSON object, `route` keyword to reference-file path, do not hand-copy it here.
@@ -104,7 +104,7 @@ flowchart TD
 
 # Work Backlog Item
 
-Bridge a backlog item into the SAM planning pipeline via `/dh:add-new-feature` (default). Optional `--language` and `--stack` select Layer 1/2 profiles — see [sdlc-layers](../../docs/sdlc-layers/).
+Bridge a backlog item into the SAM planning pipeline via `/dh:add-new-feature` (default).
 
 See the [Backlog Lifecycle reference](../../docs/backlog-lifecycle.md) for the complete state machine, handoff protocol, and data architecture.
 
@@ -125,8 +125,6 @@ The configured backend is authoritative for its native work records. For Beads-b
 
 On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_text`, not `item_ref` — `find_item()` still resolves it via its string-ID exact-match branch, so this is a routing detail, not a functional gap.
 
-**Optional flags** (when `route` is `title_substring`, `issue`, or a pipeline route): `--language <lang>` selects language plugin (default: python); `--stack <profile>` selects stack profile (e.g., python-fastapi, python-cli). See [sdlc-layers](../../docs/sdlc-layers/).
-
 ```text
 /work-backlog-item                                    # interactive browser
 /work-backlog-item #42                               # issue-first → planning
@@ -139,7 +137,6 @@ On `backend=beads`: a beads ID (`bd-a3f8`) coerces to `title_substring`/`user_te
 /work-backlog-item close #42                         # dismiss by issue number
 /work-backlog-item resolve Error Recovery            # mark completed by title
 /work-backlog-item resolve #42                       # mark completed by issue number
-/work-backlog-item --language python --stack python-fastapi Add auth  # Layer 2 stack profile
 ```
 
 ### --quick mode

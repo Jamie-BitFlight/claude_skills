@@ -6,7 +6,7 @@ How the development harness resolves abstract roles to concrete agents at runtim
 
 ## Overview
 
-The harness defines abstract roles (architect, test-designer, code-reviewer, design-spec, linting). It resolves each role by calling `mcp__plugin_dh_backlog__profile_list()` — which enumerates every installed agent's declared `name`, `plugin`, and `description` across every plugin, live, with no configuration file to maintain — and matching the role plus the task's actual content (title, requirements, file paths) against those descriptions. Whichever agent's declared capability has the strongest overlap is assigned. No language manifest, hardcoded table, or plugin name is baked into this protocol; installing a new language plugin's agent makes it selectable the next time `profile_list()` is called.
+The harness defines abstract roles (architect, test-designer, code-reviewer, design-spec, linting). It resolves each role by calling `mcp__plugin_dh_backlog__profile_list()` — which enumerates every installed agent's declared `name`, `plugin`, and `description` across every plugin, live, with no configuration file to maintain — and matching the role plus the task's actual content (title, requirements, file paths) against those descriptions. Whichever agent's declared capability has the strongest overlap is assigned. No configuration file, hardcoded table, or plugin name is baked into this protocol; installing a new language plugin's agent makes it selectable the next time `profile_list()` is called.
 
 **Layer 0 gates apply before role resolution.** RT-ICA, human touchpoint model, artifact conventions, and verification protocol are enforced before the harness resolves roles. See [docs/sdlc-layers/layer-0/](../../../docs/sdlc-layers/layer-0/).
 
@@ -21,10 +21,9 @@ flowchart TD
     ListAgents --> Match{Description overlap found?}
     Match -->|Yes| Resolve[Assign matched agent to task]
     Match -->|No| Fallback[Use dh:task-worker — no specialist profile]
-    Resolve --> LoadGates[Load Quality Gates from the project's language manifest, if any]
-    Fallback --> InferGates[Infer quality gates from detected file types]
-    LoadGates --> Ready([Resolution Complete])
-    InferGates --> Ready
+    Resolve --> Gates[Discover quality gate commands from the repository]
+    Fallback --> Gates
+    Gates --> Ready([Resolution Complete])
 ```
 
 ---
@@ -65,9 +64,13 @@ Record the resolved agent name in the task's `agent:` field, then choose the dis
 
 ---
 
-## Step 4 — Load Quality Gates
+## Step 4 — Discover Quality Gates
 
-Parse the manifest's Quality Gates section to determine which commands to run for each gate type.
+Find the command for each gate type in the repository. Check these sources in order:
+
+1. The pre-commit config (`.pre-commit-config.yaml`) or another git hook.
+2. The CI workflow (for example, `.github/workflows/*.yml`).
+3. The build config: `package.json` scripts, `pyproject.toml`, `Makefile`, or `Cargo.toml`.
 
 **Gate types:**
 
@@ -77,24 +80,14 @@ Parse the manifest's Quality Gates section to determine which commands to run fo
 - **test** — Test execution (e.g., `uv run pytest tests/`)
 - **standards** — Language-specific standards skill (e.g., `/python3-development:stinkysnake`)
 
-**Fallback gates (no manifest):**
+**Fallback gates (no source names the command):**
 
-When no manifest provides quality gate commands, the harness infers gates from detected file types:
+When no source names a gate command, use the default for the detected file types:
 
 - `.py` files detected — `ruff format`, `ruff check`, `mypy`, `pytest`
 - `.ts`/`.js` files detected — `prettier`, `eslint`, `tsc`, `jest` or `vitest`
 - `.rs` files detected — `cargo fmt`, `cargo clippy`, `cargo test`
 - `.go` files detected — `gofmt`, `go vet`, `go test`
-
----
-
-## Step 5 — Check for Flow Override
-
-After resolving roles and gates, check if the manifest declares a Process Flow Override.
-
-- If declared, load the custom flow and use it instead of the default SAM pipeline
-- If not declared, use the default flow from [./default-development-flow.md](./default-development-flow.md)
-- Custom flows must still produce artifacts with standard naming conventions
 
 ---
 
@@ -104,12 +97,10 @@ After resolving roles and gates, check if the manifest declares a Process Flow O
 
 **`profile_list()` failure or empty result:** Dispatch `dh:task-worker` for every role and note the failure in the S1 discovery artifact.
 
-**Quality-gate manifest missing or unparseable:** Independent of agent resolution (see Step 4) — if no language manifest provides quality gate commands, or an existing one fails to parse, infer gates from detected file types instead of blocking.
+**No gate command found:** Use the fallback gates from Step 4.
 
 ---
 
 ## Sources
 
-- Language manifest schema: [./language-manifest-schema.md](./language-manifest-schema.md)
 - Default development flow: [./default-development-flow.md](./default-development-flow.md)
-- Language manifest template: [../../templates/language-manifest-template.md](../../templates/language-manifest-template.md)

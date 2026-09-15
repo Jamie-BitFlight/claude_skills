@@ -1,6 +1,6 @@
 # Default Development Flow
 
-The SAM 7-stage pipeline with ARL touchpoint gates. This is the default flow used when a language plugin does not declare a custom process flow override.
+The SAM 7-stage pipeline with ARL touchpoint gates.
 
 ---
 
@@ -62,7 +62,7 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Parse and clarify the feature request
 - Scan project structure (source layout, test layout, config files)
 - Identify integration points with existing code
-- Detect language and resolve specialist roles via manifest
+- Detect language and resolve specialist roles with `mcp__plugin_dh_backlog__profile_list()`
 - Identify constraints (performance, compatibility, dependencies)
 
 **Output:** `ARTIFACT:DISCOVERY({feature-slug})` — A discovery document capturing requirements, codebase context, constraints, and resolved role assignments.
@@ -130,7 +130,7 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Decompose plan into discrete tasks, each with clear scope
 - Write each task as a standalone record with inputs, acceptance criteria, and agent assignment
 - Map task dependencies and identify parallelization opportunities
-- Assign each task to the appropriate specialist agent (from manifest or fallback)
+- Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent
 
 **Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
 `sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
@@ -285,19 +285,6 @@ For the full pre-phase logic, see the `complete-implementation` skill: `/dh:comp
 **Cross-reference tokens:** Each artifact includes `ARTIFACT:{TYPE}({ID})` tokens linking to predecessor and successor artifacts.
 
 Full naming conventions in [./artifact-conventions.md](./artifact-conventions.md).
-
----
-
-## Flow Override
-
-A language plugin can replace this entire flow by declaring a `Process Flow Override` section in its language manifest. The override must:
-
-1. Be a valid mermaid flowchart
-2. Produce artifacts compatible with the naming conventions
-3. Include at least one human touchpoint gate
-4. End with a verification stage that produces a CERTIFIED/NOT_CERTIFIED verdict
-
-When a flow override is present, the harness loads the custom flow instead of this default. All other harness features (role resolution, artifact management, touchpoint analysis) still apply.
 
 ---
 

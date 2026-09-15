@@ -1,6 +1,6 @@
 # SDLC Layer Separation Architecture
 
-Three-layer architecture separating SDLC-agnostic framework/process from language-specific steps and stack/goal-specific implementations. Each layer builds on the previous layer's best practices, reference documentation, and examples.
+Layered architecture separating SDLC-agnostic framework/process from language-specific steps. Each layer builds on the previous layer's best practices, reference documentation, and examples.
 
 ---
 
@@ -9,8 +9,7 @@ Three-layer architecture separating SDLC-agnostic framework/process from languag
 | Layer | Scope | Contents |
 |-------|-------|----------|
 | **Layer 0** | SDLC-Agnostic | SAM pipeline, human touchpoints, artifact conventions, RT-ICA, verification protocol, task format, subagent contract, evidence discipline |
-| **Layer 1** | Language-Specific | Language manifest, abstract roles, quality gates, project detection, language standards |
-| **Layer 2** | Stack/Goal-Specific | Architecture patterns, toolchain config, reference examples, stack research |
+| **Layer 1** | Language-Specific | Abstract roles, quality gates, project detection, language standards |
 | **ARL Meta-Layer** | Observation (Improvement) | Observe → Identify → Probe → Accumulate → Improve |
 
 ---
@@ -32,11 +31,9 @@ Three-layer architecture separating SDLC-agnostic framework/process from languag
 ├── layer-1/            # Language-specific overview
 │   ├── README.md
 │   ├── layer-1-overview.md
-│   ├── language-manifest-template.md
 │   ├── linting-discovery-protocol.md
 │   ├── workflow-pattern-taxonomy.md
 │   └── harness-role-mapping.md
-├── layer-2/            # Stack profiles (see plugins/development-harness/docs/layer-2/)
 ├── arl-meta-layer.md   # ARL Observation Layer flow
 └── arl-human-probing-design.md  # Human-probing flow design (to be implemented)
 ```
@@ -45,9 +42,8 @@ Three-layer architecture separating SDLC-agnostic framework/process from languag
 
 ## Principles
 
-1. **Layer 0 is the single source of truth** for process, gates, and conventions. Layer 1 and 2 docs reference it; they do not duplicate.
+1. **Layer 0 is the single source of truth** for process, gates, and conventions. Layer 1 docs reference it; they do not duplicate.
 2. **Harness owns process**; language plugins own specialists. The development-harness is the canonical Layer 0 implementation.
-3. **Stack profiles are optional**. A project can use Layer 0 + Layer 1 only.
 
 ---
 
