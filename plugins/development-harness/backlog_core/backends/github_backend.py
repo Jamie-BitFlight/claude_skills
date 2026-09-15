@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode
+    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode
     from backlog_core.file_cache_state import _PendingWorkItemMutation
     from backlog_core.models import (
         BackendStatus,
@@ -539,6 +539,12 @@ class GitHubBackend:
 
         Returns:
             Dict mapping issue_number to IssueStatus model.
+
+        Raises:
+            GraphQLUnavailableError: When the environment refuses GitHub's
+                GraphQL API outright. An empty map means "no item carries a
+                status", so the refusal reaches the caller rather than
+                disguising itself as that answer.
         """
         return gh_client.batch_fetch_statuses(items, repo or self._repo)
 
@@ -579,11 +585,12 @@ class GitHubBackend:
     # Issue comments
     # ------------------------------------------------------------------
 
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
         """Add a comment to an issue.
 
         Returns:
-            GraphQL node ID of the new comment.
+            AddedCommentNode with the new comment's GraphQL node ``id`` and,
+            when GitHub reports one, its REST ``database_id``.
         """
         return gh_client._add_comment_graphql(repo, issue_node_id, body)
 
@@ -593,7 +600,7 @@ class GitHubBackend:
         """Fetch all comments on an issue.
 
         Returns:
-            List of IssueCommentNode TypedDicts.
+            List of IssueCommentNode instances.
         """
         return gh_client._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
 
@@ -601,7 +608,7 @@ class GitHubBackend:
         """Fetch a single comment by its GraphQL node ID.
 
         Returns:
-            IssueCommentNode TypedDict.
+            IssueCommentNode instance.
         """
         return gh_client._fetch_comment_by_id_graphql(repo, comment_node_id)
 

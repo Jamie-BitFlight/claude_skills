@@ -613,6 +613,20 @@ class GitHubUnavailableError(BackendUnavailableError):
     """Raised when GITHUB_TOKEN is missing or the GitHub API is unreachable."""
 
 
+class GraphQLUnavailableError(BackendUnavailableError):
+    """Raised when the environment refuses GitHub's GraphQL API outright.
+
+    Distinct from a generic GraphQL failure. Some sandboxes permit GitHub's REST API
+    and reject every GraphQL request with HTTP 403, so the query was never wrong and
+    retrying it cannot succeed — only a REST path can. Callers branch on this type to
+    choose that path.
+
+    It is also distinct from :class:`ItemNotFoundError`. A refused query says nothing
+    about whether the requested item exists, and reporting one as the other tells the
+    caller something false.
+    """
+
+
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.
@@ -1273,6 +1287,21 @@ class ReconcileRequest(BaseModel):
     dry_run: bool = False
     force: bool = False
     include_diff: bool = False
+    # Set only by _GitHubReconciliation._with_snapshot_checkpoint when it
+    # upgrades an INCREMENTAL request to INITIAL because no checkpoint could
+    # be trusted to resolve a "since" from -- either none exists at all, or
+    # an existing one is a legacy, pre-scope-metadata shape (see
+    # _ProviderSnapshotCheckpoint). Never set for a caller that requests
+    # ReconcileScope.INITIAL directly -- that path never touches
+    # _with_snapshot_checkpoint's incremental-upgrade branch at all. Read by
+    # _GitHubWorkItemSync.fetch_snapshot to fetch closed issues too, even
+    # though scope is INITIAL: a genuine from-scratch reconcile intentionally
+    # fetches only open issues, but this recovery upgrade is about to
+    # (re-)establish the checkpoint every subsequent incremental fetch will
+    # trust, so it must not skip closed issues -- an issue closed (or edited
+    # while closed) before this point would otherwise never be observed
+    # again once the fresh watermark starts being trusted.
+    checkpoint_recovery: bool = False
 
 
 class ContentKind(StrEnum):

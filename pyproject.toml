@@ -364,6 +364,10 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# PyGithub's HTTPSRequestsConnectionClass builds a requests.Session and mounts a
+# requests.adapters.HTTPAdapter, so substituting its TLS context means subclassing that
+# adapter — github_client.py must speak requests to do it, and adds no new HTTP client
+"**/backlog_core/github_client.py" = ["banned-api"]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
 # I002 — PEP 563 stringifies annotations, so TypedDict cannot classify NotRequired at
