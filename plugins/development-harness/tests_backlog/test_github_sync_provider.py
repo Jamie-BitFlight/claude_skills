@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import backlog_core.backends.github_backend as github_backend_module
 import pytest
+from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -185,7 +186,7 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
     comments: list[dict[str, str]] = []
     backend._fetch_issue_comments_graphql = MagicMock(side_effect=lambda *_args: list(comments))
 
-    def add_comment(_repo: object, _issue_id: str, body: str) -> str:
+    def add_comment(_repo: object, _issue_id: str, body: str) -> AddedCommentNode:
         comments.append({
             "id": "comment-1",
             "body": body,
@@ -194,7 +195,7 @@ def test_github_sync_provider_publishes_body_change_as_audit_comment() -> None:
             "created_at": "2026-08-12T00:00:00Z",
             "updated_at": "2026-08-12T00:00:00Z",
         })
-        return "comment-1"
+        return AddedCommentNode(id="comment-1", database_id=None)
 
     backend._add_comment_graphql = MagicMock(side_effect=add_comment)
     patch = ProviderPatch(provider_id="node-1", reference="#1", expected_revision=root, body="updated")
@@ -215,7 +216,9 @@ def test_github_sync_provider_continues_after_audit_comment_failure() -> None:
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1), "#2": _issue(2)})
-    backend._add_comment_graphql = MagicMock(side_effect=[BacklogError("comment unavailable"), "comment-2"])
+    backend._add_comment_graphql = MagicMock(
+        side_effect=[BacklogError("comment unavailable"), AddedCommentNode(id="comment-2", database_id=None)]
+    )
     root_one = root_revision("#1", "node-1", "body")
     root_two = root_revision("#2", "node-2", "body")
 
@@ -233,7 +236,7 @@ def test_github_sync_provider_rejects_empty_audit_comment_identity() -> None:
     repository = MagicMock(full_name="owner/repo")
     backend.get_github = MagicMock(return_value=repository)
     backend._fetch_targeted_issues = MagicMock(return_value={"#1": _issue(1)})
-    backend._add_comment_graphql = MagicMock(return_value="")
+    backend._add_comment_graphql = MagicMock(return_value=AddedCommentNode(id="", database_id=None))
     root = root_revision("#1", "node-1", "body")
 
     [result] = backend._apply_patches([

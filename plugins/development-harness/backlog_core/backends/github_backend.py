@@ -69,7 +69,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode
+    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode
     from backlog_core.file_cache_state import _PendingWorkItemMutation
     from backlog_core.models import (
         BackendStatus,
@@ -585,11 +585,12 @@ class GitHubBackend:
     # Issue comments
     # ------------------------------------------------------------------
 
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
         """Add a comment to an issue.
 
         Returns:
-            GraphQL node ID of the new comment.
+            AddedCommentNode with the new comment's GraphQL node ``id`` and,
+            when GitHub reports one, its REST ``database_id``.
         """
         return gh_client._add_comment_graphql(repo, issue_node_id, body)
 

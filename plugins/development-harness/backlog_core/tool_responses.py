@@ -267,6 +267,11 @@ class BacklogCommentIssueResponse(FallibleToolResponse):
     comment_id: str | None = None
     """GraphQL node ID of the newly created comment -- not a REST integer ID."""
 
+    database_id: int | None = None
+    """REST comment database ID -- the value ``backlog_read_comment``'s ``comment_id``
+    requires. ``None`` when GitHub did not return one (only GitHub-backed comments
+    carry it; see ``AddedCommentNode.database_id``)."""
+
     comment_url: str | None = None
     """Always ``""`` -- the backend does not resolve a comment URL."""
 
@@ -539,7 +544,16 @@ class BacklogListResponse(FallibleToolResponse):
 
 
 class CommentEntry(BaseModel):
-    """One issue comment, truncated to a preview."""
+    """One issue comment, truncated to a preview.
+
+    ``from_attributes=True`` lets this validate directly from
+    ``operations.CommentListEntry`` instances (a distinct Pydantic model
+    owned by the operations layer) without an explicit ``model_dump()`` at
+    the server boundary -- pydantic v2 does not cross-validate between
+    unrelated model classes by attribute access unless this is set.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: str
     """GraphQL node ID of the comment (e.g. ``IC_kwDO...``)."""

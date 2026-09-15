@@ -16,10 +16,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from backlog_core.backend_types import IssueCommentNode
+from backlog_core.backend_types import AddedCommentNode, IssueCommentNode
 from backlog_core.gh_client import _fetch_comment_by_id_graphql, _fetch_issue_comments_graphql, _parse_comment_node
 from backlog_core.models import BacklogError, ValidationError
-from backlog_core.operations import list_comments, read_comment
+from backlog_core.operations import comment_issue, list_comments, read_comment
 
 from tests.graphql_factories import make_comment_by_id_response, make_issue_comment_node, make_issue_comments_response
 
@@ -314,11 +314,11 @@ class TestListComments:
         comments = result["comments"]
         assert isinstance(comments, list)
         assert len(comments) == 2
-        assert comments[0]["id"] == "IC_001"
-        assert comments[0]["author"] == "alice"
-        assert comments[0]["preview"] == "short comment"
+        assert comments[0].id == "IC_001"
+        assert comments[0].author == "alice"
+        assert comments[0].preview == "short comment"
         # Second comment body is 300 chars; preview truncates to 200.
-        assert len(comments[1]["preview"]) == 200
+        assert len(comments[1].preview) == 200
 
     def test_list_comments_database_id_is_the_rest_id_read_comment_needs(self, mocker: MockerFixture) -> None:
         """A listed comment's database_id is exactly what backlog_read_comment's comment_id needs.
@@ -362,7 +362,7 @@ class TestListComments:
         # Assert: database_id is populated on the listing entry, not None/missing.
         comments = listed["comments"]
         assert isinstance(comments, list)
-        assert comments[0]["database_id"] == rest_database_id
+        assert comments[0].database_id == rest_database_id
 
         # Arrange: wire up read_comment's REST resolution path to expect exactly
         # the database_id list_comments returned.
@@ -386,7 +386,7 @@ class TestListComments:
 
         # Act: feed the listing's database_id straight into read_comment's
         # comment_id, exactly as a caller of the public API would.
-        comment_id = comments[0]["database_id"]
+        comment_id = comments[0].database_id
         assert isinstance(comment_id, int)
         read = read_comment(issue_number=42, comment_id=comment_id)
 
@@ -429,7 +429,7 @@ class TestListComments:
         assert result["has_more"] is True
         comments = result["comments"]
         assert isinstance(comments, list)
-        assert comments[0]["id"] == "IC_001"
+        assert comments[0].id == "IC_001"
 
     def test_list_comments_has_more_false_when_all_fit(self, mocker: MockerFixture) -> None:
         """list_comments sets has_more=False when all comments fit in the window.
@@ -580,3 +580,96 @@ class TestReadComment:
         mock_repo.get_issue.assert_called_once_with(42)
         mock_issue.get_comment.assert_called_once_with(99)
         fetch_mock.assert_called_once_with(mock_repo, "IC_node123")
+
+
+# ---------------------------------------------------------------------------
+# comment_issue operation
+# ---------------------------------------------------------------------------
+
+
+class TestCommentIssue:
+    """Tests for the comment_issue operation."""
+
+    def test_comment_issue_database_id_is_the_rest_id_read_comment_needs(self, mocker: MockerFixture) -> None:
+        """A created comment's database_id is exactly what backlog_read_comment's comment_id needs.
+
+        Tests: End-to-end reachability -- the create-comment counterpart to
+        ``test_list_comments_database_id_is_the_rest_id_read_comment_needs``.
+        Before this fix, the ``addComment`` mutation never selected
+        ``fullDatabaseId``, so a comment created via ``comment_issue`` could
+        only be read back by first calling ``list_comments`` to discover its
+        REST ID separately -- the create path was unreachable through the
+        public API despite the listing and single-comment paths already
+        carrying the field.
+        How: comment_issue returns a database_id (as the live GraphQL
+        mutation, which now selects fullDatabaseId, would return); that exact
+        integer is fed straight into read_comment's comment_id, and
+        read_comment's REST resolution call (PyGithub Issue.get_comment) is
+        asserted to have received it unchanged.
+        Why: Confirms full identifier symmetry across create, list, and read
+        -- the whole point of #3546.
+        """
+        # Arrange: comment_issue sees a created comment with both a GraphQL
+        # node id and a REST database_id, as the live GraphQL mutation (which
+        # now selects fullDatabaseId) would return.
+        rest_database_id = 5659363377
+        mock_repo = _make_mock_repo(mocker)
+        mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
+        mocker.patch(
+            "backlog_core.operations._fetch_issue_graphql",
+            return_value={
+                "id": "I_kwDOAbCdEf4AbCdEf",
+                "number": 42,
+                "title": "t",
+                "state": "OPEN",
+                "body": "",
+                "createdAt": "",
+                "updatedAt": "",
+                "labels": [],
+                "milestone": None,
+                "assignees": [],
+            },
+        )
+        mocker.patch(
+            "backlog_core.operations._add_comment_graphql",
+            return_value=AddedCommentNode(id="IC_kwDOAbCdEf4AbCdEf", database_id=rest_database_id),
+        )
+
+        # Act
+        created = comment_issue(issue_number=42, body="LGTM!")
+
+        # Assert: database_id is populated on the create response, not None/missing.
+        assert created["database_id"] == rest_database_id
+        assert created["comment_id"] == "IC_kwDOAbCdEf4AbCdEf"
+
+        # Arrange: wire up read_comment's REST resolution path to expect
+        # exactly the database_id comment_issue returned.
+        mock_issue = mocker.Mock()
+        mock_comment = mocker.Mock()
+        mock_comment.node_id = "IC_kwDOAbCdEf4AbCdEf"
+        mock_issue.get_comment.return_value = mock_comment
+        mock_repo.get_issue.return_value = mock_issue
+        mocker.patch(
+            "backlog_core.operations._fetch_comment_by_id_graphql",
+            return_value=IssueCommentNode(
+                id="IC_kwDOAbCdEf4AbCdEf",
+                body="LGTM!",
+                url="",
+                author="alice",
+                created_at="2026-01-01T00:00:00Z",
+                updated_at="2026-01-01T00:00:00Z",
+                database_id=rest_database_id,
+            ),
+        )
+
+        # Act: feed the create response's database_id straight into
+        # read_comment's comment_id, exactly as a caller of the public API would.
+        comment_id = created["database_id"]
+        assert isinstance(comment_id, int)
+        read = read_comment(issue_number=42, comment_id=comment_id)
+
+        # Assert: the REST database ID reached PyGithub's REST call unchanged,
+        # and the same comment came back.
+        mock_issue.get_comment.assert_called_once_with(rest_database_id)
+        assert read["id"] == "IC_kwDOAbCdEf4AbCdEf"
+        assert read["body"] == "LGTM!"

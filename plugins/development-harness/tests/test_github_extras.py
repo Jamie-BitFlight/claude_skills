@@ -213,7 +213,7 @@ class TestComments:
         number = github_backend.create_issue_for_item(_MOCK_REPO, item)
         assert number is not None
         node = github_backend._fetch_issue_graphql(_MOCK_REPO, "", "", number)
-        comment_id = github_backend._add_comment_graphql(_MOCK_REPO, node["id"], "Original")
+        comment_id = github_backend._add_comment_graphql(_MOCK_REPO, node["id"], "Original").id
 
         # Act
         github_backend._update_issue_comment_graphql(_MOCK_REPO, comment_id, "Updated body")
