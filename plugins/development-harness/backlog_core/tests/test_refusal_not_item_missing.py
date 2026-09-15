@@ -22,9 +22,11 @@ from backlog_core import gh_client, operations
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
+    ContentUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
+    ReconcileRequest,
     ReconcileResult,
     ViewItemResult,
 )
@@ -34,7 +36,6 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-    from backlog_core.models import ReconcileRequest
 
 _REFUSAL_MESSAGE = "GitHub GraphQL is not available from Claude Code sessions; use the REST API"
 
@@ -232,6 +233,14 @@ class _CheckpointedBackend:
     called by ``list_items``"), this stub reports its checkpoint state via
     ``has_synced_snapshot`` so ``list_items``'s one-shot cold-cache
     read-through (A-critique.md Sec 5, ALT-5) is reachable in a test.
+
+    ``reconcile`` records every request it receives (rather than raising)
+    so a test can go through the real, unmocked
+    ``operations.refresh_local_cache_from_github`` and assert on the
+    ``ReconcileRequest`` shape that implicit refresh actually constructs --
+    most importantly, ``apply_local_patches`` (PR #3573 review Finding 1:
+    a plain ``backlog_list`` call must never push a queued local mutation
+    to the provider).
     """
 
     supports_batch_status_fetch = False
@@ -239,6 +248,7 @@ class _CheckpointedBackend:
     def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
         self._items = items
         self._synced = synced
+        self.reconcile_requests: list[ReconcileRequest] = []
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
@@ -247,8 +257,9 @@ class _CheckpointedBackend:
         return self._synced
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
-        """Satisfy the ``SyncProvider`` protocol; tests patch the wrapper instead."""
-        raise NotImplementedError
+        """Record the request and report a no-op reconciliation outcome."""
+        self.reconcile_requests.append(request)
+        return ReconcileResult()
 
 
 class TestColdCacheReadsThroughOnce:
@@ -345,3 +356,66 @@ class TestColdCacheReadsThroughOnce:
         assert isinstance(first_item, dict)
         assert first_item["title"] == "Freshly synced"
         assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_cold_cache_with_a_queued_mutation_never_pushes_it_implicitly(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 1 (P1, most serious): a plain ``backlog_list``
+        call is advertised ``read_only_hint=True``/``destructive_hint=False`` in
+        server.py's ``backlog_list`` tool annotation, so it must never replay a
+        queued local mutation to GitHub as a side effect of the implicit
+        cold-cache read-through. This drives the real, unmocked
+        ``refresh_local_cache_from_github`` down to ``backend.reconcile`` (a
+        recording stub standing in for ``_GitHubReconciliation``) and asserts
+        the request it builds asks for a fetch-only reconcile -- the flag that
+        gates ``_GitHubReconciliation.reconcile``'s call to
+        ``_ReconcileProvider._apply_patches``, the only step in that method
+        that writes to GitHub."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        operations.list_items(output=Output())
+
+        assert len(backend.reconcile_requests) == 1
+        assert backend.reconcile_requests[0].apply_local_patches is False
+
+    def test_a_running_background_sync_skips_the_implicit_refresh(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 2 (P2): a ``backlog_list`` call that lands
+        while the default startup sync is still RUNNING must not launch a
+        second, uncoordinated reconciliation. Reuses ``SyncState``'s existing
+        ``is_running()`` check rather than starting a duplicate sync; the
+        implicit refresh is skipped entirely and falls through to the
+        existing "cache holds no items" warning."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "get_sync_state", return_value=mocker.Mock(is_running=lambda: True))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_not_called()
+        assert backend.reconcile_requests == []
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_content_provider_failure_during_implicit_refresh_still_serves_the_cache(
+        self, mocker: MockerFixture
+    ) -> None:
+        """PR #3573 review Finding 3 (P2): ``ContentUnavailableError``'s base is
+        ``ContentProviderError``, a tree separate from ``BacklogError`` (see
+        ``classify_sync_error``'s docstring in sync_state.py) -- a content-provider
+        failure fetching work-item bodies on a cold cache (e.g.
+        ``_work_item_contexts`` raising ``ContentUnavailableError``) must degrade
+        to the cached-result-plus-warning path, not raise uncaught out of
+        ``list_items(refresh=False)``."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations,
+            "refresh_local_cache_from_github",
+            side_effect=ContentUnavailableError("GitHub work-item audit comment response was invalid"),
+        )
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
