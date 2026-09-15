@@ -495,6 +495,11 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Creates, updates, grooming changes, plans, and artifact mutations update the cache atomically and
   append a durable pending mutation.
 - A missing cache record is reported as unavailable data, never as an authoritative empty result.
+  The same rule applies to a full listing: `operations.list_items` reports `from_cache`/
+  `has_pending_writes` provenance on every response and, when a GitHub-backed cache's state cannot
+  be confirmed complete (never synced, or a checkpoint over a snapshot set with unreadable files),
+  withholds `items`/`count` (both `None`) by default rather than returning an ambiguous empty list —
+  see `docs/backend-providers.md`'s "Listing provenance" section (backlog #3546 task A4).
 
 **Reconnect behavior**:
 

@@ -182,11 +182,41 @@ The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
+### Listing provenance
+
+`operations.list_items` reports two independent, provenance-flavored bits on
+every response — `from_cache` and `has_pending_writes` — rather than one
+conflated "authoritative" boolean (backlog #3546 task A4; the two-bit shape
+follows Firestore's `SnapshotMetadata.fromCache`/`hasPendingWrites`).
+`from_cache` is `True` only for a backend with `supports_cached_listing = True`
+(GitHub); `has_pending_writes` is `True` when the listing includes
+locally-queued mutations the provider has not yet acknowledged, independent of
+`from_cache` — a fully-synced GitHub cache can still hold unconfirmed local
+writes.
+
+When a GitHub-backed listing's cache state cannot be confirmed complete
+(never synced, or a checkpoint sitting over a snapshot set with unreadable
+files — see `WorkItemSnapshotBatch.skipped`, backlog #3546 task A2), the
+listing is withheld by default: `items` and `count` are both `None` instead
+of the ambiguous `[]`/`0` an unaware caller could misread as a confirmed-empty
+backlog. Pass `allow_cached=True` (`--allow-cached` on the CLI) to opt into
+the best-effort cached list anyway.
+
+**Configuration caveat**: `SQLiteBackend` defaults to `db_path=":memory:"` (an
+ephemeral in-process database). A freshly started process on that default is
+structurally in the same "never populated" state as a cold GitHub cache, even
+though `supports_cached_listing = False` reports no cache to distrust —
+`sqlite`'s zero rows are correctly "authoritative" only because the backend
+has genuinely never been written to, not because it holds real data. Configure
+a persistent `db_path` for any deployment where this distinction matters.
+
 ### Capability flags
 
-`WorkItemBackend` declares five class-level capability flags every backend
-sets. Callers read a flag before invoking the operation it gates, rather than
-probing behavior or catching a stub's exception:
+`WorkItemBackend` declares the class-level capability flags every backend
+sets, listed in the table below (this section is the source of truth for the
+count — do not restate it elsewhere). Callers read a flag before invoking the
+operation it gates, rather than probing behavior or catching a stub's
+exception:
 
 | Flag | Meaning | `github` | `sqlite` | `memory` | `beads` |
 |---|---|---|---|---|---|
@@ -194,7 +224,12 @@ probing behavior or catching a stub's exception:
 | `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
 | `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
 | `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
+<<<<<<< HEAD
 | `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
+=======
+| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept (ADR-003) — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
+| `supports_cached_listing` | Backend's `list_work_items()` reads a provider-private cache (GitHub's `FileCache`) rather than the backend's own authoritative storage directly. Read by `operations.list_items` (backlog #3546 task A4) to compute the `from_cache` provenance bit on every listing response — see "Listing provenance" below. | `True` | `False` | `False` | `False` |
+>>>>>>> 8f5715822 (feat(backlog-core): report fail-safe listing provenance for a cold cache)
 
 **Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
 `runtime_checkable` Protocols. `isinstance(backend, SomeProtocol)` checks

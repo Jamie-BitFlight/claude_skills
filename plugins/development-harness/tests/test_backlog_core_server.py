@@ -670,6 +670,50 @@ async def test_backlog_list_response_includes_backend_key():
     assert response["backend"]["total_count"] == 203
 
 
+async def test_backlog_list_response_includes_provenance_bits_on_the_full_path():
+    """from_cache/has_pending_writes (backlog #3546 task A4) reach the MCP wire.
+
+    Tests: a healthy, high-confidence listing still carries both provenance
+        bits declared on BacklogListResponse -- not just the withheld path.
+    How: mock operations.list_items returning both bits alongside items.
+    Why: BacklogListResponse must declare these fields explicitly, since
+        _respond's model_validate(...).model_dump(...) silently drops any
+        key the model does not declare (Question B's critique, Sec 2.2) --
+        an inherited-only field would vanish here exactly as proven there.
+    """
+    op_result = {
+        "items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}],
+        "from_cache": True,
+        "has_pending_writes": True,
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {})
+
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is True
+
+
+async def test_backlog_list_withheld_listing_carries_provenance_with_null_items():
+    """A fail-safe withheld listing (backlog #3546 task A4) still names its provenance.
+
+    Tests: when operations.list_items withholds items/count (items=None), the
+        MCP response omits items/count entirely (exclude_none=True drops the
+        null) rather than the ambiguous items=[]/count=0 shape, while
+        from_cache/has_pending_writes -- real booleans, not None -- survive.
+    How: mock operations.list_items returning the withheld shape directly.
+    Why: an unaware caller must not be able to mistake a withheld listing for
+        a confirmed-empty one.
+    """
+    op_result = {"items": None, "count": None, "from_cache": True, "has_pending_writes": False}
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {})
+
+    assert "items" not in response
+    assert "count" not in response
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is False
+
+
 async def test_backlog_list_backend_reachable_message_format():
     """backlog_list messages includes a formatted backend status line when reachable.
 

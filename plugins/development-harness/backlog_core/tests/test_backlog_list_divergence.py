@@ -46,8 +46,22 @@ if TYPE_CHECKING:
 
 
 def _make_list_items_result(items: list[BacklogListItem]) -> ListItemsResult:
-    """Return a minimal list_items result dict with the given items."""
-    return {"items": items, "count": len(items), "messages": [], "warnings": [], "errors": []}
+    """Return a minimal list_items result dict with the given items.
+
+    ``from_cache``/``has_pending_writes`` (backlog #3546 task A4) are set to
+    their most boring values here -- these tests exercise sync_state
+    divergence signalling, not listing provenance, so a fixed ``False``/
+    ``False`` keeps that concern out of this helper's callers.
+    """
+    return {
+        "items": items,
+        "count": len(items),
+        "from_cache": False,
+        "has_pending_writes": False,
+        "messages": [],
+        "warnings": [],
+        "errors": [],
+    }
 
 
 # ---------------------------------------------------------------------------

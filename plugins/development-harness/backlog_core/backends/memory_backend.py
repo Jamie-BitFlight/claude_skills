@@ -112,6 +112,8 @@ class InMemoryBackend:
       implemented (create/get/list/delete/merge) for test-double coverage
       of the ``BranchBackend`` protocol.
     - ``supports_github_extras = False`` — same reason as ``SQLiteBackend``: methods are local simulations, ``get_github()`` can't return a real ``Repository``.
+    - ``supports_cached_listing = False`` — :meth:`list_work_items` reads
+      ``self._work_items`` directly; there is no separate provider cache.
     """
 
     supports_batch_status_fetch: bool = True
@@ -120,6 +122,18 @@ class InMemoryBackend:
     supports_branches: bool = True
     supports_github_extras: bool = False
     supports_milestones: bool = True
+    supports_cached_listing: bool = False
+
+    def has_pending_writes(self) -> bool:
+        """Report whether any mutation is queued and unacknowledged.
+
+        Always ``False`` — writes land directly in ``self._work_items`` with
+        no separate offline queue to lag behind.
+
+        Returns:
+            ``False``, always.
+        """
+        return False
 
     def __init__(self) -> None:
         """Initialise empty in-memory storage for all backend state."""
