@@ -13,6 +13,9 @@ still renders. What changes is that the answer names its own limits.
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -30,6 +33,7 @@ from backlog_core.models import (
     ReconcileResult,
     ViewItemResult,
 )
+from backlog_core.sync_state import get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -378,15 +382,16 @@ class TestColdCacheReadsThroughOnce:
         assert backend.reconcile_requests[0].apply_local_patches is False
 
     def test_a_running_background_sync_skips_the_implicit_refresh(self, mocker: MockerFixture) -> None:
-        """PR #3573 review Finding 2 (P2): a ``backlog_list`` call that lands
+        """PR #3573 review Finding 1 (P2): a ``backlog_list`` call that lands
         while the default startup sync is still RUNNING must not launch a
-        second, uncoordinated reconciliation. Reuses ``SyncState``'s existing
-        ``is_running()`` check rather than starting a duplicate sync; the
-        implicit refresh is skipped entirely and falls through to the
-        existing "cache holds no items" warning."""
+        second, uncoordinated reconciliation. Routed through ``SyncState``'s
+        single-flight ``try_claim()`` (the same primitive ``try_start()`` uses
+        for startup sync and ``sync_now``) rather than a bare read-only
+        ``is_running()`` check; the implicit refresh is skipped entirely and
+        falls through to the existing "cache holds no items" warning."""
         backend = _CheckpointedBackend([], synced=False)
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "get_sync_state", return_value=mocker.Mock(is_running=lambda: True))
+        mocker.patch.object(operations, "get_sync_state", return_value=mocker.Mock(try_claim=lambda: None))
         refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
         out = Output()
 
@@ -395,6 +400,59 @@ class TestColdCacheReadsThroughOnce:
         refresh_mock.assert_not_called()
         assert backend.reconcile_requests == []
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_two_overlapping_cold_cache_calls_reconcile_exactly_once(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 1 (P2), the concurrency regression: two
+        ``backlog_list`` calls landing on separate ``asyncio.to_thread`` worker
+        threads for the same never-synced cache must not both observe an idle
+        sync slot and both reconcile. Runs ``operations.list_items`` on two
+        real OS threads, started together via a barrier so both reach the
+        ``SyncState.try_claim()`` call at effectively the same instant,
+        against the real (unmocked) process-singleton ``SyncState`` --
+        proving the fix end to end, not just at the ``try_claim()`` primitive
+        level. The mocked ``refresh_local_cache_from_github`` sleeps briefly
+        to widen the window during which a broken, read-only ``is_running()``
+        check would let a second thread slip through before the first sets
+        ``RUNNING``."""
+
+        async def _reset() -> None:
+            reset_sync_state()
+
+        asyncio.run(_reset())
+
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        refresh_calls: list[None] = []
+        refresh_lock = threading.Lock()
+
+        def _slow_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            with refresh_lock:
+                refresh_calls.append(None)
+            time.sleep(0.05)
+            return {"pending_mutations": 0, "rejected_mutations": 0}
+
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_slow_refresh)
+
+        start_barrier = threading.Barrier(2)
+        results: list[Mapping[str, object]] = []
+        results_lock = threading.Lock()
+
+        def _call_list_items() -> None:
+            start_barrier.wait(timeout=5)
+            result = operations.list_items(output=Output())
+            with results_lock:
+                results.append(result)
+
+        threads = [threading.Thread(target=_call_list_items) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert len(refresh_calls) == 1, f"expected exactly one reconciliation attempt, got {len(refresh_calls)}"
+        assert len(results) == 2
+        assert get_sync_state().status != "running"
 
     def test_a_content_provider_failure_during_implicit_refresh_still_serves_the_cache(
         self, mocker: MockerFixture

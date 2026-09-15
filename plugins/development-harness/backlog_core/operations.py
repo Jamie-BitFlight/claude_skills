@@ -2039,18 +2039,26 @@ def list_items(
         #      fetching and updating the local cache while skipping the
         #      provider-patch seam entirely (see ``ReconcileRequest`` and
         #      ``_GitHubReconciliation.reconcile``).
-        #   2. No uncoordinated second sync: if a background sync is already
-        #      RUNNING (startup sync, or a concurrent ``sync_now``), this
-        #      call must not launch a second, uncoordinated reconciliation
-        #      that duplicates the fetch and races on provider-patch
-        #      attempts. Reuses ``SyncState``'s existing ``is_running()``
-        #      check -- the same status ``sync_now`` inspects before
-        #      claiming the sync slot with ``try_start()`` -- rather than
-        #      inventing new locking. This function runs off the event loop
-        #      thread (``asyncio.to_thread`` from ``backlog_list``), so it
-        #      only reads ``SyncState.status``; it never touches
-        #      ``SyncState.lock`` (an ``asyncio.Lock``, which is not safe to
-        #      acquire from a worker thread).
+        #   2. No uncoordinated second sync: two overlapping cold-cache
+        #      ``backlog_list`` calls (or a race with a concurrent
+        #      ``sync_now``) must not both observe an idle slot and both
+        #      reconcile concurrently. Claims the sync slot via
+        #      ``SyncState.try_claim()`` -- the same single-flight primitive
+        #      ``try_start()`` uses for startup sync and ``sync_now`` -- rather
+        #      than a bare read-only ``is_running()`` check, which cannot
+        #      prevent two callers from both observing "not running" and both
+        #      proceeding (PR #3573 review Finding 1). ``try_claim()`` is
+        #      guarded by a ``threading.Lock`` internal to ``SyncState``, so it
+        #      is safe to call from this function's worker thread
+        #      (``asyncio.to_thread`` from ``backlog_list``) even when it races
+        #      another worker thread or the event-loop thread -- unlike
+        #      ``SyncState.lock`` (an ``asyncio.Lock``), which is never safe to
+        #      acquire from a worker thread and is not touched here.
+        #      ``try_claim()`` returns the pre-claim status so it can be
+        #      restored via ``release_claim()`` once this one-shot attempt
+        #      finishes, leaving an existing OFFLINE/ERROR state exactly as
+        #      the background sync loop left it instead of silently clearing
+        #      it to IDLE.
         #   3. Graceful content-provider degradation: ``ContentUnavailableError``
         #      (and its ``ContentNotFoundError`` subclass) is the exception
         #      ``_work_item_contexts`` / ``get_many`` raise for a cold-cache
@@ -2062,7 +2070,9 @@ def list_items(
         #      sibling ``except (BacklogError, ContentUnavailableError)``
         #      clauses already established in
         #      ``_GitHubWorkItemSync.fetch_snapshot``.
-        if get_sync_state().is_running():
+        sync_state = get_sync_state()
+        previous_sync_status = sync_state.try_claim()
+        if previous_sync_status is None:
             out.info(
                 "  A background sync is already in progress; skipping the implicit "
                 "read-through for this never-synced cache rather than starting a second one."
@@ -2072,6 +2082,8 @@ def list_items(
                 refresh_local_cache_from_github(repo, label, output=out, apply_local_patches=False)
             except (GithubException, BacklogError, ContentUnavailableError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
                 out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
+            finally:
+                sync_state.release_claim(previous_sync_status)
     items = get_config().backend.list_work_items()
     if not items and isinstance(get_config().backend, SyncProvider):
         # A provider-backed cache holding nothing reads exactly like an empty
