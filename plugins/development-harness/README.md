@@ -439,12 +439,12 @@ The harness is organized in layers:
 | Layer | Owns | Examples |
 |---|---|---|
 | Layer 0 | Process framework | SAM pipeline, ARL touchpoints, RT-ICA, artifact conventions, verification protocol |
-| Layer 1 | Language specifics | Language manifest declaring specialist agents and quality gates, project detection |
+| Layer 1 | Language specifics | Specialist agents and quality gates discovered live via `profile_list()`, project detection |
 | Layer 2 | Stack/goal specifics | Architecture patterns, toolchain config (e.g., Python CLI, Python FastAPI) |
 
 An ARL Meta-Layer sits above all three, running an observation-improvement loop: Observe → Identify → Probe → Accumulate → Improve. This loop surfaces systemic issues in the development process itself.
 
-Plugin authors composing with this harness write a Layer 1 language manifest that maps abstract roles (design-spec, test-designer, code-reviewer) to their concrete agents. The harness resolves roles at runtime based on project detection.
+Plugin authors composing with this harness install Layer 1 specialist agents; the harness discovers them live via `mcp__plugin_dh_backlog__profile_list()` and matches abstract roles (design-spec, test-designer, code-reviewer) against their declared descriptions at runtime, with no manifest to declare or maintain.
 
 ---
 
@@ -550,7 +550,7 @@ The **`.cursor-plugin/plugin.json`** manifest is for Cursor (see [Plugins refere
 
 - Fixing a one-line typo or a known, trivial bug (use `/dh:work-backlog-item --quick` instead)
 - Making documentation-only changes
-- Your language plugin already provides its own complete workflow (check for a flow override in its manifest)
+- Your language plugin already provides its own complete workflow
 
 ---
 

@@ -143,8 +143,9 @@ to update.
 ## Role Resolution
 
 This stage requires a codebase analyzer capable of reading files, searching
-patterns, and understanding project structure. Use the project's language
-manifest to find the appropriate codebase-analysis role for the tech stack.
+patterns, and understanding project structure. Call
+`mcp__plugin_dh_backlog__profile_list()` to find the appropriate
+codebase-analysis role for the tech stack.
 
 ## Behavioral Rules
 

@@ -17,7 +17,7 @@ Language-agnostic development process harness that orchestrates feature developm
 - The harness owns the *process*; language plugins own the *specialists*
 - Every stage produces a logical handoff. Document artifacts use `artifact_register` and `artifact_read`; plans and task state use `sam_plan` and `sam_task`. Neither surface exposes direct filesystem paths.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
-- `dh:task-worker` executes a SAM task and loads the specialist profile the task's `agent` field names via `mcp__plugin_dh_backlog__profile_load()`; that name is resolved earlier by matching `profile_list()`'s live agent descriptions against the task's role and content, and without a match no profile is named. It is the executor in both cases, never a specialist a task can name for itself
+- `dh:task-worker` executes a SAM task and loads the specialist profile the task's `agent` field names via `mcp__plugin_dh_backlog__profile_load()` — see Voltron-Style Composition below for how that name is resolved. It is the executor in both cases, never a specialist a task can name for itself
 - Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
 
 ---
