@@ -171,6 +171,53 @@ class TestStatusFilterWithALiveAnswer:
         assert result["count"] == 1
 
 
+class TestRenderedStatusWithALiveAnswer:
+    """The render path must agree with the filter path on the live side too.
+
+    ``_item_derived_status`` normalizes a live ``status:needs-grooming`` map
+    entry to bare ``"needs-grooming"`` for filter matching (see
+    ``TestStatusFilterWithALiveAnswer`` above). ``_build_list_entry`` must
+    normalize the same live entry the same way when rendering it, or a
+    caller combining the documented ``status="needs-grooming"`` filter with
+    the supported post-render ``filter_by_key={"status": "needs-grooming"}``
+    would have the item selected by the first and dropped by the second.
+    """
+
+    def test_a_live_labeled_needs_grooming_entry_renders_bare(self, mocker: MockerFixture) -> None:
+        """Reproduction (P2, PR #3552 Codex review, third finding): a live
+        status map entry carrying the literal ``"status:needs-grooming"``
+        label rendered verbatim as ``"status:needs-grooming"`` even though
+        ``_item_derived_status`` already normalizes the same value to bare
+        ``"needs-grooming"`` for filter-matching purposes. Before the fix
+        this rendered ``"status:needs-grooming"``.
+        """
+        _patch_backend(mocker, [_item("#42", status="status:needs-grooming")])
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value={42: IssueStatus(status="status:needs-grooming", milestone="")},
+        )
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert _statuses(result) == ["needs-grooming"]
+
+    def test_a_live_labeled_needs_grooming_entry_survives_the_post_render_filter(self, mocker: MockerFixture) -> None:
+        """The rendered entry must agree with the documented post-render filter that selects it."""
+        _patch_backend(mocker, [_item("#42", status="status:needs-grooming")])
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value={42: IssueStatus(status="status:needs-grooming", milestone="")},
+        )
+
+        result = operations.list_items(
+            status="needs-grooming", output=Output(), filter_by_key={"status": "needs-grooming"}
+        )
+
+        assert result["count"] == 1
+
+
 class TestStatusFilterUnderARefusal:
     """The filter has to answer from the cache, not from a fabricated default."""
 

@@ -1847,6 +1847,32 @@ def normalize_cached_github_status(status: str) -> str:
     return candidate
 
 
+def normalize_live_github_status(status: str) -> str:
+    """Normalize a live GitHub status value to its canonical filter/render form.
+
+    A genuine ``"status:needs-grooming"`` label (see
+    :attr:`StatusLabel.NEEDS_GROOMING`) means the same thing as a missing
+    status-map key: "this item needs grooming". Both :func:`_item_derived_status`
+    (for filtering) and :func:`_build_list_entry` (for rendering) call this
+    helper on a live ``status_map`` entry so the two paths always agree on
+    which items a ``--status needs-grooming`` filter selects — the bare
+    ``"needs-grooming"`` sentinel used everywhere else in this module's
+    ``--status`` filter is the canonical form, so the labeled form is
+    normalized down here rather than returned verbatim by either call site.
+
+    Args:
+        status: Raw ``status`` value from a live ``status_map`` entry
+            (``IssueStatus.status``).
+
+    Returns:
+        ``"needs-grooming"`` when *status* is the labeled
+        ``"status:needs-grooming"`` value; otherwise *status* unchanged.
+    """
+    if status == StatusLabel.NEEDS_GROOMING.value:
+        return "needs-grooming"
+    return status
+
+
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True) -> str:
     """Return the effective status string for an item.
 
@@ -1873,11 +1899,12 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
         neither is available and ``""`` when the live status is simply
         unknown. A live ``status_map`` entry carrying the labeled
         ``"status:needs-grooming"`` value (see :attr:`StatusLabel.NEEDS_GROOMING`)
-        is itself normalized down to the bare ``"needs-grooming"`` sentinel,
-        for the same reason :func:`normalize_cached_github_status` leaves a
-        cached bare ``"needs-grooming"`` unpromoted: bare ``"needs-grooming"``
-        is the one canonical, documented ``--status`` filter token for this
-        value everywhere in this module, not the labeled form.
+        is normalized down to the bare ``"needs-grooming"`` sentinel via
+        :func:`normalize_live_github_status`, for the same reason
+        :func:`normalize_cached_github_status` leaves a cached bare
+        ``"needs-grooming"`` unpromoted: bare ``"needs-grooming"`` is the one
+        canonical, documented ``--status`` filter token for this value
+        everywhere in this module, not the labeled form.
     """
     num = parse_issue_number(item.issue)
     if num is None:
@@ -1895,16 +1922,16 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
     info = status_map.get(num)
     if info is None:
         return "needs-grooming"
-    if info.status == StatusLabel.NEEDS_GROOMING.value:
-        # A genuine "status:needs-grooming" label (gh_client._pick_primary_status_label's
-        # labeled form) means the same thing as a missing map key above — both are
-        # "this item needs grooming" — but the two would otherwise return different
-        # strings ("status:needs-grooming" vs "needs-grooming"), and only the bare
-        # form equals the documented --status needs-grooming filter token. Normalize
-        # the labeled form down to bare so both cases agree, mirroring
-        # normalize_cached_github_status's own "needs-grooming is always bare" rule.
-        return "needs-grooming"
-    return info.status
+    # A genuine "status:needs-grooming" label (gh_client._pick_primary_status_label's
+    # labeled form) means the same thing as a missing map key above — both are
+    # "this item needs grooming" — but the two would otherwise return different
+    # strings ("status:needs-grooming" vs "needs-grooming"), and only the bare
+    # form equals the documented --status needs-grooming filter token.
+    # normalize_live_github_status normalizes the labeled form down to bare so
+    # both cases agree, mirroring normalize_cached_github_status's own
+    # "needs-grooming is always bare" rule. _build_list_entry calls the same
+    # helper on its own status_map lookup so the render path agrees too.
+    return normalize_live_github_status(info.status)
 
 
 def _filter_open_items(
@@ -2010,6 +2037,12 @@ def _build_list_entry(
             (normalized to the ``status:*`` label form via
             :func:`normalize_cached_github_status` for numeric-issue items,
             matching what :func:`_item_derived_status` uses for filtering).
+            When a live *status_map* entry exists, its ``status:needs-grooming``
+            label (see :attr:`StatusLabel.NEEDS_GROOMING`) is normalized down
+            to bare ``"needs-grooming"`` via :func:`normalize_live_github_status`,
+            matching what :func:`_item_derived_status` uses for filtering the
+            live path too — otherwise a rendered entry could disagree with the
+            filter that selected it.
 
     Returns:
         Dict with section, title, issue, plan, type, topic, body, state,
@@ -2036,7 +2069,7 @@ def _build_list_entry(
         if num is not None:
             info = status_map.get(num)
             if info is not None:
-                entry["status"] = info.status
+                entry["status"] = normalize_live_github_status(info.status)
                 entry["milestone"] = info.milestone
             else:
                 # No live answer for this issue. When the query ran, that means the
