@@ -98,8 +98,8 @@ def test_github_work_item_sibling_heads_preserve_common_parent_and_distinct_audi
     ("comment", "error"),
     [
         (None, "missing"),
-        ({**_comment("comment-1", "root", "rendered"), "body": "forged"}, "invalid"),
-        ({**_comment("comment-1", "root", "rendered"), "id": "other"}, "identity"),
+        (_comment("comment-1", "root", "rendered").model_copy(update={"body": "forged"}), "invalid"),
+        (_comment("comment-1", "root", "rendered").model_copy(update={"id": "other"}), "identity"),
     ],
 )
 def test_github_work_item_rejects_missing_forged_or_replaced_audit_comment(
@@ -232,7 +232,7 @@ def test_github_work_item_backend_publishes_initial_then_subsequent_contents_hea
 
     # Then: Contents SHAs become revisions and both append-only audit comments remain intact
     assert (first.status, second.status, second.revision) == ("applied", "applied", "head-2")
-    assert [(comment_id, comment["body"].split("\n", 1)[1]) for comment_id, comment in comments.items()] == [
+    assert [(comment_id, comment.body.split("\n", 1)[1]) for comment_id, comment in comments.items()] == [
         ("comment-1", "first"),
         ("comment-2", "second"),
     ]
@@ -330,4 +330,4 @@ def test_github_work_item_backend_concurrent_initial_cas_has_one_winner_and_two_
 
     # Then: one Contents head wins, while both comments remain forensic evidence
     assert sorted(result.status for result in results) == ["applied", "conflict"]
-    assert sorted(comment["body"].split("\n", 1)[1] for comment in comments.values()) == ["one", "two"]
+    assert sorted(comment.body.split("\n", 1)[1] for comment in comments.values()) == ["one", "two"]

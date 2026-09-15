@@ -417,7 +417,7 @@ class _GitHubWorkItemSync:
                 if not isinstance(node, dict):
                     raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
                 comment = gh_client._parse_comment_node(node)
-                comments[comment["id"]] = comment
+                comments[comment.id] = comment
         return heads, comments
 
 

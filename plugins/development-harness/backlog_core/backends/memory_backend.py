@@ -496,14 +496,19 @@ class InMemoryBackend:
         return self._comments[issue_num][idx]
 
     def _update_issue_comment_graphql(self, repo: Repository, comment_node_id: str, body: str) -> None:
-        """Update a comment's body."""
+        """Update a comment's body.
+
+        ``IssueCommentNode`` is a frozen Pydantic model, so the stored record is
+        replaced with a validated copy rather than mutated in place.
+        """
         loc = self._comment_index.get(comment_node_id)
         if loc is None:
             msg = f"InMemoryBackend: comment {comment_node_id!r} not found"
             raise KeyError(msg)
         issue_num, idx = loc
-        self._comments[issue_num][idx]["body"] = body
-        self._comments[issue_num][idx]["updated_at"] = _now()
+        self._comments[issue_num][idx] = self._comments[issue_num][idx].model_copy(
+            update={"body": body, "updated_at": _now()}
+        )
 
     # ------------------------------------------------------------------
     # Status mutations

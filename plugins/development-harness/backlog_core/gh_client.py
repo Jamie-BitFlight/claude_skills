@@ -900,7 +900,7 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
 
 
 def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
-    """Parse a raw GraphQL comment dict into a typed IssueCommentNode.
+    """Parse a raw GraphQL comment dict into a validated IssueCommentNode.
 
     Args:
         node: Raw dict from GraphQL response comments.nodes[] or node() query.
@@ -910,23 +910,27 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         when the response carries a ``databaseId`` integer — it is the numeric
         identifier REST addresses the comment by, and a missing or non-integer
         value is left absent rather than guessed at, so a REST caller fails
-        loudly instead of requesting a comment that does not exist.
+        loudly instead of requesting a comment that does not exist. bool is an
+        int subclass, so it is excluded explicitly here — True would otherwise
+        become comment 1 — and ``IssueCommentNode``'s own ``strict=True``
+        config independently rejects a bool or numeric-string ``database_id``
+        that reaches construction some other way.
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    parsed = IssueCommentNode(
+    raw_database_id = node.get("databaseId")
+    database_id = (
+        raw_database_id if isinstance(raw_database_id, int) and not isinstance(raw_database_id, bool) else None
+    )
+    return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
         url=str(node.get("url", "")),
         author=author,
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
+        database_id=database_id,
     )
-    # bool is an int subclass, so it is excluded explicitly — True would
-    # otherwise become comment 1.
-    if isinstance(raw_database_id := node.get("databaseId"), int) and not isinstance(raw_database_id, bool):
-        parsed["database_id"] = raw_database_id
-    return parsed
 
 
 def _fetch_issue_comments_graphql(
@@ -941,7 +945,7 @@ def _fetch_issue_comments_graphql(
         issue_number: Issue number (positive integer).
 
     Returns:
-        List of ``IssueCommentNode`` dicts with ``id``, ``body``, ``url``,
+        List of ``IssueCommentNode`` instances with ``id``, ``body``, ``url``,
         ``author``, ``created_at``, and ``updated_at`` fields.
 
     Raises:

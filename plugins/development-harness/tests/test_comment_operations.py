@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from backlog_core.backend_types import IssueCommentNode
 from backlog_core.gh_client import _fetch_comment_by_id_graphql, _fetch_issue_comments_graphql, _parse_comment_node
 from backlog_core.models import BacklogError, ValidationError
 from backlog_core.operations import list_comments, read_comment
@@ -76,12 +77,12 @@ class TestParseCommentNode:
         result = _parse_comment_node(raw)
 
         # Assert
-        assert result["id"] == "IC_abc"
-        assert result["body"] == "Hello world"
-        assert result["url"] == "https://github.com/o/r/issues/1#issuecomment-1"
-        assert result["author"] == "alice"
-        assert result["created_at"] == "2026-01-01T00:00:00Z"
-        assert result["updated_at"] == "2026-01-02T12:00:00Z"
+        assert result.id == "IC_abc"
+        assert result.body == "Hello world"
+        assert result.url == "https://github.com/o/r/issues/1#issuecomment-1"
+        assert result.author == "alice"
+        assert result.created_at == "2026-01-01T00:00:00Z"
+        assert result.updated_at == "2026-01-02T12:00:00Z"
 
     def test_parse_comment_node_missing_author_defaults_empty_string(self) -> None:
         """_parse_comment_node returns empty string author when author is absent.
@@ -104,7 +105,7 @@ class TestParseCommentNode:
         result = _parse_comment_node(raw)
 
         # Assert
-        assert result["author"] == ""
+        assert result.author == ""
 
     def test_parse_comment_node_missing_fields_default_to_empty_string(self) -> None:
         """_parse_comment_node returns empty strings for absent optional fields.
@@ -120,11 +121,11 @@ class TestParseCommentNode:
         result = _parse_comment_node(raw)
 
         # Assert
-        assert result["id"] == "IC_min"
-        assert result["body"] == ""
-        assert result["author"] == ""
-        assert result["created_at"] == ""
-        assert result["updated_at"] == ""
+        assert result.id == "IC_min"
+        assert result.body == ""
+        assert result.author == ""
+        assert result.created_at == ""
+        assert result.updated_at == ""
 
 
 # ---------------------------------------------------------------------------
@@ -155,10 +156,10 @@ class TestFetchIssueCommentsGraphql:
 
         # Assert
         assert len(result) == 2
-        assert result[0]["id"] == "IC_001"
-        assert result[0]["author"] == "alice"
-        assert result[1]["id"] == "IC_002"
-        assert result[1]["author"] == "bob"
+        assert result[0].id == "IC_001"
+        assert result[0].author == "alice"
+        assert result[1].id == "IC_002"
+        assert result[1].author == "bob"
 
     def test_fetch_issue_comments_empty_list_returns_empty(self, mocker: MockerFixture) -> None:
         """_fetch_issue_comments_graphql returns empty list when issue has no comments.
@@ -197,8 +198,8 @@ class TestFetchIssueCommentsGraphql:
 
         # Assert
         assert len(result) == 2
-        assert result[0]["id"] == "IC_001"
-        assert result[1]["id"] == "IC_002"
+        assert result[0].id == "IC_001"
+        assert result[1].id == "IC_002"
 
 
 # ---------------------------------------------------------------------------
@@ -227,9 +228,9 @@ class TestFetchCommentByIdGraphql:
         result = _fetch_comment_by_id_graphql(repo, "IC_abc")
 
         # Assert
-        assert result["id"] == "IC_abc"
-        assert result["body"] == "Full comment body"
-        assert result["author"] == "carol"
+        assert result.id == "IC_abc"
+        assert result.body == "Full comment body"
+        assert result.author == "carol"
 
     def test_fetch_comment_by_id_missing_node_raises_backlog_error(self, mocker: MockerFixture) -> None:
         """_fetch_comment_by_id_graphql raises BacklogError when node is null.
@@ -285,22 +286,22 @@ class TestListComments:
         mocker.patch(
             "backlog_core.operations._fetch_issue_comments_graphql",
             return_value=[
-                {
-                    "id": "IC_001",
-                    "body": "short comment",
-                    "url": "",
-                    "author": "alice",
-                    "created_at": "2026-01-01T00:00:00Z",
-                    "updated_at": "2026-01-01T00:00:00Z",
-                },
-                {
-                    "id": "IC_002",
-                    "body": long_body,
-                    "url": "",
-                    "author": "bob",
-                    "created_at": "2026-01-02T00:00:00Z",
-                    "updated_at": "2026-01-02T00:00:00Z",
-                },
+                IssueCommentNode(
+                    id="IC_001",
+                    body="short comment",
+                    url="",
+                    author="alice",
+                    created_at="2026-01-01T00:00:00Z",
+                    updated_at="2026-01-01T00:00:00Z",
+                ),
+                IssueCommentNode(
+                    id="IC_002",
+                    body=long_body,
+                    url="",
+                    author="bob",
+                    created_at="2026-01-02T00:00:00Z",
+                    updated_at="2026-01-02T00:00:00Z",
+                ),
             ],
         )
 
@@ -340,7 +341,7 @@ class TestListComments:
         mock_repo = _make_mock_repo(mocker)
         mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
         all_comments = [
-            {"id": f"IC_{i:03d}", "body": f"body {i}", "url": "", "author": "u", "created_at": "", "updated_at": ""}
+            IssueCommentNode(id=f"IC_{i:03d}", body=f"body {i}", url="", author="u", created_at="", updated_at="")
             for i in range(3)
         ]
         mocker.patch("backlog_core.operations._fetch_issue_comments_graphql", return_value=all_comments)
@@ -368,8 +369,8 @@ class TestListComments:
         mocker.patch(
             "backlog_core.operations._fetch_issue_comments_graphql",
             return_value=[
-                {"id": "IC_001", "body": "a", "url": "", "author": "u", "created_at": "", "updated_at": ""},
-                {"id": "IC_002", "body": "b", "url": "", "author": "u", "created_at": "", "updated_at": ""},
+                IssueCommentNode(id="IC_001", body="a", url="", author="u", created_at="", updated_at=""),
+                IssueCommentNode(id="IC_002", body="b", url="", author="u", created_at="", updated_at=""),
             ],
         )
 
@@ -422,14 +423,14 @@ class TestReadComment:
         mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
         mocker.patch(
             "backlog_core.operations._fetch_comment_by_id_graphql",
-            return_value={
-                "id": "IC_kwDOabc",
-                "body": full_body,
-                "url": "https://github.com/o/r/issues/1#issuecomment-99",
-                "author": "dave",
-                "created_at": "2026-01-01T00:00:00Z",
-                "updated_at": "2026-01-02T00:00:00Z",
-            },
+            return_value=IssueCommentNode(
+                id="IC_kwDOabc",
+                body=full_body,
+                url="https://github.com/o/r/issues/1#issuecomment-99",
+                author="dave",
+                created_at="2026-01-01T00:00:00Z",
+                updated_at="2026-01-02T00:00:00Z",
+            ),
         )
 
         # Act
@@ -492,14 +493,9 @@ class TestReadComment:
         mocker.patch("backlog_core.operations.get_github", return_value=mock_repo)
         fetch_mock = mocker.patch(
             "backlog_core.operations._fetch_comment_by_id_graphql",
-            return_value={
-                "id": "IC_node123",
-                "body": "body",
-                "url": "",
-                "author": "u",
-                "created_at": "",
-                "updated_at": "",
-            },
+            return_value=IssueCommentNode(
+                id="IC_node123", body="body", url="", author="u", created_at="", updated_at=""
+            ),
         )
 
         # Act

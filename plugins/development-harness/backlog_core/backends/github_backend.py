@@ -599,7 +599,7 @@ class GitHubBackend:
         """Fetch all comments on an issue.
 
         Returns:
-            List of IssueCommentNode TypedDicts.
+            List of IssueCommentNode instances.
         """
         return gh_client._fetch_issue_comments_graphql(repo, owner, repo_name, issue_number)
 
@@ -607,7 +607,7 @@ class GitHubBackend:
         """Fetch a single comment by its GraphQL node ID.
 
         Returns:
-            IssueCommentNode TypedDict.
+            IssueCommentNode instance.
         """
         return gh_client._fetch_comment_by_id_graphql(repo, comment_node_id)
 
