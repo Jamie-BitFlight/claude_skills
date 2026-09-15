@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -166,13 +167,15 @@ def test_file_cache_lists_work_item_snapshots_by_stable_key(tmp_path: Path) -> N
     cache._save_work_item_snapshot("plans/P12.yaml", BacklogItem(title="Plan snapshot"))
 
     # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
+    batch = FileCache(tmp_path)._work_item_snapshots()
 
     # Then: it receives ordered logical keys and typed work items, never paths
-    assert [(key, item.title) for key, item in snapshots] == [
+    assert [(key, item.title) for key, item in batch.snapshots] == [
         ("issues/12.yaml", "Issue snapshot"),
         ("plans/P12.yaml", "Plan snapshot"),
     ]
+    # And: a fully-readable cache reports zero skips -- the signal must not false-positive
+    assert batch.skipped == []
 
 
 def test_file_cache_work_item_snapshots_orphaned_temp_file_is_invisible_to_enumeration(tmp_path: Path) -> None:
@@ -197,10 +200,11 @@ def test_file_cache_work_item_snapshots_orphaned_temp_file_is_invisible_to_enume
     (issues_dir / ".1466.yaml.vosleo7o.tmp").touch()
 
     # When: the provider enumerates its durable snapshots
-    snapshots = cache._work_item_snapshots()
+    batch = cache._work_item_snapshots()
 
-    # Then: the orphan never matches the *.yaml glob -- absent, not raised
-    assert snapshots == []
+    # Then: the orphan never matches the *.yaml glob -- absent, not raised, not counted as skipped
+    assert batch.snapshots == []
+    assert batch.skipped == []
 
 
 def _touch_orphaned_temp_file(issues_dir: Path) -> None:
@@ -230,31 +234,36 @@ def _make_symlink_escaping_cache_root(issues_dir: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("corrupt_sibling", "reason"),
+    ("corrupt_sibling", "reason", "expected_skipped"),
     [
         pytest.param(
             _touch_orphaned_temp_file,
             "an orphaned temp file never matches the *.yaml glob at all",
+            [],
             id="orphaned_temp_file",
         ),
         pytest.param(
             _touch_zero_byte_yaml,
             "a genuinely empty .yaml file parses to None and fails BacklogItem validation",
+            ["issues/13.yaml"],
             id="zero_byte_yaml",
         ),
         pytest.param(
             _write_invalid_utf8_yaml,
             "invalid UTF-8 bytes raise UnicodeDecodeError, a ValueError subclass",
+            ["issues/13.yaml"],
             id="invalid_utf8",
         ),
         pytest.param(
             _make_directory_matching_glob,
             "a directory matching the *.yaml glob raises OSError on open()",
+            ["issues/13.yaml"],
             id="unreadable_path",
         ),
         pytest.param(
             _make_symlink_escaping_cache_root,
             "a symlink escaping the cache root raises a bare ValueError from Path.relative_to",
+            ["issues/13.yaml"],
             marks=pytest.mark.skipif(
                 sys.platform == "win32", reason="symlink creation requires elevated privileges on Windows"
             ),
@@ -263,7 +272,7 @@ def _make_symlink_escaping_cache_root(issues_dir: Path) -> None:
     ],
 )
 def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
-    tmp_path: Path, corrupt_sibling: Callable[[Path], None], reason: str
+    tmp_path: Path, corrupt_sibling: Callable[[Path], None], reason: str, expected_skipped: list[str]
 ) -> None:
     """A corrupt/orphaned sibling file must not take the whole batch offline.
 
@@ -272,6 +281,13 @@ def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
     exception out of the whole enumeration, taking every other, perfectly
     good snapshot offline with it. See ``reason`` above for why each case
     is caught now.
+
+    A-critique.md Sec 2.5/Sec 3.2 (backlog #3546 task A2): skipping a
+    corrupt sibling must also be *discoverable*, not just logged, so a
+    caller can distinguish a warm checkpoint over a complete snapshot set
+    from one over a partial/corrupted set. Every corrupt (as opposed to
+    invisible-orphan) sibling here must therefore also show up in the
+    returned batch's ``skipped`` list.
     """
     # Given: one real, successfully-saved snapshot and one corrupt/orphaned sibling
     cache = FileCache(tmp_path)
@@ -280,10 +296,67 @@ def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
     corrupt_sibling(issues_dir)
 
     # When: the provider reloads its durable snapshots
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
+    batch = FileCache(tmp_path)._work_item_snapshots()
 
     # Then: only the real item is returned -- the corrupt sibling is skipped, not raised
-    assert [(key, item.title) for key, item in snapshots] == [("issues/12.yaml", "Issue snapshot")]
+    assert [(key, item.title) for key, item in batch.snapshots] == [("issues/12.yaml", "Issue snapshot")]
+    # And: the skip is discoverable by a caller, not merely logged
+    assert batch.skipped == expected_skipped
+
+
+def _permission_bits_are_unenforced() -> bool:
+    """True when ``os.chmod`` cannot actually restrict directory access here.
+
+    Root bypasses DAC permission checks entirely (``CAP_DAC_OVERRIDE``), and
+    Windows ACLs are not controlled by POSIX permission bits at all -- on
+    either platform, chmodding a directory to ``0o000`` leaves it readable,
+    so a test that depends on the chmod actually blocking access must skip
+    rather than silently exercise nothing.
+    """
+    if sys.platform == "win32":
+        return True
+    return hasattr(os, "geteuid") and os.geteuid() == 0
+
+
+@pytest.mark.skipif(
+    _permission_bits_are_unenforced(), reason="os.chmod cannot restrict directory access as root or on Windows"
+)
+def test_file_cache_work_item_snapshots_records_unreadable_directory_as_skipped(tmp_path: Path) -> None:
+    """A subdirectory that loses read/search permission must show up in ``skipped``, not vanish silently.
+
+    Regression test (backlog #3546, A-critique.md Sec 2.5/Sec 3.2): on
+    Python 3.13, ``Path.rglob`` swallows the ``PermissionError`` that
+    ``os.scandir`` raises when it cannot open a subdirectory beneath
+    ``item_root`` -- CPython's glob implementation suppresses that error
+    internally and simply yields nothing from the unreadable subtree.
+    Because ``skipped`` was populated only after a path had already been
+    yielded, a batch with one real, readable sibling and one
+    permission-denied subdirectory returned ``skipped == []`` and looked
+    complete -- the exact warm-checkpoint/partial-cache ambiguity this
+    field exists to expose. ``_work_item_snapshots`` now walks with
+    ``os.walk(onerror=...)`` instead, which surfaces that same failure
+    into ``skipped`` via ``FileCache._record_unreadable_snapshot_directory``.
+    """
+    # Given: one real, readable snapshot and one sibling subdirectory made unreadable
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    issues_dir = tmp_path / "items" / "issues"
+    unreadable_dir = issues_dir / "blocked"
+    unreadable_dir.mkdir()
+    (unreadable_dir / "13.yaml").write_text("title: unreachable")
+    original_mode = unreadable_dir.stat().st_mode
+
+    try:
+        unreadable_dir.chmod(0o000)
+        # When: the provider reloads its durable snapshots
+        batch = FileCache(tmp_path)._work_item_snapshots()
+    finally:
+        unreadable_dir.chmod(original_mode)
+
+    # Then: the real, readable snapshot is still returned
+    assert [(key, item.title) for key, item in batch.snapshots] == [("issues/12.yaml", "Issue snapshot")]
+    # And: the unreadable subdirectory is discoverable via skipped, not silently absent
+    assert batch.skipped == ["issues/blocked"]
 
 
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
@@ -293,10 +366,10 @@ def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path)
 
     # When: the snapshot is saved and loaded by a fresh cache instance
     cache._save_work_item_snapshot("ece.37", item)
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
+    batch = FileCache(tmp_path)._work_item_snapshots()
 
     # Then: the opaque key is discoverable and the item's reference survives
-    assert [(key, snapshot.reference) for key, snapshot in snapshots] == [("ece.37.yaml", "ece.37")]
+    assert [(key, snapshot.reference) for key, snapshot in batch.snapshots] == [("ece.37.yaml", "ece.37")]
 
 
 def test_file_cache_concurrent_snapshot_writes_keep_unique_temps_and_complete(
@@ -323,10 +396,11 @@ def test_file_cache_concurrent_snapshot_writes_keep_unique_temps_and_complete(
             future.result()
 
     # Then: the destination is one complete valid snapshot, with last-writer-wins semantics
-    snapshots = FileCache(tmp_path)._work_item_snapshots()
-    assert len(snapshots) == 1
-    assert snapshots[0][0] == "issues/12.yaml"
-    assert snapshots[0][1].title in {"first", "second"}
+    batch = FileCache(tmp_path)._work_item_snapshots()
+    assert len(batch.snapshots) == 1
+    assert batch.snapshots[0][0] == "issues/12.yaml"
+    assert batch.snapshots[0][1].title in {"first", "second"}
+    assert batch.skipped == []
 
 
 def test_file_cache_distinguishes_stale_hit_from_unavailable_miss(tmp_path: Path) -> None:
