@@ -101,6 +101,21 @@ class TestDerivedStatusWithoutALiveAnswer:
         """ "open"/"done"/"closed" have no ``status:*`` label counterpart — leave them bare."""
         assert operations._item_derived_status(_item("#42", status="open"), {}, status_live=False) == "open"
 
+    def test_a_bare_cached_needs_grooming_value_is_not_promoted_to_the_label_form(self) -> None:
+        """Reproduction (P1, PR #3552 Codex review): unlike every other bare
+        lifecycle value, ``"needs-grooming"`` is itself the canonical,
+        documented ``--status`` filter token (see
+        ``test_a_missing_key_in_a_live_map_is_still_needs_grooming`` above and
+        the ``list_items`` docstring) — not ``"status:needs-grooming"``.
+        Promoting a genuinely cached bare ``"needs-grooming"`` to its label
+        form would make ``--status needs-grooming`` stop matching an item
+        that is, in fact, awaiting grooming. Before the fix this returned
+        ``"status:needs-grooming"``.
+        """
+        needs_grooming_item = _item("#42", status="needs-grooming")
+
+        assert operations._item_derived_status(needs_grooming_item, {}, status_live=False) == "needs-grooming"
+
 
 class TestStatusFilterUnderARefusal:
     """The filter has to answer from the cache, not from a fabricated default."""
@@ -150,6 +165,24 @@ class TestStatusFilterUnderARefusal:
 
         assert result["count"] == 1
 
+    def test_a_cached_needs_grooming_item_still_matches_the_bare_filter(self, mocker: MockerFixture) -> None:
+        """Reproduction (P1, PR #3552 Codex review, second finding): a cached
+        GitHub item whose ``item.status`` is the genuine bare lifecycle value
+        ``"needs-grooming"`` must still be returned by
+        ``list_items(status="needs-grooming")`` — the documented bare form —
+        once GraphQL is refused and the cache is all that is left to filter
+        on. Before the fix, ``normalize_cached_github_status`` promoted the
+        cached value to ``"status:needs-grooming"``, which does not equal the
+        bare ``"needs-grooming"`` filter, so this item was silently dropped
+        even though it was genuinely awaiting grooming.
+        """
+        _patch_backend(mocker, [_item("#42", status="needs-grooming")])
+        _refuse(mocker)
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert result["count"] == 1
+
 
 class TestRenderedStatusUnderARefusal:
     """A filter that matched on the cached status must render that same status."""
@@ -179,7 +212,7 @@ class TestRenderedStatusUnderARefusal:
 
     def test_a_bare_cached_status_is_rendered_in_labeled_form(self, mocker: MockerFixture) -> None:
         """Reproduction (P2, PR #3552 Codex review): the render path bypassed
-        ``_normalize_cached_github_status``, so a numeric-issue item whose
+        ``normalize_cached_github_status``, so a numeric-issue item whose
         cache held the bare lifecycle value ``"in-progress"`` (not the
         ``status:in-progress`` label a live answer would have produced)
         rendered ``status: "in-progress"`` even though

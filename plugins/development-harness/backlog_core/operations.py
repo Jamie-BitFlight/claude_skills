@@ -1801,7 +1801,7 @@ def refresh_local_cache_from_github(
     }
 
 
-def _normalize_cached_github_status(status: str) -> str:
+def normalize_cached_github_status(status: str) -> str:
     """Convert a cached numeric-issue status to its GitHub ``status:*`` label form.
 
     A cached GitHub-backed item's ``status`` field is written locally in the
@@ -1813,6 +1813,18 @@ def _normalize_cached_github_status(status: str) -> str:
     cached value verbatim makes ``status="status:in-progress"`` exclude a
     cached in-progress item even though the two values name the same state.
 
+    ``"needs-grooming"`` is deliberately excluded from this conversion. Every
+    other lifecycle value has exactly one meaning, so promoting its bare form
+    to the labeled one always agrees with a live answer. ``"needs-grooming"``
+    does not: it is also the bare sentinel :func:`_item_derived_status`
+    returns for "no status observed" — both the value a *live* query's own
+    missing-map-key default uses (see its ``status_map.get(num)`` branch) and
+    the value the documented ``backlog_list`` ``--status`` filter is written
+    against (see this module's ``list_items`` docstring). Converting a
+    genuinely cached bare ``"needs-grooming"`` to ``"status:needs-grooming"``
+    would make it disagree with both of those, so the bare form is the
+    canonical one for this particular value and is returned unchanged.
+
     Args:
         status: Raw cached status value, already labeled or bare.
 
@@ -1821,9 +1833,11 @@ def _normalize_cached_github_status(status: str) -> str:
         known :class:`StatusLabel` member; otherwise *status* unchanged. This
         leaves values with no label equivalent — ``"open"``, ``"done"``,
         ``"closed"`` — untouched, since those name the issue's open/closed
-        state rather than a ``status:*`` label GitHub actually carries.
+        state rather than a ``status:*`` label GitHub actually carries, and
+        leaves ``"needs-grooming"`` untouched for the sentinel-collision
+        reason above.
     """
-    if not status or status.startswith(STATUS_LABEL_PREFIX):
+    if not status or status.startswith(STATUS_LABEL_PREFIX) or status == "needs-grooming":
         return status
     candidate = f"{STATUS_LABEL_PREFIX}{status}"
     try:
@@ -1854,7 +1868,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
     Returns:
         Status string — either the provider status value from *status_map* or
         the local ``item.status`` value (normalized to the ``status:*`` label
-        form via :func:`_normalize_cached_github_status` when the item has a
+        form via :func:`normalize_cached_github_status` when the item has a
         numeric issue reference), defaulting to ``"needs-grooming"`` when
         neither is available and ``""`` when the live status is simply
         unknown.
@@ -1871,7 +1885,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
         # cached value may still be in the bare lifecycle form a numeric-issue
         # item was locally written in, so normalize it to the labeled form a
         # live answer (and the documented filter) would have used.
-        return _normalize_cached_github_status(item.status)
+        return normalize_cached_github_status(item.status)
     info = status_map.get(num)
     return info.status if info is not None else "needs-grooming"
 
@@ -1977,7 +1991,7 @@ def _build_list_entry(
             answered.  When ``False`` a missing key means the status is
             unknown, not absent, so the cached value is rendered instead
             (normalized to the ``status:*`` label form via
-            :func:`_normalize_cached_github_status` for numeric-issue items,
+            :func:`normalize_cached_github_status` for numeric-issue items,
             matching what :func:`_item_derived_status` uses for filtering).
 
     Returns:
@@ -2016,7 +2030,7 @@ def _build_list_entry(
                 # the labeled form _item_derived_status uses for filtering — otherwise
                 # a rendered entry would disagree with the filter that selected it.
                 # Milestone is never cached locally, so it stays "".
-                entry["status"] = "" if status_live else _normalize_cached_github_status(item.status)
+                entry["status"] = "" if status_live else normalize_cached_github_status(item.status)
                 entry["milestone"] = ""
         else:
             # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
