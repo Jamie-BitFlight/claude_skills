@@ -159,8 +159,23 @@ class _GitHubWorkItemSync:
         labels = [request.label] if request.label else None
         match request.scope:
             case ReconcileScope.INITIAL:
+                # A caller who directly requests INITIAL (never routed through
+                # _GitHubReconciliation._with_snapshot_checkpoint's incremental
+                # upgrade) only needs open issues -- a genuine from-scratch
+                # reconcile. request.checkpoint_recovery marks the *other*
+                # case: an INCREMENTAL request that had to be upgraded to
+                # INITIAL because no trustworthy checkpoint existed to resolve
+                # a "since" from (no checkpoint at all, or one that predates
+                # scope metadata and may be a pre-A1 artifact -- see
+                # _with_snapshot_checkpoint). That upgrade establishes (or
+                # re-establishes) the checkpoint every subsequent incremental
+                # fetch will trust, so it must also see closed issues: an
+                # issue closed (or edited while closed) before this point
+                # would otherwise never be observed again once the fresh
+                # watermark starts being trusted.
+                state = "OPEN,CLOSED" if request.checkpoint_recovery else "OPEN"
                 issues = self._issues._fetch_issues_graphql(
-                    repo, owner, repo_name, state="OPEN", labels=labels, first=100
+                    repo, owner, repo_name, state=state, labels=labels, first=100
                 )
             case ReconcileScope.INCREMENTAL:
                 issues = self._issues._fetch_issues_graphql(
@@ -580,21 +595,34 @@ class _GitHubReconciliation:
     def _with_snapshot_checkpoint(self, request: ReconcileRequest) -> ReconcileRequest:
         """Resolve an incremental request's ``since`` from the durable checkpoint, if trusted.
 
-        A checkpoint missing its ``scope``/``label``/``items_observed``
-        metadata (:attr:`_ProviderSnapshotCheckpoint.has_scope_metadata` is
-        ``False``) predates task A1 and cannot be told apart from one the
-        pre-A1 label-scope bug wrote for a typo'd label against a populated
-        repo -- trusting its watermark could leave pre-existing issues whose
-        updates precede that watermark permanently unobserved by every
-        subsequent incremental fetch. Treated the same as no checkpoint at
-        all: fall back to a full initial reconciliation, which re-establishes
-        a checkpoint this method can trust from then on.
+        No checkpoint at all, and a checkpoint missing its ``scope``/
+        ``label``/``items_observed`` metadata
+        (:attr:`_ProviderSnapshotCheckpoint.has_scope_metadata` is ``False``),
+        are treated the same: neither can be trusted to resolve an
+        incremental ``since``. The latter predates task A1 and cannot be told
+        apart from one the pre-A1 label-scope bug wrote for a typo'd label
+        against a populated repo -- trusting its watermark could leave
+        pre-existing issues whose updates precede that watermark permanently
+        unobserved by every subsequent incremental fetch. Either way, this
+        falls back to a full reconciliation that (re-)establishes a
+        checkpoint this method can trust from then on, and marks the request
+        with ``checkpoint_recovery`` so :meth:`_GitHubWorkItemSync.fetch_snapshot`
+        fetches closed issues too despite the ``INITIAL`` scope: an issue
+        closed (or edited while closed) before this point must be observed
+        once during this recovery, or the fresh checkpoint about to be
+        written would silently cover it forever after (see
+        :class:`ReconcileRequest`'s ``checkpoint_recovery`` field and the P1
+        review finding on ``github_work_items.py:605`` this guards). A caller
+        who explicitly requests ``ReconcileScope.INITIAL`` from the start
+        never reaches this method's ``INCREMENTAL`` branch at all, so a
+        genuine from-scratch reconcile keeps its plain open-only fetch.
 
         Returns:
             The request unchanged for every non-incremental scope; for an
             incremental request with no explicit ``since``, the request
-            upgraded to ``INITIAL`` when no trustworthy checkpoint exists, or
-            copied with ``since`` set to the checkpoint's watermark otherwise.
+            upgraded to ``INITIAL`` with ``checkpoint_recovery=True`` when no
+            trustworthy checkpoint exists, or copied with ``since`` set to
+            the checkpoint's watermark otherwise.
         """
         match request.scope:
             case ReconcileScope.INCREMENTAL:
@@ -602,7 +630,7 @@ class _GitHubReconciliation:
                     return request
                 checkpoint = self._cache._get_snapshot_checkpoint()
                 if checkpoint is None or not checkpoint.has_scope_metadata:
-                    return request.model_copy(update={"scope": ReconcileScope.INITIAL})
+                    return request.model_copy(update={"scope": ReconcileScope.INITIAL, "checkpoint_recovery": True})
                 return request.model_copy(update={"since": checkpoint.watermark})
             case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 return request

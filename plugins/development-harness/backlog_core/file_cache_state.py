@@ -33,6 +33,17 @@ _THREAD_LOCKS: Final[dict[Path, Lock]] = {}
 _THREAD_LOCKS_GUARD: Final = Lock()
 _log = logging.getLogger(__name__)
 
+# The three fields _ProviderSnapshotCheckpoint gained after `watermark` already
+# existed on disk (task A1). Their literal presence as JSON keys -- checked
+# against the *raw* mapping, before Pydantic ever constructs the model -- is
+# the only signal that survives this store's own full-dump _save(): once a
+# checkpoint has been round-tripped through a Pydantic model even once,
+# model_fields_set can no longer tell a legacy (pre-A1) checkpoint apart from
+# a current, honestly labeled one, because _save() persists every field
+# regardless of how the object was built. See
+# _CacheStateStore._checkpoint_lacks_scope_metadata.
+_CHECKPOINT_SCOPE_METADATA_KEYS: Final = frozenset({"scope", "label", "items_observed"})
+
 
 class PendingMutation(BaseModel):
     """Durable provider mutation awaiting acknowledgement."""
@@ -79,6 +90,23 @@ class _ProviderSnapshotCheckpoint(BaseModel):
     it were a current, honestly labeled checkpoint. :attr:`has_scope_metadata`
     is the explicit-vs-defaulted signal a caller uses to tell the two apart --
     see :meth:`_GitHubReconciliation._with_snapshot_checkpoint`.
+
+    :attr:`has_scope_metadata` alone cannot survive a round trip through this
+    store's own :meth:`_CacheStateStore._save` -- a full ``model_dump_json()``
+    dump, not an ``exclude_unset`` one -- which writes the defaulted fields
+    out as real JSON keys the very first time *any* transaction runs after a
+    legacy checkpoint is loaded. From that point on, ``model_fields_set``
+    legitimately contains all three field names, because they are genuinely
+    present in the reloaded JSON: the object is no longer distinguishable
+    from a checkpoint a current, honestly labeled reconcile wrote.
+    :meth:`_CacheStateStore._checkpoint_lacks_scope_metadata` is the fix for
+    that: it inspects the *raw* JSON mapping for literal key presence before
+    a ``_ProviderSnapshotCheckpoint`` is ever constructed, and demotes a
+    legacy (watermark-only) checkpoint to ``None`` at load time so no later
+    save can ever manufacture trust it never earned. ``has_scope_metadata``
+    remains correct and is kept as a second, independent guard for any
+    checkpoint object built directly in-process (never round-tripped through
+    disk) -- see :meth:`_GitHubReconciliation._with_snapshot_checkpoint`.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -101,12 +129,20 @@ class _ProviderSnapshotCheckpoint(BaseModel):
         passes all four fields explicitly (even when ``label`` is the falsy
         empty string).
 
+        This property is a per-object, in-memory signal only -- it does not
+        survive a save/reload cycle through :meth:`_CacheStateStore._save`
+        (see the class docstring). The store's raw-JSON legacy check
+        (:meth:`_CacheStateStore._checkpoint_lacks_scope_metadata`) is what
+        makes the trust decision durable across disk round trips; this
+        property remains a correct, independent guard for any checkpoint
+        constructed directly in Python without going through disk at all.
+
         Returns:
             ``True`` if the checkpoint's own scope metadata was explicitly
             supplied rather than defaulted, ``False`` for an untrusted legacy
             checkpoint.
         """
-        return {"scope", "label", "items_observed"} <= self.model_fields_set
+        return self.model_fields_set >= _CHECKPOINT_SCOPE_METADATA_KEYS
 
 
 class _PendingWorkItemMutation(BaseModel):
@@ -238,15 +274,32 @@ class _CacheStateStore:
         return self._read(path)
 
     def _read(self, path: Path) -> _CacheState:
+        """Parse, demote a legacy checkpoint if present, then validate or salvage.
+
+        Always goes through the raw mapping first (:meth:`_parse_relaxed`) so
+        :meth:`_demote_legacy_snapshot_checkpoint` can inspect the literal
+        on-disk shape of ``snapshot_checkpoint`` before Pydantic ever
+        constructs a ``_ProviderSnapshotCheckpoint`` from it -- a schema-valid
+        legacy (watermark-only) checkpoint would otherwise take the
+        fast-validating path below with its three newer fields silently
+        backfilled to falsy defaults, indistinguishable on this load from a
+        checkpoint a current, honestly labeled reconcile wrote (see
+        :class:`_ProviderSnapshotCheckpoint`'s docstring).
+
+        Returns:
+            The validated state, with malformed entries dead-lettered or
+            dropped per :meth:`_salvage` and dead-lettered queue entries
+            cross-checked by :meth:`_verify_queue_keys`.
+        """
         text = path.read_text(encoding="utf-8")
+        raw = self._demote_legacy_snapshot_checkpoint(self._parse_relaxed(text, path))
         try:
-            state = _CacheState.model_validate_json(text)
+            state = _CacheState.model_validate(raw)
         except pydantic.ValidationError:
-            raw = self._parse_relaxed(text, path)
             state = self._salvage(raw, path)
         # Runs on every load, not only the salvage branch above: a hand-edited
         # entry with a fabricated-but-syntactically-valid idempotency_key is
-        # structurally complete, so it passes model_validate_json's fast path
+        # structurally complete, so it passes model_validate's fast path
         # without ever touching _salvage. The self-consistency check is a
         # semantic property pydantic's schema validation can't express.
         return self._verify_queue_keys(state, path)
@@ -337,7 +390,10 @@ class _CacheStateStore:
         except json.JSONDecodeError:
             # Genuine legacy YAML: parse, salvage what validates, write as JSON,
             # then supersede (not delete) the original -- no data destroyed, no
-            # longer named like something safe to hand-edit.
+            # longer named like something safe to hand-edit. _salvage_checkpoint
+            # applies the same raw-shape legacy check as _read above, so a
+            # watermark-only checkpoint in this genuinely old YAML is demoted
+            # to None before it is ever written into the new cache.json.
             raw = self._parse_yaml(text, self._legacy_state_path)
             state = self._verify_queue_keys(self._salvage(raw, self._legacy_state_path), self._legacy_state_path)
             self._save(state)
@@ -567,6 +623,55 @@ class _CacheStateStore:
             raise CacheStateCorruptError(f"Cache state file did not parse to a mapping: {path}")
         return raw
 
+    @staticmethod
+    def _checkpoint_lacks_scope_metadata(raw_checkpoint: object) -> bool:
+        """True when a raw (dict-shaped) checkpoint literally omits scope metadata keys.
+
+        The single source of truth for "this on-disk checkpoint predates task
+        A1" -- checked against the raw JSON/YAML mapping, before Pydantic ever
+        constructs a :class:`_ProviderSnapshotCheckpoint` from it. Checking
+        ``model_fields_set`` on an already-constructed model cannot do this
+        job: it only reflects what a *single* validation call received, and
+        this store's own :meth:`_save` performs a full (non-``exclude_unset``)
+        dump, so the very first transaction after loading a legacy checkpoint
+        would otherwise persist its defaulted fields as real JSON keys and
+        silently launder it into a trusted-looking checkpoint on the next
+        load.
+
+        Returns:
+            ``True`` for a mapping missing any of ``scope``, ``label``, or
+            ``items_observed``. ``False`` for anything that isn't a mapping
+            (already ``None``, or a shape malformed enough that normal schema
+            validation should reject it on its own) and for a mapping that
+            carries every key -- even when a value is itself falsy, since
+            presence, not truthiness, is what distinguishes "never written"
+            from "written as empty/zero".
+        """
+        return isinstance(raw_checkpoint, dict) and not raw_checkpoint.keys() >= _CHECKPOINT_SCOPE_METADATA_KEYS
+
+    @staticmethod
+    def _demote_legacy_snapshot_checkpoint(raw: dict[str, object]) -> dict[str, object]:
+        """Null out ``raw["snapshot_checkpoint"]`` when its on-disk shape predates task A1.
+
+        Must run before ``raw`` is handed to either ``_CacheState.model_validate``
+        or :meth:`_salvage` -- see :meth:`_checkpoint_lacks_scope_metadata` for
+        why this can only be decided from the literal raw mapping, not from a
+        constructed model. A demoted checkpoint reads back as ``None`` on
+        every subsequent load, which
+        ``_GitHubReconciliation._with_snapshot_checkpoint`` already treats the
+        same as "no checkpoint at all": both fall back to a full ``INITIAL``
+        reconciliation, which then re-establishes a checkpoint this method
+        will trust from then on (a fresh checkpoint always carries all three
+        fields -- see :meth:`_GitHubReconciliation._advance_snapshot_checkpoint`).
+
+        Returns:
+            ``raw`` unchanged, or a shallow copy with ``snapshot_checkpoint``
+            forced to ``None``.
+        """
+        if not _CacheStateStore._checkpoint_lacks_scope_metadata(raw.get("snapshot_checkpoint")):
+            return raw
+        return {**raw, "snapshot_checkpoint": None}
+
     def _salvage(self, raw: dict[str, object], path: Path) -> _CacheState:
         """Validate each entry of a partially-malformed state dict independently.
 
@@ -692,8 +797,30 @@ class _CacheStateStore:
 
     @staticmethod
     def _salvage_checkpoint(raw: dict[str, object], path: Path) -> _ProviderSnapshotCheckpoint | None:
+        """Validate ``raw["snapshot_checkpoint"]``, refusing to trust a legacy shape.
+
+        Applies :meth:`_checkpoint_lacks_scope_metadata` directly -- this is
+        the checkpoint construction path used by callers that hand a raw
+        mapping straight to :meth:`_salvage` without first routing it through
+        :meth:`_read`'s :meth:`_demote_legacy_snapshot_checkpoint` call (the
+        legacy-YAML migration branch of :meth:`_migrate_legacy_state_file`),
+        so the guard has to be re-applied here rather than assumed already
+        done by the caller.
+
+        Returns:
+            The validated checkpoint, or ``None`` when absent, malformed, or
+            structurally legacy-shaped (missing scope metadata on disk).
+        """
         value = raw.get("snapshot_checkpoint")
         if value is None:
+            return None
+        if _CacheStateStore._checkpoint_lacks_scope_metadata(value):
+            _log.info(
+                "Cache state %s: snapshot_checkpoint predates scope metadata (watermark-only "
+                "shape on disk) -- dropping it so the next reconcile falls back to a full "
+                "initial reconciliation instead of trusting an unverifiable watermark",
+                path,
+            )
             return None
         try:
             return _ProviderSnapshotCheckpoint.model_validate(value)

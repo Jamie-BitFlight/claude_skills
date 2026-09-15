@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -7,8 +9,9 @@ import pytest
 from backlog_core.backends import github_work_items
 from backlog_core.backends._github_work_item_versions import root_revision
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache, _ProviderSnapshotCheckpoint
-from backlog_core.file_cache_state import _CacheState, _CorruptQueueEntry, _RejectedWorkItemMutation
+from backlog_core.file_cache_state import _CacheState, _CacheStateStore, _CorruptQueueEntry, _RejectedWorkItemMutation
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
@@ -17,6 +20,7 @@ from backlog_core.models import (
     ContentQuery,
     ContentRecord,
     ContentRef,
+    ContentWrite,
     PatchResult,
     ProviderItem,
     ProviderPatch,
@@ -27,6 +31,44 @@ from backlog_core.models import (
 )
 from backlog_core.reconciliation import ReconcilePlan, synchronized_fingerprint
 from sam_schema.core.plan_id_index import PlanIndexEntry
+
+
+def _write_legacy_watermark_only_checkpoint(tmp_path: Path, watermark: str) -> None:
+    """Write a cache.json the way a pre-A1 plugin version wrote one.
+
+    Direct raw-text write, not ``FileCache._set_snapshot_checkpoint`` -- that
+    method always constructs a ``_ProviderSnapshotCheckpoint`` in Python and
+    round-trips it through ``model_dump_json()``, which persists every field
+    (including the falsy defaults) as real JSON keys. That is exactly the
+    *current*, trusted shape this fixture must not produce: the whole point
+    of the regression it supports is a checkpoint whose ``snapshot_checkpoint``
+    object on disk carries only ``watermark``, because ``scope``/``label``/
+    ``items_observed`` did not exist yet when it was written.
+    """
+    store = _CacheStateStore(tmp_path)
+    store._state_path.write_text(json.dumps({"snapshot_checkpoint": {"watermark": watermark}}), encoding="utf-8")
+
+
+class _RecoveryContents:
+    """Minimal in-memory ``_ContentPersistence`` stand-in for a real GitHub Contents store.
+
+    Lets ``_GitHubWorkItemSync.fetch_snapshot`` run for real (needed to prove
+    the actual issue-state query filter, not a mocked-away one) without any
+    network I/O for the work-item head/version lookups it performs alongside
+    the issue fetch.
+    """
+
+    def __init__(self) -> None:
+        self._backend = InMemoryBackend()
+
+    def list(self, query: ContentQuery) -> Sequence[ContentRecord]:
+        return self._backend.list_content(query)
+
+    def get(self, reference: ContentRef) -> ContentRecord:
+        return self._backend.get_content(reference)
+
+    def put(self, request: ContentWrite) -> ContentRecord:
+        return self._backend.put_content(request)
 
 
 def test_github_reconcile_initial_establishes_durable_snapshot_checkpoint(tmp_path: Path) -> None:
@@ -201,6 +243,110 @@ def test_github_reconcile_checkpoint_with_explicit_scope_metadata_is_trusted(
     effective_request = backend._fetch_snapshot.call_args.args[0]
     assert effective_request.scope is ReconcileScope.INCREMENTAL
     assert effective_request.since == "2026-08-12T01:00:00Z"
+
+
+def test_github_reconcile_legacy_checkpoint_stays_untrusted_after_a_no_op_transaction(tmp_path: Path) -> None:
+    """Regression for the P1 review finding on file_cache_state.py:109 (Finding 1).
+
+    ``has_scope_metadata``'s ``model_fields_set`` signal cannot by itself
+    survive this store's own full-dump ``_save()``: the very first
+    transaction after loading a legacy (watermark-only) checkpoint persists
+    its defaulted ``scope``/``label``/``items_observed`` fields as real JSON
+    keys, so the *next* load sees every key present and treats the checkpoint
+    as if a current, honestly labeled reconcile had written it. A single
+    unrelated, no-op transaction run before any reconciliation is enough to
+    launder an untrusted legacy watermark into a trusted-looking one. Fails
+    (RED) against the unfixed ``model_fields_set``-only detection; passes once
+    the legacy shape is detected structurally from the raw on-disk JSON at
+    load time, before any save can launder it.
+    """
+    # Given: a cache.json written the way a pre-A1 plugin version wrote one --
+    # snapshot_checkpoint carries only "watermark", never scope/label/items_observed
+    _write_legacy_watermark_only_checkpoint(tmp_path, "2026-08-12T01:00:00Z")
+    cache = FileCache(tmp_path)
+
+    # When: an unrelated transaction runs before any reconciliation -- e.g.
+    # discarding a pending mutation for a reference that was never queued,
+    # which still performs a full load/save round trip through _CacheStateStore
+    cache.discard_pending(
+        ContentRef(
+            kind=ContentKind.ARTIFACT_CONTENT, namespace="#never-queued", artifact_type="research", name="report.md"
+        )
+    )
+
+    # Then: startup incremental reconciliation still cannot trust the watermark
+    # -- the no-op transaction must not have laundered it into a trusted shape
+    backend = GitHubBackend(cache=FileCache(tmp_path))
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
+    )
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+    effective_request = backend._fetch_snapshot.call_args.args[0]
+    assert effective_request.scope is ReconcileScope.INITIAL, (
+        "No-op transaction laundered the legacy checkpoint into a trusted one"
+    )
+    assert effective_request.since == ""
+
+
+def _closed_recovery_issue(number: int) -> dict[str, object]:
+    """A GitHub issue closed after the legacy checkpoint's watermark -- see below."""
+    return {
+        "id": f"node-{number}",
+        "number": number,
+        "title": f"Issue {number}",
+        "body": "closed while the legacy checkpoint could not see it",
+        "state": "CLOSED",
+        "labels": [],
+        "updatedAt": "rev-1",
+        "createdAt": "2026-08-12T00:00:00Z",
+        "milestone": None,
+        "assignees": [],
+    }
+
+
+def test_github_reconcile_recovery_observes_closed_issues_instead_of_silently_skipping_them(tmp_path: Path) -> None:
+    """Regression for the P1 review finding on github_work_items.py:605 (Finding 2).
+
+    ``_with_snapshot_checkpoint`` forces ``INITIAL`` when a checkpoint's scope
+    metadata cannot be trusted, but ``fetch_snapshot``'s ``INITIAL`` branch
+    queried GitHub for ``OPEN`` issues only -- the same filter a genuine
+    from-scratch first sync legitimately uses. An issue closed (or edited
+    while closed) after the untrusted legacy watermark was therefore invisible
+    to that recovery fetch, and the fresh checkpoint this reconcile
+    establishes would then silently cover it forever after. Fails (RED)
+    against the unfixed always-``OPEN`` ``INITIAL`` fetch: the closed issue
+    never reaches the resulting snapshot and the reconcile observes zero
+    items despite the repository holding one. Passes once a checkpoint
+    recovery (as opposed to a genuine first sync) fetches ``OPEN,CLOSED``.
+    """
+    # Given: a legacy (pre-A1, watermark-only) checkpoint -- an untrusted
+    # global watermark from before scope/label/items_observed existed -- and a
+    # repository whose only issue was closed after that watermark
+    _write_legacy_watermark_only_checkpoint(tmp_path, "2026-08-12T01:00:00Z")
+    backend = GitHubBackend(cache=FileCache(tmp_path), contents=_RecoveryContents())
+    repository = MagicMock(full_name="owner/repo")
+    backend.get_github = MagicMock(return_value=repository)
+    closed_issue = _closed_recovery_issue(1)
+    backend._fetch_issues_graphql = MagicMock(
+        side_effect=lambda *args, **kwargs: [closed_issue] if kwargs.get("state") == "OPEN,CLOSED" else []
+    )
+
+    # When: startup incremental reconciliation resolves against the untrusted
+    # checkpoint and falls back to a recovery fetch
+    result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+
+    # Then: the fetch actually queried both issue states -- not open-only --
+    # so the closed issue's current state was observed, not silently skipped
+    assert backend._fetch_issues_graphql.call_args.kwargs["state"] == "OPEN,CLOSED"
+    assert result.failures == 0
+    assert "#1" in result.changed_references
+
+    # And: the fresh checkpoint this recovery establishes honestly reflects
+    # having observed that one item -- it is now safe for it to advance,
+    # because the fetch that produced it did not skip closed issues
+    checkpoint = FileCache(tmp_path)._get_snapshot_checkpoint()
+    assert checkpoint is not None
+    assert checkpoint.items_observed == 1
 
 
 def test_github_reconcile_label_scoped_zero_items_does_not_advance_checkpoint(tmp_path: Path) -> None:

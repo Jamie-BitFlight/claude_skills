@@ -1287,6 +1287,21 @@ class ReconcileRequest(BaseModel):
     dry_run: bool = False
     force: bool = False
     include_diff: bool = False
+    # Set only by _GitHubReconciliation._with_snapshot_checkpoint when it
+    # upgrades an INCREMENTAL request to INITIAL because no checkpoint could
+    # be trusted to resolve a "since" from -- either none exists at all, or
+    # an existing one is a legacy, pre-scope-metadata shape (see
+    # _ProviderSnapshotCheckpoint). Never set for a caller that requests
+    # ReconcileScope.INITIAL directly -- that path never touches
+    # _with_snapshot_checkpoint's incremental-upgrade branch at all. Read by
+    # _GitHubWorkItemSync.fetch_snapshot to fetch closed issues too, even
+    # though scope is INITIAL: a genuine from-scratch reconcile intentionally
+    # fetches only open issues, but this recovery upgrade is about to
+    # (re-)establish the checkpoint every subsequent incremental fetch will
+    # trust, so it must not skip closed issues -- an issue closed (or edited
+    # while closed) before this point would otherwise never be observed
+    # again once the fresh watermark starts being trusted.
+    checkpoint_recovery: bool = False
 
 
 class ContentKind(StrEnum):
