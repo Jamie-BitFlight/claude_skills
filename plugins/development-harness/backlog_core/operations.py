@@ -2128,6 +2128,16 @@ def list_items(
     if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
     items = get_config().backend.list_work_items()
+    if not items and isinstance(get_config().backend, SyncProvider):
+        # A provider-backed cache holding nothing reads exactly like an empty
+        # backlog. They are different answers and only one is worth acting on,
+        # so name the ambiguity rather than reporting a bare count of 0. Gated on
+        # the unfiltered backend list: a filter that matches none of N cached
+        # items is a genuine zero and stays quiet.
+        out.warn(
+            "  WARNING: The local cache holds no items. The backlog is empty, or the cache "
+            "has never synced — run a sync to tell the two apart."
+        )
     # Start with non-skipped items that have a section. The skip flag may be set
     # for reasons other than terminal status (e.g. malformed entries), so we
     # always exclude skip=True items regardless of include_closed. The
@@ -3284,16 +3294,24 @@ def view_item(
     if item:
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
-            enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+            try:
+                enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+                reason = "backend unreachable"
+            except BackendUnavailableError as exc:
+                # The cached record still answers the view, so the read succeeds.
+                # Name the cause instead of reporting the generic unreachable case.
+                enriched, reason = False, f"backend unavailable ({exc})"
             if not enriched:
-                out.warnings.append(
-                    "backend unreachable — sections_index reflects provider-backed record, may be stale"
-                )
+                out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
         result.groomed = item.metadata.groomed
     elif issue_num or get_config().backend.issue_id_type == "string":
         live_id = _live_lookup_id(item, issue_num, selector)
+        # No cached record, so the live read is the only answer available. A
+        # BackendUnavailableError propagates deliberately: "the backend refused
+        # the query" is not "the item does not exist", and reporting the second
+        # for the first sends a reader looking for an item that is really there.
         enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
         if not enriched:
             raise ItemNotFoundError(selector)
