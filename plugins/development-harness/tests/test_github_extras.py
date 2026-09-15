@@ -199,7 +199,7 @@ class TestComments:
 
         # Assert
         assert len(comments) >= 1
-        assert any(c["body"] == "First comment" for c in comments)
+        assert any(c.body == "First comment" for c in comments)
 
     @_GITHUB_MARKER
     def test_update_comment_body_is_reflected_on_fetch(self, github_backend: GitHubBackend) -> None:
@@ -220,7 +220,7 @@ class TestComments:
         comment = github_backend._fetch_comment_by_id_graphql(_MOCK_REPO, comment_id)
 
         # Assert
-        assert comment["body"] == "Updated body"
+        assert comment.body == "Updated body"
 
 
 # ---------------------------------------------------------------------------

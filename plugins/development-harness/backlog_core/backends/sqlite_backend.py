@@ -929,7 +929,7 @@ class SQLiteBackend:
             issue_number: Issue number.
 
         Returns:
-            List of ``IssueCommentNode`` TypedDicts.
+            List of ``IssueCommentNode`` instances.
         """
         rows = self._conn.execute(
             "SELECT * FROM comments WHERE issue_number = ? ORDER BY created_at", (issue_number,)
@@ -955,7 +955,7 @@ class SQLiteBackend:
             comment_node_id: UUID string of the comment.
 
         Returns:
-            ``IssueCommentNode`` TypedDict.
+            ``IssueCommentNode`` instance.
 
         Raises:
             KeyError: When no comment with ``comment_node_id`` exists.

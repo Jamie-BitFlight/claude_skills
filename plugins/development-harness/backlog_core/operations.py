@@ -5002,11 +5002,11 @@ def list_comments(
     has_more = len(all_comments) > offset + limit
     comment_list = [
         {
-            "id": c["id"],
-            "author": c["author"],
-            "created_at": c["created_at"],
-            "updated_at": c["updated_at"],
-            "preview": c["body"][:_COMMENT_PREVIEW_LENGTH],
+            "id": c.id,
+            "author": c.author,
+            "created_at": c.created_at,
+            "updated_at": c.updated_at,
+            "preview": c.body[:_COMMENT_PREVIEW_LENGTH],
         }
         for c in window
     ]
@@ -5075,11 +5075,11 @@ def read_comment(
         msg = f"GitHub API error reading comment: {e}"
         raise BacklogError(msg) from e
     return {
-        "id": comment["id"],
-        "author": comment["author"],
-        "created_at": comment["created_at"],
-        "updated_at": comment["updated_at"],
-        "body": comment["body"],
+        "id": comment.id,
+        "author": comment.author,
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+        "body": comment.body,
         **out.to_dict(),
     }
 

@@ -185,6 +185,20 @@ too-many-positional-arguments = "warn" # runtime-injected modules (e.g. backlog 
 unresolved-import = "warn"             # TDD red-state: test files import classes not yet implemented
 
 [[tool.ty.overrides]]
+# IssueCommentNode strict-type rejection tests intentionally pass str/float/bool where the model
+# declares `int | None` for `database_id`, to prove Pydantic's `strict=True` config rejects them at
+# runtime — the point of the test is that construction raises (linting-exceptions.md category 3:
+# a negative fixture exercising Pydantic's own runtime validator, not the linter). The `**_MODEL_KWARGS`
+# splat additionally over-widens ty's inference across every keyword parameter, since a `dict[str, str]`
+# statically admits any key including `database_id`, even though the dict never actually holds one.
+include = [
+    "plugins/development-harness/backlog_core/tests/test_comment_database_id.py",
+]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
 # SOLID experiment corpus files — intentional violations at known line numbers
 # (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy ty would destroy the seeded defects the experiment measures.

@@ -287,8 +287,8 @@ def test_comment_issue_returns_expected_fields(configured_github_backend: tuple[
     # Assert
     assert result["issue_number"] == 42
     comments = backend._fetch_issue_comments_graphql(repository, "owner", "repo", 42)
-    assert result["comment_id"] == comments[0]["id"]
-    assert comments[0]["body"] == "LGTM!"
+    assert result["comment_id"] == comments[0].id
+    assert comments[0].body == "LGTM!"
     assert "comment_url" in result
 
 

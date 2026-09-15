@@ -111,9 +111,9 @@ def parse_work_item_comment(head: WorkItemHead, comment: IssueCommentNode | None
     """
     if comment is None:
         raise ContentUnavailableError("GitHub work-item audit comment is missing")
-    if comment["id"] != head.comment_id:
+    if comment.id != head.comment_id:
         raise ContentUnavailableError("GitHub work-item audit comment identity is invalid")
-    header, separator, body = comment["body"].partition("\n")
+    header, separator, body = comment.body.partition("\n")
     if not separator or not header.startswith(_TAG_PREFIX) or not header.endswith(_TAG_SUFFIX):
         raise ContentUnavailableError("GitHub work-item audit comment is invalid")
     try:

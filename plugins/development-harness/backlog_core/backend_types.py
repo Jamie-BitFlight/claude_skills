@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, Protocol, TypedDict, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, runtime_checkable
+
+from pydantic import BaseModel, ConfigDict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,7 +81,7 @@ class IssueNode(TypedDict):
     assignees: list[AssigneeNode]
 
 
-class IssueCommentNode(TypedDict):
+class IssueCommentNode(BaseModel):
     """Comment node returned from issue comments listing query.
 
     ``id`` is GitHub's GraphQL node ID (``IC_kwDO...``). REST addresses the same
@@ -91,7 +93,15 @@ class IssueCommentNode(TypedDict):
     ``database_id`` is optional because only GitHub has one. The SQLite and
     memory backends address their comments by ``id`` alone, and supplying a
     number there would invent an identifier that resolves to nothing.
+
+    A validated, immutable wire-data record — ``strict=True`` rejects a
+    non-``int`` ``database_id`` (including ``bool``, which subclasses ``int``
+    in Python and would otherwise coerce ``True`` into comment ``1``) instead
+    of silently coercing it, matching ``WorkItemHead``/``WorkItemVersion`` in
+    ``backends/_github_work_item_versions.py``.
     """
+
+    model_config = ConfigDict(frozen=True, strict=True)
 
     id: str
     body: str
@@ -99,7 +109,7 @@ class IssueCommentNode(TypedDict):
     author: str
     created_at: str
     updated_at: str
-    database_id: NotRequired[int]
+    database_id: int | None = None
 
 
 class MilestoneFullNode(TypedDict):
