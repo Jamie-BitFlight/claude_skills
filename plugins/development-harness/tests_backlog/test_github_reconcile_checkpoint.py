@@ -138,6 +138,71 @@ def test_github_reconcile_incremental_uses_durable_snapshot_checkpoint(tmp_path:
     )
 
 
+def test_github_reconcile_legacy_checkpoint_without_scope_metadata_forces_initial_reconciliation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the P1 review finding on plugins/development-harness/backlog_core/file_cache_state.py.
+
+    A checkpoint deserialized from data that predates task A1 carries only
+    ``watermark`` -- Pydantic backfills ``scope``/``label``/``items_observed``
+    to their falsy defaults, which is indistinguishable from a checkpoint a
+    *current* reconcile wrote for a genuinely unlabeled scope unless the
+    reader checks ``has_scope_metadata``. Left untrusted, such a checkpoint
+    may have been durably written by the pre-A1 label-scope bug (a typo'd
+    label that observed zero items and still advanced the watermark), so
+    trusting its watermark for an incremental fetch could leave
+    pre-existing issues whose updates precede it permanently unobserved.
+    """
+    # Given: a provider-owned cache holding a checkpoint deserialized from
+    # pre-A1 data -- only "watermark" was ever present in its source
+    cache = FileCache(tmp_path)
+    legacy_checkpoint = _ProviderSnapshotCheckpoint.model_validate({"watermark": "2026-08-12T01:00:00Z"})
+    assert legacy_checkpoint.has_scope_metadata is False
+    monkeypatch.setattr(cache, "_get_snapshot_checkpoint", lambda: legacy_checkpoint)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
+    )
+
+    # When: startup requests incremental reconciliation without a since value
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+
+    # Then: the untrusted legacy watermark is never handed to the provider as
+    # an incremental "since" -- the request is upgraded to a full initial
+    # reconciliation instead, exactly as if no checkpoint existed at all
+    effective_request = backend._fetch_snapshot.call_args.args[0]
+    assert effective_request.scope is ReconcileScope.INITIAL
+    assert effective_request.since == ""
+
+
+def test_github_reconcile_checkpoint_with_explicit_scope_metadata_is_trusted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Companion to the legacy-checkpoint regression above: the current-code case must not regress."""
+    # Given: a checkpoint written the way current code always writes one --
+    # every field passed explicitly, including a falsy ("") label -- which
+    # must remain trusted rather than being caught by the same guard
+    cache = FileCache(tmp_path)
+    current_checkpoint = _ProviderSnapshotCheckpoint(
+        watermark="2026-08-12T01:00:00Z", scope="incremental", label="", items_observed=5
+    )
+    assert current_checkpoint.has_scope_metadata is True
+    monkeypatch.setattr(cache, "_get_snapshot_checkpoint", lambda: current_checkpoint)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(items=[], sync_started_at="2026-08-12T02:00:00Z", pages_fetched=1)
+    )
+
+    # When: startup requests incremental reconciliation without a since value
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+
+    # Then: the trusted checkpoint's watermark is supplied to the private
+    # snapshot fetch and the request stays incremental
+    effective_request = backend._fetch_snapshot.call_args.args[0]
+    assert effective_request.scope is ReconcileScope.INCREMENTAL
+    assert effective_request.since == "2026-08-12T01:00:00Z"
+
+
 def test_github_reconcile_label_scoped_zero_items_does_not_advance_checkpoint(tmp_path: Path) -> None:
     """Reproduces A-critique.md Sec 3.1: a label-scoped reconcile against a provider that
     durably observes zero items (e.g. a typo'd ``--label``) must not mark a cold cache as

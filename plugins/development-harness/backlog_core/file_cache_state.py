@@ -65,6 +65,20 @@ class _ProviderSnapshotCheckpoint(BaseModel):
     and ``items_observed`` record what the advancing reconcile actually
     covered, so a later reader is not left inferring full coverage from a
     watermark that only ever meant "a reconcile ran".
+
+    ``scope``/``label``/``items_observed`` were added after ``watermark``
+    already existed on disk. Upgrading an existing cache deserializes a
+    checkpoint whose source JSON carries only ``watermark`` -- Pydantic
+    silently backfills the three new fields to their falsy defaults, which
+    would otherwise be indistinguishable from a checkpoint a *current*
+    reconcile wrote for a genuinely unlabeled scope. That silent backfill is
+    exactly the failure mode this class exists to prevent one layer up: a
+    legacy checkpoint may have been durably written by the pre-A1 bug these
+    fields were added to fix (a label-typo'd reconcile that observed zero
+    items and still advanced the watermark), so it must not be trusted as if
+    it were a current, honestly labeled checkpoint. :attr:`has_scope_metadata`
+    is the explicit-vs-defaulted signal a caller uses to tell the two apart --
+    see :meth:`_GitHubReconciliation._with_snapshot_checkpoint`.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -73,6 +87,26 @@ class _ProviderSnapshotCheckpoint(BaseModel):
     scope: str = ""
     label: str = ""
     items_observed: int = 0
+
+    @property
+    def has_scope_metadata(self) -> bool:
+        """Whether ``scope``/``label``/``items_observed`` were present in the source data.
+
+        ``model_fields_set`` records only the fields a validation call
+        actually received, never ones filled in by a default -- so this is
+        ``False`` exactly when the checkpoint was deserialized from pre-A1
+        data that carried only ``watermark``, and ``True`` for every
+        checkpoint this codebase constructs today, because
+        :meth:`_GitHubReconciliation._advance_snapshot_checkpoint` always
+        passes all four fields explicitly (even when ``label`` is the falsy
+        empty string).
+
+        Returns:
+            ``True`` if the checkpoint's own scope metadata was explicitly
+            supplied rather than defaulted, ``False`` for an untrusted legacy
+            checkpoint.
+        """
+        return {"scope", "label", "items_observed"} <= self.model_fields_set
 
 
 class _PendingWorkItemMutation(BaseModel):

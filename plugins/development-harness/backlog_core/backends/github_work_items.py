@@ -578,12 +578,30 @@ class _GitHubReconciliation:
         return list(records_by_reference.values())
 
     def _with_snapshot_checkpoint(self, request: ReconcileRequest) -> ReconcileRequest:
+        """Resolve an incremental request's ``since`` from the durable checkpoint, if trusted.
+
+        A checkpoint missing its ``scope``/``label``/``items_observed``
+        metadata (:attr:`_ProviderSnapshotCheckpoint.has_scope_metadata` is
+        ``False``) predates task A1 and cannot be told apart from one the
+        pre-A1 label-scope bug wrote for a typo'd label against a populated
+        repo -- trusting its watermark could leave pre-existing issues whose
+        updates precede that watermark permanently unobserved by every
+        subsequent incremental fetch. Treated the same as no checkpoint at
+        all: fall back to a full initial reconciliation, which re-establishes
+        a checkpoint this method can trust from then on.
+
+        Returns:
+            The request unchanged for every non-incremental scope; for an
+            incremental request with no explicit ``since``, the request
+            upgraded to ``INITIAL`` when no trustworthy checkpoint exists, or
+            copied with ``since`` set to the checkpoint's watermark otherwise.
+        """
         match request.scope:
             case ReconcileScope.INCREMENTAL:
                 if request.since:
                     return request
                 checkpoint = self._cache._get_snapshot_checkpoint()
-                if checkpoint is None:
+                if checkpoint is None or not checkpoint.has_scope_metadata:
                     return request.model_copy(update={"scope": ReconcileScope.INITIAL})
                 return request.model_copy(update={"since": checkpoint.watermark})
             case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
