@@ -855,7 +855,15 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
     import backlog_core.gh_client as _gh  # ruff: ignore[import-outside-top-level]
     import backlog_core.parsing as _parsing  # ruff: ignore[import-outside-top-level]
 
-    repo = _gh.try_get_github()
+    try:
+        repo = _gh.try_get_github()
+    except _gh.GitHubUnavailableError as exc:
+        # A configured token that fails at call time (rate limit, 5xx, network
+        # error) is not the same as no token being configured, but this caller
+        # only has a cached-task fallback either way — route both through it
+        # rather than letting a transient outage crash ready-tasks/status.
+        sys.stderr.write(f"WARNING: GitHub unavailable ({exc}). Falling back to cache.\n")
+        repo = None
     if repo is None:
         # GitHub unavailable — try cache
         cached = _load_tasks_from_cache(cache_path)
