@@ -464,6 +464,47 @@ class TestIsNotFoundError:
         # Assert
         assert result is False
 
+    def test_repository_not_found_message_returns_false(self) -> None:
+        """_is_not_found_error returns False for a repository-not-found error.
+
+        Tests: _is_not_found_error repository-miss negative case (#3570 Finding)
+        How: Pass GitHub's actual GraphQL error text for an inaccessible or
+             nonexistent repository — verified against
+             https://github.com/cli/cli/issues/3591 — which also contains the
+             generic 'could not resolve' marker the helper matches on.
+        Why: A missing/inaccessible repository is a different failure from a
+             missing issue — bad/inaccessible repo, not "this issue does not
+             exist". Before this fix, the broad 'could not resolve' match made
+             view_item("#N") raise ItemNotFoundError for the issue instead of
+             preserving the repository/access failure as
+             GitHubUnavailableError.
+        """
+        # Arrange
+        error = BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'.")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is False
+
+    def test_issue_not_found_message_still_returns_true(self) -> None:
+        """_is_not_found_error still returns True for a genuine issue miss.
+
+        Tests: _is_not_found_error issue-miss regression guard (#3570 Finding)
+        How: Pass _fetch_issue_graphql's own synthesized not-found message.
+        Why: Narrowing the check to exclude repository misses must not also
+             exclude the genuine issue-not-found case it exists to detect.
+        """
+        # Arrange
+        error = BacklogError("GraphQL error: Could not resolve to issue #999")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is True
+
 
 # ---------------------------------------------------------------------------
 # _get_repo_node_id — caching behavior (Requirement 16)

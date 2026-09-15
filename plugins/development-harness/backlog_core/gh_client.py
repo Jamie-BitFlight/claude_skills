@@ -592,19 +592,37 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
 
 
 def _is_not_found_error(error: BacklogError) -> bool:
-    """Check if a GraphQL BacklogError indicates a not-found condition.
+    """Check if a GraphQL BacklogError indicates the requested issue was not found.
 
-    GraphQL returns 'Could not resolve to ...' for 404-equivalent errors
-    (where REST would return HTTP 404).
+    GraphQL returns 'Could not resolve to ...' for 404-equivalent errors (where
+    REST would return HTTP 404), but that phrasing is shared by every resource
+    type the API resolves -- including the repository itself. A missing or
+    inaccessible repository surfaces as ``Could not resolve to a Repository
+    with the name '<owner>/<repo>'.`` (verified against GitHub's actual GraphQL
+    error text, e.g. https://github.com/cli/cli/issues/3591), which is a
+    completely different failure from a missing issue: bad/inaccessible repo,
+    not "this issue does not exist". ``_fetch_issue_graphql`` raises its own
+    issue-specific message -- ``Could not resolve to issue #<N>`` -- precisely
+    so that failure can be told apart from a repository-level one.
+
+    Regression for #3570 Finding: matching on the bare 'could not resolve' /
+    'not found' phrases alone also matched a repository-not-found error, which
+    caused ``view_enrich_from_github`` to misreport an inaccessible repository
+    as "issue does not exist" (``ItemNotFoundError``) instead of propagating
+    it as ``GitHubUnavailableError``. Requiring 'issue' alongside the
+    not-found phrase restricts the match to errors that name the issue itself
+    as unresolvable.
 
     Args:
-        error: BacklogError raised by _graphql_request.
+        error: BacklogError raised by _graphql_request or _fetch_issue_graphql.
 
     Returns:
-        True if the error indicates a resource was not found.
+        True only if the error specifically identifies the requested issue as
+        not found; False for every other not-found-shaped error (repository,
+        rate limit, credentials, etc.).
     """
     msg = str(error).lower()
-    return "could not resolve" in msg or "not found" in msg
+    return "issue" in msg and ("could not resolve" in msg or "not found" in msg)
 
 
 def _get_repo_node_id(repo: Repository) -> str:
