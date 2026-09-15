@@ -320,7 +320,8 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
 
     Classification table (from design doc section 5.1):
 
-    - ``BackendUnavailableError`` (includes ``GitHubUnavailableError``) — NON_RETRYABLE.
+    - ``BackendUnavailableError`` (includes ``GitHubUnavailableError`` and
+      ``GraphQLUnavailableError``) — NON_RETRYABLE.
     - ``UnsupportedBackendCapabilityError`` (backend lacks an optional capability;
       retrying will not change what the backend supports) — NON_RETRYABLE.
     - ``ContentProviderError`` (unrelated exception tree from ``BacklogError``, so
@@ -328,7 +329,14 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
       which inspects ``__cause__``: a wrapped ``GithubException`` (e.g. a transient
       503 from ``get_many()``) gets that exception's own classification; otherwise
       NON_RETRYABLE (a genuine capability gap, not-found, or conflict).
-    - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE.
+    - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE. An
+      environment-wide GraphQL refusal is *not* generic: it raises
+      ``GraphQLUnavailableError`` and is caught by the first entry above, so it is
+      NON_RETRYABLE. That is the same verdict its underlying 403-without-``Retry-After``
+      already gets as a raw ``GithubException`` (below); before the refusal had its own
+      type, wrapping it in a plain ``BacklogError`` erased the status code and landed it
+      here by accident. OFFLINE with the refusal named beats spending the retry budget on
+      an environment that refuses the next attempt identically.
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
     - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
     - ``GithubException`` with status 403 and ``Retry-After`` header — RETRYABLE.
@@ -352,7 +360,9 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         ``SyncErrorKind`` indicating whether the sync should retry.
     """
     if isinstance(exc, (BackendUnavailableError, UnsupportedBackendCapabilityError)):
-        # Structural, not transient: a capability gap won't resolve by retrying.
+        # Structural, not transient: a capability gap won't resolve by retrying, and an
+        # environment that refuses GraphQL outright (GraphQLUnavailableError) refuses the
+        # next attempt on the same grounds.
         return SyncErrorKind.NON_RETRYABLE
     if isinstance(exc, ContentProviderError):
         # Unrelated exception tree from BacklogError (see models.py) — needs its own
@@ -365,7 +375,10 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         # Generic BacklogError (e.g. from sync_issues_graphql) and the transient
         # network exceptions both mean "worth retrying" — merged into one branch to
         # stay under ruff's too-many-return-statements limit. Checked after the
-        # structural non-retryable cases above so those stay non-retryable, and
+        # structural non-retryable cases above so those stay non-retryable: a
+        # GraphQLUnavailableError is a BacklogError by inheritance and must not reach
+        # this branch, or an environment-wide refusal would burn the retry budget
+        # before landing in the ERROR state it was never going to escape. Checked
         # after GithubException so a raw GithubException still gets status-code
         # classification rather than a blanket RETRYABLE.
         return SyncErrorKind.RETRYABLE
