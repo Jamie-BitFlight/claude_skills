@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from dh_core import ledger
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from sam_schema.core.backends.memory import InMemoryTaskProvider
@@ -324,6 +325,52 @@ async def test_sam_task_state_invalid_status_raises_tool_error(
         await client.call_tool(
             "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "not-a-valid-status"}}
         )
+
+
+async def test_sam_task_state_moves_a_ledger_held_task(client: Client) -> None:
+    """sam_task action=state must move the ledger row, not fail against an empty content backend.
+
+    ``_get_backend`` (``server.py``) always resolves a ``ContentTaskProvider`` over the configured
+    backend, with no check of ``dh_core.ledger.holds``. A task the ledger holds has no content-store
+    counterpart at all, so this call reaches ``operations.update_task_status`` against a backend that
+    has never heard of the plan and silently writes it, instead of moving the ledger row the CLI's
+    ``store_for``/``ledger_holds`` chain (``sam_plan.py``) would reach. The task is left not-started
+    (no ``dispatch``) so it clears the ledger's acceptance, lease and report checks on the way to
+    ``skipped`` -- a ``complete`` target would additionally refuse on a missing reason, an open
+    lease, and a missing completion report, none of which this test is about. This is deliberately
+    not wrapped in ``pytest.raises``: the fix's success path -- routing to the ledger and moving the
+    row -- is what must turn this test green.
+
+    Tests: sam_task state routing for a plan the content store never held.
+    How: Create a task directly on the ledger (bypassing the content backend entirely), then call
+        sam_task state through the MCP protocol and check the ledger row afterward.
+    Why: Pins the routing gap Contradiction 1 of plan-mcp-parity.md describes — the fix must check
+        the ledger before resolving a content backend, for every sam_task/sam_plan action.
+    """
+    # Arrange -- a plan the ledger holds, with no content-store counterpart.
+    conn = ledger.open_ledger()
+    try:
+        created = ledger.create(conn, slug="consolidated-tools-state", goal="Ledger goal")
+        plan_id = created.plan
+        assert plan_id is not None
+        ledger.append_task(conn, plan_id, task_id="T01", task_title="Ledger Task")
+        ledger.finalize(conn, plan_id)
+    finally:
+        conn.close()
+
+    # Act
+    await client.call_tool(
+        "sam_task",
+        {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "skipped", "reason": "user"}},
+    )
+
+    # Assert -- the ledger row reflects the new status.
+    conn = ledger.open_ledger()
+    try:
+        row_status = ledger.status(conn, plan_id).tasks[0]["status"]
+    finally:
+        conn.close()
+    assert row_status == "skipped"
 
 
 # ===========================================================================
