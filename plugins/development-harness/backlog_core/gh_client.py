@@ -501,7 +501,7 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 GRAPHQL_UNAVAILABLE_MARKERS: Final[tuple[str, ...]] = ("graphql is not available",)
 
 
-def _github_exception_message(exc: GithubException) -> str:
+def github_exception_message(exc: GithubException) -> str:
     """Return the human-readable message a GithubException carries.
 
     Args:
@@ -535,7 +535,7 @@ def is_graphql_unavailable(exc: GithubException) -> bool:
     """
     if exc.status != _HTTP_FORBIDDEN:
         return False
-    message = _github_exception_message(exc).casefold()
+    message = github_exception_message(exc).casefold()
     return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
 
 
@@ -565,7 +565,7 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
         if is_graphql_unavailable(exc):
-            msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
+            msg = f"GraphQL is unavailable in this environment: {github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc
@@ -1517,6 +1517,13 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
 
     Returns:
         Status label string or empty string.
+
+    Raises:
+        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL API
+            outright. An empty return means "this issue carries no status label",
+            which is an answer about the issue. A refused query is not that answer,
+            and reporting one as the other hides the only fact worth acting on.
+            ``batch_fetch_statuses`` propagates the same refusal for the same reason.
     """
     if not item.issue:
         return ""
@@ -1529,6 +1536,8 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
         return _pick_primary_status_label(labels)
+    except GraphQLUnavailableError:
+        raise
     except (BacklogError, GithubException):
         return ""
 
