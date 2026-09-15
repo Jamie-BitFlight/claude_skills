@@ -395,20 +395,22 @@ class TestParseSearchPrNode:
 class TestIsNotFoundError:
     """Tests for _is_not_found_error() helper.
 
-    Tests: _is_not_found_error correctly classifies BacklogError as not-found.
-    Why: 404-equivalent detection drives graceful degradation in public functions
-         that must distinguish 'resource absent' from 'API failure'.
+    Tests: _is_not_found_error structurally matches only the exact
+           issue-not-found message _fetch_issue_graphql synthesizes.
+    Why: 404-equivalent detection drives graceful degradation in public
+         functions that must distinguish "issue absent" from "API failure"
+         or "repository absent" — see #3570 Findings A and B.
     """
 
-    def test_could_not_resolve_message_returns_true(self) -> None:
-        """_is_not_found_error returns True for 'Could not resolve' error messages.
+    def test_genuine_issue_not_found_message_returns_true(self) -> None:
+        """_is_not_found_error returns True for the exact synthesized message.
 
-        Tests: _is_not_found_error GraphQL not-found pattern
-        How: Create BacklogError with 'Could not resolve to ...' message.
-        Why: This is the exact phrase GitHub GraphQL returns for 404-equivalent errors.
+        Tests: _is_not_found_error genuine issue-not-found match
+        How: Pass _fetch_issue_graphql's own synthesized not-found message.
+        Why: This is the only message this predicate exists to detect.
         """
         # Arrange
-        error = BacklogError("GraphQL error: Could not resolve to an Issue with the number 999")
+        error = BacklogError("GraphQL error: Could not resolve to issue #42")
 
         # Act
         result = _is_not_found_error(error)
@@ -416,15 +418,16 @@ class TestIsNotFoundError:
         # Assert
         assert result is True
 
-    def test_not_found_message_returns_true(self) -> None:
-        """_is_not_found_error returns True for messages containing 'not found'.
+    def test_matching_is_case_insensitive(self) -> None:
+        """_is_not_found_error matches regardless of message casing.
 
-        Tests: _is_not_found_error not-found phrase matching
-        How: Create BacklogError with 'not found' in message.
-        Why: Some operations surface this phrase in their error messages.
+        Tests: _is_not_found_error case-insensitive prefix match
+        How: Pass the synthesized message with alternate casing.
+        Why: BacklogError's str() is not guaranteed to preserve a single case
+             convention across call sites; the match must not be case-brittle.
         """
         # Arrange
-        error = BacklogError("issue not found")
+        error = BacklogError("GRAPHQL ERROR: COULD NOT RESOLVE TO ISSUE #7")
 
         # Act
         result = _is_not_found_error(error)
@@ -467,14 +470,15 @@ class TestIsNotFoundError:
     def test_repository_not_found_message_returns_false(self) -> None:
         """_is_not_found_error returns False for a repository-not-found error.
 
-        Tests: _is_not_found_error repository-miss negative case (#3570 Finding)
+        Tests: _is_not_found_error repository-miss negative case (#3570 Finding A)
         How: Pass GitHub's actual GraphQL error text for an inaccessible or
              nonexistent repository — verified against
-             https://github.com/cli/cli/issues/3591 — which also contains the
-             generic 'could not resolve' marker the helper matches on.
+             https://github.com/cli/cli/issues/3591 — which contains 'could
+             not resolve' but does not start with the exact issue-not-found
+             prefix.
         Why: A missing/inaccessible repository is a different failure from a
              missing issue — bad/inaccessible repo, not "this issue does not
-             exist". Before this fix, the broad 'could not resolve' match made
+             exist". A loose 'could not resolve' substring match made
              view_item("#N") raise ItemNotFoundError for the issue instead of
              preserving the repository/access failure as
              GitHubUnavailableError.
@@ -488,16 +492,40 @@ class TestIsNotFoundError:
         # Assert
         assert result is False
 
-    def test_issue_not_found_message_still_returns_true(self) -> None:
-        """_is_not_found_error still returns True for a genuine issue miss.
+    def test_repository_name_containing_issue_substring_returns_false(self) -> None:
+        """_is_not_found_error returns False even when the repo name contains 'issue'.
 
-        Tests: _is_not_found_error issue-miss regression guard (#3570 Finding)
-        How: Pass _fetch_issue_graphql's own synthesized not-found message.
-        Why: Narrowing the check to exclude repository misses must not also
-             exclude the genuine issue-not-found case it exists to detect.
+        Tests: _is_not_found_error repository-name-substring negative case (#3570 Finding B)
+        How: Pass a repository-not-found error where the repository name
+             itself contains the literal substring "issue" (e.g.
+             'owner/issue-tracker').
+        Why: A prior fix required the word 'issue' alongside a not-found
+             phrase, which still matched by accident whenever the repository
+             or owner identifier happened to contain "issue" anywhere in its
+             name — a structurally unrelated failure. The exact synthesized
+             prefix this predicate now checks names the resource as
+             'issue #<N>', not a repository, so no repository or owner name
+             can spuriously satisfy it.
         """
         # Arrange
-        error = BacklogError("GraphQL error: Could not resolve to issue #999")
+        error = BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/issue-tracker'.")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is False
+
+    def test_issue_not_found_message_with_extra_whitespace_still_returns_true(self) -> None:
+        """_is_not_found_error tolerates incidental leading/trailing whitespace.
+
+        Tests: _is_not_found_error whitespace-tolerant prefix match
+        How: Pass the synthesized message with surrounding whitespace.
+        Why: str(error) callers should not have to guarantee an exact-trimmed
+             message; the predicate strips before matching.
+        """
+        # Arrange
+        error = BacklogError("  GraphQL error: Could not resolve to issue #999  ")
 
         # Act
         result = _is_not_found_error(error)

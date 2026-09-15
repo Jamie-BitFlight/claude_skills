@@ -592,38 +592,48 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
     return data
 
 
+_ISSUE_NOT_FOUND_PREFIX = "graphql error: could not resolve to issue #"
+
+
 def _is_not_found_error(error: BacklogError) -> bool:
-    """Check if a GraphQL BacklogError indicates the requested issue was not found.
+    """Check if a GraphQL BacklogError is the genuine issue-not-found error.
 
-    GraphQL returns 'Could not resolve to ...' for 404-equivalent errors (where
-    REST would return HTTP 404), but that phrasing is shared by every resource
-    type the API resolves -- including the repository itself. A missing or
-    inaccessible repository surfaces as ``Could not resolve to a Repository
-    with the name '<owner>/<repo>'.`` (verified against GitHub's actual GraphQL
-    error text, e.g. https://github.com/cli/cli/issues/3591), which is a
-    completely different failure from a missing issue: bad/inaccessible repo,
-    not "this issue does not exist". ``_fetch_issue_graphql`` raises its own
-    issue-specific message -- ``Could not resolve to issue #<N>`` -- precisely
-    so that failure can be told apart from a repository-level one.
+    ``_fetch_issue_graphql`` is the only call site in this codebase that
+    raises a genuine issue-not-found ``BacklogError``, and it always raises
+    exactly the message this codebase itself constructs: ``f"GraphQL error:
+    Could not resolve to issue #{issue_number}"``. Because that message is
+    synthesized here (not raw GitHub API text), it can be matched
+    structurally -- an exact, case-insensitive prefix check -- rather than by
+    scanning the whole error text for loose keywords.
 
-    Regression for #3570 Finding: matching on the bare 'could not resolve' /
-    'not found' phrases alone also matched a repository-not-found error, which
-    caused ``view_enrich_from_github`` to misreport an inaccessible repository
-    as "issue does not exist" (``ItemNotFoundError``) instead of propagating
-    it as ``GitHubUnavailableError``. Requiring 'issue' alongside the
-    not-found phrase restricts the match to errors that name the issue itself
-    as unresolvable.
+    This is deliberately narrower than substring matching on 'could not
+    resolve' / 'not found' / 'issue' anywhere in the message, which produced
+    two distinct false positives (#3570):
+
+    - Finding A: GitHub's GraphQL error for an inaccessible or nonexistent
+      repository -- ``Could not resolve to a Repository with the name
+      '<owner>/<repo>'.`` (verified against GitHub's actual GraphQL error
+      text, e.g. https://github.com/cli/cli/issues/3591) -- also contains
+      'could not resolve', so a bare substring match misclassified a
+      repository-level failure as the requested issue being absent.
+    - Finding B: requiring the word 'issue' alongside the not-found phrase
+      does not fix Finding A when the repository or owner name itself
+      contains the substring "issue" (e.g. ``owner/issue-tracker``) --
+      GitHub's repository-not-found text would then contain both 'could not
+      resolve' and 'issue', still matching by accident. Anchoring on the
+      exact synthesized prefix -- which names the resource as ``issue #<N>``,
+      not a repository -- excludes both cases regardless of what the
+      repository or owner is named.
 
     Args:
         error: BacklogError raised by _graphql_request or _fetch_issue_graphql.
 
     Returns:
-        True only if the error specifically identifies the requested issue as
-        not found; False for every other not-found-shaped error (repository,
-        rate limit, credentials, etc.).
+        True only if the error is the exact issue-not-found message
+        _fetch_issue_graphql synthesizes; False for every other
+        not-found-shaped error (repository, rate limit, credentials, etc.).
     """
-    msg = str(error).lower()
-    return "issue" in msg and ("could not resolve" in msg or "not found" in msg)
+    return str(error).strip().lower().startswith(_ISSUE_NOT_FOUND_PREFIX)
 
 
 def _get_repo_node_id(repo: Repository) -> str:
