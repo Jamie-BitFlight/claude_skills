@@ -18,8 +18,7 @@ Run this discovery sequence before you run quality gates — verify each lint, f
 | Source | Use when |
 |--------|----------|
 | Project-local override | `.claude/quality-gates.md` or equivalent exists |
-| Git hook, CI config, or project config | The repository names the gate command |
-| Inferred from file types | No hook, CI config, or project config names the gate |
+| Everything else | Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence |
 
 ---
 

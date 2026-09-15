@@ -38,7 +38,7 @@ A fix that "runs without failing" is not validated. A fix that demonstrates the 
   - Unexpected behavior
   - System state issues
 - Confirm you can observe the failure consistently
-- Find the project's test command by activating `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence.
+- Find the project's test command. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence if it isn't already known.
 
 **Example**:
 
