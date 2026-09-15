@@ -476,57 +476,103 @@ def parse_backlog() -> list[BacklogItem]:
 # ---------------------------------------------------------------------------
 
 
+def _find_by_issue_number(items: list[BacklogItem], issue_num: str) -> BacklogItem | None:
+    """Return the item whose ``issue`` field resolves to ``issue_num``, or None."""
+    for it in items:
+        issue_ref = it.issue or ""
+        if str(parse_issue_number(issue_ref)) == issue_num:
+            return it
+    return None
+
+
+def _find_by_string_id(items: list[BacklogItem], selector: str) -> BacklogItem | None:
+    """Return the item with an exact ``issue`` match (e.g. a beads nanoid), or None."""
+    for it in items:
+        if it.issue and it.issue == selector:
+            return it
+    return None
+
+
+def _find_by_reference(items: list[BacklogItem], selector: str) -> BacklogItem | None:
+    """Return the item with an exact ``reference`` match, or None.
+
+    ``item.reference`` (see :class:`~backlog_core.models.BacklogItem`) is a
+    stable, backend-independent identifier that need not appear anywhere in
+    the title — e.g. a priority-slug reference like ``"p1-slugify-helper"``
+    for a title of ``"slugify helper"``. This is the value ``backlog add``
+    prints and instructs callers to pass back in (#3449).
+    """
+    for it in items:
+        if it.reference and it.reference == selector:
+            return it
+    return None
+
+
+def _find_by_title_substring(items: list[BacklogItem], selector: str) -> BacklogItem | None:
+    """Return the item matched by case-insensitive title substring.
+
+    Raises:
+        AmbiguousSelectorError: When multiple items match and the ambiguity
+            cannot be resolved by a shared issue number.
+    """
+    selector_lower = selector.lower()
+    matches = [it for it in items if selector_lower in it.title.lower()]
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return matches[0]
+    numbered = [it for it in matches if parse_issue_number(it.issue) is not None]
+    unnumbered = [it for it in matches if parse_issue_number(it.issue) is None]
+    if unnumbered:
+        raise AmbiguousSelectorError(selector, matches)
+    issue_numbers = [parse_issue_number(it.issue) for it in numbered]
+    distinct: set[int] = {n for n in issue_numbers if n is not None}
+    if len(distinct) != 1:
+        raise AmbiguousSelectorError(selector, matches)
+    log.warning(
+        "find_item: selector %r matched %d cache rows sharing issue number; returning first match %r",
+        selector,
+        len(matches),
+        matches[0].title,
+    )
+    return matches[0]
+
+
 def find_item(items: list[BacklogItem], selector: str) -> BacklogItem | None:
-    """Find item by issue ref, title substring, #N, bare number, or GitHub issue URL.
+    """Find item by issue ref, item reference, title substring, #N, bare number, or GitHub issue URL.
 
     Supports:
       - ``https://github.com/owner/repo/issues/123`` — extract issue number
       - ``#123`` — match by issue number
       - ``123`` — match by issue number (bare number)
       - ``<string-id>`` — exact match against ``item.issue`` (e.g. beads nanoid ``"bd-a3f8"``)
+      - ``<reference>`` — exact match against ``item.reference`` (e.g. ``"p1-slugify-helper"``,
+        the value ``backlog add`` prints and instructs callers to pass back in)
       - ``title substring`` — case-insensitive title match
 
-    The string-ID path fires when the selector is not a URL, ``#N``, or bare
-    integer.  It compares the selector directly against ``item.issue``, allowing
-    string-ID backends (beads, Linear) to resolve items by their native ID.
+    Each supported form is tried in turn by a dedicated helper — the string-ID
+    path when the selector is not a URL, ``#N``, or bare integer; then the
+    reference path; then title-substring matching — so string-ID backends
+    (beads, Linear) and reference-based selectors both resolve before falling
+    back to title matching. See ``_find_by_reference`` for why the reference
+    check exists (#3449).
 
     Returns:
         Matching BacklogItem or None.
+
+    Raises:
+        AmbiguousSelectorError: When a title-substring selector matches more
+            than one item and the ambiguity cannot be resolved.
     """
     selector = selector.strip()
     issue_num = parse_issue_selector(selector)
     if issue_num is not None:
-        for it in items:
-            issue_ref = it.issue or ""
-            if str(parse_issue_number(issue_ref)) == issue_num:
-                return it
-        return None
-    # String-ID exact match — covers beads nanoids and other non-integer issue refs.
-    for it in items:
-        if it.issue and it.issue == selector:
-            return it
-    # Title substring match (case-insensitive)
-    selector_lower = selector.lower()
-    matches = [it for it in items if selector_lower in it.title.lower()]
-    if len(matches) == 1:
-        return matches[0]
-    if len(matches) > 1:
-        numbered = [it for it in matches if parse_issue_number(it.issue) is not None]
-        unnumbered = [it for it in matches if parse_issue_number(it.issue) is None]
-        if unnumbered:
-            raise AmbiguousSelectorError(selector, matches)
-        issue_numbers = [parse_issue_number(it.issue) for it in numbered]
-        distinct: set[int] = {n for n in issue_numbers if n is not None}
-        if len(distinct) == 1:
-            log.warning(
-                "find_item: selector %r matched %d cache rows sharing issue number; returning first match %r",
-                selector,
-                len(matches),
-                matches[0].title,
-            )
-            return matches[0]
-        raise AmbiguousSelectorError(selector, matches)
-    return None
+        return _find_by_issue_number(items, issue_num)
+    return (
+        _find_by_string_id(items, selector)
+        or _find_by_reference(items, selector)
+        or _find_by_title_substring(items, selector)
+    )
 
 
 # ---------------------------------------------------------------------------
