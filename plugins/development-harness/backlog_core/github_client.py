@@ -146,6 +146,64 @@ requires ``pyjwt[crypto]`` for its own auth, which pulls it in unconditionally, 
 this adds no new dependency either. ``certifi`` is the baseline a bundle is compared
 against, and ``requests`` — already a hard dependency for the reason above — pulls
 that in the same way.
+
+Why the connection class overrides ``verify`` on every request
+------------------------------------------------------------------
+Loading ca_bundle into an SSLContext and keeping ``requests`` from re-deriving a
+*different* bundle of its own are two more independent decisions, on top of the two
+named above. ``HTTPSRequestsConnectionClass.__init__`` (``github.Requester``) sets
+``self.verify = kwargs.get("verify", True)``, and ``getresponse`` passes that value
+straight through as ``session.get(url, ..., verify=self.verify, ...)`` on every call.
+Left at PyGithub's own default of ``True``, ``Session.merge_environment_settings``
+(see "Why CA_BUNDLE_ENV_VARS checks REQUESTS_CA_BUNDLE before SSL_CERT_FILE" above)
+resolves its *own* ``verify`` from ``REQUESTS_CA_BUNDLE``/``CURL_CA_BUNDLE`` whenever
+``verify is True or verify is None`` — entirely independently of whatever bundle
+``resolve_ca_bundle`` selected for this module's own judgment. When the two disagree —
+``GITHUB_CA_BUNDLE`` naming a compliant private CA while ``REQUESTS_CA_BUNDLE`` names a
+deficient interception-proxy CA is the shape this was found under — the deficient
+bundle's certificate still reaches the live handshake: ``requests`` hands its
+independently-resolved path to urllib3 as a per-request ``ca_certs`` pool key, and
+``urllib3.util.ssl_.ssl_wrap_socket`` calls ``context.load_verify_locations(ca_certs, ...)``
+on the *same* ``ssl_context`` this module already built and mounted, whenever both are
+present (confirmed by reading that function in this repository's own ``.venv``,
+``urllib3==2.5.0``). The deficient anchor is folded into that context under whatever
+strictness this module already decided for the *compliant* one — a proxied connection
+whose live chain terminates at the deficient CA then fails strict verification even
+though ``bundle_requires_relaxed_verification`` correctly judged the compliant bundle
+needed no relaxation; the judgment was right, but a second, unvetted bundle still
+reached the handshake through ``requests``' own env resolution.
+``ProxyAwareHTTPSConnection.__init__`` therefore sets ``self.verify`` to the same
+``ca_bundle`` this module resolved, whenever the caller left ``verify`` unset, so
+``merge_environment_settings`` sees a concrete path instead of ``True`` and skips its
+own re-derivation entirely — the only bundle that can reach the handshake is the one
+``install_proxy_tls_support`` already judged.
+
+Why _build_ssl_context sets VERIFY_X509_STRICT explicitly, not only clears it
+---------------------------------------------------------------------------------
+``_build_ssl_context`` builds its context by calling ``create_urllib3_context()``, a
+name this module binds once, at import time, via ``from urllib3.util.ssl_ import
+create_urllib3_context``. Several of this module's own callers — the backlog MCP
+server, the SAM MCP server, and the SAM CLI entry point (``scripts/run_backlog_server.py``,
+``scripts/run_sam_server.py``, ``sam_schema/cli.py``) — import and call
+``scripts/tls_compat.py``'s ``relax_verify_x509_strict()`` before importing anything
+from ``backlog_core``, specifically because ``urllib3.connection`` binds that same
+function the same way and must be patched before that binding happens (see that
+module's own docstring). That shim monkeypatches
+``urllib3.util.ssl_.create_urllib3_context`` itself, process-wide, to a wrapper that
+always clears ``VERIFY_X509_STRICT`` from whatever context the original builder
+returns. Because this module's own import runs *after* that shim in every one of
+those entry points, ``from urllib3.util.ssl_ import create_urllib3_context`` binds the
+*already-patched* wrapper, not the original — so a bare ``context =
+create_urllib3_context()`` inside ``_build_ssl_context`` returns a context with the
+flag already cleared, before this function's own ``relax_strict`` branch ever runs.
+Only clearing the flag when ``relax_strict`` is True therefore silently inherits the
+shim's unconditional relaxation on the ``relax_strict=False`` path too, defeating the
+per-bundle judgment ``bundle_requires_relaxed_verification`` exists to make. The
+``else`` branch sets the flag explicitly instead, independent of whatever the
+(possibly patched) ``create_urllib3_context`` already did, reproducing urllib3's own
+*unpatched* default (gated on ``sys.version_info >= (3, 13)``, the same guard
+``urllib3/util/ssl_.py`` uses internally) rather than trusting the return value's
+current state.
 """
 
 from __future__ import annotations
@@ -156,6 +214,7 @@ import os
 import pathlib
 import re
 import ssl
+import sys
 import threading
 from typing import TYPE_CHECKING, Final
 
@@ -552,6 +611,16 @@ def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
     clients such as ``gh`` already do, and is what lets a proxy CA carrying no
     ``keyUsage`` extension verify.
 
+    The flag is always set one way or the other here, rather than only ever cleared,
+    because ``create_urllib3_context`` — the name this module binds at import time —
+    may already be a monkeypatched wrapper that unconditionally clears the flag by
+    the time this module is imported (see the module docstring's "Why
+    _build_ssl_context sets VERIFY_X509_STRICT explicitly, not only clears it"
+    section). Trusting that wrapper's return value for the non-relaxed branch would
+    silently inherit whatever relaxation it already applied; explicitly restoring
+    urllib3's own unpatched default when relax_strict is False keeps this function's
+    result correct independent of what ran before this module was imported.
+
     Args:
         ca_bundle: Path to the CA bundle file, or OpenSSL-hashed CA directory, the
             proxy (or a private GitHub Enterprise install) presents its chain against.
@@ -565,6 +634,12 @@ def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
     context = create_urllib3_context()
     if relax_strict:
         context.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    elif sys.version_info >= (3, 13):
+        # Mirrors urllib3.util.ssl_.create_urllib3_context's own version guard, so the
+        # strict flag ends up set here exactly when the unpatched builder would have
+        # set it — regardless of whether the name this module bound already points at
+        # a monkeypatched wrapper that clears it unconditionally.
+        context.verify_flags |= ssl.VERIFY_X509_STRICT
     if pathlib.Path(ca_bundle).is_dir():
         context.load_verify_locations(capath=ca_bundle)
     else:
@@ -659,6 +734,13 @@ def _make_connection_class(ca_bundle: str, *, relax_strict: bool) -> type[HTTPSR
         ) -> None:
             """Replace the adapter that the base class mounted.
 
+            Also pins ``self.verify`` to ca_bundle when the caller left it unset, so
+            that ``requests.Session.merge_environment_settings`` cannot re-derive a
+            *different* bundle from ``REQUESTS_CA_BUNDLE``/``CURL_CA_BUNDLE`` at
+            request time — see the module docstring's "Why the connection class
+            overrides verify on every request" section. An explicit ``verify`` kwarg
+            from the caller still wins.
+
             Args:
                 host: API hostname.
                 port: API port, defaulting to 443.
@@ -669,6 +751,8 @@ def _make_connection_class(ca_bundle: str, *, relax_strict: bool) -> type[HTTPSR
                 **kwargs: Extra options the base class reads, such as ``verify``.
             """
             super().__init__(host, port, strict, timeout, retry, pool_size, **kwargs)
+            if "verify" not in kwargs:
+                self.verify = ca_bundle
             self.adapter = _ProxyAwareAdapter(
                 ca_bundle,
                 relax_strict=relax_strict,

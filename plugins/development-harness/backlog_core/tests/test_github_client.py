@@ -644,6 +644,68 @@ class TestSslContextKeepsVerification:
         assert not cleared & ~ssl.VERIFY_X509_STRICT, f"cleared a flag beyond VERIFY_X509_STRICT: {cleared!r}"
 
 
+class TestBuildSslContextIndependentOfPreInitShim:
+    """New Finding 2 (P2, PR #3551 second review round): the strict path must not
+    silently inherit a monkeypatch that ran before this module was imported.
+
+    The shipped backlog MCP server, SAM MCP server, and SAM CLI entry points
+    (``scripts/run_backlog_server.py``, ``scripts/run_sam_server.py``,
+    ``sam_schema/cli.py``) each import ``tls_compat`` and call
+    ``relax_verify_x509_strict()`` *before* importing anything from ``backlog_core``
+    or ``sam_schema`` — confirmed by reading each file's own import order. That shim
+    monkeypatches ``urllib3.util.ssl_.create_urllib3_context`` process-wide to a
+    wrapper that always clears ``VERIFY_X509_STRICT``. Because
+    ``backlog_core/github_client.py`` binds that same name via
+    ``from urllib3.util.ssl_ import create_urllib3_context`` at its own import time,
+    importing it after the shim has already run binds the patched wrapper, not the
+    original — so a bare ``create_urllib3_context()`` call inside
+    ``_build_ssl_context`` would return a context with the flag already cleared,
+    before ``_build_ssl_context``'s own ``relax_strict`` branch runs at all.
+    """
+
+    def test_strict_flag_survives_a_pre_init_shim_that_already_ran(self, compliant_ca_file):
+        """Reproduces the deployed import order instead of testing this module in
+        isolation: the real ``relax_verify_x509_strict()`` runs first (producing its
+        actual patched wrapper, not a hand-rolled stand-in), and
+        ``backlog_core.github_client``'s own ``create_urllib3_context`` name is then
+        rebound to that wrapper — exactly what a fresh import of this module would
+        bind had it happened after the shim, as it does in every shipped entry point.
+        ``_build_ssl_context(..., relax_strict=False)`` must still produce a context
+        with ``VERIFY_X509_STRICT`` set: a compliant custom bundle must not be
+        silently relaxed just because some earlier, unrelated import patched a
+        function this module happens to share a name with.
+        """
+        import urllib3.connection
+        import urllib3.util.ssl_
+
+        import backlog_core.github_client as github_client_module
+        import tls_compat
+
+        original_create_default_context = ssl.create_default_context
+        original_create_urllib3_context = urllib3.util.ssl_.create_urllib3_context
+        original_connection_create_urllib3_context = urllib3.connection.create_urllib3_context
+        original_module_create_urllib3_context = github_client_module.create_urllib3_context
+        try:
+            tls_compat.relax_verify_x509_strict()
+            # Simulate github_client.py's own `from urllib3.util.ssl_ import
+            # create_urllib3_context` having executed *after* the shim already ran, by
+            # rebinding this module's name the same way a fresh import would: to
+            # whatever urllib3.util.ssl_.create_urllib3_context now points at.
+            github_client_module.create_urllib3_context = urllib3.util.ssl_.create_urllib3_context
+
+            context = github_client_module._build_ssl_context(str(compliant_ca_file), relax_strict=False)
+
+            assert context.verify_flags & ssl.VERIFY_X509_STRICT, (
+                "the pre-init shim's monkeypatched create_urllib3_context silently cleared "
+                "VERIFY_X509_STRICT even though relax_strict=False was asked"
+            )
+        finally:
+            ssl.create_default_context = original_create_default_context
+            urllib3.util.ssl_.create_urllib3_context = original_create_urllib3_context
+            urllib3.connection.create_urllib3_context = original_connection_create_urllib3_context
+            github_client_module.create_urllib3_context = original_module_create_urllib3_context
+
+
 class TestInstallProxyTlsSupport:
     """Installation is conditional, idempotent, and process-wide."""
 
@@ -822,6 +884,55 @@ class TestConnectionClassFactory:
         assert _make_connection_class(str(ca_file), relax_strict=True) is not _make_connection_class(
             str(ca_file), relax_strict=True
         )
+
+
+class TestConnectionVerifyMatchesSelectedBundle:
+    """New Finding 1 (P1, PR #3551 second review round): the connection's own
+    ``verify`` must match the bundle this module selected, not whatever
+    ``requests.Session.merge_environment_settings`` would independently re-derive
+    from ``REQUESTS_CA_BUNDLE``/``CURL_CA_BUNDLE`` at request time.
+
+    ``HTTPSRequestsConnectionClass.__init__`` (``github.Requester``) defaults
+    ``self.verify`` to ``True`` when the caller passes no explicit ``verify`` kwarg,
+    and ``getresponse`` forwards that value straight through to
+    ``session.get(url, ..., verify=self.verify, ...)``. Left at ``True``,
+    ``merge_environment_settings`` resolves its own bundle from
+    ``REQUESTS_CA_BUNDLE``/``CURL_CA_BUNDLE`` — entirely independently of
+    ``CA_BUNDLE_ENV_VARS``' own precedence — and ``urllib3.util.ssl_.ssl_wrap_socket``
+    then loads *that* bundle into the same SSLContext this module already built
+    under whatever strictness the *selected* bundle warranted, regardless of whether
+    the re-derived one shares that shape.
+    """
+
+    def test_verify_is_pinned_to_the_selected_bundle_not_requests_own_re_derivation(
+        self, monkeypatch, compliant_ca_file, ca_file
+    ):
+        """The exact scenario the finding describes: GITHUB_CA_BUNDLE (compliant)
+        outranks REQUESTS_CA_BUNDLE (deficient) in CA_BUNDLE_ENV_VARS, so this module
+        installs a context judged not to need relaxation — but a bare ``verify=True``
+        would let ``requests`` independently re-derive REQUESTS_CA_BUNDLE anyway. The
+        connection's ``verify`` must be pinned to the same bundle this module
+        selected, so ``merge_environment_settings`` never gets the chance.
+        """
+        monkeypatch.setenv("GITHUB_CA_BUNDLE", str(compliant_ca_file))
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(ca_file))
+
+        install_proxy_tls_support()
+        connection_class = _installed_https_connection_class()
+        connection = connection_class("api.github.com")
+
+        assert connection.verify == str(compliant_ca_file)
+        assert connection.verify != str(ca_file)
+
+    def test_an_explicit_verify_kwarg_still_wins(self, monkeypatch, compliant_ca_file):
+        """A caller-supplied verify must not be silently overridden by the pinning."""
+        monkeypatch.setenv("GITHUB_CA_BUNDLE", str(compliant_ca_file))
+
+        install_proxy_tls_support()
+        connection_class = _installed_https_connection_class()
+        connection = connection_class("api.github.com", verify=False)
+
+        assert connection.verify is False
 
 
 class TestMakeGithubClient:
