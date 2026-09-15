@@ -2475,6 +2475,34 @@ async def test_backlog_list_count_only_respects_search_filter():
     assert response["count"] == 2, f"Expected 2 auth items, got {response['count']}"
 
 
+async def test_backlog_list_count_only_carries_provenance_with_pending_writes():
+    """backlog_list count_only=True against a warm cache with pending writes reports it.
+
+    Tests: from_cache/has_pending_writes (backlog #3546 task A4) survive the
+        count_only short-circuit instead of being discarded (Codex review,
+        PR #3576 finding 2).
+    How: mock operations.list_items returning a confirmed GitHub cache
+        (from_cache=True) that also holds unconfirmed local writes
+        (has_pending_writes=True); call backlog_list with count_only=True.
+    Why: without this, a caller reading an unqualified count from a warm
+        cache could mistake local-only rows for provider-acknowledged data.
+    """
+    op_result = {
+        "items": [
+            {"title": "Item A", "section": "P1", "topic": "a", "type": "Feature", "body": ""},
+            {"title": "Item B", "section": "P2", "topic": "b", "type": "Bug", "body": ""},
+        ],
+        "from_cache": True,
+        "has_pending_writes": True,
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"count_only": True})
+
+    assert response["count"] == 2
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is True
+
+
 async def test_backlog_list_count_only_false_returns_full_response():
     """backlog_list with count_only=False (default) returns the normal full response.
 
