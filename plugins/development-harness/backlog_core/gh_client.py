@@ -1900,8 +1900,11 @@ def view_enrich_from_github(
     back to the raw issue body rather than failing the whole view.
 
     Returns:
-        True if GitHub data was fetched, False if no ``GITHUB_TOKEN`` is
-        configured — a configuration state, not a failure.
+        True if GitHub data was fetched. False if no ``GITHUB_TOKEN`` is
+        configured (a configuration state, not a failure), or if a reachable
+        repository confirms the issue itself does not exist — ``view_item``
+        reads this ``False`` as "no such item" and raises ``ItemNotFoundError``,
+        which is the correct outcome for a genuine absence.
 
     Raises:
         GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
@@ -1911,7 +1914,10 @@ def view_enrich_from_github(
         GitHubUnavailableError: When the GitHub API call fails for any other
             reason (network error, rate limit, 5xx, etc.) once a token is
             configured — same rationale as the GraphQL refusal: ``False``
-            would read as "no such issue", which is not what happened.
+            would read as "no such issue" for a reason other than the issue
+            genuinely not existing, which is not what happened. Does not
+            cover the genuine issue-not-found case; that returns ``False``
+            instead, per ``_is_not_found_error``.
     """
     gh_repo = try_get_github(repo)
     if gh_repo is None:
@@ -1923,7 +1929,15 @@ def view_enrich_from_github(
         gh_issue = _fetch_issue_graphql(gh_repo, owner, repo_name, int(issue_num))
     except GraphQLUnavailableError:
         raise
-    except (BacklogError, GithubException) as exc:
+    except BacklogError as exc:
+        if _is_not_found_error(exc):
+            # A reachable repository confirming the issue does not exist is not
+            # a refusal or an outage — it is the genuine absence view_item's
+            # ItemNotFoundError exists to report. Only this specific case is
+            # carved out of the blanket GitHubUnavailableError conversion below.
+            return False
+        raise GitHubUnavailableError(f"GitHub issue enrichment failed for issue {issue_num!r}: {exc}") from exc
+    except GithubException as exc:
         raise GitHubUnavailableError(f"GitHub issue enrichment failed for issue {issue_num!r}: {exc}") from exc
     body = gh_issue["body"]
     if resolve_version is not None:
