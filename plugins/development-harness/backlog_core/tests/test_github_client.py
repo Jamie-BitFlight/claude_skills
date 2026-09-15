@@ -9,6 +9,7 @@ directly rather than inferred from a connection succeeding.
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import os
 import ssl
@@ -32,6 +33,7 @@ from backlog_core.github_client import (
     _build_ssl_context,
     _InstallState,
     _make_connection_class,
+    _new_anchors,
     bundle_adds_new_anchor,
     bundle_requires_relaxed_verification,
     install_proxy_tls_support,
@@ -46,6 +48,15 @@ _ALL_ENV_VARS = (*CA_BUNDLE_ENV_VARS, *TOKEN_ENV_VARS, "GITHUB_API_URL")
 #: The integration class restores it, because a live request needs the genuine token
 #: and the genuine CA bundle.
 _AMBIENT_ENV = {name: os.environ.get(name) for name in _ALL_ENV_VARS}
+
+#: OpenSSL's X509_CERT_AUX trailer for one trust purpose (serverAuth trust), captured
+#: byte-for-byte from a real ``openssl x509 -in test.crt -addtrust serverAuth -out
+#: test-trusted.pem`` conversion during this fix's research: the decoded body of the
+#: resulting ``BEGIN TRUSTED CERTIFICATE`` block was the untrusted certificate's own
+#: DER, unchanged, followed by exactly these 14 bytes. Reused here so the fixture
+#: below reproduces the real OpenSSL output shape without shelling out to the
+#: ``openssl`` binary from within the test suite.
+_TRUSTED_CERT_AUX_TRAILER = bytes.fromhex("300c300a06082b06010505070301")
 
 
 @pytest.fixture(autouse=True)
@@ -69,13 +80,21 @@ def restore_pygithub_classes():
     _InstallState.installed = False
 
 
-def _self_signed_ca(*, key_usage: bool, basic_constraints: bool = True, basic_critical: bool = True) -> str:
+def _self_signed_ca(
+    *, key_usage: bool, basic_constraints: bool = True, basic_critical: bool = True, subject_key_identifier: bool = True
+) -> str:
     """Build a self-signed anchor in PEM form, with the extensions under test toggled.
 
     Args:
         key_usage: Include a ``keyUsage`` extension.
         basic_constraints: Include a ``basicConstraints`` extension.
         basic_critical: Mark ``basicConstraints`` critical.
+        subject_key_identifier: Include a ``subjectKeyIdentifier`` extension. Defaults
+            to True so that toggling one of the other three parameters exercises only
+            the check named by that parameter — a fixture built with every parameter
+            left at its default is genuinely RFC 5280-compliant and satisfies all four
+            checks ``_cert_fails_strict_checks`` enforces (see the module docstring's
+            "Why a missing SubjectKeyIdentifier also forces relaxation" section).
 
     Returns:
         The certificate as a PEM string.
@@ -110,7 +129,44 @@ def _self_signed_ca(*, key_usage: bool, basic_constraints: bool = True, basic_cr
             ),
             critical=True,
         )
+    if subject_key_identifier:
+        builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
     return builder.sign(key, hashes.SHA256()).public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+
+def _pem_encode(label: str, der: bytes) -> str:
+    """Wrap der in a PEM block under label, with the standard 64-column line wrapping.
+
+    Args:
+        label: The PEM boundary label, without the ``BEGIN``/``END``/``-----`` markers.
+        der: The raw bytes to base64-encode inside the block.
+
+    Returns:
+        A complete PEM block, newline-terminated.
+    """
+    body = base64.b64encode(der).decode("ascii")
+    wrapped = "\n".join(body[i : i + 64] for i in range(0, len(body), 64))
+    return f"-----BEGIN {label}-----\n{wrapped}\n-----END {label}-----\n"
+
+
+def _trusted_certificate_pem(*, key_usage: bool = True) -> str:
+    """Build one anchor in OpenSSL's non-standard ``TRUSTED CERTIFICATE`` PEM form.
+
+    Reproduces the exact shape ``openssl x509 -addtrust`` writes (see the module
+    docstring's "Why a TRUSTED CERTIFICATE PEM block still counts as an anchor"
+    section): the ordinary certificate DER immediately followed, in the same blob, by
+    OpenSSL's own X509_CERT_AUX trust-info trailer.
+
+    Args:
+        key_usage: Include a ``keyUsage`` extension on the underlying certificate.
+
+    Returns:
+        A ``BEGIN/END TRUSTED CERTIFICATE`` PEM block.
+    """
+    cert_pem = _self_signed_ca(key_usage=key_usage)
+    cert = x509.load_pem_x509_certificate(cert_pem.encode("ascii"))
+    trusted_der = cert.public_bytes(serialization.Encoding.DER) + _TRUSTED_CERT_AUX_TRAILER
+    return _pem_encode("TRUSTED CERTIFICATE", trusted_der)
 
 
 def _installed_https_connection_class() -> type:
@@ -208,6 +264,39 @@ def compliant_ca_directory(tmp_path):
     directory.mkdir()
     (directory / "aabbccdd.0").write_text(_self_signed_ca(key_usage=True), encoding="utf-8")
     return directory
+
+
+@pytest.fixture
+def trusted_certificate_bundle(tmp_path, stock_store_file):
+    """A bundle whose one added anchor uses OpenSSL's ``TRUSTED CERTIFICATE`` PEM format.
+
+    Finding 2: SSLContext.load_verify_locations() accepts this format natively, but
+    cryptography.x509.load_pem_x509_certificates() cannot parse it at all (see the
+    module docstring's "Why a TRUSTED CERTIFICATE PEM block still counts as an anchor"
+    section) — before the fix, this bundle was silently treated as holding zero
+    certificates.
+    """
+    bundle = tmp_path / "trusted-ca-bundle.crt"
+    bundle.write_text(stock_store_file.read_text(encoding="utf-8") + _trusted_certificate_pem(), encoding="utf-8")
+    return bundle
+
+
+@pytest.fixture
+def mixed_trusted_and_compliant_bundle(tmp_path, stock_store_file):
+    """A bundle mixing an ordinary compliant anchor with a TRUSTED CERTIFICATE anchor.
+
+    The severest shape of Finding 2:
+    ``x509.load_pem_x509_certificates`` raises ``ValueError`` for the *entire* input
+    the instant one block fails to parse, so before the fix a single incompatible
+    block anywhere in this bundle made the compliant anchor sitting right next to it
+    disappear too, not only the incompatible one.
+    """
+    bundle = tmp_path / "mixed-ca-bundle.crt"
+    bundle.write_text(
+        stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True) + _trusted_certificate_pem(),
+        encoding="utf-8",
+    )
+    return bundle
 
 
 class TestResolveToken:
@@ -345,11 +434,31 @@ class TestBundleAddsNewAnchor:
     def test_a_hashed_directory_with_a_compliant_anchor_counts(self, compliant_ca_directory):
         assert bundle_adds_new_anchor(str(compliant_ca_directory)) is True
 
+    def test_a_trusted_certificate_pem_block_counts(self, trusted_certificate_bundle):
+        """Finding 2 regression: a ``BEGIN TRUSTED CERTIFICATE`` bundle is not empty.
+
+        Before the fix, ``cryptography.x509.load_pem_x509_certificates`` raised
+        ``ValueError`` on this block's trailing X509_CERT_AUX bytes, ``_load_certificates``
+        caught it and returned ``[]``, and this predicate reported False even though the
+        bundle genuinely names a new anchor.
+        """
+        assert bundle_adds_new_anchor(str(trusted_certificate_bundle)) is True
+
+    def test_a_trusted_certificate_block_does_not_erase_a_compliant_neighbor(self, mixed_trusted_and_compliant_bundle):
+        """Finding 2's severest shape: one incompatible block must not zero out the rest.
+
+        ``load_pem_x509_certificates`` fails the *entire* input the instant one block is
+        malformed, so before the fix a compliant anchor sitting next to a TRUSTED
+        CERTIFICATE block in the same bundle disappeared too. Both anchors must be
+        counted once each.
+        """
+        assert len(_new_anchors(str(mixed_trusted_and_compliant_bundle))) == 2
+
 
 class TestBundleRequiresRelaxedVerification:
     """Only a locally added anchor that strict verification rejects earns the relaxation.
 
-    The three rejected shapes below were each observed against a loopback TLS server:
+    The four rejected shapes below were each observed against a loopback TLS server:
     OpenSSL refuses them under VERIFY_X509_STRICT and accepts them once the flag is
     cleared, which is the whole condition this predicate stands for.
     """
@@ -386,6 +495,26 @@ class TestBundleRequiresRelaxedVerification:
 
         assert bundle_requires_relaxed_verification(str(bundle)) is True
 
+    def test_an_added_anchor_without_subject_key_identifier_requires_it(self, tmp_path, stock_store_file):
+        """Verify code 86: CA certificate missing a SubjectKeyIdentifier extension.
+
+        Finding 1: OpenSSL 3.0 added this as a fourth X509_V_FLAG_X509_STRICT check
+        (``X509_V_ERR_MISSING_SUBJECT_KEY_IDENTIFIER``); OpenSSL 1.1.1 accepted a CA
+        certificate in this shape even under ``-x509_strict``
+        (openssl/openssl#13283). Reproduced in this session against a loopback TLS
+        server built with this exact certificate shape: OpenSSL rejected the handshake
+        with ``verify_code=86, "Missing Subject Key Identifier"`` under the default
+        flags and accepted it once VERIFY_X509_STRICT was cleared.
+        """
+        bundle = tmp_path / "no-subject-key-identifier.crt"
+        bundle.write_text(
+            stock_store_file.read_text(encoding="utf-8")
+            + _self_signed_ca(key_usage=True, subject_key_identifier=False),
+            encoding="utf-8",
+        )
+
+        assert bundle_requires_relaxed_verification(str(bundle)) is True
+
     def test_a_compliant_added_anchor_needs_nothing(self, compliant_ca_file):
         """A private CA that satisfies RFC 5280 verifies under strict mode as it is.
 
@@ -408,6 +537,15 @@ class TestBundleRequiresRelaxedVerification:
 
     def test_a_hashed_directory_containing_a_compliant_anchor_needs_nothing(self, compliant_ca_directory):
         assert bundle_requires_relaxed_verification(str(compliant_ca_directory)) is False
+
+    def test_a_compliant_trusted_certificate_block_needs_nothing(self, trusted_certificate_bundle):
+        """Finding 2: a compliant anchor in TRUSTED CERTIFICATE form still needs no relaxation.
+
+        Proves the two fixes compose: the anchor is loaded despite its PEM format
+        (Finding 2) and judged on its own certificate shape (Finding 1), independent of
+        the format it arrived in.
+        """
+        assert bundle_requires_relaxed_verification(str(trusted_certificate_bundle)) is False
 
 
 class TestSslContextKeepsVerification:
@@ -651,6 +789,19 @@ class TestInstallProxyTlsSupport:
     ):
         """Findings 1 and 2 combined: a compliant anchor in directory form still loads."""
         monkeypatch.setenv("SSL_CERT_FILE", str(compliant_ca_directory))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
+    def test_installs_from_a_trusted_certificate_bundle(self, monkeypatch, trusted_certificate_bundle):
+        """Finding 2: a ``BEGIN TRUSTED CERTIFICATE`` bundle must reach the install gate.
+
+        Before the fix, this bundle parsed as holding zero certificates, so
+        ``bundle_adds_new_anchor`` reported False and installation was skipped entirely —
+        a GITHUB_CA_BUNDLE or lone SSL_CERT_FILE in this format was never loaded.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(trusted_certificate_bundle))
 
         assert install_proxy_tls_support() is True
         assert _InstallState.installed is True
