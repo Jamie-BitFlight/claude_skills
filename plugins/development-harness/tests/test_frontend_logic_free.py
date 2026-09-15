@@ -66,6 +66,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "datetime",
         "pathlib",
         "typing",
+        "collections",
         "collections.abc",
         "tiktoken",
         "fastmcp",
