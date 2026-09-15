@@ -68,6 +68,21 @@ class TestDerivedStatusWithoutALiveAnswer:
         """The query ran and returned no label for this issue — that is a real answer."""
         assert operations._item_derived_status(_item("#42"), {}, status_live=True) == "needs-grooming"
 
+    def test_a_live_labeled_needs_grooming_status_is_normalized_to_bare(self) -> None:
+        """Reproduction: a live status map entry carrying the literal
+        ``"status:needs-grooming"`` label (the labeled form
+        ``gh_client._pick_primary_status_label`` returns when an issue genuinely
+        carries the label) must derive to the same bare ``"needs-grooming"``
+        value a missing map key derives to above — both mean "needs grooming"
+        under the documented bare ``--status needs-grooming`` filter token.
+        Before the fix this returned ``"status:needs-grooming"`` (labeled),
+        which never equals the bare filter, so an issue explicitly labeled
+        needs-grooming never matched its own documented filter.
+        """
+        status_map = {42: IssueStatus(status="status:needs-grooming", milestone="")}
+
+        assert operations._item_derived_status(_item("#42"), status_map, status_live=True) == "needs-grooming"
+
     def test_a_missing_key_without_a_live_map_uses_the_cached_status(self) -> None:
         assert operations._item_derived_status(_item("#42"), {}, status_live=False) == "status:in-progress"
 
@@ -115,6 +130,45 @@ class TestDerivedStatusWithoutALiveAnswer:
         needs_grooming_item = _item("#42", status="needs-grooming")
 
         assert operations._item_derived_status(needs_grooming_item, {}, status_live=False) == "needs-grooming"
+
+
+class TestStatusFilterWithALiveAnswer:
+    """The bare documented ``--status needs-grooming`` filter must match every
+    issue that needs grooming under a live answer — both "no status label
+    observed" (missing map key) and "explicitly labeled status:needs-grooming"."""
+
+    def test_an_explicitly_labeled_issue_matches_the_bare_filter(self, mocker: MockerFixture) -> None:
+        """Reproduction: a live GraphQL answer for issue #42 carries the literal
+        ``status:needs-grooming`` label, while issue #43's live answer carries an
+        unrelated label. ``list_items(status="needs-grooming")`` — the documented
+        bare filter token — must match #42 and must not match #43. Before the
+        fix, #42's derived status was the labeled ``"status:needs-grooming"``,
+        which never equals the bare filter, so #42 was silently excluded.
+        """
+        _patch_backend(mocker, [_item("#42", status="status:needs-grooming"), _item("#43", title="Another")])
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value={
+                42: IssueStatus(status="status:needs-grooming", milestone=""),
+                43: IssueStatus(status="status:in-progress", milestone=""),
+            },
+        )
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert result["count"] == 1
+
+    def test_a_missing_status_label_still_matches_the_bare_filter(self, mocker: MockerFixture) -> None:
+        """Unchanged behavior: an issue the live query answered for, but with no
+        status label at all, still matches the bare ``needs-grooming`` filter.
+        """
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+
+        result = operations.list_items(status="needs-grooming", output=Output())
+
+        assert result["count"] == 1
 
 
 class TestStatusFilterUnderARefusal:
