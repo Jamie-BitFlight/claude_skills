@@ -482,7 +482,14 @@ class TestSubHeadingBoundaryExtract:
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper, output=Output()
+            selector="#2529",
+            ordinal="4.0.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         assert isinstance(result, BoundedResponse)
@@ -513,7 +520,14 @@ class TestSubHeadingBoundaryExtract:
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0.0", head_tokens=total, skip_tokens=0, mapper=mock_mapper, output=Output()
+            selector="#2529",
+            ordinal="4.0.0",
+            head_tokens=total,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         assert isinstance(result, BoundedResponse)
@@ -565,7 +579,14 @@ class TestExtractOnParentNode:
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper, output=Output()
+            selector="#2529",
+            ordinal="4.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         # T10 contract: content is bounded child_map text (token-roundtrip canonical form)
@@ -604,7 +625,14 @@ class TestExtractOnParentNode:
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper, output=Output()
+            selector="#2529",
+            ordinal="4.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         # T10 contract: truncation reflects child_map size, not empty-string content

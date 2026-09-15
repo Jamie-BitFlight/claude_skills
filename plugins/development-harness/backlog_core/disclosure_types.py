@@ -19,6 +19,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .models import StatusSource
+
 
 class DisclosureMode(StrEnum):
     """Operating mode resolved from disclosure parameters in a single MCP call."""
@@ -75,6 +77,18 @@ class MapResponse(BaseModel):
     out of ``map_text`` — the "No Invented Limits" data-completeness contract
     this project follows requires struck state to be addressable, not merely
     visible in formatted text."""
+
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
+
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
 
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read,
@@ -151,6 +165,18 @@ class NavigateResponse(BaseModel):
     """Stable identifier of the owning entry; ``""`` when the resolved ordinal
     has no entry identity (level-1 sections)."""
 
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
+
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
+
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read.
     Forwarded from that call's ``Output`` collector so this disclosure mode does
@@ -206,6 +232,18 @@ class BoundedResponse(BaseModel):
     entry_id: str = ""
     """Stable identifier of the owning entry; ``""`` when the resolved ordinal
     has no entry identity (level-1 sections)."""
+
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
+
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
 
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read.

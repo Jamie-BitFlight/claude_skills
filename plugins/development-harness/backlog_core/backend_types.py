@@ -149,6 +149,18 @@ class WorkItemBackend(Protocol):
     - ``issue_id_type`` — integer vs string issue IDs.
     - ``supports_branches`` — whether ``BranchBackend`` is implemented.
     - ``supports_github_extras`` — whether ``GitHubExtras`` is implemented; gate via ``require_github_extras()`` (see ``GitHubExtras``'s docstring for why ``isinstance`` alone is insufficient).
+    - ``batch_status_fetch_requires_credentials`` — whether ``batch_fetch_statuses()``
+      itself talks to the live GitHub API and therefore needs a real
+      ``GITHUB_TOKEN`` to return live data (``True`` only for ``GitHubBackend``).
+      Deliberately independent of ``supports_github_extras``: a backend may
+      declare ``supports_github_extras = True`` for an unrelated reason (e.g. a
+      test double that simulates GitHub-shaped GraphQL delegate methods for
+      other tests, per ``tests/conftest.py``'s ``ProviderMemoryBackend``)
+      while its own ``batch_fetch_statuses()`` implementation stays a local,
+      credential-free simulation — collapsing both meanings into one flag
+      previously caused ``operations._resolve_list_status_map`` to skip a
+      perfectly runnable local/mocked batch fetch whenever no ``GITHUB_TOKEN``
+      was configured, even for backends that never needed one (#3546).
     - ``supports_milestones`` — whether the milestone create/list/assign
       methods below are genuinely implemented; gate via
       ``require_milestone_support()`` in ``_capability_gates.py``. Unlike
@@ -165,6 +177,7 @@ class WorkItemBackend(Protocol):
     issue_id_type: Literal["integer", "string"]
     supports_branches: bool
     supports_github_extras: bool
+    batch_status_fetch_requires_credentials: bool
     supports_milestones: bool
 
     def list_work_items(self) -> list[BacklogItem]: ...
