@@ -157,3 +157,32 @@ class TestCLIForeignCWD:
         )
         assert result.returncode == 0, f"label={label} {result.stderr[:500]}"
         json.loads(result.stdout)
+
+    @pytest.mark.parametrize("package", ["pydantic", "typer"])
+    def test_cli_ignores_an_importable_foreign_dependency_on_pythonpath(self, tmp_path: Path, package: str) -> None:
+        """A foreign copy of a declared dependency that imports cleanly does not reach the CLI.
+
+        The existing contaminated case puts ``/tmp`` on ``PYTHONPATH``, which holds no dependency,
+        so it cannot see a foreign package that imports but has the wrong version.
+        """
+        foreign = tmp_path / "foreign" / package
+        foreign.mkdir(parents=True)
+        (foreign / "__init__.py").write_text('VERSION = "1.10.26"\n', encoding="utf-8")
+        state_home = tmp_path / "dh_state"
+        (state_home / "projects" / _get_project_slug() / "plan").mkdir(parents=True)
+        result = run_cli_subprocess(
+            ["uv", "run", str(_CLI_PATH), "plan", "list", "--limit", "1"],
+            timeout=180,
+            cwd=tmp_path,
+            env={
+                **os.environ,
+                "PYTHONPATH": str(foreign.parent),
+                "DH_STATE_HOME": str(state_home),
+                "DH_PROJECT_ROOT": str(_REPO_ROOT),
+                "BACKLOG_BACKEND": "sqlite",
+                "GITHUB_TOKEN": "",
+                "GH_TOKEN": "",
+            },
+        )
+        assert result.returncode == 0, f"package={package} {result.stderr[:500]}"
+        json.loads(result.stdout)
