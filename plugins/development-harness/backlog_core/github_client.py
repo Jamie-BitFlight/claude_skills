@@ -27,6 +27,30 @@ connection reuse for every session on such a machine, whether or not a proxy is
 actually there. On an ordinary network, once judged this way, the strict default
 stays in force.
 
+Why CA_BUNDLE_ENV_VARS checks REQUESTS_CA_BUNDLE before SSL_CERT_FILE
+-----------------------------------------------------------------------
+The bundle this module judges has to be the same bundle ``requests`` itself will
+actually verify against, or the judgment and the connection disagree: judging the
+wrong file lets ``install_proxy_tls_support`` decide no proxy is present while
+PyGithub's underlying ``requests.Session`` still connects through one under the
+strict default. ``requests.Session.merge_environment_settings`` resolves an unset
+``verify`` to ``os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("CURL_CA_BUNDLE")
+or verify`` (confirmed by reading ``requests/sessions.py`` in this repository's own
+``.venv``, ``requests==2.33.1``), so ``REQUESTS_CA_BUNDLE`` outranks ``CURL_CA_BUNDLE``
+there — and neither that function nor ``HTTPAdapter.cert_verify`` in
+``requests/adapters.py`` ever reads ``SSL_CERT_FILE``: a bare ``verify=True`` falls
+through to ``requests.utils.DEFAULT_CA_BUNDLE_PATH`` (certifi's bundle), not to
+OpenSSL's own ``SSL_CERT_FILE``-aware default-verify-paths lookup. A Nix or conda
+shell that exports stock roots through ``SSL_CERT_FILE`` while a proxy supplies its
+deficient CA through ``REQUESTS_CA_BUNDLE`` therefore needs ``REQUESTS_CA_BUNDLE``
+judged first, or the stock file wins the old first-match order, the deficient CA
+never gets evaluated, and PyGithub keeps ``VERIFY_X509_STRICT`` while ``requests``
+verifies the live connection against the deficient bundle anyway. ``SSL_CERT_FILE``
+stays in the tuple, last, only because some environments set it alone with neither
+``REQUESTS_CA_BUNDLE`` nor ``CURL_CA_BUNDLE`` present. ``GITHUB_CA_BUNDLE`` stays
+first as this module's own explicit override, independent of what ``requests`` would
+resolve unprompted.
+
 Why this module imports ``requests``
 ------------------------------------
 PyGithub drives its HTTP through ``requests``, not ``httpx``: its
@@ -85,8 +109,13 @@ __all__ = [
 DEFAULT_TIMEOUT: Final = 30
 """Seconds before a GitHub request gives up, when a caller states no preference."""
 
-CA_BUNDLE_ENV_VARS: Final[Sequence[str]] = ("GITHUB_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
-"""CA bundle variables in priority order. The first one naming a real file wins."""
+CA_BUNDLE_ENV_VARS: Final[Sequence[str]] = ("GITHUB_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE")
+"""CA bundle variables in priority order. The first one naming a real file wins.
+
+See the module docstring's "Why CA_BUNDLE_ENV_VARS checks REQUESTS_CA_BUNDLE before
+SSL_CERT_FILE" section: this order matches the bundle ``requests`` itself resolves,
+not an arbitrary preference.
+"""
 
 TOKEN_ENV_VARS: Final[Sequence[str]] = ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN")
 """Token variables in priority order. The first non-empty one wins."""

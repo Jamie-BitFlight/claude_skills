@@ -1,7 +1,11 @@
 {
   "name": "dh",
   "description": "Language-agnostic development process harness implementing the Stateless Agent Methodology (SAM) 7-stage pipeline with ARL human touchpoint model and Voltron-style language plugin composition. Provides orchestration, workflows, planning, verification, and testing methodology that any language plugin can compose with.",
+<<<<<<< HEAD
   "version": "11.1.29",
+=======
+  "version": "11.1.13",
+>>>>>>> c32f10123 (fix(backlog-core): evaluate REQUESTS_CA_BUNDLE before SSL_CERT_FILE)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
