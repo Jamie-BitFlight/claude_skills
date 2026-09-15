@@ -542,6 +542,13 @@ class CommentEntry(BaseModel):
     """One issue comment, truncated to a preview."""
 
     id: str
+    """GraphQL node ID of the comment (e.g. ``IC_kwDO...``)."""
+
+    database_id: int | None = None
+    """REST comment database ID -- the value ``backlog_read_comment``'s ``comment_id``
+    requires. ``None`` when GitHub did not return one (only GitHub-backed comments
+    carry it; see ``IssueCommentNode.database_id``)."""
+
     author: str
     created_at: str
     updated_at: str

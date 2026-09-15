@@ -554,10 +554,26 @@ def _is_section_entry_metadata(value: object) -> TypeGuard[SectionEntryMetadata]
     return isinstance(value, dict) and "entries" in value
 
 
+class CommentListEntry(TypedDict):
+    """One comment entry as returned by list_comments().
+
+    ``id`` is the GraphQL node ID; ``database_id`` is the REST integer ID
+    ``read_comment``'s ``comment_id`` requires, carried through from
+    ``IssueCommentNode.database_id`` and ``None`` when GitHub did not report one.
+    """
+
+    id: str
+    database_id: int | None
+    author: str
+    created_at: str
+    updated_at: str
+    preview: str
+
+
 class ListCommentsResult(TypedDict):
     """Result shape returned by list_comments()."""
 
-    comments: list[dict[str, str]]
+    comments: list[CommentListEntry]
     count: int
     has_more: bool
     messages: list[str]
@@ -4974,7 +4990,11 @@ def list_comments(
 
     Returns:
         Dict with:
-          - ``comments``: list of ``{id, author, created_at, updated_at, preview}``
+          - ``comments``: list of ``{id, database_id, author, created_at, updated_at,
+            preview}``. ``id`` is the GraphQL node ID; ``database_id`` is the REST
+            integer ID ``backlog_read_comment``'s ``comment_id`` requires, present
+            only when GitHub returned one (``None`` otherwise -- see
+            ``IssueCommentNode.database_id``).
           - ``count``: total comments in the result window
           - ``has_more``: True if more comments exist beyond the current window
           - ``messages``, ``warnings``, ``errors``: output lists
@@ -5000,9 +5020,10 @@ def list_comments(
 
     window = all_comments[offset : offset + limit]
     has_more = len(all_comments) > offset + limit
-    comment_list = [
+    comment_list: list[CommentListEntry] = [
         {
             "id": c.id,
+            "database_id": c.database_id,
             "author": c.author,
             "created_at": c.created_at,
             "updated_at": c.updated_at,
