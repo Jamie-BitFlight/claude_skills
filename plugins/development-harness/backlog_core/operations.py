@@ -41,6 +41,7 @@ from .backend_types import (
     SyncProvider,
 )
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
+from .github_client import MissingGitHubTokenError, resolve_token
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -2125,7 +2126,7 @@ def _build_list_entry(
     return entry
 
 
-def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem], repo: str) -> bool:
+def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem]) -> bool:
     """Tell a genuinely empty live status map apart from one no query ever answered.
 
     ``batch_fetch_statuses`` returns an empty map both when GitHub was queried
@@ -2141,37 +2142,52 @@ def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem], repo: 
     query -- a numeric-issue item would default to ``"needs-grooming"`` in
     ``_item_derived_status`` even though its live status was never learned.
 
-    Skips the check (returns False without any GitHub call) when the answer
-    cannot matter: a backend with no live GitHub connection at all
-    (``supports_github_extras`` False, e.g. beads, SQLite, in-memory) always
-    returns ``None`` from ``try_get_github`` regardless of token state, since
-    it has no such concept -- treating that as "unavailable" would misreport
-    a backend that answered honestly. Likewise skipped when *open_items*
-    holds no numeric-issue item, since ``status_map_unavailable`` only ever
-    changes the resolved status of a numeric-issue item (see
-    ``_item_derived_status``) -- nothing downstream reads the answer either
-    way.
+    Resolves the token locally, via ``resolve_token()`` -- the exact
+    local-only check ``gh_client.try_get_github`` itself performs before it
+    ever reaches the network -- instead of re-probing GitHub. A prior
+    version of this function called ``try_get_github(repo)`` again here,
+    which repeats the live ``get_repo`` lookup ``batch_fetch_statuses``
+    already performed while building the (legitimately empty) map: a
+    token-present, genuinely-empty listing paid for a second REST round
+    trip on every call, and if that redundant call hit a rate limit or
+    timed out it raised ``GitHubUnavailableError`` and marked an
+    already-successful status result unavailable, excluding numeric-issue
+    items from status-filtered results even though the live fetch had
+    genuinely succeeded. Whether a token is configured is a local,
+    environment-only fact that cannot change between
+    ``batch_fetch_statuses``'s call and this one within the same process, so
+    re-deriving it from the environment is exact, not an approximation of
+    the network check it replaces.
+
+    Skips the check (returns False without touching the network or the
+    environment) when the answer cannot matter: a backend with no live
+    GitHub connection at all (``supports_github_extras`` False, e.g. beads,
+    SQLite, in-memory) has no token concept, so treating that as
+    "unavailable" would misreport a backend that answered honestly.
+    Likewise skipped when *open_items* holds no numeric-issue item, since
+    ``status_map_unavailable`` only ever changes the resolved status of a
+    numeric-issue item (see ``_item_derived_status``) -- nothing downstream
+    reads the answer either way.
 
     Args:
         open_items: The items the batch status fetch was attempted against.
-        repo: GitHub repo in ``owner/repo`` format, forwarded to ``try_get_github``.
 
     Returns:
         True when a numeric-issue item exists, the backend has a real GitHub
-        connection concept, and ``try_get_github`` reports no token configured.
-
-    Raises:
-        BackendUnavailableError: If the GitHub connection check performed
-            here fails for a reason other than a missing token -- the same
-            exception type ``batch_fetch_statuses`` itself raises for a
-            genuine failure, so the caller's existing handling covers it.
+        connection concept, and no ``GITHUB_TOKEN`` (or recognised
+        equivalent -- see ``TOKEN_ENV_VARS``) is configured in the
+        environment.
     """
     backend = get_config().backend
     if not backend.supports_github_extras:
         return False
     if not any(parse_issue_number(item.issue) is not None for item in open_items):
         return False
-    return try_get_github(repo) is None
+    try:
+        resolve_token()
+    except MissingGitHubTokenError:
+        return True
+    return False
 
 
 def _warn_status_map_unavailable(out: Output, status: str | None, reason: str) -> None:
@@ -2405,7 +2421,7 @@ def list_items(
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
-            if not status_map and _status_map_empty_due_to_missing_token(open_items, repo):
+            if not status_map and _status_map_empty_due_to_missing_token(open_items):
                 # gh_client.batch_fetch_statuses folds "no GITHUB_TOKEN
                 # configured" into the same empty map a genuinely-empty live
                 # fetch returns (a deliberate local-only fallback -- see its
@@ -2428,11 +2444,11 @@ def list_items(
             # mis-reports a match against data that was never received
             # (#3546). Name the cause either way, so a reader does not take
             # the blanks/exclusions for "no status set"/"genuinely no match".
-            # This also catches a genuine (non-missing-token) failure raised
-            # by _status_map_empty_due_to_missing_token's own GitHub
-            # connection check above -- the same "nothing was learned"
-            # outcome, just discovered while disambiguating an empty map
-            # instead of during the batch fetch itself.
+            # _status_map_empty_due_to_missing_token itself never reaches
+            # this except clause -- it resolves the token locally (see its
+            # docstring) and performs no network call of its own, so this
+            # branch is reached only by batch_fetch_statuses's own refusal
+            # or failure.
             status_map_unavailable = True
             _warn_status_map_unavailable(out, status, str(exc))
         else:
