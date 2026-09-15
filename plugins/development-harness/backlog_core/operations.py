@@ -1856,7 +1856,13 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
         form via :func:`normalize_cached_github_status` when the item has a
         numeric issue reference), defaulting to ``"needs-grooming"`` when
         neither is available and ``""`` when the live status is simply
-        unknown.
+        unknown. A live ``status_map`` entry carrying the labeled
+        ``"status:needs-grooming"`` value (see :attr:`StatusLabel.NEEDS_GROOMING`)
+        is itself normalized down to the bare ``"needs-grooming"`` sentinel,
+        for the same reason :func:`normalize_cached_github_status` leaves a
+        cached bare ``"needs-grooming"`` unpromoted: bare ``"needs-grooming"``
+        is the one canonical, documented ``--status`` filter token for this
+        value everywhere in this module, not the labeled form.
     """
     num = parse_issue_number(item.issue)
     if num is None:
@@ -1872,7 +1878,18 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
         # live answer (and the documented filter) would have used.
         return normalize_cached_github_status(item.status)
     info = status_map.get(num)
-    return info.status if info is not None else "needs-grooming"
+    if info is None:
+        return "needs-grooming"
+    if info.status == StatusLabel.NEEDS_GROOMING.value:
+        # A genuine "status:needs-grooming" label (gh_client._pick_primary_status_label's
+        # labeled form) means the same thing as a missing map key above — both are
+        # "this item needs grooming" — but the two would otherwise return different
+        # strings ("status:needs-grooming" vs "needs-grooming"), and only the bare
+        # form equals the documented --status needs-grooming filter token. Normalize
+        # the labeled form down to bare so both cases agree, mirroring
+        # normalize_cached_github_status's own "needs-grooming is always bare" rule.
+        return "needs-grooming"
+    return info.status
 
 
 def _filter_open_items(
