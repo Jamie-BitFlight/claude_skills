@@ -1447,6 +1447,7 @@ class ReconcileResult(BaseModel):
     no_ops: int = 0
     conflicts: int = 0
     failures: int = 0
+    skipped_patches: int = 0
     deleted_provider_items: int = 0
     changed_references: list[str] = Field(default_factory=list)
     file_paths: dict[str, str] = Field(default_factory=dict)

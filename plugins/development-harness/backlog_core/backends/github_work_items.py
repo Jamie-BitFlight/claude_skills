@@ -568,11 +568,20 @@ class _GitHubReconciliation:
         updated from it (``plan.cache_actions``), but ``plan.provider_patches``
         -- the queued local mutations the pure engine decided diverge from the
         provider and would need pushing -- are never handed to
-        ``self._provider._apply_patches``. Those patches then behave exactly
-        like an ordinary failed-to-apply patch in ``finalize_reconciliation``
-        (no matching ``PatchResult``, so their paired "checkpoint" cache action
-        is skipped and their queued mutation stays un-acknowledged/pending) --
-        no new status or bookkeeping path was introduced for this.
+        ``self._provider._apply_patches``. Those patches are reported to
+        ``finalize_reconciliation`` via ``ReconcileExecution.patches_skipped``
+        (PR #3573 review Finding 2): their paired "checkpoint" cache action is
+        still skipped and their queued mutation still stays
+        un-acknowledged/pending, exactly as before, but they now count as
+        ``result.skipped_patches`` rather than ``result.failures`` -- a
+        fetch-only pass that successfully fetched the snapshot and updated the
+        cache is not a failed reconciliation merely because it deliberately
+        never attempted a push, so it can still durably advance the snapshot
+        checkpoint (``_advance_snapshot_checkpoint``). Before this fix,
+        counting the skipped patch as a failure left ``has_synced_snapshot()``
+        permanently False for a never-synced cache carrying a divergent queued
+        mutation, forcing every subsequent default list back through a full
+        GitHub fetch.
 
         Returns:
             Completed reconciliation counts with changed logical references.
@@ -590,9 +599,8 @@ class _GitHubReconciliation:
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
-        patch_results = (
-            self._provider._apply_patches(plan.provider_patches) if effective_request.apply_local_patches else []
-        )
+        patches_skipped = not effective_request.apply_local_patches
+        patch_results = [] if patches_skipped else self._provider._apply_patches(plan.provider_patches)
         applied_revisions = {
             result.reference: result.revision for result in patch_results if result.status == "applied"
         }
@@ -610,7 +618,10 @@ class _GitHubReconciliation:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
         outcome = finalize_reconciliation(
-            plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
+            plan,
+            ReconcileExecution(
+                cache_results=cache_results, patch_results=patch_results, patches_skipped=patches_skipped
+            ),
         )
         self._advance_snapshot_checkpoint(
             effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome
