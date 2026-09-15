@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -301,6 +302,61 @@ def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
     assert [(key, item.title) for key, item in batch.snapshots] == [("issues/12.yaml", "Issue snapshot")]
     # And: the skip is discoverable by a caller, not merely logged
     assert batch.skipped == expected_skipped
+
+
+def _permission_bits_are_unenforced() -> bool:
+    """True when ``os.chmod`` cannot actually restrict directory access here.
+
+    Root bypasses DAC permission checks entirely (``CAP_DAC_OVERRIDE``), and
+    Windows ACLs are not controlled by POSIX permission bits at all -- on
+    either platform, chmodding a directory to ``0o000`` leaves it readable,
+    so a test that depends on the chmod actually blocking access must skip
+    rather than silently exercise nothing.
+    """
+    if sys.platform == "win32":
+        return True
+    return hasattr(os, "geteuid") and os.geteuid() == 0
+
+
+@pytest.mark.skipif(
+    _permission_bits_are_unenforced(), reason="os.chmod cannot restrict directory access as root or on Windows"
+)
+def test_file_cache_work_item_snapshots_records_unreadable_directory_as_skipped(tmp_path: Path) -> None:
+    """A subdirectory that loses read/search permission must show up in ``skipped``, not vanish silently.
+
+    Regression test (backlog #3546, A-critique.md Sec 2.5/Sec 3.2): on
+    Python 3.13, ``Path.rglob`` swallows the ``PermissionError`` that
+    ``os.scandir`` raises when it cannot open a subdirectory beneath
+    ``item_root`` -- CPython's glob implementation suppresses that error
+    internally and simply yields nothing from the unreadable subtree.
+    Because ``skipped`` was populated only after a path had already been
+    yielded, a batch with one real, readable sibling and one
+    permission-denied subdirectory returned ``skipped == []`` and looked
+    complete -- the exact warm-checkpoint/partial-cache ambiguity this
+    field exists to expose. ``_work_item_snapshots`` now walks with
+    ``os.walk(onerror=...)`` instead, which surfaces that same failure
+    into ``skipped`` via ``FileCache._record_unreadable_snapshot_directory``.
+    """
+    # Given: one real, readable snapshot and one sibling subdirectory made unreadable
+    cache = FileCache(tmp_path)
+    cache._save_work_item_snapshot("#12", BacklogItem(title="Issue snapshot"))
+    issues_dir = tmp_path / "items" / "issues"
+    unreadable_dir = issues_dir / "blocked"
+    unreadable_dir.mkdir()
+    (unreadable_dir / "13.yaml").write_text("title: unreachable")
+    original_mode = unreadable_dir.stat().st_mode
+
+    try:
+        unreadable_dir.chmod(0o000)
+        # When: the provider reloads its durable snapshots
+        batch = FileCache(tmp_path)._work_item_snapshots()
+    finally:
+        unreadable_dir.chmod(original_mode)
+
+    # Then: the real, readable snapshot is still returned
+    assert [(key, item.title) for key, item in batch.snapshots] == [("issues/12.yaml", "Issue snapshot")]
+    # And: the unreadable subdirectory is discoverable via skipped, not silently absent
+    assert batch.skipped == ["issues/blocked"]
 
 
 def test_file_cache_reopens_opaque_snapshot_key_with_yaml_suffix(tmp_path: Path) -> None:
