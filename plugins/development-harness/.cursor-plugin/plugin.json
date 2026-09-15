@@ -4,6 +4,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "11.1.29",
 =======
   "version": "11.1.13",
@@ -14,6 +15,9 @@
 =======
   "version": "11.1.15",
 >>>>>>> 679322407 (test(backlog-core): cover CA-directory loading and install-timing contract)
+=======
+  "version": "11.1.16",
+>>>>>>> da6be3849 (fix(backlog-core): detect missing SKI and load TRUSTED CERTIFICATE bundles)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

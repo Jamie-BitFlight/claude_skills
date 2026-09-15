@@ -3,6 +3,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "11.1.29",
 =======
   "version": "11.1.13",
@@ -13,6 +14,9 @@
 =======
   "version": "11.1.15",
 >>>>>>> 679322407 (test(backlog-core): cover CA-directory loading and install-timing contract)
+=======
+  "version": "11.1.16",
+>>>>>>> da6be3849 (fix(backlog-core): detect missing SKI and load TRUSTED CERTIFICATE bundles)
   "description": "Language-agnostic development process harness implementing the Stateless Agent Methodology (SAM) 7-stage pipeline with ARL human touchpoint model and Voltron-style language plugin composition. Provides orchestration, workflows, planning, verification, and testing methodology that any language plugin can compose with.",
   "author": {
     "name": "Jamie Nelson",
