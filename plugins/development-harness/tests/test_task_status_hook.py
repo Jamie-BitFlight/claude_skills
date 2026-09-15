@@ -1,13 +1,14 @@
-"""Tests for task_status_hook.py — the SubagentStop settle and the PostToolUse activity update.
+"""Tests for task_status_hook.py — the SubagentStop settle.
 
 Covers:
 - extract_launch_from_prompt: the address AND the attempt come from the sub-agent's own prompt
 - _call_sam_plan_settle: routes the settle through the SAM CLI subprocess
 - handle_subagent_stop: settles the attempt and writes no status
-- _call_sam_task_status: reads a status from either the ledger's or the content store's shape
-- _call_sam_task_update: routes field writes through the SAM CLI subprocess
-- read_task_context: reads the plan address directly from the "plan" field
-- handle_activity_update: calls SAM CLI helpers instead of direct YAML writes
+- main(): only SubagentStop reaches the SAM CLI — every other event and tool name issues no
+  subprocess (was red at HEAD 58f37d7be, before the step 1a deletion of the PostToolUse handler;
+  see plan-posttooluse-activetask.md, step 1a)
+- registration: task_status_hook.py is registered only under SubagentStop, across every place
+  Claude Code reads a hook registration from
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import importlib.util
 import inspect
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess, TimeoutExpired
@@ -45,16 +47,17 @@ assert _spec.loader is not None
 _hook_mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_hook_mod)  # type: ignore[union-attr]
 
+# sam_schema is importable once _plugin_dir is on sys.path (above) — ruamel.yaml per this
+# repo's YAML convention (rules/yaml-toml-libraries.md), reusing the reader modules' own
+# shared parsing instance rather than a second YAML engine.
+from sam_schema.readers._yaml_utils import coerce_to_plain, load_yaml
+
 # Re-export symbols for clarity
 Launch = _hook_mod.Launch
 _NO_FINAL_MESSAGE = _hook_mod._NO_FINAL_MESSAGE
 _call_sam_plan_settle = _hook_mod._call_sam_plan_settle
-_call_sam_task_status = _hook_mod._call_sam_task_status
-_call_sam_task_update = _hook_mod._call_sam_task_update
 extract_launch_from_prompt = _hook_mod.extract_launch_from_prompt
 handle_subagent_stop = _hook_mod.handle_subagent_stop
-handle_activity_update = _hook_mod.handle_activity_update
-HookProfile = _hook_mod.HookProfile
 _SAM_CLI_PATH = _hook_mod._SAM_CLI_PATH
 
 
@@ -114,350 +117,6 @@ def _argv_after(cmd: list[str], token: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# _call_sam_task_update — success path
-# ---------------------------------------------------------------------------
-
-
-def test_call_sam_task_update_routes_through_mcp_subprocess() -> None:
-    """_call_sam_task_update calls the SAM CLI with the mapped --last-activity option."""
-    # Arrange
-    plan_addr = "Pf4281187"
-    task_id = "T2"
-    fields = {"last-activity": "2026-05-14T18:00:00+00:00"}
-    response = _cli_success_response({"updated": True, "address": f"{plan_addr}/{task_id}"})
-
-    with (
-        patch("shutil.which", return_value="/usr/bin/uv"),
-        patch.object(Path, "exists", return_value=True),
-        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
-    ):
-        # Act
-        result = _call_sam_task_update(plan_addr, task_id, fields)
-
-    # Assert
-    assert result is True
-    cmd = mock_popen.call_args[0][0]
-    assert _argv_after(cmd, "plan") == [
-        "plan",
-        "update",
-        "--plan-address",
-        f"{plan_addr}/{task_id}",
-        "--last-activity",
-        fields["last-activity"],
-    ]
-
-
-def test_call_sam_task_update_last_activity_maps_to_cli_option() -> None:
-    """_call_sam_task_update maps a 'last-activity' field to the --last-activity CLI option."""
-    # Arrange
-    timestamp = "2026-08-29T12:00:00+00:00"
-    response = _cli_success_response({"updated": True, "address": "Pabc123/T1"})
-
-    with (
-        patch("shutil.which", return_value="/usr/bin/uv"),
-        patch.object(Path, "exists", return_value=True),
-        patch("subprocess.Popen", return_value=_popen_from_completed(response)) as mock_popen,
-    ):
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"last-activity": timestamp})
-
-    # Assert
-    assert result is True
-    cmd = mock_popen.call_args[0][0]
-    assert ["--last-activity", timestamp] == cmd[cmd.index("--last-activity") : cmd.index("--last-activity") + 2]
-
-
-def test_call_sam_task_update_returns_false_for_unmapped_field() -> None:
-    """_call_sam_task_update returns False without calling subprocess for an unmapped field.
-
-    Only 'completed' and 'last-activity' map to CLI options. Any other key
-    (e.g. an arbitrary task field) is not a supported patch target for this
-    helper — it must fail closed rather than silently drop the field or crash.
-    """
-    # Arrange
-    with patch("subprocess.Popen") as mock_popen:
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"title": "New title"})
-
-    # Assert
-    assert result is False
-    mock_popen.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# _call_sam_task_update — failure paths
-# ---------------------------------------------------------------------------
-
-
-def test_call_sam_task_update_returns_false_when_uv_missing() -> None:
-    """_call_sam_task_update returns False gracefully when uv is not on PATH."""
-    # Arrange
-    with patch("shutil.which", return_value=None):
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"last-activity": "ts"})
-
-    # Assert
-    assert result is False
-
-
-def test_call_sam_task_update_returns_false_on_nonzero_returncode() -> None:
-    """_call_sam_task_update returns False when subprocess exits with error code."""
-    # Arrange
-    with (
-        patch("shutil.which", return_value="/usr/bin/uv"),
-        patch.object(Path, "exists", return_value=True),
-        patch("subprocess.Popen", return_value=_popen_from_completed(_mcp_error_response())),
-    ):
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"last-activity": "ts"})
-
-    # Assert
-    assert result is False
-
-
-def test_call_sam_task_update_returns_false_on_timeout() -> None:
-    """_call_sam_task_update returns False when subprocess times out."""
-    # Arrange
-    with (
-        patch("shutil.which", return_value="/usr/bin/uv"),
-        patch.object(Path, "exists", return_value=True),
-        patch("subprocess.Popen", return_value=_popen_timeout()),
-        patch("os.getpgid", return_value=4242),
-        patch("os.killpg"),
-    ):
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"last-activity": "ts"})
-
-    # Assert
-    assert result is False
-
-
-def test_call_sam_task_update_returns_false_on_malformed_json() -> None:
-    """_call_sam_task_update returns False when subprocess stdout is not valid JSON."""
-    # Arrange
-    bad_response = CompletedProcess(args=[], returncode=0, stdout="not-json", stderr="")
-    with (
-        patch("shutil.which", return_value="/usr/bin/uv"),
-        patch.object(Path, "exists", return_value=True),
-        patch("subprocess.Popen", return_value=_popen_from_completed(bad_response)),
-    ):
-        # Act
-        result = _call_sam_task_update("Pabc123", "T1", {"x": "y"})
-
-    # Assert
-    assert result is False
-
-
-# ---------------------------------------------------------------------------
-# handle_activity_update — SAM CLI call path
-# ---------------------------------------------------------------------------
-
-
-def test_handle_activity_update_calls_mcp_update(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """handle_activity_update calls _call_sam_task_update for last-activity field."""
-    # Arrange — context file carries the plan address directly
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-abc"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T1"}))
-
-    hook_input = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
-
-    from sam_schema.core.models import TaskStatus
-
-    with (
-        patch.object(_hook_mod, "_call_sam_task_status", return_value=TaskStatus.IN_PROGRESS),
-        patch.object(_hook_mod, "_call_sam_task_update", return_value=True) as mock_update,
-    ):
-        # Act
-        handle_activity_update(hook_input)
-
-    # Assert
-    mock_update.assert_called_once()
-    call_args = mock_update.call_args
-    assert call_args[0][0] == "Pf4281187"  # plan_addr
-    assert call_args[0][1] == "T1"  # task_id
-    assert "last-activity" in call_args[0][2]  # set_fields has last-activity key
-
-
-def test_handle_activity_update_skips_when_no_plan_addr(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """handle_activity_update exits silently when the context file has no plan address."""
-    # Arrange — context file missing the "plan" field
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-xyz"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_id": "T1"}))
-
-    hook_input = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
-
-    with (
-        patch.object(_hook_mod, "_call_sam_task_update", return_value=True) as mock_update,
-        pytest.raises(SystemExit) as exc_info,
-    ):
-        # Act
-        handle_activity_update(hook_input)
-
-    # Assert — exited cleanly without calling the SAM CLI update
-    assert exc_info.value.code == 0
-    mock_update.assert_not_called()
-
-
-def _write_transcript(tmp_path: Path, records: list[dict[str, Any]]) -> Path:
-    transcript = tmp_path / "transcript.jsonl"
-    transcript.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
-    return transcript
-
-
-def _assistant_record(text: str) -> dict[str, Any]:
-    return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
-
-
-# ---------------------------------------------------------------------------
-# handle_activity_update — stderr diagnostic when _call_sam_task_status returns None
-# ---------------------------------------------------------------------------
-
-
-def test_handle_activity_update_emits_stderr_when_mcp_read_returns_none(
-    mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """handle_activity_update prints a diagnostic to stderr when _call_sam_task_status returns None.
-
-    Verifies the silent failure case is now visible: before this fix the hook fell
-    through to the activity update without any indication the read had failed.
-    """
-    # Arrange — context file carries the plan address directly
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-no-task"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T1"}))
-
-    hook_input: dict[str, Any] = {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
-
-    mocker.patch.object(_hook_mod, "_call_sam_task_status", create=True, return_value=None)
-    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
-
-    # Act
-    handle_activity_update(hook_input)
-
-    # Assert — diagnostic visible on stderr
-    captured = capsys.readouterr()
-    assert "could not read task T1 from plan Pf4281187 via the SAM CLI" in captured.err
-    assert "skipping" in captured.err
-
-    # Assert — update still proceeds (best-effort activity tracking continues)
-    mock_update.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# read_task_context — local backend shape (both plan and task_file_path present)
-# ---------------------------------------------------------------------------
-
-
-def test_read_task_context_reads_plan_field_for_local_backend_shape(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """read_task_context reads the "plan" field even when a genuine task_file_path is also present.
-
-    The local-YAML ContextBackend populates BOTH task_file_path (a real filesystem
-    path) and plan (the address) in the same context file. This proves reading
-    "plan" is correct for local sessions too, not just for memory/GitHub/beads
-    where task_file_path is None.
-    """
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-local-backend"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(
-        json.dumps({"task_file_path": str(tmp_path / "plan" / "Pf4281187.yaml"), "plan": "Pf4281187", "task_id": "T1"})
-    )
-
-    plan_addr, task_id = _hook_mod.read_task_context(tmp_path, session_id)
-
-    assert plan_addr == "Pf4281187"
-    assert task_id == "T1"
-
-
-# ---------------------------------------------------------------------------
-# read_task_context logs to stderr on malformed JSON
-# ---------------------------------------------------------------------------
-
-
-def test_read_task_context_returns_none_tuple_and_logs_on_malformed_json(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """read_task_context returns (None, None) and emits a [hook]-prefixed stderr message on bad JSON.
-
-    The contract (None, None) is unchanged from the pre-refactor behavior. The new
-    observable behavior is the stderr log: callers need to know the context file is
-    malformed so the failure is not invisible in production. The message must contain
-    the file path so operators can locate and delete the corrupt file.
-    """
-    # Arrange — create a real malformed JSON file at the context path
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths  # dh_paths is a runtime import needed after env setup
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-bad-json"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text("{not valid json", encoding="utf-8")
-
-    cwd = tmp_path
-
-    # Act
-    result = _hook_mod.read_task_context(cwd, session_id)
-
-    # Assert — contract: returns (None, None)
-    assert result == (None, None)
-
-    # Assert — stderr contains [hook] prefix and the file path
-    captured = capsys.readouterr()
-    assert "[hook]" in captured.err
-    assert str(context_file) in captured.err
-
-
-def test_read_task_context_fails_loudly_on_legacy_record_missing_plan_field(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A pre-migration context record (task_file_path + task_id, no plan) returns (None, None)
-    and logs a stderr diagnostic — it must not silently do nothing, and must not fall back to
-    parsing the address out of task_file_path (that fallback was deliberately rejected; see #3151).
-    """
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    session_id = "sess-legacy-pre-migration"
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(tmp_path / "plan" / "Pf4281187.yaml"), "task_id": "T1"}))
-
-    result = _hook_mod.read_task_context(tmp_path, session_id)
-
-    assert result == (None, None)
-
-    captured = capsys.readouterr()
-    assert "[hook]" in captured.err
-    assert "legacy context record" in captured.err
-    assert str(context_file) in captured.err
-
-
-# ---------------------------------------------------------------------------
 # Regression guard — no fastmcp invocation left in the hook source
 # ---------------------------------------------------------------------------
 
@@ -467,8 +126,8 @@ def test_hook_source_contains_no_fastmcp_invocation() -> None:
 
     All task-state writes/reads now route through direct SAM CLI subprocess
     calls (see _SAM_CLI_PATH). A reintroduced fastmcp invocation would bring
-    back the orphaned-process defect (keep_alive=True) and the ~10s PostToolUse
-    budget overrun this migration fixed.
+    back the orphaned-process defect (keep_alive=True) and risk the 60-second
+    SubagentStop hook deadline this migration fixed.
     """
     source = _hook_path.read_text(encoding="utf-8")
     assert "fastmcp" not in source.lower()
@@ -478,10 +137,9 @@ def test_hook_source_contains_no_fastmcp_invocation() -> None:
 # Timeout ordering and process-group cleanup
 #
 # Two compounding defects this section guards against:
-#   1. Every _call_sam_cli-family timeout default (15s, or 10s for the
-#      active-task helpers) is not safely below the outer 10s PostToolUse hook
-#      deadline Claude Code itself enforces — the external SIGKILL can beat
-#      subprocess's own internal timeout handling.
+#   1. _call_sam_cli's timeout default is not safely below the outer 60s
+#      SubagentStop hook deadline Claude Code itself enforces — the external
+#      SIGKILL can beat subprocess's own internal timeout handling.
 #   2. subprocess.run(timeout=...) only kills the immediate child (uv); a
 #      descendant process uv forks (the real sam_schema/cli.py interpreter)
 #      can be left running — the orphaned-process failure mode this whole
@@ -490,24 +148,19 @@ def test_hook_source_contains_no_fastmcp_invocation() -> None:
 
 
 def test_timeout_defaults_are_below_outer_hook_deadline() -> None:
-    """Every _call_sam_cli-family function's own timeout default must be < 10s.
+    """Every _call_sam_cli-family function's own timeout default must be < 60s.
 
-    The outer PostToolUse hook deadline is a hard 10s SIGKILL of the whole
+    The outer SubagentStop hook deadline is a hard 60s SIGKILL of the whole
     hook process, enforced externally by Claude Code. An internal subprocess
     timeout default at or above that value can never fire before the outer
     kill does, so subprocess's own timeout/cleanup path never gets a chance
     to run — this is the exact defect already fixed once for the old
     fastmcp-call path, recurring here for the plain-CLI replacement.
     """
-    funcs = [
-        _hook_mod._call_sam_cli,
-        _hook_mod._call_sam_plan_settle,
-        _hook_mod._call_sam_task_update,
-        _hook_mod._call_sam_task_status,
-    ]
+    funcs = [_hook_mod._call_sam_cli, _hook_mod._call_sam_plan_settle]
     for func in funcs:
         default = inspect.signature(func).parameters["timeout"].default
-        assert default < 10, f"{func.__name__} timeout default is {default!r}, must be < 10"
+        assert default < 60, f"{func.__name__} timeout default is {default!r}, must be < 60"
 
 
 def test_call_sam_cli_delegates_timeout_cleanup_to_terminate_process_tree(mocker: MockerFixture) -> None:
@@ -557,103 +210,6 @@ def test_call_sam_cli_uses_posix_session_flag(mocker: MockerFixture) -> None:
 
     mock_popen.assert_called_once()
     assert mock_popen.call_args.kwargs.get("start_new_session") == (os.name == "posix")
-
-
-# ---------------------------------------------------------------------------
-# handle_activity_update shares a single wall-clock deadline across its two
-# sequential _call_sam_cli-backed calls
-#
-# _call_sam_task_status then _call_sam_task_update are each individually kept
-# below the outer 10s PostToolUse hook deadline, but nothing stops their SUM
-# from exceeding it: worst case ~8s + ~8s = ~16s, well past the 10s
-# external SIGKILL Claude Code enforces on the whole hook process. The fix
-# computes a shared remaining-budget deadline once (time.monotonic()) and
-# passes the REMAINING time to each call, skipping the update call outright
-# once the budget is exhausted rather than dispatching it with a doomed
-# near-zero/negative timeout.
-# ---------------------------------------------------------------------------
-
-
-def _write_activity_update_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, session_id: str) -> dict[str, Any]:
-    """Set up a plan file + context file for handle_activity_update and return its hook_input.
-
-    Shared fixture setup for the two shared-deadline tests below — mirrors the setup
-    already used by test_handle_activity_update_calls_mcp_update.
-    """
-    plan_file = tmp_path / "Pf4281187-feature.yaml"
-    plan_file.write_text("tasks:\n- id: T1\n  status: in-progress\n  title: Test\n")
-
-    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    context_file = context_dir / f"active-task-{session_id}.json"
-    context_file.write_text(json.dumps({"task_file_path": str(plan_file), "plan": "Pf4281187", "task_id": "T1"}))
-
-    return {"cwd": str(tmp_path), "session_id": session_id, "hook_event_name": "PostToolUse"}
-
-
-def test_handle_activity_update_shares_deadline_between_read_and_update(
-    mocker: MockerFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The timeout passed to _call_sam_task_update reflects the budget remaining after the read call.
-
-    time.monotonic() is mocked to a 3-value sequence: [deadline computed, right before the
-    read call, right before the update call] = [0.0, 0.0, 6.0] — simulating the read call
-    alone consuming 6 of the shared budget's seconds. The update call must NOT receive its
-    own fresh ~8s default; it must receive whatever budget remains (< 8s).
-
-    RED on current code: handle_activity_update calls _call_sam_task_update(plan_addr,
-    task_id, set_fields) with no timeout= kwarg at all (it relies on the function's own
-    8s default), so mock_update.call_args.kwargs.get("timeout") is None here.
-    """
-    session_id = "sess-budget-shared"
-    hook_input = _write_activity_update_context(tmp_path, monkeypatch, session_id)
-
-    from sam_schema.core.models import TaskStatus
-
-    mocker.patch("time.monotonic", side_effect=[0.0, 0.0, 6.0])
-    mocker.patch.object(_hook_mod, "_call_sam_task_status", return_value=TaskStatus.IN_PROGRESS)
-    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
-
-    handle_activity_update(hook_input)
-
-    mock_update.assert_called_once()
-    passed_timeout = mock_update.call_args.kwargs.get("timeout")
-    assert passed_timeout is not None, (
-        "expected _call_sam_task_update to receive an explicit timeout= reflecting the "
-        "remaining shared budget, not fall back to its own default"
-    )
-    assert 0 < passed_timeout < 8, f"expected a reduced remaining-budget timeout, got {passed_timeout!r}"
-
-
-def test_handle_activity_update_skips_update_when_budget_exhausted(
-    mocker: MockerFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """_call_sam_task_update is skipped entirely once the shared budget is exhausted by the read call.
-
-    time.monotonic() simulates the read call alone consuming the entire shared budget
-    (remaining <= 0 by the time the update call would be dispatched). Rather than
-    dispatching _call_sam_task_update with a doomed near-zero/negative timeout, the fix
-    must skip it outright (logging to stderr) and return.
-
-    RED on current code: handle_activity_update unconditionally calls
-    _call_sam_task_update whenever the task isn't already COMPLETE — there is no budget
-    check at all, so mock_update.assert_not_called() fails (it WAS called).
-    """
-    session_id = "sess-budget-exhausted"
-    hook_input = _write_activity_update_context(tmp_path, monkeypatch, session_id)
-
-    from sam_schema.core.models import TaskStatus
-
-    mocker.patch("time.monotonic", side_effect=[0.0, 0.0, 8.5])
-    mocker.patch.object(_hook_mod, "_call_sam_task_status", return_value=TaskStatus.IN_PROGRESS)
-    mock_update = mocker.patch.object(_hook_mod, "_call_sam_task_update", return_value=True)
-
-    handle_activity_update(hook_input)
-
-    mock_update.assert_not_called()
 
 
 def test_terminate_process_tree_resolves_from_inside_the_plugin_package() -> None:
@@ -983,22 +539,8 @@ def test_subagent_stop_says_why_it_could_not_settle_without_an_attempt(
 
 
 def test_subagent_stop_stays_quiet_for_an_unrelated_sub_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A sub-agent of another plugin reaches this hook too, and leaves the session's record alone.
-
-    hooks.json registers SubagentStop with no matcher, so every stopping sub-agent in the session
-    arrives here. Whether it is a dispatched worker is decided by whether its prompt names a
-    launch, not by its agent name. The active-task record is keyed by the parent session's id,
-    which every sub-agent shares (CLAIMS-REGISTER.md). The hook only settles, so an unrelated
-    sub-agent's stop runs no subprocess and leaves that record in place.
-    """
+    """The hook settles only a launch named in the prompt. An unrelated sub-agent's stop runs no subprocess."""
     monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
-    monkeypatch.setenv("CONTEXTBACKEND", "local")
-    import dh_paths
-
-    context_dir = dh_paths.context_dir()
-    context_dir.mkdir(parents=True, exist_ok=True)
-    record = context_dir / "active-task-sess-1.json"
-    record.write_text(json.dumps({"plan": "Pf4281187", "task_id": "T2"}))
     transcript = _launch_transcript(tmp_path, "Please review the README for typos.", session_id="sess-1")
     hook_input = {
         "hook_event_name": "SubagentStop",
@@ -1010,7 +552,6 @@ def test_subagent_stop_stays_quiet_for_an_unrelated_sub_agent(tmp_path: Path, mo
         handle_subagent_stop(hook_input)
 
     mock_popen.assert_not_called()
-    assert record.exists()
 
 
 def test_subagent_stop_without_a_transcript_path_reports_it(capsys: pytest.CaptureFixture[str]) -> None:
@@ -1018,45 +559,6 @@ def test_subagent_stop_without_a_transcript_path_reports_it(capsys: pytest.Captu
     handle_subagent_stop({"hook_event_name": "SubagentStop"})
 
     assert "no agent_transcript_path" in capsys.readouterr().err
-
-
-# ---------------------------------------------------------------------------
-# _call_sam_task_status — the ledger and the content store answer in different shapes
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("label", "payload"),
-    [
-        # The ledger returns the row under "row" and the task *id* — a bare string — under "task".
-        ("ledger", {"command": "read", "task": "T1", "row": {"id": "T1", "status": "in-progress"}}),
-        ("content store", {"task": {"id": "T1", "status": "in-progress"}}),
-    ],
-)
-def test_task_status_is_read_from_either_response_shape(label: str, payload: dict[str, Any]) -> None:
-    """Both `plan read` response shapes yield the status.
-
-    Reading `task` alone returned the string "T1" on a ledger plan, which validated as no task at
-    all — so every ledger-backed read reported failure and the caller skipped its work.
-    """
-    with (
-        patch.object(_hook_mod, "_get_uv_executable", return_value="/usr/bin/uv"),
-        patch("subprocess.Popen", return_value=_popen_from_completed(_cli_success_response(payload))),
-    ):
-        status = _call_sam_task_status("Pf4281187", "T1")
-
-    from sam_schema.core.models import TaskStatus
-
-    assert status == TaskStatus.IN_PROGRESS, label
-
-
-def test_task_status_returns_none_on_subprocess_failure() -> None:
-    """A failed CLI call yields None rather than a guessed status."""
-    with (
-        patch.object(_hook_mod, "_get_uv_executable", return_value="/usr/bin/uv"),
-        patch("subprocess.Popen", return_value=_popen_from_completed(_mcp_error_response())),
-    ):
-        assert _call_sam_task_status("Pf4281187", "T1") is None
 
 
 # ---------------------------------------------------------------------------
@@ -1075,3 +577,264 @@ def test_hook_source_issues_no_plan_state_command() -> None:
 
     assert '"state"' not in source, "the hook must not issue `plan state`"
     assert '"--new-status"' not in source, "the hook must not set a task status"
+
+
+# ---------------------------------------------------------------------------
+# main() event routing — only SubagentStop reaches the SAM CLI
+#
+# Was red at HEAD 58f37d7be: main() sent PostToolUse + Bash to handle_activity_update, which
+# drove two _call_sam_cli calls — `plan read` (via _call_sam_task_status) then `plan update
+# --last-activity` (via _call_sam_task_update) — the false liveness signal ARCHITECTURE.md says
+# a hook must not approximate. The runner renews its own lease through the ledger on each
+# read/update/renew --attempt instead (docs/work-ledger/runner-contract.md), so no event but
+# SubagentStop has anything left to do here. Step 1a deletes the handler and both of its
+# registrations and puts nothing in their place.
+# ---------------------------------------------------------------------------
+
+_NON_SETTLE_EVENTS = (
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "UserPromptSubmit",
+    "Stop",
+    "SubagentStart",
+    "SessionStart",
+    "SessionEnd",
+    "Notification",
+    "TaskCompleted",
+)
+
+
+@pytest.mark.parametrize("tool_name", ["Bash", "Write", "Edit", "MultiEdit", "Read"])
+@pytest.mark.parametrize("event", _NON_SETTLE_EVENTS)
+def test_only_subagent_stop_reaches_the_sam_cli(
+    event: str,
+    tool_name: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """No event but SubagentStop, for any tool name, issues a subprocess or touches disk.
+
+    Patches subprocess.Popen AND subprocess.run — one layer below _call_sam_cli — rather than
+    _call_sam_cli itself, so this stays red however a reintroduced handler reached the CLI:
+    _call_sam_cli's own implementation calls subprocess.Popen (task_status_hook.py:393), and a
+    handler that built its own subprocess.run call instead is caught the same way. The mtime
+    sweep over tmp_path (used as `cwd`) catches an in-process write that used no subprocess at
+    all — a third way a reintroduced handler could leave the "false liveness signal"
+    ARCHITECTURE.md prohibits.
+    """
+    # Arrange
+    monkeypatch.delenv("CLAUDE_SKILLS_DISABLED_HOOKS", raising=False)
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "dh_state"))
+    payload = {
+        "hook_event_name": event,
+        "tool_name": tool_name,
+        "session_id": "sess-1",
+        "cwd": str(tmp_path),
+        "tool_input": {"command": "pytest"},
+    }
+    mocker.patch.object(_hook_mod, "parse_hook_input", return_value=payload)
+    popen = mocker.patch("subprocess.Popen", side_effect=AssertionError("hook spawned a process"))
+    run = mocker.patch("subprocess.run", side_effect=AssertionError("hook spawned a process"))
+    before = sorted((p.relative_to(tmp_path), p.stat().st_mtime_ns) for p in tmp_path.rglob("*"))
+
+    # Act
+    with pytest.raises(SystemExit) as exc_info:
+        _hook_mod.main()
+
+    # Assert
+    assert exc_info.value.code == 0
+    popen.assert_not_called()
+    run.assert_not_called()
+    after = sorted((p.relative_to(tmp_path), p.stat().st_mtime_ns) for p in tmp_path.rglob("*"))
+    assert after == before
+    assert capsys.readouterr() == ("", "")
+
+
+# ---------------------------------------------------------------------------
+# Registration — task_status_hook.py is registered only under SubagentStop
+#
+# Was red at HEAD 58f37d7be: hooks.json also registered it under PostToolUse (hooks.json:42),
+# and start-task/SKILL.md's own frontmatter carried a second PostToolUse registration writing
+# the same content-store field. hooks.json already fires in every sub-agent of the session, so
+# the frontmatter copy added no coverage of its own — only a second write. Step 1a deletes both.
+# ---------------------------------------------------------------------------
+
+_HOOK_SCRIPT = "task_status_hook.py"
+
+
+def _frontmatter(path: Path) -> dict[str, Any]:
+    """Return a skill's or agent's parsed YAML frontmatter dict, or `{}` when it has none.
+
+    Anchored to a leading `---` line and its own closing `---` line on its own line — unlike
+    an unanchored ``text.split("---", 2)[1]``, a bare `---` appearing inside a value (a
+    `description:` string, for instance) cannot end the block early.
+
+    Args:
+        path: A `SKILL.md` or agent `.md` file.
+
+    Returns:
+        The parsed frontmatter mapping, or `{}` when the file has no frontmatter block or the
+        block does not parse to a mapping.
+    """
+    text = path.read_text(encoding="utf-8")
+    match = re.match(r"\A\ufeff?---\r?\n(.*?)\r?\n---\r?\n", text, re.DOTALL)
+    if not match:
+        return {}
+    parsed = coerce_to_plain(load_yaml(match.group(1)))
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _hook_sources() -> list[tuple[str, dict[str, Any]]]:
+    """Return every `(source label, hooks mapping)` this plugin could register a hook through.
+
+    Covers the three places Claude Code reads a plugin's hook registrations from: `hooks/*.json`,
+    every `*-plugin/plugin.json` manifest (`hooks` inline as an object, or as a string path to
+    another JSON file — both forms are valid per the plugin.json schema), and any skill's or
+    agent's own frontmatter `hooks:` key.
+
+    Returns:
+        One entry per source file that carries a `hooks` mapping, keyed by that file's path (or,
+        for a manifest's `hooks`-by-path form, the referenced file's own path).
+    """
+    sources: list[tuple[str, dict[str, Any]]] = []
+
+    for hooks_file in sorted((_plugin_dir / "hooks").glob("*.json")):
+        hooks = json.loads(hooks_file.read_text(encoding="utf-8")).get("hooks")
+        if isinstance(hooks, dict):
+            sources.append((str(hooks_file), hooks))
+
+    for manifest in sorted(_plugin_dir.glob(".*-plugin/plugin.json")):
+        raw_hooks = json.loads(manifest.read_text(encoding="utf-8")).get("hooks")
+        if isinstance(raw_hooks, dict):
+            sources.append((str(manifest), raw_hooks))
+        elif isinstance(raw_hooks, str):
+            referenced = (manifest.parent / raw_hooks).resolve()
+            hooks = json.loads(referenced.read_text(encoding="utf-8")).get("hooks")
+            if isinstance(hooks, dict):
+                sources.append((str(referenced), hooks))
+
+    markdown_files = (
+        *sorted((_plugin_dir / "skills").rglob("SKILL.md")),
+        *sorted((_plugin_dir / "agents").glob("*.md")),
+    )
+    for md_path in markdown_files:
+        fm_hooks = _frontmatter(md_path).get("hooks")
+        if isinstance(fm_hooks, dict):
+            sources.append((str(md_path), fm_hooks))
+
+    return sources
+
+
+def _registrations_of(hook_script: str, sources: list[tuple[str, dict[str, Any]]]) -> set[tuple[str, str]]:
+    """Return the `(source, event)` pairs where *hook_script* appears in that event's hook groups.
+
+    Args:
+        hook_script: The command-line substring identifying the hook script (its filename).
+        sources: The `(source label, hooks mapping)` pairs `_hook_sources` returns.
+
+    Returns:
+        One `(source, event)` pair per event whose hook-group JSON mentions `hook_script`.
+    """
+    return {
+        (source, event)
+        for source, hooks in sources
+        for event, groups in hooks.items()
+        if hook_script in json.dumps(groups)
+    }
+
+
+def test_task_status_hook_is_registered_only_for_subagent_stop() -> None:
+    """Every registration of task_status_hook.py, across every place Claude Code reads one from,
+    names SubagentStop and nothing else — not the plugin manifests, not a second `hooks/*.json`,
+    and not any skill's or agent's own frontmatter.
+    """
+    registrations = _registrations_of(_HOOK_SCRIPT, _hook_sources())
+
+    assert registrations, "task_status_hook.py must be registered somewhere"
+    assert {event for _, event in registrations} == {"SubagentStop"}, registrations
+
+
+def test_hook_sources_reads_hooks_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The hooks/*.json branch of `_hook_sources`, in isolation, flags a PostToolUse entry.
+
+    Exercises the mechanism against a scratch plugin tree — never the real `hooks.json` — so a
+    reintroduced `task_status_hook.py` registration under PostToolUse there is caught by this
+    branch alone, independent of the manifest and frontmatter branches (I4).
+    """
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "hooks" / "hooks.json").write_text(
+        json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": f"uv run {_HOOK_SCRIPT}"}]}]}}), encoding="utf-8"
+    )
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "agents").mkdir()
+    monkeypatch.setattr(sys.modules[__name__], "_plugin_dir", tmp_path)
+
+    registrations = _registrations_of(_HOOK_SCRIPT, _hook_sources())
+
+    assert "PostToolUse" in {event for _, event in registrations}
+
+
+def test_hook_sources_reads_inline_manifest_hooks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `*-plugin/plugin.json`'s inline `"hooks"` object is read, on its own (I4)."""
+    (tmp_path / ".claude-plugin").mkdir()
+    (tmp_path / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": f"uv run {_HOOK_SCRIPT}"}]}]}}), encoding="utf-8"
+    )
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "agents").mkdir()
+    monkeypatch.setattr(sys.modules[__name__], "_plugin_dir", tmp_path)
+
+    registrations = _registrations_of(_HOOK_SCRIPT, _hook_sources())
+
+    assert "PostToolUse" in {event for _, event in registrations}
+
+
+def test_hook_sources_reads_manifest_hooks_by_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A `*-plugin/plugin.json`'s `"hooks"` string is followed to its referenced file (I4)."""
+    (tmp_path / ".claude-plugin").mkdir()
+    (tmp_path / ".claude-plugin" / "plugin.json").write_text(
+        json.dumps({"hooks": "./other-hooks.json"}), encoding="utf-8"
+    )
+    (tmp_path / ".claude-plugin" / "other-hooks.json").write_text(
+        json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": f"uv run {_HOOK_SCRIPT}"}]}]}}), encoding="utf-8"
+    )
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "agents").mkdir()
+    monkeypatch.setattr(sys.modules[__name__], "_plugin_dir", tmp_path)
+
+    registrations = _registrations_of(_HOOK_SCRIPT, _hook_sources())
+
+    assert "PostToolUse" in {event for _, event in registrations}
+
+
+def test_hook_sources_reads_skill_frontmatter_and_is_not_fooled_by_a_mid_value_delimiter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A skill's own frontmatter `hooks:` key is read, on its own, and a `---` inside an
+    unrelated frontmatter value does not end the block early (I4's frontmatter-fragility point).
+    """
+    skill_dir = tmp_path / "skills" / "some-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: some-skill\n"
+        'description: "use --- as a separator here"\n'
+        "hooks:\n"
+        "  PostToolUse:\n"
+        "    - hooks:\n"
+        f'        - command: "uv run {_HOOK_SCRIPT}"\n'
+        "---\n\n# Body\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "hooks").mkdir()
+    (tmp_path / "agents").mkdir()
+    monkeypatch.setattr(sys.modules[__name__], "_plugin_dir", tmp_path)
+
+    registrations = _registrations_of(_HOOK_SCRIPT, _hook_sources())
+
+    assert "PostToolUse" in {event for _, event in registrations}

@@ -12,15 +12,11 @@
 # ///
 """Task status hook — the orchestrator's automatic ``settle`` when a launch ends.
 
-Two hook events reach this script:
+One hook event reaches this script: **SubagentStop**. The hook settles the attempt the
+stopping sub-agent was launched for, and records what came back. It writes no status.
 
-- **SubagentStop**: settle the attempt the stopping sub-agent was launched for, recording what
-  came back. It writes no status.
-- **PostToolUse** (``Write|Edit|Bash``): update the ``last-activity`` timestamp of the session's
-  active task.
-
-Every write routes through the SAM CLI (``scripts/run_sam_cli.py``) as a single subprocess, so
-the hook stays backend-agnostic and never touches storage directly.
+The hook calls the SAM CLI (``scripts/run_sam_cli.py``) as one subprocess. It does not touch
+storage directly.
 
 Why SubagentStop settles and does not decide
 --------------------------------------------
@@ -60,17 +56,9 @@ as ``--return-text``, which is evidence for the judge, not a verdict.
 
 Correlating the stopping agent to its attempt
 ---------------------------------------------
-The address and the attempt both come from the sub-agent's own initial prompt, read from
-``agent_transcript_path``. That transcript is per-sub-agent, so N workers dispatched in parallel
-correlate to N distinct attempts.
-
-The session-scoped active-task record is deliberately not used for this. It is keyed by
-``${CLAUDE_CODE_SESSION_ID}``, which inside a sub-agent is the parent session's id, so every
-sub-agent of one wave writes to one record and only the last survives; and it carries no attempt
-number at all (``ActiveTaskContext`` in ``sam_schema/core/models.py`` declares none, and
-``active-task set`` exposes no ``--attempt`` flag). This hook does not clear it either: a
-sub-agent stopping is not the session stopping, and the stopping agent may be a helper unrelated
-to the task the record names. Settling is the whole of this hook (``ARCHITECTURE.md``).
+The address and the attempt come from the sub-agent's own initial prompt, read from
+``agent_transcript_path``. Each sub-agent has its own transcript, so N workers dispatched in
+parallel correlate to N attempts. Settling is the whole of this hook (``ARCHITECTURE.md``).
 
 When the prompt names no attempt, no settle is possible and the hook says so on stderr rather
 than absorbing it.
@@ -117,15 +105,12 @@ Exit Codes:
 
 from __future__ import annotations
 
-import enum
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -141,15 +126,10 @@ _DH_PLUGIN_SCRIPTS_DIR = str(_DH_PLUGIN_DIR / "scripts")
 if _DH_PLUGIN_SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _DH_PLUGIN_SCRIPTS_DIR)
 
-import dh_paths as _dh_paths
-
 _HOOK_REPO_ROOT = Path(__file__).resolve().parents[5]
 _HOOK_SAM_PACKAGES_DIR = str(_HOOK_REPO_ROOT / "packages")
 if _HOOK_SAM_PACKAGES_DIR not in sys.path:
     sys.path.insert(0, _HOOK_SAM_PACKAGES_DIR)
-
-# Import directly from submodules for concrete types (avoids lazy __getattr__ object).
-from sam_schema.core.models import TaskStatus as SamTaskStatus
 
 from run_bounded import terminate_process_tree
 
@@ -191,41 +171,9 @@ _ATTEMPT_FLAG_RE = r"(?:\s+--attempt\s+(?P<attempt>\d+))?"
 _NO_FINAL_MESSAGE = "(no final message: the launch ended without one)"
 
 
-class HookProfile(enum.StrEnum):
-    """Runtime profile controlling which hook handlers are active.
-
-    Profiles are selected via the CLAUDE_SKILLS_HOOK_PROFILE environment variable.
-    Default when unset or empty: STANDARD.
-    """
-
-    MINIMAL = "minimal"
-    STANDARD = "standard"
-    STRICT = "strict"
-
-
-HOOK_ID_POST_TOOL_USE = "task-status:post-tool-use"
 HOOK_ID_SUBAGENT_STOP = "task-status:subagent-stop"
 
-_EVENT_TO_HOOK_ID: dict[str, str] = {"PostToolUse": HOOK_ID_POST_TOOL_USE, "SubagentStop": HOOK_ID_SUBAGENT_STOP}
-
-
-def resolve_profile() -> HookProfile:
-    """Read CLAUDE_SKILLS_HOOK_PROFILE and return the corresponding HookProfile.
-
-    Returns HookProfile.STANDARD when the variable is unset or empty.
-    Prints a warning to stderr and returns STANDARD for any unrecognised value.
-
-    Returns:
-        The active HookProfile.
-    """
-    raw = os.environ.get("CLAUDE_SKILLS_HOOK_PROFILE", "").strip()
-    if not raw:
-        return HookProfile.STANDARD
-    try:
-        return HookProfile(raw)
-    except ValueError:
-        print(f'[hook] Unknown profile "{raw}", using "standard"', file=sys.stderr)
-        return HookProfile.STANDARD
+_EVENT_TO_HOOK_ID: dict[str, str] = {"SubagentStop": HOOK_ID_SUBAGENT_STOP}
 
 
 def parse_disabled_hooks() -> set[str]:
@@ -243,27 +191,18 @@ def parse_disabled_hooks() -> set[str]:
     return {segment.strip() for segment in raw.split(",") if segment.strip()}
 
 
-def should_skip_hook(event_name: str, profile: HookProfile, disabled_hooks: set[str]) -> bool:
+def should_skip_hook(event_name: str, disabled_hooks: set[str]) -> bool:
     """Return True if the hook for this event should be skipped.
 
-    Disabled hooks take precedence over profile rules.
-
     Args:
-        event_name: Value of hook_event_name from the hook input (e.g. "PostToolUse").
-        profile: The active HookProfile.
+        event_name: Value of hook_event_name from the hook input (e.g. "SubagentStop").
         disabled_hooks: Set of hook IDs to skip unconditionally.
 
     Returns:
         True if the hook should exit 0 without running its handler.
     """
     hook_id = _EVENT_TO_HOOK_ID.get(event_name)
-
-    # Disabled hooks take precedence — check first.
-    if hook_id and hook_id in disabled_hooks:
-        return True
-
-    # Profile rules: minimal skips PostToolUse only.
-    return bool(profile == HookProfile.MINIMAL and event_name == "PostToolUse")
+    return bool(hook_id and hook_id in disabled_hooks)
 
 
 def parse_hook_input() -> dict[str, Any]:
@@ -318,9 +257,7 @@ class Launch(BaseModel):
 def extract_launch_from_prompt(prompt: str) -> Launch | None:
     """Read the plan address, task id and attempt number out of a sub-agent's initial prompt.
 
-    The prompt is the only per-sub-agent carrier of these three facts. The session-scoped
-    active-task record is keyed by the parent session's id and holds no attempt number, so it
-    cannot name the attempt a settle must record against — see the module docstring.
+    The prompt is the only per-sub-agent carrier of these three facts.
 
     Every shape is matched against a *delimited position* rather than searched for in free text:
     the first three against the whole of the prompt's first line, the fourth against the whole
@@ -411,58 +348,6 @@ def _launch_of(match: re.Match[str]) -> Launch:
     )
 
 
-def get_context_file_path(cwd: Path, session_id: str) -> Path:
-    """Get the path to the active task context file.
-
-    Uses dh_paths.context_dir() which resolves to
-    ``~/.dh/projects/{slug}/context/`` (or DH_STATE_HOME override).
-    The ``cwd`` argument is accepted for call-site compatibility but is not
-    used — dh_paths detects the project root from git.
-
-    Args:
-        cwd: Current working directory (unused; kept for compatibility).
-        session_id: Session ID from hook input.
-
-    Returns:
-        Path to the context file under the DH state context directory.
-    """
-    return _dh_paths.context_dir() / f"active-task-{session_id}.json"
-
-
-def read_task_context(cwd: Path, session_id: str) -> tuple[str | None, str | None]:
-    """Read task info from context file.
-
-    Args:
-        cwd: Current working directory.
-        session_id: Session ID from hook input.
-
-    Returns:
-        Tuple of (plan_address, task_id) or (None, None) if not found.
-    """
-    context_file = get_context_file_path(cwd, session_id)
-    if not context_file.exists():
-        return None, None
-
-    try:
-        context_data: dict[str, str] = json.loads(context_file.read_text(encoding="utf-8"))
-        plan_addr = context_data.get("plan")
-        task_id = context_data.get("task_id")
-        if plan_addr and task_id:
-            return plan_addr, task_id
-        if context_data.get("task_file_path") and task_id:
-            print(
-                f"[hook] read_task_context: {context_file}: legacy context record has "
-                "task_file_path but no plan address (predates the plan/task fields) — not "
-                "falling back to path-parsing; activity tracking for this session will not "
-                "resume until a fresh /start-task runs",
-                file=sys.stderr,
-            )
-    except json.JSONDecodeError as exc:
-        print(f"[hook] read_task_context: malformed JSON in {context_file}: {exc}", file=sys.stderr)
-
-    return None, None
-
-
 def _get_uv_executable() -> str | None:
     """Return the path to the uv executable, or None if not found on PATH.
 
@@ -484,7 +369,7 @@ def _call_sam_cli(args: list[str], timeout: float = 8) -> str | None:
     not just the immediate ``uv`` child -- ``uv run --script`` may spawn its
     own child interpreter, and killing only the ``uv`` pid would leave that
     interpreter orphaned. The default timeout is kept comfortably below the
-    10-second PostToolUse hook deadline in ``hooks/hooks.json`` -- a default
+    60-second SubagentStop hook deadline in ``hooks/hooks.json`` -- a default
     at or above that deadline lets Claude Code's own external SIGKILL win the
     race before this method's internal timeout handling (and process-tree
     cleanup) ever runs, which is exactly the orphaned-process failure mode
@@ -494,7 +379,7 @@ def _call_sam_cli(args: list[str], timeout: float = 8) -> str | None:
         args: Subcommand and options to pass to the SAM CLI (e.g.
             ``["plan", "read", "--address", "P1/T1"]``).
         timeout: Subprocess timeout in seconds. Must stay below the
-            PostToolUse hook's own timeout for the reason above.
+            SubagentStop hook's own timeout for the reason above.
 
     Returns:
         Raw stdout string on success, None on any failure (uv missing,
@@ -573,100 +458,6 @@ def _call_sam_plan_settle(launch: Launch, return_text: str, timeout: float = 8) 
 
     print(f"[hook] SubagentStop: settled {launch.address} attempt {launch.attempt}", file=sys.stderr)
     return True
-
-
-_UPDATE_FIELD_OPTIONS: dict[str, str] = {"last-activity": "--last-activity"}
-
-
-def _call_sam_task_update(plan_addr: str, task_id: str, set_fields: dict[str, Any], timeout: float = 8) -> bool:
-    """Update task fields via the SAM CLI's ``plan update`` subcommand.
-
-    Only fields with a mapped CLI option are supported (a typed allowlist,
-    not a generic JSON passthrough). An unmapped field fails closed without
-    invoking the CLI at all.
-
-    Args:
-        plan_addr: Plan address (e.g. ``"Pf4281187"``).
-        task_id: Task ID within the plan (e.g. ``"T1"``).
-        set_fields: Field name/value pairs to patch on the task. Keys must
-            be one of ``_UPDATE_FIELD_OPTIONS``.
-        timeout: Subprocess timeout in seconds.
-
-    Returns:
-        ``True`` if the CLI call succeeded, ``False`` on any failure or
-        unmapped field.
-    """
-    options: list[str] = []
-    for key, value in set_fields.items():
-        option = _UPDATE_FIELD_OPTIONS.get(key)
-        if option is None:
-            print(f"[hook] sam_task update: unsupported field {key!r} for {plan_addr}/{task_id}", file=sys.stderr)
-            return False
-        options.extend([option, str(value)])
-
-    stdout = _call_sam_cli(["plan", "update", "--plan-address", f"{plan_addr}/{task_id}", *options], timeout=timeout)
-    if stdout is None:
-        print(f"[hook] sam_task update failed for {plan_addr}/{task_id}", file=sys.stderr)
-        return False
-
-    try:
-        json.loads(stdout)
-    except json.JSONDecodeError:
-        print(f"[hook] sam_task update: unexpected response for {plan_addr}/{task_id}", file=sys.stderr)
-        return False
-
-    return True
-
-
-def _call_sam_task_status(plan_id: str, task_id: str, timeout: float = 8) -> SamTaskStatus | None:
-    """Read one task's current status via the SAM CLI's ``plan read`` subcommand.
-
-    Two response shapes reach this function, because ``plan read`` serves two stores. The work
-    ledger returns the task row under ``row`` and puts the task *id* — a bare string — under
-    ``task``; the content store returns the task object under ``task``. Reading ``task`` alone
-    therefore yields a string on a ledger plan, which is why this looks at ``row`` first.
-
-    Only the status is extracted. Validating the whole row as a ``Task`` fails on a ledger
-    response regardless of shape: the ledger stores list-valued columns as JSON text, and
-    ``Task``'s own validators reject ``dependencies="[]"``.
-
-    Args:
-        plan_id: Plan address (e.g. ``"Pf4281187"``).
-        task_id: Task ID within the plan (e.g. ``"T1"``).
-        timeout: Subprocess timeout in seconds.
-
-    Returns:
-        The task's status, or ``None`` when the call failed or the response carried no
-        recognisable status.
-    """
-    stdout = _call_sam_cli(["plan", "read", "--address", f"{plan_id}/{task_id}"], timeout=timeout)
-    if stdout is None:
-        return None
-
-    try:
-        data: dict[str, Any] = json.loads(stdout)
-    except json.JSONDecodeError:
-        return None
-
-    for key in ("row", "task"):
-        candidate = data.get(key)
-        if isinstance(candidate, dict):
-            raw_status = candidate.get("status")
-            if isinstance(raw_status, str):
-                try:
-                    return SamTaskStatus(raw_status)
-                except ValueError:
-                    return None
-    return None
-
-
-def get_iso_timestamp() -> str:
-    """Return the current UTC time as an ISO-8601 string, truncated to whole seconds.
-
-    Returns:
-        ISO-8601 timestamp string (UTC, no microseconds).
-    """
-    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _first_text_block(content: object) -> str | None:
@@ -825,7 +616,7 @@ def _last_assistant_text(transcript_path: Path) -> str | None:
     return final_text
 
 
-def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = HookProfile.STANDARD) -> None:
+def handle_subagent_stop(hook_input: dict[str, Any]) -> None:
     """Settle the attempt the stopping sub-agent was launched for; write no status.
 
     The one fact this hook holds that nobody else does is that the launch ended. It records that,
@@ -847,12 +638,7 @@ def handle_subagent_stop(hook_input: dict[str, Any], profile: HookProfile = Hook
 
     Args:
         hook_input: Parsed hook input from stdin.
-        profile: Active hook profile. Accepted for call-site compatibility; the profile gates
-            whether this handler runs at all (see :func:`should_skip_hook`) and no longer varies
-            what it does, because settling records evidence rather than deciding an outcome.
     """
-    del profile
-
     transcript_path_raw = hook_input.get("agent_transcript_path", "")
     transcript_path = Path(transcript_path_raw) if transcript_path_raw else None
     if transcript_path is None:
@@ -911,70 +697,6 @@ def _resolve_launch(transcript_path: Path) -> Launch | None:
     return launch
 
 
-# Total wall-clock budget shared across every _call_sam_cli invocation made within
-# one handle_activity_update() run, kept safely below the 10-second PostToolUse
-# deadline in hooks/hooks.json. Each call below gets whatever budget remains rather
-# than its own full default -- two independent 8-second defaults could sum past the
-# outer deadline even though each call alone stays under it.
-_POST_TOOL_USE_BUDGET_SECONDS = 8.0
-
-
-def handle_activity_update(hook_input: dict[str, Any]) -> None:
-    """Handle PostToolUse event — update the active task's ``last-activity`` timestamp.
-
-    Reads the session's active task from the context record and updates the ``last-activity``
-    field through the SAM CLI.
-
-    Scope limit, deliberate and recorded here so it is not mistaken for a lease renewal: the
-    ledger's liveness signal is the attempt's lease, pushed out by ``plan renew --address P/T
-    --attempt N``, and ``--last-activity`` is a content-store field (``store_for`` in
-    ``sam_schema/sam_plan.py`` classes it as a legacy flag, so an invocation naming it routes to
-    the content store). This handler cannot renew a lease instead, because renewing needs the
-    attempt number and the record it reads has none — ``ActiveTaskContext`` declares no attempt
-    field and ``active-task set`` exposes no ``--attempt`` flag. Nor could adding one be enough:
-    the record is keyed by ``session_id``, which inside a sub-agent is the parent session's, so
-    one wave's workers share a record and this handler would renew a sibling's lease. Keying it
-    per sub-agent needs an identifier the sub-agent can read for itself; looked for one in the
-    cached Claude Code hooks documentation (``docs/work-ledger/measurements/harness-claude-code.md``
-    § 6) and found ``agent_id`` only as a hook input field, never as an environment variable.
-
-    Args:
-        hook_input: Parsed hook input from stdin.
-    """
-    cwd = Path(hook_input.get("cwd", "."))
-    session_id = hook_input.get("session_id", "")
-
-    if not session_id:
-        sys.exit(0)
-
-    plan_addr, task_id = read_task_context(cwd, session_id)
-
-    if plan_addr is None or task_id is None:
-        sys.exit(0)
-
-    deadline = time.monotonic() + _POST_TOOL_USE_BUDGET_SECONDS
-
-    current_status = _call_sam_task_status(plan_addr, task_id, timeout=max(0.1, deadline - time.monotonic()))
-    if current_status is None:
-        print(
-            f"[hook] PostToolUse: could not read task {task_id} from plan {plan_addr} via the SAM CLI — skipping",
-            file=sys.stderr,
-        )
-    elif current_status == SamTaskStatus.COMPLETE:
-        return
-
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        print(
-            f"[hook] PostToolUse: skipping last-activity update for {task_id} — shared time budget exhausted",
-            file=sys.stderr,
-        )
-        return
-
-    timestamp = get_iso_timestamp()
-    _call_sam_task_update(plan_addr, task_id, {"last-activity": timestamp}, timeout=remaining)
-
-
 def main() -> None:
     """Main entry point for the hook script."""
     try:
@@ -985,23 +707,14 @@ def main() -> None:
 
     event_name = hook_input.get("hook_event_name", "")
 
-    # Disabled hooks take precedence over profile — checked inside should_skip_hook.
-    profile = resolve_profile()
     disabled_hooks = parse_disabled_hooks()
-    if should_skip_hook(event_name, profile, disabled_hooks):
+    if should_skip_hook(event_name, disabled_hooks):
         hook_id = _EVENT_TO_HOOK_ID.get(event_name, event_name)
-        if hook_id in disabled_hooks:
-            print(f"[hook] Skipped: {hook_id} (disabled)", file=sys.stderr)
-        else:
-            print(f"[hook] Skipped: {hook_id} (profile={profile})", file=sys.stderr)
+        print(f"[hook] Skipped: {hook_id} (disabled)", file=sys.stderr)
         sys.exit(0)
 
     if event_name == "SubagentStop":
-        handle_subagent_stop(hook_input, profile=profile)
-    elif event_name == "PostToolUse":
-        tool_name = hook_input.get("tool_name", "")
-        if tool_name in {"Write", "Edit", "Bash"}:
-            handle_activity_update(hook_input)
+        handle_subagent_stop(hook_input)
     sys.exit(0)
 
 
