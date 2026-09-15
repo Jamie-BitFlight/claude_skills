@@ -36,6 +36,19 @@ it here reveals that. The portability shapes guarded below are the ones that wer
   in a medium that is harder to grep for — so the test convicts on the process text, not on one
   spelling of it.
 
+- ``dh:dh-cli-usage`` replaces the ``${CLAUDE_PLUGIN_ROOT}``/``${CLAUDE_SKILL_DIR}`` template
+  variables and the CLI's literal ``/sam_schema/cli.py`` path with one skill that derives both from
+  its own directory (a ``<skill_dir>`` tag per harness that substitutes one, resolved to
+  ``<plugin_root/>`` and ``<sam_cli/>``). A raw template variable in an agent or skill body is the
+  same checkout-binding defect as the plugin-rooted skill path above -- a substitution Claude Code
+  performs that no other measured harness does, per ``SP/design-agent-cli-path.md`` section 0-1 --
+  so it is guarded the same way: a static scan with a named-reason exception table, not a runtime
+  check. The guide these agents and skills pointed readers at moves with it, from
+  ``dh-meta-docs/references/dh-cli-usage-guide.md`` to
+  ``dh-cli-usage/references/command-reference.md``, so a lingering reference to either the old name
+  or the old ``docs/mcp-connection-check.md`` path is the same drift this file already convicts
+  elsewhere: a pointer nothing keeps in sync with where its target actually lives.
+
 The last guard is a producer contract rather than a portability one. ``alignment-analyst`` used to
 be told to emit ``MISSION_DIVERGENT`` for its ``NOT_APPLICABLE`` case — "I could not check this"
 and "I checked this and found divergence" arrived as the same token, so a check that never ran was
@@ -55,6 +68,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
+from agent_profile.parser import _load_frontmatter_from_path, _normalize_skills
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = PLUGIN_ROOT / "agents"
@@ -148,6 +163,66 @@ EMITTED_VERDICT_RE = re.compile(r"^(MISSION_[A-Z_]+):", re.MULTILINE)
 ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 
 
+# --- Plugin-root variable and hard-coded CLI path (W2, dh-cli-usage) ----------------------------
+#
+# ``dh:dh-cli-usage`` is the one place that derives the plugin root and the CLI's location. Every
+# other agent and skill file is meant to say ``<sam_cli/>`` or ``<plugin_root/>/…`` and point at
+# that skill, never re-derive either value itself. These patterns are the two ways a file did that
+# derivation directly instead: a raw ``${...PLUGIN_ROOT}`` template variable, and the CLI's literal
+# path. See SP/design-agent-cli-path.md section 0 for why -- those template variables are
+# substituted by Claude Code only, so every reference and doc file carrying one as raw text ships
+# broken text to every other harness. ``dh-cli-usage`` instead derives the root from the skill's
+# own directory, which every measured harness gives the model except Cursor (section 1).
+PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{(?:CLAUDE_|KIMI_)?PLUGIN_ROOT\}")
+PREFIXED_CLI_PATH_RE = re.compile(r"/sam_schema/cli\.py")
+AGENT_RELATIVE_LINK_RE = re.compile(r"\]\(\.\.?/")
+CLI_INVOCATION_RE = re.compile(r"<sam_cli/>|sam_schema/cli\.py")
+TEMPLATE_VARIABLE_RE = re.compile(r"\$\{([A-Za-z_]+)\}")
+
+DH_CLI_USAGE_DIR = SKILLS_DIR / "dh-cli-usage"
+DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
+DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
+
+# The three forms a harness substitutes a skill's own directory into its body as, per
+# SP/design-agent-cli-path.md section 1. ``dh-cli-usage`` must derive the plugin root from one of
+# these -- never from a plugin-root variable, which only Claude Code resolves.
+SKILL_DIR_TAGS = (
+    "<skill_dir>${CLAUDE_SKILL_DIR}</skill_dir>",
+    "<skill_dir>${KIMI_SKILL_DIR}</skill_dir>",
+    "<skill_dir>${HERMES_SKILL_DIR}</skill_dir>",
+)
+ALLOWED_SKILL_DIR_VARIABLES = frozenset({"CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR"})
+SAM_CLI_COMMAND = 'uv run "<plugin_root/>/sam_schema/cli.py"'
+
+# (file, substring of the matched line) -> reason the line is data describing the variable, not an
+# invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
+# this guard's defect, so an empty reason is never mistaken for an oversight the next editor deletes.
+PLUGIN_ROOT_DATA_LINES: dict[tuple[Path, str], str] = {
+    (SKILLS_DIR / "code-review-architecture" / "SKILL.md", "strip `${CLAUDE_SKILL_DIR}`"): (
+        "This line states, as data, the two placeholder spellings a graph-builder's script-path "
+        "resolution step must strip before resolving a target. It documents which variables to "
+        "recognise, not itself invoking one -- rewriting it to `<plugin_root/>` would delete the "
+        "literal spelling the step's own rule needs to name."
+    ),
+    (SKILLS_DIR / "code-review-architecture" / "SKILL.md", '"SessionStart": [{"hooks"'): (
+        "This is a literal `hooks.json` command string quoted as the worked example for this "
+        "skill's own hook-edge-extraction step, the same spelling a real hooks.json command "
+        "already carries verbatim. The step's job is to detect and record this exact text as an "
+        "edge target, not to invoke it."
+    ),
+}
+
+DOCS_DIR = PLUGIN_ROOT / "docs"
+# Subtrees section 5 carves out of the guide-relocation scan: a measurement record reports what a
+# harness was observed doing at the time, and a plan document is written against a layout a later
+# plan may supersede. Neither is a live pointer a reader follows today.
+DOCS_SCAN_EXCLUDED_DIRS = (DOCS_DIR / "work-ledger" / "measurements", DOCS_DIR / "plans")
+ROOT_NAMED_DOCS = (PLUGIN_ROOT / "AGENTS.md", PLUGIN_ROOT / "README.md", PLUGIN_ROOT / "ARCHITECTURE.md")
+# The old guide's name and the old MCP connection check's docs/ path -- both retired once section 2
+# and section 5 move their content under skills/dh-cli-usage/references/.
+STALE_GUIDE_NAME_SUBSTRINGS = ("dh-cli-usage-guide", "docs/mcp-connection-check.md")
+
+
 def agent_files() -> list[Path]:
     """Collect every agent definition in this plugin.
 
@@ -197,6 +272,59 @@ def matching_lines(pattern: re.Pattern[str], paths: list[Path]) -> list[str]:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
         for match in pattern.finditer(line)
     ]
+
+
+def governed_files() -> list[Path]:
+    """Agent and skill files this module's CLI-path and plugin-root guards apply to.
+
+    Excludes everything under ``skills/dh-cli-usage/`` -- that skill is the one place these
+    patterns are meant to appear: it derives ``<plugin_root/>`` from its own directory and defines
+    ``<sam_cli/>``, so every other file is meant to point at it instead of re-deriving either value.
+
+    Returns:
+        Sorted list of agent and skill files outside ``skills/dh-cli-usage/``.
+    """
+    return sorted(path for path in agent_files() + skill_files() if not path.is_relative_to(DH_CLI_USAGE_DIR))
+
+
+def plugin_root_variable_offenders(paths: list[Path]) -> list[str]:
+    """Find every ``${...PLUGIN_ROOT}`` reference in *paths* not covered by an exception.
+
+    Args:
+        paths: Files to scan, line by line.
+
+    Returns:
+        Formatted ``path:lineno -- matched text`` strings, one per unexcused match.
+    """
+    offenders: list[str] = []
+    for path in paths:
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            for match in PLUGIN_ROOT_VARIABLE_RE.finditer(line):
+                excused = any(file == path and substring in line for file, substring in PLUGIN_ROOT_DATA_LINES)
+                if not excused:
+                    offenders.append(f"  {path.relative_to(PLUGIN_ROOT)}:{lineno} — {match.group(0)}")
+    return offenders
+
+
+def guide_relocation_scan_files() -> list[Path]:
+    """Files ``test_cli_guide_lives_in_dh_cli_usage`` scans for the CLI guide's old name or path.
+
+    Every markdown file this plugin ships to a reader: ``skills/``, ``agents/`` and ``docs/`` (minus
+    the two subtrees section 5 exempts) plus the three named root documents. A measurement record
+    reports what a harness was observed doing at the time, and a plan document is written against a
+    layout a later plan may supersede -- neither is a live pointer a reader follows today, so both
+    subtrees are left out.
+
+    Returns:
+        Sorted list of the markdown files in scope for the scan.
+    """
+    docs_files = [
+        path
+        for path in DOCS_DIR.rglob("*.md")
+        if not any(path.is_relative_to(excluded) for excluded in DOCS_SCAN_EXCLUDED_DIRS)
+    ]
+    root_files = [path for path in ROOT_NAMED_DOCS if path.is_file()]
+    return sorted(agent_files() + skill_files() + docs_files + root_files)
 
 
 def test_no_agent_names_a_specific_repository() -> None:
@@ -355,4 +483,180 @@ def test_alignment_analyst_report_offers_every_assessment_value_finalize_accepts
     assert not unoffered, (
         f"The report template no longer offers {unoffered}, which groom/finalize.md still accepts "
         f"for `{ASSESSMENT_FIELD}`."
+    )
+
+
+def test_no_agent_or_skill_names_a_plugin_root_variable() -> None:
+    """No agent or skill definition writes a ``${...PLUGIN_ROOT}`` variable, outside ``dh-cli-usage``.
+
+    Only Claude Code substitutes this template variable in a skill or agent body
+    (SP/design-agent-cli-path.md section 0); every other measured harness ships it to the model as
+    literal text. A file that names it directly re-derives what ``dh:dh-cli-usage`` exists to
+    resolve once, from its own skill directory -- the checkout-binding defect this module already
+    guards for a plugin-rooted skill path, in a second shape.
+    """
+    offenders = plugin_root_variable_offenders(governed_files())
+
+    assert not offenders, (
+        "An agent or skill definition names a plugin-root variable directly:\n"
+        + "\n".join(offenders)
+        + "\nWrite `<sam_cli/>` or `<plugin_root/>/…` and point at `dh:dh-cli-usage`, which resolves "
+        "the plugin root from its own skill directory. If the match is data describing the "
+        "variable rather than an invocation of it, add it to PLUGIN_ROOT_DATA_LINES with the reason."
+    )
+
+
+def test_plugin_root_data_line_exceptions_still_match() -> None:
+    """Every ``PLUGIN_ROOT_DATA_LINES`` exception still names a real line in its file.
+
+    Mirrors ``test_skill_path_citation_exceptions_still_exist``: an exception whose file is gone or
+    whose substring no longer appears on any line excuses nothing, and is a stale entry the next
+    editor has no reason to revisit.
+    """
+    stale = [
+        f"{file.relative_to(PLUGIN_ROOT)} — {substring!r} not found in any line"
+        for file, substring in PLUGIN_ROOT_DATA_LINES
+        if not file.is_file() or not any(substring in line for line in file.read_text(encoding="utf-8").splitlines())
+    ]
+
+    assert not stale, (
+        "PLUGIN_ROOT_DATA_LINES names an exception that no longer matches a line on disk:\n"
+        + "\n".join(stale)
+        + "\nRemove the stale entry — it no longer excuses anything."
+    )
+
+
+def test_no_agent_or_skill_runs_the_cli_by_path() -> None:
+    """No agent or skill runs the CLI by its literal ``/sam_schema/cli.py`` path, outside ``dh-cli-usage``.
+
+    Every caller is meant to write ``<sam_cli/>`` and let ``dh:dh-cli-usage`` resolve it from the
+    plugin root it derives from its own directory. A file naming the path directly duplicates the
+    one command string this move exists to stop duplicating (SP/design-agent-cli-path.md section 0,
+    point 3).
+    """
+    offenders = matching_lines(PREFIXED_CLI_PATH_RE, governed_files())
+
+    assert not offenders, (
+        "An agent or skill definition names the CLI's literal path:\n"
+        + "\n".join(offenders)
+        + "\nWrite `<sam_cli/>` instead — `dh:dh-cli-usage` resolves it from its own skill "
+        "directory, so no other file needs to know the CLI's location."
+    )
+
+
+def test_no_agent_links_a_relative_path() -> None:
+    """No agent definition holds a markdown link with a relative target.
+
+    An agent file has no filesystem location once shipped -- it is prompt text loaded by name, not
+    read from a path a relative link could resolve against. The two matches on the current tree
+    (``agents/task-worker.md``, ``agents/backlog-item-groomer.md``) are F3.
+    """
+    offenders = matching_lines(AGENT_RELATIVE_LINK_RE, agent_files())
+
+    assert not offenders, (
+        "An agent definition links a relative path:\n"
+        + "\n".join(offenders)
+        + "\nName the skill or agent instead (e.g. `dh:work-milestone`) — see "
+        "rules/markdown-file-references.md."
+    )
+
+
+def test_every_agent_running_the_cli_preloads_dh_cli_usage() -> None:
+    """Every agent whose body runs the CLI lists ``dh:dh-cli-usage`` in its ``skills:`` frontmatter.
+
+    A dispatched agent starts with an empty conversation, so preload through frontmatter is the only
+    deterministic way it reaches the skill that resolves ``<sam_cli/>`` before it needs to run a
+    command. Matching the pre-move ``sam_schema/cli.py`` path too, alongside the post-move
+    ``<sam_cli/>`` tag, keeps this guard from passing vacuously before any file is edited: on the
+    current tree it is the old path that puts every offending agent into the matched set.
+    """
+    running: list[Path] = []
+    missing: list[str] = []
+    for path in agent_files():
+        meta, body = _load_frontmatter_from_path(path)
+        if not CLI_INVOCATION_RE.search(body):
+            continue
+        running.append(path)
+        skills = _normalize_skills(meta.get("skills"))
+        if DH_CLI_USAGE_SKILL_URI not in skills:
+            missing.append(f"  {path.relative_to(PLUGIN_ROOT)} — skills: {skills}")
+
+    assert running, "No agent's body runs the CLI; the preload guard below would pass vacuously."
+    assert not missing, (
+        "An agent runs the CLI without preloading the skill that resolves it:\n"
+        + "\n".join(missing)
+        + f"\nAdd `- {DH_CLI_USAGE_SKILL_URI}` to its `skills:` frontmatter."
+    )
+
+
+def test_dh_cli_usage_resolves_only_through_skill_dir_tags() -> None:
+    """``dh-cli-usage``'s SKILL.md derives the plugin root from its own directory, no other way.
+
+    Per SP/design-agent-cli-path.md section 3, the skill finds only its own directory (one
+    ``<skill_dir>`` tag per harness that substitutes one) and derives ``<plugin_root/>`` as that
+    directory's grandparent -- it names no plugin-root variable, because only Claude Code resolves
+    one.
+    """
+    assert DH_CLI_USAGE.is_file(), (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
+        "plugin-creator:skill-creator's init_skill.py, then write the section 3 body."
+    )
+    text = DH_CLI_USAGE.read_text(encoding="utf-8")
+
+    missing_tags = [tag for tag in SKILL_DIR_TAGS if tag not in text]
+    assert not missing_tags, f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} is missing skill-dir tag(s): {missing_tags}"
+
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(text)) - ALLOWED_SKILL_DIR_VARIABLES)
+    assert not unknown_variables, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names template variable(s) other than the three "
+        f"skill-dir forms: {unknown_variables}"
+    )
+
+    assert "PLUGIN_ROOT" not in text, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names PLUGIN_ROOT; it must derive the plugin root "
+        "only from its own skill directory, never from a plugin-root variable."
+    )
+    assert "<plugin_root>" not in text, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens a `<plugin_root>` tag; `<plugin_root/>` is a "
+        "derived, self-closing name, not a variable with a value tag."
+    )
+    assert SAM_CLI_COMMAND in text, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not hold the `<sam_cli>` definition: {SAM_CLI_COMMAND!r}"
+    )
+
+
+def test_cli_guide_lives_in_dh_cli_usage() -> None:
+    """The CLI guide and the MCP connection check live under ``dh-cli-usage``, and nowhere else names them.
+
+    Section 2 and section 5 move ``dh-cli-usage-guide.md`` to
+    ``dh-cli-usage/references/command-reference.md`` and ``docs/mcp-connection-check.md`` to
+    ``dh-cli-usage/references/mcp-connection-check.md`` -- a runtime skill's reference material has
+    one home, and nothing outside it should still point at either file's old name or old path once
+    the move lands.
+    """
+    command_reference = DH_CLI_USAGE_DIR / "references" / "command-reference.md"
+    connection_check = DH_CLI_USAGE_DIR / "references" / "mcp-connection-check.md"
+
+    missing = [
+        str(path.relative_to(PLUGIN_ROOT)) for path in (command_reference, connection_check) if not path.is_file()
+    ]
+    assert not missing, (
+        "dh-cli-usage is missing its moved reference file(s): "
+        + ", ".join(missing)
+        + ". git mv the CLI guide and the MCP connection check into skills/dh-cli-usage/references/, "
+        "per section 2 and section 5."
+    )
+
+    offenders = [
+        f"  {path.relative_to(PLUGIN_ROOT)}:{lineno} — names {name!r}"
+        for path in guide_relocation_scan_files()
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        for name in STALE_GUIDE_NAME_SUBSTRINGS
+        if name in line
+    ]
+    assert not offenders, (
+        "A file still names the old CLI guide location:\n"
+        + "\n".join(offenders)
+        + "\nRepoint it at skills/dh-cli-usage/references/command-reference.md, or at the MCP "
+        "connection check `dh:dh-cli-usage` now holds, per section 2 and section 5."
     )
