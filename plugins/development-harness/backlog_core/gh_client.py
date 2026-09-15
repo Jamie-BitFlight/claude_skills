@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client
+from backlog_core.github_client import MissingGitHubTokenError, make_github_client, resolve_token
 
 from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .entry_blocks import wrap_entry
@@ -1322,6 +1322,29 @@ def try_get_github(repo: str = "") -> Repository | None:
         # unreachable right now" — so it raises the same GitHubUnavailableError.
         logger.warning("try_get_github: transport error %s for repo %r", type(exc).__name__, repo)
         raise GitHubUnavailableError(f"GitHub repository {repo!r} unavailable: {exc}") from exc
+
+
+def has_github_credentials() -> bool:
+    """Report whether a GitHub token is configured in this process's environment.
+
+    Performs no network access -- delegates to :func:`resolve_token`, the same
+    local-only environment check :func:`try_get_github` performs before it
+    ever reaches the network. Exists so ``GitHubBackend`` can answer this
+    yes/no question for ``operations.py`` through the backend abstraction
+    (``CredentialAvailabilityProvider`` in ``backend_types.py``) instead of
+    ``operations.py`` importing ``github_client.resolve_token`` directly,
+    which the ``operations.py`` module boundary in ``ARCHITECTURE.md``
+    forbids.
+
+    Returns:
+        True when :func:`resolve_token` finds a token among ``TOKEN_ENV_VARS``;
+        False when it raises ``MissingGitHubTokenError``.
+    """
+    try:
+        resolve_token()
+    except MissingGitHubTokenError:
+        return False
+    return True
 
 
 def probe_backend_status(repo: str = "") -> BackendStatus:

@@ -27,7 +27,14 @@ from typing_extensions import TypedDict
 from . import models as _models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import (
+    ContentProvider,
+    CredentialAvailabilityProvider,
+    IssueCommentNode,
+    IssueNode,
+    MilestoneFullNode,
+    SyncProvider,
+)
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
@@ -1805,7 +1812,9 @@ def refresh_local_cache_from_github(
     }
 
 
-def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
+def _item_derived_status(
+    item: BacklogItem, status_map: dict[int, IssueStatus], status_map_unavailable: bool = False
+) -> str | None:
     """Return the effective status string for an item.
 
     For items with a numeric issue reference, looks up the live status
@@ -1815,13 +1824,36 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     backends from always returning ``"needs-grooming"`` when the status map is
     empty (ADR-002).
 
+    Args:
+        item: The backlog item whose effective status to resolve.
+        status_map: Live status lookup, keyed by numeric issue number. An
+            empty map is ambiguous on its own — it means either "the fetch
+            succeeded and genuinely found nothing to report for this item" or
+            "the fetch failed outright and nothing was learned about anyone".
+            *status_map_unavailable* is what tells those two apart; the map's
+            contents alone cannot.
+        status_map_unavailable: True when the live status batch fetch itself
+            failed (see ``list_items``'s ``BackendUnavailableError`` handling)
+            rather than succeeding with no entry for this item. When True, a
+            numeric-issue item's live status was never learned at all — there
+            is no genuine "no status label" answer to fall back on, and
+            defaulting to ``"needs-grooming"`` here would assert a match that
+            was never verified (#3546 — a degraded status batch must not
+            fabricate matches). Ignored for items without a numeric issue
+            reference, since those never depend on *status_map* to begin with.
+
     Returns:
         Status string — either the provider status value from *status_map* or
         the local ``item.status`` value, defaulting to ``"needs-grooming"``
-        when neither is available.
+        when neither is available. ``None`` for a numeric-issue item when
+        *status_map_unavailable* is True: its true live status was never
+        learned, so no requested filter value can be honestly compared
+        against it — the caller must treat it as "unknown", never as a match.
     """
     num = parse_issue_number(item.issue)
     if num is not None:
+        if status_map_unavailable:
+            return None
         info = status_map.get(num)
         return info.status if info is not None else "needs-grooming"
     # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
@@ -1836,6 +1868,7 @@ def _filter_open_items(
     status_map: dict[int, IssueStatus],
     type_: str | None = None,
     topic: str | None = None,
+    status_map_unavailable: bool = False,
 ) -> list[BacklogItem]:
     """Apply section, title, status, type, and topic filters to open_items.
 
@@ -1844,6 +1877,14 @@ def _filter_open_items(
 
     topic performs a case-insensitive substring match against metadata.topic.
     Items missing metadata.topic are excluded when topic filter is active.
+
+    status_map_unavailable, when True, means the live status batch fetch
+    itself failed (see ``list_items``): a numeric-issue item's status was
+    never learned, so it can never satisfy a ``status`` filter — comparing
+    against a fabricated default would assert a match that is not true
+    (#3546). ``_item_derived_status`` returns ``None`` for such items, which
+    the ``==`` comparison below naturally excludes since *status* is always a
+    non-``None`` string when this filter is active.
 
     Filters compose with AND logic.
 
@@ -1857,7 +1898,7 @@ def _filter_open_items(
         title_lower = title.lower()
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
-        open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+        open_items = [it for it in open_items if _item_derived_status(it, status_map, status_map_unavailable) == status]
     if type_:
         type_lower = type_.lower()
         open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
@@ -1956,6 +1997,103 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
     return entry
 
 
+def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem]) -> bool:
+    """Tell a genuinely empty live status map apart from one no query ever answered.
+
+    ``batch_fetch_statuses`` returns an empty map both when GitHub was queried
+    and genuinely found no status data for any item, and when no
+    ``GITHUB_TOKEN`` is configured at all -- the query was never even
+    attempted (see ``gh_client.batch_fetch_statuses``'s docstring: a missing
+    token is a deliberate local-only-fallback configuration state, not a
+    failure, so it folds into the same ``{}`` a real empty result produces).
+    Call this only after an empty map comes back with no exception raised;
+    the two cases are indistinguishable from the map's contents alone, and
+    conflating them reproduces the status-filter fabrication bug (#3546) via
+    a different trigger than the one already fixed for a raised, refused
+    query -- a numeric-issue item would default to ``"needs-grooming"`` in
+    ``_item_derived_status`` even though its live status was never learned.
+
+    Asks the backend through ``CredentialAvailabilityProvider`` --
+    ``has_github_credentials()`` -- rather than importing
+    ``github_client.resolve_token()`` directly. ``operations.py`` must not
+    import provider clients (see ``ARCHITECTURE.md``'s "Module:
+    operations.py" boundary); a prior revision of this function imported
+    ``resolve_token`` here, which let provider-neutral orchestration inspect
+    GitHub authentication directly and made any GitHub-capable backend that
+    supplies credentials by a different mechanism get incorrectly marked
+    unavailable. Going through the backend also avoids re-probing GitHub
+    over the network: an even earlier revision called ``try_get_github(repo)``
+    again here, repeating the live ``get_repo`` lookup
+    ``batch_fetch_statuses`` already performed while building the
+    (legitimately empty) map -- a token-present, genuinely-empty listing
+    paid for a second REST round trip on every call, and a rate limit or
+    timeout on that redundant call raised ``GitHubUnavailableError`` and
+    marked an already-successful status result unavailable. Whether
+    credentials are configured cannot change between
+    ``batch_fetch_statuses``'s call and this one within the same process, so
+    asking the backend once more here is exact, not an approximation of the
+    network check it replaces.
+
+    Skips the check (returns False without asking the backend anything) when
+    the answer cannot matter: a backend with no live GitHub connection at
+    all (``supports_github_extras`` False, e.g. beads, SQLite, in-memory)
+    has no credential concept, so treating that as "unavailable" would
+    misreport a backend that answered honestly. Likewise skipped when
+    *open_items* holds no numeric-issue item, since
+    ``status_map_unavailable`` only ever changes the resolved status of a
+    numeric-issue item (see ``_item_derived_status``) -- nothing downstream
+    reads the answer either way. Also returns False -- assume credentials
+    might be present rather than fabricating a "missing token" claim the
+    backend never made -- when the backend reports
+    ``supports_github_extras`` but does not structurally implement
+    ``CredentialAvailabilityProvider``; this mirrors the pre-existing
+    ``GitHubExtras``/``BranchBackend`` flag-first gating pattern documented
+    on those Protocols.
+
+    Args:
+        open_items: The items the batch status fetch was attempted against.
+
+    Returns:
+        True when a numeric-issue item exists, the backend has a real GitHub
+        connection concept, the backend implements
+        ``CredentialAvailabilityProvider``, and
+        ``has_github_credentials()`` reports no credentials configured.
+    """
+    backend = get_config().backend
+    if not backend.supports_github_extras:
+        return False
+    if not any(parse_issue_number(item.issue) is not None for item in open_items):
+        return False
+    if not isinstance(backend, CredentialAvailabilityProvider):
+        return False
+    return not backend.has_github_credentials()
+
+
+def _warn_status_map_unavailable(out: Output, status: str | None, reason: str) -> None:
+    """Emit the standard warning for a live status batch fetch that answered nothing.
+
+    Shared by both triggers that leave ``status_map_unavailable`` True in
+    ``list_items``: an outright fetch failure (*reason* is the exception
+    message) and a missing ``GITHUB_TOKEN`` (*reason* names that directly) --
+    the caller-facing message is the same in either case, since both mean
+    "no numeric-issue item's live status was learned".
+
+    Args:
+        out: Output collector to warn on.
+        status: The status filter value being evaluated, or None when no
+            status filter is active.
+        reason: Human-readable cause to name in the warning.
+    """
+    if status:
+        out.warn(
+            f"  WARNING: Live status unavailable ({reason}); the status={status!r} filter "
+            "cannot be evaluated against unavailable data, so no numeric-issue item can be "
+            "confirmed to match or excluded — matching items may be missing from this result."
+        )
+    else:
+        out.warn(f"  WARNING: Live status unavailable ({reason}); item statuses are shown blank.")
+
+
 def list_items(
     refresh: bool = False,
     label: str | None = None,
@@ -2029,14 +2167,50 @@ def list_items(
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
     status_map: dict[int, IssueStatus] = {}
+    status_map_unavailable = False
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
+            if not status_map and _status_map_empty_due_to_missing_token(open_items):
+                # gh_client.batch_fetch_statuses folds "no GITHUB_TOKEN
+                # configured" into the same empty map a genuinely-empty live
+                # fetch returns (a deliberate local-only fallback -- see its
+                # docstring), so an empty map alone cannot tell the two apart.
+                # _status_map_empty_due_to_missing_token disambiguates: this
+                # branch means the query was never even attempted, which is
+                # exactly the "nothing was learned" case the except clause
+                # below handles for a raised refusal -- treat it the same way
+                # rather than letting a numeric-issue item's status default
+                # to "needs-grooming" as though the fetch had genuinely
+                # answered (#3546, missing-token trigger).
+                status_map_unavailable = True
+                _warn_status_map_unavailable(out, status, "no GITHUB_TOKEN configured")
         except BackendUnavailableError as exc:
-            # An empty map renders every numeric-issue item with a blank status.
-            # Name the cause, so a reader does not take the blanks for "no status set".
-            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
-    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
+            # The fetch failed outright -- nothing was learned about ANY
+            # numeric-issue item's live status. status_map_unavailable tells
+            # _item_derived_status/_filter_open_items apart from the
+            # legitimate case (fetch succeeded, map has no entry for this
+            # item), so a status= filter never fabricates or silently
+            # mis-reports a match against data that was never received
+            # (#3546). Name the cause either way, so a reader does not take
+            # the blanks/exclusions for "no status set"/"genuinely no match".
+            # _status_map_empty_due_to_missing_token itself never reaches
+            # this except clause -- it resolves the token locally (see its
+            # docstring) and performs no network call of its own, so this
+            # branch is reached only by batch_fetch_statuses's own refusal
+            # or failure.
+            status_map_unavailable = True
+            _warn_status_map_unavailable(out, status, str(exc))
+    open_items = _filter_open_items(
+        open_items,
+        section,
+        title,
+        status,
+        status_map,
+        type_=type_,
+        topic=topic,
+        status_map_unavailable=status_map_unavailable,
+    )
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
