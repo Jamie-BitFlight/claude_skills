@@ -84,6 +84,23 @@ class TestDerivedStatusWithoutALiveAnswer:
         """ADR-002: beads nanoids never key the map, and their default is unchanged."""
         assert operations._item_derived_status(_item("bd-a3f8", status=""), {}, status_live=False) == "needs-grooming"
 
+    def test_a_bare_cached_lifecycle_value_is_normalized_to_its_label_form(self) -> None:
+        """A numeric-issue item's cache may hold the bare lifecycle value, not the label.
+
+        ``_apply_issue_status_labels`` writes ``metadata.status = "in-progress"``
+        (bare) for string-ID backends, and legacy/pre-label records can carry the
+        same bare form. A live answer and the documented ``--status`` filter both
+        use the ``status:*`` labeled form, so the cached value must be normalized
+        before it is compared — not returned verbatim (P1, PR #3552 review).
+        """
+        bare_item = _item("#42", status="in-progress")
+
+        assert operations._item_derived_status(bare_item, {}, status_live=False) == "status:in-progress"
+
+    def test_a_bare_cached_value_with_no_label_equivalent_is_unchanged(self) -> None:
+        """ "open"/"done"/"closed" have no ``status:*`` label counterpart — leave them bare."""
+        assert operations._item_derived_status(_item("#42", status="open"), {}, status_live=False) == "open"
+
 
 class TestStatusFilterUnderARefusal:
     """The filter has to answer from the cache, not from a fabricated default."""
@@ -117,6 +134,21 @@ class TestStatusFilterUnderARefusal:
         _refuse(mocker)
 
         assert operations.list_items(output=Output())["count"] == 2
+
+    def test_a_bare_cached_status_matches_the_labeled_filter(self, mocker: MockerFixture) -> None:
+        """Reproduction (P1, PR #3552 Codex review): a cached GitHub item whose
+        ``item.status`` is the bare lifecycle value ``"in-progress"`` — not the
+        ``status:in-progress`` label a live answer would have produced — must
+        still be returned by ``list_items(status="status:in-progress")`` once
+        GraphQL is refused and the cache is all that is left to filter on.
+        Before the fix this returned ``count: 0``.
+        """
+        _patch_backend(mocker, [_item("#42", status="in-progress")])
+        _refuse(mocker)
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 1
 
 
 class TestRenderedStatusUnderARefusal:
