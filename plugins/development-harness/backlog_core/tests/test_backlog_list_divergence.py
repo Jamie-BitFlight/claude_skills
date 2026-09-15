@@ -55,10 +55,19 @@ def _make_list_items_result(items: list[BacklogListItem]) -> ListItemsResult:
     their most boring values here -- these tests exercise sync_state
     divergence signalling, not listing provenance, so a fixed ``False``/
     ``False`` keeps that concern out of this helper's callers.
+    status_source/unavailable_capabilities/filters_evaluated_against_unavailable_data
+    (#3546, B5) default to the healthy baseline -- this helper's mocked
+    result never simulates a degraded live-status read; that is
+    ``_StatusRefusedBackend``'s job, which runs the real ``list_items`` body.
     """
     return {
         "items": items,
         "count": len(items),
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "live",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
         "from_cache": False,
         "has_pending_writes": False,
         "messages": [],
@@ -532,6 +541,79 @@ class TestCountOnlyPreservesOperationsLayerOutput:
                 "2 failures, 3 pending mutation(s), 4 rejected mutation(s)."
             )
         ]
+
+
+class TestCountOnlySurfacesStatusSourceFields:
+    """``count_only`` surfaces #3546 B5's typed degradation-provenance fields the
+    same way it surfaces ``warnings``/``errors`` (``TestCountOnlyPreservesOperationsLayerOutput``
+    above): only when they signal a genuine degradation, never on a healthy call,
+    so the documented bare-count contract is unaffected (B-critique.md §4.5). Uses
+    the same real-backend-stub pattern as that class, not a wholesale
+    ``dh_core.operations.list_items`` patch, so the real ``list_items`` body
+    computes these fields rather than a mock silently ignoring the mechanism
+    under test.
+    """
+
+    async def test_degraded_batch_fetch_surfaces_unavailable_status_source(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(count_only=True))
+
+        assert response.get("status_source") == "unavailable"
+        assert response.get("unavailable_capabilities") == ["live_status"]
+
+    async def test_degraded_batch_fetch_with_status_filter_names_the_filter(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(status="in-progress", count_only=True))
+
+        assert response.get("filters_evaluated_against_unavailable_data") == ["status"]
+
+    async def test_healthy_call_does_not_leak_status_source_into_bare_count(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        """A successful live batch fetch is not a degradation -- must not appear."""
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
+        )
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+
+        response = cast("dict[str, object]", await backlog_list(count_only=True))
+
+        assert "status_source" not in response
+        assert "unavailable_capabilities" not in response
+        assert "filters_evaluated_against_unavailable_data" not in response
+
+    async def test_cache_sourced_backend_does_not_leak_into_bare_count(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        """A backend with no live batch-fetch support reports status_source='cache',
+        a normal backend-shape fact rather than a degradation this call suffered
+        -- it must not leak into the bare-count contract either."""
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_NoReconcileBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(count_only=True))
+
+        assert "status_source" not in response
+        assert "unavailable_capabilities" not in response
 
 
 # ---------------------------------------------------------------------------

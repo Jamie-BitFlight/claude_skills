@@ -71,6 +71,7 @@ from .models import (
     Section,
     SectionEntryDict,
     SectionEntryMetadata,
+    StatusSource,
     UnsupportedBackendCapabilityError,
     ValidationError,
     ViewItemResult,
@@ -576,6 +577,9 @@ class ListItemsResult(TypedDict):
     count: int | None
     from_cache: bool
     has_pending_writes: bool
+    status_source: StatusSource
+    unavailable_capabilities: list[str]
+    filters_evaluated_against_unavailable_data: list[str]
     messages: list[str]
     warnings: list[str]
     errors: list[str]
@@ -2239,7 +2243,7 @@ def list_items(
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
     search: str | None = None,
-) -> dict[str, int | bool | list[str] | list[dict[str, str | bool]] | None]:
+) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
     """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
 
     Args:
@@ -2455,6 +2459,25 @@ def list_items(
             # or failure.
             status_map_unavailable = True
             _warn_status_map_unavailable(out, status, str(exc))
+            _warn_status_map_unavailable(out, status, str(exc))
+    # Provenance of the status data just resolved above (#3546, B5): "live" when
+    # the batch fetch succeeded, "cache" when the backend never attempts one
+    # (its own status field is authoritative -- not a degradation), "unavailable"
+    # when the batch fetch was attempted and failed. Computed once here, not
+    # per-item, since a single fetch covers the whole page.
+    status_source: StatusSource
+    if not get_config().backend.supports_batch_status_fetch:
+        status_source = "cache"
+    elif status_map_unavailable:
+        status_source = "unavailable"
+    else:
+        status_source = "live"
+    unavailable_capabilities: list[str] = ["live_status"] if status_map_unavailable else []
+    # B2's fabrication-prevention fix (see _item_derived_status/_filter_open_items
+    # above) silently corrects the result; this names which requested filter
+    # could not be honestly evaluated, so a caller sees the degradation
+    # structurally instead of only in prose (#3546, B-critique.md §3.1).
+    filters_evaluated_against_unavailable_data: list[str] = ["status"] if status and status_map_unavailable else []
     open_items = _filter_open_items(
         open_items,
         section,
@@ -2474,6 +2497,11 @@ def list_items(
     return {
         "items": result_items,
         "count": len(result_items),
+        "from_cache": from_cache,
+        "has_pending_writes": has_pending_writes,
+        "status_source": status_source,
+        "unavailable_capabilities": unavailable_capabilities,
+        "filters_evaluated_against_unavailable_data": filters_evaluated_against_unavailable_data,
         "from_cache": from_cache,
         "has_pending_writes": has_pending_writes,
         **out.to_dict(),
@@ -3591,9 +3619,17 @@ def view_item(
 
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
+    # Tracks whether a live GitHub/backend check was actually attempted this
+    # call, independent of the "backend unreachable" prose warning below --
+    # #3546 B5's status_source field must distinguish "nothing was tried"
+    # from "something was tried and failed" even though the existing prose
+    # warning does not yet (B-critique.md §3.4, tracked separately as B6).
+    live_attempted = False
+    enriched = False
     if item:
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
+            live_attempted = bool(live_id)
             try:
                 enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
                 reason = (
@@ -3612,6 +3648,7 @@ def view_item(
         result.groomed = item.metadata.groomed
     elif issue_num or get_config().backend.issue_id_type == "string":
         live_id = _live_lookup_id(item, issue_num, selector)
+        live_attempted = bool(live_id)
         # No cached record, so the live read is the only answer available. A
         # BackendUnavailableError propagates deliberately: "the backend refused
         # the query" is not "the item does not exist", and reporting the second
@@ -3621,6 +3658,24 @@ def view_item(
             raise ItemNotFoundError(selector)
     else:
         raise ItemNotFoundError(selector)
+
+    # Provenance of this item's data (#3546, B5): "live" when enrichment
+    # actually succeeded this call; "unavailable" when a live check was
+    # attempted and failed (BackendUnavailableError, or a False return with no
+    # exception); "cache" when no live check was ever attempted. Distinct
+    # "cache"/"unavailable" states so a caller can tell "nothing was tried"
+    # apart from "something was tried and failed" (B-critique.md §3.4) --
+    # computed independently of the "backend unreachable" prose warning above,
+    # which still fires for the not-attempted case too (a separate, tracked
+    # defect -- plan task B6 -- this field must not reproduce).
+    status_source: StatusSource
+    if enriched:
+        status_source = "live"
+    elif live_attempted:
+        status_source = "unavailable"
+    else:
+        status_source = "cache"
+    unavailable_capabilities: list[str] = ["live_enrichment"] if status_source == "unavailable" else []
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show
@@ -3641,6 +3696,9 @@ def view_item(
         limit=limit,
     )
 
+    out.warnings.extend(warning for warning in result.warnings if warning not in out.warnings)
+    result.status_source = status_source
+    result.unavailable_capabilities = unavailable_capabilities
     out.warnings.extend(warning for warning in result.warnings if warning not in out.warnings)
     result.messages = out.messages
     result.warnings = out.warnings

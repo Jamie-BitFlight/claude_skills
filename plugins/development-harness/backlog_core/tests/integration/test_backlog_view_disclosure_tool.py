@@ -110,12 +110,21 @@ _PASSTHROUGH_LEGACY_KEYS: frozenset[str] = frozenset({
     "section_filter_miss",
     "sections_index",
     "status",
+    "status_source",
     "title",
+    "unavailable_capabilities",
 })
 """Exact key set returned by backlog_view(selector='#2515', summary=True) today.
 
 Captured by running the tool against the mocked fixture (summary=True default).
 If this assertion ever fails post-T24, the PASSTHROUGH contract is broken.
+
+Updated for #3546 B5: status_source/unavailable_capabilities are new typed
+degradation-provenance fields on ViewItemResult/BacklogViewResponse, carried
+through the compact PASSTHROUGH manifest by _build_compact_manifest
+(server.py) so they are not silently dropped on the default (summary=True)
+call path -- the same silent-drop failure mode B-critique.md §2.1/§2.2 found
+for BacklogViewResponse generally.
 """
 
 # ---------------------------------------------------------------------------

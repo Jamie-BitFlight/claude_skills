@@ -16,7 +16,7 @@ import sys
 import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, assert_never
+from typing import TYPE_CHECKING, Literal, TypeAlias, assert_never
 
 if TYPE_CHECKING:
     from .search import ContentDuplicateMatch
@@ -1404,6 +1404,25 @@ class ContentWrite(BaseModel):
         return self
 
 
+StatusSource: TypeAlias = Literal["live", "cache", "unavailable"]
+"""Provenance of a read operation's status/enrichment data (#3546, B5).
+
+``"live"``: the value came from a successful live batch-status or
+enrichment fetch against the configured backend this call.
+``"cache"``: no live fetch was attempted this call -- the backend does not
+support one (e.g. a string-ID backend whose own status field is
+authoritative), or the item carried no identifier to check live -- so the
+locally cached/backend-owned value is reported as-is, with no live fetch
+degradation involved.
+``"unavailable"``: a live fetch was attempted and failed (a refused GraphQL
+query, a network error, a rate limit, ...) -- the true live value was never
+learned this call. Distinct from ``"cache"`` so a caller can tell "nothing
+was tried" apart from "something was tried and failed" (B-critique.md
+§3.4) -- the two must never share one signal, or a successful-by-construction
+no-op read looks identical to a genuine outage.
+"""
+
+
 class ReconcileResult(BaseModel):
     """Completed reconciliation outcomes and optional changed-item details."""
 
@@ -1577,6 +1596,15 @@ class ViewItemResult(BaseModel):
     body_total_lines: int | None = None
     section_filter_miss: bool = False
     section_filter_valid_names: list[str] = Field(default_factory=list, exclude=True)
+    status_source: StatusSource = "cache"
+    """Provenance of this item's live-enrichment data (#3546, B5). See
+    :data:`StatusSource` for the three-state meaning. Defaults to ``"cache"``
+    for a bare ``ViewItemResult()`` constructed without going through
+    :func:`view_item` (e.g. direct test construction)."""
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Names of capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Empty
+    when nothing was degraded."""
     messages: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -1598,10 +1626,17 @@ class SectionMeta(ExtTypedDict):
 class ViewItemResultCompact(BaseModel):
     """Compact result of viewing a single backlog item.
 
-    Returned when ``include_content=False`` is passed to ``backlog_view``.
-    Contains all metadata fields from :class:`ViewItemResult` but omits the
-    full ``body`` text and per-entry ``sections`` dict.  Callers receive a
-    section inventory (names and entry counts) instead.
+    Documents the intended shape for an ``include_content=False`` response:
+    all metadata fields from :class:`ViewItemResult` but omitting the full
+    ``body`` text and per-entry ``sections`` dict in favour of a section
+    inventory (names and entry counts). Not currently constructed anywhere
+    in this codebase -- ``backlog_view``'s ``include_content=False`` path
+    returns a ``ViewItemResult`` with ``sections_metadata`` populated and
+    ``body``/``sections`` cleared instead (see ``_assemble_view_content``),
+    not this model. Kept in sync with :class:`ViewItemResult`'s field set
+    per ADR-1's stated intent (independently evolvable duplication) in case
+    a future caller wires it up; verify against current call sites before
+    relying on this class as documentation of an active response shape.
 
     Fields are duplicated from :class:`ViewItemResult` rather than inherited
     so that the two response shapes remain independently evolvable.
@@ -1625,6 +1660,12 @@ class ViewItemResultCompact(BaseModel):
         default_factory=list,
         description="Compact section inventory: section names with entry counts, no body or entry content.",
     )
+    status_source: StatusSource = "cache"
+    """Provenance of this item's live-enrichment data (#3546, B5), mirroring
+    :attr:`ViewItemResult.status_source`. See :data:`StatusSource`."""
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, mirroring
+    :attr:`ViewItemResult.unavailable_capabilities`."""
     messages: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

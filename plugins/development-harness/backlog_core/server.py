@@ -1842,6 +1842,13 @@ async def backlog_list(
         from_cache/has_pending_writes name the provenance instead (backlog
         #3546 task A4) — pass allow_cached=True to see the best-effort cached
         list anyway.
+        status_source ("live", "cache", or "unavailable") reports where the
+        listing's status data came from; unavailable_capabilities names any
+        capability (e.g. "live_status") that could not be read live this
+        call; filters_evaluated_against_unavailable_data names any active
+        filter (e.g. "status") that could not be honestly evaluated against
+        live data. On count_only=True, these three appear only when they
+        signal a genuine degradation (never on a healthy call).
         On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1948,6 +1955,21 @@ async def backlog_list(
             count_resp["warnings"] = list(out.warnings)
         if out.errors:
             count_resp["errors"] = list(out.errors)
+        # Surface the operations-layer degradation fields (#3546, B5) the same
+        # way as warnings/errors above: only when they signal a genuine
+        # degradation, never on a healthy call, so the documented bare-count
+        # contract on a healthy call is unaffected (B-critique.md §4.5). A
+        # status_source of "cache" is a normal backend-shape fact (e.g. a
+        # string-ID backend with no live batch fetch at all), not a
+        # degradation this call suffered, so it is deliberately excluded here.
+        if result.get("status_source") == "unavailable":
+            count_resp["status_source"] = result["status_source"]
+        if result.get("unavailable_capabilities"):
+            count_resp["unavailable_capabilities"] = result["unavailable_capabilities"]
+        if result.get("filters_evaluated_against_unavailable_data"):
+            count_resp["filters_evaluated_against_unavailable_data"] = result[
+                "filters_evaluated_against_unavailable_data"
+            ]
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
         return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
 
@@ -2028,6 +2050,8 @@ def _build_compact_manifest(
         "status": status,
         "plan_address": plan_address,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_summary": True,
         "_full_chars": full_chars,
         "_hint": (
@@ -2101,6 +2125,8 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
         "status": result.status,
         "description": result.description,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_over_budget": True,
         "_full_chars": full_chars,
         "_usage": (
@@ -2333,6 +2359,10 @@ async def backlog_view(
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings. file_path is for reference
         only — use backlog_update or backlog_groom for all modifications.
+        Both summary=True and summary=False shapes carry status_source ("live",
+        "cache", or "unavailable"), reporting where this item's live-enrichment
+        data came from, and unavailable_capabilities, naming any capability
+        (e.g. "live_enrichment") that could not be read live this call.
         When navigate targets an ordinal that does not exist in the item: dict with
         error, requested_ordinal, and valid_ordinals (every ordinal actually present).
         On error, dict contains an error key.
