@@ -1,6 +1,6 @@
 ---
 name: implementation-manager
-description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, dispatching tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing tasks or configuring hook profiles.
+description: Manages feature implementation task state via SAM MCP tools. Use when querying task status, listing ready tasks, dispatching tasks for execution, updating task timestamps, or coordinating multi-task feature rollout. Activated by the /dh:execution orchestrator to track progress — also activates directly when managing tasks.
 user-invocable: false
 disable-model-invocation: false
 ---
@@ -183,14 +183,13 @@ A task is "ready" when:
 
 ## Hook Integration
 
-The `task_status_hook.py` script provides automated task status tracking via Claude Code hooks.
+The `task_status_hook.py` script settles the attempt a stopping sub-agent was launched for, via one Claude Code hook.
 
 ### Hook Configuration
 
-| Command              | Hook Event   | Matcher             | Purpose                                        |
-| -------------------- | ------------ | ------------------- | ---------------------------------------------- |
-| `/dh:execution` | SubagentStop | (all)               | Settle the attempt the stopping worker was launched for |
-| `/dh:start-task`        | PostToolUse  | `Write\|Edit\|Bash` | Update LastActivity timestamp during execution |
+| Command         | Hook Event   | Matcher | Purpose                                                  |
+| --------------- | ------------ | ------- | --------------------------------------------------------- |
+| `/dh:execution` | SubagentStop | (all)   | Settle the attempt the stopping worker was launched for |
 
 ### How It Works
 
@@ -220,64 +219,28 @@ The orchestrator settles as its own next step too, and whichever gets there firs
 other is answered `already-settled`. The hook exists for the launch whose orchestrator step never
 ran.
 
-**PostToolUse (Activity Tracking)**:
-
-Only the local-YAML `ContextBackend` writes this file; the memory, GitHub, and beads backends persist `ActiveTaskContext` in their own provider and never create it, so `LastActivity` tracking below applies only to local-YAML sessions.
-
-When `/dh:start-task` runs on the local-YAML backend, it creates a context file at `~/.dh/projects/{slug}/context/active-task-{session_id}.json` (resolved via `dh_paths.context_dir(session_id)`) containing the plan address, task ID, and task file path. On each Write, Edit, or Bash operation, the PostToolUse hook:
-
-1. Reads the context file to identify the active task — `handle_activity_update()` has no MCP fallback and exits silently when the file is absent
-2. Updates `**LastActivity**: {ISO timestamp}` in the task section
-
 ### Timestamp Field Responsibilities
 
-| Field              | Added By                  | When                              |
-| ------------------ | ------------------------- | --------------------------------- |
-| `**Started**`      | `plan dispatch`, when the orchestrator opens the attempt | When the worker is launched |
-| `**Completed**`    | `plan finish --result complete`, or `plan accept` on a returned task | When the runner or the judge closes it |
-| `**LastActivity**` | Hook (PostToolUse)        | On each Write, Edit, or Bash call |
+| Field           | Added By                                                              | When                                    |
+| --------------- | ---------------------------------------------------------------------- | --------------------------------------- |
+| `**Started**`   | `plan dispatch`, when the orchestrator opens the attempt               | When the worker is launched             |
+| `**Completed**` | `plan finish --result complete`, or `plan accept` on a returned task   | When the runner or the judge closes it  |
 
-## Hook Runtime Profile Controls
-
-The `task_status_hook.py` script supports environment-variable-based profile controls that adjust hook behavior without editing SKILL.md files.
-
-### CLAUDE_SKILLS_HOOK_PROFILE
-
-Controls which hook handlers run. Case-sensitive lowercase. Default when unset or empty: `standard`.
-
-- **`minimal`** — PostToolUse (LastActivity updates) is skipped entirely. SubagentStop (settle) runs normally. Use this to reduce I/O during task execution when activity timestamps are not needed.
-- **`standard`** — All handlers run.
-- **`strict`** — All handlers run. The profile decides which handlers run, not what they do: settling records that a launch ended, which is evidence rather than a verdict, so there is nothing for a stricter profile to scrutinise before it is written. Whether the work met its acceptance criteria is the judge's question, answered from the ledger — see [the work loop](../../docs/work-ledger/work-loop.md).
-
-Invalid values produce a warning to stderr and fall back to `standard`.
+## Hook Runtime Controls
 
 ### CLAUDE_SKILLS_DISABLED_HOOKS
 
 Comma-separated list of hook IDs to disable. Each ID is stripped of whitespace. Empty segments are excluded. Unknown IDs are silently ignored for forward compatibility. Default when unset or empty: no hooks disabled.
 
-Hook IDs for this script:
-
-- `task-status:post-tool-use` — the PostToolUse handler (LastActivity timestamp updates)
-- `task-status:subagent-stop` — the SubagentStop handler (settling the attempt)
-
-Disabled hooks take precedence over profile. If both `CLAUDE_SKILLS_HOOK_PROFILE=strict` and `CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop` are set, SubagentStop is skipped entirely and no attempt is settled by the hook — the orchestrator's own settle step is then the only one.
+The hook ID for this script: `task-status:subagent-stop` — the SubagentStop handler (settling the attempt).
 
 Disabled hooks exit 0 (Claude Code treats non-zero hook exit as an error that kills the hook chain).
 
-### Examples
+### Example
 
 ```bash
-# Skip PostToolUse activity tracking (reduces I/O during task execution)
-export CLAUDE_SKILLS_HOOK_PROFILE=minimal
-
-# Run every handler — same set as `standard`; no extra validation is performed
-export CLAUDE_SKILLS_HOOK_PROFILE=strict
-
-# Disable a specific hook by ID
-export CLAUDE_SKILLS_DISABLED_HOOKS=task-status:post-tool-use
-
-# Disable multiple hooks
-export CLAUDE_SKILLS_DISABLED_HOOKS="task-status:post-tool-use,task-status:subagent-stop"
+# Disable the settle hook
+export CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop
 ```
 
 ## Integration with /execution

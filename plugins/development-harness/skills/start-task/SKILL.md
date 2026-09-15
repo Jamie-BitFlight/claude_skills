@@ -1,14 +1,8 @@
 ---
 name: start-task
-description: Use when executing a task the orchestrator dispatched — reads the task and its orchestrator response from the work ledger, writes active-task context for hooks, loads task-level skills, implements against acceptance criteria, records divergences and the completion report as task sections, and closes the attempt. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
+description: Use when executing a task the orchestrator dispatched — reads the task and its orchestrator response from the work ledger, loads task-level skills, implements against acceptance criteria, records divergences and the completion report as task sections, and closes the attempt. Triggers on task execution within the implement-feature loop or when an agent picks up a specific task from a plan.
 argument-hint: <plan-address> [--task <task-id>] [--attempt <n>] [--complete <task-id>]
 user-invocable: true
-hooks:
-  PostToolUse:
-  - matcher: Write|Edit|Bash
-    hooks:
-    - type: command
-      command: uv run --script "${CLAUDE_PLUGIN_ROOT}/skills/implementation-manager/scripts/task_status_hook.py"
 ---
 
 # Start Task (SAM Task Execution Helper)

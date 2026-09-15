@@ -19,13 +19,11 @@ Divergence Note DN-2
 Requirements implied ``handle_subagent_stop`` routes through
 ``fetch_tasks_from_backend`` at runtime.  It never did, and since the hook was
 rewritten to settle the attempt named by the stopping sub-agent's own prompt it
-reads no ``parent_issue_number`` at all — ``task_status_hook.read_task_context``
-returns ``(plan, task_id)`` and nothing else.  The three tests that exercised the
+reads no ``parent_issue_number`` at all.  The three tests that exercised the
 hook's former ``_read_context_file`` reader for beads-nanoid, integer and absent
 ``parent_issue_number`` values were removed with it: the field is no longer read
 by the hook, so the ``int()`` cast those tests guarded against cannot recur there.
-The router's own type handling is still covered below, and
-``tests/test_task_status_hook.py`` covers what survives of the context reader.
+The router's own type handling is still covered below.
 """
 
 from __future__ import annotations
