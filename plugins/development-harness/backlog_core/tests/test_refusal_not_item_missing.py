@@ -17,6 +17,13 @@ folded a genuine failure (network error, 500, rate limit) into the identical
 ``GITHUB_TOKEN`` configured at all — keeps that ``False``/local-fallback behaviour
 now; a genuine failure propagates as ``GitHubUnavailableError`` instead, which
 ``view_item``'s existing ``except BackendUnavailableError`` clause already catches.
+
+A fourth read told a narrower version of the same lie: the #3546 fix's own
+``_is_not_found_error`` helper matched any 'could not resolve'/'not found'
+text, so GitHub's GraphQL error for an inaccessible or incorrect repository
+('Could not resolve to a Repository with the name ...') was misclassified as
+the requested issue being not found (#3570 Finding). ``_is_not_found_error``
+now only matches an error that specifically names the issue as unresolvable.
 """
 
 from __future__ import annotations
@@ -136,6 +143,30 @@ class TestViewEnrichSurfacesTheRefusal:
 
         assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
 
+    def test_a_repository_not_found_error_now_propagates_instead_of_becoming_item_not_found(
+        self, mocker: MockerFixture
+    ) -> None:
+        """An inaccessible/nonexistent repository is not a missing-issue answer.
+
+        Regression for #3570 Finding: ``_is_not_found_error`` matched any
+        'could not resolve'/'not found' text, so GitHub's actual GraphQL error
+        for an inaccessible or incorrect repository — 'Could not resolve to a
+        Repository with the name ...' (verified against
+        https://github.com/cli/cli/issues/3591) — was misclassified as the
+        issue itself being not found. That made ``view_item("#N")`` raise
+        ItemNotFoundError for the issue instead of preserving the
+        repository/access failure as GitHubUnavailableError.
+        """
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'."),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
+
 
 class _LiveGitHubBackend:
     """Backend stand-in whose ``view_enrich_from_github`` delegates to the real
@@ -247,6 +278,31 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
         )
 
         with pytest.raises(ItemNotFoundError):
+            operations.view_item("#999", output=Output())
+
+    def test_a_repository_not_found_error_raises_github_unavailable_not_item_not_found(
+        self, mocker: MockerFixture
+    ) -> None:
+        """End-to-end regression for #3570 Finding.
+
+        Mirrors ``test_a_genuinely_nonexistent_issue_on_a_reachable_repo_raises_not_found``
+        above, but with GitHub's actual GraphQL error text for an inaccessible
+        or incorrect repository — 'Could not resolve to a Repository with the
+        name ...' (verified against https://github.com/cli/cli/issues/3591) —
+        instead of the issue-specific not-found message. Asserts the result is
+        ``GitHubUnavailableError``, not ``ItemNotFoundError``: the repository
+        being unresolvable is not the same failure as the issue being absent,
+        and must not report the issue as missing.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'."),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
             operations.view_item("#999", output=Output())
 
 
