@@ -225,6 +225,33 @@ class TestResolveCaBundle:
 
         assert resolve_ca_bundle() == str(preferred)
 
+    def test_requests_ca_bundle_wins_over_ssl_cert_file(self, monkeypatch, stock_store_file, ca_file):
+        """Nix/conda's SSL_CERT_FILE must not shadow a proxy's REQUESTS_CA_BUNDLE.
+
+        A Nix or conda shell exports stock roots through SSL_CERT_FILE on an ordinary
+        network, but ``requests`` itself (``Session.merge_environment_settings``) resolves
+        its CA bundle from REQUESTS_CA_BUNDLE, not SSL_CERT_FILE, whenever a caller leaves
+        ``verify`` unset — exactly what ``make_github_client`` does. If SSL_CERT_FILE won
+        this race, ``resolve_ca_bundle`` would hand the stock bundle to
+        ``bundle_requires_relaxed_verification``, judge no relaxation needed, and leave
+        PyGithub verifying against a bundle ``requests`` was never going to use anyway.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(stock_store_file))
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(ca_file))
+
+        assert resolve_ca_bundle() == str(ca_file)
+
+    def test_curl_ca_bundle_wins_over_ssl_cert_file(self, monkeypatch, stock_store_file, ca_file):
+        """CURL_CA_BUNDLE is requests' own documented cURL-compatibility fallback.
+
+        ``merge_environment_settings`` checks it immediately after REQUESTS_CA_BUNDLE, so
+        it must also outrank SSL_CERT_FILE, which neither function reads at all.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(stock_store_file))
+        monkeypatch.setenv("CURL_CA_BUNDLE", str(ca_file))
+
+        assert resolve_ca_bundle() == str(ca_file)
+
 
 class TestBundleRequiresRelaxedVerification:
     """Only a locally added anchor that strict verification rejects earns the relaxation.
@@ -408,6 +435,25 @@ class TestInstallProxyTlsSupport:
         assert install_proxy_tls_support(force=True) is False
         assert _InstallState.installed is False
         assert _installed_https_connection_class() is HTTPSRequestsConnectionClass
+
+    def test_installs_from_requests_ca_bundle_despite_a_stock_ssl_cert_file(
+        self, monkeypatch, stock_store_file, ca_file
+    ):
+        """The exact scenario the P1 review finding described: Nix/conda plus a TLS proxy.
+
+        SSL_CERT_FILE carries the stock public roots (what Nix/conda hand every process
+        on an ordinary network), while REQUESTS_CA_BUNDLE carries the proxy's deficient
+        CA — the variable ``requests`` itself actually verifies against whenever a caller,
+        like ``make_github_client``, leaves ``verify`` unset. Installation has to follow
+        REQUESTS_CA_BUNDLE, or PyGithub keeps VERIFY_X509_STRICT while the live connection
+        verifies against the deficient bundle anyway, and every proxied call fails.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(stock_store_file))
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(ca_file))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
 
 
 class TestConnectionClassFactory:
