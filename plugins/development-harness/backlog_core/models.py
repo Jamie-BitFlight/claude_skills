@@ -1298,7 +1298,22 @@ class ReconcileScope(StrEnum):
 
 
 class ReconcileRequest(BaseModel):
-    """Typed request for a provider-neutral backlog reconciliation pass."""
+    """Typed request for a provider-neutral backlog reconciliation pass.
+
+    Attributes:
+        apply_local_patches: Whether the adapter may push locally-queued
+            mutations to the provider. Defaults to ``True`` so every existing
+            explicit-refresh/sync/grooming caller keeps its current
+            push-on-reconcile behaviour unchanged. Set ``False`` for a
+            fetch-only reconcile: the adapter still fetches the provider
+            snapshot and still updates the local cache from it, but never
+            calls its patch-apply seam (``_ReconcileProvider._apply_patches``),
+            so a queued local edit for an existing issue is never replayed to
+            the provider as a side effect. Added for the implicit cold-cache
+            read-through in ``operations.list_items`` -- a plain
+            ``backlog_list`` call is advertised ``read_only_hint=True`` /
+            ``destructive_hint=False`` in ``server.py`` and must never write.
+    """
 
     scope: ReconcileScope
     label: str = ""
@@ -1307,6 +1322,7 @@ class ReconcileRequest(BaseModel):
     dry_run: bool = False
     force: bool = False
     include_diff: bool = False
+<<<<<<< HEAD
     # Set only by _GitHubReconciliation._with_snapshot_checkpoint when it
     # upgrades an INCREMENTAL request to INITIAL because no checkpoint could
     # be trusted to resolve a "since" from -- either none exists at all, or
@@ -1322,6 +1338,9 @@ class ReconcileRequest(BaseModel):
     # while closed) before this point would otherwise never be observed
     # again once the fresh watermark starts being trusted.
     checkpoint_recovery: bool = False
+=======
+    apply_local_patches: bool = True
+>>>>>>> 7ca32751c (fix(backlog-core): keep the implicit cold-cache refresh read-only and coordinated)
 
 
 class ContentKind(StrEnum):

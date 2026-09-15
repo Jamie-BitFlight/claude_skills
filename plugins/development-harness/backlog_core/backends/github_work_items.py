@@ -562,6 +562,18 @@ class _GitHubReconciliation:
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
+        ``request.apply_local_patches`` (default ``True``) gates the only step
+        in this method that writes to the provider: when ``False``, the
+        provider snapshot is still fetched and the local cache is still
+        updated from it (``plan.cache_actions``), but ``plan.provider_patches``
+        -- the queued local mutations the pure engine decided diverge from the
+        provider and would need pushing -- are never handed to
+        ``self._provider._apply_patches``. Those patches then behave exactly
+        like an ordinary failed-to-apply patch in ``finalize_reconciliation``
+        (no matching ``PatchResult``, so their paired "checkpoint" cache action
+        is skipped and their queued mutation stays un-acknowledged/pending) --
+        no new status or bookkeeping path was introduced for this.
+
         Returns:
             Completed reconciliation counts with changed logical references.
         """
@@ -578,7 +590,9 @@ class _GitHubReconciliation:
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
-        patch_results = self._provider._apply_patches(plan.provider_patches)
+        patch_results = (
+            self._provider._apply_patches(plan.provider_patches) if effective_request.apply_local_patches else []
+        )
         applied_revisions = {
             result.reference: result.revision for result in patch_results if result.status == "applied"
         }

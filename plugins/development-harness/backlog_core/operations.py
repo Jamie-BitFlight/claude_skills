@@ -92,7 +92,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1836,6 +1836,7 @@ def refresh_local_cache_from_github(
     output: Output | None = None,
     full_refresh: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
+    apply_local_patches: bool = True,
 ) -> dict[str, int | list[str]]:
     """Reconcile provider items through the configured backend.
 
@@ -1847,6 +1848,13 @@ def refresh_local_cache_from_github(
             incremental snapshot.
         progress_callback: Optional callable invoked after each issue is
             reconciled. Receives ``(items_done, items_total)``.
+        apply_local_patches: Forwarded to :class:`~backlog_core.models.ReconcileRequest`.
+            Defaults to ``True`` (existing explicit-refresh/sync behaviour:
+            queued local mutations may be pushed to the provider). Pass
+            ``False`` for a fetch-only reconcile that updates the local cache
+            from the provider snapshot but never pushes a queued local
+            mutation -- used by the implicit cold-cache read-through in
+            :func:`list_items`, which must stay read-only.
 
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled
@@ -1865,7 +1873,9 @@ def refresh_local_cache_from_github(
         if label and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
         else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     )
-    result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
+    result = backend.reconcile(
+        ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
+    )
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
     out.info(

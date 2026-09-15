@@ -25,6 +25,7 @@ from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
+    ContentUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
@@ -256,6 +257,14 @@ class _CheckpointedBackend:
     called by ``list_items``"), this stub reports its checkpoint state via
     ``has_synced_snapshot`` so ``list_items``'s one-shot cold-cache
     read-through (A-critique.md Sec 5, ALT-5) is reachable in a test.
+
+    ``reconcile`` records every request it receives (rather than raising)
+    so a test can go through the real, unmocked
+    ``operations.refresh_local_cache_from_github`` and assert on the
+    ``ReconcileRequest`` shape that implicit refresh actually constructs --
+    most importantly, ``apply_local_patches`` (PR #3573 review Finding 1:
+    a plain ``backlog_list`` call must never push a queued local mutation
+    to the provider).
     """
 
     supports_batch_status_fetch = False
@@ -263,6 +272,7 @@ class _CheckpointedBackend:
     def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
         self._items = items
         self._synced = synced
+        self.reconcile_requests: list[ReconcileRequest] = []
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
@@ -271,8 +281,9 @@ class _CheckpointedBackend:
         return self._synced
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
-        """Satisfy the ``SyncProvider`` protocol; tests patch the wrapper instead."""
-        raise NotImplementedError
+        """Record the request and report a no-op reconciliation outcome."""
+        self.reconcile_requests.append(request)
+        return ReconcileResult()
 
 
 class TestColdCacheReadsThroughOnce:
