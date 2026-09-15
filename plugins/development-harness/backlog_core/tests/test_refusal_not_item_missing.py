@@ -121,6 +121,43 @@ class TestViewEnrichSurfacesTheRefusal:
 
         assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
 
+    def test_a_genuine_issue_not_found_still_returns_false(self, mocker: MockerFixture) -> None:
+        """A reachable repository confirming the issue does not exist must not
+        become GitHubUnavailableError — that reads as an outage, not an absence.
+
+        Regression for #3570 Finding 1: the blanket ``except (BacklogError,
+        GithubException)`` this file's own #3546 fix introduced converted
+        ``_fetch_issue_graphql``'s genuine "Could not resolve to issue" 404
+        equivalent into GitHubUnavailableError alongside every other failure,
+        which made ``view_item("#999")`` report "GitHub is unavailable" for an
+        issue that simply does not exist instead of raising ItemNotFoundError.
+        """
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #519"),
+        )
+
+        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+
+
+class _LiveGitHubBackend:
+    """Backend stand-in whose ``view_enrich_from_github`` delegates to the real
+    ``gh_client.view_enrich_from_github`` (unlike ``_ViewBackend`` below, which
+    is patched directly at the ``operations`` boundary) — used to prove the
+    not-found detection propagates correctly end-to-end through ``view_item``.
+    """
+
+    issue_id_type = "int"
+    supports_batch_status_fetch = False
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return []
+
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+        return gh_client.view_enrich_from_github(result, issue_num, repo)
+
 
 class _ViewBackend:
     """Backend stub exposing only what ``view_item`` reads."""
@@ -194,6 +231,28 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
             and "issue not found" in w
             for w in out.warnings
         )
+
+    def test_a_genuinely_nonexistent_issue_on_a_reachable_repo_raises_not_found(self, mocker: MockerFixture) -> None:
+        """End-to-end regression for #3570 Finding 1.
+
+        Unlike ``test_a_genuinely_absent_item_still_reports_not_found`` above
+        (which patches ``operations.view_enrich_from_github`` directly and so
+        never exercises the not-found detection itself), this test runs the
+        real ``gh_client.view_enrich_from_github`` chain — a reachable
+        repository whose GraphQL issue lookup genuinely fails to resolve —
+        through ``view_item`` and asserts the result is ``ItemNotFoundError``,
+        not ``GitHubUnavailableError``.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #999"),
+        )
+
+        with pytest.raises(ItemNotFoundError):
+            operations.view_item("#999", output=Output())
 
 
 class _CacheBackend:

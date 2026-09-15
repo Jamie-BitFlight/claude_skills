@@ -1262,15 +1262,52 @@ class TestViewEnrichFromGithub:
         Why: A genuine query failure is not "issue #999 does not exist" (#3546)
             — False used to mean both, so it is raised instead and the caller
             (view_item's existing except BackendUnavailableError) decides.
+
+        The message deliberately avoids _is_not_found_error's "not found" /
+        "could not resolve" markers (#3570 Finding 1) — a message that does
+        match those markers is a genuine issue-not-found signal and must
+        return False instead, per test_returns_false_on_genuine_not_found
+        below; this test is only about failures that are not that case.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: rate limit exceeded")
+        )
         result = ViewItemResult()
 
         # Act / Assert
         with pytest.raises(GitHubUnavailableError):
             view_enrich_from_github(result, "999")
+
+    def test_returns_false_on_genuine_not_found(self, mocker: MockerFixture) -> None:
+        """view_enrich_from_github returns False when the issue genuinely does not exist.
+
+        Tests: view_enrich_from_github not-found detection (#3570 Finding 1
+        regression). The prior blanket ``except (BacklogError, GithubException):
+        raise GitHubUnavailableError`` this file's #3546 fix introduced folded
+        _fetch_issue_graphql's own "Could not resolve to issue" 404-equivalent
+        BacklogError into the same GitHubUnavailableError as every other
+        failure, which made view_item("#999") report "GitHub is unavailable"
+        for an issue that simply does not exist instead of raising
+        ItemNotFoundError.
+        How: Raise the exact BacklogError _fetch_issue_graphql raises for a
+            missing issue from _graphql_request.
+        Why: A reachable repository confirming absence is not an outage.
+        """
+        # Arrange
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #999"),
+        )
+        result = ViewItemResult()
+
+        # Act
+        enriched = view_enrich_from_github(result, "999")
+
+        # Assert
+        assert enriched is False
 
     def test_uses_resolve_version_body_when_provided(self, mocker: MockerFixture) -> None:
         """A successful resolve_version callback's body wins over the raw issue body.
