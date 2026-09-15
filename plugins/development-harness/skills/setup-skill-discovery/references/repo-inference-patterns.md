@@ -4,9 +4,7 @@ Patterns for wizard Step 1: infer the project's technology stack from repository
 Used by `setup-skill-discovery/SKILL.md` to determine candidate skill categories before
 building the `.dh/skill_discovery.yaml` draft.
 
-This file documents file presence → stack → skill category mappings. For the canonical
-language manifest schema (role fulfillment, quality gates, project detection rules), load
-`dh:dh-meta-docs` — do not duplicate that content here.
+This file documents file presence → stack → skill category mappings.
 
 ---
 

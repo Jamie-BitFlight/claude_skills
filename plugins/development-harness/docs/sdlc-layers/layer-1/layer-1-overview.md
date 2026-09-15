@@ -6,7 +6,7 @@ Layer 1 specializes the SDLC framework for a specific programming language. It i
 
 ## Inheritance from Layer 0
 
-**Layer 0 gates apply before role resolution.** Before the harness resolves language manifests:
+**Layer 0 gates apply before role resolution.** Before the harness resolves roles:
 
 1. RT-ICA prerequisite gate (AVAILABLE | DERIVABLE | MISSING)
 2. Human touchpoint model (escalation triggers, loop limits)
@@ -14,9 +14,8 @@ Layer 1 specializes the SDLC framework for a specific programming language. It i
 4. Verification protocol (producer vs evaluator, CERTIFIED/NOT_CERTIFIED)
 5. Orchestrator discipline (delegation, no investigation escalation)
 
-Language manifests **declare gates, detection markers, and conventions**. They do **not**
-declare specialist agents — the harness resolves those at runtime via `profile_list()` — and do
-**not** redefine process.
+Layer 1 plugins provide language-specific agents and skills. The harness finds their agents at
+runtime with `mcp__plugin_dh_backlog__profile_list()`. Layer 1 plugins do **not** redefine process.
 
 ---
 
@@ -24,16 +23,16 @@ declare specialist agents — the harness resolves those at runtime via `profile
 
 | Layer 0 (Do not duplicate) | Layer 1 (Extend only) |
 |----------------------------|------------------------|
-| SAM 7-stage pipeline | Process Flow Override (optional, rare) |
+| SAM 7-stage pipeline | — |
 | Human touchpoint model | — |
 | Artifact conventions | — |
 | RT-ICA, verification | — |
 | SAM task schema (`models.py`) | — |
 | Subagent contract | — |
-| — | Quality Gates (format, lint, typecheck, test, standards) |
-| — | Project Detection (markers, source/test patterns) |
-| — | Conventions (naming, structure, testing, documentation) |
-| — | Language standards (e.g., modernpython) |
+| — | Specialist agents (found by `profile_list()`) |
+| — | Stack review skills (`dh:code-review-{stack}`) |
+| — | Quality gate commands (found in the repository's pre-commit config, CI workflow, or build config) |
+| — | Language standards skills (e.g., `python-engineering:modernpython`) |
 
 ---
 
@@ -45,4 +44,4 @@ Orchestrators pass paths and outcomes; agents discover and verify. Do not pre-ga
 
 ## Non-Typed Languages
 
-For languages without static typing (e.g., Bash, Perl without strict typing), use `typecheck: (none)` in Quality Gates. The harness skips the typecheck gate when `(none)` is declared.
+Languages without static typing (e.g., Bash, Perl without strict typing) have no typecheck gate. Skip the typecheck gate for these languages.

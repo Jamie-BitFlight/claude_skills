@@ -259,55 +259,34 @@ EVIDENCE:
 
 Tests and static analysis verify code structure — they do not exercise the actual dispatch layer a real user or caller would use. A change can pass all tests while the live wiring is broken, because tests import code directly and bypass the real runtime path. This step closes that gap.
 
-### Detect Project Language and Read Language Manifest
+### Find the Delivery Surface
 
 ```mermaid
 flowchart TD
-    Start([Scan project root]) --> Q1{pyproject.toml present?}
-    Q1 -->|Yes| Python[Language: Python]
-    Q1 -->|No| Q2{package.json present?}
-    Q2 -->|Yes| JS[Language: TypeScript/JS]
-    Q2 -->|No| Q3{go.mod present?}
-    Q3 -->|Yes| Go[Language: Go]
-    Q3 -->|No| Q4{Cargo.toml present?}
-    Q4 -->|Yes| Rust[Language: Rust]
-    Q4 -->|No| Q5{Gemfile present?}
-    Q5 -->|Yes| Ruby[Language: Ruby]
-    Q5 -->|No| Q6{Makefile or CMakeLists.txt present?}
-    Q6 -->|Yes| C[Language: C/C++]
-    Q6 -->|No| Unknown[Language: unknown]
-    Python --> ReadManifest
-    JS --> ReadManifest
-    Go --> ReadManifest
-    Rust --> ReadManifest
-    Ruby --> ReadManifest
-    C --> ReadManifest
-    Unknown --> ReadManifest
-    ReadManifest["Read .dh/language-manifest.yaml<br>(or .dh/language-manifest.yml)"] --> Q7{File exists?}
-    Q7 -->|Yes| ReadField["Read quality_gates.live_validation field"]
-    Q7 -->|No| NoManifest["No manifest — live_validation absent<br>Record: SKIPPED (no manifest)"]
-    ReadField --> Q8{live_validation present<br>and not empty?}
-    Q8 -->|Yes| Q9{"Value is 'agent-browser'?"}
-    Q8 -->|No| Absent["live_validation absent<br>Record gap"]
-    Q9 -->|Yes| Browser["Flag for agent-browser validation<br>Record: DEFERRED_BROWSER"]
-    Q9 -->|No| Q10{"Value is 'claude-skill'?"}
-    Q10 -->|Yes| Skill["Delivery surface verification deferred<br>Record: DEFERRED_SKILL<br>(run_live_validation_skill.py invoked externally — not from this flow)"]
-    Q10 -->|No| RunCommand["Run the live_validation command verbatim"]
-    RunCommand --> Evaluate
-    NoManifest --> Done(["Step complete"])
-    Absent --> Done
+    Start([Read the changed files]) --> Q1{Change ships a Claude Code skill,<br>agent, or plugin component?}
+    Q1 -->|Yes| Skill["Record: DEFERRED_SKILL<br>(run_live_validation_skill.py runs outside this flow)"]
+    Q1 -->|No| Q2{Change ships a web UI<br>that needs a browser?}
+    Q2 -->|Yes| Browser["Hand off to the agent-browser skill<br>Record: DEFERRED_BROWSER"]
+    Q2 -->|No| Q3{Repository names a runtime<br>entry point for the change?}
+    Q3 -->|Yes| RunCommand["Build the live command from that entry point<br>Run it from the project root"]
+    Q3 -->|No| Absent["Record: SKIPPED<br>Record the gap"]
+    RunCommand --> Evaluate[Evaluate the result]
+    Skill --> Done(["Step complete"])
     Browser --> Done
-    Skill --> Done
+    Absent --> Done
     Evaluate --> Done
 ```
 
+Look for the runtime entry point in `[project.scripts]` in `pyproject.toml`, `bin` in `package.json`,
+the MCP server config (`.mcp.json` or the plugin manifest's `mcpServers`), `cmd/` in a Go module, or the
+README usage section. The command must go through the real runtime path. Do not use test imports or mocks.
+
 ### Run Live Validation Command
 
-When `quality_gates.live_validation` is present and is neither `agent-browser` nor `claude-skill`, run it verbatim from the project root:
+Run the command you built from the project root:
 
 ```bash
-# Execute exactly what the manifest declares — no modification
-{live_validation command from manifest}
+{command built from the runtime entry point}
 ```
 
 Capture full stdout, stderr, and exit code.
@@ -331,13 +310,12 @@ The live invocation times out when:
 - The command does not complete within 120 seconds
 - Record `gap_message` as `"LIVE_VALIDATION: TIMEOUT — command did not complete within 120s.\nCommand: {cmd}"` with `exit_code=None`
 
-### Gap: No `live_validation` Declared
+### Gap: No Runtime Entry Point Found
 
-When `live_validation` is absent from the manifest (or the manifest does not exist), record this block verbatim in the verification report — this is a gap, not a pass:
+When the repository names no runtime entry point for the change, record this block verbatim in the verification report. This is a gap, not a pass:
 
 ```text
-LIVE_VALIDATION: SKIPPED — no live_validation command declared in language manifest.
-Add quality_gates.live_validation to your .dh/language-manifest.yaml to enable live delivery surface validation.
+LIVE_VALIDATION: SKIPPED — no runtime entry point found for the changed functionality.
 ```
 
 ### Evidence Block
@@ -346,7 +324,7 @@ Record live validation output verbatim in the verification report:
 
 ```text
 LIVE_VALIDATION:
-  Surface: [manifest-declared | agent-browser | claude-skill | None]
+  Surface: [{one-line description of the runtime entry point used, e.g. "CLI: mytool --version"} | agent-browser | claude-skill | None]
   Command: [exact command run, or "none"]
   Exit code: [0 or non-zero or null (timeout), or "n/a"]
   Stdout: [captured output]
@@ -397,7 +375,7 @@ VERIFICATION_EVIDENCE:
     - Verified by: {command or check}
     - Result: PASS
 LIVE_VALIDATION:
-  Surface: [MCP | CLI | Web | None]
+  Surface: [{one-line description of the runtime entry point used, e.g. "CLI: mytool --version"} | agent-browser | claude-skill | None]
   Command: [exact command run]
   Exit code: 0
   Stdout: [captured output]
@@ -429,7 +407,7 @@ GAPS:
     - Missing:
       - {specific thing to add/fix}
 LIVE_VALIDATION:
-  Surface: [MCP | CLI | Web | None]
+  Surface: [{one-line description of the runtime entry point used, e.g. "CLI: mytool --version"} | agent-browser | claude-skill | None]
   Command: [exact command run]
   Exit code: [non-zero or 0]
   Stdout: [captured output]
@@ -523,7 +501,7 @@ def on_complete(result):
 
 ### Live Delivery Surface Validation (Step 8)
 
-- [ ] Delivery surface detected (MCP, CLI, Web, or None)
+- [ ] Delivery surface detected (a one-line description of the runtime entry point, agent-browser, claude-skill, or None)
 - [ ] Live invocation command constructed and run
 - [ ] Full stdout and stderr captured as evidence
 - [ ] Result recorded (PASS, FAIL, DEFERRED_BROWSER, DEFERRED_SKILL, or N/A)

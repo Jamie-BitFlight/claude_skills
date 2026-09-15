@@ -18,9 +18,8 @@ own or run the development-harness lifecycle.
 - [Default Development Flow](./references/default-development-flow.md) — S1–S7 sequencing, stage handoffs, and ARL gates.
 - [DH CLI Usage Guide](./references/dh-cli-usage-guide.md) — grouped-command reference for the DH CLI adapter.
 - [Human Touchpoint Model](./references/human-touchpoint-model.md) — whether a constraint requires human escalation.
-- [Language Manifest Schema](./references/language-manifest-schema.md) — create or validate a language-plugin manifest.
 - [Role Resolution Protocol](./references/role-resolution-protocol.md) — resolve abstract harness roles to language-plugin agents.
-- [SDLC Stage Taxonomy](./references/sdlc-stage-taxonomy.md) — choose canonical stage names and `{domain}-{sdlc-stage}` identifiers.
+- [SDLC Stage Taxonomy](./references/sdlc-stage-taxonomy.md) — choose canonical stage names.
 - Severity Workflow-Continuity Lens, at ${CLAUDE_PLUGIN_ROOT}/docs/severity-workflow-continuity-lens.md — worked examples of the continuity lens for defect classification and impact analysis.
 - Backlog Item Groomed Schema, at ${CLAUDE_PLUGIN_ROOT}/docs/backlog-item-groomed-schema.md — content rules and required Groomed-section structure for backlog-item-groomer output.
 </shared_reference_routing>

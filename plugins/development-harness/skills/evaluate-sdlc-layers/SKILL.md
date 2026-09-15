@@ -29,8 +29,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 - [ ] `plugins/development-harness/CLAUDE.md` — exists
 - [ ] `stateless-agent-methodology/research/arl/PROVENANCE.md` — exists (sibling repo or configured path)
 - [ ] Layer 0 docs → domain model source — exists at `plugins/development-harness/sam_schema/core/models.py`
-- [ ] Layer 1 → `dh:dh-meta-docs` routes `language-manifest-schema.md` and `role-resolution-protocol.md`
-- [ ] Layer 2 → `plugins/development-harness/docs/sdlc-layers/layer-2/` — exists with README, schema, pilot profiles
+- [ ] Layer 1 → `dh:dh-meta-docs` routes `role-resolution-protocol.md`
 - [ ] Layer-0 redirect stubs — `artifact-conventions.md`, `sam-pipeline.md`, `arl-touchpoints.md` contain redirect pointers to canonical locations. Validate each redirect target exists.
 
 **Evidence:** List each path checked and result (exists / 404 / wrong content).
@@ -41,8 +40,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 
 - [ ] Layer 0 content files (6): README, rt-ica-gate, verification-protocol, evidence-discipline, orchestrator-discipline, context-fit-complexity
 - [ ] Layer 0 redirect stubs (3): sam-pipeline, arl-touchpoints, artifact-conventions — each must contain a redirect pointing to its canonical skill reference location
-- [ ] Layer 1: All 6 docs present (README, layer-1-overview, language-manifest-template, linting-discovery-protocol, workflow-pattern-taxonomy, harness-role-mapping)
-- [ ] Layer 2: README, layer-2-overview, stack-profile-schema, stack-profile-template; pilot profiles python-fastapi, python-cli
+- [ ] Layer 1: All 5 docs present (README, layer-1-overview, linting-discovery-protocol, workflow-pattern-taxonomy, harness-role-mapping)
 - [ ] ARL: arl-meta-layer.md, arl-human-probing-design.md
 
 **Evidence:** `Glob` or `Read` results for each expected file.
@@ -53,7 +51,6 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 
 - [ ] `uv run research/knowledge-explorer.py list --layer 0` — returns entries with `layer: "0"`
 - [ ] `uv run research/knowledge-explorer.py list --layer 1` — returns entries with `layer: "1"`
-- [ ] `uv run research/knowledge-explorer.py list --layer 2` — returns entries with `layer: "2"`
 - [ ] Entries without layer metadata are excluded when `--layer` is used (expected)
 
 **Evidence:** Paste command output for each.
@@ -63,8 +60,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 ### 4. Research Entry Layer Metadata
 
 - [ ] `evaluation-testing/harness-engineering-openai.md` — has `layer: "0"`
-- [ ] `api-frameworks/fastapi.md`, `api-frameworks/tornado.md` — have `layer: "2"`, `language`, `stack`
-- [ ] `developer-tools/copier-astral.md` — has `layer: "1"` (or `2` if stack-scaffold)
+- [ ] `developer-tools/copier-astral.md` — has `layer: "1"`
 - [ ] `research/README.md` — has "Layer Mapping" section
 
 **Evidence:** Grep for `layer:` in frontmatter of each.
@@ -73,9 +69,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 
 ### 5. Integration Points
 
-- [ ] `work-backlog-item` SKILL — documents `--language`, `--stack`; references layer docs
 - [ ] `work-backlog-item` groom workflow — documents ARL human-probing integration; references arl-human-probing-design
-- [ ] `language-manifest-schema.md` — has "Inherits from Layer 0"; `typecheck: (none)`; Conventions schema
 - [ ] `role-resolution-protocol.md` — has "Layer 0 gates apply before role resolution"
 - [ ] `plugins/development-harness/CLAUDE.md` — references layer model
 
@@ -86,7 +80,7 @@ For each linked path in `plugins/development-harness/docs/sdlc-layers/` and rela
 ### 6. Consistency with Plan
 
 - [ ] Plan deliverables (from attached plan) — compare File and Directory Changes table to actual files
-- [ ] Dependency order — Layer 0 → Layer 1 → Layer 2 → Research → SAM/ARL → ARL probing → work-backlog-item
+- [ ] Dependency order — Layer 0 → Layer 1 → Research → SAM/ARL → ARL probing → work-backlog-item
 
 **Evidence:** List any plan items not yet implemented or diverged.
 

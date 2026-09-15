@@ -1,6 +1,6 @@
 # Development Harness Plugin - AI-Facing Documentation
 
-Language-agnostic development process harness that orchestrates feature development through a structured 7-stage pipeline. Any language plugin can compose with this harness by providing a language manifest declaring specialist agents and quality gates.
+Language-agnostic development process harness that orchestrates feature development through a structured 7-stage pipeline. Any language plugin can compose with this harness by installing specialist agents that `mcp__plugin_dh_backlog__profile_list()` discovers live, with no manifest to declare or maintain.
 
 **Purpose:** [docs/PURPOSE.md](./docs/PURPOSE.md) — what the harness is for.
 **Architecture:** [ARCHITECTURE.md](./ARCHITECTURE.md) — how it achieves that: the automation boundary, the logical work model, the frontend and backend contracts, and the current boundary.
@@ -17,7 +17,7 @@ Language-agnostic development process harness that orchestrates feature developm
 - The harness owns the *process*; language plugins own the *specialists*
 - Every stage produces a logical handoff. Document artifacts use `artifact_register` and `artifact_read`; plans and task state use `sam_plan` and `sam_task`. Neither surface exposes direct filesystem paths.
 - Human escalation follows ARL constraint analysis, not arbitrary checkpoints
-- `dh:task-worker` executes a SAM task and loads the specialist profile the task's `agent` field names; a language manifest decides which specialist that is, and without one no profile is named. It is the executor in both cases, never a specialist a task can name for itself
+- `dh:task-worker` executes a SAM task and loads the specialist profile the task's `agent` field names via `mcp__plugin_dh_backlog__profile_load()`; that name is resolved earlier by matching `profile_list()`'s live agent descriptions against the task's role and content, and without a match no profile is named. It is the executor in both cases, never a specialist a task can name for itself
 - Task complexity is context-fit under uncertainty — see [Context-Fit Complexity Model](./docs/sdlc-layers/layer-0/context-fit-complexity.md)
 
 ---
@@ -39,9 +39,11 @@ touchpoint model.
 
 ### Voltron-Style Composition
 
-Language plugins snap into the harness by providing a manifest that maps abstract roles to
-concrete agents and declares quality gate commands. The harness resolves roles at runtime based on
-project-language detection, and `dh:task-worker` executes with whatever profile that resolves to. Load
+Language plugins snap into the harness by installing agent definitions under `agents/`; the harness
+resolves abstract roles at runtime by calling `mcp__plugin_dh_backlog__profile_list()` and matching
+each role and the task's content against the live agent descriptions it returns, and `dh:task-worker`
+executes with whatever profile that resolves to. Quality gate commands are discovered from the
+repository's own pre-commit config, CI workflow, or build config, not declared by the plugin. Load
 `dh:dh-meta-docs` for the role-resolution protocol.
 
 ---
@@ -106,12 +108,10 @@ flowchart TD
     Harness[Development Harness] -->|owns| Process[7-Stage Pipeline]
     Harness -->|owns| Touchpoints[ARL Human Touchpoints]
     Harness -->|owns| Artifacts[State Management]
-    LangPlugin[Language Plugin] -->|provides| Manifest[Language Manifest]
-    Manifest -->|declares| Roles[Specialist Agents]
-    Manifest -->|declares| Gates[Quality Gate Commands]
-    Manifest -->|optionally declares| FlowOverride[Custom Process Flow]
-    Process -->|resolves roles via| Manifest
-    Process -->|runs gates via| Gates
+    LangPlugin[Language Plugin] -->|installs| Agents[Specialist Agents]
+    Process -->|resolves roles via| ProfileList["profile_list()"]
+    ProfileList -->|matches role + task against| Agents
+    Process -->|discovers gates via| RepoConfig[Repository Config]
 ```
 
 **What the harness owns:**
@@ -120,17 +120,12 @@ flowchart TD
 - Human touchpoint decisions (ARL constraint analysis)
 - Artifact management (naming, storage, cross-referencing)
 - Execution substrate (`dh:task-worker`, which loads whatever specialist profile a task names)
+- Role resolution (`profile_list()` matching) and quality gate discovery from the repository's own config
 
 **What language plugins own:**
 
-- Specialist agents (architect, test-designer, code-reviewer)
-- Quality gate commands (format, lint, typecheck, test)
+- Specialist agents (architect, test-designer, code-reviewer) — installed under `agents/`, discovered live via `profile_list()`
 - Project detection markers (config files, source patterns)
-- Optionally, a custom process flow overriding the default pipeline
-
-Language plugin authors should use the template at [./templates/language-manifest-template.md](./templates/language-manifest-template.md).
-
-Load `dh:dh-meta-docs` for the language-manifest schema.
 
 ---
 
@@ -284,11 +279,10 @@ that change depends on.
 - Load [Plan Artifact Lifecycle](./docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence classification, annotation rules
 - Load `dh:dh-meta-docs` — routes the artifact storage model, file naming, and cross-reference tokens
 
-**Modifying or extending the SDLC layer architecture (Layer 0/1/2 design):**
+**Modifying or extending the SDLC layer architecture (Layer 0/1 design):**
 
 - Load [Layer 0 README](./docs/sdlc-layers/layer-0/README.md) — framework design: evidence discipline, orchestrator discipline, context-fit complexity, RT-ICA gate, verification protocol
 - Load [Layer 1 README](./docs/sdlc-layers/layer-1/README.md) — language plugin design: harness role mapping, workflow pattern taxonomy, linting discovery protocol
-- Load [Layer 2 README](./docs/sdlc-layers/layer-2/README.md) — stack profile design: profile schema, profile templates
 - Load [ARL Meta Layer](./docs/sdlc-layers/arl-meta-layer.md) — ARL human probing design across layers
 
 **Adding skills or agents, or modifying workflow logic (Mermaid forks, agent dispatch, MCP tools, artifact flows):**
@@ -321,7 +315,7 @@ A completed change in one of these categories carries a documentation obligation
 
 ## Layer Model
 
-This harness implements the **SDLC Layer Separation Architecture**. Layer 0 = framework (this harness); Layer 1 = language plugin; Layer 2 = stack profile (optional). See [docs/sdlc-layers/](./docs/sdlc-layers/).
+This harness implements the **SDLC Layer Separation Architecture**. Layer 0 = framework (this harness); Layer 1 = language plugin. See [docs/sdlc-layers/](./docs/sdlc-layers/).
 
 Layer-0 operational specifications (pipeline flow, artifact conventions, touchpoint model, task format) live in the skill references and docs — see "Required Reading by Task Type" above. Layer-0 design principles (evidence discipline, orchestrator discipline, context-fit complexity) live in [docs/sdlc-layers/layer-0/](./docs/sdlc-layers/layer-0/).
 
@@ -354,7 +348,6 @@ discoveries, or user inputs that arise during the conversation.
 - [Testing MCP Servers](./docs/testing-mcp-servers.md)
 - `dh:dh-meta-docs`
 - `dh:create-artifact`
-- [Language Manifest Template](./templates/language-manifest-template.md)
 
 ---
 

@@ -89,13 +89,13 @@ For each acceptance test:
 
 ### Step 5 — Run Quality Gates
 
-Run the project's quality gates to confirm the entire feature passes:
+Run the project's quality gates to confirm the entire feature passes. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence to find each command. Run these gates:
 
 - Format check
 - Lint check
 - Type check (if applicable)
 - Full test suite
-- Any project-specific gates from the language manifest
+- Any other gate that the pre-commit config or CI workflow runs
 
 For the quality gate protocol, reference `/dh:validation-protocol`.
 

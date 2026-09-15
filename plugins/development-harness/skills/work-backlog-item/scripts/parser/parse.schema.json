@@ -21,8 +21,6 @@
       "description": "contains only the flags that were explicitly provided in the invocation",
       "additionalProperties": false,
       "properties": {
-        "language": { "type": "string" },
-        "stack": { "type": "string" },
         "force": { "type": "boolean" },
         "auto": { "type": "boolean" },
         "quick": { "type": "boolean" }
