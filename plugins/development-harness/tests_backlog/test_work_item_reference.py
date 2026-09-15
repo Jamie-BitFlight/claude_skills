@@ -3,11 +3,13 @@ from __future__ import annotations
 import inspect
 from unittest.mock import MagicMock
 
+from backlog_core.backend_protocol import reset_config, set_config
+from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import BacklogItem
-from backlog_core.operations import _filter_closed_items
+from backlog_core.operations import _filter_closed_items, update_item
 
 
 def test_reference_survives_model_round_trip() -> None:
@@ -78,3 +80,23 @@ def test_beads_work_items_use_native_issue_commands_not_kv() -> None:
     )
     assert '"kv"' not in work_item_source
     assert "dh.work-item" not in work_item_source
+
+
+def test_update_item_resolves_selector_by_printed_reference() -> None:
+    """update_item finds its target when selected by the reference backlog add printed.
+
+    Guards: the reference (e.g. "p1-repro-selector-crash") uses hyphens where the
+    title uses spaces, so it is not a title substring. Before the fix, find_item
+    fell through to title-substring matching and update_item raised
+    ItemNotFoundError even though the item exists (#3449).
+    """
+    backend = SQLiteBackend()
+    backend.put_work_item(BacklogItem(title="repro selector crash", reference="p1-repro-selector-crash"))
+    set_config(BacklogConfig(backend=backend))
+
+    try:
+        result = update_item(selector="p1-repro-selector-crash", status="groomed")
+    finally:
+        reset_config()
+
+    assert result["title"] == "repro selector crash"
