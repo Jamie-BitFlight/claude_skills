@@ -36,3 +36,9 @@ The structured MCP composites remain MCP-only transport names (`sam_plan`, `sam_
 `sam_active_task`) and are not CLI commands. The CLI exposes their reachable operations under
 `plan`, `backlog`, `dispatch`, `artifact`, and `active-task`; consult each group's current `--help`
 before invoking a less common leaf.
+
+Once `plan import` puts a plan on the work ledger, `sam_plan`'s `read`, `status`, `ready`,
+`update`, `append_task`, and `finalize` actions and `sam_task`'s `read`, `state`, and `update`
+actions read and write the ledger instead of the plan's original content record — the same store
+the CLI's `plan` commands above read and write for that plan once it is imported. `sam_plan`'s
+`list` and `sam_task`'s `claim` keep answering from the content record regardless.

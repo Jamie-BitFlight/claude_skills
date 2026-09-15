@@ -41,7 +41,7 @@ import zlib
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, get_args
+from typing import TYPE_CHECKING, Any, TypeAlias, get_args
 
 import dh_paths
 from sam_schema.core.models import Plan, Task
@@ -55,6 +55,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 DATABASE_NAME = "dh.db"
 """The file under ``dh_paths.state_root()`` that holds the ledger."""
+
+LedgerConnection: TypeAlias = sqlite3.Connection
+"""The connection type every ledger call takes and returns.
+
+A frontend that names this alias instead of ``sqlite3.Connection`` needs no import of
+``sqlite3`` itself — a boundary ``sam_schema/server.py`` does not carry on its own import
+allowlist (``tests/test_frontend_logic_free.py``).
+"""
 
 BUSY_TIMEOUT_MS = 30_000
 """How long a writer waits for another writer's lock before raising.
@@ -764,6 +772,32 @@ def open_ledger(
     conn = connect(resolved, busy_timeout_ms=busy_timeout_ms)
     ensure_schema(conn)
     return conn
+
+
+def holds(plan: str) -> bool:
+    """Answer whether the ledger already carries a plan, without creating one.
+
+    A single ``SELECT 1`` rather than :func:`~dh_core.ledger.queries.list_plans`: that query also
+    lives in this package but in ``queries.py``, which imports this module, so calling it from here
+    would be a cycle, and it derives every plan's ``progress`` besides -- work a routing check that
+    runs on every plan-addressed call never uses. The database is only opened when its file is
+    already there, so asking the question on a repository that has no ledger writes nothing and
+    leaves no database behind.
+
+    Args:
+        plan: The canonical plan id, as :func:`sam_schema.core.addressing.canonical_plan_id`
+            returns it.
+
+    Returns:
+        Whether the ledger holds a plan row with that id.
+    """
+    if not plan or not database_path().exists():
+        return False
+    conn = open_ledger()
+    try:
+        return bool(rows_of(conn.execute("SELECT 1 FROM plans WHERE plan_id = :plan", {"plan": plan})))
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------

@@ -121,9 +121,23 @@ class TaskDefinition(Task):
 
 
 class ReadTaskConfig(_ActionConfigBase):
-    """Read a task and return a TaskAssignment (plan context + task fields)."""
+    """Read a task and return a TaskAssignment (plan context + task fields).
+
+    ``attempt`` only matters once the ledger holds the task's plan (see
+    ``dh_core.ledger.transitions.read``): naming the attempt the runner holds renews its lease on
+    an in-progress task. A plan the ledger does not hold ignores it, the way ``operations.read_task``
+    always has.
+    """
 
     action: Literal["read"] = "read"
+    attempt: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "The attempt the runner holds. Renews the task's lease when the ledger holds the plan "
+            "and the task is in-progress. Has no effect otherwise."
+        ),
+    )
 
 
 class ClaimTaskConfig(_ActionConfigBase):
@@ -133,7 +147,14 @@ class ClaimTaskConfig(_ActionConfigBase):
 
 
 class StateTaskConfig(_ActionConfigBase):
-    """Update a task's status field."""
+    """Update a task's status field.
+
+    ``reason`` and ``force`` only matter once the ledger holds the task's plan (see
+    ``dh_core.ledger.transitions.state``): the ledger records ``reason`` on every ``task.state``
+    event and refuses the call without one, the way the CLI's ledger-backed ``plan state`` command
+    does. A plan the ledger does not hold ignores both, the way ``operations.update_task_status``
+    always has.
+    """
 
     action: Literal["state"] = "state"
     status: str = Field(
@@ -142,6 +163,20 @@ class StateTaskConfig(_ActionConfigBase):
             "New status value. Canonical values: not-started, in-progress, complete, "
             "blocked, deferred, skipped. STATUS_MAP in models.py accepts additional "
             "aliases (e.g. 'done', 'pending', ':white_check_mark:')."
+        ),
+    )
+    reason: str | None = Field(
+        default=None,
+        description=(
+            "Why the status is moving without a runner. Required once the ledger holds the "
+            "task's plan; the call refuses without it. Ignored otherwise."
+        ),
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "Waive the ledger's acceptance, lease and report checks and clear acceptance. "
+            "Only meaningful once the ledger holds the task's plan."
         ),
     )
 
@@ -170,6 +205,15 @@ class UpdateTaskConfig(_ActionConfigBase):
     )
     section_content: str | None = Field(
         default=None, description="Body text for the appended section. Used with append_section."
+    )
+    attempt: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "The attempt the runner holds. Required to append a report section (e.g. "
+            "'Completion Report') once the ledger holds the task's plan; the call refuses "
+            "without it. Ignored otherwise."
+        ),
     )
 
 

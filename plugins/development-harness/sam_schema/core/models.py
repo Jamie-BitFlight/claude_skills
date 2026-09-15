@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -612,6 +612,21 @@ class ReadyTasksResult(BaseModel):
     count: int
     issue: str | None = None
     state: PlanState = PlanState.READY
+
+
+class LedgerReadyResult(BaseModel):
+    """The ledger's ``ready`` query, wrapped the way the CLI's ledger-backed ``ready`` command wraps it.
+
+    ``dh_core.ledger.ready`` returns a bare ``list[dict[str, Any]]`` of routing-manifest rows,
+    which have no fixed schema of their own -- they are whatever the row's fold left in it. This
+    model exists only so FastMCP's output validation has a name for that envelope in ``sam_plan``'s
+    return union; :class:`ReadyTasksResult` stays the shape for a plan the ledger does not hold.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    count: int = 0
 
 
 class PaginationMeta(BaseModel):

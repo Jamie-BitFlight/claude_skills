@@ -71,7 +71,7 @@ from dh_core.ledger.port import (
     projection_source,
 )
 from dh_core.ledger.queries import Finding, FindingCode, PlanStatus, list_plans, ready, status, validate
-from dh_core.ledger.store import Refusal, database_path, open_ledger, transaction
+from dh_core.ledger.store import LedgerConnection, Refusal, database_path, holds, open_ledger, transaction
 from dh_core.ledger.transitions import (
     PLAN_FIELD_COLUMNS,
     TASK_FIELD_COLUMNS,
@@ -99,6 +99,7 @@ __all__ = [
     "ContentProjectionStore",
     "Finding",
     "FindingCode",
+    "LedgerConnection",
     "MilestoneItem",
     "PlanSource",
     "PlanStatus",
@@ -121,6 +122,7 @@ __all__ = [
     "finish",
     "from_milestone",
     "held_source",
+    "holds",
     "import_plan",
     "list_plans",
     "milestone_source",
