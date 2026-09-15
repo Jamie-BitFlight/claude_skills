@@ -33,33 +33,51 @@ def err(msg: str, exit_code: int = 1) -> NoReturn:
 def output_json(data: object, *, exclude_none: bool = True) -> None:
     """Print ``data`` as compact JSON to stdout.
 
-    Pydantic models use ``model_dump_json(by_alias=True, exclude_none=...)``
-    directly so wire-alias keys (kebab-case) and absent-optional elision
-    are preserved. Other objects fall back to ``json.dumps`` with a string
-    default.
+    A bare Pydantic model uses ``model_dump_json(by_alias=True,
+    exclude_none=...)`` directly, so wire-alias keys (kebab-case) and
+    absent-optional elision are produced by Pydantic's own serializer.
+
+    Anything else — a plain ``dict``/``TypedDict`` result, a list, or any
+    structure that carries Pydantic model instances nested inside it at any
+    depth (e.g. an operations-layer ``TypedDict`` result shaped like
+    ``{"comments": [CommentListEntry(...), ...]}``) — is serialized via
+    ``json.dumps`` with a ``default`` callback that recursively dumps every
+    ``BaseModel`` it encounters through ``model_dump(mode="json", ...)``.
+    This makes ``output_json`` the single serialization boundary for the CLI:
+    an operations-layer function may return a typed Pydantic object anywhere
+    inside its result without every call site remembering to flatten it to a
+    plain dict first, and the JSON wire type stays a real object instead of
+    silently degrading to a Python ``repr()`` string. A value that is neither
+    natively JSON-serializable nor a ``BaseModel`` (e.g. ``Path``) still
+    stringifies via ``str()`` as the final fallback.
 
     Args:
-        data: A Pydantic model, list of models, or JSON-serializable object.
+        data: A Pydantic model, or any JSON-serializable object — optionally
+            containing nested Pydantic model instances at any depth.
         exclude_none: When ``True`` (default), omit fields whose value is
-            ``None``. Set to ``False`` when the caller needs explicit
-            ``null`` values (e.g., ``active_task: null``).
+            ``None``. Applied to both a bare top-level model and to any
+            model nested inside *data*. Set to ``False`` when the caller
+            needs explicit ``null`` values (e.g., ``active_task: null``).
     """
     if isinstance(data, BaseModel):
         typer.echo(data.model_dump_json(by_alias=True, exclude_none=exclude_none))
-    elif isinstance(data, list) and data and all(isinstance(item, BaseModel) for item in data):
-        typer.echo(
-            json.dumps(
-                [
-                    item.model_dump(mode="json", by_alias=True, exclude_none=exclude_none)
-                    for item in data
-                    if isinstance(item, BaseModel)
-                ],
-                default=str,
-                separators=(",", ":"),
-            )
-        )
-    else:
-        typer.echo(json.dumps(data, default=str, separators=(",", ":")))
+        return
+
+    def _dump_nested_model(value: object) -> object:
+        """Fallback for a value ``json.dumps`` cannot serialize natively.
+
+        Args:
+            value: A non-JSON-native value encountered during traversal.
+
+        Returns:
+            A JSON-native ``dict`` when *value* is a nested ``BaseModel``;
+            otherwise *value*'s string representation.
+        """
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json", by_alias=True, exclude_none=exclude_none)
+        return str(value)
+
+    typer.echo(json.dumps(data, default=_dump_nested_model, separators=(",", ":")))
 
 
 def _is_result_mapping(value: object) -> TypeGuard[dict[str, object]]:
