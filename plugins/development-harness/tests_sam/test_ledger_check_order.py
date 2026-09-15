@@ -773,6 +773,52 @@ def state_leased_and_unreported(tmp_path: Path) -> Arranged:
     )
 
 
+@register("state", COMPLETE, ("reason-required", "task-accepted"))
+def state_no_reason_and_accepted(tmp_path: Path) -> Arranged:
+    """Move an accepted task without a reason."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    complete_and_accept(conn, plan)
+    return Arranged(
+        conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=BLOCKED, reason=None)
+    )
+
+
+@register("state", IN_PROGRESS, ("reason-required", "status-invalid"))
+def state_no_reason_and_invalid(tmp_path: Path) -> Arranged:
+    """Move a task to a status no ``Status`` names, without a reason."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    dispatch_task(conn, plan)
+    return Arranged(
+        conn=conn,
+        plan=plan,
+        task="T1",
+        run=lambda: ledger.state(conn, plan, "T1", new_status=INVALID_STATUS, reason=None),
+    )
+
+
+@register("state", IN_PROGRESS, ("reason-required", "leased"))
+def state_no_reason_and_leased(tmp_path: Path) -> Arranged:
+    """Move a leased task without a reason."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, ONE_TASK)
+    dispatch_task(conn, plan)
+    return Arranged(
+        conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=BLOCKED, reason=None)
+    )
+
+
+@register("state", COMPLETE, ("reason-required", "report-missing"))
+def state_no_reason_and_unreported(tmp_path: Path) -> Arranged:
+    """Re-mark an imported, unreported, unaccepted task complete without a reason."""
+    conn = new_ledger(tmp_path)
+    plan = imported(conn, status=COMPLETE, accepted=0, attempts=1)
+    return Arranged(
+        conn=conn, plan=plan, task="T1", run=lambda: ledger.state(conn, plan, "T1", new_status=COMPLETE, reason=None)
+    )
+
+
 # ---------------------------------------------------------------------------
 # import and from-milestone
 # ---------------------------------------------------------------------------

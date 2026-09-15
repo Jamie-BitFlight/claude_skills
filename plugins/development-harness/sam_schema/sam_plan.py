@@ -74,7 +74,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from enum import StrEnum
 from pathlib import Path
@@ -327,10 +327,13 @@ def named(flags: Mapping[str, object]) -> list[str]:
 
 
 def ledger_holds(plan: str) -> bool:
-    """Answer whether the ledger already carries a plan, without creating one.
+    """Answer whether the ledger already carries a plan, the way ``dh_core.ledger.holds`` answers it.
 
-    The database is only opened when its file is already there, so asking the question on a
-    repository that has no ledger writes nothing and leaves no database behind.
+    A thin wrapper rather than a second implementation: ``ledger.holds`` already opens only when
+    the database file exists and asks with one ``SELECT 1`` rather than scanning every plan's
+    derived progress. This wrapper's own job is translating the ``Refusal`` opening can raise (e.g.
+    ``network-filesystem``) into the CLI's clean refusal exit, the way :func:`_open` does for every
+    other ledger command.
 
     Args:
         plan: The canonical plan id, as raw_plan_of returns it.
@@ -338,13 +341,10 @@ def ledger_holds(plan: str) -> bool:
     Returns:
         Whether the ledger holds a plan row with that id.
     """
-    if not plan or not ledger.database_path().exists():
-        return False
-    conn = _open()
     try:
-        return any(str(row.get("plan_id")) == plan for row in ledger.list_plans(conn))
-    finally:
-        conn.close()
+        return ledger.holds(plan)
+    except ledger.Refusal as exc:
+        _refused(exc.reason)
 
 
 def store_for(
@@ -686,22 +686,17 @@ def _optional_task_of(value: str | None) -> tuple[str | None, str | None]:
     return _task_of(value)
 
 
-def _set_values(pairs: list[str] | None, columns: Sequence[str]) -> dict[str, Any]:
+def _set_values(pairs: list[str] | None) -> dict[str, Any]:
     """Decode ``--set field=value`` pairs into the mapping ``update`` takes.
 
     A value that parses as JSON is used as JSON, so a list, a number or a boolean reaches the
-    column with its own type; anything else is the literal string.
-
-    A name outside ``columns`` is refused here rather than dropped by the ledger: ``update``
-    appends a ``fields`` event, and ``ledger_spec.COLUMNS`` says which columns that event's fold
-    sets. ``tasks.status``, ``started``, ``completed`` and ``last_activity`` are not among them —
-    each names the lifecycle events instead — so ``--set status=complete`` would otherwise report
-    success while the task stayed where it was.
+    column with its own type; anything else is the literal string. A name no ``fields`` event sets
+    -- ``tasks.status`` is the case that matters, since it moves through ``dispatch``, ``finish``,
+    ``state``, ``reclaim`` or ``accept`` instead -- is left for ``dh_core.ledger.transitions.update``
+    to refuse, the one place both this CLI and MCP's ``sam_plan``/``sam_task`` reach it through.
 
     Args:
         pairs: The raw ``field=value`` strings.
-        columns: The columns the ``fields`` event sets, from ``ledger.TASK_FIELD_COLUMNS`` or
-            ``ledger.PLAN_FIELD_COLUMNS``.
 
     Returns:
         Field name to value.
@@ -715,12 +710,6 @@ def _set_values(pairs: list[str] | None, columns: Sequence[str]) -> dict[str, An
             values[name.strip()] = json.loads(raw)
         except json.JSONDecodeError:
             values[name.strip()] = raw
-    refused = sorted(set(values) - set(columns))
-    if refused:
-        _error(
-            f"--set may not write {', '.join(refused)}: no fields event sets them in ledger_spec.COLUMNS. "
-            "A task's status moves with dispatch, finish, state, reclaim or accept"
-        )
     return values
 
 
@@ -1576,7 +1565,6 @@ def update(
         return
     plan_ref, _, address_task = plan_address.partition("/")
     task = task_id or (f"T{address_task.strip()}" if address_task.strip().isdigit() else address_task.strip() or None)
-    columns = ledger.TASK_FIELD_COLUMNS if task is not None else ledger.PLAN_FIELD_COLUMNS
     with _ledger() as conn:
         _emit_transition(
             ledger.update(
@@ -1586,7 +1574,7 @@ def update(
                 attempt=attempt,
                 section=append_section,
                 section_content=section_content,
-                values=_set_values(set_values, columns),
+                values=_set_values(set_values),
             )
         )
 
@@ -1722,8 +1710,6 @@ def state(
         "state", legacy={"--plan-dir": plan_dir}, spec={"--reason": reason, "--force": force}, plan=raw_plan_of(address)
     )
     if store is Store.LEDGER:
-        if reason is None:
-            _error("--reason is required: the ledger records why a status moved without a runner")
         plan_ref, task_ref = _task_of(address)
         with _ledger() as conn:
             _emit_transition(

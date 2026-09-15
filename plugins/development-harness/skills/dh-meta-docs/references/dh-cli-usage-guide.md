@@ -41,4 +41,7 @@ Once `plan import` puts a plan on the work ledger, `sam_plan`'s `read`, `status`
 `update`, `append_task`, and `finalize` actions and `sam_task`'s `read`, `state`, and `update`
 actions read and write the ledger instead of the plan's original content record — the same store
 the CLI's `plan` commands above read and write for that plan once it is imported. `sam_plan`'s
-`list` and `sam_task`'s `claim` keep answering from the content record regardless.
+`list` and `sam_task`'s `claim` keep answering from the content record regardless. `append_task`'s
+`conflict_group` field mirrors `plan append-task --conflict-group` above. `ready`'s `full` flag
+takes effect once the ledger holds the plan: `false` (the default) returns the 7-field routing
+manifest, `true` every column.

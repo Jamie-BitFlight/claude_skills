@@ -131,17 +131,20 @@ def status(conn: sqlite3.Connection, plan: str) -> PlanStatus:
     )
 
 
-def ready(conn: sqlite3.Connection, plan: str) -> list[dict[str, Any]]:
+def ready(conn: sqlite3.Connection, plan: str, *, full: bool = True) -> list[dict[str, Any]]:
     """Read the tasks of one plan whose ``ready`` is true.
 
     Args:
         conn: An open ledger connection.
         plan: The plan id.
+        full: When True (the default), every stored column. When False, the 7-field routing
+            manifest (:data:`~dh_core.ledger.derive.READY_MANIFEST_COLUMNS`) a caller deciding
+            what to dispatch next needs, without the rest.
 
     Returns:
         The dispatchable task rows, ordered by id.
     """
-    return derive.ready_tasks(conn, plan)
+    return derive.ready_tasks(conn, plan, full=full)
 
 
 def cycles(rows: Sequence[Mapping[str, Any]]) -> list[str]:

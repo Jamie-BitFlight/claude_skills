@@ -104,10 +104,13 @@ _LedgerResultT = TypeVar("_LedgerResultT")
 
 
 def _on_ledger(fn: Callable[[LedgerConnection], _LedgerResultT]) -> _LedgerResultT:
-    """Run *fn* against an open ledger connection, translating ledger errors into ``ToolError``.
+    """Open the ledger and run *fn* against it, translating ledger errors into ``ToolError``.
 
     Mirrors the CLI's ``sam_plan._ledger()`` context manager without importing ``contextlib``,
-    which this file's import allowlist (``tests/test_frontend_logic_free.py``) does not carry.
+    which this file's import allowlist (``tests/test_frontend_logic_free.py``) does not carry. The
+    open call sits inside the same guarded block as *fn* -- a ``Refusal`` raised while opening
+    (e.g. ``network-filesystem``) is exactly as translatable as one *fn* raises, so both go through
+    one ``except``.
 
     Args:
         fn: A callable that performs one or more ledger reads or writes on the open connection.
@@ -116,19 +119,44 @@ def _on_ledger(fn: Callable[[LedgerConnection], _LedgerResultT]) -> _LedgerResul
         Whatever *fn* returns.
 
     Raises:
-        ToolError: When the ledger refuses the operation (:class:`dh_core.ledger.Refusal`), or the
-            operation names a plan, task, or field the ledger does not recognise
-            (``LookupError``/``ValueError``).
+        ToolError: When the ledger refuses to open or refuses the operation
+            (:class:`dh_core.ledger.Refusal`), or the operation names a plan, task, or field the
+            ledger does not recognise (``LookupError``/``ValueError``).
     """
-    conn = ledger.open_ledger()
     try:
-        return fn(conn)
+        conn = ledger.open_ledger()
+        try:
+            return fn(conn)
+        finally:
+            conn.close()
     except ledger.Refusal as exc:
         raise ToolError(exc.reason) from exc
     except (LookupError, ValueError) as exc:
         raise ToolError(str(exc)) from exc
-    finally:
-        conn.close()
+
+
+def _ledger_holds(canonical: str) -> bool:
+    """Answer whether the ledger holds *canonical*, translating a ``Refusal`` into ``ToolError``.
+
+    ``ledger.holds`` opens its own connection and lets a ``Refusal`` (e.g. ``network-filesystem``)
+    propagate rather than translate it -- translation is a frontend concern. Every routing check in
+    this module goes through here instead of calling ``ledger.holds`` directly, so that refusal
+    reaches the caller as ``ToolError`` the same way :func:`_on_ledger` translates one raised
+    inside the guarded block.
+
+    Args:
+        canonical: The canonical plan id.
+
+    Returns:
+        Whether the ledger holds a plan row with that id.
+
+    Raises:
+        ToolError: When the ledger refuses to open.
+    """
+    try:
+        return ledger.holds(canonical)
+    except ledger.Refusal as exc:
+        raise ToolError(exc.reason) from exc
 
 
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
@@ -253,7 +281,7 @@ def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     when present.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
         return _on_ledger(
             lambda conn: ReadResult(
                 plan=Plan.model_validate(ledger.projection(conn, canonical)), source_format="ledger", source_path=Path()
@@ -328,7 +356,7 @@ def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus | LedgerPlanStatus:
     result carries ``state`` so callers can detect drafting plans.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
         return _on_ledger(lambda conn: ledger.status(conn, canonical))
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
@@ -339,14 +367,11 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyT
     """List tasks ready for dispatch.
 
     Thin adapter: once the ledger holds the plan, reads its dependency-resolved queue the way the
-    CLI's ledger-backed ``plan ready`` command does. Otherwise resolves the content backend via
-    ``_get_backend`` and delegates to ``dh_core.operations.get_ready_tasks``, which handles the
-    drafting check and ready-task retrieval and returns a
-    :class:`~sam_schema.core.models.ReadyTasksResult` envelope.
-
-    # ponytail: config.full has no effect once the ledger holds the plan -- dh_core.ledger.ready
-    # always returns the compact routing manifest. Add a full ledger-task dump if a caller needs
-    # config.full's detail level on a ledger-held plan.
+    CLI's ledger-backed ``plan ready`` command does, forwarding ``config.full`` to
+    ``dh_core.ledger.ready`` the same way it reaches ``dh_core.operations.get_ready_tasks`` below.
+    Otherwise resolves the content backend via ``_get_backend`` and delegates to
+    ``dh_core.operations.get_ready_tasks``, which handles the drafting check and ready-task
+    retrieval and returns a :class:`~sam_schema.core.models.ReadyTasksResult` envelope.
 
     Returns:
         A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``, ``count``, ``issue``, and
@@ -355,16 +380,16 @@ def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyT
         returns a :class:`~sam_schema.core.models.LedgerReadyResult` instead.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
 
         def _ready(conn: LedgerConnection) -> LedgerReadyResult:
-            rows = ledger.ready(conn, canonical)
+            rows = ledger.ready(conn, canonical, full=config.full)
             return LedgerReadyResult(items=rows, count=len(rows))
 
         return _on_ledger(_ready)
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
-    return operations.get_ready_tasks(backend, plan)
+    return operations.get_ready_tasks(backend, plan, full=config.full)
 
 
 def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult | TransitionResult:
@@ -383,7 +408,7 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
         returns a :class:`~dh_core.ledger.TransitionResult` instead.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
         values = dict(config.set_fields_json or {})
         if config.context is not None:
             values["context"] = config.context
@@ -440,11 +465,16 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
         ToolError: When the ledger holds the plan and refuses the append, e.g. an archived plan.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
         definition = config.task.model_dump(mode="json", by_alias=False, exclude={"id", "title"}, exclude_none=True)
         return _on_ledger(
             lambda conn: ledger.append_task(
-                conn, canonical, task_id=config.task.id, task_title=config.task.title, definition=definition
+                conn,
+                canonical,
+                task_id=config.task.id,
+                task_title=config.task.title,
+                conflict_group=config.conflict_group,
+                definition=definition,
             )
         )
     backend = _get_backend(plan_dir)
@@ -471,7 +501,7 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult | Transit
         :class:`~dh_core.ledger.TransitionResult` instead.
     """
     canonical = canonical_plan_id(plan)
-    if ledger.holds(canonical):
+    if _ledger_holds(canonical):
         return _on_ledger(lambda conn: ledger.finalize(conn, canonical))
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
@@ -605,10 +635,10 @@ def _sam_task_ledger(plan: str, task: str, config: TaskActionConfig) -> Transiti
         The ledger transition's result.
 
     Raises:
-        ToolError: When ``action='state'`` carries no ``reason`` — the ledger records why a status
-            moved without a runner and refuses the call without one, the same way the CLI's
-            ledger-backed ``plan state`` command does. Also raised when the ledger itself refuses
-            or rejects the call (see :func:`_on_ledger`).
+        ToolError: When the ledger refuses or rejects the call (see :func:`_on_ledger`) -- for
+            ``action='state'`` with no ``reason``, that is ``ledger.state``'s own
+            ``reason-required`` refusal, reached the same way the CLI's ledger-backed ``plan
+            state`` command reaches it.
     """
     match config.action:
         case "read":
@@ -619,12 +649,10 @@ def _sam_task_ledger(plan: str, task: str, config: TaskActionConfig) -> Transiti
         case "state":
             if not isinstance(config, StateTaskConfig):
                 raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
-            reason = config.reason
-            if reason is None:
-                msg = "sam_task: action='state' requires 'reason' once the ledger holds the plan"
-                raise ToolError(msg)
             return _on_ledger(
-                lambda conn: ledger.state(conn, plan, task, new_status=config.status, reason=reason, force=config.force)
+                lambda conn: ledger.state(
+                    conn, plan, task, new_status=config.status, reason=config.reason, force=config.force
+                )
             )
 
         case "update":
@@ -690,7 +718,7 @@ def sam_task(
         Action-specific Pydantic model. See individual action descriptions.
     """
     canonical = canonical_plan_id(plan)
-    if config.action != "claim" and ledger.holds(canonical):
+    if config.action != "claim" and _ledger_holds(canonical):
         return _sam_task_ledger(canonical, task, config)
 
     backend = _get_backend(plan_dir)

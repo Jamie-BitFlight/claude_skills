@@ -188,11 +188,12 @@ class TransitionResult(BaseModel):
 
     A ``noop`` code means the transition declined without appending anything. ``status`` is the
     resulting task status when the transition changed it, and ``None`` when it did not.
-    ``changed`` carries what the transition actually wrote, and ``unsettable`` the ``--set`` names
-    it declined to write because no event it appends sets that column. ``cascaded`` names every
-    dependent a failure now blocks and ``reversed_tasks`` every one whose hold a reclaim released;
-    a dependent two failures blocked appears in both while staying skipped, because the entry is
-    the hold rather than the status.
+    ``changed`` carries what the transition actually wrote -- ``update`` refuses rather than
+    returns when a ``--set`` name is not one an appended event's ``set_by`` sets, so every key
+    requested is a key ``changed`` carries. ``cascaded`` names every dependent a failure now blocks
+    and ``reversed_tasks`` every one whose hold a reclaim released; a dependent two failures
+    blocked appears in both while staying skipped, because the entry is the hold rather than the
+    status.
     """
 
     command: str
@@ -206,7 +207,6 @@ class TransitionResult(BaseModel):
     cascaded: list[str] = Field(default_factory=list)
     reversed_tasks: list[str] = Field(default_factory=list)
     changed: dict[str, Any] = Field(default_factory=dict)
-    unsettable: list[str] = Field(default_factory=list)
     row: dict[str, Any] | None = None
     sections: list[dict[str, Any]] = Field(default_factory=list)
 
@@ -1058,8 +1058,14 @@ def append_section(
     )
 
 
-def settable(table: str, columns: Sequence[str], values: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
-    """Split ``--set`` values into the ones an event may write and the ones it may not.
+def settable(table: str, columns: Sequence[str], values: Mapping[str, Any]) -> dict[str, Any]:
+    """Refuse a ``--set`` value no event this transition appends may write.
+
+    A name outside ``columns`` is refused here rather than dropped: the caller asked for a write
+    the event's ``set_by`` does not perform, and reporting that back as an unfulfilled write would
+    invite a caller that does not inspect the response to read the call as having succeeded.
+    ``status`` is the case that matters -- moving a task is ``dispatch``, ``finish``, ``state``,
+    ``reclaim`` or ``accept``, each of which runs the checks and the cascade ``update`` does not.
 
     Args:
         table: The table being updated.
@@ -1067,17 +1073,26 @@ def settable(table: str, columns: Sequence[str], values: Mapping[str, Any]) -> t
         values: The caller's field-to-value mapping.
 
     Returns:
-        The values the event sets, and the sorted names of the columns it does not.
+        The values the event sets.
 
     Raises:
-        ValueError: When a name is not a stored column of that table in ``ledger_spec.COLUMNS``.
+        ValueError: When a name is not a stored column of that table in ``ledger_spec.COLUMNS``,
+            or is a stored column no event this transition appends sets.
     """
     unknown = sorted(set(values) - set(stored_columns(table)))
     if unknown:
         msg = f"{', '.join(unknown)} are not columns of {table} in ledger_spec.COLUMNS"
         raise ValueError(msg)
     permitted = set(columns)
-    return ({name: value for name, value in values.items() if name in permitted}, sorted(set(values) - permitted))
+    unwritable = sorted(set(values) - permitted)
+    if unwritable:
+        coda = " -- a task's status moves via dispatch, finish, state, reclaim or accept" if table == "tasks" else ""
+        msg = (
+            f"{', '.join(unwritable)} may not be written by update: no fields event sets "
+            f"{'them' if len(unwritable) > 1 else 'it'} in ledger_spec.COLUMNS{coda}"
+        )
+        raise ValueError(msg)
+    return {name: value for name, value in values.items() if name in permitted}
 
 
 def write_fields(
@@ -1100,7 +1115,7 @@ def write_fields(
 
 def update_plan_fields(
     conn: sqlite3.Connection, plan: str, values: Mapping[str, Any], moment: datetime
-) -> tuple[dict[str, Any], list[str]]:
+) -> dict[str, Any]:
     """Apply the ``--set`` values ``plan.fields`` sets to a plan row and append the event.
 
     Args:
@@ -1110,27 +1125,29 @@ def update_plan_fields(
         moment: The instant the caller sampled for this transition.
 
     Returns:
-        What was written, and the names ``plan.fields`` does not set.
+        What was written.
 
     Raises:
-        ValueError: When a value fails its model field; see :func:`validated`.
+        ValueError: When a name is not a writable ``plans`` column; see :func:`settable`. Also
+            when a value fails its model field; see :func:`validated`.
         LookupError: When the ledger holds no such plan; the check runs before any write.
     """
     row = store.fetch_plan(conn, plan)
-    applied, unsettable = settable("plans", PLAN_FIELD_COLUMNS, values)
-    applied = validated(Plan, row, applied)
+    applied = validated(Plan, row, settable("plans", PLAN_FIELD_COLUMNS, values))
     write_fields(conn, "plans", "plan_id = :plan", {"plan": plan}, applied)
     append(conn, kind="plan.fields", plan=plan, task=None, payload={"changed": applied}, at=moment)
-    return applied, unsettable
+    return applied
 
 
 def update_task_fields(
     conn: sqlite3.Connection, plan: str, task: str, values: Mapping[str, Any], moment: datetime
-) -> tuple[dict[str, Any], list[str]]:
+) -> dict[str, Any]:
     """Apply the ``--set`` values ``task.fields`` sets to a task row and append the event.
 
-    A name outside :data:`TASK_FIELD_COLUMNS` is a column no event this transition appends sets, so
-    it is not written and comes back for the caller to report.
+    A name outside :data:`TASK_FIELD_COLUMNS` is a column no event this transition appends sets;
+    see :func:`settable`, which refuses it rather than silently dropping it -- ``status`` is the
+    case that matters, since a task moves through it via ``dispatch``, ``finish``, ``state``,
+    ``reclaim`` or ``accept``, never ``--set``.
 
     Args:
         conn: An open ledger connection, inside the caller's transaction.
@@ -1140,17 +1157,17 @@ def update_task_fields(
         moment: The instant the caller sampled for this transition.
 
     Returns:
-        What was written, and the names ``task.fields`` does not set.
+        What was written.
 
     Raises:
-        ValueError: When a value fails its model field; see :func:`validated`.
+        ValueError: When a name is not a writable ``tasks`` column; see :func:`settable`. Also
+            when a value fails its model field; see :func:`validated`.
     """
     row = fetch_task(conn, plan, task)
-    applied, unsettable = settable("tasks", TASK_FIELD_COLUMNS, values)
-    applied = validated(Task, row, applied)
+    applied = validated(Task, row, settable("tasks", TASK_FIELD_COLUMNS, values))
     write_fields(conn, "tasks", "plan = :plan AND id = :task", {"plan": plan, "task": task}, applied)
     append(conn, kind="task.fields", plan=plan, task=task, payload={"changed": applied}, at=moment)
-    return applied, unsettable
+    return applied
 
 
 def validated(model: type[BaseModel], row: Mapping[str, Any], applied: Mapping[str, Any]) -> dict[str, Any]:
@@ -1194,9 +1211,10 @@ def update(
 
     ``--set`` reaches only the columns whose ``ledger_spec.COLUMNS`` ``set_by`` names the ``fields``
     event this transition appends. A name that is a stored column of the table but not one of those
-    is left unwritten and named in the result's ``unsettable`` — ``status`` is the case that matters,
-    because moving a task is ``dispatch``, ``finish``, ``state``, ``reclaim`` or ``accept``, each of
-    which runs the checks and the cascade that ``update`` does not.
+    refuses the whole call rather than writing the rest and silently dropping it -- ``status`` is
+    the case that matters, because moving a task is ``dispatch``, ``finish``, ``state``, ``reclaim``
+    or ``accept``, each of which runs the checks and the cascade that ``update`` does not. See
+    :func:`settable`.
 
     Args:
         conn: An open ledger connection.
@@ -1208,12 +1226,11 @@ def update(
         values: Field-to-value pairs from ``--set``.
 
     Returns:
-        A result naming the events appended, the fields changed, and any ``--set`` name the
-        ``fields`` event does not set.
+        A result naming the events appended and the fields changed.
 
     Raises:
-        ValueError: When a section name comes without content, a ``--set`` name is not a stored
-            column of the table, or a ``--set`` value fails its model field.
+        ValueError: When a section name comes without content, a ``--set`` name is not a writable
+            column of the table (see :func:`settable`), or a ``--set`` value fails its model field.
         LookupError: When the plan or the task is absent.
     """
     if section is not None and section_content is None:
@@ -1221,15 +1238,14 @@ def update(
         raise ValueError(msg)
     requested = dict(values or {})
     changed: dict[str, Any] = {}
-    unsettable: list[str] = []
     events: list[str] = []
     with store.transaction(conn):
         moment = now()
         if task is None:
             if requested:
-                changed, unsettable = update_plan_fields(conn, plan, requested, moment)
+                changed = update_plan_fields(conn, plan, requested, moment)
                 events.append("plan.fields")
-            return TransitionResult(command="update", plan=plan, events=events, changed=changed, unsettable=unsettable)
+            return TransitionResult(command="update", plan=plan, events=events, changed=changed)
         row = fetch_task(conn, plan, task)
         if attempt is not None:
             require_current_attempt(row, attempt)
@@ -1249,14 +1265,12 @@ def update(
             )
             events.append("task.section")
         if requested:
-            changed, unsettable = update_task_fields(conn, plan, task, requested, moment)
+            changed = update_task_fields(conn, plan, task, requested, moment)
             events.append("task.fields")
         if attempt is not None and row["status"] == IN_PROGRESS:
             renew_lease(conn, row, moment, via="update")
             events.append("lease.renewed")
-    return TransitionResult(
-        command="update", plan=plan, task=task, events=events, changed=changed, unsettable=unsettable, attempt=attempt
-    )
+    return TransitionResult(command="update", plan=plan, task=task, events=events, changed=changed, attempt=attempt)
 
 
 # ---------------------------------------------------------------------------
@@ -1640,7 +1654,7 @@ def reclaim(
 
 
 def state(
-    conn: sqlite3.Connection, plan: str, task: str, *, new_status: str, reason: str, force: bool = False
+    conn: sqlite3.Connection, plan: str, task: str, *, new_status: str, reason: str | None, force: bool = False
 ) -> TransitionResult:
     """Move a task to a new status without a runner.
 
@@ -1652,15 +1666,24 @@ def state(
         plan: The plan id.
         task: The task id.
         new_status: One of ``ledger_spec``'s ``state --new-status`` values.
-        reason: Why the orchestrator decided this.
+        reason: Why the orchestrator decided this. ``None`` refuses with ``reason-required`` --
+            typed optional rather than required so a caller cannot reach this transition without
+            the refusal running, the way a required ``str`` parameter would let a caller who
+            forwards its own optional input pass ``None`` straight through unchecked.
         force: Waive the acceptance, lease and report checks and clear acceptance.
 
     Returns:
         A result naming the resulting status and every task the cascade skipped.
+
+    Raises:
+        Refusal: With ``reason-required`` when *reason* is ``None``, and with every other reason
+            ``ledger_spec.REASONS`` names for this transition.
     """
     cascaded: list[str] = []
     with store.transaction(conn):
         moment = now()
+        if reason is None:
+            refuse("reason-required")
         if new_status not in STATE_TARGETS:
             refuse("status-invalid")
         row = fetch_task(conn, plan, task)
