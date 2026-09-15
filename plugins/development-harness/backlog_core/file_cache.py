@@ -10,8 +10,8 @@ import warnings
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
-from typing import NamedTuple
 
+from pydantic import BaseModel, ConfigDict
 from ruamel.yaml import YAML, YAMLError
 
 from .file_cache_state import (
@@ -38,7 +38,7 @@ class LegacyMigrationError(ValueError):
     """Legacy item cannot be migrated without data loss."""
 
 
-class WorkItemSnapshotBatch(NamedTuple):
+class WorkItemSnapshotBatch(BaseModel):
     """Result of enumerating every durable work-item snapshot beneath the cache root.
 
     ``skipped`` names every snapshot file that existed but failed to load,
@@ -54,6 +54,8 @@ class WorkItemSnapshotBatch(NamedTuple):
     checkpoint, complete snapshot set" from "warm checkpoint, partial or
     corrupted snapshot set" -- neither of which this batch alone decides.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     snapshots: list[tuple[str, BacklogItem]]
     skipped: list[str]
