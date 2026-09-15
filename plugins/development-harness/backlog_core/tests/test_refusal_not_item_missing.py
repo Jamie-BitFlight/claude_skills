@@ -13,6 +13,9 @@ still renders. What changes is that the answer names its own limits.
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -36,6 +39,7 @@ from backlog_core.models import (
     ReconcileScope,
     ViewItemResult,
 )
+from backlog_core.sync_state import get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

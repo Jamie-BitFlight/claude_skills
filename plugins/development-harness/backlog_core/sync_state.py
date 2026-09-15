@@ -17,6 +17,7 @@ Source: design doc sections 2.3, 3.1-3.3, 5.2, Risk #2.
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -107,8 +108,11 @@ class SyncState:
         pending_mutations: Offline-queue depth as of the last completed sync.
         rejected_mutations: Dead-lettered mutation count as of the last
             completed sync (key mismatches plus schema-invalid entries).
-        lock: asyncio.Lock serialising sync workers.  Named without underscore
-            so sync_engine can access it without triggering SLF001.
+        lock: asyncio.Lock serialising sync workers for the duration of a full
+            sync attempt.  Named without underscore so sync_engine can access
+            it without triggering SLF001.  Only ever awaited from the event
+            loop thread — never safe to acquire from a worker thread (see
+            ``try_claim``/``release_claim`` below for the cross-thread case).
     """
 
     status: SyncStatus = SyncStatus.IDLE
@@ -123,6 +127,14 @@ class SyncState:
     pending_mutations: int = 0
     rejected_mutations: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False, compare=False)
+    # Guards the ``status``/``started_at`` check-and-set in try_claim()/try_start()
+    # so it is atomic across OS threads, not just across coroutines. A plain
+    # ``threading.Lock`` (not the asyncio.Lock above) because callers include
+    # asyncio.to_thread worker threads (operations.list_items's implicit
+    # cold-cache read-through), where an asyncio.Lock cannot safely be awaited.
+    # Never accessed outside this class, so it stays private -- unlike ``lock``,
+    # which is genuinely public API for sync_engine.
+    _claim_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     @property
     def percent(self) -> int | None:
@@ -144,23 +156,64 @@ class SyncState:
         """
         return self.status == SyncStatus.RUNNING
 
+    def try_claim(self) -> SyncStatus | None:
+        """Atomically claim the sync slot, returning the status held before the claim.
+
+        The single-flight primitive underlying both ``try_start()`` (startup
+        sync and ``sync_now``, always called from the event-loop thread) and
+        the implicit cold-cache read-through in ``operations.list_items``
+        (called from an ``asyncio.to_thread`` worker thread, and potentially
+        from two such worker threads racing each other on overlapping
+        ``backlog_list`` calls). The check-and-set is guarded by
+        ``_claim_lock``, a plain ``threading.Lock``, so it is atomic across
+        OS threads — the single-threaded-event-loop assumption a bare
+        ``if status == RUNNING`` check relies on does not hold once a worker
+        thread is a caller.
+
+        Returns the pre-claim status (rather than assuming the caller should
+        restore ``IDLE``) so a transient, one-shot claim — like the cold-cache
+        read-through — can hand it back to ``release_claim()`` and leave an
+        existing ``OFFLINE``/``ERROR`` state exactly as the background sync
+        loop left it, instead of silently clearing it to ``IDLE``.
+
+        Returns:
+            The ``SyncStatus`` that prevailed before the claim when the slot
+            was claimed (status was not ``RUNNING``, and is now); ``None``
+            when a sync is already ``RUNNING`` and the claim was refused.
+        """
+        with self._claim_lock:
+            if self.status == SyncStatus.RUNNING:
+                return None
+            previous = self.status
+            self.status = SyncStatus.RUNNING
+            self.started_at = datetime.now(UTC)
+            return previous
+
+    def release_claim(self, previous: SyncStatus) -> None:
+        """Restore the status that prevailed before a matching ``try_claim()``.
+
+        Args:
+            previous: The status ``try_claim()`` returned when it succeeded.
+                Passing the value from an unsuccessful claim (``None``) is a
+                caller bug — every ``try_claim()`` caller must guard on
+                ``None`` before running the claimed work, so ``release_claim``
+                is never reached in that case.
+        """
+        with self._claim_lock:
+            self.status = previous
+
     def try_start(self) -> bool:
         """Atomically claim the sync slot, returning True when claimed.
 
-        Synchronous and await-free: under the single-threaded event loop the
-        check-and-set cannot interleave with another coroutine. Callers use this
-        in place of a separate ``is_running()`` check followed by ``create_task``,
-        which races and can launch duplicate sync workers.
+        Thread-safe wrapper around ``try_claim()`` for callers — startup sync
+        and ``sync_now`` — that only need a boolean claim result and always
+        run the full sync to completion (never restoring a prior status).
 
         Returns:
             True if the slot was claimed (status was not RUNNING); False if a
             sync is already RUNNING.
         """
-        if self.status == SyncStatus.RUNNING:
-            return False
-        self.status = SyncStatus.RUNNING
-        self.started_at = datetime.now(UTC)
-        return True
+        return self.try_claim() is not None
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serialisable representation of the sync state.
