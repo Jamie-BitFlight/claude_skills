@@ -3709,9 +3709,11 @@ async def backlog_list_comments(
 
     Returns:
         :class:`~backlog_core.tool_responses.BacklogListCommentsResponse`
-        with comments (each with id, author, created_at, updated_at, preview),
-        count, has_more, and output messages/warnings. On error, ``error``
-        is set.
+        with comments (each with id, database_id, author, created_at,
+        updated_at, preview), count, has_more, and output messages/warnings.
+        ``database_id`` is the REST integer ID to pass as
+        ``backlog_read_comment``'s ``comment_id``; ``id`` is a GraphQL node ID
+        and will not work there. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3738,9 +3740,10 @@ async def backlog_read_comment(
         int,
         Field(
             description=(
-                "REST comment database ID (integer) — obtain it from the GitHub REST API. Not "
-                "the value backlog_list_comments/backlog_comment_issue return; those are GraphQL "
-                "node IDs and will not work here."
+                "REST comment database ID (integer) — obtain it from the GitHub REST API, or "
+                "from backlog_list_comments's per-comment database_id field. backlog_list_comments's "
+                "id and backlog_comment_issue's comment_id are GraphQL node IDs and will not work "
+                "here; database_id may also be absent for a given comment (e.g. non-GitHub backends)."
             )
         ),
     ],

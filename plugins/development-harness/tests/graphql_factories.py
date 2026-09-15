@@ -377,6 +377,7 @@ def make_issue_comment_node(
     author: str = "test-user",
     created_at: str = "2026-01-01T00:00:00Z",
     updated_at: str = "2026-01-02T00:00:00Z",
+    database_id: int | None = None,
 ) -> dict[str, Any]:
     """Return an IssueCommentNode-shaped dict for comment listing responses.
 
@@ -390,11 +391,15 @@ def make_issue_comment_node(
         author: Login of the comment author.
         created_at: ISO 8601 creation timestamp.
         updated_at: ISO 8601 last-update timestamp.
+        database_id: REST comment database ID as GraphQL would report it under
+            ``databaseId``. Omitted from the returned dict when ``None``, matching
+            a real response that never omits the field but lets tests indifferent
+            to it opt out of asserting on it.
 
     Returns:
         Dict matching raw GraphQL IssueCommentNode shape (before parsing).
     """
-    return {
+    node: dict[str, Any] = {
         "id": comment_id,
         "body": body,
         "url": url,
@@ -402,6 +407,9 @@ def make_issue_comment_node(
         "createdAt": created_at,
         "updatedAt": updated_at,
     }
+    if database_id is not None:
+        node["databaseId"] = database_id
+    return node
 
 
 def make_issue_comments_response(
