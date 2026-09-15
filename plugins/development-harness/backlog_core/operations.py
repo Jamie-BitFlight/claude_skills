@@ -80,6 +80,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
@@ -1785,6 +1786,38 @@ def refresh_local_cache_from_github(
     }
 
 
+def _normalize_cached_github_status(status: str) -> str:
+    """Convert a cached numeric-issue status to its GitHub ``status:*`` label form.
+
+    A cached GitHub-backed item's ``status`` field is written locally in the
+    bare lifecycle form (e.g. ``"in-progress"``, see
+    :data:`backlog_core.models._VALID_STATUSES`) by call sites such as
+    ``_apply_issue_status_labels``, while a *live* GraphQL answer and the
+    documented ``backlog_list`` ``--status`` filter both use the labeled
+    ``status:*`` form defined by :class:`StatusLabel`. Returning the bare
+    cached value verbatim makes ``status="status:in-progress"`` exclude a
+    cached in-progress item even though the two values name the same state.
+
+    Args:
+        status: Raw cached status value, already labeled or bare.
+
+    Returns:
+        The ``status:*``-labeled form when *status* (once prefixed) matches a
+        known :class:`StatusLabel` member; otherwise *status* unchanged. This
+        leaves values with no label equivalent — ``"open"``, ``"done"``,
+        ``"closed"`` — untouched, since those name the issue's open/closed
+        state rather than a ``status:*`` label GitHub actually carries.
+    """
+    if not status or status.startswith(STATUS_LABEL_PREFIX):
+        return status
+    candidate = f"{STATUS_LABEL_PREFIX}{status}"
+    try:
+        StatusLabel(candidate)
+    except ValueError:
+        return status
+    return candidate
+
+
 def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True) -> str:
     """Return the effective status string for an item.
 
@@ -1805,8 +1838,10 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
 
     Returns:
         Status string — either the provider status value from *status_map* or
-        the local ``item.status`` value, defaulting to ``"needs-grooming"``
-        when neither is available and ``""`` when the live status is simply
+        the local ``item.status`` value (normalized to the ``status:*`` label
+        form via :func:`_normalize_cached_github_status` when the item has a
+        numeric issue reference), defaulting to ``"needs-grooming"`` when
+        neither is available and ``""`` when the live status is simply
         unknown.
     """
     num = parse_issue_number(item.issue)
@@ -1817,8 +1852,11 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
         # The live query never answered, so "this issue carries no status label"
         # was never established. Report the cached value, and report nothing when
         # there is none — an invented "needs-grooming" would make every such item
-        # match a --status needs-grooming filter and none match any other.
-        return item.status
+        # match a --status needs-grooming filter and none match any other. The
+        # cached value may still be in the bare lifecycle form a numeric-issue
+        # item was locally written in, so normalize it to the labeled form a
+        # live answer (and the documented filter) would have used.
+        return _normalize_cached_github_status(item.status)
     info = status_map.get(num)
     return info.status if info is not None else "needs-grooming"
 
