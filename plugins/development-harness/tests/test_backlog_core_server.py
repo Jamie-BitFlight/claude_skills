@@ -670,6 +670,50 @@ async def test_backlog_list_response_includes_backend_key():
     assert response["backend"]["total_count"] == 203
 
 
+async def test_backlog_list_response_includes_provenance_bits_on_the_full_path():
+    """from_cache/has_pending_writes (backlog #3546 task A4) reach the MCP wire.
+
+    Tests: a healthy, high-confidence listing still carries both provenance
+        bits declared on BacklogListResponse -- not just the withheld path.
+    How: mock operations.list_items returning both bits alongside items.
+    Why: BacklogListResponse must declare these fields explicitly, since
+        _respond's model_validate(...).model_dump(...) silently drops any
+        key the model does not declare (Question B's critique, Sec 2.2) --
+        an inherited-only field would vanish here exactly as proven there.
+    """
+    op_result = {
+        "items": [{"title": "X", "description": "", "topic": "", "type": "Bug"}],
+        "from_cache": True,
+        "has_pending_writes": True,
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {})
+
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is True
+
+
+async def test_backlog_list_withheld_listing_carries_provenance_with_null_items():
+    """A fail-safe withheld listing (backlog #3546 task A4) still names its provenance.
+
+    Tests: when operations.list_items withholds items/count (items=None), the
+        MCP response omits items/count entirely (exclude_none=True drops the
+        null) rather than the ambiguous items=[]/count=0 shape, while
+        from_cache/has_pending_writes -- real booleans, not None -- survive.
+    How: mock operations.list_items returning the withheld shape directly.
+    Why: an unaware caller must not be able to mistake a withheld listing for
+        a confirmed-empty one.
+    """
+    op_result = {"items": None, "count": None, "from_cache": True, "has_pending_writes": False}
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {})
+
+    assert "items" not in response
+    assert "count" not in response
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is False
+
+
 async def test_backlog_list_backend_reachable_message_format():
     """backlog_list messages includes a formatted backend status line when reachable.
 
@@ -2429,6 +2473,34 @@ async def test_backlog_list_count_only_respects_search_filter():
         response = await _call("backlog_list", {"count_only": True, "search": "auth"})
 
     assert response["count"] == 2, f"Expected 2 auth items, got {response['count']}"
+
+
+async def test_backlog_list_count_only_carries_provenance_with_pending_writes():
+    """backlog_list count_only=True against a warm cache with pending writes reports it.
+
+    Tests: from_cache/has_pending_writes (backlog #3546 task A4) survive the
+        count_only short-circuit instead of being discarded (Codex review,
+        PR #3576 finding 2).
+    How: mock operations.list_items returning a confirmed GitHub cache
+        (from_cache=True) that also holds unconfirmed local writes
+        (has_pending_writes=True); call backlog_list with count_only=True.
+    Why: without this, a caller reading an unqualified count from a warm
+        cache could mistake local-only rows for provider-acknowledged data.
+    """
+    op_result = {
+        "items": [
+            {"title": "Item A", "section": "P1", "topic": "a", "type": "Feature", "body": ""},
+            {"title": "Item B", "section": "P2", "topic": "b", "type": "Bug", "body": ""},
+        ],
+        "from_cache": True,
+        "has_pending_writes": True,
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"count_only": True})
+
+    assert response["count"] == 2
+    assert response["from_cache"] is True
+    assert response["has_pending_writes"] is True
 
 
 async def test_backlog_list_count_only_false_returns_full_response():

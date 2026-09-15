@@ -158,6 +158,19 @@ class WorkItemBackend(Protocol):
       ``NotImplementedError`` and setting the flag ``False`` is the
       documented escape hatch for a backend whose native ID type cannot
       satisfy the ``int`` signature below — see ``BeadsBackend``'s ADR-003).
+    - ``supports_cached_listing`` — whether :meth:`list_work_items` reads a
+      provider-private cache (``True``, GitHub only) rather than the
+      backend's own authoritative storage directly (``False`` — sqlite,
+      memory, beads). Read by ``operations.list_items`` (backlog #3546 task
+      A4) to compute the ``from_cache`` provenance bit on every listing
+      response — a cache-backed listing can lag the provider; a
+      backend-owned one cannot. ``has_pending_writes()`` below is the
+      companion fact and deliberately a separate bit (critique ALT-4,
+      Firestore's ``fromCache``/``hasPendingWrites``): a fully-synced cache
+      can still hold locally-queued mutations the provider has not
+      acknowledged, and collapsing both facts into one boolean would report
+      such a listing as unqualified-confident when a third of its rows are
+      local-only.
     """
 
     supports_batch_status_fetch: bool
@@ -166,10 +179,23 @@ class WorkItemBackend(Protocol):
     supports_branches: bool
     supports_github_extras: bool
     supports_milestones: bool
+    supports_cached_listing: bool
 
     def list_work_items(self) -> list[BacklogItem]: ...
     def get_work_item(self, reference: str) -> BacklogItem: ...
     def put_work_item(self, item: BacklogItem) -> None: ...
+    def has_pending_writes(self) -> bool:
+        """Report whether the most recent listing includes locally-queued mutations.
+
+        Every backend defines this directly (like the milestone methods
+        above), always ``False`` for a backend that writes straight to its
+        own authoritative storage with no separate offline queue (sqlite,
+        memory, beads — see each backend's flags block). GitHub is the one
+        backend where this can be ``True``: ``put_work_item`` durably queues
+        an intent that ``list_work_items`` overlays onto the cached snapshot
+        before the provider has acknowledged it (backlog #3546 task A4).
+        """
+        ...
 
     # Repository access (generic subset)
     def try_get_github(self, repo: str = "") -> Repository | None: ...
@@ -260,6 +286,33 @@ class SnapshotCheckpointProvider(Protocol):
     """
 
     def has_synced_snapshot(self) -> bool: ...
+
+
+@runtime_checkable
+class SnapshotCompletenessProvider(Protocol):
+    """Optional capability: report whether the last snapshot load skipped any file.
+
+    Deliberately a separate protocol from :class:`SnapshotCheckpointProvider`,
+    for the same reason that one is deliberately separate from
+    :class:`SyncProvider` (see its docstring): folding ``has_skipped_snapshots``
+    into ``SnapshotCheckpointProvider`` would require every existing
+    ``isinstance(x, SnapshotCheckpointProvider)`` gate — including the
+    read-through-once check in ``operations.list_items`` (backlog #3546 task
+    A3) — to also implement this method, silently disabling that check for
+    any backend or test double that does not.
+
+    A warm ``snapshot_checkpoint`` only records that a reconcile ran, never
+    that the item files it produced are still readable
+    (``WorkItemSnapshotBatch.skipped``, backlog #3546 task A2): a cache whose
+    files were truncated, restored from a partial backup, or otherwise made
+    unreadable keeps its checkpoint but silently returns a partial snapshot
+    set. ``operations.list_items`` (task A4) gates its fail-safe provenance
+    check on *both* this protocol and ``SnapshotCheckpointProvider``
+    independently, exactly as the docstring above prescribes for the
+    checkpoint/sync pairing.
+    """
+
+    def has_skipped_snapshots(self) -> bool: ...
 
 
 @runtime_checkable

@@ -433,6 +433,11 @@ class _GitHubReconciliation:
         """
         self._cache = cache
         self._provider = provider
+        # Populated by load_records() (and therefore list_work_items()) on every
+        # call from the WorkItemSnapshotBatch.skipped list -- read back by
+        # has_skipped_snapshots() with no extra I/O, rather than re-scanning the
+        # cache root a second time per listing. Empty before the first load.
+        self._last_skipped_snapshots: list[str] = []
 
     def list_work_items(self) -> list[BacklogItem]:
         """List work items from the provider-private cache.
@@ -458,6 +463,36 @@ class _GitHubReconciliation:
             ``True`` once a reconcile has durably advanced the checkpoint.
         """
         return self._cache._get_snapshot_checkpoint() is not None
+
+    def has_skipped_snapshots(self) -> bool:
+        """Report whether the most recent local snapshot load skipped any unreadable file.
+
+        Reflects ``WorkItemSnapshotBatch.skipped`` from the most recent
+        :meth:`load_records` call on this instance (backlog #3546 task A2) --
+        not re-derived by scanning the cache root again, so it costs no extra
+        I/O beyond the load that already happened for
+        :meth:`list_work_items`. Returns ``False`` before any load has run.
+        A warm checkpoint over a partial snapshot set is exactly the case
+        ``operations.list_items`` (task A4) must not report as confidently
+        servable.
+
+        Returns:
+            ``True`` when the most recent load skipped one or more files.
+        """
+        return bool(self._last_skipped_snapshots)
+
+    def has_pending_writes(self) -> bool:
+        """Report whether the cache holds mutations not yet acknowledged by GitHub.
+
+        Read fresh from the durable queue on every call (a lightweight
+        ``cache.json`` read, not a directory scan) rather than cached like
+        :meth:`has_skipped_snapshots`, since ``put_work_item``/acknowledgement
+        can change it between calls within a single process.
+
+        Returns:
+            ``True`` when one or more work-item mutations are queued.
+        """
+        return bool(self._cache._pending_work_item_mutations())
 
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
@@ -579,10 +614,9 @@ class _GitHubReconciliation:
         Returns:
             One logical cache record per work-item reference.
         """
-        records_by_reference = {
-            item.reference: LogicalCacheRecord(key=key, item=item)
-            for key, item in self._cache._work_item_snapshots().snapshots
-        }
+        batch = self._cache._work_item_snapshots()
+        self._last_skipped_snapshots = batch.skipped
+        records_by_reference = {item.reference: LogicalCacheRecord(key=key, item=item) for key, item in batch.snapshots}
         for mutation in (
             pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
         ):

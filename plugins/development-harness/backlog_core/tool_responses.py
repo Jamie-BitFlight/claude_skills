@@ -494,12 +494,16 @@ class BacklogListFollowupsResponse(FallibleToolResponse):
     """Number of items returned; ``0`` alongside an empty ``items``. Absent on the error arm."""
 
 
-# backlog_list has two disjoint success shapes selected by count_only: the
-# full shape (items/count/available_fields/pagination/backend, optionally
-# sync_state/next_call/match_pages) and a minimal {count, sync_state?}
-# shape that skips items/available_fields/pagination/backend/next_call/
-# match_pages entirely -- so every field but the Output triad is optional.
-# The BacklogError arm reports only error/backend plus the Output triad.
+# backlog_list has three disjoint success shapes selected by count_only and
+# listing confidence: the full shape (items/count/available_fields/
+# pagination/backend, optionally sync_state/next_call/match_pages), a
+# minimal {count, sync_state?} shape that skips items/available_fields/
+# pagination/backend/next_call/match_pages entirely, and a fail-safe
+# withheld shape ({from_cache, has_pending_writes}, items/count both None)
+# for a low-confidence provider-private cache listing the caller did not
+# opt into via allow_cached (backlog #3546 task A4) -- so every field but
+# the Output triad is optional. The BacklogError arm reports only
+# error/backend plus the Output triad.
 # ``items`` stays ``dict[str, object]`` (never a model) because the
 # caller-supplied ``fields=`` parameter projects an arbitrary per-call key
 # subset via ``_apply_fields_projection`` in server.py -- genuinely dynamic,
@@ -514,10 +518,31 @@ class BacklogListResponse(FallibleToolResponse):
     """Response for ``backlog_list``."""
 
     items: list[dict[str, object]] | None = None
-    """Matching item dicts, projected to ``fields=`` when given."""
+    """Matching item dicts, projected to ``fields=`` when given. ``None`` when
+    a low-confidence provider-private cache listing is withheld by default
+    (see ``count``/``from_cache`` below, and ``allow_cached`` on
+    ``backlog_list`` -- backlog #3546 task A4)."""
 
     count: int | None = None
-    """Number of items in this response."""
+    """Number of items in this response. ``None`` alongside a withheld
+    ``items`` -- distinct from ``0``, which means a confirmed-empty result."""
+
+    from_cache: bool | None = None
+    """``True`` when this listing was served from a provider-private cache
+    (GitHub) rather than the backend's own authoritative storage directly
+    (sqlite/memory/beads, always ``False``). Provenance, not a freshness or
+    confidence claim by itself -- see ``has_pending_writes`` below, and
+    ``items``/``count`` for whether the cache's state was confirmed complete
+    enough to serve at all. Declared explicitly here (not inherited) because
+    ``_respond``'s ``model_validate`` silently drops any undeclared key --
+    the same failure mode Question B's critique proved at #2.2."""
+
+    has_pending_writes: bool | None = None
+    """``True`` when this listing includes locally-queued mutations the
+    provider has not yet acknowledged. Independent of ``from_cache``
+    (critique ALT-4, Firestore's ``fromCache``/``hasPendingWrites``): a
+    fully-synced cache can still hold unconfirmed local writes, and
+    collapsing both facts into one boolean would misreport that case."""
 
     available_fields: list[str] | None = None
     """Field names selectable via ``fields=``."""
