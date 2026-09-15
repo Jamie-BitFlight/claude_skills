@@ -177,6 +177,34 @@ class TestRenderedStatusUnderARefusal:
         assert any(_REFUSAL_MESSAGE in w for w in warnings)
         assert any("local cache" in w and "under-report" in w for w in warnings)
 
+    def test_a_bare_cached_status_is_rendered_in_labeled_form(self, mocker: MockerFixture) -> None:
+        """Reproduction (P2, PR #3552 Codex review): the render path bypassed
+        ``_normalize_cached_github_status``, so a numeric-issue item whose
+        cache held the bare lifecycle value ``"in-progress"`` (not the
+        ``status:in-progress`` label a live answer would have produced)
+        rendered ``status: "in-progress"`` even though
+        ``status="status:in-progress"`` now selects it (see
+        ``TestStatusFilterUnderARefusal.test_a_bare_cached_status_matches_the_labeled_filter``).
+        A caller piping this output into ``filter_by_key={"status":
+        "status:in-progress"}`` would then drop the very item the primary
+        filter just matched. Before the fix this rendered ``"in-progress"``.
+        """
+        _patch_backend(mocker, [_item("#42", status="in-progress")])
+        _refuse(mocker)
+
+        result = operations.list_items(output=Output())
+
+        assert _statuses(result) == ["status:in-progress"]
+
+    def test_a_bare_cached_status_survives_the_documented_post_render_filter(self, mocker: MockerFixture) -> None:
+        """The rendered entry must agree with the filter that is documented to select it."""
+        _patch_backend(mocker, [_item("#42", status="in-progress")])
+        _refuse(mocker)
+
+        result = operations.list_items(output=Output(), filter_by_key={"status": "status:in-progress"})
+
+        assert result["count"] == 1
+
 
 class TestBackendsWithoutABatchStatusFetch:
     """A backend that never queries is in the same position as one that was refused."""

@@ -1960,7 +1960,10 @@ def _build_list_entry(
         status_map: Live statuses keyed by issue number.
         status_live: Whether *status_map* is the result of a query that
             answered.  When ``False`` a missing key means the status is
-            unknown, not absent, so the cached value is rendered instead.
+            unknown, not absent, so the cached value is rendered instead
+            (normalized to the ``status:*`` label form via
+            :func:`_normalize_cached_github_status` for numeric-issue items,
+            matching what :func:`_item_derived_status` uses for filtering).
 
     Returns:
         Dict with section, title, issue, plan, type, topic, body, state,
@@ -1993,8 +1996,12 @@ def _build_list_entry(
                 # No live answer for this issue. When the query ran, that means the
                 # issue carries no status label. When it did not, the cached value is
                 # the only thing known — render it rather than a blank that reads as
-                # "no status set". Milestone is never cached locally, so it stays "".
-                entry["status"] = "" if status_live else item.status
+                # "no status set". The cached value may still be in the bare lifecycle
+                # form a numeric-issue item was locally written in, so normalize it to
+                # the labeled form _item_derived_status uses for filtering — otherwise
+                # a rendered entry would disagree with the filter that selected it.
+                # Milestone is never cached locally, so it stays "".
+                entry["status"] = "" if status_live else _normalize_cached_github_status(item.status)
                 entry["milestone"] = ""
         else:
             # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
