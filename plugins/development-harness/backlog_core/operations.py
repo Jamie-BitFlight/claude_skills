@@ -5,6 +5,8 @@ dicts. Each public function accepts an optional ``output: Output | None``
 parameter and returns ``{...result, **out.to_dict()}``.
 """
 
+from __future__ import annotations
+
 import operator
 import re
 import sys
