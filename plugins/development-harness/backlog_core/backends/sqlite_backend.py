@@ -174,6 +174,12 @@ class SQLiteBackend:
       ``GitHubExtras`` methods as local simulations for internal delegation,
       but ``get_github()`` cannot return a real ``Repository``, so the
       capability is absent regardless of which methods exist.
+    - ``supports_cached_listing = False`` — :meth:`list_work_items` reads
+      ``work_item_records`` directly; there is no separate provider cache to
+      lag it. See the class docstring's ``db_path`` note for the one
+      exception worth knowing about: the ``:memory:`` default is itself a
+      "never populated" store on every fresh process, structurally the same
+      shape as a cold GitHub cache, even though this flag reports ``False``.
 
     Args:
         db_path: Path to the SQLite database file, or ``:memory:`` for an
@@ -186,6 +192,18 @@ class SQLiteBackend:
     supports_branches: bool = False
     supports_github_extras: bool = False
     supports_milestones: bool = True
+    supports_cached_listing: bool = False
+
+    def has_pending_writes(self) -> bool:
+        """Report whether any mutation is queued and unacknowledged.
+
+        Always ``False`` — writes land directly in ``work_item_records``
+        with no separate offline queue to lag behind.
+
+        Returns:
+            ``False``, always.
+        """
+        return False
 
     def __init__(self, db_path: str = ":memory:") -> None:
         """Initialise the SQLite database and create tables if absent.

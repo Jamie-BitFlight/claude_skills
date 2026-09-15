@@ -14,27 +14,34 @@ still renders. What changes is that the answer names its own limits.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 from github import GithubException
 
 from backlog_core import gh_client, operations
+from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
+    ProviderItem,
+    ProviderSnapshot,
+    ReconcileRequest,
     ReconcileResult,
+    ReconcileScope,
     ViewItemResult,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from pathlib import Path
 
     from pytest_mock import MockerFixture
 
-    from backlog_core.models import ReconcileRequest
 
 _REFUSAL_MESSAGE = "GitHub GraphQL is not available from Claude Code sessions; use the REST API"
 
@@ -154,15 +161,28 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
 
 
 class _CacheBackend:
-    """Backend stub whose cache is fed by an external provider."""
+    """Backend stub whose cache is fed by an external provider.
+
+    Deliberately does not implement ``SnapshotCheckpointProvider`` or
+    ``SnapshotCompletenessProvider`` -- it satisfies only ``SyncProvider``,
+    exactly as before A4. ``supports_cached_listing = True`` now flows
+    through to the ``from_cache`` response bit, but A4's fail-safe gate
+    never activates for this stub because it can't report checkpoint/skip
+    state, matching the real backend's own docstring rationale for keeping
+    those two protocols separate from ``SyncProvider``.
+    """
 
     supports_batch_status_fetch = False
+    supports_cached_listing = True
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
+
+    def has_pending_writes(self) -> bool:
+        return False
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Satisfy the ``SyncProvider`` protocol; never called by ``list_items``."""
@@ -173,12 +193,16 @@ class _NativeBackend:
     """Backend stub that owns its own storage, with no provider to lag behind."""
 
     supports_batch_status_fetch = False
+    supports_cached_listing = False
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
+
+    def has_pending_writes(self) -> bool:
+        return False
 
 
 def _warnings(result: Mapping[str, object]) -> list[str]:
@@ -345,3 +369,175 @@ class TestColdCacheReadsThroughOnce:
         assert isinstance(first_item, dict)
         assert first_item["title"] == "Freshly synced"
         assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+
+def _snapshot(*, items: list[ProviderItem] | None = None, started_at: str = "2026-08-12T01:00:00Z") -> ProviderSnapshot:
+    return ProviderSnapshot(items=items or [], sync_started_at=started_at, pages_fetched=1)
+
+
+class TestListingProvenance:
+    """Fail-safe, two-bit provenance on list_items() (A-critique.md Sec 4, ALT-2/ALT-4).
+
+    Uses a real ``GitHubBackend``/``FileCache`` pair (mirroring
+    ``tests_backlog/test_github_reconcile_checkpoint.py``'s pattern) rather
+    than the plain stubs above, since these reproduce the actual write-side
+    (A1 checkpoint honesty) plus read-side (A4 provenance) interaction.
+    """
+
+    def test_a_label_scoped_empty_reconcile_withholds_items_by_default(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """A-critique.md Sec 3.1's exact reproduction: a label-scoped reconcile that
+        durably observes zero items must not resurface as a confidently-empty
+        listing. A1 already keeps the checkpoint honestly None for this case;
+        A4 must read that honesty and decline to serve items by default."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
+        assert cache._get_snapshot_checkpoint() is None  # A1: still honestly never-synced
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+
+        result = operations.list_items(output=Output())
+
+        assert result["items"] is None
+        assert result["count"] is None
+        assert result["from_cache"] is True
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_label_scoped_empty_reconcile_serves_items_when_allow_cached(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """The same low-confidence state, opted into explicitly."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+
+        result = operations.list_items(allow_cached=True, output=Output())
+
+        assert result["items"] == []
+        assert result["count"] == 0
+        assert result["from_cache"] is True
+
+    def test_a_cold_cache_with_pending_writes_reports_both_bits_independently(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """The inverse of the warm+pending case above: a cold (never-synced) cache
+        already holding a locally-queued mutation. Approach A's own Sec 6.5 folds
+        this direction in; A4 must keep it correct alongside the warm direction
+        that Approach A missed -- has_pending_writes is independent of
+        from_cache/low_confidence in both directions, never derived from one
+        another."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend.put_work_item(_item("#1", title="Queued locally"))
+        assert cache._get_snapshot_checkpoint() is None  # still honestly never-synced
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+
+        result = operations.list_items(output=Output())
+
+        # Cold + no confirmed checkpoint => low confidence => items withheld by
+        # default, but has_pending_writes still names the queued mutation.
+        assert result["items"] is None
+        assert result["count"] is None
+        assert result["from_cache"] is True
+        assert result["has_pending_writes"] is True
+
+    def test_a_synced_cache_with_pending_writes_reports_the_pending_writes_bit(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """A-critique.md Sec 4 ALT-4: a fully-synced cache holding a locally-queued
+        mutation must not be reported as unqualified-confident -- has_pending_writes
+        is a bit independent of from_cache/low_confidence, and this case (warm
+        checkpoint + queued item) is exactly the one Approach A's original design
+        missed (it only noticed the inverse: a cold cache with queued items)."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))  # unlabeled -> warm checkpoint
+        assert cache._get_snapshot_checkpoint() is not None
+
+        backend.put_work_item(_item("#1", title="Queued locally"))
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        result = operations.list_items(output=Output())
+
+        # Warm + no skipped snapshots => high confidence => items served normally,
+        # but has_pending_writes still names the locally-queued mutation.
+        assert result["items"] is not None
+        assert result["count"] == 1
+        assert result["from_cache"] is True
+        assert result["has_pending_writes"] is True
+
+    def test_an_honest_empty_checkpoint_does_not_warn_or_withhold_items(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """The legitimate-zero case (post-A1): an unlabeled reconcile against a
+        genuinely empty repo produces a durable, honest checkpoint. A later
+        listing must serve it normally -- no warning, no withheld items."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+        assert cache._get_snapshot_checkpoint() is not None
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        result = operations.list_items(output=Output())
+
+        assert result["items"] == []
+        assert result["count"] == 0
+        assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+        assert result["from_cache"] is True
+        assert result["has_pending_writes"] is False
+
+    def test_a_warm_checkpoint_over_skipped_snapshots_withholds_items(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """A-critique.md Sec 2.5/Sec 3.2 (wired in via A2's WorkItemSnapshotBatch.skipped):
+        a warm checkpoint over a partial/corrupted snapshot set must be treated as
+        low-confidence too, exactly like a never-synced cache, even though
+        has_synced_snapshot() alone reports True."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(
+            return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
+        )
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+        assert cache._get_snapshot_checkpoint() is not None
+
+        # Corrupt one of the two snapshot files the reconcile just wrote.
+        items_root = tmp_path / "items" / "issues"
+        corrupt_files = sorted(items_root.glob("*.yaml"))
+        assert corrupt_files
+        corrupt_files[0].write_text("not: [valid, yaml:", encoding="utf-8")
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+
+        result = operations.list_items(output=Output())
+
+        assert result["items"] is None
+        assert result["count"] is None
+        assert result["from_cache"] is True
+
+
+def _provider_item(reference: str, title: str) -> ProviderItem:
+    return ProviderItem(
+        provider_id=f"node-{reference}",
+        reference=reference,
+        title=title,
+        body="body",
+        state="OPEN",
+        labels=[],
+        revision="rev-1",
+    )

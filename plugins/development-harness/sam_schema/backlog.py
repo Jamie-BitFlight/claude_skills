@@ -83,6 +83,18 @@ def list_items(
     refresh: Annotated[
         bool, typer.Option("--refresh", help="Refresh from the selected backend provider before listing")
     ] = False,
+    allow_cached: Annotated[
+        bool,
+        typer.Option(
+            "--allow-cached",
+            help=(
+                "Opt into serving items/count from a provider-private cache even when its state "
+                "cannot be confirmed complete (never synced, or a checkpoint over a partial/corrupted "
+                "snapshot set). Default declines and reports from_cache/has_pending_writes instead "
+                "(backlog #3546 task A4)."
+            ),
+        ),
+    ] = False,
     label: Annotated[str | None, typer.Option("--label", help="Filter by label")] = None,
     section: Annotated[str | None, typer.Option("--section", help="Filter by section")] = None,
     status: Annotated[str | None, typer.Option("--status", help="Filter by status")] = None,
@@ -100,6 +112,7 @@ def list_items(
     output = Output()
     result = operations.list_items(
         refresh=refresh,
+        allow_cached=allow_cached,
         label=label,
         section=section,
         status=status,

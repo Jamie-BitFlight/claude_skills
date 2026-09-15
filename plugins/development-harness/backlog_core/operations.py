@@ -33,6 +33,7 @@ from .backend_types import (
     IssueNode,
     MilestoneFullNode,
     SnapshotCheckpointProvider,
+    SnapshotCompletenessProvider,
     SyncProvider,
 )
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
@@ -530,10 +531,20 @@ class ListItemsResult(TypedDict):
     """Full result shape returned by list_items().
 
     Used by server.py to remove cast() call sites (T05).
+
+    ``items``/``count`` are ``None`` when a listing from a low-confidence
+    provider-private cache is withheld by default rather than risk an unaware
+    caller misreading it (backlog #3546 task A4 -- see ``allow_cached`` on
+    ``list_items``). ``from_cache``/``has_pending_writes`` are always present:
+    two independent provenance bits (critique ALT-4, Firestore's
+    ``fromCache``/``hasPendingWrites``) rather than one conflated
+    "authoritative" boolean -- see that method's docstring.
     """
 
-    items: list[BacklogListItem]
-    count: int
+    items: list[BacklogListItem] | None
+    count: int | None
+    from_cache: bool
+    has_pending_writes: bool
     messages: list[str]
     warnings: list[str]
     errors: list[str]
@@ -1945,6 +1956,7 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
 
 def list_items(
     refresh: bool = False,
+    allow_cached: bool = False,
     label: str | None = None,
     section: str | None = None,
     status: str | None = None,
@@ -1956,11 +1968,22 @@ def list_items(
     output: Output | None = None,
     filter_by_key: dict[str, str] | None = None,
     search: str | None = None,
-) -> dict[str, int | list[str] | list[dict[str, str | bool]]]:
+) -> dict[str, int | bool | list[str] | list[dict[str, str | bool]] | None]:
     """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
 
     Args:
         refresh: Refresh the provider-backed record from the configured backend before listing.
+        allow_cached: Opt into serving items/count from a provider-private
+            cache even when that cache's state cannot be confirmed complete
+            -- never synced, or a warm checkpoint sitting over a
+            partial/corrupted snapshot set (backlog #3546 task A4). Default
+            ``False`` is fail-safe (critique ALT-2): a low-confidence cache
+            listing returns ``items: None, count: None`` instead of an
+            ambiguous ``items: [], count: 0`` an unaware caller could
+            misread as a confirmed-empty backlog. Has no effect on a backend
+            that does not serve listings from a cache at all
+            (``from_cache`` is always ``False``, e.g. sqlite/memory/beads)
+            or on a listing this backend can already confirm.
         label: Filter by GitHub label (applied during refresh).
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
@@ -1984,7 +2007,10 @@ def list_items(
 
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
-        file_path, groomed, status, and milestone fields for items with a GitHub issue).
+        file_path, groomed, status, and milestone fields for items with a GitHub issue),
+        plus ``count``, ``from_cache`` and ``has_pending_writes`` (backlog #3546 task A4).
+        ``items``/``count`` are ``None`` instead of ``[]``/``0`` when a
+        low-confidence cache listing is withheld -- see ``allow_cached`` above.
     """
     out = output or Output()
     backend = get_config().backend
@@ -2023,16 +2049,76 @@ def list_items(
         except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
             out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
     items = get_config().backend.list_work_items()
-    if not items and isinstance(get_config().backend, SyncProvider):
+
+    # backlog #3546 task A4: two independent, provenance-flavored bits
+    # (critique ALT-4, Firestore's fromCache/hasPendingWrites) computed after
+    # list_work_items() so has_skipped_snapshots() reflects this call's load
+    # (see _GitHubReconciliation.has_skipped_snapshots). Deliberately not one
+    # conflated "authoritative" boolean (critique Sec 4.3): a fully-synced
+    # cache holding locally-queued mutations (has_pending_writes) must not be
+    # reported as unqualified-confident just because from_cache alone would
+    # suggest it, and vice versa.
+    from_cache = bool(getattr(backend, "supports_cached_listing", False))
+    has_pending_writes = bool(backend.has_pending_writes()) if hasattr(backend, "has_pending_writes") else False
+    # "Cannot be served with confidence" gates on two independent, structurally
+    # separate protocols for the same reason SnapshotCheckpointProvider is kept
+    # apart from SyncProvider (see that protocol's docstring): a backend or
+    # test double satisfying one must not be silently required to satisfy the
+    # other just to keep behaving as it already does.
+    low_confidence = from_cache and (
+        (isinstance(backend, SnapshotCheckpointProvider) and not backend.has_synced_snapshot())
+        or (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
+    )
+    # Positive confirmation that an empty listing is a genuine zero, not an
+    # unexplained one (A-approach.md Sec 1.3, "GitHub backend, checkpoint
+    # present, zero items ... must stay quiet"). Deliberately stronger than
+    # `not low_confidence`: a backend that cannot report checkpoint state at
+    # all (no SnapshotCheckpointProvider -- e.g. a SyncProvider test double
+    # that only implements `reconcile`) makes `low_confidence` compute to
+    # `False` for lack of a negative signal, which must NOT be read as a
+    # positive one -- the ambiguity warning below still needs to fire for
+    # that backend, exactly as before A4.
+    confirmed_complete = (
+        isinstance(backend, SnapshotCheckpointProvider)
+        and backend.has_synced_snapshot()
+        and not (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
+    )
+    if not items and isinstance(get_config().backend, SyncProvider) and not confirmed_complete:
         # A provider-backed cache holding nothing reads exactly like an empty
         # backlog. They are different answers and only one is worth acting on,
         # so name the ambiguity rather than reporting a bare count of 0. Gated on
         # the unfiltered backend list: a filter that matches none of N cached
-        # items is a genuine zero and stays quiet.
+        # items is a genuine zero and stays quiet. This gate is deliberately
+        # unfiltered and independent of low_confidence below -- do not change it
+        # to key off `count == 0` (A-critique.md Sec 2.6): that would fire on a
+        # legitimate filtered zero over known-good cached data, which
+        # test_a_filter_matching_nothing_does_not_warn pins as silent.
+        # `confirmed_complete` (task A4) narrows this further: an honest,
+        # durable, unlabeled checkpoint over a fully-readable snapshot set
+        # means a genuine zero is the correct and complete answer, not an
+        # ambiguity worth naming.
         out.warn(
             "  WARNING: The local cache holds no items. The backlog is empty, or the cache "
             "has never synced — run a sync to tell the two apart."
         )
+    if low_confidence and not allow_cached:
+        # Fail-safe shape (A-critique.md Sec 4, ALT-2's Apollo dataState
+        # analogy), not fail-open: an unconfirmed cache state must not
+        # silently hand back items/count for an unaware caller to misread as
+        # a real answer. Withhold both by default; allow_cached=True opts
+        # into the best-effort cached list anyway.
+        out.warn(
+            "  WARNING: Declining to serve items from an unconfirmed local cache (never "
+            "fully synced, or a snapshot set with unreadable files). Pass allow_cached=True "
+            "to see the best-effort cached list anyway, or run a sync."
+        )
+        return {
+            "items": None,
+            "count": None,
+            "from_cache": from_cache,
+            "has_pending_writes": has_pending_writes,
+            **out.to_dict(),
+        }
     # Start with non-skipped items that have a section. The skip flag may be set
     # for reasons other than terminal status (e.g. malformed entries), so we
     # always exclude skip=True items regardless of include_closed. The
@@ -2062,7 +2148,13 @@ def list_items(
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:
         result_items = apply_search_filter(result_items, search)
-    return {"items": result_items, "count": len(result_items), **out.to_dict()}
+    return {
+        "items": result_items,
+        "count": len(result_items),
+        "from_cache": from_cache,
+        "has_pending_writes": has_pending_writes,
+        **out.to_dict(),
+    }
 
 
 # ---------------------------------------------------------------------------
