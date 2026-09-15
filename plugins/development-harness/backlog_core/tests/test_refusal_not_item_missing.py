@@ -541,3 +541,60 @@ def _provider_item(reference: str, title: str) -> ProviderItem:
         labels=[],
         revision="rev-1",
     )
+
+
+class TestRefreshEscalatesToFullOnSkipSignal:
+    """Codex finding 2 (backlog #3546): ``list_items(refresh=True)`` must widen to a
+    full provider refresh when the backend's most recent snapshot load flagged the
+    on-disk cache incomplete -- an incremental refresh alone only asks GitHub for
+    items changed since the checkpoint's watermark, so a locally-corrupted-but-
+    upstream-unchanged item is never refetched and the low-confidence signal never
+    clears. The common case (no skip signal) must keep its existing incremental
+    behavior -- this is a narrow escalation, not a blanket change to every
+    ``refresh=True`` call.
+    """
+
+    def test_a_refresh_over_a_corrupted_snapshot_escalates_to_full_refresh(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(
+            return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
+        )
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+        assert cache._get_snapshot_checkpoint() is not None
+
+        # Corrupt one of the two snapshot files the reconcile just wrote -- the same
+        # unreadable-but-present case the warm-checkpoint withholding test above uses.
+        items_root = tmp_path / "items" / "issues"
+        corrupt_files = sorted(items_root.glob("*.yaml"))
+        assert corrupt_files
+        corrupt_files[0].write_text("not: [valid, yaml:", encoding="utf-8")
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(refresh=True, output=Output())
+
+        refresh_mock.assert_called_once()
+        assert refresh_mock.call_args.kwargs["full_refresh"] is True
+
+    def test_a_refresh_with_no_skip_signal_stays_incremental(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The regression guard: a clean warm checkpoint must not be swept into the
+        finding-2 escalation just because ``refresh=True`` was passed."""
+        cache = FileCache(tmp_path)
+        backend = GitHubBackend(cache=cache)
+        backend._fetch_snapshot = MagicMock(
+            return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
+        )
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+        assert cache._get_snapshot_checkpoint() is not None
+
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(refresh=True, output=Output())
+
+        refresh_mock.assert_called_once()
+        assert refresh_mock.call_args.kwargs["full_refresh"] is False
