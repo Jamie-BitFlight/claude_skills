@@ -17,14 +17,24 @@ module brings PyGithub to the same posture and no further: the certificate chain
 and the hostname are both still verified, and only the strict extension checks are
 cleared. Verification is never disabled.
 
-The relaxation applies only when a CA bundle environment variable names a real file
-*and* that file adds at least one anchor beyond the public trust store this process
-already ships — bundle_requires_relaxed_verification decides that by certificate
-shape, not by the variable's mere presence. Nix and conda export these same variables
-on an ordinary network, pointed at an unmodified copy of the public roots; treating
-that presence alone as proxy evidence would drop VERIFY_X509_STRICT and PyGithub's
-connection reuse for every session on such a machine, whether or not a proxy is
-actually there. On an ordinary network, once judged this way, the strict default
+Loading a custom CA bundle and relaxing VERIFY_X509_STRICT are two independent
+decisions, both gated on the bundle adding at least one anchor beyond the public
+trust store this process already ships (bundle_adds_new_anchor decides that by
+certificate identity, not by the variable's mere presence). A bundle that adds a
+*compliant* anchor still has to be loaded: ``requests`` only ever consumes
+REQUESTS_CA_BUNDLE and CURL_CA_BUNDLE on its own (see the next section), so
+GITHUB_CA_BUNDLE and a lone SSL_CERT_FILE reach GitHub only through the connection
+class this module installs — skipping installation for a compliant bundle would
+leave those two variables unenforced against a non-standard GITHUB_API_URL, and
+verification would fail even though the override is configured correctly. Whether
+that same bundle also needs VERIFY_X509_STRICT cleared is judged separately, by
+bundle_requires_relaxed_verification, which inspects the added anchors' certificate
+shape (a missing or non-critical extension). Nix and conda export these same
+variables on an ordinary network, pointed at an unmodified copy of the public
+roots; treating that presence alone as proxy evidence would install a redundant
+connection class and drop PyGithub's connection reuse for every session on such a
+machine, whether or not a proxy is actually there. On an ordinary network, once
+judged this way — no new anchor at all — nothing installs and the strict default
 stays in force.
 
 Why CA_BUNDLE_ENV_VARS checks REQUESTS_CA_BUNDLE before SSL_CERT_FILE
@@ -51,6 +61,22 @@ stays in the tuple, last, only because some environments set it alone with neith
 first as this module's own explicit override, independent of what ``requests`` would
 resolve unprompted.
 
+Why a CA bundle variable may also name a directory
+-----------------------------------------------------
+``requests.adapters.HTTPAdapter.cert_verify`` (same file cited above) branches on
+``os.path.isdir(cert_loc)``: a directory is handed to urllib3 as ``conn.ca_cert_dir``,
+which OpenSSL consults lazily, through ``SSLContext.load_verify_locations(capath=...)``,
+at verification time rather than eagerly loading every entry the way a single-file
+``cafile`` bundle is loaded (confirmed empirically: ``SSLContext.get_ca_certs()``
+returns an empty list immediately after a ``capath`` load, even though the
+certificate it points at verifies a real handshake). That directory shape is the
+OpenSSL ``c_rehash``/``openssl rehash`` layout: one certificate per file, named
+``<8-hex-digit-subject-hash>.<n>``. A caller whose interception proxy or private
+GitHub Enterprise install ships its trust anchors that way, rather than as one
+concatenated PEM file, needs the same detection and loading this module already
+gives a single bundle file — resolve_ca_bundle accepts either shape, and
+_build_ssl_context loads a directory through ``capath`` instead of ``cafile``.
+
 Why this module imports ``requests``
 ------------------------------------
 PyGithub drives its HTTP through ``requests``, not ``httpx``: its
@@ -76,6 +102,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import ssl
 import threading
 from typing import TYPE_CHECKING, Final
@@ -99,6 +126,7 @@ __all__ = [
     "DEFAULT_TIMEOUT",
     "TOKEN_ENV_VARS",
     "MissingGitHubTokenError",
+    "bundle_adds_new_anchor",
     "bundle_requires_relaxed_verification",
     "install_proxy_tls_support",
     "make_github_client",
@@ -110,7 +138,8 @@ DEFAULT_TIMEOUT: Final = 30
 """Seconds before a GitHub request gives up, when a caller states no preference."""
 
 CA_BUNDLE_ENV_VARS: Final[Sequence[str]] = ("GITHUB_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE")
-"""CA bundle variables in priority order. The first one naming a real file wins.
+"""CA bundle variables in priority order. The first one naming a real file or an
+OpenSSL-hashed CA directory wins.
 
 See the module docstring's "Why CA_BUNDLE_ENV_VARS checks REQUESTS_CA_BUNDLE before
 SSL_CERT_FILE" section: this order matches the bundle ``requests`` itself resolves,
@@ -119,6 +148,13 @@ not an arbitrary preference.
 
 TOKEN_ENV_VARS: Final[Sequence[str]] = ("GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PERSONAL_ACCESS_TOKEN")
 """Token variables in priority order. The first non-empty one wins."""
+
+_OPENSSL_HASH_FILENAME: Final = re.compile(r"^[0-9a-f]{8}\.\d+$")
+"""Filename shape ``c_rehash``/``openssl rehash`` produces inside a CA directory.
+
+See the module docstring's "Why a CA bundle variable may also name a directory"
+section.
+"""
 
 
 class MissingGitHubTokenError(RuntimeError):
@@ -160,16 +196,42 @@ def resolve_token(token: str | None = None) -> str:
     raise MissingGitHubTokenError(msg)
 
 
+def _is_openssl_hashed_ca_directory(path: pathlib.Path) -> bool:
+    """Whether path is a directory in the OpenSSL ``c_rehash`` layout requests accepts.
+
+    Args:
+        path: Candidate directory.
+
+    Returns:
+        True when path is a directory holding at least one hash-named entry (eight
+        lowercase hex digits, a dot, and a numeric suffix — the shape ``c_rehash``/
+        ``openssl rehash`` produces, and the shape ``requests.adapters.HTTPAdapter.
+        cert_verify`` hands to urllib3 as ``conn.ca_cert_dir``). False for a plain
+        file, a directory with no such entry, or a path this process cannot list.
+    """
+    if not path.is_dir():
+        return False
+    try:
+        return any(_OPENSSL_HASH_FILENAME.match(entry.name) for entry in path.iterdir())
+    except OSError:
+        return False
+
+
 def resolve_ca_bundle() -> str | None:
     """Return the CA bundle path an interception proxy has configured, if any.
 
     Returns:
-        The first path among CA_BUNDLE_ENV_VARS that names an existing file. None when
-        no variable is set, or when every path named is absent from disk.
+        The first path among CA_BUNDLE_ENV_VARS that names an existing file, or an
+        OpenSSL-hashed CA directory (see the module docstring's "Why a CA bundle
+        variable may also name a directory" section). None when no variable is set,
+        or when every path named is neither.
     """
     for env_var in CA_BUNDLE_ENV_VARS:
         candidate = os.environ.get(env_var)
-        if candidate and pathlib.Path(candidate).is_file():
+        if not candidate:
+            continue
+        path = pathlib.Path(candidate)
+        if path.is_file() or _is_openssl_hashed_ca_directory(path):
             return candidate
     return None
 
@@ -198,6 +260,79 @@ def _cert_fails_strict_checks(cert: x509.Certificate) -> bool:
     return not basic_constraints.critical
 
 
+def _load_certificates(ca_bundle: str) -> list[x509.Certificate]:
+    """Parse every certificate ca_bundle supplies, whether a file or a hashed directory.
+
+    Args:
+        ca_bundle: Path to a PEM-encoded CA bundle file, or an OpenSSL-hashed CA
+            directory (see the module docstring's "Why a CA bundle variable may also
+            name a directory" section).
+
+    Returns:
+        Every certificate ca_bundle holds. Empty when ca_bundle cannot be read, holds
+        no certificates, or (for a directory) has no readable hash-named entry.
+    """
+    path = pathlib.Path(ca_bundle)
+    if path.is_dir():
+        certificates: list[x509.Certificate] = []
+        for entry in sorted(path.iterdir()):
+            if not _OPENSSL_HASH_FILENAME.match(entry.name):
+                continue
+            try:
+                certificates.extend(x509.load_pem_x509_certificates(entry.read_bytes()))
+            except (OSError, ValueError):
+                continue
+        return certificates
+    try:
+        return x509.load_pem_x509_certificates(path.read_bytes())
+    except (OSError, ValueError):
+        return []
+
+
+def _new_anchors(ca_bundle: str) -> list[x509.Certificate]:
+    """Certificates ca_bundle supplies that the baseline trust store does not already carry.
+
+    Args:
+        ca_bundle: Path to a PEM-encoded CA bundle file, or an OpenSSL-hashed CA directory.
+
+    Returns:
+        Every certificate in ca_bundle whose SHA-256 fingerprint is absent from
+        certifi's bundle — the store ``requests``, a hard dependency, already ships.
+    """
+    candidate_certs = _load_certificates(ca_bundle)
+    if not candidate_certs:
+        return []
+    try:
+        baseline_certs = x509.load_pem_x509_certificates(pathlib.Path(certifi.where()).read_bytes())
+    except (OSError, ValueError):
+        baseline_certs = []
+    baseline_fingerprints = {cert.fingerprint(hashes.SHA256()) for cert in baseline_certs}
+    return [cert for cert in candidate_certs if cert.fingerprint(hashes.SHA256()) not in baseline_fingerprints]
+
+
+def bundle_adds_new_anchor(ca_bundle: str) -> bool:
+    """Decide whether ca_bundle supplies any certificate the baseline trust store lacks.
+
+    This is the gate for loading ca_bundle at all, independent of whether what it adds
+    also needs VERIFY_X509_STRICT cleared — bundle_requires_relaxed_verification
+    decides that separately. ``requests`` never consumes GITHUB_CA_BUNDLE or a lone
+    SSL_CERT_FILE on its own (see the module docstring), so a *compliant* custom CA
+    named by either still has to be loaded through the connection class this module
+    installs, or a non-standard GITHUB_API_URL fails verification despite the override
+    being configured correctly.
+
+    Args:
+        ca_bundle: Path to a PEM-encoded CA bundle file, or an OpenSSL-hashed CA directory.
+
+    Returns:
+        True when ca_bundle holds at least one certificate absent from the baseline
+        store. False when ca_bundle cannot be read, holds no certificates, or every
+        certificate it holds already appears in the baseline store — the shape Nix and
+        conda hand these variables on an ordinary network.
+    """
+    return bool(_new_anchors(ca_bundle))
+
+
 def bundle_requires_relaxed_verification(ca_bundle: str) -> bool:
     """Decide whether ca_bundle adds an anchor that VERIFY_X509_STRICT would reject.
 
@@ -207,10 +342,12 @@ def bundle_requires_relaxed_verification(ca_bundle: str) -> bool:
     isolation, so scanning every certificate in a full bundle would flag an unmodified
     copy of the public roots, which Nix and conda hand these variables on an ordinary
     network. Only a certificate genuinely new to the bundle can be the interception
-    proxy's own CA, so only those are tested.
+    proxy's own CA, so only those are tested. This is independent of whether ca_bundle
+    should be loaded at all — bundle_adds_new_anchor decides that, and a compliant
+    added anchor still needs loading even though it does not need this relaxation.
 
     Args:
-        ca_bundle: Path to a PEM-encoded CA bundle.
+        ca_bundle: Path to a PEM-encoded CA bundle file, or an OpenSSL-hashed CA directory.
 
     Returns:
         True when at least one certificate in ca_bundle, absent from the baseline
@@ -218,37 +355,37 @@ def bundle_requires_relaxed_verification(ca_bundle: str) -> bool:
         cannot be read or parsed, holds no certificates, or every added certificate
         passes those checks.
     """
-    try:
-        candidate_certs = x509.load_pem_x509_certificates(pathlib.Path(ca_bundle).read_bytes())
-    except (OSError, ValueError):
-        return False
-    try:
-        baseline_certs = x509.load_pem_x509_certificates(pathlib.Path(certifi.where()).read_bytes())
-    except (OSError, ValueError):
-        baseline_certs = []
-    baseline_fingerprints = {cert.fingerprint(hashes.SHA256()) for cert in baseline_certs}
-    return any(
-        cert.fingerprint(hashes.SHA256()) not in baseline_fingerprints and _cert_fails_strict_checks(cert)
-        for cert in candidate_certs
-    )
+    return any(_cert_fails_strict_checks(cert) for cert in _new_anchors(ca_bundle))
 
 
-def _build_ssl_context(ca_bundle: str) -> ssl.SSLContext:
-    """Build a context that trusts ca_bundle and skips only the strict extension checks.
+def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
+    """Build a context that trusts ca_bundle, clearing strict checks only when asked.
 
-    Chain verification and hostname verification both stay on. Clearing
-    ``VERIFY_X509_STRICT`` matches what Go-based clients such as ``gh`` already do, and
-    is what lets a proxy CA carrying no ``keyUsage`` extension verify.
+    Loading ca_bundle and clearing ``VERIFY_X509_STRICT`` are independent decisions
+    (see the module docstring): a compliant custom CA still has to be loaded so a
+    non-standard GITHUB_API_URL verifies at all, even when its certificate shape needs
+    no relaxation. Chain verification and hostname verification both stay on
+    regardless of relax_strict. Clearing the flag, when asked, matches what Go-based
+    clients such as ``gh`` already do, and is what lets a proxy CA carrying no
+    ``keyUsage`` extension verify.
 
     Args:
-        ca_bundle: Path to the CA bundle the proxy presents its chain against.
+        ca_bundle: Path to the CA bundle file, or OpenSSL-hashed CA directory, the
+            proxy (or a private GitHub Enterprise install) presents its chain against.
+        relax_strict: Whether to clear ``ssl.VERIFY_X509_STRICT``. True only when
+            bundle_requires_relaxed_verification judged ca_bundle to add an anchor
+            that flag would reject.
 
     Returns:
         A configured SSLContext.
     """
     context = create_urllib3_context()
-    context.verify_flags &= ~ssl.VERIFY_X509_STRICT
-    context.load_verify_locations(cafile=ca_bundle)
+    if relax_strict:
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    if pathlib.Path(ca_bundle).is_dir():
+        context.load_verify_locations(capath=ca_bundle)
+    else:
+        context.load_verify_locations(cafile=ca_bundle)
     return context
 
 
@@ -265,6 +402,7 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
         self,
         ca_bundle: str,
         *,
+        relax_strict: bool,
         pool_connections: int = requests.adapters.DEFAULT_POOLSIZE,
         pool_maxsize: int = requests.adapters.DEFAULT_POOLSIZE,
         max_retries: int | Retry = requests.adapters.DEFAULT_RETRIES,
@@ -273,11 +411,14 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
 
         Args:
             ca_bundle: Path passed to every SSL context this adapter creates.
+            relax_strict: Whether every SSL context this adapter creates should clear
+                ``ssl.VERIFY_X509_STRICT``.
             pool_connections: Number of connection pools to cache.
             pool_maxsize: Maximum connections to keep in each pool.
             max_retries: Retry policy handed to urllib3.
         """
         self._ca_bundle = ca_bundle
+        self._relax_strict = relax_strict
         super().__init__(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=max_retries)
 
     def init_poolmanager(
@@ -291,7 +432,7 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
             block: Whether the pool blocks when it has no free connection.
             **pool_kwargs: Extra pool options, which this override extends with the context.
         """
-        pool_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle)
+        pool_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle, relax_strict=self._relax_strict)
         super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
 
     def proxy_manager_for(self, proxy: str, **proxy_kwargs: object) -> PoolManager:
@@ -304,15 +445,17 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
         Returns:
             The ProxyManager the base implementation builds.
         """
-        proxy_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle)
+        proxy_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle, relax_strict=self._relax_strict)
         return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
-def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]:
+def _make_connection_class(ca_bundle: str, *, relax_strict: bool) -> type[HTTPSRequestsConnectionClass]:
     """Build the HTTPS connection class PyGithub should use.
 
     Args:
         ca_bundle: Path passed to every SSL context the class creates.
+        relax_strict: Whether every SSL context the class creates should clear
+            ``ssl.VERIFY_X509_STRICT``.
 
     Returns:
         A subclass that remounts PyGithub's own session on a proxy-aware adapter.
@@ -362,7 +505,11 @@ def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]
             if "verify" not in kwargs:
                 self.verify = ca_bundle
             self.adapter = _ProxyAwareAdapter(
-                ca_bundle, max_retries=self.retry, pool_connections=self.pool_size, pool_maxsize=self.pool_size
+                ca_bundle,
+                relax_strict=relax_strict,
+                max_retries=self.retry,
+                pool_connections=self.pool_size,
+                pool_maxsize=self.pool_size,
             )
             self.session.mount("https://", self.adapter)
 
@@ -370,11 +517,21 @@ def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]
 
 
 def install_proxy_tls_support(*, force: bool = False) -> bool:
-    """Teach every PyGithub client in this process to trust an interception proxy.
+    """Teach every PyGithub client in this process to trust a custom CA bundle.
 
-    PyGithub resolves its connection classes on the Requester class, so one call covers
-    every ``Github`` instance the process builds, whether built before or after this
-    call. The call is idempotent and safe from more than one thread.
+    PyGithub resolves its connection classes on the Requester class, so a call made
+    before any ``Github`` instance is built covers every instance built afterward.
+    This is **not** retroactive, though: ``Requester.__init__`` copies the connection
+    class onto the instance at construction time, so a client already built when this
+    call runs keeps the class it captured for its whole life, and no later call
+    reaches it. Call this (or use ``make_github_client``, which always does) before
+    building a client, never after. The call itself is idempotent and safe from more
+    than one thread.
+
+    Loading ca_bundle and clearing VERIFY_X509_STRICT are independent decisions (see
+    the module docstring): ``bundle_adds_new_anchor`` gates installation itself, and
+    ``bundle_requires_relaxed_verification`` — checked only once installation is
+    already warranted — gates the strict-mode relaxation within it.
 
     ``Requester.injectConnectionClasses`` also turns off PyGithub's connection reuse,
     because its intended caller is PyGithub's own HTTP-replay test harness. Restoring
@@ -386,26 +543,31 @@ def install_proxy_tls_support(*, force: bool = False) -> bool:
     Args:
         force: Re-evaluate and install (or uninstall) again even when a previous call
             already decided. Without it, a previous installed=True short-circuits, so a
-            bundle that starts, stops, or changes needing relaxation after the first
-            call is picked up only when this is set.
+            bundle that starts, stops, or changes needing installation or relaxation
+            after the first call is picked up only when this is set.
 
     Returns:
-        True when the proxy-aware classes are now installed. False when no CA bundle
-        variable names a real file, or the file it names adds nothing that strict
-        verification would reject — in both cases no interception proxy is judged to be
-        configured, PyGithub's own strict default and connection reuse stay in force,
-        and (under force) a previous install is undone.
+        True when ca_bundle now supplies at least one certificate absent from the
+        baseline trust store — that certificate is loaded through the substituted
+        connection class regardless of whether it also needs VERIFY_X509_STRICT
+        cleared. False when no CA bundle variable names a real file or OpenSSL-hashed
+        directory, or the one named adds nothing beyond the baseline store — in both
+        cases no custom trust is judged necessary, PyGithub's own defaults and
+        connection reuse stay in force, and (under force) a previous install is undone.
     """
     with _InstallState.lock:
         if _InstallState.installed and not force:
             return True
         ca_bundle = resolve_ca_bundle()
-        if ca_bundle is None or not bundle_requires_relaxed_verification(ca_bundle):
+        if ca_bundle is None or not bundle_adds_new_anchor(ca_bundle):
             if _InstallState.installed:
                 Requester.injectConnectionClasses(HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass)
                 _InstallState.installed = False
             return False
-        Requester.injectConnectionClasses(HTTPRequestsConnectionClass, _make_connection_class(ca_bundle))
+        relax_strict = bundle_requires_relaxed_verification(ca_bundle)
+        Requester.injectConnectionClasses(
+            HTTPRequestsConnectionClass, _make_connection_class(ca_bundle, relax_strict=relax_strict)
+        )
         _InstallState.installed = True
         return True
 
@@ -416,7 +578,10 @@ def make_github_client(
     """Build a PyGithub client that works on a normal network and behind a TLS proxy.
 
     Prefer this over calling ``Github(...)`` directly, so that TLS handling and token
-    lookup stay in one place.
+    lookup stay in one place. Calls ``install_proxy_tls_support`` before constructing
+    the client on every call, not only the first: that function's own installation is
+    not retroactive (see its docstring), so a client built here always needs its own
+    fresh install to precede its own construction.
 
     Args:
         token: An explicit token. When omitted, TOKEN_ENV_VARS supplies one.
