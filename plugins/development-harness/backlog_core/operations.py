@@ -33,6 +33,7 @@ from .backend_protocol import get_config
 from .backend_types import (
     AddedCommentNode,
     ContentProvider,
+    CredentialAvailabilityProvider,
     IssueCommentNode,
     IssueNode,
     MilestoneFullNode,
@@ -41,7 +42,6 @@ from .backend_types import (
     SyncProvider,
 )
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
-from .github_client import MissingGitHubTokenError, resolve_token
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -2142,52 +2142,60 @@ def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem]) -> boo
     query -- a numeric-issue item would default to ``"needs-grooming"`` in
     ``_item_derived_status`` even though its live status was never learned.
 
-    Resolves the token locally, via ``resolve_token()`` -- the exact
-    local-only check ``gh_client.try_get_github`` itself performs before it
-    ever reaches the network -- instead of re-probing GitHub. A prior
-    version of this function called ``try_get_github(repo)`` again here,
-    which repeats the live ``get_repo`` lookup ``batch_fetch_statuses``
-    already performed while building the (legitimately empty) map: a
-    token-present, genuinely-empty listing paid for a second REST round
-    trip on every call, and if that redundant call hit a rate limit or
-    timed out it raised ``GitHubUnavailableError`` and marked an
-    already-successful status result unavailable, excluding numeric-issue
-    items from status-filtered results even though the live fetch had
-    genuinely succeeded. Whether a token is configured is a local,
-    environment-only fact that cannot change between
+    Asks the backend through ``CredentialAvailabilityProvider`` --
+    ``has_github_credentials()`` -- rather than importing
+    ``github_client.resolve_token()`` directly. ``operations.py`` must not
+    import provider clients (see ``ARCHITECTURE.md``'s "Module:
+    operations.py" boundary); a prior revision of this function imported
+    ``resolve_token`` here, which let provider-neutral orchestration inspect
+    GitHub authentication directly and made any GitHub-capable backend that
+    supplies credentials by a different mechanism get incorrectly marked
+    unavailable. Going through the backend also avoids re-probing GitHub
+    over the network: an even earlier revision called ``try_get_github(repo)``
+    again here, repeating the live ``get_repo`` lookup
+    ``batch_fetch_statuses`` already performed while building the
+    (legitimately empty) map -- a token-present, genuinely-empty listing
+    paid for a second REST round trip on every call, and a rate limit or
+    timeout on that redundant call raised ``GitHubUnavailableError`` and
+    marked an already-successful status result unavailable. Whether
+    credentials are configured cannot change between
     ``batch_fetch_statuses``'s call and this one within the same process, so
-    re-deriving it from the environment is exact, not an approximation of
-    the network check it replaces.
+    asking the backend once more here is exact, not an approximation of the
+    network check it replaces.
 
-    Skips the check (returns False without touching the network or the
-    environment) when the answer cannot matter: a backend with no live
-    GitHub connection at all (``supports_github_extras`` False, e.g. beads,
-    SQLite, in-memory) has no token concept, so treating that as
-    "unavailable" would misreport a backend that answered honestly.
-    Likewise skipped when *open_items* holds no numeric-issue item, since
+    Skips the check (returns False without asking the backend anything) when
+    the answer cannot matter: a backend with no live GitHub connection at
+    all (``supports_github_extras`` False, e.g. beads, SQLite, in-memory)
+    has no credential concept, so treating that as "unavailable" would
+    misreport a backend that answered honestly. Likewise skipped when
+    *open_items* holds no numeric-issue item, since
     ``status_map_unavailable`` only ever changes the resolved status of a
     numeric-issue item (see ``_item_derived_status``) -- nothing downstream
-    reads the answer either way.
+    reads the answer either way. Also returns False -- assume credentials
+    might be present rather than fabricating a "missing token" claim the
+    backend never made -- when the backend reports
+    ``supports_github_extras`` but does not structurally implement
+    ``CredentialAvailabilityProvider``; this mirrors the pre-existing
+    ``GitHubExtras``/``BranchBackend`` flag-first gating pattern documented
+    on those Protocols.
 
     Args:
         open_items: The items the batch status fetch was attempted against.
 
     Returns:
         True when a numeric-issue item exists, the backend has a real GitHub
-        connection concept, and no ``GITHUB_TOKEN`` (or recognised
-        equivalent -- see ``TOKEN_ENV_VARS``) is configured in the
-        environment.
+        connection concept, the backend implements
+        ``CredentialAvailabilityProvider``, and
+        ``has_github_credentials()`` reports no credentials configured.
     """
     backend = get_config().backend
     if not backend.supports_github_extras:
         return False
     if not any(parse_issue_number(item.issue) is not None for item in open_items):
         return False
-    try:
-        resolve_token()
-    except MissingGitHubTokenError:
-        return True
-    return False
+    if not isinstance(backend, CredentialAvailabilityProvider):
+        return False
+    return not backend.has_github_credentials()
 
 
 def _warn_status_map_unavailable(out: Output, status: str | None, reason: str) -> None:

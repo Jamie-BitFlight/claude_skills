@@ -358,6 +358,32 @@ class SnapshotCompletenessProvider(Protocol):
 
 
 @runtime_checkable
+class CredentialAvailabilityProvider(Protocol):
+    """Optional capability: report whether GitHub credentials are configured.
+
+    A local, environment-only yes/no question ("is a token configured"), not
+    a live GitHub operation — distinct from ``GitHubExtras``, whose methods
+    perform real GraphQL/REST calls. Implemented by ``GitHubBackend`` so
+    ``operations.py`` can ask this question through the backend abstraction
+    instead of importing ``github_client.resolve_token()`` directly, which
+    ``ARCHITECTURE.md``'s "Module: operations.py" section forbids
+    (``operations.py`` must not import provider clients).
+
+    Like ``GitHubExtras`` and ``BranchBackend``, this Protocol is
+    ``runtime_checkable`` — ``isinstance`` checks method *names* only, so a
+    backend with no credential concept at all could still satisfy it
+    structurally via a local simulation. Callers MUST gate on the
+    ``supports_github_extras`` flag first (a backend with no live GitHub
+    connection concept has no credential concept either) and treat
+    ``isinstance(backend, CredentialAvailabilityProvider)`` only as a
+    secondary assertion — the same pattern ``GitHubExtras``'s docstring
+    documents.
+    """
+
+    def has_github_credentials(self) -> bool: ...
+
+
+@runtime_checkable
 class ContentProvider(Protocol):
     """Optional logical plan and artifact content capability."""
 

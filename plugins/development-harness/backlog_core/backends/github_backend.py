@@ -185,6 +185,19 @@ class GitHubBackend:
         """
         return gh_client.probe_backend_status(repo or self._repo)
 
+    def has_github_credentials(self) -> bool:
+        """Report whether a GitHub token is configured for this backend.
+
+        Implements ``CredentialAvailabilityProvider`` -- a local,
+        environment-only check that performs no network access. See
+        :func:`backlog_core.gh_client.has_github_credentials` for the exact
+        resolution rule.
+
+        Returns:
+            True when a GitHub token is configured; False otherwise.
+        """
+        return gh_client.has_github_credentials()
+
     # ------------------------------------------------------------------
     # Work items — delegated to the reconciliation collaborator
     # ------------------------------------------------------------------
