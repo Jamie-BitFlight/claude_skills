@@ -65,6 +65,16 @@ class _ProviderSnapshotCheckpoint(BaseModel):
     and ``items_observed`` record what the advancing reconcile actually
     covered, so a later reader is not left inferring full coverage from a
     watermark that only ever meant "a reconcile ran".
+
+    ``items_observed`` is the total snapshot file count (readable +
+    unreadable) the durable cache held on disk immediately after the
+    advancing reconcile's writes landed -- not the provider-side delta that
+    reconcile fetched. A later :meth:`_GitHubReconciliation.load_records`
+    call compares a fresh disk count against this figure to detect a
+    snapshot file that has since vanished entirely -- deleted, or a partial
+    cache restore -- which never shows up in ``WorkItemSnapshotBatch.skipped``
+    since that list only names a file that still exists but failed to load
+    (backlog #3546 Codex finding 1).
     """
 
     model_config = ConfigDict(frozen=True)

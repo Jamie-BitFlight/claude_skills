@@ -1972,7 +1972,11 @@ def list_items(
     """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
 
     Args:
-        refresh: Refresh the provider-backed record from the configured backend before listing.
+        refresh: Refresh the provider-backed record from the configured backend before
+            listing. Escalates to a full (not incremental) refresh automatically when the
+            backend's most recent snapshot load flagged unreadable or vanished cache
+            files (backlog #3546 Codex finding 2), since an incremental refresh alone
+            cannot repair an item that is locally broken but unchanged upstream.
         allow_cached: Opt into serving items/count from a provider-private
             cache even when that cache's state cannot be confirmed complete
             -- never synced, or a warm checkpoint sitting over a
@@ -2015,7 +2019,23 @@ def list_items(
     out = output or Output()
     backend = get_config().backend
     if refresh:
-        refresh_local_cache_from_github(repo, label, output=out)
+        # A warm checkpoint whose most recent snapshot load flagged unreadable
+        # or vanished files (SnapshotCompletenessProvider.has_skipped_snapshots,
+        # backlog #3546 Codex finding 2) cannot be repaired by the default
+        # incremental refresh below: GitHub only returns items that changed
+        # since the checkpoint's watermark, so an item that is locally broken
+        # but unchanged upstream is never refetched, and the low-confidence
+        # signal never clears. has_skipped_snapshots() only reflects a load
+        # that already happened on this backend instance (see its docstring),
+        # so list_work_items() is called once here to read the current
+        # on-disk state honestly before deciding refresh scope -- narrowly
+        # for this branch, not for every refresh=True call, so the common
+        # case (no skip signal) keeps its existing incremental behavior.
+        full_refresh = False
+        if isinstance(backend, SnapshotCompletenessProvider):
+            backend.list_work_items()
+            full_refresh = backend.has_skipped_snapshots()
+        refresh_local_cache_from_github(repo, label, output=out, full_refresh=full_refresh)
     elif (
         isinstance(backend, SyncProvider)
         and isinstance(backend, SnapshotCheckpointProvider)

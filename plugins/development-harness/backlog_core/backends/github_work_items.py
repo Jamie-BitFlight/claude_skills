@@ -438,6 +438,17 @@ class _GitHubReconciliation:
         # has_skipped_snapshots() with no extra I/O, rather than re-scanning the
         # cache root a second time per listing. Empty before the first load.
         self._last_skipped_snapshots: list[str] = []
+        # Populated by load_records() alongside _last_skipped_snapshots --
+        # True when the total snapshot file count found on disk (readable +
+        # unreadable) falls short of the checkpoint's recorded
+        # items_observed inventory (backlog #3546 Codex finding 1). A file
+        # that vanished entirely -- deleted, or a partial cache restore --
+        # never appears in WorkItemSnapshotBatch.skipped (that list only
+        # names files that exist but failed to load), so it is otherwise
+        # invisible to has_skipped_snapshots() alone. False before the first
+        # load, and False whenever no checkpoint exists yet to compare
+        # against.
+        self._last_snapshot_shortfall: bool = False
 
     def list_work_items(self) -> list[BacklogItem]:
         """List work items from the provider-private cache.
@@ -465,21 +476,34 @@ class _GitHubReconciliation:
         return self._cache._get_snapshot_checkpoint() is not None
 
     def has_skipped_snapshots(self) -> bool:
-        """Report whether the most recent local snapshot load skipped any unreadable file.
+        """Report whether the most recent local snapshot load found the cache incomplete.
 
-        Reflects ``WorkItemSnapshotBatch.skipped`` from the most recent
-        :meth:`load_records` call on this instance (backlog #3546 task A2) --
-        not re-derived by scanning the cache root again, so it costs no extra
-        I/O beyond the load that already happened for
-        :meth:`list_work_items`. Returns ``False`` before any load has run.
-        A warm checkpoint over a partial snapshot set is exactly the case
-        ``operations.list_items`` (task A4) must not report as confidently
-        servable.
+        True for either of two independent, most-recent-``load_records()``
+        discoveries (backlog #3546 tasks A2 and the Codex finding-1 follow-up):
+
+        * ``WorkItemSnapshotBatch.skipped`` is non-empty -- one or more
+          snapshot files exist but failed to load (bad YAML, invalid UTF-8,
+          an ``OSError``).
+        * The total snapshot file count found on disk (readable + unreadable)
+          falls short of the checkpoint's recorded ``items_observed``
+          inventory -- one or more files that were durably synced have since
+          vanished entirely (deleted, or a partial cache restore). A vanished
+          file never appears in ``skipped`` -- that list only names files
+          that exist but failed to load -- so this second check is the only
+          signal that catches it.
+
+        Neither is re-derived by scanning the cache root again here -- both
+        are read back from the load that already happened for
+        :meth:`list_work_items`, so this costs no extra I/O. Returns
+        ``False`` before any load has run. A warm checkpoint over a partial
+        or incomplete snapshot set is exactly the case ``operations.list_items``
+        (task A4) must not report as confidently servable.
 
         Returns:
-            ``True`` when the most recent load skipped one or more files.
+            ``True`` when the most recent load skipped one or more files, or
+            found fewer snapshot files on disk than the checkpoint expects.
         """
-        return bool(self._last_skipped_snapshots)
+        return bool(self._last_skipped_snapshots) or self._last_snapshot_shortfall
 
     def has_pending_writes(self) -> bool:
         """Report whether the cache holds mutations not yet acknowledged by GitHub.
@@ -616,6 +640,17 @@ class _GitHubReconciliation:
         """
         batch = self._cache._work_item_snapshots()
         self._last_skipped_snapshots = batch.skipped
+        checkpoint = self._cache._get_snapshot_checkpoint()
+        # A checkpoint's items_observed records the total snapshot file count
+        # (readable + unreadable) the durable cache held immediately after the
+        # reconcile that advanced it (see _advance_snapshot_checkpoint). A
+        # shortfall here -- fewer files found now than that recorded total --
+        # means one or more files vanished entirely between then and now
+        # (backlog #3546 Codex finding 1), since WorkItemSnapshotBatch.skipped
+        # only ever names a file that still exists but failed to load.
+        self._last_snapshot_shortfall = (
+            checkpoint is not None and len(batch.snapshots) + len(batch.skipped) < checkpoint.items_observed
+        )
         records_by_reference = {item.reference: LogicalCacheRecord(key=key, item=item) for key, item in batch.snapshots}
         for mutation in (
             pending_work_items if pending_work_items is not None else self._cache._pending_work_item_mutations()
@@ -669,9 +704,24 @@ class _GitHubReconciliation:
         ``pages_fetched=1`` for every scope, including ``LINKED``/
         ``TARGETED``, which never fetch a page at all (``issues = []`` is
         assigned directly) -- so the field carries no real pagination signal
-        to gate on today. ``items_observed`` is still recorded below so a
-        future discriminator (or a diagnostic reader) has the count without
-        this method needing to change again.
+        to gate on today.
+
+        ``items_observed`` is recorded from a fresh disk scan taken *after*
+        this reconcile's cache writes have already landed (both write phases
+        in :meth:`reconcile` run before this method is called), not from
+        ``outcome.result.fetched_items``. ``fetched_items`` is only the
+        provider-side delta this reconcile fetched -- for ``INCREMENTAL``
+        scope that is the changed-since-watermark subset, not the cache's
+        total item count -- so it cannot stand in for "how many snapshot
+        files does the cache expect to hold". A direct disk count can: every
+        item untouched by this reconcile still has its file on disk, and a
+        provider-side removal never deletes the local file (see
+        ``_plan_item``'s ``unlink`` action, which rewrites the file with a
+        cleared issue reference rather than removing it), so the count taken
+        here is stable across reconciles except when a file vanishes outside
+        the reconcile's control entirely -- exactly the condition
+        :meth:`load_records` compares a later load against to detect that
+        (backlog #3546 Codex finding 1).
         """
         if not (
             outcome.advance_snapshot_checkpoint
@@ -683,8 +733,12 @@ class _GitHubReconciliation:
             # A label-scoped observation never covers the full unlabeled item
             # set a bare checkpoint is read to mean -- see the docstring above.
             return
+        batch = self._cache._work_item_snapshots()
         self._cache._set_snapshot_checkpoint(
             _ProviderSnapshotCheckpoint(
-                watermark=watermark, scope=scope.value, label=label, items_observed=outcome.result.fetched_items
+                watermark=watermark,
+                scope=scope.value,
+                label=label,
+                items_observed=len(batch.snapshots) + len(batch.skipped),
             )
         )
