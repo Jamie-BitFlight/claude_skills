@@ -634,6 +634,20 @@ class GraphQLUnavailableError(BackendUnavailableError):
     """
 
 
+class GraphQLUnavailableError(BackendUnavailableError):
+    """Raised when the environment refuses GitHub's GraphQL API outright.
+
+    Distinct from a generic GraphQL failure. Some sandboxes permit GitHub's REST API
+    and reject every GraphQL request with HTTP 403, so the query was never wrong and
+    retrying it cannot succeed — only a REST path can. Callers branch on this type to
+    choose that path.
+
+    It is also distinct from :class:`ItemNotFoundError`. A refused query says nothing
+    about whether the requested item exists, and reporting one as the other tells the
+    caller something false.
+    """
+
+
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
 # UnsupportedBackendCapabilityError's protocol_mismatch message — "github_extras" alone
 # doesn't tell a reader which Protocol class the backend failed to satisfy.
