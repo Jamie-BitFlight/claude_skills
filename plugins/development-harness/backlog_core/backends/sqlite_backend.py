@@ -174,6 +174,9 @@ class SQLiteBackend:
       ``GitHubExtras`` methods as local simulations for internal delegation,
       but ``get_github()`` cannot return a real ``Repository``, so the
       capability is absent regardless of which methods exist.
+    - ``batch_status_fetch_requires_credentials = False`` — :meth:`batch_fetch_statuses`
+      queries the local SQLite database only; it never talks to the live
+      GitHub API, so no ``GITHUB_TOKEN`` is needed.
 
     Args:
         db_path: Path to the SQLite database file, or ``:memory:`` for an
@@ -185,6 +188,7 @@ class SQLiteBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = False
     supports_github_extras: bool = False
+    batch_status_fetch_requires_credentials: bool = False
     supports_milestones: bool = True
 
     def __init__(self, db_path: str = ":memory:") -> None:

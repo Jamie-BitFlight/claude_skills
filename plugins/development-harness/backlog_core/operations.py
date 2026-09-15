@@ -2081,10 +2081,21 @@ def _resolve_list_status_map(
     # flag is declared on every real backend (github/memory/sqlite/beads),
     # per WorkItemBackend's Protocol docstring, but narrow test doubles that
     # only implement the subset a given test exercises are not required to
-    # declare it -- such a double is never GitHub-credential-gated to begin
-    # with, so treating an undeclared flag as False (skip the token check
-    # entirely) matches its actual behaviour.
-    if getattr(get_config().backend, "supports_github_extras", False):
+    # declare it -- such a double never routes batch_fetch_statuses() through
+    # the live GitHub API to begin with, so treating an undeclared flag as
+    # False (skip the token check entirely) matches its actual behaviour.
+    #
+    # Deliberately NOT supports_github_extras: that flag means "implements
+    # the optional GitHubExtras Protocol", a different capability that a test
+    # double may legitimately declare True for reasons unrelated to
+    # batch_fetch_statuses (e.g. tests/conftest.py's ProviderMemoryBackend,
+    # which sets supports_github_extras=True to simulate GraphQL-shaped
+    # delegate methods for other tests, while its batch_fetch_statuses stays
+    # a local, credential-free simulation). Gating on it here previously
+    # skipped a perfectly runnable local/mocked fetch whenever no
+    # GITHUB_TOKEN was configured, even though nothing about that fetch
+    # needed one (#3546, CI regression on PR #3577).
+    if getattr(get_config().backend, "batch_status_fetch_requires_credentials", False):
         try:
             resolve_token()
         except MissingGitHubTokenError:

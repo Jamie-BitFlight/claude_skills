@@ -105,6 +105,12 @@ class InMemoryBackend:
       implemented (create/get/list/delete/merge) for test-double coverage
       of the ``BranchBackend`` protocol.
     - ``supports_github_extras = False`` — same reason as ``SQLiteBackend``: methods are local simulations, ``get_github()`` can't return a real ``Repository``.
+    - ``batch_status_fetch_requires_credentials = False`` — :meth:`batch_fetch_statuses`
+      is a pure in-memory simulation; it never talks to the live GitHub API,
+      so no ``GITHUB_TOKEN`` is needed regardless of what a subclass sets
+      ``supports_github_extras`` to (see ``tests/conftest.py``'s
+      ``ProviderMemoryBackend`` for a subclass that does exactly that for an
+      unrelated reason).
     """
 
     supports_batch_status_fetch: bool = True
@@ -112,6 +118,7 @@ class InMemoryBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
     supports_github_extras: bool = False
+    batch_status_fetch_requires_credentials: bool = False
     supports_milestones: bool = True
 
     def __init__(self) -> None:

@@ -305,6 +305,11 @@ class BeadsBackend:
       ``GitHubExtras`` methods (see ``backend_types.py`` for the protocol);
       this is the one backend the old ``isinstance``-only gate actually
       caught correctly.
+    - ``batch_status_fetch_requires_credentials = False`` — moot in practice:
+      :meth:`batch_fetch_statuses` already raises ``NotImplementedError``
+      because ``supports_batch_status_fetch`` is ``False`` above, so this
+      flag is never consulted for beads. Declared ``False`` for consistency
+      with every other non-GitHub backend rather than left undeclared.
     - ``supports_milestones = False`` — the generic ``list_milestones``/
       ``create_milestone``/``assign_item_to_milestone`` methods use ``int``
       issue/milestone numbers, which beads' string nanoid IDs cannot satisfy
@@ -327,6 +332,7 @@ class BeadsBackend:
     issue_id_type: Literal["integer", "string"] = "string"
     supports_branches: bool = False
     supports_github_extras: bool = False
+    batch_status_fetch_requires_credentials: bool = False
     supports_milestones: bool = False
 
     def __init__(self, runner: _BdRunnerLike | None = None) -> None:

@@ -107,6 +107,10 @@ class GitHubBackend:
     - ``supports_github_extras = True`` — this is the only backend that
       implements ``GitHubExtras`` for real, backed by a live GitHub
       connection.
+    - ``batch_status_fetch_requires_credentials = True`` — :meth:`batch_fetch_statuses`
+      delegates to ``gh_client.batch_fetch_statuses``, which needs a real
+      ``GITHUB_TOKEN`` to query live data; this is the only backend for which
+      that is true.
     """
 
     supports_batch_status_fetch: bool = True
@@ -114,6 +118,7 @@ class GitHubBackend:
     issue_id_type: Literal["integer", "string"] = "integer"
     supports_branches: bool = True
     supports_github_extras: bool = True
+    batch_status_fetch_requires_credentials: bool = True
     supports_milestones: bool = True
 
     def __init__(

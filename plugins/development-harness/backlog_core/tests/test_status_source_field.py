@@ -56,12 +56,17 @@ class _StringIdBackend:
 
 class _GitHubLikeBackend:
     """Backend stub that, unlike ``_BatchCapableBackend``, declares
-    ``supports_github_extras = True`` -- the flag ``list_items()`` gates its
-    (network-free) GitHub-token check on, matching the real ``GitHubBackend``.
+    ``batch_status_fetch_requires_credentials = True`` -- the flag
+    ``list_items()`` gates its (network-free) GitHub-token check on, matching
+    the real ``GitHubBackend``. Also declares ``supports_github_extras = True``
+    to model a GitHub-shaped backend faithfully, even though that flag is not
+    what the token check gates on (see ``operations._resolve_list_status_map``'s
+    docstring -- the two capabilities are deliberately independent).
     """
 
     supports_batch_status_fetch = True
     supports_github_extras = True
+    batch_status_fetch_requires_credentials = True
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items
