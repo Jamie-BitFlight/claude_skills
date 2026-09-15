@@ -63,6 +63,7 @@ from .parsing import (
     today,
 )
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -1331,6 +1332,18 @@ def try_get_github(repo: str = "") -> Repository | None:
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
+        raise GitHubUnavailableError(f"GitHub repository {repo!r} unavailable: {exc}") from exc
+    except RETRYABLE_TRANSIENT_EXCEPTIONS as exc:
+        # PyGithub's requester can raise a transport-level exception directly
+        # (requests.exceptions.ConnectionError, Timeout, ...) when get_repo fails
+        # before an HTTP response is received at all — a dropped connection never
+        # reaches the GithubException branch above. sync_state.py's
+        # RETRYABLE_TRANSIENT_EXCEPTIONS is the established, already-tested list
+        # of these transport exception types; reused here rather than duplicated
+        # so both call sites stay in sync. From the caller's perspective this is
+        # indistinguishable from a GithubException failure — "GitHub is
+        # unreachable right now" — so it raises the same GitHubUnavailableError.
+        logger.warning("try_get_github: transport error %s for repo %r", type(exc).__name__, repo)
         raise GitHubUnavailableError(f"GitHub repository {repo!r} unavailable: {exc}") from exc
 
 

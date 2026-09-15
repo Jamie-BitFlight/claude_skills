@@ -472,6 +472,7 @@ max-complexity = 12
 "**/tests/test_backlog_core_github.py" = ["banned-api"]
 # Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
 # requests exception instance to verify exact-type matching in the except clause.
+"**/tests/test_backlog_core_github.py" = ["banned-api"]
 "**/tests/test_backlog_core_operations.py" = ["banned-api"]
 # Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
 # (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
