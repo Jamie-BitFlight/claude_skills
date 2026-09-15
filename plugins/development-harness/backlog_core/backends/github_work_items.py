@@ -70,7 +70,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode
+    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode
     from backlog_core.file_cache import FileCache
     from backlog_core.file_cache_state import _PendingWorkItemMutation
 
@@ -116,7 +116,7 @@ class _IssueGateway(Protocol):
         self, repo: Repository, owner: str, repo_name: str, references: list[str]
     ) -> dict[str, IssueNode | None]: ...
 
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str: ...
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode: ...
 
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode: ...
 
@@ -282,10 +282,10 @@ class _GitHubWorkItemSync:
                 )
                 continue
             try:
-                comment_id = self._issues._add_comment_graphql(
+                added_comment = self._issues._add_comment_graphql(
                     repo, issue["id"], render_work_item_comment(current.revision, patch.body)
                 )
-                if not comment_id:
+                if not added_comment.id:
                     results.append(
                         PatchResult(
                             provider_id=patch.provider_id,
@@ -295,7 +295,7 @@ class _GitHubWorkItemSync:
                         )
                     )
                     continue
-                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
+                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, added_comment.id)
                 written = self._contents().put(
                     ContentWrite(
                         reference=work_item_head_ref(patch.reference),

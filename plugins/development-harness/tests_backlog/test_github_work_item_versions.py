@@ -6,7 +6,7 @@ from threading import Barrier, Lock, Thread
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core.backend_types import IssueCommentNode
+from backlog_core.backend_types import AddedCommentNode, IssueCommentNode
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     parse_work_item_comment,
@@ -198,7 +198,7 @@ def _backend(
 
     lock = comment_lock or Lock()
 
-    def add_comment(_repo: object, _issue_id: str, body: str) -> str:
+    def add_comment(_repo: object, _issue_id: str, body: str) -> AddedCommentNode:
         with lock:
             comment_id = f"comment-{len(comments) + 1}"
             comments[comment_id] = IssueCommentNode(
@@ -209,7 +209,7 @@ def _backend(
                 created_at="2026-08-12T00:00:00Z",
                 updated_at="2026-08-12T00:00:00Z",
             )
-        return comment_id
+        return AddedCommentNode(id=comment_id, database_id=None)
 
     backend._add_comment_graphql = MagicMock(side_effect=add_comment)
     return backend

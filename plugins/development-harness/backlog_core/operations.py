@@ -18,6 +18,7 @@ from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException
 from github.Repository import Repository
+from pydantic import BaseModel, ConfigDict
 from ruamel.yaml.error import YAMLError
 from sam_schema.core.backends.content import parse_plan_content
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
@@ -27,7 +28,14 @@ from typing_extensions import TypedDict
 from . import models as _models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import (
+    AddedCommentNode,
+    ContentProvider,
+    IssueCommentNode,
+    IssueNode,
+    MilestoneFullNode,
+    SyncProvider,
+)
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
@@ -377,11 +385,12 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     require_github_extras(backend, "_update_issues_graphql_batch")._update_issues_graphql_batch(repo, updates)
 
 
-def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
+def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
     """Add a comment to an issue via the active backend.
 
     Returns:
-        GraphQL node ID of the newly created comment.
+        AddedCommentNode with the newly created comment's GraphQL node ``id``
+        and, when the backend reports one, its REST ``database_id``.
     """
     backend = get_config().backend
     return require_github_extras(backend, "_add_comment_graphql")._add_comment_graphql(repo, issue_node_id, body)
@@ -554,13 +563,19 @@ def _is_section_entry_metadata(value: object) -> TypeGuard[SectionEntryMetadata]
     return isinstance(value, dict) and "entries" in value
 
 
-class CommentListEntry(TypedDict):
+class CommentListEntry(BaseModel):
     """One comment entry as returned by list_comments().
 
     ``id`` is the GraphQL node ID; ``database_id`` is the REST integer ID
     ``read_comment``'s ``comment_id`` requires, carried through from
     ``IssueCommentNode.database_id`` and ``None`` when GitHub did not report one.
+
+    A validated, immutable output record, consistent with ``IssueCommentNode``
+    and ``AddedCommentNode`` (both in ``backend_types.py``) -- the structured
+    data this repository's ingestion and output objects standardize on.
     """
+
+    model_config = ConfigDict(frozen=True, strict=True)
 
     id: str
     database_id: int | None
@@ -4934,7 +4949,7 @@ def list_issues(
 
 def comment_issue(
     repo: str = "", issue_number: int = 0, body: str = "", output: Output | None = None
-) -> dict[str, str | int | list[str]]:
+) -> dict[str, str | int | list[str] | None]:
     """Add a comment to a GitHub issue.
 
     Args:
@@ -4944,8 +4959,12 @@ def comment_issue(
         output: Optional Output collector.
 
     Returns:
-        Dict with ``issue_number`` (int), ``comment_id`` (int),
-        ``comment_url`` (str), and output messages/warnings.
+        Dict with ``issue_number`` (int), ``comment_id`` (str -- the GraphQL
+        node ID; not usable as ``read_comment``'s ``comment_id``),
+        ``database_id`` (int | None -- the REST integer ID
+        ``read_comment``'s ``comment_id`` requires, carried through from
+        ``AddedCommentNode.database_id`` and ``None`` when GitHub did not
+        report one), ``comment_url`` (str), and output messages/warnings.
 
     Raises:
         ValidationError: If ``issue_number`` is not positive or ``body`` is empty.
@@ -4963,14 +4982,20 @@ def comment_issue(
         gh_repo = get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
         issue_node = _fetch_issue_graphql(gh_repo, owner, repo_name, issue_number)
-        comment_node_id = _add_comment_graphql(gh_repo, issue_node["id"], body)
+        added_comment = _add_comment_graphql(gh_repo, issue_node["id"], body)
         out.info(f"  Comment added to issue #{issue_number}")
     except UnsupportedBackendCapabilityError:
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error adding comment: {e}"
         raise BacklogError(msg) from e
-    return {"issue_number": issue_number, "comment_id": comment_node_id, "comment_url": "", **out.to_dict()}
+    return {
+        "issue_number": issue_number,
+        "comment_id": added_comment.id,
+        "database_id": added_comment.database_id,
+        "comment_url": "",
+        **out.to_dict(),
+    }
 
 
 _COMMENT_PREVIEW_LENGTH = 200
@@ -5021,14 +5046,14 @@ def list_comments(
     window = all_comments[offset : offset + limit]
     has_more = len(all_comments) > offset + limit
     comment_list: list[CommentListEntry] = [
-        {
-            "id": c.id,
-            "database_id": c.database_id,
-            "author": c.author,
-            "created_at": c.created_at,
-            "updated_at": c.updated_at,
-            "preview": c.body[:_COMMENT_PREVIEW_LENGTH],
-        }
+        CommentListEntry(
+            id=c.id,
+            database_id=c.database_id,
+            author=c.author,
+            created_at=c.created_at,
+            updated_at=c.updated_at,
+            preview=c.body[:_COMMENT_PREVIEW_LENGTH],
+        )
         for c in window
     ]
     out_d = out.to_dict()

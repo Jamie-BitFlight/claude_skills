@@ -3679,9 +3679,10 @@ async def backlog_comment_issue(
     Returns:
         :class:`~backlog_core.tool_responses.BacklogCommentIssueResponse` with
         issue_number, comment_id (a GraphQL node ID — not usable as
-        backlog_read_comment's comment_id, which requires a REST integer ID),
-        comment_url (always empty), and output messages/warnings. On error,
-        ``error`` is set.
+        backlog_read_comment's comment_id), database_id (the REST integer ID
+        backlog_read_comment's comment_id requires; ``None`` when GitHub did
+        not report one), comment_url (always empty), and output
+        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3740,10 +3741,11 @@ async def backlog_read_comment(
         int,
         Field(
             description=(
-                "REST comment database ID (integer) — obtain it from the GitHub REST API, or "
-                "from backlog_list_comments's per-comment database_id field. backlog_list_comments's "
-                "id and backlog_comment_issue's comment_id are GraphQL node IDs and will not work "
-                "here; database_id may also be absent for a given comment (e.g. non-GitHub backends)."
+                "REST comment database ID (integer) — obtain it from the GitHub REST API, from "
+                "backlog_list_comments's per-comment database_id field, or from "
+                "backlog_comment_issue's database_id field. backlog_list_comments's id and "
+                "backlog_comment_issue's comment_id are GraphQL node IDs and will not work here; "
+                "database_id may also be absent for a given comment (e.g. non-GitHub backends)."
             )
         ),
     ],

@@ -86,9 +86,18 @@ class IssueCommentNode(BaseModel):
 
     ``id`` is GitHub's GraphQL node ID (``IC_kwDO...``). REST addresses the same
     comment by its numeric identifier instead, which GraphQL exposes as
-    ``databaseId`` and is carried here as ``database_id``. Both are needed
+    ``fullDatabaseId`` and is carried here as ``database_id``. Both are needed
     together: a node that arrives over GraphQL cannot otherwise be read or
     written over REST.
+
+    ``fullDatabaseId`` (GitHub's ``BigInt`` scalar) is what the GraphQL
+    queries select, not the sibling ``databaseId: Int`` field: real comment
+    database IDs already exceed the signed 32-bit range ``Int`` caps out at,
+    and GitHub serializes ``BigInt`` as a decimal string on the wire (a JSON
+    integer is also tolerated) — see
+    https://docs.github.com/en/graphql/reference/scalars#bigint. The parser
+    that populates this field (``gh_client._parse_full_database_id``)
+    normalizes both encodings to a Python ``int`` before construction.
 
     ``database_id`` is optional because only GitHub has one. The SQLite and
     memory backends address their comments by ``id`` alone, and supplying a
@@ -109,6 +118,29 @@ class IssueCommentNode(BaseModel):
     author: str
     created_at: str
     updated_at: str
+    database_id: int | None = None
+
+
+class AddedCommentNode(BaseModel):
+    """Result of creating a comment via the ``addComment`` mutation.
+
+    ``id`` is GitHub's GraphQL node ID for the newly created comment.
+    ``database_id`` is the REST integer ID (the mutation's ``fullDatabaseId``
+    selection, normalized the same way as ``IssueCommentNode.database_id`` --
+    see that model's docstring for the ``BigInt`` wire encoding) that
+    ``backlog_read_comment``'s ``comment_id`` requires. It achieves the same
+    create/list/read identifier symmetry ``IssueCommentNode.database_id``
+    already provides for the listing and single-comment paths.
+
+    ``database_id`` is optional for the same reason as
+    ``IssueCommentNode.database_id``: only GitHub-backed comments carry a
+    REST integer ID -- the SQLite and in-memory backends invent no such
+    value for a comment they created themselves.
+    """
+
+    model_config = ConfigDict(frozen=True, strict=True)
+
+    id: str
     database_id: int | None = None
 
 
@@ -331,7 +363,7 @@ class GitHubExtras(Protocol):
     ) -> list[IssueNode]: ...
 
     # Issue comments (GraphQL)
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str: ...
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode: ...
     def _fetch_issue_comments_graphql(
         self, repo: Repository, owner: str, repo_name: str, issue_number: int
     ) -> list[IssueCommentNode]: ...

@@ -45,7 +45,14 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from backlog_core.backend_types import (
+    AddedCommentNode,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -895,8 +902,8 @@ class SQLiteBackend:
     # ------------------------------------------------------------------
 
     @_serialized_connection_operation
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
-        """Add a comment to an issue and return its ID.
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
+        """Add a comment to an issue and return its identity.
 
         Args:
             repo: Ignored.
@@ -904,7 +911,9 @@ class SQLiteBackend:
             body: Comment body text.
 
         Returns:
-            UUID string for the new comment.
+            AddedCommentNode with a generated UUID string as ``id`` and
+            ``database_id=None`` -- SQLite has no REST integer comment ID to
+            report.
         """
         number = self._issue_number_for_node_id(issue_node_id)
         comment_id = str(uuid.uuid4())
@@ -914,7 +923,7 @@ class SQLiteBackend:
             (comment_id, number, body, ts, ts),
         )
         self._conn.commit()
-        return comment_id
+        return AddedCommentNode(id=comment_id, database_id=None)
 
     @_serialized_connection_operation
     def _fetch_issue_comments_graphql(

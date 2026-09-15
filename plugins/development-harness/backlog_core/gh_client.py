@@ -23,7 +23,15 @@ from typing_extensions import TypedDict
 
 from backlog_core.github_client import MissingGitHubTokenError, make_github_client
 
-from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from .backend_types import (
+    AddedCommentNode,
+    AssigneeNode,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from .entry_blocks import wrap_entry
 from .models import (
     TYPE_TO_LABEL,
@@ -262,7 +270,7 @@ mutation UpdateIssue(
 _ADD_COMMENT_MUTATION = """
 mutation AddComment($subjectId: ID!, $body: String!) {
   addComment(input: {subjectId: $subjectId, body: $body}) {
-    commentEdge { node { id url } }
+    commentEdge { node { id fullDatabaseId url } }
   }
 }
 """
@@ -334,7 +342,7 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
-          databaseId
+          fullDatabaseId
           body
           url
           author { login }
@@ -353,7 +361,7 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
-      databaseId
+      fullDatabaseId
       body
       url
       author { login }
@@ -880,7 +888,7 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
                 _update_issue_graphql(repo, node_id, body=body)
 
 
-def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
+def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
     """Add a comment to an issue via GraphQL.
 
     Args:
@@ -889,14 +897,56 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
         body: Comment body text.
 
     Returns:
-        Comment node ID string.
+        AddedCommentNode carrying the GraphQL node ``id`` and, when GitHub
+        reports one, the REST integer ``database_id`` that
+        ``backlog_read_comment``'s ``comment_id`` requires -- the same
+        identifier symmetry ``_fetch_issue_comments_graphql`` and
+        ``_fetch_comment_by_id_graphql`` already provide for the listing and
+        single-comment paths.
 
     Raises:
         BacklogError: On GraphQL errors.
     """
     data = _graphql_request(repo, _ADD_COMMENT_MUTATION, {"subjectId": issue_node_id, "body": body})
     comment_node = data.get("addComment", {}).get("commentEdge", {}).get("node", {})
-    return str(comment_node.get("id", ""))
+    return AddedCommentNode(
+        id=str(comment_node.get("id", "")), database_id=_parse_full_database_id(comment_node.get("fullDatabaseId"))
+    )
+
+
+def _parse_full_database_id(raw_full_database_id: object) -> int | None:
+    """Normalize a raw GraphQL ``fullDatabaseId`` value to ``int | None``.
+
+    ``fullDatabaseId`` is GitHub's ``BigInt`` scalar -- the field the comment
+    queries and the ``addComment`` mutation select instead of the sibling
+    ``databaseId: Int`` field, because a real comment database ID already
+    exceeds ``Int``'s signed 32-bit range. GitHub serializes ``BigInt`` as a
+    decimal string on the wire, though a JSON integer is also tolerated
+    (https://docs.github.com/en/graphql/reference/scalars#bigint), so both
+    encodings are accepted here and normalized to a Python ``int``.
+
+    ``bool`` is an ``int`` subclass in Python, so it is excluded explicitly —
+    ``True`` would otherwise be accepted as comment ``1``. A string is only
+    accepted when it is a plain, unsigned decimal (every character an ASCII
+    digit): GitHub never emits a sign or a fractional part for this field,
+    and accepting one anyway would coerce an unrelated malformed response
+    into a plausible-looking ID.
+
+    Args:
+        raw_full_database_id: The raw ``fullDatabaseId`` value from a GraphQL
+            response (``comments.nodes[].fullDatabaseId``, ``node()``'s
+            ``... on IssueComment { fullDatabaseId }``, or
+            ``commentEdge.node.fullDatabaseId``).
+
+    Returns:
+        The integer database ID, or ``None`` if absent, ``null``, or not a
+        recognizable ``int``/decimal-string encoding.
+    """
+    if isinstance(raw_full_database_id, int) and not isinstance(raw_full_database_id, bool):
+        return raw_full_database_id
+    if isinstance(raw_full_database_id, str) and re.fullmatch(r"[0-9]+", raw_full_database_id):
+        return int(raw_full_database_id)
+    return None
 
 
 def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
@@ -907,21 +957,15 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
 
     Returns:
         IssueCommentNode with all fields populated. ``database_id`` is set only
-        when the response carries a ``databaseId`` integer — it is the numeric
-        identifier REST addresses the comment by, and a missing or non-integer
-        value is left absent rather than guessed at, so a REST caller fails
-        loudly instead of requesting a comment that does not exist. bool is an
-        int subclass, so it is excluded explicitly here — True would otherwise
-        become comment 1 — and ``IssueCommentNode``'s own ``strict=True``
-        config independently rejects a bool or numeric-string ``database_id``
-        that reaches construction some other way.
+        when the response carries a recognizable ``fullDatabaseId`` -- it is
+        the numeric identifier REST addresses the comment by, and a missing or
+        unrecognizable value is left absent rather than guessed at, so a REST
+        caller fails loudly instead of requesting a comment that does not
+        exist. See ``_parse_full_database_id`` for the accepted encodings.
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    raw_database_id = node.get("databaseId")
-    database_id = (
-        raw_database_id if isinstance(raw_database_id, int) and not isinstance(raw_database_id, bool) else None
-    )
+    database_id = _parse_full_database_id(node.get("fullDatabaseId"))
     return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),

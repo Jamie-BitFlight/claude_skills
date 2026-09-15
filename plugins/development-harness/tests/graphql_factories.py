@@ -392,9 +392,9 @@ def make_issue_comment_node(
         created_at: ISO 8601 creation timestamp.
         updated_at: ISO 8601 last-update timestamp.
         database_id: REST comment database ID as GraphQL would report it under
-            ``databaseId``. Omitted from the returned dict when ``None``, matching
-            a real response that never omits the field but lets tests indifferent
-            to it opt out of asserting on it.
+            ``fullDatabaseId``. Omitted from the returned dict when ``None``,
+            matching a real response that never omits the field but lets tests
+            indifferent to it opt out of asserting on it.
 
     Returns:
         Dict matching raw GraphQL IssueCommentNode shape (before parsing).
@@ -408,7 +408,7 @@ def make_issue_comment_node(
         "updatedAt": updated_at,
     }
     if database_id is not None:
-        node["databaseId"] = database_id
+        node["fullDatabaseId"] = database_id
     return node
 
 
