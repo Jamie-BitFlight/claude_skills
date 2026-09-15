@@ -1235,17 +1235,23 @@ class TestListItemsFiltering:
         assert items[0]["milestone"] == "v2"
 
     def test_list_items_always_calls_batch_fetch(self, mocker: MockerFixture) -> None:
-        """Verify list_items always calls batch_fetch_statuses to populate status fields.
+        """Verify list_items calls batch_fetch_statuses to populate status fields.
 
-        Tests: batch_fetch_statuses is always called regardless of filter parameters.
+        Tests: batch_fetch_statuses is called regardless of filter parameters, for a
+            page that has at least one numeric-issue item to look up.
         How: Call list_items with no status filter; assert batch fetch was called.
         Why: Status fields (status, milestone) are always included in every response —
-             batch_fetch must always run to populate them.
+             batch fetch must run to populate them for numeric-issue items. A page with
+             no numeric issue reference at all is deliberately skipped instead (#3546,
+             Codex review on PR #3577) -- see
+             ``test_status_source_field.py::test_no_numeric_issue_references_reports_cache_not_live``
+             for that distinct case -- so this item is given an issue reference to keep
+             exercising the "must run" path this test names.
         """
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item")
+        _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item", issue="#1")
         mock_batch = mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
         list_items(refresh=False)

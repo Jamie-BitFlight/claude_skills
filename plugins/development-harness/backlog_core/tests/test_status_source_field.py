@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backlog_core import operations
+from backlog_core.github_client import MissingGitHubTokenError
 from backlog_core.models import BackendUnavailableError, BacklogItem, GraphQLUnavailableError, Output
 
 if TYPE_CHECKING:
@@ -45,6 +46,22 @@ class _StringIdBackend:
     """Backend stub without batch status support (e.g. beads) -- status is backend-owned."""
 
     supports_batch_status_fetch = False
+
+    def __init__(self, items: list[BacklogItem]) -> None:
+        self._items = items
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return list(self._items)
+
+
+class _GitHubLikeBackend:
+    """Backend stub that, unlike ``_BatchCapableBackend``, declares
+    ``supports_github_extras = True`` -- the flag ``list_items()`` gates its
+    (network-free) GitHub-token check on, matching the real ``GitHubBackend``.
+    """
+
+    supports_batch_status_fetch = True
+    supports_github_extras = True
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items
@@ -85,6 +102,57 @@ class TestListItemsStatusSource:
 
         result = operations.list_items(output=Output())
 
+        assert result["status_source"] == "cache"
+        assert result["unavailable_capabilities"] == []
+
+    def test_missing_github_token_reports_cache_not_live(self, mocker: MockerFixture) -> None:
+        """A skipped batch fetch (no GITHUB_TOKEN) must not be reported as 'live' (#3546,
+        Codex review on PR #3577): gh_client.batch_fetch_statuses() would short-circuit to
+        an empty map without ever making a live request, so list_items() must never claim
+        the request succeeded. Per StatusSource's docstring, "no live fetch was attempted
+        this call" is "cache", not "unavailable" -- the latter is reserved for an attempt
+        that was made and failed.
+        """
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([_item("#1")]))
+        )
+        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token configured"))
+        batch_fetch_spy = mocker.patch.object(operations, "batch_fetch_statuses")
+
+        result = operations.list_items(output=Output())
+
+        batch_fetch_spy.assert_not_called()
+        assert result["status_source"] == "cache"
+        assert result["unavailable_capabilities"] == []
+
+    def test_missing_github_token_with_status_filter_names_filter_unreliable(self, mocker: MockerFixture) -> None:
+        """A skipped-for-credentials fetch is exactly as unevaluable as an
+        attempted-and-failed one -- B2's fabrication-prevention guard must apply here too.
+        """
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([_item("#1")]))
+        )
+        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token configured"))
+        mocker.patch.object(operations, "batch_fetch_statuses")
+
+        result = operations.list_items(status="in-progress", output=Output())
+
+        assert result["filters_evaluated_against_unavailable_data"] == ["status"]
+
+    def test_no_numeric_issue_references_reports_cache_not_live(self, mocker: MockerFixture) -> None:
+        """No item on the page carries a numeric issue reference -- nothing for the
+        provider to look up, live or otherwise (#3546, Codex review on PR #3577).
+        Must report "cache", never "live", and must never call batch_fetch_statuses.
+        """
+        beads_style_item = BacklogItem(title="Beads item", issue="bd-a3f8", section="P1", status="status:in-progress")
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([beads_style_item]))
+        )
+        batch_fetch_spy = mocker.patch.object(operations, "batch_fetch_statuses")
+
+        result = operations.list_items(output=Output())
+
+        batch_fetch_spy.assert_not_called()
         assert result["status_source"] == "cache"
         assert result["unavailable_capabilities"] == []
 
