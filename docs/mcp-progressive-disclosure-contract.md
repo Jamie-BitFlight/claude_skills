@@ -279,6 +279,44 @@ The `suggestion` key is present only when difflib finds a close match (SequenceM
 fallback is removed. Callers that previously relied on approximate section names should use
 `map=True` to discover exact section names or use `sections_index` from a summary-mode response.
 
+### Generic backend error
+
+Ordinal misses and section-filter misses are the two *expected* miss shapes above — both carry
+dedicated structured fields (`valid_ordinals`, `valid_sections`) because the calling code can
+recover from them by retrying with a corrected ordinal or section name. Every other failure raised
+while executing a MAP, NAVIGATE, or EXTRACT request — a missing backlog item, a refused
+GraphQL/REST lookup, an unsupported backend capability, or any other `BacklogError` subclass — is
+caught at the same site and returns a smaller, generic error shape instead:
+
+```text
+{
+  "error": "No item found for: #99999",
+  "error_type": "ItemNotFoundError"
+}
+```
+
+`error` is the exception's rendered message (`str(exc)`), identical in spirit to the `error` key in
+the ordinal-miss and section-miss shapes above. `error_type` is new: it is the raised exception's
+class name (`type(exc).__name__`), giving the caller a stable identity to branch on instead of
+parsing the free-text message. This matters because `BacklogError` has multiple subclasses —
+`ItemNotFoundError`, `EntryNotFoundError`, `CacheStateCorruptError`, and others defined in
+[`../plugins/development-harness/backlog_core/models.py`](../plugins/development-harness/backlog_core/models.py)
+— and prior to this field every one of them flattened to the same bare `{"error": str(exc)}`,
+discarding which failure actually occurred.
+
+This generic shape is distinct from, and does not replace, the dedicated ordinal-miss and
+section-miss shapes documented above: `OrdinalNotFoundError` keeps its own
+`requested_ordinal`/`valid_ordinals` fields, and the legacy `section=`/`sections=[]` miss keeps its
+own `valid_sections`/`section_filter_miss`/`suggestion` fields. A caller that needs to distinguish
+"ordinal not found" from "item not found" from "backend refused the lookup" should check for the
+presence of `valid_ordinals` or `valid_sections` first, then fall back to `error_type` for every
+other `BacklogError` subclass. The generic shape never carries a `body` field, matching the
+no-`body` convention used to distinguish every error dict in this section from a content response.
+
+Implemented in
+[`../plugins/development-harness/backlog_core/server.py`](../plugins/development-harness/backlog_core/server.py)'s
+`_execute_disclosure_or_passthrough`.
+
 ---
 
 ## Token Budget Targets
