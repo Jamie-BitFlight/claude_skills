@@ -20,6 +20,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
+from github import Github
 from github.Requester import HTTPSRequestsConnectionClass, Requester
 from urllib3.util.ssl_ import create_urllib3_context
 
@@ -31,6 +32,7 @@ from backlog_core.github_client import (
     _build_ssl_context,
     _InstallState,
     _make_connection_class,
+    bundle_adds_new_anchor,
     bundle_requires_relaxed_verification,
     install_proxy_tls_support,
     make_github_client,
@@ -167,6 +169,47 @@ def ca_file(tmp_path, stock_store_file):
     return bundle
 
 
+@pytest.fixture
+def compliant_ca_file(tmp_path, stock_store_file):
+    """A bundle adding one RFC 5280-compliant private CA that VERIFY_X509_STRICT accepts.
+
+    This is the Finding 1 scenario: a custom CA that needs loading (it is genuinely new
+    to the process) but needs no strict-mode relaxation (its shape already satisfies the
+    checks ``_cert_fails_strict_checks`` enforces).
+    """
+    bundle = tmp_path / "compliant-ca-bundle.crt"
+    bundle.write_text(stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True), encoding="utf-8")
+    return bundle
+
+
+@pytest.fixture
+def ca_directory(tmp_path):
+    """An OpenSSL-hashed CA directory holding one anchor VERIFY_X509_STRICT rejects.
+
+    Real ``c_rehash`` output names each file ``<8-hex-digit-hash>.<n>``. The hash prefix
+    does not have to be the certificate's genuine OpenSSL subject hash for this module's
+    own detection to accept it: ``_is_openssl_hashed_ca_directory`` only checks the
+    filename shape, matching what ``requests.adapters.HTTPAdapter.cert_verify`` hands to
+    urllib3 as ``conn.ca_cert_dir`` (see the module docstring). Each hashed file holds a
+    single certificate here, matching the real layout, and unlike ``ca_file`` needs no
+    stock-store certificates alongside it: a directory has no "everything requests
+    already trusts" baseline to concatenate — only the added anchor lives in the file.
+    """
+    directory = tmp_path / "ca-directory"
+    directory.mkdir()
+    (directory / "aabbccdd.0").write_text(_self_signed_ca(key_usage=False), encoding="utf-8")
+    return directory
+
+
+@pytest.fixture
+def compliant_ca_directory(tmp_path):
+    """The directory counterpart of compliant_ca_file: one compliant anchor, hash-named."""
+    directory = tmp_path / "compliant-ca-directory"
+    directory.mkdir()
+    (directory / "aabbccdd.0").write_text(_self_signed_ca(key_usage=True), encoding="utf-8")
+    return directory
+
+
 class TestResolveToken:
     """Token precedence, and the failure when nothing supplies one."""
 
@@ -252,6 +295,56 @@ class TestResolveCaBundle:
 
         assert resolve_ca_bundle() == str(ca_file)
 
+    def test_accepts_an_openssl_hashed_ca_directory(self, monkeypatch, ca_directory):
+        """Finding 2: Requests accepts a hashed CA directory through ``ca_cert_dir``.
+
+        Detection has to accept the same shape, or a caller whose proxy or GitHub
+        Enterprise install ships its trust anchors as a directory rather than one
+        concatenated bundle file never gets past ``resolve_ca_bundle`` at all.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_directory))
+
+        assert resolve_ca_bundle() == str(ca_directory)
+
+    def test_ignores_a_directory_with_no_hash_named_entries(self, monkeypatch, tmp_path):
+        """An arbitrary directory is not a CA directory just because it exists."""
+        plain_directory = tmp_path / "not-a-ca-directory"
+        plain_directory.mkdir()
+        (plain_directory / "readme.txt").write_text("nothing here", encoding="utf-8")
+        monkeypatch.setenv("SSL_CERT_FILE", str(plain_directory))
+
+        assert resolve_ca_bundle() is None
+
+
+class TestBundleAddsNewAnchor:
+    """Whether a bundle supplies anything beyond the baseline store — the gate for loading it.
+
+    Finding 1: this is judged independently of bundle_requires_relaxed_verification, so a
+    compliant added anchor still counts here even though it needs no relaxation.
+    """
+
+    def test_the_stock_trust_store_adds_nothing(self, stock_store_file):
+        assert bundle_adds_new_anchor(str(stock_store_file)) is False
+
+    def test_a_compliant_added_anchor_counts(self, compliant_ca_file):
+        assert bundle_adds_new_anchor(str(compliant_ca_file)) is True
+
+    def test_a_deficient_added_anchor_counts(self, ca_file):
+        assert bundle_adds_new_anchor(str(ca_file)) is True
+
+    def test_a_bundle_holding_no_certificates_adds_nothing(self, tmp_path):
+        bundle = tmp_path / "empty.crt"
+        bundle.write_text("not a certificate\n", encoding="utf-8")
+
+        assert bundle_adds_new_anchor(str(bundle)) is False
+
+    def test_a_hashed_directory_with_a_deficient_anchor_counts(self, ca_directory):
+        """Finding 2: directory-supplied anchors go through the same new-anchor test."""
+        assert bundle_adds_new_anchor(str(ca_directory)) is True
+
+    def test_a_hashed_directory_with_a_compliant_anchor_counts(self, compliant_ca_directory):
+        assert bundle_adds_new_anchor(str(compliant_ca_directory)) is True
+
 
 class TestBundleRequiresRelaxedVerification:
     """Only a locally added anchor that strict verification rejects earns the relaxation.
@@ -293,14 +386,14 @@ class TestBundleRequiresRelaxedVerification:
 
         assert bundle_requires_relaxed_verification(str(bundle)) is True
 
-    def test_a_compliant_added_anchor_needs_nothing(self, tmp_path, stock_store_file):
-        """A private CA that satisfies RFC 5280 verifies under strict mode as it is."""
-        bundle = tmp_path / "compliant-private-ca.crt"
-        bundle.write_text(
-            stock_store_file.read_text(encoding="utf-8") + _self_signed_ca(key_usage=True), encoding="utf-8"
-        )
+    def test_a_compliant_added_anchor_needs_nothing(self, compliant_ca_file):
+        """A private CA that satisfies RFC 5280 verifies under strict mode as it is.
 
-        assert bundle_requires_relaxed_verification(str(bundle)) is False
+        Finding 1: this bundle still needs *loading* (see TestBundleAddsNewAnchor and
+        TestInstallProxyTlsSupport.test_installs_a_compliant_bundle_without_relaxing_strict)
+        even though this predicate reports False for it.
+        """
+        assert bundle_requires_relaxed_verification(str(compliant_ca_file)) is False
 
     def test_a_bundle_holding_no_certificates_needs_nothing(self, tmp_path):
         """An empty or non-PEM file announces no proxy, so it must not relax anything."""
@@ -309,33 +402,94 @@ class TestBundleRequiresRelaxedVerification:
 
         assert bundle_requires_relaxed_verification(str(bundle)) is False
 
+    def test_a_hashed_directory_containing_a_deficient_anchor_requires_it(self, ca_directory):
+        """Finding 2: the relaxation predicate must read a directory's hashed entries too."""
+        assert bundle_requires_relaxed_verification(str(ca_directory)) is True
+
+    def test_a_hashed_directory_containing_a_compliant_anchor_needs_nothing(self, compliant_ca_directory):
+        assert bundle_requires_relaxed_verification(str(compliant_ca_directory)) is False
+
 
 class TestSslContextKeepsVerification:
     """The relaxation clears one flag. Every other guarantee must survive it."""
 
-    def test_strict_x509_flag_is_cleared(self, ca_file):
+    def test_strict_x509_flag_is_cleared_when_asked(self, ca_file):
         """This is the whole point: the proxy CA carries no keyUsage extension."""
-        context = _build_ssl_context(str(ca_file))
+        context = _build_ssl_context(str(ca_file), relax_strict=True)
 
         assert not context.verify_flags & ssl.VERIFY_X509_STRICT
 
+    def test_relax_strict_false_leaves_verify_flags_untouched(self, compliant_ca_file):
+        """Finding 1: loading a compliant bundle must not also clear VERIFY_X509_STRICT.
+
+        Bundle loading and strict-mode relaxation are independent decisions — this proves
+        the second does not happen just because the first did.
+        """
+        context = _build_ssl_context(str(compliant_ca_file), relax_strict=False)
+
+        assert context.verify_flags == create_urllib3_context().verify_flags
+
     def test_certificate_verification_stays_required(self, ca_file):
         """Clearing the strict flag must not weaken chain verification to optional or off."""
-        context = _build_ssl_context(str(ca_file))
+        context = _build_ssl_context(str(ca_file), relax_strict=True)
 
         assert context.verify_mode == ssl.CERT_REQUIRED
 
     def test_hostname_verification_stays_on(self, ca_file):
         """A relaxed extension check must not become a licence to accept any host."""
-        context = _build_ssl_context(str(ca_file))
+        context = _build_ssl_context(str(ca_file), relax_strict=True)
 
         assert context.check_hostname is True
 
     def test_the_bundle_is_actually_loaded(self, ca_file):
         """A context trusting nothing would fail closed rather than verify."""
-        context = _build_ssl_context(str(ca_file))
+        context = _build_ssl_context(str(ca_file), relax_strict=True)
 
         assert context.get_ca_certs(), "expected the CA bundle to load as a trust anchor"
+
+    def test_a_compliant_bundle_is_loaded_even_without_relaxation(self, compliant_ca_file):
+        """Finding 1: loading must not be skipped just because relax_strict is False."""
+        context = _build_ssl_context(str(compliant_ca_file), relax_strict=False)
+
+        assert context.get_ca_certs(), "expected the compliant CA bundle to load as a trust anchor"
+
+    def test_a_directory_is_loaded_through_capath_not_cafile(self, monkeypatch, ca_directory):
+        """Finding 2: a hashed CA directory must go through ``capath``, not ``cafile``.
+
+        ``SSLContext.get_ca_certs()`` cannot prove a ``capath`` load happened: OpenSSL
+        consults ``capath`` entries lazily, by hash, at verification time rather than
+        eagerly loading them into the in-memory CA-cert list the way ``cafile`` is
+        loaded (confirmed empirically — ``get_ca_certs()`` returns ``[]`` immediately
+        after a real ``capath`` load, even though the certificate it points at verifies
+        a live handshake). This asserts the call shape instead.
+        """
+        calls: list[dict[str, str | None]] = []
+        original = ssl.SSLContext.load_verify_locations
+
+        def spy(self, cafile=None, capath=None, cadata=None):
+            calls.append({"cafile": cafile, "capath": capath})
+            return original(self, cafile=cafile, capath=capath, cadata=cadata)
+
+        monkeypatch.setattr(ssl.SSLContext, "load_verify_locations", spy)
+
+        _build_ssl_context(str(ca_directory), relax_strict=True)
+
+        assert calls == [{"cafile": None, "capath": str(ca_directory)}]
+
+    def test_a_file_is_loaded_through_cafile_not_capath(self, monkeypatch, ca_file):
+        """The companion assertion: a plain bundle file must keep using ``cafile``."""
+        calls: list[dict[str, str | None]] = []
+        original = ssl.SSLContext.load_verify_locations
+
+        def spy(self, cafile=None, capath=None, cadata=None):
+            calls.append({"cafile": cafile, "capath": capath})
+            return original(self, cafile=cafile, capath=capath, cadata=cadata)
+
+        monkeypatch.setattr(ssl.SSLContext, "load_verify_locations", spy)
+
+        _build_ssl_context(str(ca_file), relax_strict=True)
+
+        assert calls == [{"cafile": str(ca_file), "capath": None}]
 
     def test_no_other_verify_flag_is_cleared(self, ca_file):
         """Nothing but VERIFY_X509_STRICT is dropped from the library default.
@@ -346,7 +500,7 @@ class TestSslContextKeepsVerification:
         difference is empty, which this still accepts.
         """
         default_flags = create_urllib3_context().verify_flags
-        actual_flags = _build_ssl_context(str(ca_file)).verify_flags
+        actual_flags = _build_ssl_context(str(ca_file), relax_strict=True).verify_flags
         cleared = default_flags & ~actual_flags
 
         assert not cleared & ~ssl.VERIFY_X509_STRICT, f"cleared a flag beyond VERIFY_X509_STRICT: {cleared!r}"
@@ -455,19 +609,68 @@ class TestInstallProxyTlsSupport:
         assert _InstallState.installed is True
         assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
 
+    def test_installs_a_compliant_bundle_via_github_ca_bundle_without_relaxing_strict(
+        self, monkeypatch, compliant_ca_file
+    ):
+        """Finding 1: GITHUB_CA_BUNDLE is never consumed by ``requests`` on its own.
+
+        A compliant custom CA named there still has to be loaded through the
+        substituted connection class, or a non-standard GITHUB_API_URL fails
+        verification despite the override being configured correctly.
+        """
+        monkeypatch.setenv("GITHUB_CA_BUNDLE", str(compliant_ca_file))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
+    def test_installs_a_compliant_bundle_via_lone_ssl_cert_file_without_relaxing_strict(
+        self, monkeypatch, compliant_ca_file
+    ):
+        """Finding 1's other named variable: a lone SSL_CERT_FILE, same reasoning.
+
+        ``requests`` reads SSL_CERT_FILE nowhere in its own resolution chain (see the
+        module docstring), so this is the same gap as GITHUB_CA_BUNDLE.
+        """
+        monkeypatch.setenv("SSL_CERT_FILE", str(compliant_ca_file))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
+    def test_installs_from_a_hashed_ca_directory(self, monkeypatch, ca_directory):
+        """Finding 2: PyGithub must pick up an OpenSSL-hashed CA directory too, not just a file."""
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_directory))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
+    def test_installs_from_a_compliant_hashed_ca_directory_without_relaxing_strict(
+        self, monkeypatch, compliant_ca_directory
+    ):
+        """Findings 1 and 2 combined: a compliant anchor in directory form still loads."""
+        monkeypatch.setenv("SSL_CERT_FILE", str(compliant_ca_directory))
+
+        assert install_proxy_tls_support() is True
+        assert _InstallState.installed is True
+        assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
+
 
 class TestConnectionClassFactory:
     """The substituted class must remain a drop-in for the one PyGithub ships."""
 
     def test_returns_a_subclass_of_pygithubs_own_class(self, ca_file):
         """PyGithub builds connections from it, so it has to satisfy that contract."""
-        connection_class = _make_connection_class(str(ca_file))
+        connection_class = _make_connection_class(str(ca_file), relax_strict=True)
 
         assert issubclass(connection_class, HTTPSRequestsConnectionClass)
 
     def test_each_call_builds_a_distinct_class(self, ca_file):
         """force depends on a rebuild, so the factory must not cache one class."""
-        assert _make_connection_class(str(ca_file)) is not _make_connection_class(str(ca_file))
+        assert _make_connection_class(str(ca_file), relax_strict=True) is not _make_connection_class(
+            str(ca_file), relax_strict=True
+        )
 
 
 class TestConnectionClassPinsVerifyToTheResolvedBundle:
@@ -536,7 +739,8 @@ class TestMakeGithubClient:
         PyGithub's ``Requester.__init__`` reads the class off the Requester class and stores
         it on the instance, which is why this factory installs before it builds anything: a
         client built earlier keeps the stock strict class for its whole life, and no later
-        install reaches it.
+        install reaches it. This is the documented, accepted non-retroactive contract
+        Finding 3 asked to have made accurate (see install_proxy_tls_support's docstring).
         """
         monkeypatch.setenv("GITHUB_TOKEN", "t" * 40)
         built_before_install = make_github_client()
@@ -546,6 +750,30 @@ class TestMakeGithubClient:
 
         assert _requester_connection_class(built_before_install.requester) is HTTPSRequestsConnectionClass
         assert _requester_connection_class(built_after_install.requester) is not HTTPSRequestsConnectionClass
+
+    def test_installs_before_constructing_the_client_every_call(self, monkeypatch, ca_file):
+        """Finding 3's chosen resolution: make_github_client always installs first.
+
+        Since install_proxy_tls_support is not retroactive, the only thing that closes
+        the gap for this module's own factory is calling it before ``Github(...)`` runs,
+        on every call — not only the first. This proves the ordering directly, by
+        recording _InstallState.installed at the moment ``Github.__init__`` executes,
+        rather than inferring it from the connection class the built client ends up with.
+        """
+        monkeypatch.setenv("GITHUB_TOKEN", "t" * 40)
+        monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
+        installed_state_at_construction: list[bool] = []
+        original_init = Github.__init__
+
+        def spy_init(self, *args, **kwargs):
+            installed_state_at_construction.append(_InstallState.installed)
+            original_init(self, *args, **kwargs)
+
+        monkeypatch.setattr(Github, "__init__", spy_init)
+
+        make_github_client()
+
+        assert installed_state_at_construction == [True]
 
     def test_default_timeout_is_applied(self):
         """The documented default reaches the client rather than PyGithub's own 15s."""
