@@ -1429,6 +1429,35 @@ class TestTryGetGithub:
             try_get_github("test-owner/test-repo")
         assert exc_info.value.__cause__ is underlying
 
+    def test_raises_github_unavailable_on_transport_exception(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """try_get_github raises GitHubUnavailableError when get_repo raises a transport exception.
+
+        Tests: try_get_github transport failure handling
+        How: Patch the shared client factory so its client's get_repo raises
+            ``requests.exceptions.ConnectionError`` — one of sync_state.py's
+            RETRYABLE_TRANSIENT_EXCEPTIONS — instead of a GithubException.
+        Why: PyGithub's requester raises a transport exception directly, not a
+            GithubException, when get_repo fails before an HTTP response is
+            received at all (a dropped connection). That case bypassed the
+            GithubException-only handling this session's B1 work added, so a
+            network outage would crash callers instead of degrading to the
+            same GitHubUnavailableError/cache-fallback path a GithubException
+            failure already triggers (Codex review on PR #3570).
+        """
+        # Arrange
+        import requests
+
+        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
+        underlying = requests.exceptions.ConnectionError("Connection refused")
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = underlying
+
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError) as exc_info:
+            try_get_github("test-owner/test-repo")
+        assert exc_info.value.__cause__ is underlying
+
 
 # ---------------------------------------------------------------------------
 # apply_status_in_progress — ADR-003 fetch-then-update label pattern
