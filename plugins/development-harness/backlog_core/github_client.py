@@ -611,15 +611,15 @@ def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
     clients such as ``gh`` already do, and is what lets a proxy CA carrying no
     ``keyUsage`` extension verify.
 
-    The flag is always set one way or the other here, rather than only ever cleared,
-    because ``create_urllib3_context`` — the name this module binds at import time —
-    may already be a monkeypatched wrapper that unconditionally clears the flag by
-    the time this module is imported (see the module docstring's "Why
-    _build_ssl_context sets VERIFY_X509_STRICT explicitly, not only clears it"
-    section). Trusting that wrapper's return value for the non-relaxed branch would
-    silently inherit whatever relaxation it already applied; explicitly restoring
-    urllib3's own unpatched default when relax_strict is False keeps this function's
-    result correct independent of what ran before this module was imported.
+    The flag is set or cleared based on relax_strict, with special handling for
+    monkeypatching. The ``create_urllib3_context`` name this module binds at import
+    time may be a monkeypatched wrapper that clears the flag (see the module
+    docstring's "Why _build_ssl_context sets VERIFY_X509_STRICT explicitly, not only
+    clears it" section). When relax_strict is False, this function restores the flag
+    on Python 3.13+ where urllib3 would normally set it. This ensures the function's
+    result is correct when monkeypatching has cleared a flag that should otherwise
+    be present, while matching urllib3's defaults on earlier versions where the flag
+    is not set by default.
 
     Args:
         ca_bundle: Path to the CA bundle file, or OpenSSL-hashed CA directory, the
@@ -634,11 +634,14 @@ def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
     context = create_urllib3_context()
     if relax_strict:
         context.verify_flags &= ~ssl.VERIFY_X509_STRICT
-    elif sys.version_info >= (3, 13):
-        # Mirrors urllib3.util.ssl_.create_urllib3_context's own version guard, so the
-        # strict flag ends up set here exactly when the unpatched builder would have
-        # set it — regardless of whether the name this module bound already points at
-        # a monkeypatched wrapper that clears it unconditionally.
+    # Restore the strict flag on Python 3.13+ if it's missing.
+    # urllib3.util.ssl_.create_urllib3_context's default sets VERIFY_X509_STRICT
+    # on Python 3.13+ but not on earlier versions. Since this module's imported
+    # name may point at a monkeypatched wrapper that clears the flag, restore it
+    # on 3.13+ to ensure the function's result is correct independent of what ran
+    # before this module was imported. On earlier versions where the flag is not
+    # part of urllib3's default, leave it unset to match those defaults.
+    elif sys.version_info >= (3, 13) and not (context.verify_flags & ssl.VERIFY_X509_STRICT):
         context.verify_flags |= ssl.VERIFY_X509_STRICT
     if pathlib.Path(ca_bundle).is_dir():
         context.load_verify_locations(capath=ca_bundle)
