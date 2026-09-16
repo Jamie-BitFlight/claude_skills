@@ -620,10 +620,8 @@ class CommentListEntry(BaseModel):
     preview: str
 
 
-class ListCommentsResult(BaseModel):
-    """Validated output returned by :func:`list_comments`."""
-
-    model_config = ConfigDict(frozen=True, strict=True)
+class ListCommentsResult(TypedDict):
+    """Mapping result returned by :func:`list_comments`."""
 
     comments: list[CommentListEntry]
     count: int
@@ -5237,7 +5235,7 @@ def list_comments(
         output: Optional Output collector.
 
     Returns:
-        Validated result with:
+        Dict with:
           - ``comments``: list of ``{id, database_id, author, created_at, updated_at,
             preview}``. ``id`` is the GraphQL node ID; ``database_id`` is the REST
             integer ID ``backlog_read_comment``'s ``comment_id`` requires, present
@@ -5280,14 +5278,14 @@ def list_comments(
         for c in window
     ]
     out_d = out.to_dict()
-    return ListCommentsResult(
-        comments=comment_list,
-        count=len(comment_list),
-        has_more=has_more,
-        messages=out_d["messages"],
-        warnings=out_d["warnings"],
-        errors=out_d["errors"],
-    )
+    return {
+        "comments": comment_list,
+        "count": len(comment_list),
+        "has_more": has_more,
+        "messages": out_d["messages"],
+        "warnings": out_d["warnings"],
+        "errors": out_d["errors"],
+    }
 
 
 def read_comment(

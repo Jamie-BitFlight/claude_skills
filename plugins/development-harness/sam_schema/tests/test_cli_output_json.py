@@ -8,7 +8,7 @@ individually addressable, never as a Python ``repr()`` string.
 How: Call ``output_json`` directly with a locally defined ``BaseModel`` that
 mirrors the shape reported in the PR #3564 Codex review finding
 (``backlog_core.operations.CommentListEntry`` nested inside
-``ListCommentsResult``'s ``comments`` list) and assert on the JSON parsed
+``ListCommentsResult``'s mapping-valued ``comments`` list) and assert on the JSON parsed
 back from stdout.
 
 Why: ``output_json`` previously special-cased only two shapes — a bare

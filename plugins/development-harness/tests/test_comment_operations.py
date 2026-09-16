@@ -309,9 +309,10 @@ class TestListComments:
         result = list_comments(issue_number=42)
 
         # Assert
-        assert result.count == 2
-        assert result.has_more is False
-        comments = result.comments
+        assert isinstance(result, dict)
+        assert result["count"] == 2
+        assert result["has_more"] is False
+        comments = result["comments"]
         assert isinstance(comments, list)
         assert len(comments) == 2
         assert comments[0].id == "IC_001"
@@ -360,7 +361,7 @@ class TestListComments:
         listed = list_comments(issue_number=42)
 
         # Assert: database_id is populated on the listing entry, not None/missing.
-        comments = listed.comments
+        comments = listed["comments"]
         assert isinstance(comments, list)
         assert comments[0].database_id == rest_database_id
 
@@ -425,9 +426,9 @@ class TestListComments:
         result = list_comments(issue_number=1, limit=1, offset=1)
 
         # Assert
-        assert result.count == 1
-        assert result.has_more is True
-        comments = result.comments
+        assert result["count"] == 1
+        assert result["has_more"] is True
+        comments = result["comments"]
         assert isinstance(comments, list)
         assert comments[0].id == "IC_001"
 
@@ -453,7 +454,7 @@ class TestListComments:
         result = list_comments(issue_number=1, limit=5)
 
         # Assert
-        assert result.has_more is False
+        assert result["has_more"] is False
 
     def test_list_comments_github_error_raises_backlog_error(self, mocker: MockerFixture) -> None:
         """list_comments raises BacklogError when GitHub API fails.
