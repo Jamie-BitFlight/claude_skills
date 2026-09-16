@@ -47,6 +47,7 @@ from .models import (
     Output,
     PullRequestRef,
     SamTask,
+    ValidationError,
     ViewItemResult,
     parse_issue_number,
     resolve_repo,
@@ -1408,7 +1409,7 @@ def close_github_issue(
         repository = get_github(repo)
         if (num := parse_issue_number(issue_ref)) is None:
             msg = f"Invalid issue ref: {issue_ref!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         parts = [f"**Closed** ({reason})."]
@@ -1440,7 +1441,7 @@ def resolve_github_issue(
         repository = get_github(repo)
         if (num := parse_issue_number(issue_ref)) is None:
             msg = f"Invalid issue ref: {issue_ref!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         body_parts = [f"## Resolved\n\n**Summary**: {summary}"]
@@ -1591,7 +1592,7 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         repository = get_github(repo)
         if (num := parse_issue_number(item.issue)) is None:
             msg = f"Invalid issue ref: {item.issue!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
@@ -1682,7 +1683,7 @@ def apply_status_in_progress(item: BacklogItem, repo: str = "", output: Output |
         repository = get_github(repo)
         if (num := parse_issue_number(item.issue)) is None:
             msg = f"Invalid issue ref: {item.issue!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         owner, repo_name = repository.full_name.split("/", 1)
         _apply_status_label(
             repository,
@@ -1725,7 +1726,7 @@ def apply_status_verified(item: BacklogItem, repo: str = "", output: Output | No
     repository = get_github(repo)
     if (num := parse_issue_number(item.issue)) is None:
         msg = f"Invalid issue ref: {item.issue!r}"
-        raise ValueError(msg)
+        raise ValidationError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
     _apply_status_label(
         repository,
@@ -1768,7 +1769,7 @@ def apply_status_groomed(item: BacklogItem, repo: str = "", output: Output | Non
     repository = get_github(repo)
     if (num := parse_issue_number(item.issue)) is None:
         msg = f"Invalid issue ref: {item.issue!r}"
-        raise ValueError(msg)
+        raise ValidationError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
     _apply_status_label(
         repository,
@@ -1811,7 +1812,7 @@ def apply_status_blocked(item: BacklogItem, repo: str = "", output: Output | Non
     repository = get_github(repo)
     if (num := parse_issue_number(item.issue)) is None:
         msg = f"Invalid issue ref: {item.issue!r}"
-        raise ValueError(msg)
+        raise ValidationError(msg)
     owner, repo_name = repository.full_name.split("/", 1)
     # Blocked is an overlay: no removes — other status:* labels stay in place.
     _apply_status_label(
