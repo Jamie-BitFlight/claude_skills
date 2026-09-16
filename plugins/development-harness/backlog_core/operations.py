@@ -1852,12 +1852,7 @@ def refresh_local_cache_from_github(
         else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     )
     result = backend.reconcile(
-        ReconcileRequest(
-            scope=scope,
-            label=label or "",
-            references=references,
-            apply_local_patches=apply_local_patches,
-        )
+        ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
     )
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
@@ -2069,6 +2064,32 @@ def _build_list_entry(
     return entry
 
 
+def read_through_cold_cache(repo: str, output: Output) -> None:
+    """Attempt one fetch-only, unlabeled refresh for a never-synced cache."""
+    sync_state = get_sync_state()
+    previous_sync_status = sync_state.try_claim()
+    if previous_sync_status is None:
+        output.info(
+            "  A background sync is already in progress; skipping the implicit "
+            "read-through for this never-synced cache rather than starting a second one."
+        )
+        return
+    try:
+        # A label-scoped reconcile cannot establish the global snapshot checkpoint.
+        refresh_local_cache_from_github(repo, None, output=output, apply_local_patches=False)
+    except (
+        GithubException,
+        BacklogError,
+        ContentUnavailableError,
+        OSError,
+        ValueError,
+        *RETRYABLE_TRANSIENT_EXCEPTIONS,
+    ) as exc:
+        output.warn(f"  WARNING: Could not refresh the never-synced local cache: {exc}")
+    finally:
+        sync_state.release_claim(previous_sync_status)
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2179,29 +2200,7 @@ def list_items(
         # attempt per call, never a retry loop within one -- which the
         # critique frames as complementary, not a defect: "we tried and
         # could not" is a sharper answer than "we never tried".
-        sync_state = get_sync_state()
-        previous_sync_status = sync_state.try_claim()
-        if previous_sync_status is None:
-            out.info(
-                "  A background sync is already in progress; skipping the implicit "
-                "read-through for this never-synced cache rather than starting a second one."
-            )
-        else:
-            try:
-                # A label-scoped reconcile cannot establish the global snapshot
-                # checkpoint, so the implicit first read must always be unlabeled.
-                refresh_local_cache_from_github(repo, None, output=out, apply_local_patches=False)
-            except (
-                GithubException,
-                BacklogError,
-                ContentUnavailableError,
-                OSError,
-                ValueError,
-                *RETRYABLE_TRANSIENT_EXCEPTIONS,
-            ) as e:
-                out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
-            finally:
-                sync_state.release_claim(previous_sync_status)
+        read_through_cold_cache(repo, out)
     items = get_config().backend.list_work_items()
 
     # backlog #3546 task A4: two independent, provenance-flavored bits
