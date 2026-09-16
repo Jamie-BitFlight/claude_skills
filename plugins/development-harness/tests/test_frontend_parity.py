@@ -215,11 +215,18 @@ def test_importing_cli_module_is_safe() -> None:
 """,
             encoding="utf-8",
         )
+        # Drop the guard's own sentinel before forwarding the environment. Inheriting
+        # ``DH_CLI_PYTHONPATH_CLEARED`` -- which the outer process carries whenever it was
+        # itself re-exec'd by an unfixed guard, or whenever a developer exports it -- makes
+        # the child skip the guard entirely, so this test would pass on the very defect it
+        # guards. Keep this in sync with ``_RELOADED`` in ``sam_schema/cli.py``.
+        child_env = {k: v for k, v in os.environ.items() if k != "DH_CLI_PYTHONPATH_CLEARED"}
+        child_env["PYTHONPATH"] = "/tmp"
         result = run_cli_subprocess(
             ["uv", "run", "pytest", str(probe), "-q", "-p", "no:randomly", "--no-cov"],
             timeout=180,
             cwd=_plugin_root,
-            env={**os.environ, "PYTHONPATH": "/tmp"},
+            env=child_env,
         )
         assert result.returncode == 0, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
         assert "1 passed" in result.stdout, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
