@@ -152,7 +152,7 @@ class TestBacklogListFullResponseOfflineState:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         assert "sync_state" in response, (
             "backlog_list must include 'sync_state' in the full response when status is OFFLINE. "
@@ -178,7 +178,7 @@ class TestBacklogListFullResponseOfflineState:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         warnings = cast("list[str]", response.get("warnings", []))
         assert warnings, (
@@ -202,7 +202,7 @@ class TestBacklogListFullResponseOfflineState:
         state.status = SyncStatus.ERROR
         state.last_error = "GitHub 503 after 3 retries"
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         assert "sync_state" in response, "backlog_list must include 'sync_state' when status is ERROR."
         assert response.get("warnings"), "warnings must be non-empty when status is ERROR."
@@ -221,7 +221,7 @@ class TestBacklogListFullResponseOfflineState:
         state = get_sync_state()
         state.status = SyncStatus.RUNNING
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         assert "sync_state" in response, "backlog_list must include 'sync_state' when status is RUNNING."
 
@@ -251,7 +251,7 @@ class TestBacklogListCountOnlyOfflineState:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert "count" in response, "count_only response must still include 'count'."
         assert "sync_state" in response, (
@@ -270,7 +270,7 @@ class TestBacklogListCountOnlyOfflineState:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         warnings = response.get("warnings", [])
         assert warnings, (
@@ -288,7 +288,7 @@ class TestBacklogListCountOnlyOfflineState:
         state.status = SyncStatus.ERROR
         state.last_error = "GitHub 503 after 3 retries"
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert "sync_state" in response, "count_only=True must include sync_state when status is ERROR."
 
@@ -301,7 +301,7 @@ class TestBacklogListCountOnlyOfflineState:
         state = get_sync_state()
         state.status = SyncStatus.RUNNING
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert "sync_state" in response, "count_only=True must include sync_state when status is RUNNING."
 
@@ -332,7 +332,7 @@ class TestBacklogListCountOnlyIdleState:
         state = get_sync_state()
         assert state.status == SyncStatus.IDLE  # precondition: verify fixture set IDLE
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert response.get("count") == 0
         assert "sync_state" not in response, (
@@ -354,7 +354,7 @@ class TestBacklogListCountOnlyIdleState:
         state = get_sync_state()
         assert state.status == SyncStatus.IDLE  # precondition: verify fixture set IDLE
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         assert "sync_state" not in response, (
             "backlog_list must NOT include 'sync_state' in the normal IDLE response. "
@@ -374,9 +374,7 @@ class TestBacklogListCountOnlyIdleState:
         state = get_sync_state()
         assert state.status == SyncStatus.IDLE  # precondition: verify fixture set IDLE
 
-        response = cast(
-            "dict[str, object]", await backlog_list(search="zzz_no_match_xyz_unique_string_9999", count_only=True)
-        )
+        response = await backlog_list(search="zzz_no_match_xyz_unique_string_9999", count_only=True)
 
         assert "sync_state" not in response, (
             "A genuine zero-match against a healthy cache must NOT include sync_state. "
@@ -402,7 +400,7 @@ class TestSyncStateBlockShape:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         sync_block = cast("dict[str, object]", response.get("sync_state", {}))
         required_sync_block_fields = {"status", "offline_reason", "last_success_at", "cache_warning"}
@@ -422,7 +420,7 @@ class TestSyncStateBlockShape:
         state.status = SyncStatus.OFFLINE
         state.offline_reason = "GITHUB_TOKEN not set"
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         sync_block = cast("dict[str, object]", response.get("sync_state", {}))
         assert sync_block.get("cache_warning"), (
@@ -461,7 +459,7 @@ class TestSyncStateBlockNamesErrorCause:
         state.last_error = "boom"
         assert not state.offline_reason  # precondition: ERROR path leaves this empty
 
-        response = cast("dict[str, object]", await backlog_list())
+        response = await backlog_list()
 
         warnings = cast("list[str]", response.get("warnings", []))
         assert any("boom" in w for w in warnings), (
