@@ -1123,8 +1123,13 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
 
     Raises:
         ValidationError: If a label name contains disallowed characters.  A
-            ``BacklogError`` subclass, so a caller sees the documented refusal rather
-            than an unhandled exception out of the MCP tool call.
+            ``BacklogError`` subclass -- the type a caller would need to catch, not
+            one any caller sees today: nothing in the project calls this helper.  Its
+            only reference is ``GitHubBackend._resolve_labels_graphql``
+            (``backends/github_backend.py``), a ``WorkItemBackend`` protocol delegate
+            that no production code invokes; the direct callers are the tests in
+            ``tests/test_graphql_helpers.py``.  ``_resolve_label_ids_graphql`` is the
+            sibling that is live, through ``_apply_status_label``.
         BacklogError: If the GraphQL request fails (auth, network, permissions).
     """
     if not label_names:
