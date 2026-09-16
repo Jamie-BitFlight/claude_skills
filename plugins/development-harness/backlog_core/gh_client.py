@@ -1059,7 +1059,12 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
         Dict mapping label name to GraphQL node ID.
 
     Raises:
-        ValueError: If a label name contains disallowed characters.
+        ValidationError: If a label name contains disallowed characters.  The names are
+            not caller-supplied — ``_apply_status_label`` reads them off the live issue
+            and sends the whole set back — so one repository label outside the pattern
+            refuses every status update on every issue wearing it.  It is a
+            ``BacklogError``, which that caller's own handler turns into a
+            "Could not set status" warning instead of failing the MCP tool call.
         BacklogError: On GraphQL auth/network/permission failures.
     """
     if not label_names:
@@ -1075,7 +1080,7 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
             msg = f"Label name contains disallowed characters: {name!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
 
     # Build aliased query: labelN: label(name: "...") { id name }
     alias_lines = [f'    label{i}: label(name: "{n}") {{ id name }}' for i, n in enumerate(unique_names)]
@@ -1117,7 +1122,9 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
         List of label name strings that exist in the repository.
 
     Raises:
-        ValueError: If a label name contains disallowed characters.
+        ValidationError: If a label name contains disallowed characters.  A
+            ``BacklogError`` subclass, so a caller sees the documented refusal rather
+            than an unhandled exception out of the MCP tool call.
         BacklogError: If the GraphQL request fails (auth, network, permissions).
     """
     if not label_names:
@@ -1133,7 +1140,7 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
             msg = f"Label name contains disallowed characters: {name!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
 
     alias_lines = [f'    label{i}: label(name: "{n}") {{ name }}' for i, n in enumerate(unique_names)]
     query = f"""
