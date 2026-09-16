@@ -103,3 +103,6 @@ Afterwards, append the two report sections for that attempt and close it:
 Then continue to Step 3 of the Dispatch Loop exactly as for any other completed task. Moving the status directly
 is not a shortcut here: `plan state --new-status in-progress` is refused as `status-invalid`,
 because opening an attempt is what puts a task in progress.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

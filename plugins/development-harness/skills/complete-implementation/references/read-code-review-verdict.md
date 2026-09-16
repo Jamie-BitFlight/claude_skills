@@ -101,3 +101,6 @@ Read the verdict again from Step A. If the second pass also yields no report, re
 
 Never continue to the Apply status:verified Label section on an absent verdict. That section runs
 only after a verdict was read and its routing completed.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

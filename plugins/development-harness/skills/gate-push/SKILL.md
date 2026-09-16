@@ -92,3 +92,6 @@ fi
 ```
 
 Use the original input branch (`branch_name`), not `normalized_slug`, for `--head`.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

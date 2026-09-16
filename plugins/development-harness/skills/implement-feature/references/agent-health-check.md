@@ -61,3 +61,6 @@ flowchart TD
     Verdict -->|"Active — tool calls within last 2–3 min"| Waiting
     Waiting[Continue waiting] --> Later["Re-check after 5–10 min<br>if the task is still not terminal"]
 ```
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

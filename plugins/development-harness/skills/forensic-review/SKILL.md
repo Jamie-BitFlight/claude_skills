@@ -200,3 +200,6 @@ Remediation tasks follow the same CLEAR format as original tasks. They:
 - `code-review` artifact is registered on issue #{item_id} and its `artifact_id` is named in the agent's STATUS output
 - Review Results appended to the task via `plan update --append-section "Review Results"`
 - Blocking findings (if any) have concrete remediation tasks created
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

@@ -116,3 +116,6 @@ Next step: /dh:groom-milestone {number}
 - Milestone assignment fails (`backlog_assign_item_to_milestone` response has an `error` key): log error per item, skip Project V2 status update and success reporting for that item, continue with remaining.
 - No items match filter: report and show available sections.
 - Label not found: `github_project_setup.py issue create` handles label creation automatically via `_ensure_label()`.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

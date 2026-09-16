@@ -639,3 +639,6 @@ Problem: Assumption may be wrong, causes rework or security issues
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------- |
 | RT-ICA Framework             | [Liu et al., 2025 - Reverse Thinking Enhances Missing Information Detection in LLMs](https://arxiv.org/abs/2512.10273) | 2026-01-20  |
 | CoVe (Chain of Verification) | [Dhuliawala et al., 2023 - Chain-of-Verification Reduces Hallucination](https://arxiv.org/abs/2309.11495)              | 2026-01-20  |
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

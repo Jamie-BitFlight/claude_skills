@@ -155,3 +155,6 @@ that never moved.
 
 If no plan is found during M2 self-discovery, skip these commands — the worker executes against the
 item's acceptance criteria directly and reports in text only.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

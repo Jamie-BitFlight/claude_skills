@@ -127,3 +127,6 @@ nothing of it.
 Report every command you ran with its outcome. Keep changes confined to the task you were given.
 
 </reporting>
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

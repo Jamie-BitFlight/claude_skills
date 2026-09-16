@@ -58,3 +58,6 @@ reads nothing and passes on an empty file.
 ```
 
 Do NOT build the QG plan, dispatch T1, or apply any SAM state until all items above are confirmed.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

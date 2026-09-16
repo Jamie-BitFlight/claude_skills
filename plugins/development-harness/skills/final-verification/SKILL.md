@@ -215,3 +215,6 @@ flowchart TD
 ## Success Criteria
 
 - Certification statement (or gap list) is complete and evidence-based
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

@@ -232,3 +232,6 @@ Design questions (route to planning research, NOT human escalation):
 - Goals and anti-goals are specific enough to verify in Stage 7
 - No implementation decisions leak into the discovery (no HOW)
 - NFRs are measurable, not vague ("fast" is not a requirement; "<200ms p95" is)
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

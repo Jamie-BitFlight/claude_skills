@@ -192,3 +192,6 @@ tells you when a lease has run out with no worker behind it.
 **Ignoring blocker messages** — Workers go idle waiting for a response. Check messages between waves.
 
 **Pre-gathering data** — Running diagnostics before delegating wastes orchestrator context. Workers gather their own data.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

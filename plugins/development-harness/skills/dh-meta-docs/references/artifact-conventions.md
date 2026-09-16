@@ -306,3 +306,6 @@ Read these together to get the full system picture:
 
 - SAM methodology: <https://github.com/bitflight-devops/stateless-agent-methodology>
 - Default development flow: [./default-development-flow.md](./default-development-flow.md)
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

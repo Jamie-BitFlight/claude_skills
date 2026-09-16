@@ -6,6 +6,7 @@ model: opus
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
+  - dh:dh-cli-usage
   - dh:final-verification
   - dh:validation-protocol
   - ccc

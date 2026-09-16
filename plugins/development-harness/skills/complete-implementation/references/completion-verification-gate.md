@@ -48,3 +48,6 @@ BLOCKED tasks will be reset to NOT_STARTED automatically.
 Stop. Do not apply the `status:verified` label.
 
 **On verification success**, proceed to `{next_step}`.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

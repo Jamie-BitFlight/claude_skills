@@ -6,6 +6,7 @@ tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
+  - dh:dh-cli-usage
   - dh:file-classification
   - ccc
 color: orange

@@ -224,3 +224,6 @@ replace-in-place vs. insert branch that guarantees this.
 /dh:interop docs/superpowers/plans/2026-03-11-oauth-token-refresh.md
 /dh:interop docs/superpowers/plans/2026-02-28-manifest-discovery.md
 ```
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

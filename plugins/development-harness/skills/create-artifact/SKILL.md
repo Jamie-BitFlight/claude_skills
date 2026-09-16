@@ -158,3 +158,6 @@ ARTIFACT: type={artifact_type}, action={action}, content_stored={content_stored}
 ```
 
 Include a `<concerns>` block if quality issues were found during the work.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

@@ -606,3 +606,6 @@ When all phases complete, provide the user:
 The architect agent calls `artifact_register(content=...)` directly, the selected provider stores the body, and the orchestrator receives only `STATUS: DONE`.
 
 **This workflow requires `content=` on every `artifact_register` call** so later phases receive the body from `artifact_read`. A registration without content does not satisfy the phase handoff.
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

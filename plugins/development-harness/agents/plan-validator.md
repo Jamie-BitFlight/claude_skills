@@ -6,6 +6,7 @@ model: sonnet
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
+  - dh:dh-cli-usage
   - ccc
 color: green
 ---

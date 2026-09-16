@@ -654,3 +654,6 @@ flowchart TD
 | 🔵 Conway violation | Cluster boundary misaligns with team/ownership boundary | Align module groupings with team boundaries, or restructure CODEOWNERS to match the actual dependency clusters |
 | 🟤 Brown dashed edge | Cross-language invocation (`invokes`, `fires`, `spawns`) — e.g., SKILL.md → parse.mjs, hooks.json → session-start.cjs, hook → uv run script | Verify the target script exists; ensure input/output contract is documented |
 | ⬜ Light grey hexagon | External PEP 723 package dependency (`ext-pkg`) or MCP tool call (`mcp-call`) | No action unless the package has known vulnerabilities or the MCP tool is undocumented |
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.
