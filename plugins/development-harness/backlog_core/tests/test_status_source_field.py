@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel
+import pytest
+from pydantic import BaseModel, ValidationError
 
 from backlog_core import gh_client, operations
 from backlog_core.backends.github_backend import GitHubBackend
@@ -123,9 +124,8 @@ class TestListItemsStatusSource:
         """A skipped batch fetch (no GITHUB_TOKEN) must not be reported as 'live' (#3546,
         Codex review on PR #3577): gh_client.batch_fetch_statuses() would short-circuit to
         an empty map without ever making a live request, so list_items() must never claim
-        the request succeeded. Per StatusSource's docstring, "no live fetch was attempted
-        this call" is "cache", not "unavailable" -- the latter is reserved for an attempt
-        that was made and failed.
+        the request succeeded. The provider-owned reason reports the live capability as
+        unavailable while ``attempted=False`` preserves that no request was made.
         """
         mocker.patch.object(
             operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([_item("#1")]))
@@ -139,8 +139,8 @@ class TestListItemsStatusSource:
         result = operations.list_items(output=Output())
 
         batch_fetch_spy.assert_called_once()
-        assert result["status_source"] == "cache"
-        assert result["unavailable_capabilities"] == []
+        assert result["status_source"] == "unavailable"
+        assert result["unavailable_capabilities"] == ["live_status"]
 
     def test_missing_github_token_with_status_filter_names_filter_unreliable(self, mocker: MockerFixture) -> None:
         """A skipped-for-credentials fetch is exactly as unevaluable as an
@@ -171,6 +171,19 @@ class TestListItemsStatusSource:
         result = operations.list_items(output=Output())
 
         assert result["status_source"] == "mixed"
+
+    def test_filtered_unlinked_row_does_not_make_live_result_mixed(self, mocker: MockerFixture) -> None:
+        items = [_item("#1", title="Live"), _item("", title="Filtered out")]
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend(items)))
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(statuses={1: IssueStatus(status="open")}, attempted=True),
+        )
+
+        result = operations.list_items(title="Live", output=Output())
+
+        assert result["status_source"] == "live"
 
     def test_generic_status_and_milestone_filters_are_named_under_degradation(self, mocker: MockerFixture) -> None:
         mocker.patch.object(
@@ -279,8 +292,24 @@ class TestViewItemStatusSource:
 
         result = operations.view_item("#519", output=Output())
 
-        assert result.status_source == "cache"
-        assert result.unavailable_capabilities == []
+        assert result.status_source == "unavailable"
+        assert result.unavailable_capabilities == ["live_enrichment"]
+        assert result.warnings == [
+            "no GitHub credentials configured — sections_index reflects provider-backed record, may be stale"
+        ]
+
+    def test_uncached_skipped_enrichment_raises_backend_unavailable(self, mocker: MockerFixture) -> None:
+        _patch_view_backend(mocker, [])
+        mocker.patch.object(
+            operations,
+            "view_enrich_from_github",
+            return_value=ViewEnrichmentResult(
+                enriched=False, attempted=False, unavailable_reason="no GitHub credentials configured"
+            ),
+        )
+
+        with pytest.raises(BackendUnavailableError, match="no GitHub credentials configured"):
+            operations.view_item("#519", output=Output())
 
     def test_backend_unavailable_exception_reports_unavailable(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
@@ -352,3 +381,15 @@ class TestGitHubProviderOutcomeBoundary:
         assert outcome.attempted is False
         assert outcome.enriched is False
         enrich.assert_not_called()
+
+
+class TestProviderOutcomeValidation:
+    """Provider outcomes reject contradictory provenance states."""
+
+    def test_statuses_require_an_attempt(self) -> None:
+        with pytest.raises(ValidationError, match="statuses require attempted=True"):
+            StatusFetchResult(statuses={1: IssueStatus(status="open")}, attempted=False)
+
+    def test_enrichment_requires_an_attempt(self) -> None:
+        with pytest.raises(ValidationError, match="enriched=True requires attempted=True"):
+            ViewEnrichmentResult(enriched=True, attempted=False)

@@ -1409,20 +1409,17 @@ StatusSource: TypeAlias = Literal["live", "cache", "mixed", "unavailable"]
 
 ``"live"``: the value came from a successful live batch-status or
 enrichment fetch against the configured backend this call.
-``"cache"``: no live fetch was attempted this call -- the backend does not
-support one (e.g. a string-ID backend whose own status field is
-authoritative), or the item carried no identifier to check live -- so the
-locally cached/backend-owned value is reported as-is, with no live fetch
-degradation involved.
+``"cache"``: live data was not needed this call -- the backend does not support
+a fetch (e.g. a string-ID backend whose own status field is authoritative), or
+the item carried no identifier to check live -- so the locally
+cached/backend-owned value is reported as-is, with no live degradation.
 ``"mixed"``: one listing contains both successfully fetched live status data
 and backend-owned cached status data, such as numeric GitHub issue references
 beside unlinked or string-ID work items.
-``"unavailable"``: a live fetch was attempted and failed (a refused GraphQL
-query, a network error, a rate limit, ...) -- the true live value was never
-learned this call. Distinct from ``"cache"`` so a caller can tell "nothing
-was tried" apart from "something was tried and failed" (B-critique.md
-§3.4) -- the two must never share one signal, or a successful-by-construction
-no-op read looks identical to a genuine outage.
+``"unavailable"``: a required live fetch could not run or was attempted and
+failed (missing credentials, a refused GraphQL query, a network error, a rate
+limit, ...) -- the true live value was never learned this call. Provider
+outcomes separately report whether an outbound request was attempted.
 """
 
 
@@ -1511,6 +1508,17 @@ class StatusFetchResult(BaseModel):
     attempted: bool
     unavailable_reason: str = ""
 
+    @model_validator(mode="after")
+    def validate_attempt_state(self) -> StatusFetchResult:
+        """Reject statuses that could not have come from an attempted fetch.
+
+        Returns:
+            The validated provider outcome.
+        """
+        if self.statuses and not self.attempted:
+            raise ValueError("statuses require attempted=True")
+        return self
+
 
 class ViewEnrichmentResult(BaseModel):
     """Provider-reported outcome of enriching one work-item view."""
@@ -1518,6 +1526,17 @@ class ViewEnrichmentResult(BaseModel):
     enriched: bool
     attempted: bool
     unavailable_reason: str = ""
+
+    @model_validator(mode="after")
+    def validate_attempt_state(self) -> ViewEnrichmentResult:
+        """Reject successful enrichment when no provider request was attempted.
+
+        Returns:
+            The validated provider outcome.
+        """
+        if self.enriched and not self.attempted:
+            raise ValueError("enriched=True requires attempted=True")
+        return self
 
 
 class PullRequestRef(BaseModel):

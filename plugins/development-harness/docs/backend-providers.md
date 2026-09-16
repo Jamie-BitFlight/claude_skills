@@ -204,9 +204,11 @@ the best-effort cached list anyway.
 
 Status provenance is independent of listing provenance. `status_source` is
 `live` when all returned status-bearing rows came from a successful provider
-fetch, `cache` when no fetch was attempted, `mixed` when live numeric-issue
-rows and backend-owned string/unlinked rows occur together, and `unavailable`
-when an attempted fetch failed. Providers return `StatusFetchResult`, whose
+fetch, `cache` when returned rows use only backend-owned status, `mixed` when
+live numeric-issue rows and backend-owned string/unlinked rows occur together,
+and `unavailable` when numeric-issue rows could not be read live. Pagination
+reports provenance for the current page, not rows outside it. Providers return
+`StatusFetchResult`, whose
 `attempted` and `unavailable_reason` fields are authoritative; operations do
 not inspect provider credentials or infer an attempt from an issue identifier.
 `ViewEnrichmentResult` provides the same boundary for a single-item view.

@@ -2262,34 +2262,30 @@ def _resolve_list_status_map(
 
 def _listing_status_metadata(
     resolution: _ListStatusMapResolution,
-    items: list[BacklogItem],
+    issue_references: list[str],
     status: str | None,
     filter_by_key: dict[str, str] | None,
-) -> tuple[StatusSource, list[str], list[str], bool]:
+) -> tuple[StatusSource, list[str], list[str]]:
     """Derive listing provenance and status-dependent filter degradation.
 
     Returns:
-        Status source, unavailable capabilities, degraded filter keys, and
-        whether the status map is untrustworthy.
+        Status source, unavailable capabilities, and degraded filter keys.
     """
     untrustworthy = resolution.unavailable or resolution.skipped_for_credentials
-    if resolution.unavailable:
+    has_numeric = any(parse_issue_number(issue) is not None for issue in issue_references)
+    has_backend_owned = any(parse_issue_number(issue) is None for issue in issue_references)
+    if not has_numeric or not resolution.has_numeric_issue_reference:
+        source: StatusSource = "cache"
+    elif untrustworthy:
         source: StatusSource = "unavailable"
-    elif resolution.skipped_for_credentials or not resolution.has_numeric_issue_reference:
-        source = "cache"
-    elif any(parse_issue_number(item.issue) is None for item in items):
+    elif has_backend_owned:
         source = "mixed"
     else:
         source = "live"
     keys = {key for key in ("status", "milestone") if filter_by_key and key in filter_by_key}
     if status:
         keys.add("status")
-    return (
-        source,
-        ["live_status"] if resolution.unavailable else [],
-        sorted(keys) if untrustworthy else [],
-        untrustworthy,
-    )
+    return (source, ["live_status"] if source == "unavailable" else [], sorted(keys) if untrustworthy else [])
 
 
 def list_items(
@@ -2475,6 +2471,9 @@ def list_items(
             "count": None,
             "from_cache": from_cache,
             "has_pending_writes": has_pending_writes,
+            "status_source": "cache",
+            "unavailable_capabilities": [],
+            "filters_evaluated_against_unavailable_data": [],
             **out.to_dict(),
         }
     # Start with non-skipped items that have a section. The skip flag may be set
@@ -2503,14 +2502,11 @@ def list_items(
     status_resolution = _resolve_list_status_map(open_items, repo, status, out)
     # Provenance of the status data just resolved above (#3546, B5/B6): "live"
     # when the batch fetch was attempted and succeeded, "cache" when the
-    # backend never attempts one -- either structurally (its own status field
-    # is authoritative -- not a degradation) or because this call had nothing
-    # to query / lacked credentials to query with -- "unavailable" when the
-    # batch fetch was attempted and failed. Computed once here, not
-    # per-item, since a single fetch covers the whole page.
-    (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data, status_map_untrustworthy) = (
-        _listing_status_metadata(status_resolution, open_items, status, filter_by_key)
-    )
+    # backend does not need one -- either structurally (its own status field is
+    # authoritative) or because this call had nothing to query -- and
+    # "unavailable" when live data was required but the provider could not
+    # supply it. Computed after filtering so it describes returned rows.
+    status_map_untrustworthy = status_resolution.unavailable or status_resolution.skipped_for_credentials
     open_items = _filter_open_items(
         open_items,
         section,
@@ -2534,6 +2530,9 @@ def list_items(
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:
         result_items = apply_search_filter(result_items, search)
+    (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data) = _listing_status_metadata(
+        status_resolution, [str(item.get("issue", "")) for item in result_items], status, filter_by_key
+    )
     return {
         "items": result_items,
         "count": len(result_items),
@@ -3683,7 +3682,7 @@ def view_item(
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
             enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=True)
-            if not enrichment.enriched and enrichment.attempted:
+            if not enrichment.enriched and (enrichment.attempted or enrichment.unavailable_reason):
                 reason = enrichment.unavailable_reason or (
                     "GitHub lookup failed (authentication failure, rate limit, GitHub server error, or issue not found)"
                 )
@@ -3700,22 +3699,22 @@ def view_item(
         # for the first sends a reader looking for an item that is really there.
         enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=False)
         if not enrichment.enriched:
+            if enrichment.unavailable_reason:
+                raise BackendUnavailableError(enrichment.unavailable_reason)
             raise ItemNotFoundError(selector)
     else:
         raise ItemNotFoundError(selector)
 
     # Provenance of this item's data (#3546, B5/B6): "live" when enrichment
     # actually succeeded this call; "unavailable" when a live check was
-    # attempted and failed (BackendUnavailableError, or a False return with no
-    # exception); "cache" when no live check was ever attempted. Distinct
-    # "cache"/"unavailable" states so a caller can tell "nothing was tried"
-    # apart from "something was tried and failed" (B-critique.md §3.4) --
-    # consistent with the provider-reported attempt outcome used by the prose
-    # warning above.
+    # required but could not run or was attempted and failed
+    # (BackendUnavailableError, provider refusal, or a False return);
+    # "cache" when no live check was needed. The provider outcome separately
+    # records whether an outbound request was attempted.
     status_source: StatusSource
     if enrichment.enriched:
         status_source = "live"
-    elif enrichment.attempted:
+    elif enrichment.attempted or enrichment.unavailable_reason:
         status_source = "unavailable"
     else:
         status_source = "cache"

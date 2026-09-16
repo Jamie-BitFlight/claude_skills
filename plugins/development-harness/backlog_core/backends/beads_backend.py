@@ -773,8 +773,8 @@ class BeadsBackend:
         Populates ``result.status``, ``result.state``, ``result.title``,
         ``result.source``, ``result.issue`` (the beads nanoid), and
         ``result.body`` (from the issue description and notes) from the
-        beads issue.  Returns ``False`` when the issue cannot be found or
-        the data is malformed.
+        beads issue. Returns a typed provider outcome when the issue cannot be
+        found or the data is malformed.
 
         Args:
             result: ViewItemResult to enrich in place.
@@ -782,7 +782,7 @@ class BeadsBackend:
             repo: Ignored for the beads backend.
 
         Returns:
-            True if enrichment succeeded, False otherwise.
+            Provider-reported enrichment outcome.
         """
         _ = repo
         try:

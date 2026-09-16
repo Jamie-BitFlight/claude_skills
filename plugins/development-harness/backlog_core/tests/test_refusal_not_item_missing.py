@@ -607,6 +607,9 @@ class TestListingProvenance:
         assert result["items"] is None
         assert result["count"] is None
         assert result["from_cache"] is True
+        assert result["status_source"] == "cache"
+        assert result["unavailable_capabilities"] == []
+        assert result["filters_evaluated_against_unavailable_data"] == []
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
 
     def test_a_label_scoped_empty_reconcile_serves_items_when_allow_cached(

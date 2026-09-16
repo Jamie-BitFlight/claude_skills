@@ -571,7 +571,8 @@ class BacklogListResponse(FallibleToolResponse):
     """Provenance of the live status data behind this listing's ``status``
     values and any ``status=`` filter -- ``"live"``, ``"cache"``, or
     ``"unavailable"``. See :data:`~backlog_core.models.StatusSource`. Present
-    on every successful listing; absent (``None``) on the error arm."""
+    on full and withheld successful listings; omitted from a healthy minimal
+    ``count_only`` response and absent (``None``) on the error arm."""
 
     unavailable_capabilities: list[str] | None = None
     """Capabilities that could not be read live this call, e.g.

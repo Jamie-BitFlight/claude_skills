@@ -72,9 +72,11 @@ from .models import (
     DispatchWaveSummary as _DispatchWaveSummary,
     Output,
     RegisterResult,
+    StatusSource,
     UnsupportedCapabilityError,
     init as _init_models,
 )
+from .parsing import parse_issue_number
 from .search import (
     _DEFAULT_SNIPPET_CONTEXT,
     _META_FIELDS,
@@ -1630,6 +1632,23 @@ def _build_count_only_response(
     return cast("BacklogListResponse", BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True))
 
 
+def _page_status_source(source: object, items: list[dict[str, str | bool]]) -> StatusSource:
+    """Narrow operation-level status provenance to the rows on this page.
+
+    Returns:
+        Status provenance for the returned page rows.
+    """
+    if source == "cache":
+        return "cache"
+    has_numeric = any(parse_issue_number(str(item.get("issue", ""))) is not None for item in items)
+    if not has_numeric:
+        return "cache"
+    has_backend_owned = any(parse_issue_number(str(item.get("issue", ""))) is None for item in items)
+    if source == "unavailable":
+        return "unavailable"
+    return "mixed" if has_backend_owned else "live"
+
+
 def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
     """Resolve the effective page limit for a ``backlog_list`` response.
 
@@ -1929,6 +1948,9 @@ async def backlog_list(
         withheld: dict[str, object] = {
             "from_cache": result.get("from_cache"),
             "has_pending_writes": result.get("has_pending_writes"),
+            "status_source": result.get("status_source"),
+            "unavailable_capabilities": result.get("unavailable_capabilities"),
+            "filters_evaluated_against_unavailable_data": result.get("filters_evaluated_against_unavailable_data"),
             "backend": backend_status.model_dump(),
             **out.to_dict(),
         }
@@ -1983,6 +2005,7 @@ async def backlog_list(
 
     effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
+    page_status_source = _page_status_source(result.get("status_source"), page_items)
     has_more = (offset + effective_limit) < total
 
     # Primitive 2 and 1: enrich page items when depth or match context is requested.
@@ -2012,6 +2035,10 @@ async def backlog_list(
         **result,
         "items": enriched_items,
         "count": len(enriched_items),
+        "status_source": page_status_source,
+        "unavailable_capabilities": (
+            result.get("unavailable_capabilities", []) if page_status_source == "unavailable" else []
+        ),
         "available_fields": list(_AVAILABLE_FIELDS),
         "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
         "backend": backend_status.model_dump(),
