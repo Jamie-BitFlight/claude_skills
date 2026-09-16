@@ -830,7 +830,8 @@ class TestSyncStateTryClaim:
         fresh_sync_state.status = SyncStatus.OFFLINE
         fresh_sync_state.offline_reason = "no token configured"
 
-        previous = fresh_sync_state.try_claim()
+        previous_started_at = fresh_sync_state.started_at
+        previous = fresh_sync_state.try_claim(track_started_at=False)
         assert previous == SyncStatus.OFFLINE
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
@@ -838,6 +839,7 @@ class TestSyncStateTryClaim:
 
         assert fresh_sync_state.status == SyncStatus.OFFLINE
         assert fresh_sync_state.offline_reason == "no token configured"
+        assert fresh_sync_state.started_at == previous_started_at
 
     def test_try_start_still_returns_bool_and_claims(self, fresh_sync_state: SyncState) -> None:
         """try_start() keeps its existing bool contract for sync_now/lifespan."""

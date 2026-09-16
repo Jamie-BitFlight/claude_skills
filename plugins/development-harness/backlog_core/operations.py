@@ -2064,30 +2064,43 @@ def _build_list_entry(
     return entry
 
 
-def read_through_cold_cache(repo: str, output: Output) -> None:
-    """Attempt one fetch-only, unlabeled refresh for a never-synced cache."""
+def read_through_cold_cache(repo: str, output: Output) -> bool:
+    """Attempt one fetch-only, unlabeled refresh for a never-synced cache.
+
+    Returns:
+        True when a documented cache/provider failure was handled and the
+        caller should serve the readable cached listing with a warning.
+    """
     sync_state = get_sync_state()
-    previous_sync_status = sync_state.try_claim()
+    previous_sync_status = sync_state.try_claim(track_started_at=False)
     if previous_sync_status is None:
         output.info(
             "  A background sync is already in progress; skipping the implicit "
             "read-through for this never-synced cache rather than starting a second one."
         )
-        return
+        return False
+    succeeded = False
+    degraded_to_cache = False
     try:
         # A label-scoped reconcile cannot establish the global snapshot checkpoint.
         refresh_local_cache_from_github(repo, None, output=output, apply_local_patches=False)
+        succeeded = True
     except (
         GithubException,
-        BacklogError,
+        BackendUnavailableError,
+        CacheStateCorruptError,
         ContentUnavailableError,
         OSError,
-        ValueError,
         *RETRYABLE_TRANSIENT_EXCEPTIONS,
     ) as exc:
+        degraded_to_cache = True
         output.warn(f"  WARNING: Could not refresh the never-synced local cache: {exc}")
     finally:
-        sync_state.release_claim(previous_sync_status)
+        if succeeded:
+            sync_state.complete_claim()
+        else:
+            sync_state.release_claim(previous_sync_status)
+    return degraded_to_cache
 
 
 def list_items(
@@ -2154,6 +2167,7 @@ def list_items(
     """
     out = output or Output()
     backend = get_config().backend
+    degraded_to_cache = False
     if refresh:
         # A warm checkpoint whose most recent snapshot load flagged unreadable
         # or vanished files (SnapshotCompletenessProvider.has_skipped_snapshots,
@@ -2200,7 +2214,7 @@ def list_items(
         # attempt per call, never a retry loop within one -- which the
         # critique frames as complementary, not a defect: "we tried and
         # could not" is a sharper answer than "we never tried".
-        read_through_cold_cache(repo, out)
+        degraded_to_cache = read_through_cold_cache(repo, out)
     items = get_config().backend.list_work_items()
 
     # backlog #3546 task A4: two independent, provenance-flavored bits
@@ -2254,7 +2268,7 @@ def list_items(
             "  WARNING: The local cache holds no items. The backlog is empty, or the cache "
             "has never synced — run a sync to tell the two apart."
         )
-    if low_confidence and not allow_cached:
+    if low_confidence and not allow_cached and not degraded_to_cache:
         # Fail-safe shape (A-critique.md Sec 4, ALT-2's Apollo dataState
         # analogy), not fail-open: an unconfirmed cache state must not
         # silently hand back items/count for an unaware caller to misread as

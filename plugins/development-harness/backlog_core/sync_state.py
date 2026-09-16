@@ -156,7 +156,7 @@ class SyncState:
         """
         return self.status == SyncStatus.RUNNING
 
-    def try_claim(self) -> SyncStatus | None:
+    def try_claim(self, *, track_started_at: bool = True) -> SyncStatus | None:
         """Atomically claim the sync slot, returning the status held before the claim.
 
         The single-flight primitive underlying both ``try_start()`` (startup
@@ -176,6 +176,12 @@ class SyncState:
         existing ``OFFLINE``/``ERROR`` state exactly as the background sync
         loop left it, instead of silently clearing it to ``IDLE``.
 
+        Args:
+            track_started_at: Whether to replace ``started_at`` when taking
+                the claim. Transient callers that restore prior state after a
+                handled failure leave this false so they do not corrupt the
+                previous sync's bookkeeping.
+
         Returns:
             The ``SyncStatus`` that prevailed before the claim when the slot
             was claimed (status was not ``RUNNING``, and is now); ``None``
@@ -186,7 +192,8 @@ class SyncState:
                 return None
             previous = self.status
             self.status = SyncStatus.RUNNING
-            self.started_at = datetime.now(UTC)
+            if track_started_at:
+                self.started_at = datetime.now(UTC)
             return previous
 
     def release_claim(self, previous: SyncStatus) -> None:
@@ -201,6 +208,18 @@ class SyncState:
         """
         with self._claim_lock:
             self.status = previous
+
+    def complete_claim(self) -> None:
+        """Complete a successful transient claim as a successful sync."""
+        with self._claim_lock:
+            now = datetime.now(UTC)
+            self.status = SyncStatus.IDLE
+            self.started_at = now
+            self.completed_at = now
+            self.last_success_at = now
+            self.last_error = ""
+            self.retry_count = 0
+            self.offline_reason = ""
 
     def try_start(self) -> bool:
         """Atomically claim the sync slot, returning True when claimed.

@@ -13,6 +13,8 @@ still renders. What changes is that the answer names its own limits.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -23,8 +25,10 @@ from backlog_core import gh_client, operations
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
+    CacheStateCorruptError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
@@ -35,6 +39,7 @@ from backlog_core.models import (
     ReconcileScope,
     ViewItemResult,
 )
+from backlog_core.sync_state import SyncState, SyncStatus
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -263,6 +268,7 @@ class _CheckpointedBackend:
     """
 
     supports_batch_status_fetch = False
+    supports_cached_listing = True
 
     def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
         self._items = items
@@ -343,7 +349,7 @@ class TestColdCacheReadsThroughOnce:
         backend = _CheckpointedBackend([], synced=False)
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
         refresh_mock = mocker.patch.object(
-            operations, "refresh_local_cache_from_github", side_effect=BacklogError("no token configured")
+            operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("no token configured")
         )
 
         operations.list_items(output=Output())
@@ -388,9 +394,9 @@ class TestColdCacheReadsThroughOnce:
         assert backend.reconcile_requests[0].label == ""
         assert backend.reconcile_requests[0].apply_local_patches is False
 
-    @pytest.mark.parametrize("failure", [OSError("cache is read-only"), ValueError("invalid cache state")])
+    @pytest.mark.parametrize("failure", [OSError("cache is read-only"), CacheStateCorruptError("invalid cache state")])
     def test_cache_io_failure_degrades_to_cached_listing(
-        self, mocker: MockerFixture, failure: OSError | ValueError
+        self, mocker: MockerFixture, failure: OSError | CacheStateCorruptError
     ) -> None:
         backend = _CheckpointedBackend([_item("#1")], synced=False)
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
@@ -401,6 +407,61 @@ class TestColdCacheReadsThroughOnce:
 
         assert result["count"] == 1
         assert any(str(failure) in warning for warning in out.warnings)
+
+    def test_undocumented_value_error_propagates_and_releases_claim(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=False)
+        state = SyncState()
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "get_sync_state", return_value=state)
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=ValueError("programming error"))
+
+        with pytest.raises(ValueError, match="programming error"):
+            operations.list_items(output=Output())
+
+        assert state.status == SyncStatus.IDLE
+
+    def test_successful_read_through_replaces_prior_failure_state(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=False)
+        state = SyncState(status=SyncStatus.OFFLINE, last_error="offline", offline_reason="no token", retry_count=2)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "get_sync_state", return_value=state)
+
+        operations.list_items(output=Output())
+
+        assert state.status == SyncStatus.IDLE
+        assert state.last_success_at is not None
+        assert state.completed_at == state.last_success_at
+        assert state.last_error == ""
+        assert state.offline_reason == ""
+        assert state.retry_count == 0
+
+    def test_two_overlapping_cold_cache_calls_reconcile_exactly_once(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=False)
+        state = SyncState()
+        refresh_entered = Event()
+        release_refresh = Event()
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "get_sync_state", return_value=state)
+
+        def _blocked_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            refresh_entered.set()
+            assert release_refresh.wait(timeout=2)
+            backend._synced = True
+            return {"refreshed": 1}
+
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_blocked_refresh)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(operations.list_items, output=Output())
+            assert refresh_entered.wait(timeout=2)
+            second = executor.submit(operations.list_items, output=Output())
+            try:
+                second.result(timeout=1)
+            finally:
+                release_refresh.set()
+            first.result(timeout=2)
+
+        refresh_mock.assert_called_once()
 
 
 def _snapshot(*, items: list[ProviderItem] | None = None, started_at: str = "2026-08-12T01:00:00Z") -> ProviderSnapshot:
@@ -416,13 +477,13 @@ class TestListingProvenance:
     (A1 checkpoint honesty) plus read-side (A4 provenance) interaction.
     """
 
-    def test_a_label_scoped_empty_reconcile_withholds_items_by_default(
+    def test_a_label_scoped_empty_reconcile_degrades_to_cached_result_after_refresh_failure(
         self, tmp_path: Path, mocker: MockerFixture
     ) -> None:
         """A-critique.md Sec 3.1's exact reproduction: a label-scoped reconcile that
-        durably observes zero items must not resurface as a confidently-empty
-        listing. A1 already keeps the checkpoint honestly None for this case;
-        A4 must read that honesty and decline to serve items by default."""
+        durably observes zero items keeps its checkpoint honestly unset. When
+        the implicit repair attempt fails, the documented degradation path
+        returns that cached result with explicit warnings."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
         backend._fetch_snapshot = MagicMock(return_value=_snapshot())
@@ -430,12 +491,14 @@ class TestListingProvenance:
         assert cache._get_snapshot_checkpoint() is None  # A1: still honestly never-synced
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+        mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("offline")
+        )
 
         result = operations.list_items(output=Output())
 
-        assert result["items"] is None
-        assert result["count"] is None
+        assert result["items"] == []
+        assert result["count"] == 0
         assert result["from_cache"] is True
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
 
@@ -449,7 +512,9 @@ class TestListingProvenance:
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+        mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("offline")
+        )
 
         result = operations.list_items(allow_cached=True, output=Output())
 
@@ -472,14 +537,18 @@ class TestListingProvenance:
         assert cache._get_snapshot_checkpoint() is None  # still honestly never-synced
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+        mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("offline")
+        )
 
         result = operations.list_items(output=Output())
 
-        # Cold + no confirmed checkpoint => low confidence => items withheld by
-        # default, but has_pending_writes still names the queued mutation.
-        assert result["items"] is None
-        assert result["count"] is None
+        # The failed implicit repair degrades to the readable cached item, while
+        # has_pending_writes independently names the queued mutation.
+        items = result["items"]
+        assert isinstance(items, list)
+        assert len(items) == 1
+        assert result["count"] == 1
         assert result["from_cache"] is True
         assert result["has_pending_writes"] is True
 
@@ -554,7 +623,9 @@ class TestListingProvenance:
         corrupt_files[0].write_text("not: [valid, yaml:", encoding="utf-8")
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=BacklogError("offline"))
+        mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("offline")
+        )
 
         result = operations.list_items(output=Output())
 
