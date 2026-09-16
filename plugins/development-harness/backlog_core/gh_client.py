@@ -1265,14 +1265,14 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Try to get GitHub repo, return None when GITHUB_TOKEN is missing or GitHub errors.
+    """Try to get GitHub repo, return None when no token or GitHub errors.
 
     Use this for operations where local-only fallback is acceptable.
 
     Returns:
-        Repository object, or None when GITHUB_TOKEN is missing, or GitHub
-        returned an error (authentication failure, rate limit, or server
-        error).
+        Repository object, or None when no GitHub token is available (check
+        TOKEN_ENV_VARS), or GitHub returned an error (authentication failure,
+        rate limit, or server error).
     """
     repo = resolve_repo(repo)
     try:
@@ -1318,7 +1318,7 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
-            error="GITHUB_TOKEN set but GitHub returned an error (authentication failure, rate limit, or server error)",
+            error="GitHub token set but GitHub returned an error (authentication failure, rate limit, or server error)",
         )
 
     try:
