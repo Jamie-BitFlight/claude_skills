@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogItem, Section, ViewItemResult
+from backlog_core.models import BacklogItem, Section, ViewEnrichmentResult, ViewItemResult
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -65,12 +65,14 @@ def _configure_memory_view(
             item = BacklogItem.model_validate({**item.model_dump(), "issue": f"#{issue_num}"})
         backend.put_work_item(item)
 
-    def _enrich(result: ViewItemResult, issue: str, repo: str = "") -> bool:
+    def _enrich(result: ViewItemResult, issue: str, repo: str = "") -> ViewEnrichmentResult:
         if not reachable:
-            return False
+            return ViewEnrichmentResult(
+                enriched=False, attempted=True, unavailable_reason="GitHub lookup failed (backend unreachable)"
+            )
         if body is not None:
             result.body = body
-        return True
+        return ViewEnrichmentResult(enriched=True, attempted=True)
 
     mocker.patch.object(backend, "view_enrich_from_github", side_effect=_enrich)
     mocker.patch("backlog_core.operations.get_config", return_value=BacklogConfig(backend=backend))

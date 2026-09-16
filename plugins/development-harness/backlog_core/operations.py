@@ -2274,17 +2274,21 @@ def _listing_status_metadata(
     untrustworthy = resolution.unavailable or resolution.skipped_for_credentials
     has_numeric = any(parse_issue_number(issue) is not None for issue in issue_references)
     has_backend_owned = any(parse_issue_number(issue) is None for issue in issue_references)
-    if not has_numeric or not resolution.has_numeric_issue_reference:
+    keys = {key for key in ("status", "milestone") if filter_by_key and key in filter_by_key}
+    if status:
+        keys.add("status")
+    if untrustworthy and resolution.has_numeric_issue_reference and keys:
+        # A status-dependent filter can remove every numeric row precisely because
+        # live status was unavailable. The empty result must not erase that cause.
+        source: StatusSource = "unavailable"
+    elif not has_numeric or not resolution.has_numeric_issue_reference:
         source: StatusSource = "cache"
     elif untrustworthy:
-        source: StatusSource = "unavailable"
+        source = "unavailable"
     elif has_backend_owned:
         source = "mixed"
     else:
         source = "live"
-    keys = {key for key in ("status", "milestone") if filter_by_key and key in filter_by_key}
-    if status:
-        keys.add("status")
     return (source, ["live_status"] if source == "unavailable" else [], sorted(keys) if untrustworthy else [])
 
 
@@ -3608,6 +3612,17 @@ def _attempt_view_enrichment(
     return ViewEnrichmentResult(enriched=raw, attempted=True)
 
 
+def _view_enrichment_unavailable_reason(enrichment: ViewEnrichmentResult) -> str:
+    """Format a provider reason according to whether a live lookup was attempted.
+
+    Returns:
+        The reason, prefixed as unreachable only when a live lookup was attempted.
+    """
+    if enrichment.attempted:
+        return f"backend unreachable — {enrichment.unavailable_reason}"
+    return enrichment.unavailable_reason
+
+
 def view_item(
     selector: str,
     repo: str = "",
@@ -3682,11 +3697,8 @@ def view_item(
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
             enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=True)
-            if not enrichment.enriched and (enrichment.attempted or enrichment.unavailable_reason):
-                reason = enrichment.unavailable_reason or (
-                    "GitHub lookup failed (authentication failure, rate limit, GitHub server error, or issue not found)"
-                )
-                reason = f"backend unreachable — {reason}"
+            if not enrichment.enriched and enrichment.unavailable_reason:
+                reason = _view_enrichment_unavailable_reason(enrichment)
                 out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
@@ -3706,15 +3718,14 @@ def view_item(
         raise ItemNotFoundError(selector)
 
     # Provenance of this item's data (#3546, B5/B6): "live" when enrichment
-    # actually succeeded this call; "unavailable" when a live check was
-    # required but could not run or was attempted and failed
-    # (BackendUnavailableError, provider refusal, or a False return);
-    # "cache" when no live check was needed. The provider outcome separately
-    # records whether an outbound request was attempted.
+    # actually enriched this call; "unavailable" when the provider names an
+    # inability to answer; "cache" when no live check was needed or a completed
+    # check confirmed absence and left the cached fallback unchanged. The
+    # provider outcome separately records whether an outbound request was attempted.
     status_source: StatusSource
     if enrichment.enriched:
         status_source = "live"
-    elif enrichment.attempted or enrichment.unavailable_reason:
+    elif enrichment.unavailable_reason:
         status_source = "unavailable"
     else:
         status_source = "cache"

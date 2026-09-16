@@ -242,6 +242,20 @@ class TestListItemsStatusSource:
 
         assert result["filters_evaluated_against_unavailable_data"] == ["status"]
 
+    def test_status_filter_empty_result_retains_unavailable_provenance(self, mocker: MockerFixture) -> None:
+        """Filtering every numeric row cannot erase the degraded lookup provenance."""
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend([_item("#1")]))
+        )
+        mocker.patch.object(operations, "batch_fetch_statuses", side_effect=GraphQLUnavailableError(_REFUSAL_MESSAGE))
+
+        result = operations.list_items(status="done", output=Output())
+
+        assert result["count"] == 0
+        assert result["status_source"] == "unavailable"
+        assert result["unavailable_capabilities"] == ["live_status"]
+        assert result["filters_evaluated_against_unavailable_data"] == ["status"]
+
     def test_status_filter_absent_under_refusal_does_not_name_a_filter(self, mocker: MockerFixture) -> None:
         """No status= filter was requested, so nothing was evaluated against unavailable data."""
         mocker.patch.object(
@@ -286,7 +300,11 @@ class TestViewItemStatusSource:
     def test_attempted_and_failed_enrichment_reports_unavailable(self, mocker: MockerFixture) -> None:
         """A genuine attempt that failed -- distinct from never having tried."""
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
-        mocker.patch.object(operations, "view_enrich_from_github", return_value=False)
+        mocker.patch.object(
+            operations,
+            "view_enrich_from_github",
+            return_value=ViewEnrichmentResult(enriched=False, attempted=True, unavailable_reason="simulated failure"),
+        )
 
         result = operations.view_item("#519", output=Output())
 
@@ -310,6 +328,21 @@ class TestViewItemStatusSource:
         assert result.warnings == [
             "no GitHub credentials configured — sections_index reflects provider-backed record, may be stale"
         ]
+
+    def test_confirmed_live_absence_keeps_cached_result_without_unavailable_provenance(
+        self, mocker: MockerFixture
+    ) -> None:
+        """A completed lookup that finds nothing is not provider unavailability."""
+        _patch_view_backend(mocker, [_item("#519", title="Cached title")])
+        mocker.patch.object(
+            operations, "view_enrich_from_github", return_value=ViewEnrichmentResult(enriched=False, attempted=True)
+        )
+
+        result = operations.view_item("#519", output=Output())
+
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
+        assert result.warnings == []
 
     def test_uncached_skipped_enrichment_raises_backend_unavailable(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [])
