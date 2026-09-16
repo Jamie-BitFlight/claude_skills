@@ -234,12 +234,11 @@ def _parse_entry_timestamp(entry_id: str) -> datetime | None:
 
     Raises:
         ValidationError: If ``entry_id`` starts with neither the zero-date fallback prefix
-            nor a well-formed ISO timestamp.  Entry IDs come off stored bodies, not from
-            callers, and ``backlog_view(since=...)`` parses every one of them, so the
-            refusal has to be a ``BacklogError`` for the tool to report an ``error`` field
-            rather than fail the call.
-        ValueError: If the prefix is well-formed but names no real calendar date —
-            ``datetime.fromisoformat``'s own refusal, raised as it raises it.
+            nor a well-formed ISO timestamp, or if the prefix is well-formed but names no
+            date any calendar has.  Entry IDs come off stored bodies, not from callers, and
+            ``backlog_view(since=...)`` parses every one of them, so both refusals have to
+            be a ``BacklogError`` for the tool to report an ``error`` field rather than fail
+            the call.  The second wraps ``datetime.fromisoformat``'s own ``ValueError``.
     """
     if entry_id.startswith(_ZERO_DATE_PREFIX):
         # The zero-date fallback means "this entry's timestamp is unknown", not "year zero"
@@ -255,7 +254,13 @@ def _parse_entry_timestamp(entry_id: str) -> datetime | None:
         msg = f"Entry ID does not contain a valid ISO timestamp prefix: {entry_id!r}"
         raise ValidationError(msg)
     ts = m.group(1)
-    dt = datetime.fromisoformat(ts)
+    try:
+        dt = datetime.fromisoformat(ts)
+    except ValueError as exc:
+        # Shape and calendar-reality are separate checks, and the regex only does the first:
+        # ``2026-13-01T00:00:00Z`` matches _ISO_TIMESTAMP_RE and is still no date.
+        msg = f"Entry ID timestamp is not a real calendar date: {entry_id!r}"
+        raise ValidationError(msg) from exc
     if dt.tzinfo is None:
         return dt.replace(tzinfo=UTC)
     return dt
@@ -276,10 +281,9 @@ def _is_entry_id(entry_id: str) -> bool:
         return False
     try:
         _parse_entry_timestamp(entry_id)
-    except (ValidationError, ValueError):
-        # Both arms are needed: the missing-prefix refusal is this module's own
-        # ValidationError, the calendar-impossible one is fromisoformat's ValueError, and
-        # ValidationError does not inherit from ValueError.
+    except ValidationError:
+        # Covers both of that function's refusals: a missing timestamp prefix, and a prefix
+        # that is well-formed but names no real date.
         return False
     return True
 

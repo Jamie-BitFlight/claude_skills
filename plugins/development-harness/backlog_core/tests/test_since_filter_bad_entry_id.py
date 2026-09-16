@@ -25,12 +25,25 @@ from backlog_core.models import BacklogError
 
 # An entry-shaped block whose ID is a word, not a timestamp.
 _UNTIMESTAMPED_BODY = "<div><sub>seeded</sub>legacy content</div>"
+# An entry-shaped block whose ID has the shape of a timestamp but names no real date.
+_CALENDAR_IMPOSSIBLE_BODY = "<div><sub>2026-13-01T00:00:00Z</sub>month thirteen</div>"
 
 
 def test_since_read_over_an_untimestamped_entry_refuses_as_a_backlog_error() -> None:
     """The refusal must be catchable by the handler ``backlog_view`` actually has."""
     with pytest.raises(BacklogError, match="does not contain a valid ISO timestamp prefix"):
         parse_entries(_UNTIMESTAMPED_BODY, since="2026-01-01")
+
+
+def test_since_read_over_a_calendar_impossible_entry_refuses_as_a_backlog_error() -> None:
+    """The second refusal in the same function had to be converted too.
+
+    A prefix can be well-formed and still name no date any calendar has, and that one
+    came from ``datetime.fromisoformat``, not from this module -- a bare ``ValueError``
+    reaching the same wrapper, for the same reason, one line further down.
+    """
+    with pytest.raises(BacklogError, match="not a real calendar date"):
+        parse_entries(_CALENDAR_IMPOSSIBLE_BODY, since="2026-01-01")
 
 
 def test_a_since_less_read_is_unaffected() -> None:
