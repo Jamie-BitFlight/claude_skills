@@ -380,7 +380,9 @@ max-complexity = 12
 # must reference requests.exceptions types to distinguish transient network-transport OSErrors
 # (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
 "**/backlog_core/sync_state.py" = ["banned-api"]
-# Open-PR safety tests construct requests transport exceptions because PyGithub exposes them.
+# Category 6 (maintenance burden exceeds compliance gain): these tests must construct the
+# requests transport exceptions PyGithub exposes. Replacing them with test doubles would
+# duplicate PyGithub's exception hierarchy and stop testing the exact production types.
 "**/backlog_core/tests/test_open_pr_search_failure.py" = ["banned-api"]
 "**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
 # Regression test for the two issue mirrors' transient-transport handling needs a genuine
