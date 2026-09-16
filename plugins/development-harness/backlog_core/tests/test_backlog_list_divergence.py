@@ -561,7 +561,7 @@ class TestCountOnlySurfacesStatusSourceFields:
             operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert response.get("status_source") == "unavailable"
         assert response.get("unavailable_capabilities") == ["live_status"]
@@ -575,7 +575,7 @@ class TestCountOnlySurfacesStatusSourceFields:
             operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(status="in-progress", count_only=True))
+        response = await backlog_list(status="in-progress", count_only=True)
 
         assert response.get("filters_evaluated_against_unavailable_data") == ["status"]
 
@@ -590,7 +590,7 @@ class TestCountOnlySurfacesStatusSourceFields:
         )
         mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert "status_source" not in response
         assert "unavailable_capabilities" not in response
@@ -608,7 +608,7 @@ class TestCountOnlySurfacesStatusSourceFields:
             operations, "get_config", return_value=mocker.Mock(backend=_NoReconcileBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert "status_source" not in response
         assert "unavailable_capabilities" not in response

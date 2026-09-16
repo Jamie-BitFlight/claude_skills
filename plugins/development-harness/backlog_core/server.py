@@ -27,7 +27,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, cast
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -1608,7 +1608,7 @@ def _build_count_only_response(
     output: Output,
     sync_state_block: dict[str, object] | None,
     sync_warnings: list[str],
-) -> BacklogListResponse:
+) -> dict[str, object]:
     """Build the minimal count response while preserving degradation signals.
 
     Returns:
@@ -1629,7 +1629,7 @@ def _build_count_only_response(
         if result.get(field):
             response[field] = result[field]
     _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
-    return cast("BacklogListResponse", BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True))
+    return BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True)
 
 
 def _page_status_source(source: object, items: list[dict[str, str | bool]]) -> StatusSource:
