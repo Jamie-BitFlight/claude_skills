@@ -13,7 +13,9 @@ Writing an entry rather than reviewing one? Use [Entry Quality Standards](./entr
 
 **Completion criterion**: every gate below has been run and its result recorded. A gate you skipped is a gate that FAILED — record it as `NOT RUN` with the reason, never as a pass.
 
-**Defect** = any finding under any gate. Record every defect as `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Quote the offending text verbatim; paraphrase loses the reviewer's evidence.
+**Defect** = a finding the entry's author controlled: text that was wrong when it was written. Record every defect as `{file}:{line} — {gate} — {exact quoted text} — {required correction}`. Quote the offending text verbatim; paraphrase loses the reviewer's evidence.
+
+**Repair** = a finding the author could not have controlled: text that was accurate when written and that a later repository change invalidated. Record every repair as `{file}:{line} — {gate} — {exact quoted text} — {the change that invalidated it} — {required correction}`, and count repairs separately from defects. A repair schedules work against the citing file and leaves the verdict where it stood.
 
 ---
 
@@ -49,7 +51,7 @@ Each rule in [Entry Quality Standards](./entry-quality-standards.md) is a separa
 |---|---|---|
 | **Rule 1 — Read Before Writing** | Does every section's content trace to a source listed in References, and was that source actually reachable? | A claim whose only possible basis is the resource's name, URL path, or domain. An inaccessible source whose absence is not stated in References |
 | **Rule 2 — Preserve Counts** | Are capability figures written as the exact number the source gives? | A vague quantifier ("many languages", "recent release", "low latency") standing where the source has a figure |
-| **Rule 2a — No Popularity Statistics** | Is the entry free of star, download, fork, and contributor counts? | Any such figure anywhere in the entry, including inside a badge, a quoted README passage, or a "Key Statistics" section that should not exist |
+| **Rule 2a — No Popularity Statistics** | Did this run leave every star, download, fork, and contributor count out of the entry? | A figure this run gathered, wherever it landed — a badge, a quoted README passage, a section of its own. Figures the entry already carried stay as written, per Rule 2a's scope |
 | **Rule 3 — Absence vs Nonexistence** | Where information was not found, does the entry say it was not found? | "Doesn't support X" / "Not available" / "Not supported" where the honest statement is "Not mentioned in documentation" or "Unable to access {source}". Applies to the entry's repo claims too: `-> nothing in {scope}` reports that these search terms matched nothing in that scope, and an item reading it as "this repo has no X" is a Rule 3 defect |
 | **Rule 4 — Explicit Confidence** | Does every major section carry a confidence level in the confidence map? | A section missing from the map. A `high` on a section whose sources are informal, partial, contradictory, or code-read |
 
@@ -75,12 +77,26 @@ Every statement an entry or an analysis file makes about **this repository** is 
 For each repo claim, in order:
 
 1. **Path exists** — open the path first. If it opens, step 2 applies: verify what it says against
-   what is actually there. If it does not open, decide which kind of claim it was before recording a
-   defect:
-   A claim about **what is there now** — "`X` already does Y", "the hook in `Z` writes the field" — is a defect when the path does not open. Record what was named and what is actually there; do not repair a near-miss on the writer's behalf.
-   A path named as a **place to create something** is not a defect for being absent. That is the entire purpose of an Integration Opportunities item: the file's absence is the reason the proposal exists. "Integration point: `.claude/hooks/pre-push.js`", "new skill in `plugins/developer-tools/skills/ci-debugger/`", "new file at", "target state", "could add", "consider adding" are all this second kind. For one of these, check instead that the parent location it would go into exists, and let step 3 settle whether something already implements it.
-   Opening first rather than classifying first means a path renamed or removed elsewhere in the repo
-   since the claim was written is caught by this same read, not waved through as a creation target.
+   what is actually there. If it does not open, three outcomes are available, and which one applies
+   is settled by `git log --all --full-history -- {path}` plus the claim's own wording:
+
+   - **Never existed** — a claim about **what is there now** ("`X` already does Y", "the hook in
+     `Z` writes the field") whose path the log has never seen. Record a **defect**: what was named,
+     and what is actually there. Record the path exactly as written; a near-miss is the writer's to
+     correct, not the reviewer's to guess at.
+   - **Existed and moved** — the same kind of claim, but the log returns the commits that once held
+     the path. The entry was accurate when written and a repository change since then moved or
+     removed the path. Record a **repair** against the citing file, naming the commit the log gives.
+     The writer's verdict stands.
+   - **A place to create something** — the file's absence is the reason the proposal exists, which is
+     the entire purpose of an Integration Opportunities item. "Integration point:
+     `.claude/hooks/pre-push.js`", "new skill in `plugins/developer-tools/skills/ci-debugger/`", "new
+     file at", "target state", "could add", "consider adding" all read this way. Check instead that
+     the parent location it would go into exists, and let step 3 settle whether something already
+     implements it.
+
+   Opening first, then consulting the log, is what keeps a path the repository renamed out from under
+   a correct entry in the repair column rather than the defect column.
 2. **Path is described correctly** — the file's real contents match what the claim says about them. A proposal that names a real path but misdescribes what lives there is a defect of the same severity as an invented path.
 3. **Gap is real** — where a proposal says the local system lacks a capability, the file confirms the absence. A capability the file already implements makes the proposal a defect, not a low-confidence proposal.
 4. **Measurable signal is runnable** — where a proposal names a command or an observable field as its completion signal, that command runs and that field is reachable.
@@ -149,7 +165,7 @@ GATE 1 mechanical:    PASS | FAIL | NOT RUN ({reason})
   check-backlinks:                 {N} asymmetric pairs, {N} scan-skipped files
 GATE 2 fidelity:      PASS | FAIL — rules failed: {1|2|2a|3|4}
 GATE 3 depth:         PASS | FAIL — sections failed: {names}
-GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective
+GATE 4 repo claims:   PASS | FAIL — {N} claims verified, {N} defective, {N} for repair
 GATE 5 engagement:    PASS | FAIL
 GATE 6 triggers:      PASS | FAIL — triggers hit: {names}
 
@@ -157,7 +173,13 @@ DEFECTS: {N}
 1. {file}:{line} — GATE {N} — "{exact quoted text}" — {required correction}
 2. ...
 
+REPAIRS: {N}
+1. {file}:{line} — GATE {N} — "{exact quoted text}" — {the change that invalidated it} — {required correction}
+2. ...
+
 VERDICT: APPROVE | REQUEST CHANGES
 ```
 
 `APPROVE` requires every gate at PASS and `DEFECTS: 0`. Any gate at FAIL or NOT RUN, or any defect recorded, is `REQUEST CHANGES` — a defect count above zero and an `APPROVE` verdict cannot both be true.
+
+Repairs are reported and then set aside: they are work scheduled against the citing file, so an entry with repairs and `DEFECTS: 0` is `APPROVE` and keeps its README row. A gate whose only findings are repairs is `PASS`.

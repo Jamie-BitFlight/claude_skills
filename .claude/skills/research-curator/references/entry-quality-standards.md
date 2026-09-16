@@ -30,13 +30,23 @@ Popularity metrics (stars, downloads, forks) are out of scope entirely — see R
 
 ### Rule 2a: No Popularity Statistics
 
-Do NOT gather or write star counts, download counts, fork counts, or contributor counts.
-There is no "Key Statistics" section in the entry template; do not add one, and do not fold
-this data into another section.
+Leave star counts, download counts, fork counts, and contributor counts ungathered. The entry
+template has no "Key Statistics" section; write the entry without one, and keep this data out
+of the other sections too.
 
-This rule binds gathering as well as writing: it applies whether the repository is in the
-session's authorized GitHub scope or out of it, and no fallback source (web search, package
-registry, a badge in the README) makes the data in scope.
+The rule binds an agent at gather time: it applies whether the repository is in the session's
+authorized GitHub scope or out of it, and no fallback source (web search, package registry, a
+badge in the README) makes the data in scope.
+
+It reaches no further than that. Figures a finished entry already carries stay as written —
+the entry template required a `Key Statistics` block of `GitHub Stars`, `Downloads/month`, and
+`Contributors` until commit `a54eef252` (2026-07-08) removed it, so every entry written before
+that date carries the section because its template demanded it. Such a figure is not a defect,
+not a `--fix` target, and not a reason to edit or withhold an entry. A refresh of one of these
+entries keeps the section it found and adds nothing to it.
+
+SOURCE: `git show a54eef252 -- .claude/skills/research-curator/references/entry-template.md`
+(commit dated 2026-07-08, PR #2723) — the diff that deleted the `Key Statistics` block.
 
 ### Rule 3: Distinguish Absence from Nonexistence
 
