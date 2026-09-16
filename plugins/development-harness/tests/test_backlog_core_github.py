@@ -1378,16 +1378,16 @@ class TestTryGetGithub:
         Tests: try_get_github network-failure handling (defect: the docstring
         promises None for "no token, network error, etc." but the implementation
         only caught GithubException, so a raw ConnectionError escaped).
-        How: Patch Github.get_repo to raise requests.exceptions.ConnectionError.
+        How: Mock make_github_client to return a repo object whose get_repo raises ConnectionError.
         Why: Callers (gh_client.probe_backend_status, gh_client.batch_fetch_statuses,
         backends/github_backend.py) treat None as "fall back to local-only" and
         do not expect try_get_github to ever raise.
         """
         # Arrange
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch(
-            "backlog_core.gh_client.Github"
-        ).return_value.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
+        mock_repo = mocker.MagicMock()
+        mock_repo.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
+        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
 
         # Act
         result = try_get_github("test-owner/test-repo")
@@ -1400,14 +1400,14 @@ class TestTryGetGithub:
 
         Tests: try_get_github network-failure handling (defect: only
         GithubException was caught, so requests.exceptions.Timeout escaped).
-        How: Patch Github.get_repo to raise requests.exceptions.Timeout.
+        How: Mock make_github_client to return a repo object whose get_repo raises Timeout.
         Why: Same fallback contract as the ConnectionError case above.
         """
         # Arrange
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = requests.exceptions.Timeout(
-            "request timed out"
-        )
+        mock_repo = mocker.MagicMock()
+        mock_repo.get_repo.side_effect = requests.exceptions.Timeout("request timed out")
+        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
 
         # Act
         result = try_get_github("test-owner/test-repo")
