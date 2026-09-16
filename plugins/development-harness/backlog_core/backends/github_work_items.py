@@ -70,7 +70,7 @@ if TYPE_CHECKING:
 
     from github.Repository import Repository
 
-    from backlog_core.backend_types import IssueCommentNode, IssueNode
+    from backlog_core.backend_types import AddedCommentNode, IssueCommentNode, IssueNode
     from backlog_core.file_cache import FileCache
     from backlog_core.file_cache_state import _PendingWorkItemMutation
 
@@ -116,7 +116,7 @@ class _IssueGateway(Protocol):
         self, repo: Repository, owner: str, repo_name: str, references: list[str]
     ) -> dict[str, IssueNode | None]: ...
 
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str: ...
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode: ...
 
     def _fetch_comment_by_id_graphql(self, repo: Repository, comment_node_id: str) -> IssueCommentNode: ...
 
@@ -159,8 +159,23 @@ class _GitHubWorkItemSync:
         labels = [request.label] if request.label else None
         match request.scope:
             case ReconcileScope.INITIAL:
+                # A caller who directly requests INITIAL (never routed through
+                # _GitHubReconciliation._with_snapshot_checkpoint's incremental
+                # upgrade) only needs open issues -- a genuine from-scratch
+                # reconcile. request.checkpoint_recovery marks the *other*
+                # case: an INCREMENTAL request that had to be upgraded to
+                # INITIAL because no trustworthy checkpoint existed to resolve
+                # a "since" from (no checkpoint at all, or one that predates
+                # scope metadata and may be a pre-A1 artifact -- see
+                # _with_snapshot_checkpoint). That upgrade establishes (or
+                # re-establishes) the checkpoint every subsequent incremental
+                # fetch will trust, so it must also see closed issues: an
+                # issue closed (or edited while closed) before this point
+                # would otherwise never be observed again once the fresh
+                # watermark starts being trusted.
+                state = "OPEN,CLOSED" if request.checkpoint_recovery else "OPEN"
                 issues = self._issues._fetch_issues_graphql(
-                    repo, owner, repo_name, state="OPEN", labels=labels, first=100
+                    repo, owner, repo_name, state=state, labels=labels, first=100
                 )
             case ReconcileScope.INCREMENTAL:
                 issues = self._issues._fetch_issues_graphql(
@@ -267,10 +282,10 @@ class _GitHubWorkItemSync:
                 )
                 continue
             try:
-                comment_id = self._issues._add_comment_graphql(
+                added_comment = self._issues._add_comment_graphql(
                     repo, issue["id"], render_work_item_comment(current.revision, patch.body)
                 )
-                if not comment_id:
+                if not added_comment.id:
                     results.append(
                         PatchResult(
                             provider_id=patch.provider_id,
@@ -280,7 +295,7 @@ class _GitHubWorkItemSync:
                         )
                     )
                     continue
-                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, comment_id)
+                head = WorkItemHead.create(patch.reference, current.revision, root, patch.body, added_comment.id)
                 written = self._contents().put(
                     ContentWrite(
                         reference=work_item_head_ref(patch.reference),
@@ -417,7 +432,7 @@ class _GitHubWorkItemSync:
                 if not isinstance(node, dict):
                     raise ContentUnavailableError("GitHub work-item audit comment response was invalid")
                 comment = gh_client._parse_comment_node(node)
-                comments[comment["id"]] = comment
+                comments[comment.id] = comment
         return heads, comments
 
 
@@ -507,7 +522,9 @@ class _GitHubReconciliation:
         outcome = finalize_reconciliation(
             plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
         )
-        self._advance_snapshot_checkpoint(effective_request.scope, plan.snapshot_checkpoint, outcome)
+        self._advance_snapshot_checkpoint(
+            effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome
+        )
         if not effective_request.dry_run:
             snapshot_by_reference = {item.reference: item for item in snapshot.items}
             patch_statuses = {patch.reference: "pending" for patch in plan.provider_patches}
@@ -576,21 +593,92 @@ class _GitHubReconciliation:
         return list(records_by_reference.values())
 
     def _with_snapshot_checkpoint(self, request: ReconcileRequest) -> ReconcileRequest:
+        """Resolve an incremental request's ``since`` from the durable checkpoint, if trusted.
+
+        No checkpoint at all, and a checkpoint missing its ``scope``/
+        ``label``/``items_observed`` metadata
+        (:attr:`_ProviderSnapshotCheckpoint.has_scope_metadata` is ``False``),
+        are treated the same: neither can be trusted to resolve an
+        incremental ``since``. The latter predates task A1 and cannot be told
+        apart from one the pre-A1 label-scope bug wrote for a typo'd label
+        against a populated repo -- trusting its watermark could leave
+        pre-existing issues whose updates precede that watermark permanently
+        unobserved by every subsequent incremental fetch. Either way, this
+        falls back to a full reconciliation that (re-)establishes a
+        checkpoint this method can trust from then on, and marks the request
+        with ``checkpoint_recovery`` so :meth:`_GitHubWorkItemSync.fetch_snapshot`
+        fetches closed issues too despite the ``INITIAL`` scope: an issue
+        closed (or edited while closed) before this point must be observed
+        once during this recovery, or the fresh checkpoint about to be
+        written would silently cover it forever after (see
+        :class:`ReconcileRequest`'s ``checkpoint_recovery`` field and the P1
+        review finding on ``github_work_items.py:605`` this guards). A caller
+        who explicitly requests ``ReconcileScope.INITIAL`` from the start
+        never reaches this method's ``INCREMENTAL`` branch at all, so a
+        genuine from-scratch reconcile keeps its plain open-only fetch.
+
+        Returns:
+            The request unchanged for every non-incremental scope; for an
+            incremental request with no explicit ``since``, the request
+            upgraded to ``INITIAL`` with ``checkpoint_recovery=True`` when no
+            trustworthy checkpoint exists, or copied with ``since`` set to
+            the checkpoint's watermark otherwise.
+        """
         match request.scope:
             case ReconcileScope.INCREMENTAL:
                 if request.since:
                     return request
                 checkpoint = self._cache._get_snapshot_checkpoint()
-                if checkpoint is None:
-                    return request.model_copy(update={"scope": ReconcileScope.INITIAL})
+                if checkpoint is None or not checkpoint.has_scope_metadata:
+                    return request.model_copy(update={"scope": ReconcileScope.INITIAL, "checkpoint_recovery": True})
                 return request.model_copy(update={"since": checkpoint.watermark})
             case ReconcileScope.INITIAL | ReconcileScope.LINKED | ReconcileScope.TARGETED:
                 return request
 
-    def _advance_snapshot_checkpoint(self, scope: ReconcileScope, watermark: str, outcome: ReconcileOutcome) -> None:
-        if (
+    def _advance_snapshot_checkpoint(
+        self, scope: ReconcileScope, label: str, watermark: str, outcome: ReconcileOutcome
+    ) -> None:
+        """Advance the durable global snapshot watermark, but only when it is honest.
+
+        A reconcile that observed zero items and finished without failure is
+        not the same fact as "the local cache holds the provider's full item
+        set" -- it only means "a reconcile ran" (A-critique.md Sec 3.1, Sec
+        3.4: a ``dh backlog refresh --label <typo>`` reconcile durably
+        observes zero items and, without this guard, marks the checkpoint as
+        if it covered the whole repository). A label-scoped reconcile can
+        only ever speak for that label's slice of the provider's items, so it
+        must never advance the checkpoint a bare, unlabeled read treats as
+        covering everything -- refuse outright rather than record a
+        watermark a later unlabeled ``since=`` lookup would wrongly trust.
+
+        A separate "zero items with nothing to explain the zero" gate is not
+        implemented here: within the two scopes eligible to advance the
+        checkpoint (``INITIAL``/``INCREMENTAL``), ``fetch_snapshot``
+        (``_GitHubWorkItemSync.fetch_snapshot``) either completes a real
+        GraphQL round trip or raises before a ``ProviderSnapshot`` is ever
+        constructed -- there is currently no in-tree path that reaches this
+        method with an *unlabeled* zero that was not a genuine round trip.
+        ``ProviderSnapshot.pages_fetched`` was evaluated as that
+        discriminator and rejected: ``fetch_snapshot`` hard-codes
+        ``pages_fetched=1`` for every scope, including ``LINKED``/
+        ``TARGETED``, which never fetch a page at all (``issues = []`` is
+        assigned directly) -- so the field carries no real pagination signal
+        to gate on today. ``items_observed`` is still recorded below so a
+        future discriminator (or a diagnostic reader) has the count without
+        this method needing to change again.
+        """
+        if not (
             outcome.advance_snapshot_checkpoint
             and outcome.result.conflicts == 0
             and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
         ):
-            self._cache._set_snapshot_checkpoint(_ProviderSnapshotCheckpoint(watermark=watermark))
+            return
+        if label:
+            # A label-scoped observation never covers the full unlabeled item
+            # set a bare checkpoint is read to mean -- see the docstring above.
+            return
+        self._cache._set_snapshot_checkpoint(
+            _ProviderSnapshotCheckpoint(
+                watermark=watermark, scope=scope.value, label=label, items_observed=outcome.result.fetched_items
+            )
+        )

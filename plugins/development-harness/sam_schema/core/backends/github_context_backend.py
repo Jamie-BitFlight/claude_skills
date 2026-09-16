@@ -40,7 +40,8 @@ from datetime import UTC, datetime
 from functools import cached_property
 from typing import TYPE_CHECKING
 
-from github import Auth, Github, GithubException
+from backlog_core.github_client import make_github_client
+from github import GithubException
 
 from sam_schema.core.models import ActiveTaskContext
 
@@ -261,7 +262,7 @@ class GitHubContextBackend:
         Returns:
             PyGithub ``Repository`` instance for ``self._repo_name``.
         """
-        gh = Github(auth=Auth.Token(self._github_token), timeout=30)
+        gh = make_github_client(self._github_token)
         return gh.get_repo(self._repo_name)
 
     def _find_comment(self, issue_number: str | int, session_id: str) -> IssueComment | None:

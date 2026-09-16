@@ -5,6 +5,8 @@ dicts. Each public function accepts an optional ``output: Output | None``
 parameter and returns ``{...result, **out.to_dict()}``.
 """
 
+from __future__ import annotations
+
 import operator
 import re
 import sys
@@ -18,6 +20,7 @@ from dispatch_schema.core.constants import MIN_CONFLICT_GROUP_SIZE
 from dispatch_schema.core.models import ConflictGroup
 from github import GithubException
 from github.Repository import Repository
+from pydantic import BaseModel, ConfigDict
 from ruamel.yaml.error import YAMLError
 from sam_schema.core.backends.content import parse_plan_content
 from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
@@ -27,13 +30,21 @@ from typing_extensions import TypedDict
 from . import models as _models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import (
+    AddedCommentNode,
+    ContentProvider,
+    IssueCommentNode,
+    IssueNode,
+    MilestoneFullNode,
+    SyncProvider,
+)
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
     VALID_ITEM_TYPES,
     VALID_NEW_ITEM_PRIORITIES,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     CacheStateCorruptError,
@@ -195,6 +206,12 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
 
     Returns:
         Mapping of issue number to IssueStatus.
+
+    Raises:
+        BackendUnavailableError: When the backend cannot serve the query — for
+            GitHub, a ``GraphQLUnavailableError`` when the environment refuses
+            GraphQL. An empty mapping is reserved for "no item carries a
+            status", so an unavailable backend never returns one.
     """
     return get_config().backend.batch_fetch_statuses(items, repo)
 
@@ -370,11 +387,12 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
     require_github_extras(backend, "_update_issues_graphql_batch")._update_issues_graphql_batch(repo, updates)
 
 
-def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
+def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
     """Add a comment to an issue via the active backend.
 
     Returns:
-        GraphQL node ID of the newly created comment.
+        AddedCommentNode with the newly created comment's GraphQL node ``id``
+        and, when the backend reports one, its REST ``database_id``.
     """
     backend = get_config().backend
     return require_github_extras(backend, "_add_comment_graphql")._add_comment_graphql(repo, issue_node_id, body)
@@ -547,10 +565,32 @@ def _is_section_entry_metadata(value: object) -> TypeGuard[SectionEntryMetadata]
     return isinstance(value, dict) and "entries" in value
 
 
+class CommentListEntry(BaseModel):
+    """One comment entry as returned by list_comments().
+
+    ``id`` is the GraphQL node ID; ``database_id`` is the REST integer ID
+    ``read_comment``'s ``comment_id`` requires, carried through from
+    ``IssueCommentNode.database_id`` and ``None`` when GitHub did not report one.
+
+    A validated, immutable output record, consistent with ``IssueCommentNode``
+    and ``AddedCommentNode`` (both in ``backend_types.py``) -- the structured
+    data this repository's ingestion and output objects standardize on.
+    """
+
+    model_config = ConfigDict(frozen=True, strict=True)
+
+    id: str
+    database_id: int | None
+    author: str
+    created_at: str
+    updated_at: str
+    preview: str
+
+
 class ListCommentsResult(TypedDict):
     """Result shape returned by list_comments()."""
 
-    comments: list[dict[str, str]]
+    comments: list[CommentListEntry]
     count: int
     has_more: bool
     messages: list[str]
@@ -1991,6 +2031,16 @@ def list_items(
     if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
     items = get_config().backend.list_work_items()
+    if not items and isinstance(get_config().backend, SyncProvider):
+        # A provider-backed cache holding nothing reads exactly like an empty
+        # backlog. They are different answers and only one is worth acting on,
+        # so name the ambiguity rather than reporting a bare count of 0. Gated on
+        # the unfiltered backend list: a filter that matches none of N cached
+        # items is a genuine zero and stays quiet.
+        out.warn(
+            "  WARNING: The local cache holds no items. The backlog is empty, or the cache "
+            "has never synced — run a sync to tell the two apart."
+        )
     # Start with non-skipped items that have a section. The skip flag may be set
     # for reasons other than terminal status (e.g. malformed entries), so we
     # always exclude skip=True items regardless of include_closed. The
@@ -2006,10 +2056,14 @@ def list_items(
     # empty map.  _item_derived_status falls back to item.status when the map is
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
+    status_map: dict[int, IssueStatus] = {}
     if get_config().backend.supports_batch_status_fetch:
-        status_map = batch_fetch_statuses(open_items, repo)
-    else:
-        status_map: dict[int, IssueStatus] = {}
+        try:
+            status_map = batch_fetch_statuses(open_items, repo)
+        except BackendUnavailableError as exc:
+            # An empty map renders every numeric-issue item with a blank status.
+            # Name the cause, so a reader does not take the blanks for "no status set".
+            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
     open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
     result_items = [_build_list_entry(it, status_map) for it in open_items]
     if filter_by_key:
@@ -3133,16 +3187,24 @@ def view_item(
     if item:
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
-            enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+            try:
+                enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
+                reason = "backend unreachable"
+            except BackendUnavailableError as exc:
+                # The cached record still answers the view, so the read succeeds.
+                # Name the cause instead of reporting the generic unreachable case.
+                enriched, reason = False, f"backend unavailable ({exc})"
             if not enriched:
-                out.warnings.append(
-                    "backend unreachable — sections_index reflects provider-backed record, may be stale"
-                )
+                out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
         result.groomed = item.metadata.groomed
     elif issue_num or get_config().backend.issue_id_type == "string":
         live_id = _live_lookup_id(item, issue_num, selector)
+        # No cached record, so the live read is the only answer available. A
+        # BackendUnavailableError propagates deliberately: "the backend refused
+        # the query" is not "the item does not exist", and reporting the second
+        # for the first sends a reader looking for an item that is really there.
         enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
         if not enriched:
             raise ItemNotFoundError(selector)
@@ -4889,7 +4951,7 @@ def list_issues(
 
 def comment_issue(
     repo: str = "", issue_number: int = 0, body: str = "", output: Output | None = None
-) -> dict[str, str | int | list[str]]:
+) -> dict[str, str | int | list[str] | None]:
     """Add a comment to a GitHub issue.
 
     Args:
@@ -4899,8 +4961,12 @@ def comment_issue(
         output: Optional Output collector.
 
     Returns:
-        Dict with ``issue_number`` (int), ``comment_id`` (int),
-        ``comment_url`` (str), and output messages/warnings.
+        Dict with ``issue_number`` (int), ``comment_id`` (str -- the GraphQL
+        node ID; not usable as ``read_comment``'s ``comment_id``),
+        ``database_id`` (int | None -- the REST integer ID
+        ``read_comment``'s ``comment_id`` requires, carried through from
+        ``AddedCommentNode.database_id`` and ``None`` when GitHub did not
+        report one), ``comment_url`` (str), and output messages/warnings.
 
     Raises:
         ValidationError: If ``issue_number`` is not positive or ``body`` is empty.
@@ -4918,14 +4984,20 @@ def comment_issue(
         gh_repo = get_github(repo)
         owner, repo_name = gh_repo.full_name.split("/", 1)
         issue_node = _fetch_issue_graphql(gh_repo, owner, repo_name, issue_number)
-        comment_node_id = _add_comment_graphql(gh_repo, issue_node["id"], body)
+        added_comment = _add_comment_graphql(gh_repo, issue_node["id"], body)
         out.info(f"  Comment added to issue #{issue_number}")
     except UnsupportedBackendCapabilityError:
         raise
     except (GithubException, BacklogError) as e:
         msg = f"GitHub API error adding comment: {e}"
         raise BacklogError(msg) from e
-    return {"issue_number": issue_number, "comment_id": comment_node_id, "comment_url": "", **out.to_dict()}
+    return {
+        "issue_number": issue_number,
+        "comment_id": added_comment.id,
+        "database_id": added_comment.database_id,
+        "comment_url": "",
+        **out.to_dict(),
+    }
 
 
 _COMMENT_PREVIEW_LENGTH = 200
@@ -4945,7 +5017,11 @@ def list_comments(
 
     Returns:
         Dict with:
-          - ``comments``: list of ``{id, author, created_at, updated_at, preview}``
+          - ``comments``: list of ``{id, database_id, author, created_at, updated_at,
+            preview}``. ``id`` is the GraphQL node ID; ``database_id`` is the REST
+            integer ID ``backlog_read_comment``'s ``comment_id`` requires, present
+            only when GitHub returned one (``None`` otherwise -- see
+            ``IssueCommentNode.database_id``).
           - ``count``: total comments in the result window
           - ``has_more``: True if more comments exist beyond the current window
           - ``messages``, ``warnings``, ``errors``: output lists
@@ -4971,14 +5047,15 @@ def list_comments(
 
     window = all_comments[offset : offset + limit]
     has_more = len(all_comments) > offset + limit
-    comment_list = [
-        {
-            "id": c["id"],
-            "author": c["author"],
-            "created_at": c["created_at"],
-            "updated_at": c["updated_at"],
-            "preview": c["body"][:_COMMENT_PREVIEW_LENGTH],
-        }
+    comment_list: list[CommentListEntry] = [
+        CommentListEntry(
+            id=c.id,
+            database_id=c.database_id,
+            author=c.author,
+            created_at=c.created_at,
+            updated_at=c.updated_at,
+            preview=c.body[:_COMMENT_PREVIEW_LENGTH],
+        )
         for c in window
     ]
     out_d = out.to_dict()
@@ -5046,11 +5123,11 @@ def read_comment(
         msg = f"GitHub API error reading comment: {e}"
         raise BacklogError(msg) from e
     return {
-        "id": comment["id"],
-        "author": comment["author"],
-        "created_at": comment["created_at"],
-        "updated_at": comment["updated_at"],
-        "body": comment["body"],
+        "id": comment.id,
+        "author": comment.author,
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+        "body": comment.body,
         **out.to_dict(),
     }
 

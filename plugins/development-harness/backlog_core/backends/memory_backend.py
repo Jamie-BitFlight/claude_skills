@@ -31,7 +31,14 @@ if TYPE_CHECKING:
     from backlog_core.models import Output, SamTask
 
 from backlog_core import rendering as _rendering
-from backlog_core.backend_types import IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from backlog_core.backend_types import (
+    AddedCommentNode,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from backlog_core.models import (
     BackendAvailability,
     BackendStatus,
@@ -460,8 +467,14 @@ class InMemoryBackend:
     # Issue comments
     # ------------------------------------------------------------------
 
-    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> str:
-        """Add a comment to an issue and return its node ID."""
+    def _add_comment_graphql(self, repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
+        """Add a comment to an issue and return its identity.
+
+        Returns:
+            AddedCommentNode with a generated ``comment-{hex}`` string as
+            ``id`` and ``database_id=None`` -- the in-memory backend has no
+            REST integer comment ID to report.
+        """
         number = self._issue_number_for_node_id(issue_node_id)
         comment_id = f"comment-{uuid.uuid4().hex[:8]}"
         ts = _now()
@@ -478,7 +491,7 @@ class InMemoryBackend:
         idx = len(self._comments[number])
         self._comments[number].append(comment)
         self._comment_index[comment_id] = (number, idx)
-        return comment_id
+        return AddedCommentNode(id=comment_id, database_id=None)
 
     def _fetch_issue_comments_graphql(
         self, repo: Repository, owner: str, repo_name: str, issue_number: int
@@ -496,14 +509,19 @@ class InMemoryBackend:
         return self._comments[issue_num][idx]
 
     def _update_issue_comment_graphql(self, repo: Repository, comment_node_id: str, body: str) -> None:
-        """Update a comment's body."""
+        """Update a comment's body.
+
+        ``IssueCommentNode`` is a frozen Pydantic model, so the stored record is
+        replaced with a validated copy rather than mutated in place.
+        """
         loc = self._comment_index.get(comment_node_id)
         if loc is None:
             msg = f"InMemoryBackend: comment {comment_node_id!r} not found"
             raise KeyError(msg)
         issue_num, idx = loc
-        self._comments[issue_num][idx]["body"] = body
-        self._comments[issue_num][idx]["updated_at"] = _now()
+        self._comments[issue_num][idx] = self._comments[issue_num][idx].model_copy(
+            update={"body": body, "updated_at": _now()}
+        )
 
     # ------------------------------------------------------------------
     # Status mutations
