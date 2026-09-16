@@ -199,9 +199,6 @@ class WorkItemBackend(Protocol):
       ``WorkItemBackend`` and every backend must define them (raising
       ``NotImplementedError`` and setting the flag ``False`` is the
       documented escape hatch for a backend whose native ID type cannot
-<<<<<<< HEAD
-      satisfy the ``int`` signature below — see ``BeadsBackend``).
-=======
       satisfy the ``int`` signature below — see ``BeadsBackend``'s ADR-003).
     - ``supports_cached_listing`` — whether :meth:`list_work_items` reads a
       provider-private cache (``True``, GitHub only) rather than the
@@ -216,7 +213,6 @@ class WorkItemBackend(Protocol):
       acknowledged, and collapsing both facts into one boolean would report
       such a listing as unqualified-confident when a third of its rows are
       local-only.
->>>>>>> 8f5715822 (feat(backlog-core): report fail-safe listing provenance for a cold cache)
     """
 
     supports_batch_status_fetch: bool
