@@ -244,7 +244,11 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
     Returns:
         List of PullRequestRef objects for matching open PRs.
     """
-    return get_config().backend.check_open_prs_for_issue(issue_num, repo)
+    try:
+        return get_config().backend.check_open_prs_for_issue(issue_num, repo)
+    except (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+        msg = f"Open-PR search failed for issue #{issue_num}; use force=True to bypass this safety check: {exc}"
+        raise BacklogError(msg) from exc
 
 
 def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
@@ -1965,10 +1969,10 @@ def _item_derived_status(
     num = parse_issue_number(item.issue)
     if num is None:
         return item.status or "needs-grooming"
-    if status_map_unavailable:
-        return None
     if not status_live:
         return normalize_cached_github_status(item.status)
+    if status_map_unavailable:
+        return None
     info = status_map.get(num)
     return normalize_live_github_status(info.status) if info is not None else "needs-grooming"
 
@@ -2188,7 +2192,7 @@ def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem]) -> boo
         ``has_github_credentials()`` reports no credentials configured.
     """
     backend = get_config().backend
-    if not backend.supports_github_extras:
+    if not getattr(backend, "supports_github_extras", False):
         return False
     if not any(parse_issue_number(item.issue) is not None for item in open_items):
         return False
@@ -2219,7 +2223,10 @@ def _warn_status_map_unavailable(out: Output, status: str | None, reason: str) -
             "confirmed to match or excluded — matching items may be missing from this result."
         )
     else:
-        out.warn(f"  WARNING: Live status unavailable ({reason}); item statuses are shown blank.")
+        out.warn(
+            f"  WARNING: Live status unavailable ({reason}); statuses come from the local cache "
+            "and may under-report live state."
+        )
 
 
 def list_items(
