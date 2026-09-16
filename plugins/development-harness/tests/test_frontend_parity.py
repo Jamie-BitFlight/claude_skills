@@ -220,8 +220,10 @@ class TestCLIForeignCWD:
     def test_importing_cli_module_does_not_hijack_a_foreign_pythonpath_host(self, tmp_path: Path) -> None:
         """Importing ``sam_schema.cli`` in-process must never re-exec the host process.
 
-        ~15 test modules do ``from sam_schema.cli import app`` (or similar) to drive it
-        in-process via ``CliRunner``. If the ``PYTHONPATH`` guard fires at import time
+        The test modules that drive it in-process via ``CliRunner`` are the ones
+        ``git grep -n "from sam_schema.cli import" -- plugins/development-harness`` lists
+        (this module drives it too, via ``import sam_schema.cli`` in the probe below).
+        If the ``PYTHONPATH`` guard fires at import time
         rather than only on direct script execution, importing the module while a
         *foreign* ``PYTHONPATH`` is set (common in developer/CI shells) calls
         ``os.execve`` using the *importing* process's own ``sys.argv`` -- pytest's, not
