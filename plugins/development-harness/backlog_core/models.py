@@ -1741,14 +1741,24 @@ class BackendStatus(BaseModel):
     Fields ``open_count`` and ``total_count`` are ``None`` when the backend was
     not reachable.  ``cache_open_count`` and ``cache_total_count`` are derived
     from the local list result in ``server.py``, not from the probe.
+
+    ``cache_open_count`` and ``cache_total_count`` default to ``0`` on a bare
+    construction (a genuine "not yet derived" state before ``server.py``
+    overwrites them from a completed listing, per ADR-5) but accept ``None``
+    as an explicit "unknown" sentinel. ``server.py`` sets them to ``None`` on
+    the fail-safe withheld-listing path (backlog #3546 task A4), where the
+    dedup/count pipeline that would derive a real value never runs -- so the
+    nested ``backend`` object in that response cannot reintroduce the
+    authoritative-looking zero that withholding ``items``/``count`` exists to
+    avoid (Codex review, PR #3576 finding 1).
     """
 
     name: str = "GitHub"
     availability: BackendAvailability = BackendAvailability.NOT_CHECKED
     open_count: int | None = None
     total_count: int | None = None
-    cache_open_count: int = 0
-    cache_total_count: int = 0
+    cache_open_count: int | None = 0
+    cache_total_count: int | None = 0
     last_sync: str = ""
     error: str = ""
 

@@ -229,6 +229,33 @@ class TestConnectionClassFactory:
         assert _make_connection_class(str(ca_file)) is not _make_connection_class(str(ca_file))
 
 
+class TestConnectionClassPinsVerifyToTheResolvedBundle:
+    """PyGithub's HTTPSRequestsConnectionClass defaults ``verify`` to ``True`` and
+    passes it straight through to every ``session.get(..., verify=self.verify)``
+    call. Left at ``True``, ``requests.Session.merge_environment_settings``
+    independently re-derives its own CA bundle from REQUESTS_CA_BUNDLE/
+    CURL_CA_BUNDLE, bypassing whatever bundle this module resolved and mounted
+    an SSL context for (backlog #3601) -- so the connection class must pin
+    ``self.verify`` to that same bundle whenever the caller leaves it unset.
+    """
+
+    def test_verify_is_pinned_to_the_ca_bundle_when_the_caller_leaves_it_unset(self, ca_file):
+        connection_class = _make_connection_class(str(ca_file))
+
+        connection = connection_class("api.github.com")
+
+        assert connection.verify == str(ca_file)
+
+    def test_an_explicit_verify_kwarg_from_the_caller_still_wins(self, ca_file):
+        """PyGithub itself is free to pass an explicit verify; this module must not
+        silently override an explicit caller decision."""
+        connection_class = _make_connection_class(str(ca_file))
+
+        connection = connection_class("api.github.com", verify=False)
+
+        assert connection.verify is False
+
+
 class TestMakeGithubClient:
     """Client construction resolves the token and the API root."""
 

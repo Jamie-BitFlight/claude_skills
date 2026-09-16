@@ -224,6 +224,22 @@ def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]
         ) -> None:
             """Replace the adapter that the base class mounted.
 
+            Also pins ``self.verify`` to ``ca_bundle`` when the caller left it unset.
+            ``HTTPSRequestsConnectionClass.__init__`` sets ``self.verify =
+            kwargs.get("verify", True)``, and ``getresponse`` passes that value
+            straight through as ``session.get(url, ..., verify=self.verify, ...)`` on
+            every call. Left at PyGithub's own default of ``True``,
+            ``requests.Session.merge_environment_settings`` independently re-derives
+            its own CA bundle from ``REQUESTS_CA_BUNDLE``/``CURL_CA_BUNDLE`` whenever
+            ``verify is True or verify is None`` -- entirely bypassing the bundle
+            ``resolve_ca_bundle`` selected and the SSL context ``_ProxyAwareAdapter``
+            already built for it below. Pinning ``self.verify`` to the same
+            ``ca_bundle`` this module resolved means ``merge_environment_settings``
+            sees a concrete path instead of ``True`` and skips its own re-derivation
+            entirely -- the only bundle that can reach the handshake is the one
+            ``install_proxy_tls_support`` already selected. An explicit ``verify``
+            kwarg from the caller still wins.
+
             Args:
                 host: API hostname.
                 port: API port, defaulting to 443.
@@ -234,6 +250,8 @@ def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]
                 **kwargs: Extra options the base class reads, such as ``verify``.
             """
             super().__init__(host, port, strict, timeout, retry, pool_size, **kwargs)
+            if "verify" not in kwargs:
+                self.verify = ca_bundle
             self.adapter = _ProxyAwareAdapter(
                 ca_bundle, max_retries=self.retry, pool_connections=self.pool_size, pool_maxsize=self.pool_size
             )

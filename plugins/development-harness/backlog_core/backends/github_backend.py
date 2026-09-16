@@ -107,6 +107,10 @@ class GitHubBackend:
     - ``supports_github_extras = True`` — this is the only backend that
       implements ``GitHubExtras`` for real, backed by a live GitHub
       connection.
+    - ``supports_cached_listing = True`` — :meth:`list_work_items` reads the
+      provider-private ``FileCache``, never GitHub directly (see
+      :meth:`has_synced_snapshot`, :meth:`has_skipped_snapshots`,
+      :meth:`has_pending_writes`).
     """
 
     supports_batch_status_fetch: bool = True
@@ -115,6 +119,7 @@ class GitHubBackend:
     supports_branches: bool = True
     supports_github_extras: bool = True
     supports_milestones: bool = True
+    supports_cached_listing: bool = True
 
     def __init__(
         self,
@@ -199,6 +204,31 @@ class GitHubBackend:
             The matching work item.
         """
         return self._reconciliation.get_work_item(reference)
+
+    def has_synced_snapshot(self) -> bool:
+        """Report whether a durable, honest provider snapshot has ever completed.
+
+        Returns:
+            ``True`` once a reconcile has durably advanced the snapshot checkpoint.
+        """
+        return self._reconciliation.has_synced_snapshot()
+
+    def has_skipped_snapshots(self) -> bool:
+        """Report whether the most recent local snapshot load skipped any unreadable file.
+
+        Returns:
+            ``True`` when the most recent listing's snapshot load skipped
+            one or more files.
+        """
+        return self._reconciliation.has_skipped_snapshots()
+
+    def has_pending_writes(self) -> bool:
+        """Report whether the cache holds mutations not yet acknowledged by GitHub.
+
+        Returns:
+            ``True`` when one or more work-item mutations are queued.
+        """
+        return self._reconciliation.has_pending_writes()
 
     def put_work_item(self, item: BacklogItem) -> None:
         """Persist a work-item intent for provider reconciliation."""

@@ -1618,6 +1618,18 @@ async def backlog_list(
     refresh: Annotated[
         bool, Field(description="Refresh the local cache from the configured backend before listing")
     ] = False,
+    allow_cached: Annotated[
+        bool,
+        Field(
+            description=(
+                "Opt into serving items/count from a provider-private cache even when its state "
+                "cannot be confirmed complete (never synced, or a checkpoint over a partial/corrupted "
+                "snapshot set). Default False is fail-safe: a low-confidence cache listing returns "
+                "items=null, count=null plus from_cache/has_pending_writes instead of an ambiguous "
+                "items=[], count=0 an unaware caller could misread as a confirmed-empty backlog."
+            )
+        ),
+    ] = False,
     label: Annotated[str | None, Field(description="Filter by GitHub label (e.g. 'priority:p1', 'type:bug')")] = None,
     section: Annotated[
         str | None, Field(description="Filter by priority section: P0, P1, P2, or Ideas (case-insensitive)")
@@ -1797,8 +1809,16 @@ async def backlog_list(
         next_call provides the suggested follow-up call string.
         When match_context=True, match_pages contains current_page, total_pages,
         tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, only the count key (and, when a background sync
-        is running, sync_state/warnings) is present.
+        When count_only=True, the response carries count plus from_cache/
+        has_pending_writes (backlog #3546 task A4/Codex review PR #3576
+        finding 2) -- a warm cache holding unconfirmed local writes must not
+        be handed back as an unqualified count -- and, when a background
+        sync is running, sync_state/warnings.
+        When a provider-private cache listing cannot be confirmed complete and
+        allow_cached=False (default), items and count are both null and
+        from_cache/has_pending_writes name the provenance instead (backlog
+        #3546 task A4) — pass allow_cached=True to see the best-effort cached
+        list anyway.
         On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1810,6 +1830,7 @@ async def backlog_list(
             asyncio.to_thread(
                 operations.list_items,
                 refresh=refresh,
+                allow_cached=allow_cached,
                 label=label,
                 section=section,
                 status=status,
@@ -1826,6 +1847,33 @@ async def backlog_list(
     except BacklogError as e:
         backend_status = await asyncio.to_thread(_probe_backend_status)
         return _respond(BacklogListResponse, {"error": str(e), "backend": backend_status.model_dump(), **out.to_dict()})
+
+    sync_state_block, sync_warnings = _build_sync_state_block(get_sync_state())
+
+    if result.get("items") is None:
+        # Fail-safe withheld listing (backlog #3546 task A4): operations.list_items
+        # declined to serve items/count from a low-confidence provider-private
+        # cache. Return early -- the dedup/pagination pipeline below assumes a
+        # real list and would otherwise silently reconstruct items: [], the
+        # exact ambiguous shape this withheld response exists to avoid.
+        # cache_open_count/cache_total_count are normally derived from the
+        # dedup'd item list below (ADR-5) -- which this early return skips
+        # entirely because the cache result is low-confidence. Leaving them
+        # at BackendStatus's default 0 would reintroduce, inside the nested
+        # "backend" object, the exact authoritative-looking-zero problem
+        # items/count=None exists to avoid (Codex review, PR #3576 finding
+        # 1): mark them explicitly unknown rather than defaulting to a real
+        # observation this response never made.
+        backend_status.cache_open_count = None
+        backend_status.cache_total_count = None
+        withheld: dict[str, object] = {
+            "from_cache": result.get("from_cache"),
+            "has_pending_writes": result.get("has_pending_writes"),
+            "backend": backend_status.model_dump(),
+            **out.to_dict(),
+        }
+        _apply_sync_state_to_response(withheld, sync_state_block, sync_warnings)
+        return _respond(BacklogListResponse, withheld)
 
     # "items" holds list[dict[str, str | bool]] per operations.list_items return type.
     # Filter to dict elements only to narrow the heterogeneous value union.
@@ -1855,7 +1903,17 @@ async def backlog_list(
     # is [] rather than None, so exclude_none alone would leave them in the
     # response and contradict this branch's documented minimal shape.
     if count_only:
-        count_resp: dict[str, object] = {"count": total}
+        # from_cache/has_pending_writes are sourced from the same `result`
+        # dict list_items already returned above -- operations.list_items
+        # guarantees both keys are always present (backlog #3546 task A4).
+        # Without them, a caller reading a bare count from a warm cache that
+        # still holds unconfirmed local writes could mistake local-only rows
+        # for provider-acknowledged data (Codex review, PR #3576 finding 2).
+        count_resp: dict[str, object] = {
+            "count": total,
+            "from_cache": result.get("from_cache"),
+            "has_pending_writes": result.get("has_pending_writes"),
+        }
         _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
         return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
 

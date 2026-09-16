@@ -74,6 +74,43 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
 
 
+class TestFetchItemStatusSurfacesTheRefusal:
+    """The single-item fallback must not swallow the same refusal batch_fetch_statuses
+    re-raises -- GraphQLUnavailableError is a BacklogError subclass, so a plain
+    ``except (BacklogError, GithubException): return ""`` silently reports the
+    refusal as "no status set" unless the refusal is caught and re-raised first."""
+
+    def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(gh_client, "get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "_fetch_issue_graphql", side_effect=GraphQLUnavailableError(_REFUSAL_MESSAGE))
+
+        with pytest.raises(GraphQLUnavailableError):
+            gh_client.fetch_item_status(_item("#42"))
+
+    def test_a_generic_backlog_error_still_falls_back_to_an_empty_string(self, mocker: MockerFixture) -> None:
+        """Offline continuity is deliberate: an ordinary failure keeps its existing fallback."""
+        mocker.patch.object(gh_client, "get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "_fetch_issue_graphql", side_effect=BacklogError("query rejected"))
+
+        assert gh_client.fetch_item_status(_item("#42")) == ""
+
+    def test_a_github_exception_still_falls_back_to_an_empty_string(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(gh_client, "get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=GithubException(status=500, data={"message": "Server Error"}, headers={}),
+        )
+
+        assert gh_client.fetch_item_status(_item("#42")) == ""
+
+    def test_an_item_with_no_issue_reference_short_circuits_before_any_call(self, mocker: MockerFixture) -> None:
+        get_github = mocker.patch.object(gh_client, "get_github", return_value=_Repo())
+
+        assert gh_client.fetch_item_status(_item("")) == ""
+        assert not get_github.called
+
+
 class TestBatchFetchStatusesSkipsAPointlessQuery:
     """A list with no numeric issue reference has nothing to look up."""
 

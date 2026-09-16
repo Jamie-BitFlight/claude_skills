@@ -480,6 +480,62 @@ def test_github_reconcile_checkpoint_records_items_observed_for_populated_snapsh
     assert checkpoint.scope == "initial"
 
 
+def test_github_reconcile_vanished_snapshot_file_reports_incomplete(tmp_path: Path) -> None:
+    """Codex finding 1: a snapshot file deleted entirely -- not corrupted, just gone --
+    never appears in WorkItemSnapshotBatch.skipped (that list only names a file that
+    still exists but failed to load), so the checkpoint's recorded items_observed
+    inventory is the only way a later load can detect the shortfall and report the
+    cache incomplete rather than confirmed-complete.
+    """
+    # Given: a durably synced cache holding two item snapshots
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(cache=cache)
+    backend._fetch_snapshot = MagicMock(
+        return_value=ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="node-1",
+                    reference="#1",
+                    title="Issue 1",
+                    body="body",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+                ProviderItem(
+                    provider_id="node-2",
+                    reference="#2",
+                    title="Issue 2",
+                    body="body",
+                    state="OPEN",
+                    labels=[],
+                    revision="rev-1",
+                ),
+            ],
+            sync_started_at="2026-08-12T01:00:00Z",
+            pages_fetched=1,
+        )
+    )
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
+    checkpoint = FileCache(tmp_path)._get_snapshot_checkpoint()
+    assert checkpoint is not None
+    assert checkpoint.items_observed == 2
+
+    # When: one of the two snapshot files vanishes entirely (deleted, or a partial
+    # cache restore) instead of being left behind corrupted
+    items_root = tmp_path / "items" / "issues"
+    snapshot_files = sorted(items_root.glob("*.yaml"))
+    assert len(snapshot_files) == 2
+    snapshot_files[0].unlink()
+
+    # Then: the next load finds only the surviving snapshot (skipped stays empty --
+    # nothing failed to parse, one file is simply gone) but still reports the cache
+    # incomplete, because the disk count now falls short of items_observed
+    items = backend.list_work_items()
+    assert len(items) == 1
+    assert backend.has_skipped_snapshots() is True
+
+
 def test_github_reconcile_fetch_failure_preserves_snapshot_checkpoint(tmp_path: Path) -> None:
     # Given: a prior global watermark and a provider fetch that fails before returning a complete snapshot
     cache = FileCache(tmp_path)

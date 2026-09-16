@@ -310,6 +310,10 @@ class BeadsBackend:
       through the beads-native shadow methods
       (:meth:`list_beads_milestones`, :meth:`create_beads_milestone`,
       :meth:`assign_beads_item_to_milestone`) instead of the generic gate.
+    - ``supports_cached_listing = False`` — :meth:`list_work_items` calls
+      ``bd list`` live on every read; a failed ``bd`` invocation raises
+      (see ``bd_runner.run_json``) rather than degrading to an empty list, so
+      there is no cache state to lag or distrust.
 
     Parameters
     ----------
@@ -326,10 +330,22 @@ class BeadsBackend:
     supports_branches: bool = False
     supports_github_extras: bool = False
     supports_milestones: bool = False
+    supports_cached_listing: bool = False
 
     def __init__(self, runner: _BdRunnerLike | None = None) -> None:
         """Store the runner; do not touch the filesystem or spawn processes."""
         self._runner: _BdRunnerLike = runner if runner is not None else BdRunner()
+
+    def has_pending_writes(self) -> bool:
+        """Report whether any mutation is queued and unacknowledged.
+
+        Always ``False`` — every write is a synchronous ``bd`` subprocess
+        call with no separate offline queue to lag behind.
+
+        Returns:
+            ``False``, always.
+        """
+        return False
 
     def list_work_items(self) -> list[BacklogItem]:
         """List work items projected from native Beads issues."""

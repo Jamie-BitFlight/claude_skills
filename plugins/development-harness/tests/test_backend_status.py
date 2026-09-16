@@ -182,6 +182,33 @@ class TestBackendStatusDefaults:
         status = BackendStatus()
         assert status.cache_total_count == 0
 
+    def test_cache_open_count_accepts_none_as_explicit_unknown_sentinel(self) -> None:
+        """BackendStatus.cache_open_count accepts None distinct from its 0 default.
+
+        Tests: cache_open_count type widened to int | None (Codex review,
+            PR #3576 finding 1) without changing the bare-construction default.
+        How: Construct with cache_open_count=None; check the field round-trips.
+        Why: server.py sets this field to None on the fail-safe withheld-
+            listing path so the nested "backend" dict cannot reintroduce an
+            authoritative-looking zero for a count that was never derived.
+        """
+        status = BackendStatus(cache_open_count=None)
+        assert status.cache_open_count is None
+        assert status.model_dump()["cache_open_count"] is None
+
+    def test_cache_total_count_accepts_none_as_explicit_unknown_sentinel(self) -> None:
+        """BackendStatus.cache_total_count accepts None distinct from its 0 default.
+
+        Tests: cache_total_count type widened to int | None (Codex review,
+            PR #3576 finding 1) without changing the bare-construction default.
+        How: Construct with cache_total_count=None; check the field round-trips.
+        Why: Same rationale as cache_open_count -- both nested cache counts
+            must be markable "unknown" on the withheld-listing path.
+        """
+        status = BackendStatus(cache_total_count=None)
+        assert status.cache_total_count is None
+        assert status.model_dump()["cache_total_count"] is None
+
     def test_default_last_sync_is_empty_string(self) -> None:
         """BackendStatus() defaults last_sync to ''.
 
@@ -683,3 +710,39 @@ class TestBacklogListBackendIntegration:
             response = await _call("backlog_list", {})
 
         assert response["backend"] == expected_backend
+
+    async def test_backlog_list_withheld_listing_marks_cache_counts_unknown_not_zero(self) -> None:
+        """A fail-safe withheld listing (task A4) never reports a bare-zero cache_open_count.
+
+        Tests: the "backend" nested dict on a withheld-listing response does
+            not carry BackendStatus's default int 0 for cache_open_count/
+            cache_total_count -- that would look like a confirmed-empty
+            observation and reintroduce the exact ambiguity items=None/
+            count=None exists to avoid (Codex review, PR #3576 finding 1).
+        How: mock operations.list_items returning the withheld shape
+            (items=None) alongside a probe status that already carries a
+            nonzero cache_total_count (simulating one corrupted snapshot
+            among several readable ones -- the finding's own example);
+            assert both nested cache counts are explicitly None on the
+            response, never the probe's stale nonzero value nor a
+            reintroduced 0.
+        Why: a caller reading response["backend"]["cache_open_count"] == 0
+            would reasonably conclude the cache is confirmed empty -- exactly
+            the false confidence withholding items/count is meant to
+            prevent.
+        """
+        probe_status = BackendStatus(
+            availability=BackendAvailability.REACHABLE, cache_open_count=5, cache_total_count=12
+        )
+        op_result = {"items": None, "count": None, "from_cache": True, "has_pending_writes": True}
+
+        with (
+            patch("dh_core.operations.list_items", return_value=op_result),
+            patch("backlog_core.server._probe_backend_status", return_value=probe_status),
+        ):
+            response = await _call("backlog_list", {})
+
+        assert "items" not in response
+        assert "count" not in response
+        assert response["backend"]["cache_open_count"] is None
+        assert response["backend"]["cache_total_count"] is None
