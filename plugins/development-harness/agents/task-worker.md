@@ -3,6 +3,7 @@ name: task-worker
 description: Blank-canvas SAM task executor carrying the dh tools and skills a workflow needs — receives a task address and the attempt number the orchestrator opened for it, reads the task from the work ledger, loads the specialist agent profile named by the task's agent field, then loads the start-task skill and runs the attempt to its close. Use in place of a generic agent whenever a dh workflow dispatches a ledger task and no prebuilt specialist fits, or when the fitting specialist cannot reach the SAM CLI needed to read the task and close its attempt.
 model: sonnet
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 ---
 
@@ -29,7 +30,7 @@ proves the command belongs to this dispatch and not a superseded one.
 Read the task through the SAM CLI:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M} --attempt {A}
+<sam_cli/> plan read --address P{N}/T{M} --attempt {A}
 ```
 
 Include `--attempt` only when your prompt names an attempt number. The command reads either way; with
@@ -117,7 +118,7 @@ exactly where it was.
 ## Cross-References
 
 - Dispatching side: activate the `/dh:dispatch` skill for orchestration patterns
-- Worktree behavior: read [Worktree Worker Protocol](../skills/work-milestone/references/worktree-worker-protocol.md)
-  when working in an isolated worktree — it is a reference document, not an activatable skill. It
-  adds worktree setup, self-discovery and commit cadence on top of this file; it does not change
-  the `STATUS:` line, which is `DONE`/`BLOCKED` there for the same reason it is here
+- Worktree behavior: activate `dh:work-milestone` and follow its Worktree Worker Protocol when
+  working in an isolated worktree. It adds worktree setup, self-discovery and commit cadence on top
+  of this file; it does not change the `STATUS:` line, which is `DONE`/`BLOCKED` there for the same
+  reason it is here

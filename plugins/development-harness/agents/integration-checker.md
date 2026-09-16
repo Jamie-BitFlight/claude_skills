@@ -4,6 +4,7 @@ description: Verifies cross-module integration and end-to-end flows. Checks that
 model: haiku
 tools: Read, Bash, Grep, Glob, Write, Skill, mcp__git-forensics__analyze_file_changes, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:validation-protocol
   - ccc
@@ -75,7 +76,7 @@ For each module in the feature, extract what it provides and what it should cons
 Read the plan record through the plan operations — task plans are SAM state, not registry content:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
+<sam_cli/> plan status --plan-address {plan_address}
 ```
 
 `plan status` returns the plan row and every task row on the work ledger, or plan-level counts

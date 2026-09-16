@@ -4,6 +4,7 @@ description: "Quality-perspective reviewer for multi-perspective code review. Sc
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:file-classification
 user-invocable: false

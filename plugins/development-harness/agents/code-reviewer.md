@@ -4,6 +4,7 @@ description: "SAM Stage 6 independent code reviewer. Reviews any language or sta
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:file-classification
   - ccc
@@ -42,7 +43,7 @@ Read the task through the SAM CLI, which answers from the work ledger once the p
 from the content store otherwise:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_address}/{task_id}
+<sam_cli/> plan read --address {plan_address}/{task_id}
 ```
 
 Read without `--attempt`: you are reviewing this task, not working an attempt on it, and naming an

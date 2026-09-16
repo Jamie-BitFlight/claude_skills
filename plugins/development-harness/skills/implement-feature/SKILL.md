@@ -11,14 +11,7 @@ This workflow continues from `add-new-feature`. It executes tasks from the selec
 
 <plan_ref>$ARGUMENTS</plan_ref>
 
-<sam_cli>
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
-</sam_cli>
-
-<mcp_server_scripts>
-SAM server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"
-Backlog server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py" --project-dir .
-</mcp_server_scripts>
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>` below.
 
 ---
 
@@ -30,7 +23,8 @@ turns on, so this workflow reaches task state through the CLI.
 
 **MCP server availability**: This skill uses `mcp__plugin_dh_backlog__*` tools for backlog items
 and artifacts. The server initializes in ~1–2 seconds after a session restart, and Claude Code
-handles connection waiting automatically. If a tool is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md — its commands use the `<sam_cli/>` and `<mcp_server_scripts/>` values above.
+handles connection waiting automatically. If a tool is unavailable, load `dh:dh-cli-usage` and
+follow its MCP connection check.
 
 ## Resolve Plan
 
@@ -39,7 +33,7 @@ Treat the value from the `plan_ref` key as an opaque reference. Pass it unchange
 Confirm the plan exists:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
+<sam_cli/> plan status --plan-address "{plan_ref}"
 ```
 
 ## Put the Plan in the Ledger
@@ -50,7 +44,7 @@ dispatch` on such a plan answers `no task {plan_ref}/{task_id} in the ledger` an
 start. Bring the plan across before the first dispatch:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{plan_ref}"
+<sam_cli/> plan import --from content --plan-address "{plan_ref}"
 ```
 
 This is safe to run when you are unsure: a plan the ledger already holds answers `exists` and
@@ -82,7 +76,7 @@ Otherwise, before the Progress Loop makes its first commit: run `git rev-parse H
 setting `context` overwrites the whole field — then write it back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address "{plan_ref}" --set context="{updated context}"
 ```
 
@@ -93,7 +87,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
 1. Query status:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
+<sam_cli/> plan status --plan-address "{plan_ref}"
 ```
 
 After receiving the status response, extract and store the autonomy mode. This loop runs after the
@@ -122,7 +116,7 @@ be taken back.
 2. If tasks remain, query ready tasks **once** and store the result as the current batch:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{plan_ref}"
+<sam_cli/> plan ready --plan-address "{plan_ref}"
 ```
 
 Output shape: `{"items": [...], "count": N}`. Readiness is derived from each task's status and its
@@ -154,7 +148,7 @@ For each task being dispatched:
   number, which is the key every command the worker runs carries back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{plan_ref}/{task_id}"
+<sam_cli/> plan dispatch --address "{plan_ref}/{task_id}"
 ```
 
   Add `--worktree {dir}` when the worker gets its own git worktree. Two codes mean "move to the
@@ -187,7 +181,7 @@ in progress. Execute the full check — crash/idle/active branches and re-spawn 
 4. After each agent returns, record what came back against the attempt you opened, then judge it.
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+<sam_cli/> plan settle \
   --address "{plan_ref}/{task_id}" --attempt {A} --return-text "{the agent's response}"
 ```
 
@@ -198,7 +192,7 @@ attempt reads as a worker still at it, and the loop waits on a worker that is go
 Then judge against the ledger rather than the response text:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address "{plan_ref}/{task_id}"
+<sam_cli/> plan read --address "{plan_ref}/{task_id}"
 ```
 
 Compare the `Completion Report` and `Verification Results` sections against the task's acceptance
@@ -206,7 +200,7 @@ criteria and verification steps, and against the diff of the files the report li
 plan's base SHA. Where they hold:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan accept --address "{plan_ref}/{task_id}" --note "{why}"
+<sam_cli/> plan accept --address "{plan_ref}/{task_id}" --note "{why}"
 ```
 
 Where a criterion is unmet, a verification step failed, or a report section is missing, send it
@@ -214,7 +208,7 @@ back with what to change — `reclaim` writes the response and returns the task 
 one move, so the next `dispatch` finds it ready and its worker reads the answer first:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+<sam_cli/> plan reclaim \
   --address "{plan_ref}/{task_id}" --reason judge --response "{what to change and why}"
 ```
 
@@ -241,7 +235,7 @@ Concerns accumulate across all task agents. They feed into the validation stage 
 4a. If a parent issue number is known (`str | int` — GitHub integer ID or beads string ID), attempt contract verification against the architect spec:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type architect
+<sam_cli/> artifact read --item-id N --artifact-type architect
 ```
 
 If `artifact_read` returns content (architect spec exists), resolve the files modified by the just-completed task:
@@ -327,11 +321,11 @@ After task N completes (steps 4 through 4b finished), before dispatching task N+
 3. Await explicit user confirmation before proceeding.
    - If confirmed: dispatch the next task from the stored batch (or query the next batch if the batch is exhausted).
    - If declined or cancelled: stop the Progress Loop. Report the current plan state via
-     `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` and exit.
+     `<sam_cli/> plan status --plan-address "{plan_ref}"` and exit.
 
 Skip this gate when `autonomy_mode` is `"full_auto"` or `"checkpoint"`.
 
-5. After all tasks in the current batch complete, call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"` to
+5. After all tasks in the current batch complete, call `<sam_cli/> plan status --plan-address "{plan_ref}"` to
    check plan progress. Tasks remain while the plan-level `progress` is `open`; return to step 2
    then to fetch the next batch of ready tasks. Do not fetch another ready batch until the previous
    batch is fully dispatched.

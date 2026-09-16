@@ -3,6 +3,8 @@ name: interop
 description: Routes a Superpowers plan file through the /work-backlog-item pipeline and writes SAM task back-references and chunk annotations into the original plan. Use when given a path to a Superpowers plan file via $ARGUMENTS and needing to create a linked backlog item plus SAM task plan.
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # /dh:interop — Superpowers Plan Interop Adapter
 
 Routes a Superpowers plan file through the `/work-backlog-item` pipeline to produce a SAM task
@@ -138,7 +140,7 @@ After `/work-backlog-item` completes, identify the plan address it produced. The
 If the plan address is not stated in the output, use `sam_list` via MCP (or `plan list` via CLI) to find the plan whose slug matches the backlog item title:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
+<sam_cli/> plan list
 ```
 
 If no matching plan exists, abort:

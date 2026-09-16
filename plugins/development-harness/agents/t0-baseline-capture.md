@@ -4,6 +4,7 @@ description: Captures baseline state of structured acceptance criteria before im
 tools: Read, Bash, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: haiku
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 ---
 
@@ -33,7 +34,7 @@ filesystem path. The plan lives in the configured backend, which may be remote, 
 returns nothing in a worktree-isolated dispatch:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}
+<sam_cli/> plan read --address P{N}
 ```
 
 `plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. It

@@ -1,5 +1,7 @@
 # Artifact Conventions
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 SAM artifact naming, logical identifiers, and cross-referencing conventions for the development harness.
 
 ---
@@ -94,7 +96,7 @@ Execution results, review results and verification results are written by a runn
 attempt, so they go to the ledger:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address {plan_ref} --task-id {task_id} --attempt {n} \
   --append-section "{section name}" --section-content "{content}"
 ```

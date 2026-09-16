@@ -5,6 +5,8 @@ argument-hint: <branch-name>
 user-invocable: true
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Gate Push
 
 Run `/dh:gate-push <branch-name>` to resolve branch context into a `/dh:complete-implementation` input and execute that quality-gate pipeline.
@@ -31,9 +33,9 @@ Then re-run:
    - Store the result as `normalized_slug`
    - Expected pattern is `type/slug` (e.g., `feature/foo-bar`); multi-segment branches (`type/segment1/segment2`) are supported and normalize with the same replacement rule
 2. Strategy 1 (title match):
-   - `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --title "<normalized_slug>"`
+   - `<sam_cli/> backlog list --title "<normalized_slug>"`
 3. Strategy 2 (topic match fallback, only if Strategy 1 has zero results):
-   - `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --topic "<normalized_slug>"`
+   - `<sam_cli/> backlog list --topic "<normalized_slug>"`
 4. If exactly one item is returned, use it as `match`.
 5. If multiple items are returned, do not guess — stop and follow the No-match / unresolved fallback procedure below.
 

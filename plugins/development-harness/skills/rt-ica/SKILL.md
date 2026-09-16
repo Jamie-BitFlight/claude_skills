@@ -6,6 +6,8 @@ user-invocable: true
 context: fork
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # RT-ICA: Reverse Thinking - Information Completeness Assessment
 
 ## Sister skill — when to use which
@@ -67,7 +69,7 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:rt-ica', args='#42')`)
 1. Load item context before doing anything else:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
+<sam_cli/> backlog view --selector "#N"
 ```
 
 Note: the CLI's `backlog view` has no `summary` toggle — it always returns the flatter,
@@ -79,7 +81,7 @@ full-content equivalent of `summary=false`.
 4. After completing the assessment, write the RT-ICA result back to the item:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "#N" --section "RT-ICA" --content "{RT-ICA SUMMARY block}"
+<sam_cli/> backlog groom --selector "#N" --section "RT-ICA" --content "{RT-ICA SUMMARY block}"
 ```
 
 Without a `#N` arg, the skill expects the goal/input to be provided inline in the invocation

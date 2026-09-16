@@ -21,7 +21,15 @@ from typing_extensions import TypedDict
 
 from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client, resolve_token
 
-from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from .backend_types import (
+    AddedCommentNode,
+    AssigneeNode,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from .entry_blocks import wrap_entry
 from .models import (
     TYPE_TO_LABEL,
@@ -879,7 +887,7 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
                 _update_issue_graphql(repo, node_id, body=body)
 
 
-def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
+def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
     """Add a comment to an issue via GraphQL.
 
     Args:
@@ -888,14 +896,16 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
         body: Comment body text.
 
     Returns:
-        Comment node ID string.
+        AddedCommentNode carrying the GraphQL and REST identifiers.
 
     Raises:
         BacklogError: On GraphQL errors.
     """
     data = _graphql_request(repo, _ADD_COMMENT_MUTATION, {"subjectId": issue_node_id, "body": body})
     comment_node = data.get("addComment", {}).get("commentEdge", {}).get("node", {})
-    return str(comment_node.get("id", ""))
+    return AddedCommentNode(
+        id=str(comment_node.get("id", "")), database_id=_parse_full_database_id(comment_node.get("fullDatabaseId"))
+    )
 
 
 def _parse_full_database_id(raw_full_database_id: object) -> int | None:

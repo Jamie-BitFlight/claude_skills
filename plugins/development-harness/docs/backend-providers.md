@@ -123,7 +123,7 @@ the transport.
 The CLI transport is `sam_schema/cli.py` (grouped Typer app: `plan`, `backlog`,
 `dispatch`, `artifact`, `active-task`; also reachable through the
 `scripts/run_sam_cli.py` wrapper). Per-command reference lives in
-[DH CLI Usage Guide](../skills/dh-meta-docs/references/dh-cli-usage-guide.md).
+[DH CLI Command Reference](../skills/dh-cli-usage/references/command-reference.md).
 
 Shared logical operations include:
 
@@ -224,12 +224,8 @@ exception:
 | `supports_branches` | Backend can satisfy `BranchBackend` — integration branch create/merge/delete. | `True` | `False` | `True` | `False` |
 | `supports_batch_status_fetch` | Backend implements a real batched status fetch. | `True` | `True` | `True` | `False` |
 | `supports_batch_issue_update` | Backend implements a real batched GraphQL update. | `True` | `False` | `False` | `False` |
-<<<<<<< HEAD
-| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
-=======
-| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept (ADR-003) — use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
-| `supports_cached_listing` | Backend's `list_work_items()` reads a provider-private cache (GitHub's `FileCache`) rather than the backend's own authoritative storage directly. Read by `operations.list_items` (backlog #3546 task A4) to compute the `from_cache` provenance bit on every listing response — see "Listing provenance" below. | `True` | `False` | `False` | `False` |
->>>>>>> 8f5715822 (feat(backlog-core): report fail-safe listing provenance for a cold cache)
+| `supports_milestones` | Backend implements real `list_milestones`/`create_milestone`/`assign_item_to_milestone` (`require_milestone_support()`, `backlog_core/_capability_gates.py`). Beads has no int-keyed milestone concept; use its beads-native shadow methods (`list_beads_milestones` etc.) instead. | `True` | `True` | `True` | `False` |
+| `supports_cached_listing` | Backend's `list_work_items()` reads a provider-private cache (GitHub's `FileCache`) rather than the backend's own authoritative storage directly. Read by `operations.list_items` to compute the `from_cache` provenance bit on every listing response; see "Listing provenance" below. | `True` | `False` | `False` | `False` |
 
 **Flag-first gating rule:** `GitHubExtras` and `BranchBackend` are both
 `runtime_checkable` Protocols. `isinstance(backend, SomeProtocol)` checks

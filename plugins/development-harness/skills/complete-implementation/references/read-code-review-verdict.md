@@ -1,5 +1,7 @@
 # Read the Code Review Verdict
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 Resolves the `code-review` report `@dh:code-reviewer` registered during Phase 1 (task T1) into
 `{review_report}`, the content the Recursive Follow-up Handling section branches on.
 
@@ -25,7 +27,7 @@ Take the response's `feature` field as `{qg_slug}`. `{review_artifact_id}` is
 `code-review-T1-{qg_slug}`. Do not shorten it to a substring.
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type "code-review" --artifact-id "{review_artifact_id}"
+<sam_cli/> artifact read --item-id "{item_ref}" --artifact-type "code-review" --artifact-id "{review_artifact_id}"
 ```
 
 On success, that content is `{review_report}` — return to the caller.
@@ -35,7 +37,7 @@ On success, that content is `{review_report}` — return to the caller.
 Confirm what the type does hold before concluding anything:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type code-review
+<sam_cli/> artifact list --item-id "{item_ref}" --artifact-type code-review
 ```
 
 Match `artifact_id` exactly against `{review_artifact_id}`. Never select by substring and never fall
@@ -57,7 +59,7 @@ The plan may predate that artifact type: a verdict recorded by an earlier run is
 `codebase-analysis`. Enumerate that type:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
+<sam_cli/> artifact list --item-id "{item_ref}" --artifact-type codebase-analysis
 ```
 
 Match `artifact_id` exactly against the same `{review_artifact_id}` derived in Step A. The type
@@ -72,7 +74,7 @@ Read the match by its own identifier — a read by `codebase-analysis` alone ret
 analysis document was registered last, which is not a verdict:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{review_artifact_id}"
+<sam_cli/> artifact read --item-id "{item_ref}" --artifact-type codebase-analysis --artifact-id "{review_artifact_id}"
 ```
 
 That content is `{review_report}` — return to the caller.
@@ -86,7 +88,7 @@ loop never re-runs the reviewer.
 Send T1 back and dispatch it again:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+<sam_cli/> plan reclaim \
   --address "{qg_plan_address}/T1" --reason no-verdict \
   --response "the gate holds no code-review verdict for this plan; register one this time"
 ```

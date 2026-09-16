@@ -3,6 +3,8 @@ name: create-artifact
 description: Register a plan artifact via the MCP backlog server. Use when you produce a document or report that downstream agents or worktree-isolated environments need to retrieve — feature-context, codebase-analysis, architect, T0-baseline, TN-verification, or research artifacts. Triggers include "store an artifact", "register a plan artifact", "write a report to the backlog", "upload artifact content".
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Create Artifact
 
 Register your deliverable through the configured content provider with
@@ -35,7 +37,7 @@ mcp__plugin_dh_backlog__artifact_register(
 **CLI equivalent** (scripting/dispatch contexts):
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
+<sam_cli/> artifact register \
   --item-id <identifier> \
   --artifact-type <str> \
   --artifact-id <str> \

@@ -4,6 +4,7 @@ description: Post-task verifier that compares method signatures and type contrac
 model: haiku
 tools: Read, Grep, Glob, Bash, mcp__plugin_dh_backlog
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 color: yellow
 ---

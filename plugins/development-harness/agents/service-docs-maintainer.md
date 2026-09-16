@@ -6,6 +6,7 @@ model: sonnet
 color: yellow
 memory: project
 skills:
+  - dh:dh-cli-usage
   - mattpocock-skills:writing-for-agents
   - dh:subagent-contract
 ---

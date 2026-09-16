@@ -4,6 +4,7 @@ description: Explores codebase patterns and registers structured analysis docume
 tools: Read, Bash, Grep, Glob, Skill, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
 model: haiku
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - ccc
   - dh:create-artifact

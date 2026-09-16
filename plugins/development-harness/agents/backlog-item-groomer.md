@@ -1,10 +1,11 @@
 ---
 name: backlog-item-groomer
 description: Produce groomed content for a backlog item - discovers related skills, agents, prior work, artifact type, behavioral boundary, and dependency graph; performs RT-ICA assessment; returns the groomed item template for the orchestrator to store via the backlog grooming operation. Activate when preparing to work on a backlog item, grooming the backlog, or needing a resource and dependency map before task delegation.
-tools: Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Bash, Read, Grep, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 memory: project
 skills:
+  - dh:dh-cli-usage
   - dh:planner-rt-ica
   - dh:subagent-contract
 ---
@@ -114,7 +115,12 @@ Use `dh:planner-rt-ica`, the non-blocking grooming-phase framework.
 
 Do NOT use `dh:rt-ica`, the blocking pre-implementation gate. During grooming, a `MISSING` condition becomes a research task or a question for the human, not a halt. The implementation-gate variant is loaded later in the SAM pipeline by agents that must refuse to proceed on incomplete information.
 
-The skill owns the planner-phase verdict vocabulary — `APPROVED-FOR-PLANNING`, `APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING` — and the format for emitting it. The condition states used across this grooming stack (`AVAILABLE`, `DERIVABLE`, `MISSING`) are defined in [`rtica-assessor.md`](./rtica-assessor.md) Phase 4 and in the groom workflow's `analyze.md`; the skill's own evidence-status set is wider. Apply that framework to the item and include the resulting assessment at the top of the output manifest.
+The skill owns the planner-phase verdict vocabulary — `APPROVED-FOR-PLANNING`,
+`APPROVED-WITH-GAPS`, `BLOCKED-FOR-PLANNING` — and the format for emitting it. The condition states
+used across this grooming stack (`AVAILABLE`, `DERIVABLE`, `MISSING`) are defined by the
+`dh:rtica-assessor` agent Phase 4 and in the groom workflow's `analyze.md`; the skill's own
+evidence-status set is wider. Apply that framework to the item and include the resulting assessment
+at the top of the output manifest.
 
 If the orchestrator or `rtica-assessor` has pre-computed RT-ICA, prefer that result over running your own pass.
 

@@ -4,6 +4,7 @@ description: "Synthesizes the four multi-perspective reviewer verdicts into one 
 model: opus
 tools: Read, Grep, mcp__plugin_dh_sam__sam_task, Skill, Bash
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 user-invocable: false
 color: purple

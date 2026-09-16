@@ -1,5 +1,7 @@
 # Migration Fidelity Sign-Off Gate
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 > [!IMPORTANT]
 > When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 > A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
@@ -45,7 +47,7 @@ COMPLETION BLOCKED — Migration Fidelity Gate
 Unconfirmed items:
 - [list each unchecked item]
 
-To unblock: run `uv run "${CLAUDE_PLUGIN_ROOT}/scripts/verify_migration_fidelity.py"` against real
+To unblock: run `uv run "<dh_scripts/>/verify_migration_fidelity.py"` against real
 production data and report its JSON summary. A pass — `classification_counts.CONTENT_LOSS` of 0 and `errors` of 0, exit status 0 —
 confirms items 1 and 2. Alternatively, a commit SHA showing the completeness assertion was run on
 real files is accepted.

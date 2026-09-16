@@ -5,6 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash, Skill, WebFetch, WebSearch, mcp__plu
 model: haiku
 memory: project
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 ---
 

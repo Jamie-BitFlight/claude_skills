@@ -4,6 +4,7 @@ description: Goal-backward verification AFTER feature implementation. Starts fro
 tools: Read, Write, Edit, Bash, Grep, Glob, Skill, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: opus
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:final-verification
   - dh:validation-protocol
@@ -85,7 +86,7 @@ mcp__plugin_dh_backlog__artifact_read(item_id={issue_number}, artifact_type="arc
 ```
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
+<sam_cli/> plan status --plan-address {plan_address}
 ```
 
 `plan status` returns the plan row and every task row on the work ledger, or plan-level counts

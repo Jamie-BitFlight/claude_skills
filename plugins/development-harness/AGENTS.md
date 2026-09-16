@@ -291,7 +291,7 @@ that change depends on.
 
 **Checking whether a CLI or MCP capability already exists, before building, replacing, or diagnosing one:**
 
-- Load `dh:dh-meta-docs` — its [DH CLI Usage Guide](./skills/dh-meta-docs/references/dh-cli-usage-guide.md) is the only document naming the CLI adapter's actual entry point, `sam_schema/cli.py`, with the grouped commands (`plan`, `backlog`, `dispatch`, `artifact`, `active-task`) and their invocation form. Every backlog, plan, artifact, and dispatch operation this plugin exposes over MCP has a CLI equivalent there. Check it before concluding a capability is missing — a filename search alone does not find it.
+- Load `dh:dh-meta-docs` — its [DH CLI Command Reference](./skills/dh-cli-usage/references/command-reference.md) is the only document naming the CLI adapter's actual entry point, `sam_schema/cli.py`, with the grouped commands (`plan`, `backlog`, `dispatch`, `artifact`, `active-task`) and their invocation form. Every backlog, plan, artifact, and dispatch operation this plugin exposes over MCP has a CLI equivalent there. Check it before concluding a capability is missing — a filename search alone does not find it.
 
 Note: The layer-0 design documents artifact-conventions, task-file-format, sam-pipeline, and arl-touchpoints were consolidated into the canonical skill references on 2026-03-31. The layer-0 files now contain redirects to the canonical locations. The remaining layer-0 files (evidence-discipline, orchestrator-discipline, context-fit-complexity, rt-ica-gate, verification-protocol) contain design principles with no operational equivalent — they are authoritative in place.
 

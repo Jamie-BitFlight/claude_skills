@@ -5,6 +5,7 @@ model: haiku
 color: orange
 tools: Read, Grep, Glob, Bash, Write, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - ccc
 ---

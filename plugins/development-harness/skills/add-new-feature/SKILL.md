@@ -9,6 +9,8 @@ metadata:
   last_updated: '2026-01-27'
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Add New Feature (SAM Workflow)
 
 You MUST convert the user's request into durable planning content through the structured artifact and SAM interfaces:
@@ -176,7 +178,7 @@ Register your deliverable and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type feature-context
+<sam_cli/> artifact list --item-id {issue} --artifact-type feature-context
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -187,7 +189,7 @@ the MCP-native rule is that agents own their artifact storage.
 Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type feature-context
+<sam_cli/> artifact read --item-id {issue} --artifact-type feature-context
 ```
 
 ---
@@ -242,7 +244,7 @@ Register each document and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type codebase-analysis
+<sam_cli/> artifact list --item-id {issue} --artifact-type codebase-analysis
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -253,7 +255,7 @@ the MCP-native rule is that agents own their artifact storage.
 Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type codebase-analysis
+<sam_cli/> artifact read --item-id {issue} --artifact-type codebase-analysis
 ```
 
 ---
@@ -438,7 +440,7 @@ Register your deliverable and return:
 After the agent completes, verify the artifact was registered:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id {issue} --artifact-type architect
+<sam_cli/> artifact list --item-id {issue} --artifact-type architect
 ```
 
 If `count == 0`, the agent did not register the artifact. Re-dispatch with an explicit
@@ -449,7 +451,7 @@ is that agents own their artifact storage.
 Then apply the registration read-back rule from the Artifact Discovery section above:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue} --artifact-type architect
+<sam_cli/> artifact read --item-id {issue} --artifact-type architect
 ```
 
 ---
@@ -512,13 +514,13 @@ reading state, not by trusting a report:
 
 ```bash
 # 1. Read current state — plan is null until the link is written
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
+<sam_cli/> backlog view --selector "#{issue}"
 
 # 2. If plan is null, write the link using the exact value returned by sam_plan
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog update --selector "{title}" --plan "{plan_ref}"
+<sam_cli/> backlog update --selector "{title}" --plan "{plan_ref}"
 
 # 3. Re-read and confirm plan equals plan_ref before proceeding to Phase 5
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#{issue}"
+<sam_cli/> backlog view --selector "#{issue}"
 ```
 
 The `backlog_update(plan=...)` call writes the opaque `plan_ref` into the backlog item's `metadata.plan`
