@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client
+from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client, resolve_token
 
 from .backend_types import (
     AddedCommentNode,
@@ -1309,12 +1308,12 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Try to get GitHub repo, return None when GITHUB_TOKEN is missing or GitHub errors.
+    """Try to get GitHub repo, return None when no token is available or GitHub errors.
 
     Use this for operations where local-only fallback is acceptable.
 
     Returns:
-        Repository object, or None when GITHUB_TOKEN is missing, or GitHub
+        Repository object, or None when no accepted token is available, or GitHub
         returned an error (authentication failure, rate limit, or server
         error).
     """
@@ -1322,12 +1321,15 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
     except MissingGitHubTokenError:
-        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
+        logger.warning("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
+        return None
+    except OSError as exc:
+        logger.warning("try_get_github: network or transport error for repo %r: %s", repo, exc)
         return None
 
 
@@ -1345,13 +1347,18 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         BackendStatus with availability and live issue counts. Cache fields retain
         their defaults because the provider owns cache observation.
     """
-    if not os.environ.get("GITHUB_TOKEN"):
-        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
+    try:
+        resolve_token()
+    except MissingGitHubTokenError:
+        names = ", ".join(TOKEN_ENV_VARS)
+        return BackendStatus(
+            availability=BackendAvailability.NEEDS_AUTHENTICATION, error=f"No GitHub token found. Set one of: {names}"
+        )
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
             availability=BackendAvailability.ERROR,
-            error="GITHUB_TOKEN set but GitHub returned an error (authentication failure, rate limit, or server error)",
+            error="GitHub token set but GitHub returned an error (authentication failure, rate limit, or server error)",
         )
 
     try:
@@ -1512,6 +1519,9 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
     except GithubException as exc:
         msg = f"GitHub PR search failed: {exc}"
         raise BacklogError(msg) from exc
+    except OSError as exc:
+        msg = f"GitHub PR search failed (network error or timeout): {exc}"
+        raise BacklogError(msg) from exc
     nodes = (data.get("search") or {}).get("nodes") or []
     prs: list[PullRequestRef] = []
     for raw in nodes:
@@ -1596,6 +1606,9 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
 
     Returns:
         Status label string or empty string.
+
+    Raises:
+        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL API.
     """
     if not item.issue:
         return ""
@@ -1608,6 +1621,8 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
         return _pick_primary_status_label(labels)
+    except GraphQLUnavailableError:
+        raise
     except (BacklogError, GithubException):
         return ""
 

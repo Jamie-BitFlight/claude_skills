@@ -1469,9 +1469,6 @@ class TestTryGetGithub:
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-# apply_status_in_progress — fetch-then-update label pattern
-=======
 # probe_backend_status — backend availability summary
 # ---------------------------------------------------------------------------
 
@@ -1531,8 +1528,7 @@ class TestProbeBackendStatus:
 
 
 # ---------------------------------------------------------------------------
-# apply_status_in_progress — ADR-003 fetch-then-update label pattern
->>>>>>> 794f682f5 (fix(backlog-core): make probe_backend_status accept every token variable)
+# apply_status_in_progress — fetch-then-update label pattern
 # ---------------------------------------------------------------------------
 
 

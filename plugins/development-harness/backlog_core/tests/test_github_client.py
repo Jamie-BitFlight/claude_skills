@@ -246,6 +246,14 @@ class TestConnectionClassPinsVerifyToTheResolvedBundle:
 
         assert connection.verify == str(ca_file)
 
+    def test_verify_is_pinned_when_pygithub_passes_its_default_true(self, ca_file):
+        """PyGithub explicitly passes its default ``True`` into every connection."""
+        connection_class = _make_connection_class(str(ca_file))
+
+        connection = connection_class("api.github.com", verify=True)
+
+        assert connection.verify == str(ca_file)
+
     def test_an_explicit_verify_kwarg_from_the_caller_still_wins(self, ca_file):
         """PyGithub itself is free to pass an explicit verify; this module must not
         silently override an explicit caller decision."""

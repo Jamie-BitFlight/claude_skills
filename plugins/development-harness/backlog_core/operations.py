@@ -92,6 +92,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
@@ -1883,25 +1884,39 @@ def refresh_local_cache_from_github(
     }
 
 
-def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
-    """Return the effective status string for an item.
-
-    For items with a numeric issue reference, looks up the live status
-    from *status_map*.  For items with a non-integer issue reference (e.g. a
-    beads nanoid ``"bd-a3f8"``) or no issue at all, falls back to the locally
-    cached ``item.status`` field.  This prevents beads and other string-ID
-    backends from always returning ``"needs-grooming"`` when the status map is
-    empty.
+def _normalize_github_status(status: str) -> str:
+    """Normalize cached and live GitHub statuses to the listing filter vocabulary.
 
     Returns:
-        Status string — either the provider status value from *status_map* or
-        the local ``item.status`` value, defaulting to ``"needs-grooming"``
-        when neither is available.
+        The canonical status token used by list filters and rendered entries.
+    """
+    if status in {StatusLabel.NEEDS_GROOMING, "needs-grooming"}:
+        return "needs-grooming"
+    if status.startswith(STATUS_LABEL_PREFIX) or not status:
+        return status
+    labeled = f"{STATUS_LABEL_PREFIX}{status}"
+    return labeled if labeled in {member.value for member in StatusLabel} else status
+
+
+def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool) -> str:
+    """Return the effective status string for an item.
+
+    For numeric issue references, a live map is authoritative, including a
+    missing key (no status label). When no live query answered, the cached
+    status is used instead of inventing a live default. String-ID backends
+    always use their backend-owned status.
+
+    Returns:
+        Effective status in the listing filter vocabulary.
     """
     num = parse_issue_number(item.issue)
     if num is not None:
         info = status_map.get(num)
-        return info.status if info is not None else "needs-grooming"
+        if info is not None:
+            return _normalize_github_status(info.status)
+        if status_live:
+            return "needs-grooming"
+        return _normalize_github_status(item.status)
     # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
     return item.status or "needs-grooming"
 
@@ -1912,6 +1927,7 @@ def _filter_open_items(
     title: str | None,
     status: str | None,
     status_map: dict[int, IssueStatus],
+    status_live: bool,
     type_: str | None = None,
     topic: str | None = None,
 ) -> list[BacklogItem]:
@@ -1935,7 +1951,9 @@ def _filter_open_items(
         title_lower = title.lower()
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
-        open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+        open_items = [
+            it for it in open_items if _item_derived_status(it, status_map, status_live=status_live) == status
+        ]
     if type_:
         type_lower = type_.lower()
         open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
@@ -1991,7 +2009,9 @@ def _build_item_search_body(item: BacklogItem) -> str:
     return " ".join(parts)
 
 
-def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> dict[str, str | bool]:
+def _build_list_entry(
+    item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True
+) -> dict[str, str | bool]:
     """Build the result dict for a single backlog item.
 
     Returns:
@@ -2018,7 +2038,11 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
         num = parse_issue_number(item.issue)
         if num is not None:
             info = status_map.get(num)
-            entry["status"] = info.status if info is not None else ""
+            entry["status"] = (
+                _item_derived_status(item, status_map, status_live=status_live)
+                if info is not None or not status_live
+                else ""
+            )
             entry["milestone"] = info.milestone if info is not None else ""
         else:
             # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
@@ -2235,15 +2259,20 @@ def list_items(
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
     status_map: dict[int, IssueStatus] = {}
+    status_live = False
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
+            status_live = True
         except BackendUnavailableError as exc:
-            # An empty map renders every numeric-issue item with a blank status.
-            # Name the cause, so a reader does not take the blanks for "no status set".
-            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
-    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
-    result_items = [_build_list_entry(it, status_map) for it in open_items]
+            out.warn(
+                f"  WARNING: Live status unavailable ({exc}); using the local cache, which may under-report "
+                "recent status changes."
+            )
+    open_items = _filter_open_items(
+        open_items, section, title, status, status_map, status_live, type_=type_, topic=topic
+    )
+    result_items = [_build_list_entry(it, status_map, status_live=status_live) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:
@@ -3384,6 +3413,10 @@ def view_item(
                 enriched, reason = False, f"backend unavailable ({exc})"
             if not enriched:
                 out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
+                if reason.startswith("GitHub lookup failed"):
+                    out.warnings.append(
+                        "backend unreachable — sections_index reflects provider-backed record, may be stale"
+                    )
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
         result.groomed = item.metadata.groomed
@@ -3569,6 +3602,22 @@ def sync_items(
 # ---------------------------------------------------------------------------
 # Public API: CLOSE
 # ---------------------------------------------------------------------------
+
+
+def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
+    """Search for open PRs, preserving failure as a close/resolve refusal.
+
+    Returns:
+        Open pull requests that reference ``issue_num``.
+
+    Raises:
+        BacklogError: The search did not complete, so absence cannot be established.
+    """
+    try:
+        return check_open_prs_for_issue(issue_num, repo)
+    except (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+        msg = f"Open-PR search failed for issue #{issue_num}; retry, or pass force=True to bypass this safety check"
+        raise BacklogError(msg) from exc
 
 
 def close_item(

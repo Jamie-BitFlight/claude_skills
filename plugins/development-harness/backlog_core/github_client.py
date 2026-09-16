@@ -250,7 +250,7 @@ def _make_connection_class(ca_bundle: str) -> type[HTTPSRequestsConnectionClass]
                 **kwargs: Extra options the base class reads, such as ``verify``.
             """
             super().__init__(host, port, strict, timeout, retry, pool_size, **kwargs)
-            if "verify" not in kwargs:
+            if kwargs.get("verify", True) is True:
                 self.verify = ca_bundle
             self.adapter = _ProxyAwareAdapter(
                 ca_bundle, max_retries=self.retry, pool_connections=self.pool_size, pool_maxsize=self.pool_size
