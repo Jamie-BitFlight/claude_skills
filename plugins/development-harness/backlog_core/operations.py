@@ -766,6 +766,19 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
 
     Returns:
         True if updated, False if no backend reference on item.
+
+    Raises:
+        ValidationError: Raised for a non-numeric ``item.issue`` on an
+            integer-ID backend, and caught by this function's own
+            ``except (GithubException, BacklogError)`` -- ``ValidationError``
+            is a ``BacklogError`` subclass, not a plain ``ValueError``, so it
+            no longer escapes past that handler. Callers therefore see no
+            exception from this refusal: they get ``True`` plus a warning on
+            ``output``, which is the documented surface ``backlog_update``
+            (``except BacklogError``) reports instead of failing the tool call
+            with an unhandled exception. The backend-owned title write above
+            has already succeeded at this point; only the GitHub mirror is
+            skipped.
     """
     out = output or Output()
     reference = item.reference
@@ -785,7 +798,7 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
                 num = parse_issue_number(issue_ref)
                 if num is None:
                     msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
-                    raise ValueError(msg)
+                    raise ValidationError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
@@ -836,6 +849,19 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
 
     Returns:
         True if updated, False otherwise.
+
+    Raises:
+        ValidationError: Raised for a non-numeric ``item.issue`` on an
+            integer-ID backend, and caught by this function's own
+            ``except (GithubException, BacklogError)`` -- ``ValidationError``
+            is a ``BacklogError`` subclass, not a plain ``ValueError``, so it
+            no longer escapes past that handler. Callers therefore see no
+            exception from this refusal: they get ``True`` plus a warning on
+            ``output``, which is the documented surface ``backlog_update``
+            (``except BacklogError``) reports instead of failing the tool call
+            with an unhandled exception. The backend-owned plan write above
+            has already succeeded at this point; only the GitHub plan comment
+            is skipped.
     """
     out = output or Output()
     reference = item.reference
@@ -856,7 +882,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
                 num = parse_issue_number(issue_ref)
                 if num is None:
                     msg = f"Expected numeric GitHub issue ref, got {issue_ref!r}"
-                    raise ValueError(msg)
+                    raise ValidationError(msg)
                 owner, repo_name = repository.full_name.split("/", 1)
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")
