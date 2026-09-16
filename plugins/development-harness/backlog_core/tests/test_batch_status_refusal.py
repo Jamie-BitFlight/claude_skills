@@ -5,10 +5,9 @@
 refusal used to be converted into that same empty mapping, so every listing rendered
 blank statuses and reported no reason.
 
-Two guarantees are protected here. The refusal reaches the caller as a distinct
-exception, and the caller that chooses to continue with blank statuses says so in
-its output. Every other failure keeps its existing local-fallback behaviour, so an
-offline read still serves the cache rather than raising.
+Two guarantees are protected here. Every unavailable query reaches the caller as a
+distinct exception, and the caller catches it and serves the cached status with a
+warning. A successful empty live query remains an authoritative empty mapping.
 """
 
 from __future__ import annotations
@@ -19,7 +18,14 @@ import pytest
 from github import GithubException
 
 from backlog_core import gh_client, operations
-from backlog_core.models import BacklogError, BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+from backlog_core.models import (
+    BackendUnavailableError,
+    BacklogError,
+    BacklogItem,
+    GraphQLUnavailableError,
+    IssueStatus,
+    Output,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -50,14 +56,14 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         with pytest.raises(GraphQLUnavailableError):
             gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_generic_backlog_error_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """Offline continuity is deliberate: an ordinary failure keeps serving the cache."""
+    def test_a_generic_backlog_error_is_reported_as_unavailable(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=BacklogError("query rejected"))
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="query rejected"):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_github_exception_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
+    def test_a_github_exception_is_reported_as_unavailable(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(
             gh_client,
@@ -65,13 +71,15 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
             side_effect=GithubException(status=500, data={"message": "Server Error"}, headers={}),
         )
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="Server Error"):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_an_unreachable_backend_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """``try_get_github`` returning None is the no-token/no-network path, not a refusal."""
+    def test_an_unreachable_backend_is_reported_as_unavailable(self, mocker: MockerFixture) -> None:
+        """``try_get_github`` returning None is the no-token/no-network path."""
         mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="GitHub client unavailable"):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
 
 class TestFetchItemStatusSurfacesTheRefusal:
@@ -204,3 +212,30 @@ class TestListItemsReportsBlankStatuses:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any("Live status unavailable" in str(w) for w in warnings)
+
+    def test_an_unavailable_query_preserves_the_cached_status(self, mocker: MockerFixture) -> None:
+        """An unavailable lower-level query is not live status evidence."""
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(
+            operations, "batch_fetch_statuses", side_effect=BackendUnavailableError("GitHub client unavailable")
+        )
+
+        result = operations.list_items(output=Output())
+        items = result["items"]
+
+        assert isinstance(items, list)
+        assert isinstance(items[0], dict)
+        assert items[0]["status"] == "status:in-progress"
+
+    def test_an_unavailable_query_filters_by_the_cached_status(self, mocker: MockerFixture) -> None:
+        """Unavailable live status must not reclassify a cached item as needs-grooming."""
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(
+            operations, "batch_fetch_statuses", side_effect=BackendUnavailableError("GitHub client unavailable")
+        )
+
+        in_progress = operations.list_items(status="status:in-progress", output=Output())
+        needs_grooming = operations.list_items(status="needs-grooming", output=Output())
+
+        assert in_progress["count"] == 1
+        assert needs_grooming["count"] == 0

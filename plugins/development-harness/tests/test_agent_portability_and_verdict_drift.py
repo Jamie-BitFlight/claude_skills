@@ -243,12 +243,11 @@ DH_CLI_USAGE_DIR = SKILLS_DIR / "dh-cli-usage"
 DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
 DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 
-# The three forms a harness substitutes a skill's own directory into its body as.
-# ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
-# plugin-root variable, which only Claude Code resolves.
+FIRST_CLASS_HARNESSES = ("Claude Code", "Codex", "OpenCode", "Cursor")
 SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
-DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
+SKILL_ROOT_LINES = tuple(f"${{{variable}}}" for variable in SKILL_DIR_VARIABLES)
+SAM_CLI_LINES = ('uv run "<skill-root>/../../sam_schema/cli.py"',)
+DH_SCRIPTS_LINES = ("<skill-root>/../../scripts",)
 
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
@@ -794,21 +793,12 @@ def test_every_agent_running_the_cli_preloads_dh_cli_usage() -> None:
     )
 
 
-def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
+def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() -> None:
     """``dh-cli-usage``'s SKILL.md derives ``<sam_cli/>`` and ``<dh_scripts/>`` only from its own
     directory, and states its documented failure path.
 
-    Structure, not substrings: exactly one line-anchored ``<sam_cli>`` open and one
-    ``<dh_scripts>`` open -- an inline mention such as `` `<sam_cli>` `` in prose does not count --
-    each pairing with a close into a block holding the three skill-dir command or script-directory
-    lines. Every ``${...SKILL_DIR}/..`` climb outside those two blocks is banned by position: the
-    blocks' own content is removed first, then the remainder is scanned, so a hand-written duplicate
-    of an allowed line placed outside the blocks still convicts even though its text matches one of
-    them. Every ``${...}`` template name used is one of the three skill-dir variables, never a
-    plugin-root variable, and the skill still gives the caller its documented failure path --
-    ``plan --help``, then ``STATUS: BLOCKED`` -- checked with fenced blocks and HTML comments
-    stripped, so a comment-only mention of either string does not satisfy the model-visible
-    instruction it stands in for.
+    The command definitions use one model-resolved skill-root token, and the instructions support
+    both harness-supplied root metadata and the three known body-substitution variables.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
@@ -817,13 +807,8 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
     raw = DH_CLI_USAGE.read_text(encoding="utf-8")
     stripped = HTML_COMMENT_RE.sub("", FENCED_BLOCK_RE.sub("", raw))
 
-    open_tags = BLOCK_OPEN_RE.findall(stripped)
-    for tag in ("sam_cli", "dh_scripts"):
-        opens = open_tags.count(tag)
-        assert opens == 1, (
-            f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens <{tag}> {opens} time(s) at the start of "
-            "a line; expected exactly one."
-        )
+    skill_root_blocks = _extract_tag_block(stripped, "skill_root")
+    assert skill_root_blocks == [list(SKILL_ROOT_LINES)]
 
     sam_cli_blocks = _extract_tag_block(stripped, "sam_cli")
     assert len(sam_cli_blocks) == 1, (
@@ -845,22 +830,10 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         f"expected {list(DH_SCRIPTS_LINES)!r}."
     )
 
-    remainder = re.sub(r"<(sam_cli|dh_scripts)>.*?</\1>", "", raw, flags=re.DOTALL)
-    outside_climbs = [
-        f"  {DH_CLI_USAGE.relative_to(PLUGIN_ROOT)}:{lineno} — {line.strip()}"
-        for lineno, line in enumerate(remainder.splitlines(), start=1)
-        if SKILL_DIR_PARENT_RE.search(line)
-    ]
-    assert not outside_climbs, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} climbs out of the skill directory outside its "
-        "<sam_cli> and <dh_scripts> blocks:\n" + "\n".join(outside_climbs)
-    )
-
+    missing_harnesses = [harness for harness in FIRST_CLASS_HARNESSES if harness not in raw]
+    assert not missing_harnesses, f"dh-cli-usage does not explain skill-root resolution for {missing_harnesses}"
     unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
-    assert not unknown_variables, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names template variable(s) other than the three "
-        f"skill-dir forms: {unknown_variables}"
-    )
+    assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
     assert "PLUGIN_ROOT" not in raw, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names PLUGIN_ROOT; it must derive the plugin root "
@@ -906,6 +879,33 @@ def test_impact_analyst_description_fits_frontmatter_limit() -> None:
     """Agent discovery metadata must fit the portable 1024-character description limit."""
     frontmatter, _ = _load_frontmatter_from_path(AGENTS_DIR / "impact-analyst.md")
     assert len(str(frontmatter["description"])) <= 1024
+
+
+def test_cli_tokens_are_not_executed_before_model_resolution() -> None:
+    """Dynamic context executes before instruction tokens can be resolved by the model."""
+    implementation_manager = (SKILLS_DIR / "implementation-manager" / "SKILL.md").read_text(encoding="utf-8")
+    dynamic_cli_lines = [
+        line for line in implementation_manager.splitlines() if line.startswith("!`") and "<sam_cli" in line
+    ]
+
+    assert not dynamic_cli_lines, f"Dynamic commands execute unresolved CLI tokens: {dynamic_cli_lines}"
+
+
+def test_context_refinement_splits_the_resolved_cli_command_for_subprocess() -> None:
+    """The safe argv example must not pass a complete CLI command as one executable argument."""
+    context_refinement = (AGENTS_DIR / "context-refinement.md").read_text(encoding="utf-8")
+
+    assert 'shlex.split("<sam_cli/>")' in context_refinement
+    assert '["uv", "run", "<sam_cli/>"' not in context_refinement
+
+
+def test_mcp_connection_check_names_both_server_commands() -> None:
+    """Manual recovery must provide runnable commands for both shipped MCP servers."""
+    connection_check = (DH_CLI_USAGE_DIR / "references" / "mcp-connection-check.md").read_text(encoding="utf-8")
+
+    assert 'uv run --script "<dh_scripts/>/run_backlog_server.py"' in connection_check
+    assert 'uv run --script "<dh_scripts/>/run_sam_server.py"' in connection_check
+    assert "<mcp_server_scripts" not in connection_check
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:

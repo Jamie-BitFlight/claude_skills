@@ -5,9 +5,16 @@ user-invocable: false
 disable-model-invocation: false
 ---
 
-Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
-
 # Implementation Manager
+
+## Current Task Context
+
+After activation, resolve `<sam_cli/>` through `dh:dh-cli-usage` and run `<sam_cli/> plan list` to
+list available plans. Do not place `<sam_cli/>` in a dynamic `!` command: dynamic commands execute
+before the model can resolve the instruction token.
+
+**Active task context (if any):**
+!`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
 
 A skill for querying and managing feature implementation tasks. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
 
@@ -247,3 +254,6 @@ The `/dh:execution` orchestrator uses this skill to:
    passing the address and the attempt number
 4. Settle each launch with `plan settle` when it returns, then judge with `plan read` and close
    with `plan accept` or send back with `plan reclaim`
+
+
+Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.

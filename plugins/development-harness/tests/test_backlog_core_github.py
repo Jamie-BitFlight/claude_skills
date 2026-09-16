@@ -47,6 +47,7 @@ from backlog_core.gh_client import (
 from backlog_core.github_client import TOKEN_ENV_VARS
 from backlog_core.models import (
     BackendAvailability,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -883,22 +884,20 @@ class TestBatchFetchStatuses:
         # Assert
         assert result == {}
 
-    def test_returns_empty_dict_when_github_unavailable(self, mocker: MockerFixture) -> None:
-        """batch_fetch_statuses returns empty dict when try_get_github returns None.
+    def test_raises_when_github_unavailable(self, mocker: MockerFixture) -> None:
+        """batch_fetch_statuses distinguishes an unavailable client from a live empty result.
 
         Tests: batch_fetch_statuses offline path
         How: Patch try_get_github to return None.
-        Why: Agents must work offline — empty status is acceptable, crash is not.
+        Why: The listing catches this exception and falls back to cached status.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.try_get_github", return_value=None)
         items = [BacklogItem(title="Item", issue="#5", priority="P1")]
 
-        # Act
-        result = batch_fetch_statuses(items)
-
-        # Assert
-        assert result == {}
+        # Act / Assert
+        with pytest.raises(BackendUnavailableError, match="GitHub client unavailable"):
+            batch_fetch_statuses(items)
 
     def test_empty_milestone_is_empty_string(self, mocker: MockerFixture) -> None:
         """batch_fetch_statuses maps None milestone to empty string in IssueStatus.

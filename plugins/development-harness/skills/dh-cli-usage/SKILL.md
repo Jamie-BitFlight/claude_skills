@@ -1,40 +1,41 @@
 ---
 name: dh-cli-usage
-description: "Gives the dh CLI command and the directory of dh's scripts, both resolved from this skill's own directory. Use before running a dh plan, backlog, artifact or dispatch command, or a script from dh's scripts directory, and when an mcp__plugin_dh_* server failed to connect."
+description: Use when a development-harness agent or skill needs to run the DH CLI or locate DH server scripts across supported harnesses.
 user-invocable: false
 ---
 
-# dh CLI usage
+# DH CLI Usage
+
+Determine this skill's absolute directory from the skill metadata supplied by the current harness:
+
+- Codex exposes `skill_root` when the skill is read.
+- OpenCode appends `Base directory for this skill` to the loaded skill.
+- Cursor resolves paths relative to the skill root.
+- Claude Code, Kimi, and Hermes substitute one of these skill-directory values. Use the first line
+  that became a concrete absolute path; ignore unresolved lines:
+
+<skill_root>
+${CLAUDE_SKILL_DIR}
+${KIMI_SKILL_DIR}
+${HERMES_SKILL_DIR}
+</skill_root>
+
+Call that absolute directory `<skill-root>`. Replace `<skill-root>` with its resolved value before
+running any command; it is an instruction token, not a shell or harness substitution variable.
 
 <sam_cli>
-uv run "${CLAUDE_SKILL_DIR}/../../sam_schema/cli.py"
-uv run "${KIMI_SKILL_DIR}/../../sam_schema/cli.py"
-uv run "${HERMES_SKILL_DIR}/../../sam_schema/cli.py"
+uv run "<skill-root>/../../sam_schema/cli.py"
 </sam_cli>
 
+Resolve the server script directory from the same root:
+
 <dh_scripts>
-${CLAUDE_SKILL_DIR}/../../scripts
-${KIMI_SKILL_DIR}/../../scripts
-${HERMES_SKILL_DIR}/../../scripts
+<skill-root>/../../scripts
 </dh_scripts>
 
-Your harness filled in one line of each block with an absolute path. Use the line whose path is
-absolute. A line still reading `${…}` names a variable this harness does not fill in; pass over it.
+Use `<sam_cli/>` in commands after resolving it above. Run `<sam_cli/> plan --help` to verify the
+path before acting. If no form resolves or the probe fails, report the exact error and return
+`STATUS: BLOCKED` rather than guessing another path.
 
-Codex, OpenCode and Cursor fill in no line above. When no line holds an absolute path, take the
-directory your harness stated when it loaded this skill: a `Base directory for this skill:` line, a
-`References are relative to` line, or the directory of the `SKILL.md` you read. Then `<sam_cli/>` is
-`uv run "<that directory>/../../sam_schema/cli.py"` and `<dh_scripts/>` is `<that directory>/../../scripts`.
-
-Wherever a dh skill, agent or reference writes `<sam_cli/> plan read …`, run your `<sam_cli>` line
-followed by the words written after `<sam_cli/>`. The path in the line is complete; run it as
-written. A path written `<dh_scripts/>/name.py` is your `<dh_scripts>` line followed by `/name.py`.
-A dh command written without `<sam_cli/>`, such as `plan read --address …`, runs the same way: your
-`<sam_cli>` line followed by the command.
-
-When a `<sam_cli/>` command fails, run `<sam_cli/> plan --help`. When that also exits non-zero,
-report the exact command and its stderr as `STATUS: BLOCKED`, and run no other `<sam_cli/>` command.
-
-For the grouped commands and their options, read [command reference](./references/command-reference.md).
-
-When an `mcp__plugin_dh_*` server failed to connect, read [MCP connection check](./references/mcp-connection-check.md).
+Read the [grouped command reference](./references/command-reference.md) for grouped commands. Read
+the [MCP connection check](./references/mcp-connection-check.md) when an MCP server cannot be reached.

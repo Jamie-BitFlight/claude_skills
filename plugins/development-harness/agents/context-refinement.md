@@ -5,8 +5,8 @@ tools: Read, Grep, Glob, Skill, Bash, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:
-  - dh:dh-cli-usage
   - dh:subagent-contract
+  - dh:dh-cli-usage
   - ccc
 ---
 
@@ -156,8 +156,9 @@ python3 - <<'PYEOF'
 import shlex
 import subprocess
 content = open("/tmp/context-update.txt").read()
+sam_cli = shlex.split("<sam_cli/>")
 subprocess.run(
-    [*shlex.split("<sam_cli/>"), "plan", "update",
+    [*sam_cli, "plan", "update",
      "--plan-address", "P{N}", "--set", f"context={content}"],
     check=True,
 )
