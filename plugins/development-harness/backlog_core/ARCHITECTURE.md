@@ -49,7 +49,10 @@ The cache owns all local persistence needed for remote-provider continuity:
 - `yaml_io.py` — private YAML serialisation used only by `FileCache` for backlog snapshots,
   grooming, synchronization checkpoints, and pending mutations.
 - Cached plan and artifact files plus their manifests and provider revisions.
-- The durable pending-write queue used while the provider is unreachable.
+- The durable pending-write queue, entered when the request is unauthenticated (a missing or
+  invalid `GITHUB_TOKEN`), the network path is blocked (a proxy or firewall failure, or a
+  timeout), GitHub rate-limits the request, or GitHub returns a server error. A queued write
+  replays on the next successful connection to the provider.
 
 `github_sync.py` remains a pure provider-format adapter. `render_issue_body` serialises a
 `BacklogItem` to GitHub markdown; `parse_issue_body` reconstructs a `BacklogItem` from issue body
@@ -206,7 +209,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
 - `DuplicateItemError(duplicates)` — content-based duplicate detected
-- `GitHubUnavailableError` — GITHUB_TOKEN missing or API unreachable
+- `GitHubUnavailableError` — GITHUB_TOKEN missing from the environment; retries only after a token is set
 - `ValidationError` — input validation failure
 
 ---
@@ -378,9 +381,9 @@ below), `from ruamel.yaml import YAML, YAMLError`.
 
 **Responsibility**: Full-text search engine over the `list[dict[str, str | bool]]` item shape
 produced by `operations._build_list_entry`, plus content-based duplicate detection built on top of
-it (#3169). Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
-`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`
-(ADR-001: search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`).
+it. Must never import `fastmcp` or `mcp` — that constraint is what makes it importable from
+`operations.py`, which cannot depend on the FastMCP server module. Extracted from `server.py`:
+search is a distinct concern from markdown parsing, so it is not folded into `parsing.py`.
 
 **Search engine**:
 
@@ -396,7 +399,7 @@ it (#3169). Must never import `fastmcp` or `mcp` — that constraint is what mak
   `_parse_body_sections()`.
 
 **Content-based duplicate detection** (replaces the deleted title-character-ratio matcher that
-previously lived in `parsing.py`, per ADR-004):
+previously lived in `parsing.py`):
 
 - `DuplicateCheckStatus(StrEnum)` — `DUPLICATE_FOUND`, `NO_DUPLICATE`, `COULD_NOT_VERIFY`. The
   tri-state result `operations._classify_duplicate_check()` returns; `COULD_NOT_VERIFY` never blocks
@@ -473,7 +476,10 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 - Provider snapshots for backlog items and grooming content
 - Cached plans, artifact manifests, and artifact content
 - Last acknowledged provider revision and synchronization fingerprint
-- Pending mutations created while the provider is unreachable
+- Pending mutations created when the request cannot reach the provider — unauthenticated
+  (missing or invalid `GITHUB_TOKEN`), network-blocked (proxy, firewall, or timeout),
+  rate-limited, or met with a GitHub server error; see Storage Ownership above and Reconnect
+  behavior below
 
 **On-disk layout**, under the cache root (`<state_root>/github-cache/` for the GitHub backend):
 
@@ -1132,8 +1138,8 @@ Deep ordinals remain resolvable via `navigate=`.
 
 ### Token Counting
 
-All token counts use the `ENCODING` singleton from `progressive_markdown.list_navigator`
-(ADR-2). No additional tiktoken instantiation occurs in this subsystem.
+All token counts use the `ENCODING` singleton from `progressive_markdown.list_navigator`.
+No additional tiktoken instantiation occurs in this subsystem.
 
 ### Key Files
 

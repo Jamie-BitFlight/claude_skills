@@ -1,7 +1,7 @@
 ---
 name: plan-validator
 description: Validates implementation plans BEFORE execution begins. Checks for completeness, contradictions, missing dependencies, and executability. Returns READY or BLOCKED with specific gaps. Prevents wasted effort from flawed plans.
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 skills:
   - dh:subagent-contract
@@ -240,8 +240,8 @@ For each task T:
    documentation assigned to an agent whose description is about implementing CLI features is a
    mismatch, regardless of whether the name resolves).
 3. `agent` absent, or explicitly `dh:task-worker`, is always valid — the documented generic
-   fallback when nothing matched at assignment time
-   (`plugins/development-harness/skills/execution/SKILL.md` Step 2).
+   fallback when nothing matched at assignment time. Load the `dh:execution` skill and see its
+   "Step 2 — Resolve Role to Agent" section.
 
 **Red flags:**
 

@@ -38,12 +38,13 @@ A fix that "runs without failing" is not validated. A fix that demonstrates the 
   - Unexpected behavior
   - System state issues
 - Confirm you can observe the failure consistently
+- Find the project's test command. Activate `dh:dh-meta-docs` for the Role Resolution Protocol's quality-gate discovery sequence if it isn't already known.
 
 **Example**:
 
 ```bash
 # Create the broken state by running the relevant command or test
-{test command from language manifest} -k test_broken_function
+{project test command} {filter selecting test_broken_function}
 
 # Observe the failure
 # Expected: Error or incorrect output
@@ -89,7 +90,7 @@ Success Criteria:
 
 ```bash
 # Run the fixed code
-{test command from language manifest} -k test_fixed_function
+{project test command} {filter selecting test_fixed_function}
 
 # Observe the output
 # Expected: All assertions pass with correct values

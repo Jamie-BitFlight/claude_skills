@@ -26,20 +26,15 @@ import sys
 from io import TextIOWrapper
 from pathlib import Path
 
-# CPython prepends an inherited PYTHONPATH ahead of the environment uv resolved for this script,
-# so a foreign copy of a declared dependency can win and fail to import. Only pay for a reload
-# when that has actually happened: a compatible PYTHONPATH costs one cheap import and no re-exec.
+# CPython puts an inherited PYTHONPATH ahead of the environment uv resolved for this script, so a
+# foreign copy of any declared dependency can shadow it, including one that imports cleanly at the
+# wrong version. Restart without PYTHONPATH; the plugin's own import roots are added below.
 _RELOADED = "DH_CLI_PYTHONPATH_CLEARED"
 if os.environ.get("PYTHONPATH") and not os.environ.get(_RELOADED):
-    try:
-        import pydantic
-    except ImportError:
-        _clean_env = dict(os.environ)
-        _clean_env.pop("PYTHONPATH", None)
-        _clean_env[_RELOADED] = "1"
-        os.execve(sys.executable, [sys.executable, *sys.argv], _clean_env)
-    else:
-        del pydantic
+    _clean_env = dict(os.environ)
+    _clean_env.pop("PYTHONPATH")
+    _clean_env[_RELOADED] = "1"
+    os.execve(sys.executable, [sys.executable, *sys.argv], _clean_env)
 
 # Keep direct script invocation safe on platforms whose default streams are not UTF-8.
 if isinstance(sys.stdout, TextIOWrapper):
@@ -56,7 +51,7 @@ relax_verify_x509_strict()
 
 import typer
 
-from sam_schema import artifacts, backlog, cli_active_task, dispatch, sam_plan
+from sam_schema import artifacts, backlog, cli_active_task, cli_known_failure_types, dispatch, sam_plan
 
 app = typer.Typer(
     name="sam", help="Provider-neutral development harness CLI.", no_args_is_help=True, rich_markup_mode=None
@@ -67,6 +62,9 @@ app.add_typer(backlog.app, name="backlog")
 app.add_typer(dispatch.app, name="dispatch")
 app.add_typer(artifacts.app, name="artifact")
 app.add_typer(cli_active_task.app, name="active-task")
+# A leaf command, not a domain app: the failure-type table is one thing to read, and its
+# behavior still lives beside its operation in cli_known_failure_types.py.
+app.command("known-failure-types")(cli_known_failure_types.known_failure_types)
 
 if __name__ == "__main__":  # pragma: no cover
     app()

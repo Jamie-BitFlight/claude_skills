@@ -239,5 +239,5 @@ content revision and `artifact_read` returns the migrated content.
 - [Backend providers](./backend-providers.md) — one-backend ownership, cache states, and configuration.
 - [Default development flow](../skills/dh-meta-docs/references/default-development-flow.md) — stage sequencing.
 - [Artifact conventions](../skills/dh-meta-docs/references/artifact-conventions.md) — naming and cross-referencing.
-- [Backlog item lifecycle](./backlog-item-lifecycle.md) — work-item grooming and closure.
+- [Backlog lifecycle](./backlog-lifecycle.md) — item states, grooming gates, and closure.
 - [Task field reference](../sam_schema/core/models.py) — authoritative field definitions; verify current fields against the active backend.

@@ -221,25 +221,16 @@ The short forms below are graph-normalization labels, not executable signatures.
 
 Stored via `artifact_register`, retrieved via `artifact_read`. The `artifact_type` value
 is the canonical key. Short-form prose references (e.g. "the architect spec", "the T0
-baseline") must resolve to one of these keys.
+baseline") must resolve to a key the registry declares.
 
-SAM plans are not registered artifacts. Create and read their content through `sam_plan`,
-then associate the returned logical plan address with its owner through `backlog_update`.
+[dh_core/artifact_registry.py](../../dh_core/artifact_registry.py) is the artifact-type registry
+and the sole source for its key set and for the producer and consumer skills that register and
+read each type — `ArtifactTypeRow.producer_skills` and `.consumer_skills`. This file holds no copy
+of that map.
 
-| artifact_type key | Producer skill/agent | Consumer skill/agent |
-|---|---|---|
-| `feature-context` | `add-new-feature` (feature-researcher) | `add-new-feature` (architect, swarm-task-planner) |
-| `codebase-analysis` | `add-new-feature` (codebase-analyzer), `code-review-architecture` | `add-new-feature` |
-| `architect` | `add-new-feature` (swarm-task-planner) | `implement-feature`, `add-new-feature` |
-| `T0-baseline` | `implement-feature` (t0-baseline-capture) | `implement-feature` (TN gate comparison) |
-| `TN-verification` | `implement-feature` (tn-verification-gate) | `complete-implementation` |
-| `code-review` | `complete-implementation` (code-reviewer) | `complete-implementation`, `forensic-review` |
-| `audit-report` | `complete-implementation` (doc-drift-auditor) | `complete-implementation` |
-| `research` | `add-new-feature` (ecosystem-researcher / technical-researcher) | `add-new-feature` |
-| `dispatch-plan` | `groom-milestone` (dispatch_create_plan) | `work-milestone` |
-
-Source: `backlog_core/models.py` ArtifactType enum (L1263–1271), `G2-artifacts.json`,
-`add-new-feature/SKILL.md`, `implement-feature/SKILL.md`, `complete-implementation/SKILL.md`.
+A `task-plan` manifest entry exists and no agent may write or read one, so it has no producer or
+consumer skill and carries no row. Create and read plan content through `sam_plan`, then associate
+the returned logical plan address with its owner through `backlog_update`.
 
 ---
 
@@ -369,8 +360,9 @@ verified from body content evidence, it MUST update this file before continuing.
 Add to this file when ALL of the following are true:
 1. The entity appears in the body content of the source file (not the description or frontmatter)
 2. The verbatim evidence quote can be cited with file path and line number
-3. The entity is one of: an agent name, a skill name, an MCP tool name, a registered
-   artifact type key, or a named backlog item section
+3. The entity is one of: an agent name, a skill name, an MCP tool name, or a named
+   backlog item section. A registered artifact type key is never added here — it is
+   declared in `dh_core/artifact_registry.py`, not in this file.
 
 Do NOT add based on description text, inferred relationships, or mentions in other
 agents' descriptions of what a target does.
@@ -383,8 +375,9 @@ Add the entity to its correct section with this annotation on the same line:
 entry-name   ← [discovered: {source_file}:{line}, {date}]
 ```
 
-For artifact types and sections, add a full row to the table with producer/consumer
-and evidence source.
+For a backlog item section, add a full row to the Backlog Item Sections table with
+producer/consumer and evidence source. An artifact type is never added to a table
+here — see the note under Registered Artifacts above.
 
 ### How to flag a conflict
 
@@ -402,8 +395,8 @@ across corroborated workers, or escalates to a human if tied.
 
 ### Staleness
 
-The Agents/Skills/MCP-tool/Registered-Artifacts sections were last generated on 2026-06-11 from
-source and have not been re-verified in this pass. The **Backlog Item Sections** section was
+The Agents/Skills/MCP-tool sections were last generated on 2026-06-11 from source and have not
+been re-verified in this pass. The **Backlog Item Sections** section was
 reconciled on 2026-08-18 (#2979) against `backlog_core/rendering.py`'s `SECTION_HEADING` registry
 and a full `section=`/`sections[...]` grep of `plugins/development-harness/{agents,skills}/**/*.md`
 — see the provenance notes inline above. If the plugin has changed since either date, run an
@@ -423,10 +416,10 @@ extraction pass — workers will discover and add missing entities as they trace
    appropriate mode argument.
 5. Descriptions and frontmatter fields are NOT valid evidence sources. Evidence quotes
    must come from the body content only.
-6. Any `artifact_type` value extracted from body content must match a key in the
-   Registered Artifacts table. Prose references like "the architect spec" or "the T0
-   baseline" must be resolved to their canonical key (`architect`, `T0-baseline`) before
-   entering the graph.
+6. Any `artifact_type` value extracted from body content must match a key
+   `dh_core/artifact_registry.py`'s `REGISTRY` declares. Prose references like "the
+   architect spec" or "the T0 baseline" must be resolved to their canonical key
+   (`architect`, `T0-baseline`) before entering the graph.
 7. Any `section=` value extracted from a `backlog_groom` call must match a name in the
    Backlog Item Sections lists. Unrecognised section names must be flagged as AMBIGUOUS,
    not silently included.

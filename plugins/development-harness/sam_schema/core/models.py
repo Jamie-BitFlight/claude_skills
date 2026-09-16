@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -491,7 +491,7 @@ class TaskAssignment(WireContractModel):
     with the specific task details, so agents receive everything needed in a
     single call without separate plan-level lookups.
 
-    Per ADR-003: all task dispatches return this shape when a task address is
+    All task dispatches return this shape when a task address is
     provided. Plan-only reads (``sam read P{N}``) continue to return ``Plan``.
     """
 
@@ -614,6 +614,21 @@ class ReadyTasksResult(BaseModel):
     state: PlanState = PlanState.READY
 
 
+class LedgerReadyResult(BaseModel):
+    """The ledger's ``ready`` query, wrapped the way the CLI's ledger-backed ``ready`` command wraps it.
+
+    ``dh_core.ledger.ready`` returns a bare ``list[dict[str, Any]]`` of routing-manifest rows,
+    which have no fixed schema of their own -- they are whatever the row's fold left in it. This
+    model exists only so FastMCP's output validation has a name for that envelope in ``sam_plan``'s
+    return union; :class:`ReadyTasksResult` stays the shape for a plan the ledger does not hold.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    count: int = 0
+
+
 class PaginationMeta(BaseModel):
     """Pagination metadata returned by paginated MCP list operations."""
 
@@ -682,8 +697,8 @@ class CreatePlanResult(BaseModel):
 class CreatePlanError(BaseModel):
     """Structured error returned when plan creation's artifact write fails.
 
-    Returned by ``operations.create_plan`` on the ArtifactWriteError path
-    (ADR-2509-5). The plan may exist on local disk but is NOT durable; callers
+    Returned by ``operations.create_plan`` on the ArtifactWriteError path.
+    The plan may exist on local disk but is NOT durable; callers
     inspect ``error``/``reason`` to decide retry behaviour.
     """
 
@@ -741,9 +756,14 @@ class ActiveTaskContext(BaseModel):
 
     Persistence as context_dir()/active-task-{session_id}.json is a local-YAML
     ContextBackend storage detail, not a universal contract — the memory, GitHub,
-    and beads backends hold the same binding without writing that file. The
-    SubagentStop hook's primary retrieval path is the sam_active_task(action="get")
-    fastmcp call; a file read is only a local-backend fallback.
+    and beads backends hold the same binding without writing that file.
+
+    The record carries no attempt number, and does not identify which sub-agent wrote it:
+    ``session_id`` inside a sub-agent is the parent session's, so one wave's workers share a
+    record. It is therefore not a correlation key for anything per-attempt. The SubagentStop
+    hook reads the address and attempt from the sub-agent's own launch prompt instead, and never
+    touches this record; the PostToolUse handler reads it for the ``last-activity`` timestamp,
+    which needs no attempt.
 
     Schema note: new fields (session_id, feature_slug, started_at) are additive.
     Existing files without these fields remain valid — all new fields default to None.

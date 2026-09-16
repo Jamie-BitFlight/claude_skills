@@ -262,26 +262,18 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id {issue}
 
 **HOW only.** The design-spec agent designs the implementation approach — interfaces, data models, module boundaries, and call flows. Output prescribes structure and contracts; it does not re-describe the problem or re-map existing code.
 
-Resolve the `design-spec` role from the language manifest before delegating:
+Resolve the `design-spec` role before delegating. Follow the `dh:dh-meta-docs` Role Resolution Protocol:
 
 ```mermaid
 flowchart TD
-    Scan[Scan project root for language markers] --> Found{Marker found?}
-    Found -->|pyproject.toml| Py[Search Python language manifest]
-    Found -->|package.json| TS[Search TypeScript language manifest]
-    Found -->|Cargo.toml| Rust[Search Rust language manifest]
-    Found -->|None| FB["Fallback: dh:task-worker<br>(no specialist profile loaded)"]
-    Py --> ManifestFound{Manifest exists?}
-    TS --> ManifestFound
-    Rust --> ManifestFound
-    ManifestFound -->|Yes| Resolve["Resolve design-spec role from manifest<br>(Python example: python-engineering:python-cli-design-spec)"]
-    ManifestFound -->|No| FB["Fallback: dispatch dh:task-worker<br>no specialist profile loaded"]
-    Resolve --> Store["Store as {resolved_agent}<br>profile_load(agent_name='{resolved_agent}') in delegation prompt"]
-    Store --> Delegate["Dispatch subagent_type='dh:task-worker'"]
+    List["Call mcp__plugin_dh_backlog__profile_list() with no plugin filter"] --> Match{"Does an agent description match<br>the design-spec role and this feature?"}
+    Match -->|Yes| Resolve["Store the plugin-qualified agent name as {resolved_agent}"]
+    Match -->|"No match, or profile_list fails"| FB["Leave {resolved_agent} unset<br>(no specialist profile loaded)"]
+    Resolve --> Delegate["Dispatch subagent_type='dh:task-worker'<br>with profile_load(agent_name='{resolved_agent}') in the prompt"]
     FB --> Delegate
 ```
 
-Phase 3 always dispatches `subagent_type="dh:task-worker"`. When a specialist is resolved from the language manifest, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec. This call remains MCP-only.
+Phase 3 always dispatches `subagent_type="dh:task-worker"`. When `profile_list()` resolves a specialist, the orchestrator instructs task-worker to call `mcp__plugin_dh_backlog__profile_load(agent_name="{resolved_agent}")` at the start of its prompt — this is the `agent_profile` MCP tool on the backlog server and is how task-worker loads specialist behavior when no SAM task `agent:` field is available. Use `{resolved_agent}` as the `agent=` metadata in `artifact_register` to record which specialist produced the spec. This call remains MCP-only.
 
 ### Domain Signal Detection — Config-Driven (`.dh/skill_discovery.yaml`)
 
@@ -440,8 +432,8 @@ Register your deliverable and return:
 
 `{specialist_skill_block}` is built by the orchestrator before dispatch:
 
-- When `{resolved_agent}` is set (manifest found): `"Load your specialist profile before starting: mcp__plugin_dh_backlog__profile_load(agent_name='{resolved_agent}'). This is a BLOCKING prerequisite — complete it before reading any artifacts or designing.\n\n"`
-- When no manifest found (fallback): `""` (empty string — task-worker executes directly without a specialist profile)
+- When `{resolved_agent}` is set (an agent matched in `profile_list()`): `"Load your specialist profile before starting: mcp__plugin_dh_backlog__profile_load(agent_name='{resolved_agent}'). This is a BLOCKING prerequisite — complete it before reading any artifacts or designing.\n\n"`
+- When no agent matched (fallback): `""` (empty string — task-worker executes directly without a specialist profile)
 
 After the agent completes, verify the artifact was registered:
 

@@ -9,8 +9,7 @@ Crawls from the hardcoded DH entry-point skills, following four reference
 patterns (Mermaid node ``.md`` labels, ``/dh:skill`` invocations,
 ``subagent_type="dh:agent"`` dispatches, and prose file references) to
 build the full in-scope file set for workflow extraction. The crawl is
-purely deterministic (no LLM calls, no hallucination risk) — see ADR-1 in
-``plan/architect-dh-workflow-extractor-system.md``.
+purely deterministic (no LLM calls, no hallucination risk).
 
 This module owns scope crawl logic, reference pattern detection, and
 ``SCOPE.md`` serialization. It does NOT own extraction logic, layer JSON
@@ -421,8 +420,7 @@ def enumerate_scope(
 ) -> list[ScopeEntry]:
     """Deterministically BFS-crawl the reachable file set from entry points.
 
-    See ADR-1 in ``plan/architect-dh-workflow-extractor-system.md`` for
-    why this crawl is fully deterministic (no LLM involvement).
+    The crawl is fully deterministic — no LLM involvement.
 
     Args:
         entry_points: Absolute (or CWD-relative) paths to entry-point

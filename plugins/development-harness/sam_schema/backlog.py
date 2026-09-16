@@ -183,16 +183,19 @@ def close(
 ) -> None:
     """Dismiss a backlog item without completion."""
     output = Output()
-    result = operations.close_item(
-        selector=selector,
-        reason=reason,
-        reference=reference,
-        comment=comment,
-        cleanup=cleanup,
-        force=force,
-        repo=repo,
-        output=output,
-    )
+    try:
+        result = operations.close_item(
+            selector=selector,
+            reason=reason,
+            reference=reference,
+            comment=comment,
+            cleanup=cleanup,
+            force=force,
+            repo=repo,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -211,19 +214,22 @@ def resolve(
 ) -> None:
     """Mark a backlog item as done and close the issue with evidence."""
     output = Output()
-    result = operations.resolve_item(
-        selector=selector,
-        summary=summary,
-        plan=plan,
-        method=method,
-        notes=notes,
-        follow_ups=follow_ups,
-        findings=findings,
-        cleanup=cleanup,
-        force=force,
-        repo=repo,
-        output=output,
-    )
+    try:
+        result = operations.resolve_item(
+            selector=selector,
+            summary=summary,
+            plan=plan,
+            method=method,
+            notes=notes,
+            follow_ups=follow_ups,
+            findings=findings,
+            cleanup=cleanup,
+            force=force,
+            repo=repo,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 

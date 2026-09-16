@@ -1,6 +1,6 @@
 ---
 name: backlog-mcp-validator
-description: Validate the backlog FastMCP server against the CLI. Calls MCP tools natively via the agent-scoped backlog server and compares results against equivalent CLI output. Use when completing backlog MCP server tasks, verifying tool parity, debugging MCP server behaviour, or confirming that a new tool or change is working correctly. Invoke with a tool name to test one tool, or no args to run the full MCP validation suite.
+description: Validate the backlog FastMCP server against the CLI. Use when completing backlog MCP server tasks, verifying tool parity after a change, or debugging MCP server behaviour. Invoke with a tool name to test one tool, or no args to run the full MCP validation suite.
 model: sonnet
 tools: TodoWrite, Skill, mcp__plugin_dh_backlog__backlog_list, mcp__plugin_dh_backlog__backlog_view, mcp__plugin_dh_backlog__backlog_add, mcp__plugin_dh_backlog__backlog_update, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_close, mcp__plugin_dh_backlog__backlog_resolve, mcp__plugin_dh_backlog__backlog_sync, mcp__plugin_dh_backlog__backlog_normalize, mcp__plugin_dh_backlog__backlog_pull
 mcpServers:
@@ -169,11 +169,11 @@ Parameters:
   reference  str   optional  Related item reference: #N, URL, or title of the item this
                              duplicates/is superseded by  (default: "")
   comment    str   optional  Additional context about why this item is being closed  (default: "")
-  cleanup    bool  optional  Remove local file after close; index link becomes GitHub issue URL
-                             (default: false)
-  force      bool  optional  Close even if open PRs reference the issue  (default: false)
+  cleanup    bool  optional  Reserved; currently has no effect  (default: false)
+  force      bool  optional  Close even if open PRs reference the issue, or the open-PR search
+                             fails  (default: false)
 
-Returns: {title, issue?, messages, warnings}
+Returns: {title, closed?, already_closed?, reason?, messages, warnings}
 CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close --selector "<selector>" --reason "duplicate"
 ```
 
@@ -185,16 +185,16 @@ CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog close --select
 Parameters:
   selector    str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
   summary     str       required  What was done — 1-2 sentence completion summary
-  plan        str|null  optional  Plan path or completion reference  (default: null)
+  plan        str|null  optional  Plan address or completion reference. The item stores it verbatim.  (default: null)
   method      str|null  optional  How the work was done — approach taken  (default: null)
   notes       str|null  optional  Problems found, surprises, or other comments  (default: null)
   follow_ups  str|null  optional  Created follow-up tickets (comma-separated refs)  (default: null)
   findings    str|null  optional  Retrospective learnings from this work  (default: null)
-  cleanup     bool      optional  Remove local file after resolve; index link becomes GitHub issue URL
-                                  (default: false)
-  force       bool      optional  Resolve even if open PRs reference the issue  (default: false)
+  cleanup     bool      optional  Reserved; currently has no effect  (default: false)
+  force       bool      optional  Resolve even if open PRs reference the issue, or the open-PR
+                                  search fails  (default: false)
 
-Returns: {title, summary, issue?, messages, warnings}
+Returns: {title, resolved?, already_resolved?, summary?, messages, warnings}
 CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "<selector>" --summary "..."
 ```
 
@@ -203,14 +203,15 @@ CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --sele
 ```text
 Parameters:
   selector        str       required  GitHub issue URL | "#N" | bare number | title substring | beads nanoid (e.g. bd-a3f8)
-  plan            str|null  optional  Path to a plan file to attach to the item  (default: null)
+  plan            str|null  optional  Plan address to record on the item, such as Pa1b2c3d4. The item stores it verbatim.  (default: null)
   status          str|null  optional  "in-progress" | "groomed" | etc.  (default: null)
   section         str|null  optional  Section name for content update (use with content)  (default: null)
   content         str|null  optional  Content for the named section  (default: null)
   title           str|null  optional  New title; updates local file and linked GitHub issue title
                                       (default: null)
-  description     str|null  optional  New description text; local file only, no GitHub sync
-                                      (default: null)
+  description     str|null  optional  New description text. Synced to the linked GitHub issue as
+                                      an audit-trail comment if one exists; never edits the issue's
+                                      raw body  (default: null)
   entry_id        str|null  optional  ID of an existing entry to replace within the section
                                       (default: null)
   replace_section bool      optional  Strike all existing entries in the section and append new
@@ -246,7 +247,7 @@ Parameters:
   mark_groomed    bool       optional  Advance item status to "groomed" after content is written
                                        (default: false)
 
-Returns: {title, synced, messages, warnings}
+Returns: {title, groomed_updated?, sections_written?, messages, warnings}
 CLI:     uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog groom --selector "<selector>" --section S --content C
 ```
 
@@ -438,14 +439,18 @@ unconditional and plan cleanup accordingly:
 3. backlog_view   — view item by title substring; record whether "issue" field is set
 4. backlog_update — set status
 5. backlog_groom  — write a test section
-6. backlog_resolve — resolve with summary "Validation test item", cleanup=true
-7. backlog_list   — confirm item is gone from local list
+6. backlog_resolve — resolve with summary "Validation test item"
+7. backlog_list   — confirm item is gone from the default (non-`include_closed`) result
 ```
 
-**CRITICAL**: Because issue creation is unconditional, expect Step 3's `backlog_view` to show a
-populated `issue` field. Record whether it does; if an issue was created, Step 6 (Cleanup
-Verification) must use `backlog_close` (which also closes the GitHub issue) instead of
-`backlog_resolve` (local file only).
+`backlog_resolve` does not delete the item's local file; Step 7 passes because the default
+`backlog_list` call excludes `done`/`closed` items, not because the file is gone.
+
+**close vs resolve**: `backlog_close` sets the item's status to `closed` with a required reason
+(duplicate, out_of_scope, superseded, wontfix, blocked) and closes the linked GitHub issue if one
+exists. `backlog_resolve` sets the item's status to `done`, sets its priority to `completed`, and
+closes the linked GitHub issue with a structured evidence-trail comment if one exists. Use `close`
+to dismiss an item without completing it. Use `resolve` when the work is done.
 
 ### Step 5: Error Path Validation
 
@@ -459,25 +464,8 @@ Verify error handling:
 - backlog_resolve with empty summary → error key present
 ```
 
-### Step 6: Cleanup Verification (MANDATORY)
-
-After all validation is complete, verify no test artifacts remain. This step runs unconditionally — even if earlier steps failed.
-
-```text
-1. backlog_list(title="mcp-validator-test") — check for any items matching the test prefix
-2. For EACH match found:
-   a. backlog_view(selector="{title}") — check if "issue" field contains a GitHub issue number
-   b. If issue exists: backlog_close(selector="{title}", reason="wontfix",
-      comment="Validator cleanup — test artifact", cleanup=true, force=true)
-   c. If no issue: backlog_resolve(selector="{title}", summary="Validator cleanup — test artifact",
-      cleanup=true)
-3. backlog_list(title="mcp-validator-test") — confirm zero matches remain
-4. If any items still remain, report them in the FAIL section with their titles
-```
-
-**Why close vs resolve**: `backlog_close` closes both the local file AND the linked GitHub issue. `backlog_resolve` only handles the local file. Use `close` when a GitHub issue was inadvertently created; use `resolve` when no issue exists.
-
-**If cleanup itself fails**: Report the item title(s) and issue number(s) in the output under a `## Cleanup Failures` section so the caller can manually remove them. Never silently leave test artifacts behind.
+If Step 4's `backlog_resolve` call fails, report the item title and issue number in the FAIL
+section so the caller can close it manually. Never leave the throwaway test item unreported.
 
 ---
 
@@ -519,13 +507,6 @@ Details:
 2. backlog_list: {result summary}
 ...
 
-## Cleanup Verification
-
-{PASS | FAIL}
-- Items found after lifecycle: {count}
-- GitHub issues closed: {count or N/A}
-- Items remaining: {count — must be 0 for PASS}
-
 ## Recommendations
 
 {Any follow-up fixes needed, ordered by priority}
@@ -537,9 +518,9 @@ Details:
 
 - Run ONLY validation code — do not modify backlog items or files except for the lifecycle throwaway item
 - `backlog_add` has no `create_issue` toggle — issue creation is unconditional; always check the
-  `issue` field after add/groom calls and route cleanup through `backlog_close` when one was created
-- Step 6 (Cleanup Verification) is MANDATORY and runs even if earlier steps fail
-- If cleanup fails, report item titles and issue numbers in a `## Cleanup Failures` section — never leave artifacts silently
+  `issue` field after add/groom calls, since `backlog_resolve` closes it too when one exists
+- If Step 4's `backlog_resolve` call fails, report the item title and issue number so the caller
+  can close it manually — never leave the throwaway test item unreported
 - Report what you observed, not what you expect — if output doesn't match spec, cite the actual value
 
 ## Important Output Note

@@ -19,8 +19,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from backlog_core.models import BacklogItem, ValidationError
-from backlog_core.operations import _resolve_groomed_content, groom_item
+from backlog_core.models import BacklogItem, Entry, Section, ValidationError
+from backlog_core.operations import _apply_groomed_entries, _resolve_groomed_content, groom_item
 
 from ._view_test_helpers import _configure_memory_view
 
@@ -46,6 +46,21 @@ def test_resolve_groomed_content_raises_without_input() -> None:
     # Act + Assert
     with pytest.raises(ValidationError, match="No groomed content provided"):
         _resolve_groomed_content(None, None, None, None)
+
+
+def test_replace_section_without_reason_raises_backlog_error() -> None:
+    """replace_section=True with no reason raises a BacklogError subclass.
+
+    The backlog_groom MCP wrapper catches only BacklogError and returns it in
+    the ``error`` field. A plain ValueError escaped the wrapper as an unhandled
+    tool exception instead.
+    """
+    section = Section(entries=[Entry(id="2026-01-01T00:00:00Z", content="old")])
+
+    with pytest.raises(ValidationError, match="reason is required"):
+        _apply_groomed_entries(
+            section, "new", append=False, replace_section=True, reason=None, entry_id=None, added_date="2026-01-01"
+        )
 
 
 # ---------------------------------------------------------------------------

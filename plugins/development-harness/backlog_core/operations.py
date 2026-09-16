@@ -508,7 +508,7 @@ def unknown_key_to_heading(key: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# TypedDicts for operations.py return shapes (ADR-002: not in models.py)
+# TypedDicts for operations.py return shapes — not in models.py
 # ---------------------------------------------------------------------------
 
 
@@ -1760,7 +1760,7 @@ def add_item(
     out.info(f"Backlog item created.\n  Title: {stored_title}\n  Priority: {priority}\n  Reference: {item_reference}")
     if issue_ref:
         out.info(f"  Issue: {issue_ref}")
-    out.info(f"Next steps: /groom-backlog-item {stored_title}  /work-backlog-item {stored_title}")
+    out.info(f"Next steps: /work-backlog-item groom {stored_title}  /work-backlog-item work {stored_title}")
 
     result: dict[str, str | int | bool | list[str]] = {
         "title": stored_title,
@@ -1841,7 +1841,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     beads nanoid ``"bd-a3f8"``) or no issue at all, falls back to the locally
     cached ``item.status`` field.  This prevents beads and other string-ID
     backends from always returning ``"needs-grooming"`` when the status map is
-    empty (ADR-002).
+    empty.
 
     Returns:
         Status string — either the provider status value from *status_map* or

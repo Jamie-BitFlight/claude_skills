@@ -50,7 +50,7 @@ _FENCE_PATTERN: re.Pattern[str] = re.compile(r"```[^\n]*\n.*?```", re.DOTALL)
 # full content is returned, not a child map.
 _MIN_ROOT_SECTIONS_FOR_PARENT: int = 2
 
-# In-band struck markers (#3187). Reuses the ``[code:{ordinal}]`` token
+# In-band struck markers. Reuses the ``[code:{ordinal}]`` token
 # convention already established by ``_replace_code_fences_with_tokens``.
 _STRUCK_CONTENT_MARKER: str = "[struck:{entry_id}]"
 """Prefix inserted before a struck entry's own text in aggregate content
@@ -74,12 +74,12 @@ class OrdinalEntry:
         title: Section or entry heading text.  Truncated to
             ``_TITLE_MAX`` chars (with ``…``) by ``format_map_line``.
         est_tokens: Exact tiktoken cl100k_base count of the content at this
-            ordinal — never an approximation (ADR-2).
+            ordinal — never an approximation.
         first_line_preview: First non-empty, non-heading line of the content;
             max ``_PREVIEW_MAX`` chars; empty string when content has no body
             text.
         struck: ``True`` when this ordinal addresses a struck (retracted)
-            entry, or a sub-heading/code fence nested inside one (#3187).
+            entry, or a sub-heading/code fence nested inside one.
             Defaulted ``False`` — a level-1 section aggregate is never itself
             struck; only entries and their descendants carry the flag.
         entry_id: Stable identifier of the owning entry; ``""`` when this
@@ -102,11 +102,11 @@ class ResolvedUnit:
         ordinal: The ordinal string that was resolved.
         title: Section or entry heading text.
         content: Full raw markdown text of the resolved unit.  Empty string
-            when ``has_sub_heading_children`` is ``True`` (ADR-7).
-        total_tokens: Exact tiktoken cl100k_base count of ``content`` (ADR-2).
+            when ``has_sub_heading_children`` is ``True``.
+        total_tokens: Exact tiktoken cl100k_base count of ``content``.
         has_sub_heading_children: ``True`` iff this node has direct SectionNode
             children (sub-headings).  Set from ``_SubtreeNode`` during
-            ``resolve()``.  Code-only nodes are ``False`` (ADR-4).
+            ``resolve()``.  Code-only nodes are ``False``.
         is_code_block: ``True`` iff this ordinal addresses a code fence body.
         child_ordinals: Direct sub-heading child ordinals (document order).
             Populated from ``_SubtreeNode`` for level-3+ nodes; empty for
@@ -116,7 +116,7 @@ class ResolvedUnit:
             the same ``format_map_line`` format as MAP responses.  Non-empty
             only when ``has_sub_heading_children`` is ``True``.
         struck: ``True`` when this ordinal addresses a struck (retracted)
-            entry, or a descendant of one (#3187).  Defaulted ``False`` for
+            entry, or a descendant of one.  Defaulted ``False`` for
             level-1 section aggregates, which have no single-entry identity.
         entry_id: Stable identifier of the owning entry; ``""`` when this
             ordinal has no entry identity (level-1 sections).
@@ -152,15 +152,15 @@ class _SubtreeNode:
         ordinal: Dot-path ordinal string for this node.
         title: Heading text or language tag (code blocks).
         content: Prose-with-tokens for leaf nodes; ``""`` when
-            ``has_sub_heading_children=True`` (ADR-7).
+            ``has_sub_heading_children=True``.
         total_tokens: Exact cl100k_base token count of ``content``.
         has_sub_heading_children: True iff this node has direct SectionNode
-            children (sub-headings).  Code-only nodes are False (ADR-4).
+            children (sub-headings).  Code-only nodes are False.
         is_code_block: True iff this ordinal addresses a code fence body.
         child_ordinals: Direct sub-heading child ordinals (document order).
         code_block_ordinals: Direct-body fence ordinals (document order).
         struck: ``True`` when this node addresses a struck (retracted) entry,
-            or a descendant of one (#3187).  Defaulted ``False`` for level-1
+            or a descendant of one.  Defaulted ``False`` for level-1
             section aggregates.
         entry_id: Stable identifier of the owning entry; ``""`` when this
             node has no entry identity (level-1 sections).
@@ -186,8 +186,8 @@ class _SubtreeNode:
 def _entry_block_text(entry: NormalizedEntry) -> str:
     r"""Return entry content, prefixed with an in-band struck marker when struck.
 
-    This is the AC-4 fix (#3187): the level-1 section aggregate join must not
-    merge struck and live entry text into one indistinguishable string.
+    The level-1 section aggregate join must not merge struck and live entry
+    text into one indistinguishable string.
     Prefixing the marker in-band means a caller reading the aggregate
     ``content`` (e.g. via ``navigate`` on a level-1 ordinal) can still tell
     which entry was struck, even though the aggregate has no per-entry field.
@@ -336,7 +336,7 @@ class OrdinalPathMapper:
 
     Token counting always uses the ``ENCODING`` singleton imported from
     ``progressive_markdown.list_navigator`` (cl100k_base), never a freshly
-    registered encoding instance (ADR-2).
+    registered encoding instance.
 
     Backward-compatibility invariant (§5.2): flat content (no headings, no
     fences) produces an identical ordinal set to the pre-feature implementation.
@@ -361,11 +361,11 @@ class OrdinalPathMapper:
                 uses the ``ENCODING`` singleton from
                 ``progressive_markdown.list_navigator`` (cl100k_base) to
                 guarantee consistent token counting across all progressive-
-                disclosure components (ADR-2).  A new tiktoken encoding is
+                disclosure components.  A new tiktoken encoding is
                 never registered here.
         """
         self._sections = sections
-        # ADR-2: Reuse the module-level ENCODING singleton from list_navigator
+        # Reuse the module-level ENCODING singleton from list_navigator
         # so all progressive-disclosure components share one cl100k_base instance.
         self._enc = _ENCODING
         self._map_entries: list[OrdinalEntry] = []
@@ -395,7 +395,7 @@ class OrdinalPathMapper:
         ``valid_ordinals()``.  Calling ``build_map()`` again replaces the
         previous index.
 
-        Struck entries (#3187): the level-1 aggregate content is joined via
+        Struck entries: the level-1 aggregate content is joined via
         ``_entry_block_text()``, which prefixes an in-band
         ``[struck:{entry_id}]`` marker before a struck entry's own text — the
         aggregate has no per-entry field, so this is the only way a caller
@@ -417,7 +417,7 @@ class OrdinalPathMapper:
 
             # Canonical section content: all entry bodies joined by blank lines.
             # _entry_block_text prefixes struck entries with an in-band marker
-            # so the merged aggregate never presents struck text as live (#3187 AC-4).
+            # so the merged aggregate never presents struck text as live.
             section_content = "\n\n".join(_entry_block_text(e) for e in section.entries)
             section_tokens = len(self._enc.encode(section_content)) if section_content else 0
             level1_preview = _extract_preview(section_content)
@@ -457,7 +457,7 @@ class OrdinalPathMapper:
 
                 # Stamp the source entry's struck/entry_id onto every node in
                 # its indexed subtree — a sub-heading or code fence inside a
-                # struck entry is itself struck (#3187 AC-5 precondition).
+                # struck entry is itself struck.
                 sub_ents = [replace(e, struck=entry.struck, entry_id=entry.entry_id) for e in sub_ents]
                 sub_idx = {k: replace(v, struck=entry.struck, entry_id=entry.entry_id) for k, v in sub_idx.items()}
 
@@ -504,7 +504,7 @@ class OrdinalPathMapper:
         ``entry.first_line_preview`` is the empty string.  The struck marker
         (``"[struck] "``) is emitted immediately before the title, OUTSIDE
         the title's truncation window, so it can never be eaten by the
-        ellipsis (#3187 §3.3).
+        ellipsis.
 
         Caps enforced:
 
@@ -656,7 +656,7 @@ class OrdinalPathMapper:
         Returns:
             Tuple of:
             - ``final_content``: Content to store for ``parent_ordinal``.
-              Empty string when the entry has sub-heading children (ADR-7).
+              Empty string when the entry has sub-heading children.
             - ``final_tokens``: Exact cl100k_base count of ``final_content``.
             - ``final_preview``: First non-empty, non-heading body line.
             - ``sub_ents``: ``OrdinalEntry`` list for all sub-ordinals, in
@@ -696,7 +696,7 @@ class OrdinalPathMapper:
         self._emit_direct_fence_ordinals(parent_ordinal, direct_fence_ids, doc.code_blocks, sub_ents, sub_idx)
 
         if has_root_sections:
-            # ADR-7: parent with sub-heading children → content="" total_tokens=0.
+            # Parent with sub-heading children → content="" total_tokens=0.
             self._collect_section_children(
                 parent_ordinal, doc.root_section_ids, doc.sections, doc.code_blocks, entry_lines, sub_ents, sub_idx
             )
@@ -788,7 +788,7 @@ class OrdinalPathMapper:
             node = doc_sections[section_id]
             sub_ordinal = _entry_ordinal_for_sub_heading(parent_ordinal, sibling_idx)
 
-            # Extract body text using body_span (inclusive end line, ADR-DN-1).
+            # Extract body text using body_span (inclusive end line).
             body_lines = entry_lines[node.body_span.start_line : node.body_span.end_line + 1]
             body_text = "\n".join(body_lines)
 
@@ -800,7 +800,7 @@ class OrdinalPathMapper:
             fence_ordinals_for_node = [_entry_ordinal_for_code(sub_ordinal, k) for k in range(len(section_fence_ids))]
 
             if has_sub_children:
-                # ADR-7: parent node with sub-heading children → content="".
+                # Parent node with sub-heading children → content="".
                 node_content = ""
                 node_tokens = 0
                 node_preview = ""

@@ -1,6 +1,6 @@
 # Default Development Flow
 
-The SAM 7-stage pipeline with ARL touchpoint gates. This is the default flow used when a language plugin does not declare a custom process flow override.
+The SAM 7-stage pipeline with ARL touchpoint gates.
 
 ---
 
@@ -62,7 +62,7 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Parse and clarify the feature request
 - Scan project structure (source layout, test layout, config files)
 - Identify integration points with existing code
-- Detect language and resolve specialist roles via manifest
+- Detect language and resolve specialist roles with `mcp__plugin_dh_backlog__profile_list()`
 - Identify constraints (performance, compatibility, dependencies)
 
 **Output:** `ARTIFACT:DISCOVERY({feature-slug})` — A discovery document capturing requirements, codebase context, constraints, and resolved role assignments.
@@ -130,7 +130,7 @@ Each arrow represents a provider-owned artifact handoff. No stage reads from con
 - Decompose plan into discrete tasks, each with clear scope
 - Write each task as a standalone record with inputs, acceptance criteria, and agent assignment
 - Map task dependencies and identify parallelization opportunities
-- Assign each task to the appropriate specialist agent (from manifest or fallback)
+- Assign each task to the specialist agent `profile_list()` matches, or to the fallback agent
 
 **Output:** `ARTIFACT:TASK({task-id})` per task — create the task plan with
 `sam_plan(config={"action": "create", ...})`. Keep the returned `plan_ref`; discover plans with
@@ -262,7 +262,7 @@ the issue, enabling worktree-isolated agents to read provider-owned content thro
 
 **Pre-Phase 1b: Process Accumulated Concerns** — checks the backlog item for a `## Concerns` section accumulated during `/implement-feature` and routes unresolved concerns to the QG plan.
 
-After all pre-phases complete, the skill builds the SAM-enforced QG plan (phases defined by `build_quality_gate_plan` in `sam_schema/core/quality_gates.py`).
+After all pre-phases complete, the skill creates the QG plan from the task list and records it in the ledger.
 
 For the full pre-phase logic, see the `complete-implementation` skill: `/dh:complete-implementation`.
 
@@ -288,27 +288,13 @@ Full naming conventions in [./artifact-conventions.md](./artifact-conventions.md
 
 ---
 
-## Flow Override
-
-A language plugin can replace this entire flow by declaring a `Process Flow Override` section in its language manifest. The override must:
-
-1. Be a valid mermaid flowchart
-2. Produce artifacts compatible with the naming conventions
-3. Include at least one human touchpoint gate
-4. End with a verification stage that produces a CERTIFIED/NOT_CERTIFIED verdict
-
-When a flow override is present, the harness loads the custom flow instead of this default. All other harness features (role resolution, artifact management, touchpoint analysis) still apply.
-
----
-
 ## Related Documents
 
 Read these together to get the full system picture:
 
 - [Artifact Conventions](./artifact-conventions.md) — naming, file layout, cross-referencing
-- [Workflow Architecture Diagram](../../../docs/workflow-architecture-diagram.md) — data shapes, publisher-consumer map, state machine
 - [Plan Artifact Lifecycle](../../../docs/plan-artifact-lifecycle.md) — immutable vs mutable artifacts, divergence detection
-- [Backlog Item Lifecycle](../../../docs/backlog-item-lifecycle.md) — end-to-end issue journey from creation to closure
+- [Backlog Lifecycle](../../../docs/backlog-lifecycle.md) — item states and stage transitions from creation to closure
 - [Domain model source](../../../sam_schema/core/models.py) — authoritative field definitions (`Task` class)
 
 ## Sources

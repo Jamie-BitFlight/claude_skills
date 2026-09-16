@@ -1,7 +1,7 @@
 ---
 name: codebase-analyzer
 description: Explores codebase patterns and registers structured analysis documents through the artifact operations. Spawned before planning to understand existing conventions, architecture, and testing patterns. Registers documents directly to reduce orchestrator context load.
-tools: Read, Bash, Grep, Glob, Skill, SendMessage, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
+tools: Read, Bash, Grep, Glob, Skill, mcp__git-forensics__analyze_file_changes, mcp__git-forensics__analyze_time_period, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_backlog
 model: haiku
 skills:
   - dh:subagent-contract

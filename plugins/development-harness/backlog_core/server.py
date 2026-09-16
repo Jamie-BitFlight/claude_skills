@@ -945,7 +945,7 @@ def _filter_view_sections(
     if sections and not dict_matched and not metadata_matched and not body_matched:
         response["section_filter_miss"] = True
         result.section_filter_miss = True
-        # Collect all known section names for the ADR-3 error response.
+        # Collect all known section names for the section-filter-miss error response.
         # ``raw_sections`` and ``raw_metadata`` still reference the original
         # (pre-filter) objects even though ``response["sections"]`` and
         # ``response["sections_metadata"]`` have been replaced above.
@@ -962,7 +962,7 @@ def _filter_view_sections(
 
 
 def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Output) -> dict[str, object]:
-    """Build an ADR-3 error dict for a section-filter miss.
+    """Build an error dict for a section-filter miss.
 
     Returns a dict with ``error``, ``valid_sections``, and ``section_filter_miss``
     (back-compat flag) but NO ``body`` field, so callers can distinguish an error
@@ -1287,8 +1287,10 @@ async def sync_now(
     If a sync is already in progress, returns the current progress without
     starting a new sync (singleton guarantee).
 
-    If the server is in offline or error mode, clears the state and attempts a
-    fresh sync.
+    If the last sync entered OFFLINE (a non-retryable failure — missing/invalid
+    GITHUB_TOKEN, or a filesystem/config error) or ERROR (a retryable failure —
+    network blocked, rate limited, or a GitHub server error — that exhausted
+    all retries), clears the state and attempts a fresh sync.
 
     Args:
         full_refresh: When True, ignore the provider checkpoint and perform a
@@ -1539,6 +1541,7 @@ def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] |
         cache_warning = "serving stale cache — backend sync failed"
         warning_lead = f"Serving stale cache: backend sync {sync_state.status}"
 
+    failure_reason = sync_state.offline_reason or sync_state.last_error
     block: dict[str, object] = {
         "status": str(sync_state.status),
         "offline_reason": sync_state.offline_reason,
@@ -1547,7 +1550,7 @@ def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] |
     }
     warning = (
         warning_lead
-        + (f" ({sync_state.offline_reason})" if sync_state.offline_reason else "")
+        + (f" ({failure_reason})" if failure_reason else "")
         + ("." if not sync_state.last_success_at else f". Last successful sync: {last_success_str}.")
     )
     return block, [warning]
@@ -1829,13 +1832,13 @@ async def backlog_list(
     all_items: list[dict[str, str | bool]] = _extract_item_list(result)
 
     # Deduplicate by issue number — the cache may contain duplicate entries for
-    # the same issue (observed: #260 appeared twice when multiple match paths
+    # the same issue (observed: an issue appeared twice when multiple match paths
     # selected the same item).  Keyed on numeric issue number; first occurrence wins.
     all_items = _dedup_by_issue_number(all_items)
 
     total = len(all_items)
 
-    # ADR-5: cache_open_count reflects the same filter as the items list.
+    # cache_open_count reflects the same filter as the items list.
     # Hoisted above count_only short-circuit so divergence computation always has
     # the correct cache count regardless of which path returns.
     backend_status.cache_open_count = total
@@ -2283,7 +2286,7 @@ async def backlog_view(
             # Primitive 3: filter to named sections when requested.
             if sections_filter is not None:
                 full_response = _filter_view_sections(full_response, sections_filter, result)
-            # ADR-3: return an explicit error dict on section-filter miss.  Covers both
+            # Return an explicit error dict on section-filter miss.  Covers both
             # the singular ``section=`` path (flag set by view_item via
             # _apply_body_section_filter / _assemble_view_compact) and the plural
             # ``sections=[...]`` path (flag set by _filter_view_sections above).
@@ -2536,7 +2539,9 @@ async def backlog_resolve(
         ),
     ],
     summary: Annotated[str, Field(description="What was done — 1-2 sentence completion summary (required)")],
-    plan: Annotated[str | None, Field(description="Plan path or completion reference")] = None,
+    plan: Annotated[
+        str | None, Field(description="Plan address or completion reference. The item stores it verbatim.")
+    ] = None,
     method: Annotated[str | None, Field(description="How the work was done — approach taken")] = None,
     notes: Annotated[str | None, Field(description="Problems found, surprises, or other comments")] = None,
     follow_ups: Annotated[str | None, Field(description="Created follow-up tickets (comma-separated refs)")] = None,
@@ -2594,7 +2599,10 @@ async def backlog_update(
             description="Item selector: GitHub issue URL, #N, bare number, or title substring, or beads nanoid (e.g. bd-a3f8)"
         ),
     ],
-    plan: Annotated[str | None, Field(description="Path to a plan file to attach to the item")] = None,
+    plan: Annotated[
+        str | None,
+        Field(description="Plan address to record on the item, such as Pa1b2c3d4. The item stores it verbatim."),
+    ] = None,
     status: Annotated[
         str | None,
         Field(description="Set item status (e.g. 'in-progress'). Updates the backend's status labels when applicable."),

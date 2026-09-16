@@ -275,7 +275,7 @@ class TaskBackend(Protocol):
         **Concurrency — single-writer assumption**: ``TaskBackend.append_task`` is NOT
         required to be atomic under concurrent writers. Callers MUST serialize writes to
         the same plan. Behavior under concurrent writes is undefined — backends are not
-        required to detect, reject, or recover from it. See ADR-1770-1.
+        required to detect, reject, or recover from it.
 
         Args:
             plan_id: Plan identifier returned by create_plan.
@@ -298,7 +298,7 @@ class TaskBackend(Protocol):
         **Concurrency — single-writer assumption**: ``TaskBackend.finalize_plan`` is NOT
         required to be atomic under concurrent writers. Callers MUST serialize writes to
         the same plan. Behavior under concurrent writes is undefined — backends are not
-        required to detect, reject, or recover from it. See #1770 / ADR-1770-1.
+        required to detect, reject, or recover from it.
 
         After finalize, the plan transitions from ``state="drafting"`` to
         ``state="ready"`` and becomes available for execution via

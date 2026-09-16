@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from dh_core import ledger
 from fastmcp.client import Client
 from fastmcp.exceptions import ToolError
 from sam_schema.core.backends.memory import InMemoryTaskProvider
@@ -324,6 +325,52 @@ async def test_sam_task_state_invalid_status_raises_tool_error(
         await client.call_tool(
             "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "not-a-valid-status"}}
         )
+
+
+async def test_sam_task_state_moves_a_ledger_held_task(client: Client) -> None:
+    """sam_task action=state must move the ledger row, not fail against an empty content backend.
+
+    ``_get_backend`` (``server.py``) always resolves a ``ContentTaskProvider`` over the configured
+    backend, with no check of ``dh_core.ledger.holds``. A task the ledger holds has no content-store
+    counterpart at all, so this call reaches ``operations.update_task_status`` against a backend that
+    has never heard of the plan and silently writes it, instead of moving the ledger row the CLI's
+    ``store_for``/``ledger_holds`` chain (``sam_plan.py``) would reach. The task is left not-started
+    (no ``dispatch``) so it clears the ledger's acceptance, lease and report checks on the way to
+    ``skipped`` -- a ``complete`` target would additionally refuse on a missing reason, an open
+    lease, and a missing completion report, none of which this test is about. This is deliberately
+    not wrapped in ``pytest.raises``: the fix's success path -- routing to the ledger and moving the
+    row -- is what must turn this test green.
+
+    Tests: sam_task state routing for a plan the content store never held.
+    How: Create a task directly on the ledger (bypassing the content backend entirely), then call
+        sam_task state through the MCP protocol and check the ledger row afterward.
+    Why: Pins the routing gap Contradiction 1 of plan-mcp-parity.md describes — the fix must check
+        the ledger before resolving a content backend, for every sam_task/sam_plan action.
+    """
+    # Arrange -- a plan the ledger holds, with no content-store counterpart.
+    conn = ledger.open_ledger()
+    try:
+        created = ledger.create(conn, slug="consolidated-tools-state", goal="Ledger goal")
+        plan_id = created.plan
+        assert plan_id is not None
+        ledger.append_task(conn, plan_id, task_id="T01", task_title="Ledger Task")
+        ledger.finalize(conn, plan_id)
+    finally:
+        conn.close()
+
+    # Act
+    await client.call_tool(
+        "sam_task",
+        {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "skipped", "reason": "user"}},
+    )
+
+    # Assert -- the ledger row reflects the new status.
+    conn = ledger.open_ledger()
+    try:
+        row_status = ledger.status(conn, plan_id).tasks[0]["status"]
+    finally:
+        conn.close()
+    assert row_status == "skipped"
 
 
 # ===========================================================================
@@ -789,7 +836,9 @@ async def test_sam_active_task_get_returns_null_when_not_set(client: Client) -> 
     Why: Agents must handle the null case without an error before calling set.
     """
     # Act
-    result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
+    result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "get"}, "session_id": "test-session-empty"}
+    )
 
     # Assert
     assert result.data.active_task is None
@@ -808,7 +857,9 @@ async def test_sam_active_task_set_stores_plan_and_task(client: Client) -> None:
     Why: set is the primary write operation for session-to-task binding.
     """
     # Act
-    result = await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}})
+    result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}, "session_id": "test-session-set"}
+    )
 
     # Assert
     data = result.data
@@ -843,10 +894,15 @@ async def test_sam_active_task_get_after_set_returns_stored_context(client: Clie
     Why: Round-trip fidelity ensures agents can recover their active task after session resume.
     """
     # Arrange
-    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": "P5", "task": "T03"}})
+    await client.call_tool(
+        "sam_active_task",
+        {"config": {"action": "set", "plan": "P5", "task": "T03"}, "session_id": "test-session-roundtrip"},
+    )
 
     # Act
-    result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
+    result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "get"}, "session_id": "test-session-roundtrip"}
+    )
 
     # Assert
     ctx = result.data.active_task
@@ -867,15 +923,22 @@ async def test_sam_active_task_clear_removes_context(client: Client) -> None:
     Why: Agents call clear on task completion to free the session slot.
     """
     # Arrange
-    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}})
+    await client.call_tool(
+        "sam_active_task",
+        {"config": {"action": "set", "plan": "P1", "task": "T01"}, "session_id": "test-session-clear"},
+    )
 
     # Act
-    clear_result = await client.call_tool("sam_active_task", {"config": {"action": "clear"}})
+    clear_result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "clear"}, "session_id": "test-session-clear"}
+    )
 
     # Assert
     assert clear_result.data.cleared is True
 
-    get_result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
+    get_result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "get"}, "session_id": "test-session-clear"}
+    )
     assert get_result.data.active_task is None
 
 
@@ -887,7 +950,9 @@ async def test_sam_active_task_clear_nonexistent_returns_false(client: Client) -
     Why: Idempotent clear prevents errors in cleanup-on-failure handlers.
     """
     # Act
-    result = await client.call_tool("sam_active_task", {"config": {"action": "clear"}})
+    result = await client.call_tool(
+        "sam_active_task", {"config": {"action": "clear"}, "session_id": "test-session-clear-empty"}
+    )
 
     # Assert
     assert result.data.cleared is False
@@ -907,7 +972,13 @@ async def test_sam_active_task_update_without_active_raises_tool_error(client: C
     """
     # Act / Assert
     with pytest.raises(ToolError, match="no active task set"):
-        await client.call_tool("sam_active_task", {"config": {"action": "update", "set_fields_json": {"priority": 1}}})
+        await client.call_tool(
+            "sam_active_task",
+            {
+                "config": {"action": "update", "set_fields_json": {"priority": 1}},
+                "session_id": "test-session-update-empty",
+            },
+        )
 
 
 async def test_sam_active_task_update_patches_task_via_active_context(
@@ -924,11 +995,18 @@ async def test_sam_active_task_update_patches_task_via_active_context(
     # Arrange
     plan_data = task_backend.create_plan("active-plan", "Active goal", [_task_def("T01")])
     plan_id = plan_data["plan_id"]
-    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": plan_id, "task": "T01"}})
+    await client.call_tool(
+        "sam_active_task",
+        {"config": {"action": "set", "plan": plan_id, "task": "T01"}, "session_id": "test-session-update"},
+    )
 
     # Act
     result = await client.call_tool(
-        "sam_active_task", {"config": {"action": "update", "set_fields_json": {"title": "Updated via active context"}}}
+        "sam_active_task",
+        {
+            "config": {"action": "update", "set_fields_json": {"title": "Updated via active context"}},
+            "session_id": "test-session-update",
+        },
     )
 
     # Assert
@@ -970,20 +1048,60 @@ async def test_sam_active_task_different_sessions_are_isolated(client: Client) -
     assert result_b.data.active_task.task_id == "T02"
 
 
-async def test_sam_active_task_omitting_session_id_uses_default_sentinel(client: Client) -> None:
-    """sam_active_task without session_id uses the _default sentinel key internally.
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"action": "get"},
+        {"action": "set", "plan": "P1", "task": "T01"},
+        {"action": "update", "set_fields_json": {"priority": 1}},
+        {"action": "clear"},
+    ],
+    ids=["get", "set", "update", "clear"],
+)
+async def test_sam_active_task_omitted_session_id_is_a_hard_failure(client: Client, config: dict) -> None:
+    """Every sam_active_task action rejects a missing session_id.
 
-    Tests: sam_active_task default session isolation from explicit sessions.
-    How: Set with no session_id; get with no session_id; verify context retrieved.
-    Why: Single-agent workflows omit session_id — the _default sentinel must work.
+    Regression guard for the silent '_default' sentinel fallback: a
+    shared bucket that nothing meaningfully owns, keyed by whichever caller
+    wrote last. Omitting session_id here previously resolved to that
+    sentinel and silently succeeded.
     """
-    # Arrange
-    await client.call_tool("sam_active_task", {"config": {"action": "set", "plan": "P1", "task": "T01"}})
+    # Act / Assert
+    with pytest.raises(ToolError, match="session id is required"):
+        await client.call_tool("sam_active_task", {"config": config})
 
-    # Act
-    result = await client.call_tool("sam_active_task", {"config": {"action": "get"}})
 
-    # Assert
-    ctx = result.data.active_task
-    assert ctx is not None
-    assert ctx.task_id == "T01"
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"action": "get"},
+        {"action": "set", "plan": "P1", "task": "T01"},
+        {"action": "update", "set_fields_json": {"priority": 1}},
+        {"action": "clear"},
+    ],
+    ids=["get", "set", "update", "clear"],
+)
+async def test_sam_active_task_empty_session_id_is_a_hard_failure(client: Client, config: dict) -> None:
+    """An explicitly empty session_id is rejected the same way as an omitted one."""
+    # Act / Assert
+    with pytest.raises(ToolError, match="session id is required"):
+        await client.call_tool("sam_active_task", {"config": config, "session_id": ""})
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"action": "get"},
+        {"action": "set", "plan": "P1", "task": "T01"},
+        {"action": "update", "set_fields_json": {"priority": 1}},
+        {"action": "clear"},
+    ],
+    ids=["get", "set", "update", "clear"],
+)
+async def test_sam_active_task_default_sentinel_passed_explicitly_is_a_hard_failure(
+    client: Client, config: dict
+) -> None:
+    """Passing the reserved '_default' sentinel directly is rejected too, not just omission."""
+    # Act / Assert
+    with pytest.raises(ToolError, match="session id is required"):
+        await client.call_tool("sam_active_task", {"config": config, "session_id": "_default"})

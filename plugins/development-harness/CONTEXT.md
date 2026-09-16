@@ -13,9 +13,14 @@ every other area of the plugin as it gets resolved.
 Load, Dispatch, and Delegate name actions. Dispatcher, Orchestrator, Manager, and Worker name
 the scope an agent's assignment covers — not a capability it holds or is denied.
 Every agent may decompose its own assignment however the work requires, including by dispatching
-further agents; the scope of the assignment is what differs. See
-[ADR-3113-1](./docs/adrs/ADR-3113-1-orchestrator-manager-worker-role-vocabulary.md) for the
-incident that required stating this precisely.
+further agents; the scope of the assignment is what differs. This distinction was drawn precisely
+after a dispatched agent, handed a plan-level skill invocation written in first person for "the
+orchestrator," delegated the whole invocation to a further subagent instead of running it inline —
+re-entering the workflow level that produced its own assignment and restarting a loop whose
+earlier round was still in flight, at real unplanned cost. An agent's assignment must not
+re-enter the workflow level that produced that assignment; enforcement sits with the dispatching
+agent (which can observe whether it is about to hand an invocation onward), never the receiving
+one (which cannot observe which workflow level dispatched it).
 
 **Load**:
 Reading a skill's instructions into the current agent's own context. The agent that loads a skill
@@ -56,6 +61,18 @@ subagent the orchestrator.
 _Avoid_: "the orchestrator" as a synonym for "whoever is executing this skill". A skill written in
 first person for the orchestrator, read by an agent whose assignment is one task inside that
 skill's own loop, reads as instruction to re-enter the loop that produced its assignment.
+
+The Orchestrator runs the work loop over the graph: it dispatches agents against claimable nodes,
+receives the events they produce, and consults the CLI for graph state and for the next claimable
+task. It is the loop rather than a node inside it — not a stage the graph reaches, but the process
+that runs for as long as work is outstanding. A dispatch returning — or a launched command
+completing — is the event; there is no subscription, queue or callback. Workers notify individually as each completes, so many
+nodes stay active at once and the loop turns on each return rather than on the last member of a
+batch. Scheduling answers come from the CLI; the Orchestrator holds no scheduling state of its own.
+
+Running a loop is what an Orchestrator does, not what makes an agent one. A Manager runs a loop
+over its own scope and is still a Manager: the role is fixed by whose assignment the agent holds,
+per the definition above.
 
 **Manager**:
 An agent whose assignment covers a scoped body of work and its decomposition — the dispatcher
@@ -103,13 +120,13 @@ between the methodology and one literal stateless agent instance).
 
 **Resolve**:
 Mark a work item DONE with an evidence trail (summary, method, notes, follow-ups, findings) —
-`resolve_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)). The evidence trail is meant
+`resolve_item()`. The evidence trail is meant
 as contractual, not a GitHub-only artifact — persisting it on every backend, not only rendering it
 into a GitHub comment, is tracked by [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
 _Avoid_: "close" for completed work — that is Close below, a different, incompatible contract.
 
 **Close**:
-Dismiss a work item without completion — `close_item()` ([ADR-9](./docs/adr-9-close-resolve-semantics.md)),
+Dismiss a work item without completion — `close_item()`,
 requires a categorized `reason` (duplicate, out_of_scope, superseded, wontfix, permanently
 blocked — not a temporary wait on a dependency or input). No
 resolution evidence trail — that is Resolve's contract above, not Close's. `close_item()` also
@@ -118,12 +135,31 @@ remains distinct from `BacklogItem.reference`, the storage identity. Close persi
 `close_reference`, and `close_comment` in neutral metadata on every backend, and GitHub's closing
 comment uses those same caller-provided values — see
 [#3230](https://github.com/Jamie-BitFlight/claude_skills/issues/3230).
-_Avoid_: "resolve" for a dismissal — [ADR-9](./docs/adr-9-close-resolve-semantics.md) exists
-because these were once conflated and callers used the wrong one for already-completed work.
+_Avoid_: "resolve" for a dismissal — these were once conflated and callers used the wrong one
+for already-completed work; close and resolve are now a deliberate, distinct pair.
 
 **Evidence trail**:
 The structured resolution record Resolve above requires. Only `summary` is enforced today;
 persisting the rest beyond the GitHub-rendered comment is [#3220](https://github.com/Jamie-BitFlight/claude_skills/issues/3220).
+
+**Failure type**:
+A label a Worker attaches to a failure it reports, drawn from the extensible vocabulary in
+`dh_core/known_failure_types.py` (readable as JSON via `sam known-failure-types` or the
+`sam_known_failure_types` MCP tool). It assists the router's pattern match the way a label on a
+GitHub issue does: it says where the work should go at a glance without dictating what happens to
+it. Biased by construction to what the reporting agent could see and understand — that is a
+property of the report, not a defect in it. An unknown name is accepted, recorded and routed
+rather than refused, because refusing pushes a novel failure into a mislabelled known one.
+Distinct from a `REASONS` code (why a CLI command refused about a ledger row — the ledger's own
+observation, which no agent chooses) and from `reclaim --reason` (what the Orchestrator did about
+it). Two mappings exist because they sit at different layers: the ledger's vocabulary maps status
+in the orchestration layer, while a failure type evaluates the problem met inside the workload
+being executed. The three are one direction of flow: the Worker labels, the router maps, the
+Orchestrator records.
+_Avoid_: treating a failure type as a verdict, or as authority over ledger state — where a label
+and the ledger's own observation disagree, the observation is the fact and the label is the
+reporter's reading of it. Also avoid "error code" or "error type": these name why work could not
+proceed, not an exception that was raised.
 
 **Backend**:
 The data provider Collection reaches. Confirmed by the repo owner: "backend" always means the
@@ -197,11 +233,11 @@ SQLite database at `state_root()/control-set.db` (per-project, WAL mode), rows k
 eviction by size, not entry count) and a periodic, rate-limited age-based cleanup pass (hourly to
 daily, not on every write). Holds no authoritative data — every row is a disposable cache
 Collection and Generation can rebuild on demand, so losing the whole database costs nothing but a
-cold cache. See ADR-3082-1.
+cold cache.
 _Avoid_: "in-process cache" or "shared dict" as a mental model — that shape cannot satisfy
 "same entry regardless of transport" no matter how carefully it's wired. Also avoid describing
-this as "a directory per session" — that was ADR-3075-4's original storage mechanism, superseded
-by ADR-3082-1.
+this as "a directory per session" — that was an earlier storage mechanism, since superseded by
+the content-keyed SQLite store described above.
 
 **Navigate** (action):
 Requesting content at a specific address from the table of contents. Matches the `navigate`

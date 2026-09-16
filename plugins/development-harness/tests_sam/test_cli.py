@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from dh_core.known_failure_types import KNOWN_FAILURE_TYPES
 from ruamel.yaml import YAML
 from sam_schema.cli import app
+from sam_schema.core.addressing import canonical_plan_id
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.models import Plan
 from typer.testing import CliRunner
@@ -43,7 +46,7 @@ def test_help_shows_all_commands() -> None:
     """--help output lists the grouped command domains."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for cmd in ("plan", "backlog", "dispatch", "artifact", "active-task"):
+    for cmd in ("plan", "backlog", "dispatch", "artifact", "active-task", "known-failure-types"):
         assert cmd in result.stdout
 
 
@@ -363,6 +366,122 @@ def test_read_plan_only_address_returns_plan_json(plan_dir: Path) -> None:
     assert "feature" in data["plan"]
 
 
+def test_read_plan_only_address_reads_the_ledger_once_it_holds_the_plan(plan_dir: Path) -> None:
+    """A plan-only read of an imported plan answers from the ledger, in the content read's shape.
+
+    ``implement-feature`` imports every plan before running it. After that, ``store_for`` routes an
+    address naming that plan to the ledger unless ``--plan-dir`` is passed. A plan-only address
+    there must return the plan, not the P/T address error, and must return the ledger's copy: the
+    title set below exists only in the ledger, so the content store cannot supply it.
+    """
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+    updated = runner.invoke(
+        app, ["plan", "update", "--plan-address", plan_id, "--task-id", "T3", "--set", "title=ledger-only title"]
+    )
+    assert updated.exit_code == 0, updated.output
+
+    result = runner.invoke(app, ["plan", "read", "--address", plan_id])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["source_format"] == "ledger"
+    titles = {task["id"]: task["title"] for task in data["plan"]["tasks"]}
+    assert titles["T3"] == "ledger-only title"
+
+
+_CASE_SPELLINGS = pytest.mark.parametrize(
+    "spell", [str.upper, lambda plan_id: "p" + plan_id[1:]], ids=["upper hex", "lower p"]
+)
+
+
+@_CASE_SPELLINGS
+def test_a_plan_address_differing_only_in_case_reads_the_ledger(plan_dir: Path, spell: Callable[[str], str]) -> None:
+    """A plan id spelled in another case routes to the ledger that holds the plan.
+
+    The content resolver matches plan ids without regard to case. The ledger matches them exactly.
+    Without one canonical spelling, a case variant reads the content store's copy instead.
+    """
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+    updated = runner.invoke(
+        app, ["plan", "update", "--plan-address", plan_id, "--task-id", "T3", "--set", "title=ledger-only title"]
+    )
+    assert updated.exit_code == 0, updated.output
+
+    result = runner.invoke(app, ["plan", "read", "--address", spell(plan_id)])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["source_format"] == "ledger"
+    titles = {task["id"]: task["title"] for task in data["plan"]["tasks"]}
+    assert titles["T3"] == "ledger-only title"
+
+
+@_CASE_SPELLINGS
+def test_a_ledger_only_command_accepts_a_plan_id_differing_only_in_case(
+    plan_dir: Path, spell: Callable[[str], str]
+) -> None:
+    """A ledger-only command finds the plan when its id is spelled in another case."""
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+
+    result = runner.invoke(app, ["plan", "archive", "--plan-address", spell(plan_id), "--reason", "case"])
+
+    assert result.exit_code == 0, result.output
+
+
+def test_canonical_plan_id_lowercases_mixed_case_hex() -> None:
+    """A UID id spelled with alternating upper/lower hex digits canonicalises to one lowercase spelling.
+
+    ``upper hex`` and ``lower p`` above each vary one part of the id (the whole id, or just the
+    prefix letter) while leaving the rest at the fixture's original casing. Neither proves the
+    regex matches an id where the hex digits themselves are mixed case, which is what a human
+    typing an id from memory is most likely to produce.
+    """
+    assert canonical_plan_id("PdEc8934D") == "Pdec8934d"
+
+
+def test_canonical_plan_id_lowercases_a_lowercase_p_prefix_with_uppercase_hex() -> None:
+    """A lowercase ``p`` prefix paired with uppercase hex digits still canonicalises.
+
+    ``_UID_PLAN_ID_RE`` is case-insensitive over the whole id, so the prefix letter's case and the
+    hex digits' case vary independently. ``lower p`` above pairs a lowercase prefix with hex that
+    was already lowercase; this pairs it with hex that is not.
+    """
+    assert canonical_plan_id("pDEC8934D") == "Pdec8934d"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["P042", "QG3", "my-feature-slug", "Pdec8934", "Pdec8934dd"],
+    ids=["legacy numeric id", "quality-gate id", "slug", "seven hex digits", "nine hex digits"],
+)
+def test_canonical_plan_id_leaves_a_non_uid_id_unchanged(raw: str) -> None:
+    """An id that is not ``P`` plus exactly eight hex digits passes through unchanged.
+
+    Legacy numeric ids, quality-gate ids and slugs are not UID-derived; the content store and the
+    ledger already match them exactly as written. Lowercasing or reshaping one would address a
+    plan neither store recognises.
+    """
+    assert canonical_plan_id(raw) == raw
+
+
+def test_read_plan_only_address_with_an_attempt_is_refused_on_the_ledger(plan_dir: Path) -> None:
+    """An attempt belongs to a task, so ``--attempt`` with a plan-only address exits 1 instead of reading the plan."""
+    plan_id = plan_dir.name
+    imported = runner.invoke(app, ["plan", "import", "--from", "content", "--plan-address", plan_id])
+    assert imported.exit_code == 0, imported.output
+
+    result = runner.invoke(app, ["plan", "read", "--address", plan_id, "--attempt", "1"])
+
+    assert result.exit_code == 1
+    assert "must name a plan and a task" in result.output
+
+
 def test_read_nonexistent_plan_exits_with_code_1(plan_dir: Path) -> None:
     """Read P99/T1 (no matching plan number) exits 1."""
     result = runner.invoke(app, ["plan", "read", "--address", "P99/T1", "--plan-dir", str(plan_dir)])
@@ -571,3 +690,35 @@ def test_success_output_is_compact_json(plan_dir: Path) -> None:
     json.loads(result.stdout)
     assert '": "' not in result.stdout
     assert '", "' not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# sam known-failure-types
+# ---------------------------------------------------------------------------
+
+
+def test_known_failure_types_prints_the_whole_table_as_compact_json() -> None:
+    """The default is every row, emitted as one line of compact JSON."""
+    result = runner.invoke(app, ["known-failure-types"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["total"] == len(KNOWN_FAILURE_TYPES)
+    assert payload["returned"] == len(KNOWN_FAILURE_TYPES)
+    assert result.stdout.strip().count("\n") == 0
+
+
+def test_known_failure_types_honours_offset_and_limit() -> None:
+    """A caller that wants a window chooses it; the result still reports the total."""
+    result = runner.invoke(app, ["known-failure-types", "--offset", "1", "--limit", "2"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["offset"] == 1
+    assert payload["returned"] == 2
+    assert payload["total"] == len(KNOWN_FAILURE_TYPES)
+
+
+def test_known_failure_types_rejects_a_negative_offset() -> None:
+    """A negative window is an error, not a silently clamped one."""
+    result = runner.invoke(app, ["known-failure-types", "--offset", "-1"])
+    assert result.exit_code == 1
+    assert "must not be negative" in result.output

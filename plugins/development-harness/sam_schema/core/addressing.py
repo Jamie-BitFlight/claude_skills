@@ -228,6 +228,27 @@ def resolve_plan_address(address: str, plan_dir: Path) -> Path:
     raise AddressingError(address, plan_dir)
 
 
+_UID_PLAN_ID_RE = re.compile(r"P[0-9a-f]{8}", re.IGNORECASE)
+
+
+def canonical_plan_id(plan: str) -> str:
+    """Give the one spelling every store records a UID-derived plan id under.
+
+    Every store mints UID plan ids as ``P`` followed by eight lowercase hex digits. The content
+    resolver matches ids without regard to case, but the ledger matches them exactly. The ledger's
+    address splitters in ``sam_plan.py`` (``raw_plan_of``, ``_plan_of`` and ``_task_of``) call this
+    function, so routing and the ledger see the same id for any spelling of it.
+
+    Args:
+        plan: A plan id as the caller wrote it.
+
+    Returns:
+        ``P`` and lowercase hex for a UID-derived id. Any other id, stripped and otherwise unchanged.
+    """
+    plan = plan.strip()
+    return f"P{plan[1:].lower()}" if _UID_PLAN_ID_RE.fullmatch(plan) else plan
+
+
 def resolve_provider_plan_address(address: str, backend: TaskBackend) -> tuple[str, str | None]:
     """Resolve a logical plan address against a provider-backed task backend.
 

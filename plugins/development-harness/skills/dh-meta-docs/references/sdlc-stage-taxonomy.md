@@ -65,7 +65,7 @@ skill_activation: /dh:task-decomposition
 purpose: Break the validated plan into executable, independently-delegatable task records with acceptance criteria and dependency ordering.
 inputs: Amended PLAN artifact
 outputs: One TASK record per work unit, with acceptance criteria, agent routing, and dependency graph
-artifact_access: sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": tasks, "issue": issue_number}) / sam_task(plan=plan_ref, task=task_id, config={"action": "read"})
+artifact_access: sam_plan(config={"action": "create", "slug": slug, "goal": goal, "tasks": tasks, "issue": issue_number}) — plan authoring writes the content store / plan import --from content --plan-address {plan_ref} puts it in the ledger for the stages that execute it
 ```
 
 #### S5 — `execution`
@@ -75,9 +75,9 @@ stage_id: S5
 name: execution
 skill_activation: /dh:execution
 purpose: Implement each task using language-appropriate specialist agents; produce execution artifacts per task.
-inputs: TASK record, quality gate commands from language manifest
+inputs: TASK record, quality gate commands found in the repository's pre-commit config, CI workflow, or build config
 outputs: EXECUTION artifact per task containing implementation evidence and quality gate results
-artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Execution Results", "section_content": content})
+artifact_access: plan read --address {plan_ref}/{task_id} --attempt {n} / plan update --plan-address {plan_ref} --task-id {task_id} --attempt {n} --append-section "Execution Results" --section-content {content}
 ```
 
 #### S6 — `forensic-review`
@@ -89,7 +89,7 @@ skill_activation: /dh:forensic-review
 purpose: Verify each executed task against its acceptance criteria; identify regressions, gaps, and quality violations.
 inputs: TASK record, EXECUTION artifact, codebase diff
 outputs: REVIEW artifact per task with pass/fail per acceptance criterion and remediation instructions
-artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Review Results", "section_content": content})
+artifact_access: plan read --address {plan_ref}/{task_id} --attempt {n} / plan update --plan-address {plan_ref} --task-id {task_id} --attempt {n} --append-section "Review Results" --section-content {content}
 ```
 
 #### S7 — `final-verification`
@@ -101,7 +101,7 @@ skill_activation: /dh:final-verification
 purpose: Certify the complete feature against the original discovery and acceptance criteria; produce a CERTIFIED or NOT_CERTIFIED verdict.
 inputs: DISCOVERY artifact, all REVIEW artifacts, codebase state
 outputs: VERIFICATION artifact with per-criterion verdict and overall CERTIFIED or NOT_CERTIFIED determination
-artifact_access: sam_task(plan=plan_ref, task=task_id, config={"action": "read"}) / sam_task(plan=plan_ref, task=task_id, config={"action": "update", "append_section": "Final Verification", "section_content": content})
+artifact_access: plan read --address {plan_ref}/{task_id} --attempt {n} / plan update --plan-address {plan_ref} --task-id {task_id} --attempt {n} --append-section "Final Verification" --section-content {content}
 ```
 
 ---
@@ -118,14 +118,12 @@ Removed: the domain-prefixed Layer 2 naming scheme (`{domain}-{sdlc-stage}` keys
 `planning-context-integration`, `testing-forensic-review`) existed solely to name `stage_skills`
 manifest keys for `generic-stage-agent`. That agent and its dispatch pipeline
 (`manifest_resolver.py`, `dispatch_helper.py`) were built as a proof of concept in March 2026 and
-never got a live caller — both deleted. See [./language-manifest-schema.md](./language-manifest-schema.md)
-for what a language manifest actually declares today.
+never got a live caller — both deleted.
 
 ---
 
 ## Sources
 
-- Language manifest schema: [./language-manifest-schema.md](./language-manifest-schema.md)
 - IEEE 12207:2017 — Systems and software engineering — Software life cycle processes
 - ISO 15288:2023 — Systems and software engineering — System life cycle processes
 - SAFe 6.0 — Scaled Agile Framework practices (scaledagileframework.com)

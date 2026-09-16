@@ -2,7 +2,7 @@
 name: technical-researcher
 description: Orchestrates multi-angle technical research by running four independent research skills in parallel (API state, ecosystem context, impact measurement, codebase audit), applying an internal review gate to detect cross-angle signals and conflicts, then synthesising a research note. Use when a backlog item requires high-confidence research on a library, protocol, internal module, or codebase behaviour — replaces single-agent fact-checking in the groom swarm's pre-wave research phase. Produces a structured research note, optionally written to the backlog item's Research section via backlog_groom.
 model: sonnet
-tools: Read, Grep, Glob, Bash, Skill, SendMessage, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_view
+tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_backlog__backlog_groom, mcp__plugin_dh_backlog__backlog_view
 skills:
   - dh:api-state
   - dh:ecosystem-research

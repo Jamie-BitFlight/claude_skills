@@ -1,0 +1,2 @@
+- The renderer writes one report row per entry it is given.
+- The renderer writes a header row before the entry rows.

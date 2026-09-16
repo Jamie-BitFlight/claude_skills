@@ -3,22 +3,33 @@
 Exposes the same operations as the Typer CLI as MCP tools for use by
 Claude Code agents and other MCP clients.
 
+A plan the work ledger holds — because a workflow ran ``plan import`` on it — is read and written
+on the ledger by every plan-addressed ``sam_plan`` and ``sam_task`` action but ``sam_task``'s
+``claim`` and ``sam_plan``'s ``list``, the same way the CLI's ``store_for`` routing does
+(``sam_schema/sam_plan.py``). A plan the ledger does not hold keeps answering from the content
+store, as before.
+
 Tools:
     sam_plan        — Consolidated plan-level operations (read, create, list, status, ready, update)
     sam_task        — Consolidated task-level operations (read, claim, state, update)
     sam_active_task — Session-scoped active task context management (get, set, update, clear)
+    sam_known_failure_types — The work-failure vocabulary an agent names when work could not proceed
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Annotated
+from collections.abc import Callable
+from pathlib import Path
+from typing import Annotated, TypeVar
 
 import tiktoken
 from backlog_core.backend_protocol import get_config as get_backlog_config
 from backlog_core.backend_types import ContentProvider
-from dh_core import operations
+from dh_core import ledger, operations
+from dh_core.known_failure_types import KnownFailureTypesPage, page as known_failure_types_page
+from dh_core.ledger import LedgerConnection, PlanStatus as LedgerPlanStatus, TransitionResult
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -31,6 +42,7 @@ from sam_schema.core.action_models import (
     FinalizePlanConfig,
     ListPlansConfig,
     PlanActionConfig,
+    ReadTaskConfig,
     ReadyPlanConfig,
     SetActiveTaskConfig,
     StateTaskConfig,
@@ -39,7 +51,7 @@ from sam_schema.core.action_models import (
     UpdatePlanConfig,
     UpdateTaskConfig,
 )
-from sam_schema.core.addressing import resolve_provider_plan_address
+from sam_schema.core.addressing import canonical_plan_id, resolve_provider_plan_address
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
 from sam_schema.core.models import (
@@ -52,8 +64,10 @@ from sam_schema.core.models import (
     CreatePlanError,
     CreatePlanResult,
     FinalizePlanResult,
+    LedgerReadyResult,
     PaginatedResult,
     PaginationMeta,
+    Plan,
     PlanStatus,
     PlanSummaryModel,
     ReadResult,
@@ -65,10 +79,6 @@ from sam_schema.core.models import (
 )
 
 _log = logging.getLogger(__name__)
-
-# Sentinel session key used when session_id is omitted from sam_active_task calls.
-# Single-agent scenarios do not require explicit session isolation.
-_DEFAULT_SESSION_ID = "_default"
 
 # Stem parsing thresholds used in _build_task_assignment.
 _STEM_MIN_PARTS_FOR_NUMBER: int = 2
@@ -90,6 +100,37 @@ def _get_backend(plan_dir_str: str) -> ContentTaskProvider:
     return ContentTaskProvider(provider)
 
 
+_LedgerResultT = TypeVar("_LedgerResultT")
+
+
+def _on_ledger(fn: Callable[[LedgerConnection], _LedgerResultT]) -> _LedgerResultT:
+    """Run *fn* against an open ledger connection, translating ledger errors into ``ToolError``.
+
+    Mirrors the CLI's ``sam_plan._ledger()`` context manager without importing ``contextlib``,
+    which this file's import allowlist (``tests/test_frontend_logic_free.py``) does not carry.
+
+    Args:
+        fn: A callable that performs one or more ledger reads or writes on the open connection.
+
+    Returns:
+        Whatever *fn* returns.
+
+    Raises:
+        ToolError: When the ledger refuses the operation (:class:`dh_core.ledger.Refusal`), or the
+            operation names a plan, task, or field the ledger does not recognise
+            (``LookupError``/``ValueError``).
+    """
+    conn = ledger.open_ledger()
+    try:
+        return fn(conn)
+    except ledger.Refusal as exc:
+        raise ToolError(exc.reason) from exc
+    except (LookupError, ValueError) as exc:
+        raise ToolError(str(exc)) from exc
+    finally:
+        conn.close()
+
+
 # Token budget for auto-pagination: 4400 tokens (cl100k_base encoding).
 _TOKEN_BUDGET: int = 4_400
 _enc: tiktoken.Encoding = tiktoken.get_encoding("cl100k_base")
@@ -103,9 +144,13 @@ mcp: FastMCP = FastMCP(
         "Use sam_plan to read a plan, create a plan, list all plans, get progress status, "
         "or list ready-to-dispatch tasks — "
         "set config.action to: read | create | list | status | ready | update | append_task | finalize. "
+        "Once a plan has been imported into the work ledger, every action here but sam_task's claim "
+        "and sam_plan's list reads and writes the ledger instead of the plan's original content record. "
         "Use sam_active_task to park and retrieve the task currently being worked on "
         "within an agent session — "
-        "set config.action to: get | set | update | clear."
+        "set config.action to: get | set | update | clear. "
+        "Use sam_known_failure_types to read the shared vocabulary of work-failure types an agent names "
+        "when work could not proceed — it returns the whole table by default."
     ),
 )
 
@@ -200,12 +245,20 @@ def _require_plan(plan: str | None, action: str) -> str:
 def _sam_plan_read(plan: str, plan_dir: str) -> ReadResult:
     """Return Plan fields for the given plan address.
 
-    Thin adapter: resolves the backend and delegates to dh_core.operations.
-    The operation handles plan retrieval, Plan model conversion, and
-    source-degradation warning surfacing. Returns flat plan fields (feature,
-    goal, context, …) rather than a nested ``ReadResult`` envelope. Warnings
-    are added at the top level when present.
+    Thin adapter: once the ledger holds the plan, reads its projection the way the CLI's
+    ledger-backed ``plan read`` command does (``sam_plan.py``). Otherwise resolves the content
+    backend and delegates to dh_core.operations. The operation handles plan retrieval, Plan model
+    conversion, and source-degradation warning surfacing. Returns flat plan fields (feature, goal,
+    context, …) rather than a nested ``ReadResult`` envelope. Warnings are added at the top level
+    when present.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+        return _on_ledger(
+            lambda conn: ReadResult(
+                plan=Plan.model_validate(ledger.projection(conn, canonical)), source_format="ledger", source_path=Path()
+            )
+        )
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.read_plan(backend, plan)
@@ -266,48 +319,86 @@ def _sam_plan_list(config: ListPlansConfig, plan_dir: str) -> PaginatedResult:
     )
 
 
-def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus:
+def _sam_plan_status(plan: str, plan_dir: str) -> PlanStatus | LedgerPlanStatus:
     """Return plan-level progress summary including autonomy mode.
 
-    Thin adapter that resolves the backend via ``_get_backend`` and
-    delegates to ``dh_core.operations.get_plan_status``. The returned
-    model carries ``state`` so callers can detect drafting plans.
+    Thin adapter: once the ledger holds the plan, reads its progress the way the CLI's
+    ledger-backed ``plan status`` command does. Otherwise resolves the content backend via
+    ``_get_backend`` and delegates to ``dh_core.operations.get_plan_status``. The content-store
+    result carries ``state`` so callers can detect drafting plans.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+        return _on_ledger(lambda conn: ledger.status(conn, canonical))
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.get_plan_status(backend, plan)
 
 
-def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyTasksResult:
+def _sam_plan_ready(plan: str, config: ReadyPlanConfig, plan_dir: str) -> ReadyTasksResult | LedgerReadyResult:
     """List tasks ready for dispatch.
 
-    Thin adapter: resolves the backend via ``_get_backend`` and delegates
-    to ``dh_core.operations.get_ready_tasks``. The operation handles the
-    drafting check and ready-task retrieval, and returns a
+    Thin adapter: once the ledger holds the plan, reads its dependency-resolved queue the way the
+    CLI's ledger-backed ``plan ready`` command does. Otherwise resolves the content backend via
+    ``_get_backend`` and delegates to ``dh_core.operations.get_ready_tasks``, which handles the
+    drafting check and ready-task retrieval and returns a
     :class:`~sam_schema.core.models.ReadyTasksResult` envelope.
 
+    # ponytail: config.full has no effect once the ledger holds the plan -- dh_core.ledger.ready
+    # always returns the compact routing manifest. Add a full ledger-task dump if a caller needs
+    # config.full's detail level on a ledger-held plan.
+
     Returns:
-        A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``,
-        ``count``, ``issue``, and ``state`` fields. When the plan is
-        drafting, ``state`` is ``"drafting"`` and
-        ``ready_tasks`` is empty.
+        A ``ReadyTasksResult`` model with ``feature``, ``ready_tasks``, ``count``, ``issue``, and
+        ``state`` fields for a plan the ledger does not hold. When the content-store plan is
+        drafting, ``state`` is ``"drafting"`` and ``ready_tasks`` is empty. A plan the ledger holds
+        returns a :class:`~sam_schema.core.models.LedgerReadyResult` instead.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+
+        def _ready(conn: LedgerConnection) -> LedgerReadyResult:
+            rows = ledger.ready(conn, canonical)
+            return LedgerReadyResult(items=rows, count=len(rows))
+
+        return _on_ledger(_ready)
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.get_ready_tasks(backend, plan)
 
 
-def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult:
+def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> UpdatePlanResult | TransitionResult:
     """Update plan-level context and/or fields.
 
-    Thin adapter: resolves the backend via ``_get_backend`` and delegates to
-    ``dh_core.operations.update_plan_fields``. The operation handles raw field
-    validation through the Plan model, backend delegation, and response assembly.
+    Thin adapter: once the ledger holds the plan, writes it the way the CLI's ledger-backed
+    ``plan update`` command does -- ``context`` and ``owner_reference`` join ``set_fields_json``
+    as ``--set`` values (``owner_reference`` under the ledger's own field name, ``issue``).
+    Otherwise resolves the content backend via ``_get_backend`` and delegates to
+    ``dh_core.operations.update_plan_fields``, which handles raw field validation through the Plan
+    model, backend delegation, and response assembly.
 
     Returns:
-        :class:`~sam_schema.core.models.UpdatePlanResult` with ``updated``
-        (bool) and ``address`` (plan identifier) fields.
+        :class:`~sam_schema.core.models.UpdatePlanResult` with ``updated`` (bool) and ``address``
+        (plan identifier) fields for a plan the ledger does not hold. A plan the ledger holds
+        returns a :class:`~dh_core.ledger.TransitionResult` instead.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+        values = dict(config.set_fields_json or {})
+        if config.context is not None:
+            values["context"] = config.context
+        if config.owner_reference is not None:
+            values["issue"] = config.owner_reference
+        return _on_ledger(
+            lambda conn: ledger.update(
+                conn,
+                canonical,
+                config.task_id,
+                section=config.append_section_name,
+                section_content=config.section_content,
+                values=values,
+            )
+        )
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.update_plan_fields(
@@ -322,11 +413,13 @@ def _sam_plan_update(plan: str, config: UpdatePlanConfig, plan_dir: str) -> Upda
     )
 
 
-def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult:
+def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) -> AppendTaskResult | TransitionResult:
     """Append a single task to an existing plan.
 
-    Thin adapter: resolves the backend via ``_get_backend`` and delegates
-    to ``dh_core.operations.append_task``. The operation handles
+    Thin adapter: once the ledger holds the plan, appends the task the way the CLI's ledger-backed
+    ``plan append-task`` command does, carrying every ``TaskDefinition`` field beyond ``id`` and
+    ``title`` through as the ledger's ``definition``. Otherwise resolves the content backend via
+    ``_get_backend`` and delegates to ``dh_core.operations.append_task``, which handles
     ``config.task`` conversion and ``backend.append_task`` delegation.
 
     See AppendTaskConfig for the single-writer contract and #1770 for the ADR.
@@ -338,23 +431,34 @@ def _sam_plan_append_task(plan: str, config: AppendTaskConfig, plan_dir: str) ->
 
     Returns:
         :class:`~sam_schema.core.models.AppendTaskResult` — shape:
-        ``appended=True``, ``task_id=...``.
+        ``appended=True``, ``task_id=...`` — for a plan the ledger does not hold. A plan the ledger
+        holds returns a :class:`~dh_core.ledger.TransitionResult` instead.
 
     Raises:
         PlanNotFoundError: When the plan address cannot be resolved.
         TaskValidationError: When the task definition fails model validation.
+        ToolError: When the ledger holds the plan and refuses the append, e.g. an archived plan.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+        definition = config.task.model_dump(mode="json", by_alias=False, exclude={"id", "title"}, exclude_none=True)
+        return _on_ledger(
+            lambda conn: ledger.append_task(
+                conn, canonical, task_id=config.task.id, task_title=config.task.title, definition=definition
+            )
+        )
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.append_task(backend, plan, config.task)
 
 
-def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
+def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult | TransitionResult:
     """Transition a plan from drafting state to ready state.
 
-    Thin adapter: resolves the backend via ``_get_backend`` and delegates
-    to ``dh_core.operations.finalize_plan``. The operation handles the
-    drafting → ready state transition via ``backend.finalize_plan``.
+    Thin adapter: once the ledger holds the plan, finalizes it the way the CLI's ledger-backed
+    ``plan finalize`` command does. Otherwise resolves the content backend via ``_get_backend`` and
+    delegates to ``dh_core.operations.finalize_plan``, which handles the drafting → ready state
+    transition via ``backend.finalize_plan``.
 
     See FinalizePlanConfig and #1770 for the ADR.
 
@@ -362,9 +466,13 @@ def _sam_plan_finalize(plan: str, plan_dir: str) -> FinalizePlanResult:
     no caller-provided issue is needed at finalize time.
 
     Returns:
-        :class:`~sam_schema.core.models.FinalizePlanResult` — shape:
-        ``finalized=True``, ``state="ready"``.
+        :class:`~sam_schema.core.models.FinalizePlanResult` — shape: ``finalized=True``,
+        ``state="ready"`` — for a plan the ledger does not hold. A plan the ledger holds returns a
+        :class:`~dh_core.ledger.TransitionResult` instead.
     """
+    canonical = canonical_plan_id(plan)
+    if ledger.holds(canonical):
+        return _on_ledger(lambda conn: ledger.finalize(conn, canonical))
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
     return operations.finalize_plan(backend, plan)
@@ -400,12 +508,15 @@ def sam_plan(
 ) -> (
     CreatePlanResult
     | PlanStatus
+    | LedgerPlanStatus
     | ReadyTasksResult
+    | LedgerReadyResult
     | ReadResult
     | UpdatePlanResult
     | AppendTaskResult
     | FinalizePlanResult
     | PaginatedResult
+    | TransitionResult
 ):
     """Consolidated plan-level operations for SAM.
 
@@ -477,6 +588,65 @@ def sam_plan(
             raise ValueError(msg)
 
 
+def _sam_task_ledger(plan: str, task: str, config: TaskActionConfig) -> TransitionResult:
+    """Read, move, or update a task the ledger holds, the way the CLI's ledger-backed commands do.
+
+    Called only for ``read``, ``state`` and ``update`` — ``sam_task`` routes ``claim`` to the
+    content backend unconditionally, because ``claim`` is retired everywhere except the content
+    path until a later slice removes it there too.
+
+    Args:
+        plan: The canonical plan id (see ``sam_schema.core.addressing.canonical_plan_id``).
+        task: The task id.
+        config: The action's discriminated-union config, already narrowed to one of ``read``,
+            ``state`` or ``update`` by the caller's ``match``.
+
+    Returns:
+        The ledger transition's result.
+
+    Raises:
+        ToolError: When ``action='state'`` carries no ``reason`` — the ledger records why a status
+            moved without a runner and refuses the call without one, the same way the CLI's
+            ledger-backed ``plan state`` command does. Also raised when the ledger itself refuses
+            or rejects the call (see :func:`_on_ledger`).
+    """
+    match config.action:
+        case "read":
+            if not isinstance(config, ReadTaskConfig):
+                raise TypeError(f"Expected ReadTaskConfig, got {type(config).__name__}")
+            return _on_ledger(lambda conn: ledger.read(conn, plan, task, attempt=config.attempt))
+
+        case "state":
+            if not isinstance(config, StateTaskConfig):
+                raise TypeError(f"Expected StateTaskConfig, got {type(config).__name__}")
+            reason = config.reason
+            if reason is None:
+                msg = "sam_task: action='state' requires 'reason' once the ledger holds the plan"
+                raise ToolError(msg)
+            return _on_ledger(
+                lambda conn: ledger.state(conn, plan, task, new_status=config.status, reason=reason, force=config.force)
+            )
+
+        case "update":
+            if not isinstance(config, UpdateTaskConfig):
+                raise TypeError(f"Expected UpdateTaskConfig, got {type(config).__name__}")
+            return _on_ledger(
+                lambda conn: ledger.update(
+                    conn,
+                    plan,
+                    task,
+                    attempt=config.attempt,
+                    section=config.append_section,
+                    section_content=config.section_content,
+                    values=config.set_fields_json,
+                )
+            )
+
+        case _:  # pragma: no cover
+            msg = f"sam_task: action='{config.action}' is not available once the ledger holds the plan"
+            raise ToolError(msg)
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="SAM Task Operations",
@@ -493,8 +663,12 @@ def sam_task(
         TaskActionConfig, Field(description="Action config. Set 'action' to: read | claim | state | update")
     ],
     plan_dir: Annotated[str, Field(description="Plan directory path")] = "plan",
-) -> TaskAssignment | ClaimResult | StateResult | UpdateTaskResult:
+) -> TaskAssignment | ClaimResult | StateResult | UpdateTaskResult | TransitionResult:
     """Read, claim, update state, or update fields for a specific task.
+
+    Once the ledger holds the task's plan, every action but ``claim`` reads or writes the ledger
+    the way the CLI's ledger-backed commands do (``sam_plan.py``); ``claim`` stays on the content
+    path, because it is retired everywhere except there until a later slice removes it too.
 
     # TRADE-OFF: readonly annotation loss
     # sam_read (replaced by action="read") was annotated readonly=True in FastMCP,
@@ -515,6 +689,10 @@ def sam_task(
     Returns:
         Action-specific Pydantic model. See individual action descriptions.
     """
+    canonical = canonical_plan_id(plan)
+    if config.action != "claim" and ledger.holds(canonical):
+        return _sam_task_ledger(canonical, task, config)
+
     backend = _get_backend(plan_dir)
     plan, _ = resolve_provider_plan_address(plan, backend)
 
@@ -564,8 +742,9 @@ def sam_active_task(
         str | None,
         Field(
             description=(
-                "Session identifier for scoping the active task context. "
-                "When None, uses the '_default' sentinel for single-agent scenarios."
+                "Caller-specific session identifier for scoping the active task "
+                "context. Required — omitting it, or passing the empty string, "
+                "is a hard error. Never pass the reserved '_default' sentinel."
             )
         ),
     ] = None,
@@ -573,8 +752,7 @@ def sam_active_task(
     """Session-scoped active task context management.
 
     Parks a task address in session-scoped storage so subsequent operations
-    can omit the plan/task parameters. Useful in single-agent workflows where
-    repeatedly passing the same address is noise.
+    can omit the plan/task parameters.
 
     Actions:
 
@@ -585,17 +763,20 @@ def sam_active_task(
 
     Args:
         config: Discriminated union selecting the action and its parameters.
-        session_id: Claude Code session identifier. When ``None``, uses the
-            ``"_default"`` sentinel (suitable for single-agent scenarios that
-            do not need explicit session isolation).
+        session_id: Caller-specific session identifier. Required.
 
     Returns:
         Action-specific Pydantic model. See individual action descriptions.
 
     Raises:
-        ToolError: When ``action="update"`` and no active task has been set.
+        ToolError: When ``session_id`` is missing, empty, or the reserved
+            ``"_default"`` sentinel. Also when ``action="update"`` and no
+            active task has been set.
     """
-    resolved_session = session_id if session_id is not None else _DEFAULT_SESSION_ID
+    try:
+        resolved_session = operations.require_session_id(session_id)
+    except operations.MissingSessionIdError as exc:
+        raise ToolError(str(exc)) from exc
     ctx_backend = get_context_config().backend
 
     match config.action:
@@ -635,3 +816,53 @@ def sam_active_task(
         case _:  # pragma: no cover
             msg = f"sam_active_task: unhandled action '{config.action}'"
             raise ValueError(msg)
+
+
+@mcp.tool(
+    annotations=ToolAnnotations(
+        title="SAM Known Failure Types",
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
+def sam_known_failure_types(
+    offset: Annotated[int, Field(description="Skip this many rows. 0 (the default) starts at the beginning.")] = 0,
+    limit: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Return at most this many rows. Omitted (the default) returns every remaining row; "
+                "the table is never truncated on the caller's behalf."
+            )
+        ),
+    ] = None,
+) -> KnownFailureTypesPage:
+    """Return the shared vocabulary of work-failure types, as data.
+
+    A Worker names one of these codes when work could not proceed, so the reason is routable rather
+    than reinvented as prose in each status report. The table is
+    ``dh_core.known_failure_types.KNOWN_FAILURE_TYPES``; the ``sam known-failure-types`` CLI command
+    returns the same rows from the same source.
+
+    This vocabulary is deliberately separate from the ledger's own reason codes
+    (``dh_core.ledger_spec.REASONS``, why a command refused) and from ``reclaim --reason`` (what the
+    Orchestrator says when it sends a task back). If the ledger already refuses a condition with a
+    ``REASONS`` code, name that code instead of a failure type.
+
+    Args:
+        offset: How many rows to skip before the window starts.
+        limit: How many rows the window holds at most; omitted returns every remaining row.
+
+    Returns:
+        :class:`~dh_core.known_failure_types.KnownFailureTypesPage` — the window, plus ``total`` so
+        a caller reading a window knows how much it did not read.
+
+    Raises:
+        ToolError: When ``offset`` or ``limit`` is negative.
+    """
+    try:
+        return known_failure_types_page(offset=offset, limit=limit)
+    except ValueError as exc:
+        raise ToolError(str(exc)) from exc

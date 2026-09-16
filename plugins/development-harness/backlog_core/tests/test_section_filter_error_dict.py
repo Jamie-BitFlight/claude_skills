@@ -1,8 +1,8 @@
-"""RED tests for ADR-3: section-filter miss returns an explicit error dict.
+"""RED tests: section-filter miss returns an explicit error dict.
 
 These tests MUST FAIL before T22's implementation and PASS after.
 
-ADR-3 Decision (selected option 3, "Error-on-miss, suggestion-in-error"):
+Decision (selected option 3, "Error-on-miss, suggestion-in-error"):
     When a ``section=`` or ``sections=[...]`` filter misses, ``backlog_view``
     returns an error dict instead of silently returning content:
 
@@ -38,11 +38,11 @@ Fixture: ``issue-2521-full.json`` — valid section headers (from ``##`` lines):
     Story, Description, Acceptance Criteria, Context,
     Groomed (2026-06-01), Concerns, RT-ICA
 
-Source: architect spec §4.6 and ADR-3.
+Source: architect spec §4.6.
 
 Test naming convention: every test contains ``section_miss_error`` or
 ``section_hit`` so ``pytest -k "section_miss_error or section_hit"``
-selects the full ADR-3 suite.
+selects the full suite for this fix.
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         Assert: response dict contains 'error' key.
 
         RED: fails because the current code sets section_filter_miss=True and returns
-        an empty body — the response has no 'error' key.  After ADR-3 fix, the
+        an empty body — the response has no 'error' key.  After this fix, the
         handler early-returns an error dict instead of a content response.
         """
         # Arrange
@@ -143,7 +143,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
         assert "error" in resp, (
             f"Response must contain 'error' key on section= miss. "
             f"Got keys: {sorted(resp.keys())}. "
-            "Before ADR-3 fix: response has section_filter_miss=True but no 'error' key."
+            "Before this fix: response has section_filter_miss=True but no 'error' key."
         )
 
     def test_section_miss_error_dict_has_valid_sections_key_include_content_true(self, mocker: MockerFixture) -> None:
@@ -179,7 +179,7 @@ class TestSectionMissErrorDictIncludeContentTrue:
     def test_section_miss_error_dict_no_body_include_content_true(self, mocker: MockerFixture) -> None:
         """section= miss error response does not include a 'body' field.
 
-        No content is returned on a miss (ADR-3 selected option 3).
+        No content is returned on a miss (selected option 3).
 
         Arrange: same as above.
         Act: call backlog_view(summary=False, include_content=True, section=<miss>).
@@ -295,7 +295,7 @@ class TestSectionsFilterPluralMissErrorDict:
         RED: fails because _filter_view_sections currently sets
         section_filter_miss=True on the response and result, but does NOT add
         an 'error' key.  The response includes the full body unchanged (the
-        "silent fallback" described in ADR-3 context).
+        "silent fallback" described above).
         """
         # Arrange
         _patch_issue_2521(mocker)
@@ -307,7 +307,7 @@ class TestSectionsFilterPluralMissErrorDict:
         assert "error" in resp, (
             f"sections=[] miss response must contain 'error' key. "
             f"Got keys: {sorted(resp.keys())}. "
-            "Before ADR-3 fix: section_filter_miss=True but no 'error' key."
+            "Before this fix: section_filter_miss=True but no 'error' key."
         )
 
     def test_section_miss_error_dict_has_valid_sections_key_sections_plural(self, mocker: MockerFixture) -> None:
@@ -340,7 +340,7 @@ class TestSectionsFilterPluralMissErrorDict:
 
         RED: fails because _filter_view_sections does not clear the body on a
         total miss — the response currently includes the full #2521 body.
-        This is the silent-fallback described in ADR-3: the caller asked for a
+        This is the silent-fallback described above: the caller asked for a
         specific section but received the entire item content with only a flag.
         """
         # Arrange
@@ -366,7 +366,7 @@ class TestSectionsFilterPluralMissErrorDict:
 class TestSectionMissErrorDictSuggestion:
     """A near-miss section name yields a Levenshtein best-match suggestion.
 
-    ADR-3 format: ``"suggestion": "Did you mean: 'Concerns'?"``
+    Format: ``"suggestion": "Did you mean: 'Concerns'?"``
     Present only when a close match exists; omitted for completely random names.
     """
 
@@ -451,7 +451,7 @@ class TestSectionMissErrorDictSuggestion:
 
 
 class TestSectionHitRegressionGuard:
-    """Valid section names continue to succeed after the ADR-3 fix.
+    """Valid section names continue to succeed after this fix.
 
     These tests PASS both before and after the fix — they guard against false
     positives where the fix accidentally errors on valid section names.
