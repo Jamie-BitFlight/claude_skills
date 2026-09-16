@@ -580,6 +580,9 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc
+    except RETRYABLE_TRANSIENT_EXCEPTIONS as exc:
+        msg = f"GraphQL transport failed: {exc}"
+        raise BacklogError(msg) from exc
     if "errors" in response:
         first_error = response["errors"][0] if response["errors"] else {}
         msg = first_error.get("message", str(response["errors"]))

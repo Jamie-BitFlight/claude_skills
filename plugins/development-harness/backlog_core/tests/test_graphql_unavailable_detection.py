@@ -22,6 +22,7 @@ from backlog_core.gh_client import (
     is_graphql_unavailable,
 )
 from backlog_core.models import BackendUnavailableError, BacklogError, GraphQLUnavailableError
+from backlog_core.sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 
 #: The message body observed verbatim from a Claude Code sandbox on 2026-09-14.
 _SANDBOX_MESSAGE = (
@@ -159,6 +160,17 @@ class TestGraphqlRequestRaisesTheDistinctType:
             _graphql_request(repo, "query { viewer { login } }")
 
         assert not isinstance(excinfo.value, GraphQLUnavailableError)
+
+    @pytest.mark.parametrize("transport_type", RETRYABLE_TRANSIENT_EXCEPTIONS)
+    def test_raw_transport_failures_raise_the_generic_error(self, transport_type: type[Exception]):
+        transport_error = transport_type("transport failed")
+        repo = _FakeRepo(transport_error)
+
+        with pytest.raises(BacklogError) as excinfo:
+            _graphql_request(repo, "query { viewer { login } }")
+
+        assert "GraphQL transport failed" in str(excinfo.value)
+        assert excinfo.value.__cause__ is transport_error
 
 
 class TestErrorTypeRelationships:
