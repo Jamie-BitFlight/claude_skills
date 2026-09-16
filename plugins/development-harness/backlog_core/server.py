@@ -27,7 +27,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, cast
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -1600,6 +1600,36 @@ def _apply_sync_state_to_response(
     response["warnings"] = (list(existing) + sync_warnings) if isinstance(existing, list) else sync_warnings
 
 
+def _build_count_only_response(
+    total: int,
+    result: Mapping[str, object],
+    output: Output,
+    sync_state_block: dict[str, object] | None,
+    sync_warnings: list[str],
+) -> BacklogListResponse:
+    """Build the minimal count response while preserving degradation signals.
+
+    Returns:
+        Serialized count-only response.
+    """
+    response: dict[str, object] = {
+        "count": total,
+        "from_cache": result.get("from_cache"),
+        "has_pending_writes": result.get("has_pending_writes"),
+    }
+    if output.warnings:
+        response["warnings"] = list(output.warnings)
+    if output.errors:
+        response["errors"] = list(output.errors)
+    if result.get("status_source") == "unavailable":
+        response["status_source"] = result["status_source"]
+    for field in ("unavailable_capabilities", "filters_evaluated_against_unavailable_data"):
+        if result.get(field):
+            response[field] = result[field]
+    _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
+    return cast("BacklogListResponse", BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True))
+
+
 def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
     """Resolve the effective page limit for a ``backlog_list`` response.
 
@@ -1842,7 +1872,7 @@ async def backlog_list(
         from_cache/has_pending_writes name the provenance instead (backlog
         #3546 task A4) — pass allow_cached=True to see the best-effort cached
         list anyway.
-        status_source ("live", "cache", or "unavailable") reports where the
+        status_source ("live", "cache", "mixed", or "unavailable") reports where the
         listing's status data came from; unavailable_capabilities names any
         capability (e.g. "live_status") that could not be read live this
         call; filters_evaluated_against_unavailable_data names any active
@@ -1946,32 +1976,7 @@ async def backlog_list(
         # Without them, a caller reading a bare count from a warm cache that
         # still holds unconfirmed local writes could mistake local-only rows
         # for provider-acknowledged data (Codex review, PR #3576 finding 2).
-        count_resp: dict[str, object] = {
-            "count": total,
-            "from_cache": result.get("from_cache"),
-            "has_pending_writes": result.get("has_pending_writes"),
-        }
-        if out.warnings:
-            count_resp["warnings"] = list(out.warnings)
-        if out.errors:
-            count_resp["errors"] = list(out.errors)
-        # Surface the operations-layer degradation fields (#3546, B5) the same
-        # way as warnings/errors above: only when they signal a genuine
-        # degradation, never on a healthy call, so the documented bare-count
-        # contract on a healthy call is unaffected (B-critique.md §4.5). A
-        # status_source of "cache" is a normal backend-shape fact (e.g. a
-        # string-ID backend with no live batch fetch at all), not a
-        # degradation this call suffered, so it is deliberately excluded here.
-        if result.get("status_source") == "unavailable":
-            count_resp["status_source"] = result["status_source"]
-        if result.get("unavailable_capabilities"):
-            count_resp["unavailable_capabilities"] = result["unavailable_capabilities"]
-        if result.get("filters_evaluated_against_unavailable_data"):
-            count_resp["filters_evaluated_against_unavailable_data"] = result[
-                "filters_evaluated_against_unavailable_data"
-            ]
-        _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
+        return _build_count_only_response(total, result, out, sync_state_block, sync_warnings)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))

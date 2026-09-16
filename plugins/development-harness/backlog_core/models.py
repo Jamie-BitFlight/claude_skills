@@ -1404,7 +1404,7 @@ class ContentWrite(BaseModel):
         return self
 
 
-StatusSource: TypeAlias = Literal["live", "cache", "unavailable"]
+StatusSource: TypeAlias = Literal["live", "cache", "mixed", "unavailable"]
 """Provenance of a read operation's status/enrichment data (#3546, B5).
 
 ``"live"``: the value came from a successful live batch-status or
@@ -1414,6 +1414,9 @@ support one (e.g. a string-ID backend whose own status field is
 authoritative), or the item carried no identifier to check live -- so the
 locally cached/backend-owned value is reported as-is, with no live fetch
 degradation involved.
+``"mixed"``: one listing contains both successfully fetched live status data
+and backend-owned cached status data, such as numeric GitHub issue references
+beside unlinked or string-ID work items.
 ``"unavailable"``: a live fetch was attempted and failed (a refused GraphQL
 query, a network error, a rate limit, ...) -- the true live value was never
 learned this call. Distinct from ``"cache"`` so a caller can tell "nothing
@@ -1499,6 +1502,22 @@ class IssueStatus(BaseModel):
 
     status: str = ""
     milestone: str = ""
+
+
+class StatusFetchResult(BaseModel):
+    """Provider-reported outcome of a batch status fetch."""
+
+    statuses: dict[int, IssueStatus] = Field(default_factory=dict)
+    attempted: bool
+    unavailable_reason: str = ""
+
+
+class ViewEnrichmentResult(BaseModel):
+    """Provider-reported outcome of enriching one work-item view."""
+
+    enriched: bool
+    attempted: bool
+    unavailable_reason: str = ""
 
 
 class PullRequestRef(BaseModel):
@@ -1598,7 +1617,7 @@ class ViewItemResult(BaseModel):
     section_filter_valid_names: list[str] = Field(default_factory=list, exclude=True)
     status_source: StatusSource = "cache"
     """Provenance of this item's live-enrichment data (#3546, B5). See
-    :data:`StatusSource` for the three-state meaning. Defaults to ``"cache"``
+    :data:`StatusSource` for the provenance meanings. Defaults to ``"cache"``
     for a bare ``ViewItemResult()`` constructed without going through
     :func:`view_item` (e.g. direct test construction)."""
     unavailable_capabilities: list[str] = Field(default_factory=list)

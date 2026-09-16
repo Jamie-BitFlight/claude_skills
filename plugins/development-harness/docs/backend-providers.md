@@ -202,6 +202,15 @@ of the ambiguous `[]`/`0` an unaware caller could misread as a confirmed-empty
 backlog. Pass `allow_cached=True` (`--allow-cached` on the CLI) to opt into
 the best-effort cached list anyway.
 
+Status provenance is independent of listing provenance. `status_source` is
+`live` when all returned status-bearing rows came from a successful provider
+fetch, `cache` when no fetch was attempted, `mixed` when live numeric-issue
+rows and backend-owned string/unlinked rows occur together, and `unavailable`
+when an attempted fetch failed. Providers return `StatusFetchResult`, whose
+`attempted` and `unavailable_reason` fields are authoritative; operations do
+not inspect provider credentials or infer an attempt from an issue identifier.
+`ViewEnrichmentResult` provides the same boundary for a single-item view.
+
 **Configuration caveat**: `SQLiteBackend` defaults to `db_path=":memory:"` (an
 ephemeral in-process database). A freshly started process on that default is
 structurally in the same "never populated" state as a cold GitHub cache, even
@@ -240,65 +249,6 @@ also set the matching flag `True` — declaring the flag without satisfying the
 Protocol raises `UnsupportedBackendCapabilityError` with `protocol_mismatch=True`
 (a backend bug), and satisfying the Protocol without setting the flag is
 treated as unsupported (the flag getter defaults `False`).
-
-### Credential availability
-
-`CredentialAvailabilityProvider` (`backlog_core/backend_types.py`, re-exported
-through `backlog_core/backend_protocol.py`) is an optional, `runtime_checkable`
-Protocol distinct from the five capability flags above — it has no matching
-flag of its own and instead piggybacks on `supports_github_extras`. It answers
-one local, environment-only question — "is a GitHub token configured" — via a
-single method:
-
-```python
-def has_github_credentials(self) -> bool: ...
-```
-
-This is not a live GitHub call: it performs no network access, unlike
-`GitHubExtras`'s methods, which perform real GraphQL/REST calls. `github` is
-the only backend that currently implements it
-(`GitHubBackend.has_github_credentials()`, `backlog_core/backends/github_backend.py`),
-delegating to `gh_client.has_github_credentials()`.
-
-`operations.py`'s `_status_map_empty_due_to_missing_token()` is the sole
-caller. It exists to tell a genuinely empty live status map (GitHub was
-queried and found nothing) apart from one no query ever attempted (no
-`GITHUB_TOKEN` configured at all) — conflating the two lets a numeric-issue
-item default to `needs-grooming` even though its live status was never
-learned (the status-filter fabrication bug, #3546). `operations.py` must not
-import provider clients directly (see `ARCHITECTURE.md`'s "Module:
-operations.py" boundary), so it asks the question through this Protocol
-instead of calling `gh_client.resolve_token()` itself.
-
-The caller applies the same flag-first gating rule documented above for
-`GitHubExtras`/`BranchBackend`, in this order:
-
-1. Skip the check entirely (return `False`, meaning "not due to a missing
-   token") when `supports_github_extras` is `False` — a backend with no live
-   GitHub connection concept (`beads`, `sqlite`, `memory`) has no credential
-   concept either, so there is nothing meaningful to ask.
-2. Skip when no item in the batch has a numeric issue reference — a missing
-   token can only explain an empty status map for numeric-issue items, so the
-   answer cannot change anything downstream.
-3. Only once `supports_github_extras` is `True` and a numeric-issue item
-   exists, check `isinstance(backend, CredentialAvailabilityProvider)` as a
-   secondary assertion.
-4. Only when all of the above pass, call `has_github_credentials()` and use
-   its answer.
-
-**Consequence of a GitHub-capable backend not implementing this Protocol:**
-if a backend sets `supports_github_extras = True` (step 1 passes) and a
-numeric-issue item is present (step 2 passes) but the backend does not
-structurally implement `CredentialAvailabilityProvider` (step 3 fails), the
-function returns `False` — the same "not due to a missing token" answer as
-the skip cases above. This is a deliberate safe fallback, not silently broken
-behavior: `False` means "assume credentials might be present" rather than
-fabricating a "missing token" claim the backend never actually made. The
-practical effect is that an unauthenticated empty status batch on such a
-backend is *not* attributed to a missing token, so the safe default supplied
-by the pre-#3546 fix path in `operations.py` still applies. A GitHub-capable
-backend that wants the missing-token distinction to work correctly for its
-own numeric-issue items MUST also implement `has_github_credentials()`.
 
 ### Milestones
 

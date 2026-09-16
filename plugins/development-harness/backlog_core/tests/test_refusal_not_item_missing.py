@@ -58,6 +58,7 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    StatusFetchResult,
     ViewItemResult,
 )
 
@@ -669,6 +670,11 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(output=Output())
 

@@ -12,7 +12,6 @@ import re
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Final, NotRequired, TypeGuard
@@ -34,7 +33,6 @@ from .backend_protocol import get_config
 from .backend_types import (
     AddedCommentNode,
     ContentProvider,
-    CredentialAvailabilityProvider,
     IssueCommentNode,
     IssueNode,
     MilestoneFullNode,
@@ -43,7 +41,6 @@ from .backend_types import (
     SyncProvider,
 )
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
-from .github_client import MissingGitHubTokenError, resolve_token
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -73,9 +70,11 @@ from .models import (
     Section,
     SectionEntryDict,
     SectionEntryMetadata,
+    StatusFetchResult,
     StatusSource,
     UnsupportedBackendCapabilityError,
     ValidationError,
+    ViewEnrichmentResult,
     ViewItemResult,
     parse_issue_number,
     reference_is_title_derived,
@@ -208,11 +207,11 @@ def sync_issues_graphql(
     )
 
 
-def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> StatusFetchResult | dict[int, IssueStatus]:
     """Fetch status for multiple items in one operation.
 
     Returns:
-        Mapping of issue number to IssueStatus.
+        Provider-reported fetch outcome and status mapping.
 
     Raises:
         BackendUnavailableError: When the backend cannot serve the query — for
@@ -223,11 +222,11 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
     return get_config().backend.batch_fetch_statuses(items, repo)
 
 
-def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+def view_enrich_from_github(result: ViewItemResult, issue_num: str, repo: str = "") -> ViewEnrichmentResult | bool:
     """Enrich a ViewItemResult with live data from the backend.
 
     Returns:
-        True if enrichment succeeded, False otherwise.
+        Provider-reported enrichment outcome.
     """
     return get_config().backend.view_enrich_from_github(result, issue_num, repo)
 
@@ -2138,14 +2137,10 @@ def _build_list_entry(
     return entry
 
 
-@dataclass(frozen=True, slots=True)
-class _ListStatusMapResolution:
+class _ListStatusMapResolution(BaseModel):
     """Internal result of resolving ``list_items()``'s live status map.
 
-    Not an MCP response shape -- a purely internal implementation-detail
-    value object returned by ``_resolve_list_status_map``, mirroring
-    ``BoundedContent``'s precedent (``disclosure_types.py``) for value
-    objects that never cross the tool boundary.
+    This Pydantic value object is internal and never crosses the tool boundary.
     """
 
     status_map: dict[int, IssueStatus]
@@ -2221,40 +2216,21 @@ def _resolve_list_status_map(
             status_map={}, unavailable=False, skipped_for_credentials=False, has_numeric_issue_reference=False
         )
     has_numeric_issue_reference = any(parse_issue_number(it.issue) is not None for it in open_items)
-    provider_credentials_available = True
-    # getattr with a default, not direct attribute access: this capability
-    # flag is declared on every real backend (github/memory/sqlite/beads),
-    # per WorkItemBackend's Protocol docstring, but narrow test doubles that
-    # only implement the subset a given test exercises are not required to
-    # declare it -- such a double is never GitHub-credential-gated to begin
-    # with, so treating an undeclared flag as False (skip the token check
-    # entirely) matches its actual behaviour.
-    if getattr(get_config().backend, "supports_github_extras", False):
-        try:
-            resolve_token()
-        except MissingGitHubTokenError:
-            provider_credentials_available = False
     if not has_numeric_issue_reference:
         # Nothing on this page carries a numeric issue reference -- no live
         # query is needed at all; the caller's status_source reports "cache".
         return _ListStatusMapResolution(
             status_map={}, unavailable=False, skipped_for_credentials=False, has_numeric_issue_reference=False
         )
-    if not provider_credentials_available:
-        # Numeric-issue items exist, but no GitHub token is configured --
-        # gh_client.batch_fetch_statuses would short-circuit to {} without
-        # ever making a live request. Flagged for the filtering guard exactly
-        # like an attempted-and-failed fetch, so a status= filter never
-        # fabricates a match against data that was never queried (#3546, B2)
-        # -- but reported as "cache" rather than "unavailable" by the caller's
-        # status_source, since no request was ever attempted (see
-        # StatusSource's docstring).
-        _warn_live_status_unavailable(out, status, "no GitHub token configured")
-        return _ListStatusMapResolution(
-            status_map={}, unavailable=False, skipped_for_credentials=True, has_numeric_issue_reference=True
-        )
     try:
-        status_map = batch_fetch_statuses(open_items, repo)
+        raw_fetch_result = batch_fetch_statuses(open_items, repo)
+        # Keep the documented module-level patch seam usable for focused tests
+        # that replace this wrapper with its historical mapping return.
+        fetch_result = (
+            raw_fetch_result
+            if isinstance(raw_fetch_result, StatusFetchResult)
+            else StatusFetchResult(statuses=raw_fetch_result, attempted=True)
+        )
     except BackendUnavailableError as exc:
         # The fetch failed outright -- nothing was learned about ANY
         # numeric-issue item's live status. `unavailable` tells
@@ -2268,8 +2244,51 @@ def _resolve_list_status_map(
         return _ListStatusMapResolution(
             status_map={}, unavailable=True, skipped_for_credentials=False, has_numeric_issue_reference=True
         )
+    if fetch_result.unavailable_reason:
+        _warn_live_status_unavailable(out, status, fetch_result.unavailable_reason)
+        return _ListStatusMapResolution(
+            status_map=fetch_result.statuses,
+            unavailable=fetch_result.attempted,
+            skipped_for_credentials=not fetch_result.attempted,
+            has_numeric_issue_reference=True,
+        )
     return _ListStatusMapResolution(
-        status_map=status_map, unavailable=False, skipped_for_credentials=False, has_numeric_issue_reference=True
+        status_map=fetch_result.statuses,
+        unavailable=False,
+        skipped_for_credentials=not fetch_result.attempted,
+        has_numeric_issue_reference=True,
+    )
+
+
+def _listing_status_metadata(
+    resolution: _ListStatusMapResolution,
+    items: list[BacklogItem],
+    status: str | None,
+    filter_by_key: dict[str, str] | None,
+) -> tuple[StatusSource, list[str], list[str], bool]:
+    """Derive listing provenance and status-dependent filter degradation.
+
+    Returns:
+        Status source, unavailable capabilities, degraded filter keys, and
+        whether the status map is untrustworthy.
+    """
+    untrustworthy = resolution.unavailable or resolution.skipped_for_credentials
+    if resolution.unavailable:
+        source: StatusSource = "unavailable"
+    elif resolution.skipped_for_credentials or not resolution.has_numeric_issue_reference:
+        source = "cache"
+    elif any(parse_issue_number(item.issue) is None for item in items):
+        source = "mixed"
+    else:
+        source = "live"
+    keys = {key for key in ("status", "milestone") if filter_by_key and key in filter_by_key}
+    if status:
+        keys.add("status")
+    return (
+        source,
+        ["live_status"] if resolution.unavailable else [],
+        sorted(keys) if untrustworthy else [],
+        untrustworthy,
     )
 
 
@@ -2482,7 +2501,6 @@ def list_items(
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
     status_resolution = _resolve_list_status_map(open_items, repo, status, out)
-    status_map = status_resolution.status_map
     # Provenance of the status data just resolved above (#3546, B5/B6): "live"
     # when the batch fetch was attempted and succeeded, "cache" when the
     # backend never attempts one -- either structurally (its own status field
@@ -2490,35 +2508,28 @@ def list_items(
     # to query / lacked credentials to query with -- "unavailable" when the
     # batch fetch was attempted and failed. Computed once here, not
     # per-item, since a single fetch covers the whole page.
-    status_source: StatusSource
-    if status_resolution.unavailable:
-        status_source = "unavailable"
-    elif status_resolution.skipped_for_credentials or not status_resolution.has_numeric_issue_reference:
-        status_source = "cache"
-    else:
-        status_source = "live"
-    unavailable_capabilities: list[str] = ["live_status"] if status_resolution.unavailable else []
-    # B2's fabrication-prevention fix (see _item_derived_status/_filter_open_items
-    # above) silently corrects the result; this names which requested filter
-    # could not be honestly evaluated, so a caller sees the degradation
-    # structurally instead of only in prose (#3546, B-critique.md §3.1). A
-    # skipped-for-credentials fetch is exactly as unevaluable as an
-    # attempted-and-failed one, so both count here.
-    status_map_untrustworthy = status_resolution.unavailable or status_resolution.skipped_for_credentials
-    status_live = status_resolution.has_numeric_issue_reference and not status_map_untrustworthy
-    filters_evaluated_against_unavailable_data: list[str] = ["status"] if status and status_map_untrustworthy else []
+    (status_source, unavailable_capabilities, filters_evaluated_against_unavailable_data, status_map_untrustworthy) = (
+        _listing_status_metadata(status_resolution, open_items, status, filter_by_key)
+    )
     open_items = _filter_open_items(
         open_items,
         section,
         title,
         status,
-        status_map,
+        status_resolution.status_map,
         type_=type_,
         topic=topic,
-        status_live=status_live,
+        status_live=status_resolution.has_numeric_issue_reference and not status_map_untrustworthy,
         status_map_unavailable=status_map_untrustworthy,
     )
-    result_items = [_build_list_entry(it, status_map, status_live=status_live) for it in open_items]
+    result_items = [
+        _build_list_entry(
+            it,
+            status_resolution.status_map,
+            status_live=status_resolution.has_numeric_issue_reference and not status_map_untrustworthy,
+        )
+        for it in open_items
+    ]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:
@@ -3577,6 +3588,27 @@ def _live_lookup_id(item: BacklogItem | None, issue_num: str | None, selector: s
     return selector.strip() or None
 
 
+def _attempt_view_enrichment(
+    result: ViewItemResult, live_id: str | None, repo: str, *, cached_fallback: bool
+) -> ViewEnrichmentResult:
+    """Ask the provider to enrich a view and normalize the patchable wrapper seam.
+
+    Returns:
+        The provider-reported enrichment outcome.
+    """
+    if not live_id:
+        return ViewEnrichmentResult(enriched=False, attempted=False)
+    try:
+        raw = view_enrich_from_github(result, live_id, repo)
+    except BackendUnavailableError as exc:
+        if not cached_fallback:
+            raise
+        return ViewEnrichmentResult(enriched=False, attempted=True, unavailable_reason=f"backend unavailable ({exc})")
+    if isinstance(raw, ViewEnrichmentResult):
+        return raw
+    return ViewEnrichmentResult(enriched=raw, attempted=True)
+
+
 def view_item(
     selector: str,
     repo: str = "",
@@ -3646,47 +3678,28 @@ def view_item(
 
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
-    # Tracks whether a live GitHub/backend check was actually attempted this
-    # call, i.e. whether ``live_id`` resolved to a usable identifier. Gates
-    # both the "backend unreachable" prose warning below and the
-    # status_source provenance computed further down (#3546 B5/B6):
-    # "nothing was tried" (live_id falsy -- no local number/issue ref to
-    # check against) must not render identically to "something was tried
-    # and failed" (B-critique.md §3.4).
-    live_attempted = False
-    enriched = False
+    enrichment = ViewEnrichmentResult(enriched=False, attempted=False)
     if item:
         if issue_num or refresh:
             live_id = _live_lookup_id(item, issue_num, selector)
-            live_attempted = bool(live_id)
-            try:
-                enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
-                reason = (
+            enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=True)
+            if not enrichment.enriched and enrichment.attempted:
+                reason = enrichment.unavailable_reason or (
                     "GitHub lookup failed (authentication failure, rate limit, GitHub server error, or issue not found)"
                 )
-                if live_id and not enriched:
-                    reason = f"backend unreachable — {reason}"
-            except BackendUnavailableError as exc:
-                # The cached record still answers the view, so the read succeeds.
-                # Name the cause instead of reporting the generic unreachable case.
-                enriched, reason = False, f"backend unavailable ({exc})"
-            # Only warn when a live check was actually attempted and failed.
-            # When live_id was falsy (live_attempted is False), no lookup was
-            # ever made -- nothing to warn about, and no degradation occurred.
-            if not enriched and live_attempted:
+                reason = f"backend unreachable — {reason}"
                 out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
         result.groomed = item.metadata.groomed
     elif issue_num or get_config().backend.issue_id_type == "string":
         live_id = _live_lookup_id(item, issue_num, selector)
-        live_attempted = bool(live_id)
         # No cached record, so the live read is the only answer available. A
         # BackendUnavailableError propagates deliberately: "the backend refused
         # the query" is not "the item does not exist", and reporting the second
         # for the first sends a reader looking for an item that is really there.
-        enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
-        if not enriched:
+        enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=False)
+        if not enrichment.enriched:
             raise ItemNotFoundError(selector)
     else:
         raise ItemNotFoundError(selector)
@@ -3697,13 +3710,12 @@ def view_item(
     # exception); "cache" when no live check was ever attempted. Distinct
     # "cache"/"unavailable" states so a caller can tell "nothing was tried"
     # apart from "something was tried and failed" (B-critique.md §3.4) --
-    # consistent with the "backend unreachable" prose warning above, which
-    # is now gated on the same live_attempted flag and no longer fires for
-    # the not-attempted case.
+    # consistent with the provider-reported attempt outcome used by the prose
+    # warning above.
     status_source: StatusSource
-    if enriched:
+    if enrichment.enriched:
         status_source = "live"
-    elif live_attempted:
+    elif enrichment.attempted:
         status_source = "unavailable"
     else:
         status_source = "cache"

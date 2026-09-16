@@ -81,7 +81,7 @@ class MapResponse(BaseModel):
     status_source: StatusSource = "cache"
     """Provenance of the underlying ``operations.view_item()`` read's
     live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
-    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
     disclosure-mode response never silently drops the signal a passthrough
     ``backlog_view`` call already carries (Codex review, PR #3577)."""
 
@@ -168,7 +168,7 @@ class NavigateResponse(BaseModel):
     status_source: StatusSource = "cache"
     """Provenance of the underlying ``operations.view_item()`` read's
     live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
-    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
     disclosure-mode response never silently drops the signal a passthrough
     ``backlog_view`` call already carries (Codex review, PR #3577)."""
 
@@ -236,7 +236,7 @@ class BoundedResponse(BaseModel):
     status_source: StatusSource = "cache"
     """Provenance of the underlying ``operations.view_item()`` read's
     live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
-    for the three-state meaning. Forwarded from that call's ``ViewItemResult`` so a
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
     disclosure-mode response never silently drops the signal a passthrough
     ``backlog_view`` call already carries (Codex review, PR #3577)."""
 

@@ -17,20 +17,9 @@ shape (three items, two genuinely ``in-progress``, one genuinely ``needs-groomin
 adapted to patch ``operations.batch_fetch_statuses`` with the typed exception B1
 introduced rather than the pre-B1 empty-map behaviour the original proof used.
 
-A second trigger for the same ambiguity was found by review after B2 landed: an
-absent ``GITHUB_TOKEN`` makes ``gh_client.batch_fetch_statuses`` return the same empty
-``{}`` *without* raising (a deliberate local-only fallback, not a failure — see its
-own docstring), so B2's exception-only handling left that path reproducing the exact
-fabrication bug via a different trigger. ``TestStatusFilterMissingTokenDoesNotFabricateMatches``
-and ``TestStatusMapEmptyDueToMissingToken`` cover that trigger.
-
-A third review pass (P1, on PR #3572) found that the fix for the redundant-probe issue
-had reintroduced a different bug: ``_status_map_empty_due_to_missing_token`` imported
-``resolve_token()`` from ``github_client`` directly, which is a provider-client import
-``operations.py`` is architecturally forbidden from making (see
-``backlog_core/ARCHITECTURE.md``'s "Module: operations.py" boundary). The fix asks the
-backend through ``CredentialAvailabilityProvider.has_github_credentials()`` instead, so
-the tests below patch that backend method rather than ``operations.resolve_token``.
+A second trigger is a provider that cannot attempt the request because credentials are
+unavailable. The provider reports that distinction through ``StatusFetchResult``;
+provider-neutral operations never inspect credentials or import a provider client.
 """
 
 from __future__ import annotations
@@ -38,7 +27,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from backlog_core import operations
-from backlog_core.models import BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+from backlog_core.models import BacklogItem, GraphQLUnavailableError, IssueStatus, Output, StatusFetchResult
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -68,13 +57,7 @@ LIVE_MAP = {
 
 
 class _Backend:
-    """Minimal provider-backed backend stand-in exposing only what list_items reads.
-
-    Implements ``CredentialAvailabilityProvider`` structurally
-    (``has_github_credentials``) so ``isinstance`` checks in
-    ``_status_map_empty_due_to_missing_token`` pass the same way the real
-    ``GitHubBackend`` does.
-    """
+    """Minimal provider-backed backend stand-in exposing only what list_items reads."""
 
     supports_batch_status_fetch = True
     supports_github_extras = True
@@ -202,7 +185,11 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
 
     def test_missing_token_does_not_fabricate_needs_grooming_matches(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker, has_credentials=False)
-        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(status="needs-grooming", output=Output())
 
@@ -211,7 +198,11 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
 
     def test_missing_token_does_not_silently_drop_in_progress_matches(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker, has_credentials=False)
-        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
         out = Output()
 
         result = operations.list_items(status="in-progress", output=out)
@@ -219,7 +210,7 @@ class TestStatusFilterMissingTokenDoesNotFabricateMatches:
         assert result["count"] == 0, "the live status was never learned -- a match cannot be asserted either"
         warnings = _warnings(result)
         assert warnings, "a missing-token result must not look like a confident zero"
-        assert any("GITHUB_TOKEN" in w for w in warnings), f"warning must name the missing token, got: {warnings}"
+        assert any("credentials" in w for w in warnings), f"warning must name unavailable credentials, got: {warnings}"
 
     def test_genuinely_empty_live_result_with_token_present_is_not_reported_unavailable(
         self, mocker: MockerFixture
@@ -295,82 +286,3 @@ class TestItemDerivedStatusUnavailableMap:
             == operations._item_derived_status(beads_item, {}, status_map_unavailable=False)
             == "in-progress"
         )
-
-
-class TestStatusMapEmptyDueToMissingToken:
-    """Unit-level coverage of ``_status_map_empty_due_to_missing_token``'s guard conditions.
-
-    The helper asks the backend through ``CredentialAvailabilityProvider``
-    (``has_github_credentials()``) rather than importing
-    ``github_client.resolve_token()`` directly -- ``operations.py`` must not import
-    provider clients (see ``backlog_core/ARCHITECTURE.md``'s "Module: operations.py"
-    boundary; P1 finding on #3572). These tests patch or configure
-    ``has_github_credentials`` to stand in for token presence/absence, and assert it
-    is left uncalled wherever the guard short-circuits before that question would
-    matter.
-    """
-
-    def test_true_when_no_token_and_a_numeric_issue_item_exists(self, mocker: MockerFixture) -> None:
-        _patch_backend(mocker, has_credentials=False)
-
-        assert operations._status_map_empty_due_to_missing_token(ITEMS) is True
-
-    def test_false_when_token_is_present(self, mocker: MockerFixture) -> None:
-        _patch_backend(mocker, has_credentials=True)
-
-        assert operations._status_map_empty_due_to_missing_token(ITEMS) is False
-
-    def test_false_when_no_numeric_issue_item_present(self, mocker: MockerFixture) -> None:
-        """A beads-style item never reads status_map_unavailable, so the disambiguation
-        would be pure unnecessary credential-check overhead for no observable effect.
-        """
-        beads_item = BacklogItem(title="Beads item", section="P1", skip=False, issue="bd-a3f8")
-        backend = _patch_backend(mocker, items=[beads_item], has_credentials=False)
-        has_credentials_spy = mocker.spy(backend, "has_github_credentials")
-
-        assert operations._status_map_empty_due_to_missing_token([beads_item]) is False
-        has_credentials_spy.assert_not_called()
-
-    def test_false_when_backend_has_no_github_connection_concept(self, mocker: MockerFixture) -> None:
-        """A backend like beads/SQLite/in-memory has no token concept at all -- that must
-        never be misread as "unavailable".
-        """
-
-        class _NoGitHubBackend(_Backend):
-            supports_github_extras = False
-
-        backend = _NoGitHubBackend(ITEMS, has_credentials=False)
-        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        has_credentials_spy = mocker.spy(backend, "has_github_credentials")
-
-        assert operations._status_map_empty_due_to_missing_token(ITEMS) is False
-        has_credentials_spy.assert_not_called()
-
-    def test_false_when_backend_does_not_implement_credential_availability_provider(
-        self, mocker: MockerFixture
-    ) -> None:
-        """A GitHub-capable backend that has not implemented ``CredentialAvailabilityProvider``
-        must not have "missing token" fabricated on its behalf.
-
-        This is the pre-9e926cb41 fallback semantics preserved for a backend that
-        genuinely cannot answer the question: assume credentials might be present
-        rather than claim "missing token" for an unverified backend, and do so without
-        any network re-probe (the ``_NoCredentialProtocolBackend`` stand-in below has
-        no ``try_get_github`` mock installed, so a re-probe would raise ``AttributeError``
-        on ``get_config().backend.try_get_github`` if one were attempted).
-        """
-
-        class _NoCredentialProtocolBackend:
-            supports_batch_status_fetch = True
-            supports_github_extras = True
-
-            def __init__(self, items: list[BacklogItem]) -> None:
-                self._items = items
-
-            def list_work_items(self) -> list[BacklogItem]:
-                return list(self._items)
-
-        backend = _NoCredentialProtocolBackend(ITEMS)
-        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-
-        assert operations._status_map_empty_due_to_missing_token(ITEMS) is False

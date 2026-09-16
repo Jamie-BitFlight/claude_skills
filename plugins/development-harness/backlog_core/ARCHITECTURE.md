@@ -625,8 +625,8 @@ provides the `create_backend()` factory plus `get_config()` / `set_config()` / `
 This keeps operations and server code decoupled from provider APIs, native stores, and file-cache
 implementation details.
 
-**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `CredentialAvailabilityProvider`,
-`ContentProvider`, `BranchBackend`, `BacklogConfig`, provider-neutral node types, `create_backend`,
+**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `ContentProvider`, `BranchBackend`,
+`BacklogConfig`, provider-neutral node types, `create_backend`,
 `get_config`, `set_config`, `reset_config`
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
@@ -634,14 +634,11 @@ implementation details.
   `ContentProvider` and `BranchBackend`.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
-- `CredentialAvailabilityProvider` — optional one-method `has_github_credentials() -> bool`
-  capability. A local, environment-only check (no network access), implemented by `GitHubBackend`
-  so `operations.py` can ask whether a GitHub token is configured through the backend abstraction
-  instead of importing `github_client.resolve_token()` directly, which this module's own
-  "must not import ... provider clients" restriction (below) forbids. Gate on the
-  `supports_github_extras` flag first, then treat `isinstance(backend, CredentialAvailabilityProvider)`
-  as a secondary assertion — the same flag-first pattern documented on `GitHubExtras` and
-  `BranchBackend`.
+- `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic
+  `StatusFetchResult` and `ViewEnrichmentResult` models. Their `attempted` and
+  `unavailable_reason` fields are the sole source for live-read provenance. Credential resolution
+  remains private to the provider; `operations.py` neither imports provider clients nor infers an
+  attempted request from an identifier.
 - `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
 
   ```python

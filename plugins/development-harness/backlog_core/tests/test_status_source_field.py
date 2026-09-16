@@ -15,11 +15,25 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backlog_core import operations
-from backlog_core.github_client import MissingGitHubTokenError
-from backlog_core.models import BackendUnavailableError, BacklogItem, GraphQLUnavailableError, Output
+from pydantic import BaseModel
+
+from backlog_core import gh_client, operations
+from backlog_core.backends.github_backend import GitHubBackend
+from backlog_core.file_cache import FileCache
+from backlog_core.models import (
+    BackendUnavailableError,
+    BacklogItem,
+    GraphQLUnavailableError,
+    IssueStatus,
+    Output,
+    StatusFetchResult,
+    ViewEnrichmentResult,
+    ViewItemResult,
+)
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pytest_mock import MockerFixture
 
 _REFUSAL_MESSAGE = "GitHub GraphQL is not available from Claude Code sessions; use the REST API"
@@ -116,12 +130,15 @@ class TestListItemsStatusSource:
         mocker.patch.object(
             operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([_item("#1")]))
         )
-        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token configured"))
-        batch_fetch_spy = mocker.patch.object(operations, "batch_fetch_statuses")
+        batch_fetch_spy = mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(output=Output())
 
-        batch_fetch_spy.assert_not_called()
+        batch_fetch_spy.assert_called_once()
         assert result["status_source"] == "cache"
         assert result["unavailable_capabilities"] == []
 
@@ -132,12 +149,44 @@ class TestListItemsStatusSource:
         mocker.patch.object(
             operations, "get_config", return_value=mocker.Mock(backend=_GitHubLikeBackend([_item("#1")]))
         )
-        mocker.patch.object(operations, "resolve_token", side_effect=MissingGitHubTokenError("no token configured"))
-        mocker.patch.object(operations, "batch_fetch_statuses")
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(status="in-progress", output=Output())
 
         assert result["filters_evaluated_against_unavailable_data"] == ["status"]
+
+    def test_mixed_numeric_and_unlinked_items_report_mixed_status_source(self, mocker: MockerFixture) -> None:
+        items = [_item("#1"), _item("", title="Unlinked")]
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend(items)))
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(statuses={1: IssueStatus(status="status:in-progress")}, attempted=True),
+        )
+
+        result = operations.list_items(output=Output())
+
+        assert result["status_source"] == "mixed"
+
+    def test_generic_status_and_milestone_filters_are_named_under_degradation(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend([_item("#1")]))
+        )
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="credentials unavailable"),
+        )
+
+        result = operations.list_items(
+            filter_by_key={"status": "status:in-progress", "milestone": "v1"}, output=Output()
+        )
+
+        assert result["filters_evaluated_against_unavailable_data"] == ["milestone", "status"]
 
     def test_no_numeric_issue_references_reports_cache_not_live(self, mocker: MockerFixture) -> None:
         """No item on the page carries a numeric issue reference -- nothing for the
@@ -218,6 +267,21 @@ class TestViewItemStatusSource:
         assert result.status_source == "unavailable"
         assert result.unavailable_capabilities == ["live_enrichment"]
 
+    def test_provider_skipped_enrichment_reports_cache(self, mocker: MockerFixture) -> None:
+        _patch_view_backend(mocker, [_item("#519", title="Cached title")])
+        mocker.patch.object(
+            operations,
+            "view_enrich_from_github",
+            return_value=ViewEnrichmentResult(
+                enriched=False, attempted=False, unavailable_reason="no GitHub credentials configured"
+            ),
+        )
+
+        result = operations.view_item("#519", output=Output())
+
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
+
     def test_backend_unavailable_exception_reports_unavailable(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
         mocker.patch.object(
@@ -248,15 +312,7 @@ class TestViewItemStatusSource:
         assert result.unavailable_capabilities == []
 
     def test_refresh_requested_but_no_identifier_still_reports_cache(self, mocker: MockerFixture) -> None:
-        """The precise #3546 §3.4 reproduction: refresh=True enters the live-check
-        sub-block (issue_num or refresh is True), but the item carries no issue
-        reference at all, so _live_lookup_id resolves to None and
-        view_enrich_from_github is never called -- this is the exact branch where
-        the "backend unreachable" prose warning used to be a false positive
-        (fixed by plan task B6, now gated on the same live_attempted flag).
-        status_source must still say "cache", not "unavailable", even though the
-        sub-block was entered.
-        """
+        """A refresh with no resolvable identifier remains a cache-only read."""
         item_without_issue = BacklogItem(title="No issue ref", section="P1", status="status:in-progress")
         _patch_view_backend(mocker, [item_without_issue])
         mock_enrich = mocker.patch.object(operations, "view_enrich_from_github")
@@ -266,3 +322,33 @@ class TestViewItemStatusSource:
         mock_enrich.assert_not_called()
         assert result.status_source == "cache"
         assert result.unavailable_capabilities == []
+
+
+class TestGitHubProviderOutcomeBoundary:
+    """GitHub owns credential checks and reports skipped requests structurally."""
+
+    def test_missing_credentials_skip_status_fetch_inside_provider(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        backend = GitHubBackend(cache=FileCache(tmp_path))
+        mocker.patch.object(backend, "has_github_credentials", return_value=False)
+        fetch = mocker.patch.object(gh_client, "batch_fetch_statuses")
+
+        outcome = backend.batch_fetch_statuses([_item("#1")])
+
+        assert isinstance(outcome, BaseModel)
+        assert outcome.attempted is False
+        assert outcome.unavailable_reason
+        fetch.assert_not_called()
+
+    def test_missing_credentials_skip_view_enrichment_inside_provider(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        backend = GitHubBackend(cache=FileCache(tmp_path))
+        mocker.patch.object(backend, "has_github_credentials", return_value=False)
+        enrich = mocker.patch.object(gh_client, "view_enrich_from_github")
+
+        outcome = backend.view_enrich_from_github(ViewItemResult(), "1")
+
+        assert isinstance(outcome, BaseModel)
+        assert outcome.attempted is False
+        assert outcome.enriched is False
+        enrich.assert_not_called()
