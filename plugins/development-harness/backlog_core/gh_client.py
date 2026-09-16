@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
@@ -19,9 +20,17 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client, resolve_token
+from backlog_core.github_client import MissingGitHubTokenError, make_github_client
 
-from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
+from .backend_types import (
+    AddedCommentNode,
+    AssigneeNode,
+    IssueCommentNode,
+    IssueNode,
+    LabelNode,
+    MilestoneFullNode,
+    MilestoneNode,
+)
 from .entry_blocks import wrap_entry
 from .models import (
     TYPE_TO_LABEL,
@@ -261,7 +270,7 @@ mutation UpdateIssue(
 _ADD_COMMENT_MUTATION = """
 mutation AddComment($subjectId: ID!, $body: String!) {
   addComment(input: {subjectId: $subjectId, body: $body}) {
-    commentEdge { node { id url } }
+    commentEdge { node { id fullDatabaseId url } }
   }
 }
 """
@@ -333,6 +342,7 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
+          fullDatabaseId
           body
           url
           author { login }
@@ -351,6 +361,7 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
+      fullDatabaseId
       body
       url
       author { login }
@@ -500,7 +511,7 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 GRAPHQL_UNAVAILABLE_MARKERS: Final[tuple[str, ...]] = ("graphql is not available",)
 
 
-def github_exception_message(exc: GithubException) -> str:
+def _github_exception_message(exc: GithubException) -> str:
     """Return the human-readable message a GithubException carries.
 
     Args:
@@ -534,7 +545,7 @@ def is_graphql_unavailable(exc: GithubException) -> bool:
     """
     if exc.status != _HTTP_FORBIDDEN:
         return False
-    message = github_exception_message(exc).casefold()
+    message = _github_exception_message(exc).casefold()
     return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
 
 
@@ -564,7 +575,7 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
         if is_graphql_unavailable(exc):
-            msg = f"GraphQL is unavailable in this environment: {github_exception_message(exc)}"
+            msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc
@@ -877,7 +888,7 @@ def _update_issues_graphql_batch(repo: Repository, updates: list[tuple[str, str]
                 _update_issue_graphql(repo, node_id, body=body)
 
 
-def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str:
+def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> AddedCommentNode:
     """Add a comment to an issue via GraphQL.
 
     Args:
@@ -886,27 +897,75 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
         body: Comment body text.
 
     Returns:
-        Comment node ID string.
+        AddedCommentNode carrying the GraphQL node ``id`` and, when GitHub
+        reports one, the REST integer ``database_id`` that
+        ``backlog_read_comment``'s ``comment_id`` requires -- the same
+        identifier symmetry ``_fetch_issue_comments_graphql`` and
+        ``_fetch_comment_by_id_graphql`` already provide for the listing and
+        single-comment paths.
 
     Raises:
         BacklogError: On GraphQL errors.
     """
     data = _graphql_request(repo, _ADD_COMMENT_MUTATION, {"subjectId": issue_node_id, "body": body})
     comment_node = data.get("addComment", {}).get("commentEdge", {}).get("node", {})
-    return str(comment_node.get("id", ""))
+    return AddedCommentNode(
+        id=str(comment_node.get("id", "")), database_id=_parse_full_database_id(comment_node.get("fullDatabaseId"))
+    )
+
+
+def _parse_full_database_id(raw_full_database_id: object) -> int | None:
+    """Normalize a raw GraphQL ``fullDatabaseId`` value to ``int | None``.
+
+    ``fullDatabaseId`` is GitHub's ``BigInt`` scalar -- the field the comment
+    queries and the ``addComment`` mutation select instead of the sibling
+    ``databaseId: Int`` field, because a real comment database ID already
+    exceeds ``Int``'s signed 32-bit range. GitHub serializes ``BigInt`` as a
+    decimal string on the wire, though a JSON integer is also tolerated
+    (https://docs.github.com/en/graphql/reference/scalars#bigint), so both
+    encodings are accepted here and normalized to a Python ``int``.
+
+    ``bool`` is an ``int`` subclass in Python, so it is excluded explicitly —
+    ``True`` would otherwise be accepted as comment ``1``. A string is only
+    accepted when it is a plain, unsigned decimal (every character an ASCII
+    digit): GitHub never emits a sign or a fractional part for this field,
+    and accepting one anyway would coerce an unrelated malformed response
+    into a plausible-looking ID.
+
+    Args:
+        raw_full_database_id: The raw ``fullDatabaseId`` value from a GraphQL
+            response (``comments.nodes[].fullDatabaseId``, ``node()``'s
+            ``... on IssueComment { fullDatabaseId }``, or
+            ``commentEdge.node.fullDatabaseId``).
+
+    Returns:
+        The integer database ID, or ``None`` if absent, ``null``, or not a
+        recognizable ``int``/decimal-string encoding.
+    """
+    if isinstance(raw_full_database_id, int) and not isinstance(raw_full_database_id, bool):
+        return raw_full_database_id
+    if isinstance(raw_full_database_id, str) and re.fullmatch(r"[0-9]+", raw_full_database_id):
+        return int(raw_full_database_id)
+    return None
 
 
 def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
-    """Parse a raw GraphQL comment dict into a typed IssueCommentNode.
+    """Parse a raw GraphQL comment dict into a validated IssueCommentNode.
 
     Args:
         node: Raw dict from GraphQL response comments.nodes[] or node() query.
 
     Returns:
-        IssueCommentNode with all fields populated.
+        IssueCommentNode with all fields populated. ``database_id`` is set only
+        when the response carries a recognizable ``fullDatabaseId`` -- it is
+        the numeric identifier REST addresses the comment by, and a missing or
+        unrecognizable value is left absent rather than guessed at, so a REST
+        caller fails loudly instead of requesting a comment that does not
+        exist. See ``_parse_full_database_id`` for the accepted encodings.
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
+    database_id = _parse_full_database_id(node.get("fullDatabaseId"))
     return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
@@ -914,6 +973,7 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
         author=author,
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
+        database_id=database_id,
     )
 
 
@@ -929,7 +989,7 @@ def _fetch_issue_comments_graphql(
         issue_number: Issue number (positive integer).
 
     Returns:
-        List of ``IssueCommentNode`` dicts with ``id``, ``body``, ``url``,
+        List of ``IssueCommentNode`` instances with ``id``, ``body``, ``url``,
         ``author``, ``created_at``, and ``updated_at`` fields.
 
     Raises:
@@ -1251,7 +1311,7 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
     except MissingGitHubTokenError:
-        logger.warning("try_get_github: no GitHub token available — GitHub operations will be skipped")
+        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
         return gh.get_repo(repo)
@@ -1274,10 +1334,8 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         BackendStatus with availability and live issue counts. Cache fields retain
         their defaults because the provider owns cache observation.
     """
-    try:
-        resolve_token()
-    except MissingGitHubTokenError as exc:
-        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error=str(exc))
+    if not os.environ.get("GITHUB_TOKEN"):
+        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
@@ -1527,13 +1585,6 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
 
     Returns:
         Status label string or empty string.
-
-    Raises:
-        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL API
-            outright. An empty return means "this issue carries no status label",
-            which is an answer about the issue. A refused query is not that answer,
-            and reporting one as the other hides the only fact worth acting on.
-            ``batch_fetch_statuses`` propagates the same refusal for the same reason.
     """
     if not item.issue:
         return ""
@@ -1546,8 +1597,6 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
         return _pick_primary_status_label(labels)
-    except GraphQLUnavailableError:
-        raise
     except (BacklogError, GithubException):
         return ""
 

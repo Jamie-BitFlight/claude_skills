@@ -13,6 +13,7 @@ import base64
 import datetime as dt
 import os
 import ssl
+import sys
 from pathlib import Path
 
 import certifi
@@ -663,6 +664,14 @@ class TestBuildSslContextIndependentOfPreInitShim:
     before ``_build_ssl_context``'s own ``relax_strict`` branch runs at all.
     """
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 13),
+        reason=(
+            "tls_compat.relax_verify_x509_strict() is a documented no-op below Python 3.13 "
+            "(see tls_compat.py's own `if sys.version_info < (3, 13): return`), so on 3.11/3.12 "
+            "this test's setup patches nothing and the scenario it simulates cannot occur."
+        ),
+    )
     def test_strict_flag_survives_a_pre_init_shim_that_already_ran(self, compliant_ca_file):
         """Reproduces the deployed import order instead of testing this module in
         isolation: the real ``relax_verify_x509_strict()`` runs first (producing its

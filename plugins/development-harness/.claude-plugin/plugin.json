@@ -8,6 +8,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "11.1.29",
 =======
   "version": "11.1.13",
@@ -30,6 +31,9 @@
 =======
   "version": "11.1.13",
 >>>>>>> 49d9200bd (fix(backlog-core): restore VERIFY_X509_STRICT only when Python's own default sets it)
+=======
+  "version": "11.1.15",
+>>>>>>> 40a7dca4c (test(backlog-core): skip pre-init-shim test below Python 3.13)
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
