@@ -6,7 +6,7 @@ import re
 from datetime import UTC, datetime
 from typing import NamedTuple
 
-from .models import Entry, EntryNotFoundError
+from .models import Entry, EntryNotFoundError, ValidationError
 from .timestamps import now_iso
 
 # Matches ISO 8601 timestamps (with or without sub-second fraction) at the start of a string.
@@ -233,8 +233,13 @@ def _parse_entry_timestamp(entry_id: str) -> datetime | None:
         timestamp rather than a real one.
 
     Raises:
-        ValueError: If ``entry_id`` neither starts with the zero-date fallback prefix nor
-            with a valid, calendar-real ISO timestamp.
+        ValidationError: If ``entry_id`` starts with neither the zero-date fallback prefix
+            nor a well-formed ISO timestamp.  Entry IDs come off stored bodies, not from
+            callers, and ``backlog_view(since=...)`` parses every one of them, so the
+            refusal has to be a ``BacklogError`` for the tool to report an ``error`` field
+            rather than fail the call.
+        ValueError: If the prefix is well-formed but names no real calendar date —
+            ``datetime.fromisoformat``'s own refusal, raised as it raises it.
     """
     if entry_id.startswith(_ZERO_DATE_PREFIX):
         # The zero-date fallback means "this entry's timestamp is unknown", not "year zero"
@@ -248,7 +253,7 @@ def _parse_entry_timestamp(entry_id: str) -> datetime | None:
     m = _ISO_TIMESTAMP_RE.match(entry_id)
     if not m:
         msg = f"Entry ID does not contain a valid ISO timestamp prefix: {entry_id!r}"
-        raise ValueError(msg)
+        raise ValidationError(msg)
     ts = m.group(1)
     dt = datetime.fromisoformat(ts)
     if dt.tzinfo is None:
@@ -271,7 +276,10 @@ def _is_entry_id(entry_id: str) -> bool:
         return False
     try:
         _parse_entry_timestamp(entry_id)
-    except ValueError:
+    except (ValidationError, ValueError):
+        # Both arms are needed: the missing-prefix refusal is this module's own
+        # ValidationError, the calendar-impossible one is fromisoformat's ValueError, and
+        # ValidationError does not inherit from ValueError.
         return False
     return True
 
