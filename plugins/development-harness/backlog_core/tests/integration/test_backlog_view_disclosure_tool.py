@@ -664,6 +664,34 @@ class TestBacklogErrorInDisclosurePath:
             f"Got: {data['error']!r}"
         )
 
+    async def test_item_not_found_error_type_survives_flattening(self, mocker: MockerFixture) -> None:
+        """'error_type' names the raised exception's class, not just its message.
+
+        Regression guard for B-critique.md §3.2: before this fix,
+        ``_execute_disclosure_or_passthrough``'s ``except BacklogError`` arm
+        returned only ``{"error": str(exc)}`` -- indistinguishable from any
+        other ``BacklogError`` subtype (a refused GraphQL/REST lookup, an
+        unsupported backend capability, ...) with a similar-looking message.
+        A caller had to string-match the rendered message to recover the
+        failure's identity. This asserts the exception's *type* survives
+        instead, via a discriminating field -- not string content.
+        """
+        mocker.patch("backlog_core.operations.view_item", side_effect=ItemNotFoundError("#99999"))
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("backlog_view", {"selector": "#99999", "map": True})
+
+        data = _extract_response_dict(result)
+        assert "error_type" in data, (
+            f"BacklogError arm must include 'error_type' so the exception's identity "
+            f"survives instead of being flattened to a bare error string. "
+            f"Got keys: {sorted(data.keys())}"
+        )
+        assert data["error_type"] == "ItemNotFoundError", (
+            f"'error_type' must name the raised exception's class. "
+            f"Expected 'ItemNotFoundError', got: {data['error_type']!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Synthetic fixture support (recursive-nav shape)

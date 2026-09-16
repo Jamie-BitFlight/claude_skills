@@ -16,6 +16,7 @@ by acceptance tests.
 - [Layer 1 — Map](#layer-1--map)
 - [Layer 2 — Navigate](#layer-2--navigate)
 - [Layer 3 — Extract](#layer-3--extract)
+- [Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields)
 - [Error-on-Miss Invariant](#error-on-miss-invariant)
 - [Token Budget Targets](#token-budget-targets)
 - [Parameter Reference](#parameter-reference)
@@ -58,9 +59,15 @@ backlog_view(selector="#2515", map=True)
   "total_sections": <count of level-1 sections>,
   "total_est_tokens": <sum of level-1 section estimates>,
   "over_budget": <true when total exceeds the tool token budget>,
-  "map_text": "<formatted map, always < 2,000 tokens>"
+  "map_text": "<formatted map, always < 2,000 tokens>",
+  "messages": [],
+  "warnings": [],
+  "errors": []
 }
 ```
+
+`messages`, `warnings`, and `errors` are always present and default to an empty list — see
+[Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields).
 
 ### Map line format
 
@@ -117,12 +124,16 @@ calling with `map=True` first.
   "title": "RT-ICA entry",
   "content": "<full section/entry content>",
   "total_tokens": <exact cl100k_base count>,
-  "truncated": false
+  "truncated": false,
+  "messages": [],
+  "warnings": [],
+  "errors": []
 }
 ```
 
 `truncated` is always `false` for navigate-without-head responses. To paginate large content,
-add `head=N` to activate Extract mode.
+add `head=N` to activate Extract mode. `messages`, `warnings`, and `errors` are always present and
+default to an empty list — see [Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields).
 
 ### Ordinal format
 
@@ -156,11 +167,16 @@ backlog_view(selector="#2515", navigate="4.0", head=4000)
   "total_tokens": <exact count of full content before truncation>,
   "returned_tokens": <tokens actually returned in this window>,
   "truncated": true,
-  "next_call": "backlog_view(selector=\"#2515\", navigate=\"4.0\", head=4000, skip_tokens=4000)"
+  "next_call": "backlog_view(selector=\"#2515\", navigate=\"4.0\", head=4000, skip_tokens=4000)",
+  "messages": [],
+  "warnings": [],
+  "errors": []
 }
 ```
 
 When `truncated` is `false`, `next_call` is `null` and all content has been delivered.
+`messages`, `warnings`, and `errors` are always present and default to an empty list — see
+[Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields).
 
 ### Pagination with skip_tokens
 
@@ -195,6 +211,33 @@ These two parameters address different concerns and must not be substituted for 
 
 `offset` is a coarse pagination mechanism for entry blocks. `skip_tokens` is a fine-grained
 pagination mechanism for token-bounded extraction within a single ordinal unit.
+
+---
+
+## Degradation and Diagnostic Fields
+
+Every response type in this contract — `MapResponse` (Layer 1), `NavigateResponse` (Layer 2), and
+`BoundedResponse` (Layer 3) — carries three additional fields that are independent of the
+map/navigate/extract shape documented above:
+
+| Field | Type | Default | Meaning |
+|-------|------|---------|---------|
+| `messages` | `list[str]` | `[]` | Informational messages from the underlying read (e.g. a reconcile summary). |
+| `warnings` | `list[str]` | `[]` | Degradation warnings from the underlying read (e.g. `"backend unreachable — sections_index reflects provider-backed record, may be stale"`). |
+| `errors` | `list[str]` | `[]` | Non-fatal error messages from the underlying read. Distinct from the fatal ordinal/parameter errors in [Error-on-Miss Invariant](#error-on-miss-invariant) — these accompany a successful content response, they do not replace it. |
+
+All three fields are forwarded from the underlying `operations.view_item()` call's `Output`
+collector, so a degraded read (for example a refused live-enrichment lookup) surfaces to the
+caller on every MAP, NAVIGATE, and EXTRACT response instead of being silently discarded. The
+fields are always present on the response and default to an empty list when the underlying read
+produced no diagnostics — absence of entries, not absence of the fields, signals a clean read. An
+agent consuming any disclosure-mode response should inspect `warnings` before treating returned
+content as authoritative, the same way it would for a PASSTHROUGH response.
+
+`MapResponse`, `NavigateResponse`, and `BoundedResponse` are frozen Pydantic `BaseModel`
+subclasses (not dataclasses), per this repo's "structured data → Pydantic, not
+dataclass/TypedDict" convention, defined in
+[`../plugins/development-harness/backlog_core/disclosure_types.py`](../plugins/development-harness/backlog_core/disclosure_types.py).
 
 ---
 
@@ -235,6 +278,44 @@ The `suggestion` key is present only when difflib finds a close match (SequenceM
 **Before this contract**: missing sections silently returned the full unchanged body. That silent
 fallback is removed. Callers that previously relied on approximate section names should use
 `map=True` to discover exact section names or use `sections_index` from a summary-mode response.
+
+### Generic backend error
+
+Ordinal misses and section-filter misses are the two *expected* miss shapes above — both carry
+dedicated structured fields (`valid_ordinals`, `valid_sections`) because the calling code can
+recover from them by retrying with a corrected ordinal or section name. Every other failure raised
+while executing a MAP, NAVIGATE, or EXTRACT request — a missing backlog item, a refused
+GraphQL/REST lookup, an unsupported backend capability, or any other `BacklogError` subclass — is
+caught at the same site and returns a smaller, generic error shape instead:
+
+```text
+{
+  "error": "No item found for: #99999",
+  "error_type": "ItemNotFoundError"
+}
+```
+
+`error` is the exception's rendered message (`str(exc)`), identical in spirit to the `error` key in
+the ordinal-miss and section-miss shapes above. `error_type` is new: it is the raised exception's
+class name (`type(exc).__name__`), giving the caller a stable identity to branch on instead of
+parsing the free-text message. This matters because `BacklogError` has multiple subclasses —
+`ItemNotFoundError`, `EntryNotFoundError`, `CacheStateCorruptError`, and others defined in
+[`../plugins/development-harness/backlog_core/models.py`](../plugins/development-harness/backlog_core/models.py)
+— and prior to this field every one of them flattened to the same bare `{"error": str(exc)}`,
+discarding which failure actually occurred.
+
+This generic shape is distinct from, and does not replace, the dedicated ordinal-miss and
+section-miss shapes documented above: `OrdinalNotFoundError` keeps its own
+`requested_ordinal`/`valid_ordinals` fields, and the legacy `section=`/`sections=[]` miss keeps its
+own `valid_sections`/`section_filter_miss`/`suggestion` fields. A caller that needs to distinguish
+"ordinal not found" from "item not found" from "backend refused the lookup" should check for the
+presence of `valid_ordinals` or `valid_sections` first, then fall back to `error_type` for every
+other `BacklogError` subclass. The generic shape never carries a `body` field, matching the
+no-`body` convention used to distinguish every error dict in this section from a content response.
+
+Implemented in
+[`../plugins/development-harness/backlog_core/server.py`](../plugins/development-harness/backlog_core/server.py)'s
+`_execute_disclosure_or_passthrough`.
 
 ---
 
@@ -328,6 +409,9 @@ data-returning tool (e.g. `sam_plan read`, `sam_plan ready`):
    `skip_tokens=` continuation (not `offset=`).
 6. On ordinal miss: raise an error listing all valid ordinals (see
    [Error-on-Miss Invariant](#error-on-miss-invariant)).
+7. On every MAP/NAVIGATE/EXTRACT response: forward `messages`/`warnings`/`errors` from the
+   underlying read (see [Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields))
+   instead of dropping them.
 
 The token encoding and budget derivation are defined in the reference implementation at
 [`../plugins/development-harness/progressive_markdown/models.py`](../plugins/development-harness/progressive_markdown/models.py)
@@ -340,5 +424,5 @@ and
 
 - [`../plugins/development-harness/backlog_core/disclosure_handler.py`](../plugins/development-harness/backlog_core/disclosure_handler.py) — reference implementation: `DisclosureRequestParser`, `BacklogViewDisclosureHandler`, `TokenBoundedExtractor`
 - [`../plugins/development-harness/backlog_core/ordinal_mapper.py`](../plugins/development-harness/backlog_core/ordinal_mapper.py) — `OrdinalPathMapper`, `format_map_line`, `OrdinalEntry`
-- [`../plugins/development-harness/backlog_core/disclosure_types.py`](../plugins/development-harness/backlog_core/disclosure_types.py) — `MapResponse`, `NavigateResponse`, `BoundedResponse`, `OrdinalNotFoundError`, `DisclosureParamError`
+- [`../plugins/development-harness/backlog_core/disclosure_types.py`](../plugins/development-harness/backlog_core/disclosure_types.py) — `MapResponse`, `NavigateResponse`, `BoundedResponse` (frozen Pydantic `BaseModel` subclasses carrying `messages`/`warnings`/`errors`; see [Degradation and Diagnostic Fields](#degradation-and-diagnostic-fields)), `OrdinalNotFoundError`, `DisclosureParamError`
 - [`../plugins/development-harness/backlog_core/content_normalizer.py`](../plugins/development-harness/backlog_core/content_normalizer.py) — `ItemContentNormalizer`
