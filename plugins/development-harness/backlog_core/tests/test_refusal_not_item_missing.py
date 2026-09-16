@@ -149,14 +149,19 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
 
         assert any(_REFUSAL_MESSAGE in w for w in out.warnings)
 
-    def test_a_plain_lookup_failure_names_the_possible_causes(self, mocker: MockerFixture) -> None:
+    def test_a_plain_lookup_failure_names_unreachable_backend_and_possible_causes(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
         mocker.patch.object(operations, "view_enrich_from_github", return_value=False)
         out = Output()
 
         operations.view_item("#519", output=out)
 
-        assert any(w.startswith("GitHub lookup failed (") for w in out.warnings)
+        assert any(
+            w.startswith("backend unreachable — GitHub lookup failed (")
+            and "authentication failure" in w
+            and "issue not found" in w
+            for w in out.warnings
+        )
 
 
 class _CacheBackend:
