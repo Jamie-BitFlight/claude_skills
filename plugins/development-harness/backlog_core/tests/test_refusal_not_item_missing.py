@@ -339,6 +339,27 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
         with pytest.raises(GitHubUnavailableError):
             operations.view_item("#999", output=Output())
 
+    def test_nothing_attempted_emits_no_warning_or_degradation_signal(self, mocker: MockerFixture) -> None:
+        """ "Nothing was tried" must not render identically to "the backend refused us".
+
+        A cached item with no resolvable identifier (no issue number, no issue
+        ref) and a title selector with ``refresh=True`` reaches the live-check
+        branch, but ``_live_lookup_id`` returns ``None`` -- no lookup is ever
+        made. Neither the "backend unreachable" prose warning nor the
+        ``status_source``/``unavailable_capabilities`` degradation fields (#3546
+        B5) may fire for a call that never attempted anything (B-critique.md
+        §3.4).
+        """
+        _patch_view_backend(mocker, [_item("", title="Untracked cached title")])
+        enrich_mock = mocker.patch.object(operations, "view_enrich_from_github")
+
+        result = operations.view_item("Untracked cached title", refresh=True, output=Output())
+
+        enrich_mock.assert_not_called()
+        assert result.warnings == []
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
+
 
 class _CacheBackend:
     """Backend stub whose cache is fed by an external provider.

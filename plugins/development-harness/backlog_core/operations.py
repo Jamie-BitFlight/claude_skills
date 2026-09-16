@@ -3647,10 +3647,12 @@ def view_item(
     result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
 
     # Tracks whether a live GitHub/backend check was actually attempted this
-    # call, independent of the "backend unreachable" prose warning below --
-    # #3546 B5's status_source field must distinguish "nothing was tried"
-    # from "something was tried and failed" even though the existing prose
-    # warning does not yet (B-critique.md §3.4, tracked separately as B6).
+    # call, i.e. whether ``live_id`` resolved to a usable identifier. Gates
+    # both the "backend unreachable" prose warning below and the
+    # status_source provenance computed further down (#3546 B5/B6):
+    # "nothing was tried" (live_id falsy -- no local number/issue ref to
+    # check against) must not render identically to "something was tried
+    # and failed" (B-critique.md §3.4).
     live_attempted = False
     enriched = False
     if item:
@@ -3668,7 +3670,10 @@ def view_item(
                 # The cached record still answers the view, so the read succeeds.
                 # Name the cause instead of reporting the generic unreachable case.
                 enriched, reason = False, f"backend unavailable ({exc})"
-            if not enriched:
+            # Only warn when a live check was actually attempted and failed.
+            # When live_id was falsy (live_attempted is False), no lookup was
+            # ever made -- nothing to warn about, and no degradation occurred.
+            if not enriched and live_attempted:
                 out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
@@ -3686,15 +3691,15 @@ def view_item(
     else:
         raise ItemNotFoundError(selector)
 
-    # Provenance of this item's data (#3546, B5): "live" when enrichment
+    # Provenance of this item's data (#3546, B5/B6): "live" when enrichment
     # actually succeeded this call; "unavailable" when a live check was
     # attempted and failed (BackendUnavailableError, or a False return with no
     # exception); "cache" when no live check was ever attempted. Distinct
     # "cache"/"unavailable" states so a caller can tell "nothing was tried"
     # apart from "something was tried and failed" (B-critique.md §3.4) --
-    # computed independently of the "backend unreachable" prose warning above,
-    # which still fires for the not-attempted case too (a separate, tracked
-    # defect -- plan task B6 -- this field must not reproduce).
+    # consistent with the "backend unreachable" prose warning above, which
+    # is now gated on the same live_attempted flag and no longer fires for
+    # the not-attempted case.
     status_source: StatusSource
     if enriched:
         status_source = "live"
@@ -3726,7 +3731,6 @@ def view_item(
     out.warnings.extend(warning for warning in result.warnings if warning not in out.warnings)
     result.status_source = status_source
     result.unavailable_capabilities = unavailable_capabilities
-    out.warnings.extend(warning for warning in result.warnings if warning not in out.warnings)
     result.messages = out.messages
     result.warnings = out.warnings
     result.errors = out.errors

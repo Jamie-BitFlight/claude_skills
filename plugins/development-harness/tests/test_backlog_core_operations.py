@@ -1992,17 +1992,23 @@ class TestViewItem:
         mock_enrich.assert_called_once()
         assert mock_enrich.call_args.args[1] == "999"
 
-    def test_view_item_refresh_true_no_identifier_appends_warning_without_call(self, mocker: MockerFixture) -> None:
-        """Cached item with no resolvable id + refresh=True appends a warning, no call, no raise.
+    def test_view_item_refresh_true_no_identifier_appends_no_warning_without_call(self, mocker: MockerFixture) -> None:
+        """Cached item with no resolvable id + refresh=True: no call, no warning, no raise.
 
-        Tests: view_item's guard against calling enrich with no identifier at all.
+        Tests: view_item's guard against calling enrich with no identifier at all,
+             and (#3546 B6) that "nothing was tried" does not render identically to
+             "the backend refused us".
         How: Write a local item with no issue number set; call view_item by title
              with refresh=True; assert enrich was never called, no exception was
-             raised, and the "GitHub lookup failed" warning was appended.
+             raised, and no "backend unreachable" warning was appended — nothing
+             was ever attempted, so there is nothing to warn about.
         Why: _live_lookup_id() must never return an empty string, and its None
-             return means the caller has no identifier to send to the backend —
-             the correct outcome is a warning, not a crash or a call with an
-             invalid argument.
+             return means the caller has no identifier to send to the backend.
+             Previously this rendered the same "backend unreachable" warning as a
+             genuine attempted-and-failed live check (B-critique.md §3.4); the
+             corrected behaviour distinguishes "not attempted" from "attempted and
+             failed" (see status_source == "cache" in test_status_source_wire.py
+             and backlog_core/tests/test_refusal_not_item_missing.py).
         """
         import backlog_core.models as models
 
@@ -2013,10 +2019,9 @@ class TestViewItem:
         result = view_item("No Identifier Item", refresh=True)
 
         mock_enrich.assert_not_called()
-        assert (
-            "GitHub lookup failed (authentication failure, rate limit, GitHub server error, "
-            "or issue not found) — sections_index reflects provider-backed record, may be stale" in result.warnings
-        )
+        assert result.warnings == []
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
 
 
 # ---------------------------------------------------------------------------

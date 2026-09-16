@@ -233,8 +233,9 @@ class TestViewItemStatusSource:
         """The false-positive #3546 §3.4 bug: nothing was attempted here (no issue ref,
         no refresh requested). status_source must say "cache", never "unavailable" --
         a caller asking specifically for this field must not receive the B-critique.md
-        §3.4 false positive that the *prose* warning still carries (tracked separately,
-        plan task B6). This is the field this test suite exists to keep honest.
+        §3.4 false positive. Plan task B6 fixed the analogous false positive in the
+        *prose* warning (now gated on the same live_attempted flag); this is the
+        field this test suite exists to keep honest.
         """
         item_without_issue = BacklogItem(title="No issue ref", section="P1", status="status:in-progress")
         _patch_view_backend(mocker, [item_without_issue])
@@ -251,9 +252,10 @@ class TestViewItemStatusSource:
         sub-block (issue_num or refresh is True), but the item carries no issue
         reference at all, so _live_lookup_id resolves to None and
         view_enrich_from_github is never called -- this is the exact branch where
-        the existing "backend unreachable" prose warning is a false positive
-        (tracked separately as plan task B6). status_source must still say
-        "cache", not "unavailable", even though the sub-block was entered.
+        the "backend unreachable" prose warning used to be a false positive
+        (fixed by plan task B6, now gated on the same live_attempted flag).
+        status_source must still say "cache", not "unavailable", even though the
+        sub-block was entered.
         """
         item_without_issue = BacklogItem(title="No issue ref", section="P1", status="status:in-progress")
         _patch_view_backend(mocker, [item_without_issue])
