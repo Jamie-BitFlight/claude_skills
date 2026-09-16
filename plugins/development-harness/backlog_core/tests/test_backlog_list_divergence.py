@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from backlog_core import operations
-from backlog_core.models import BackendUnavailableError, BacklogItem
+from backlog_core.models import BackendUnavailableError, BacklogItem, ReconcileRequest, ReconcileResult
 from backlog_core.sync_state import SyncStatus, get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
@@ -113,6 +113,13 @@ class _NoReconcileBackend:
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
+
+
+class _DegradedReconcileBackend(_NoReconcileBackend):
+    """SyncProvider stub returning every caller-relevant degradation counter."""
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        return ReconcileResult(fetched_items=1, failures=2, pending_mutations=3, rejected_mutations=4)
 
 
 # ---------------------------------------------------------------------------
@@ -503,6 +510,28 @@ class TestCountOnlyPreservesOperationsLayerOutput:
         )
         assert "warnings" not in response
         assert "errors" not in response
+
+    async def test_count_only_refresh_surfaces_reconciliation_degradation(
+        self, reset_state: None, mock_probe_not_checked: None, mocker: MockerFixture
+    ) -> None:
+        """A requested refresh must report incomplete reconciliation and queued mutations."""
+        from backlog_core.server import backlog_list
+
+        mocker.patch.object(
+            operations, "get_config", return_value=mocker.Mock(backend=_DegradedReconcileBackend([_item("#1")]))
+        )
+
+        response = cast("dict[str, object]", await backlog_list(refresh=True, count_only=True))
+
+        assert response.get("count") == 1
+        assert "messages" not in response
+        warnings = cast("list[str]", response.get("warnings", []))
+        assert warnings == [
+            (
+                "Reconciled 1 provider item(s): 0 local updates, 0 patches, 0 no-ops, 2 failures, "
+                "3 pending mutation(s), 4 rejected mutation(s)."
+            )
+        ]
 
 
 # ---------------------------------------------------------------------------

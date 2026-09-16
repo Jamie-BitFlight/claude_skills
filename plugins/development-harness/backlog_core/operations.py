@@ -1873,11 +1873,15 @@ def refresh_local_cache_from_github(
     result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
-    out.info(
+    summary = (
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
         f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures, "
         f"{result.pending_mutations} pending mutation(s), {result.rejected_mutations} rejected mutation(s)."
     )
+    if result.failures or result.pending_mutations or result.rejected_mutations:
+        out.warn(summary)
+    else:
+        out.info(summary)
     return {
         "refreshed": result.local_updates,
         "reconciled": result.deleted_provider_items,

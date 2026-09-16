@@ -1928,17 +1928,10 @@ async def backlog_list(
     #
     # `out` (the operations-layer Output collector `list_items` wrote into) is
     # merged here on its `warnings`/`errors` channels only — never `messages`.
-    # `list_items(refresh=True)` populates `out.info()` (routine reconcile
-    # prose, e.g. "Reconciled N provider item(s)...") on a HEALTHY call too
-    # (#3546 B-critique.md §2.3), so merging `messages` unconditionally would
-    # leak routine operational prose into what is documented and tested as a
-    # count-only response on a healthy call. `warnings`/`errors` are the
-    # channels the operations layer already reserves for genuine degradation
-    # (BackendUnavailableError-derived reads via out.warn()/out.error() — see
-    # e.g. the "Live status unavailable" warning at batch_fetch_statuses'
-    # except clause above), so gating the merge on those two channels
-    # surfaces a real degradation without breaking the healthy-path contract
-    # (B-critique.md §4.5).
+    # `list_items(refresh=True)` records a healthy reconciliation summary with
+    # `out.info()`, while reconciliation failures and pending/rejected mutations
+    # use `out.warn()`. This keeps routine prose out of the documented minimal
+    # shape without discarding side-effect degradation results.
     if count_only:
         # from_cache/has_pending_writes are sourced from the same `result`
         # dict list_items already returned above -- operations.list_items
