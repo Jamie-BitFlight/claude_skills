@@ -913,6 +913,8 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> Add
     return AddedCommentNode(
         id=str(comment_node.get("id", "")), database_id=_parse_full_database_id(comment_node.get("fullDatabaseId"))
     )
+
+
 def _parse_full_database_id(raw_full_database_id: object) -> int | None:
     """Normalize a raw GraphQL ``fullDatabaseId`` value to ``int | None``.
 

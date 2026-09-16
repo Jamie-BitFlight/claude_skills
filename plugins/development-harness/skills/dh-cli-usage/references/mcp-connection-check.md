@@ -1,5 +1,7 @@
 # MCP Server Connection Check
 
+Load `dh:dh-cli-usage` before resolving `<sam_cli/>` or `<dh_scripts/>` below.
+
 Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers
 to be connected before use. After a session restart, these servers initialize in
 approximately 1–2 seconds, starting in parallel at session startup.
