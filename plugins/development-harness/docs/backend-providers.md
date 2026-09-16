@@ -125,6 +125,50 @@ The same rule applies to remote work-item reconciliation: provider snapshots
 and local item files are private cache records, while the remote provider owns
 the accepted state.
 
+### Cold-cache read-through capability
+
+`SyncProvider` (`backlog_core/backend_types.py`) is the optional one-method
+reconciliation capability a remote backend implements:
+`reconcile(request: ReconcileRequest) -> ReconcileResult`.
+`SnapshotCheckpointProvider` is a separate, optional Protocol —
+`has_synced_snapshot() -> bool` — reporting whether a reconcile has ever
+durably advanced that backend's snapshot checkpoint.
+
+Kept as two Protocols rather than one: folding `has_synced_snapshot()` into
+`SyncProvider` would require every existing `isinstance(x, SyncProvider)` gate
+in `operations.py` to also implement checkpoint reporting, silently changing
+behavior for any backend or test double that satisfies `SyncProvider`
+structurally without exposing checkpoint state.
+
+`has_synced_snapshot()` semantics:
+
+- Returns `True` once a reconcile has durably advanced the snapshot
+  checkpoint at least once; `False` while the checkpoint has never advanced
+  (backed by a `None` checkpoint) — an honest "never synced" signal, not
+  "synced with zero items."
+- `operations.list_items()` gates its one-shot cold-cache read-through on
+  `isinstance(backend, SyncProvider)` **and**
+  `isinstance(backend, SnapshotCheckpointProvider)` together with
+  `not backend.has_synced_snapshot()`. A backend implementing `SyncProvider`
+  without also implementing `SnapshotCheckpointProvider` never reaches this
+  gate — its `list_items()` calls silently skip the automatic read-through
+  and fall back to the pre-existing "cache holds no items" ambiguity warning,
+  with no error raised anywhere. Implement `SnapshotCheckpointProvider` on any
+  new remote backend that also implements `SyncProvider`, or its cold cache
+  never reads through.
+- The checkpoint advances only when a reconcile pass completes with zero
+  `ReconcileResult.failures` (`reconciliation.finalize_reconciliation`) against
+  an unlabeled `INITIAL`/`INCREMENTAL` scope — see
+  `_GitHubReconciliation._advance_snapshot_checkpoint`
+  (`backends/github_work_items.py`) for the concrete GitHub implementation. A
+  fetch-only reconcile (`ReconcileRequest.apply_local_patches=False`, used by
+  the implicit cold-cache read-through so a plain `backlog_list` call never
+  pushes a queued local mutation to the provider) reports each patch it
+  deliberately never attempted as `ReconcileResult.skipped_patches`, not
+  `failures` — a fetch-only pass that successfully fetched the snapshot and
+  updated the local cache is not a failed reconciliation merely because it
+  never attempted a push, so it still advances the checkpoint.
+
 ### Capability flags
 
 `WorkItemBackend` declares five class-level capability flags every backend

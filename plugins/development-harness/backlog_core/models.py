@@ -1278,7 +1278,22 @@ class ReconcileScope(StrEnum):
 
 
 class ReconcileRequest(BaseModel):
-    """Typed request for a provider-neutral backlog reconciliation pass."""
+    """Typed request for a provider-neutral backlog reconciliation pass.
+
+    Attributes:
+        apply_local_patches: Whether the adapter may push locally-queued
+            mutations to the provider. Defaults to ``True`` so every existing
+            explicit-refresh/sync/grooming caller keeps its current
+            push-on-reconcile behaviour unchanged. Set ``False`` for a
+            fetch-only reconcile: the adapter still fetches the provider
+            snapshot and still updates the local cache from it, but never
+            calls its patch-apply seam (``_ReconcileProvider._apply_patches``),
+            so a queued local edit for an existing issue is never replayed to
+            the provider as a side effect. Added for the implicit cold-cache
+            read-through in ``operations.list_items`` -- a plain
+            ``backlog_list`` call is advertised ``read_only_hint=True`` /
+            ``destructive_hint=False`` in ``server.py`` and must never write.
+    """
 
     scope: ReconcileScope
     label: str = ""
@@ -1287,6 +1302,7 @@ class ReconcileRequest(BaseModel):
     dry_run: bool = False
     force: bool = False
     include_diff: bool = False
+    apply_local_patches: bool = True
 
 
 class ContentKind(StrEnum):
@@ -1393,6 +1409,7 @@ class ReconcileResult(BaseModel):
     no_ops: int = 0
     conflicts: int = 0
     failures: int = 0
+    skipped_patches: int = 0
     deleted_provider_items: int = 0
     changed_references: list[str] = Field(default_factory=list)
     file_paths: dict[str, str] = Field(default_factory=dict)

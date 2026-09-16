@@ -13,6 +13,9 @@ still renders. What changes is that the answer names its own limits.
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,19 +25,21 @@ from backlog_core import gh_client, operations
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
+    ContentUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
+    ReconcileRequest,
     ReconcileResult,
     ViewItemResult,
 )
+from backlog_core.sync_state import get_sync_state, reset_sync_state
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from pytest_mock import MockerFixture
 
-    from backlog_core.models import ReconcileRequest
 
 _REFUSAL_MESSAGE = "GitHub GraphQL is not available from Claude Code sessions; use the REST API"
 
@@ -223,3 +228,252 @@ class TestEmptyCacheIsDistinguishableFromAnEmptyBacklog:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any(_EMPTY_CACHE_MARKER in w for w in warnings)
+
+
+class _CheckpointedBackend:
+    """Backend stub that also implements ``SnapshotCheckpointProvider``.
+
+    Unlike ``_CacheBackend`` above (whose ``reconcile`` is documented "never
+    called by ``list_items``"), this stub reports its checkpoint state via
+    ``has_synced_snapshot`` so ``list_items``'s one-shot cold-cache
+    read-through (A-critique.md Sec 5, ALT-5) is reachable in a test.
+
+    ``reconcile`` records every request it receives (rather than raising)
+    so a test can go through the real, unmocked
+    ``operations.refresh_local_cache_from_github`` and assert on the
+    ``ReconcileRequest`` shape that implicit refresh actually constructs --
+    most importantly, ``apply_local_patches`` (PR #3573 review Finding 1:
+    a plain ``backlog_list`` call must never push a queued local mutation
+    to the provider).
+    """
+
+    supports_batch_status_fetch = False
+
+    def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
+        self._items = items
+        self._synced = synced
+        self.reconcile_requests: list[ReconcileRequest] = []
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return self._items
+
+    def has_synced_snapshot(self) -> bool:
+        return self._synced
+
+    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+        """Record the request and report a no-op reconciliation outcome."""
+        self.reconcile_requests.append(request)
+        return ReconcileResult()
+
+
+class TestColdCacheReadsThroughOnce:
+    """A never-synced cache triggers one automatic refresh instead of only naming
+    the ambiguity (A-critique.md Sec 5, ALT-5)."""
+
+    def test_a_cold_cache_triggers_exactly_one_refresh_attempt(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(output=Output())
+
+        refresh_mock.assert_called_once()
+
+    def test_a_warm_cache_does_not_trigger_a_spurious_refresh(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=True)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(output=Output())
+
+        refresh_mock.assert_not_called()
+
+    def test_an_explicit_refresh_request_does_not_also_trigger_the_automatic_path(self, mocker: MockerFixture) -> None:
+        """``refresh=True`` must not cause two refresh attempts in one call."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+
+        operations.list_items(refresh=True, output=Output())
+
+        refresh_mock.assert_called_once()
+
+    def test_a_failed_refresh_does_not_loop_and_the_existing_warning_still_fires(self, mocker: MockerFixture) -> None:
+        """A refusal/offline failure (no token, still refused) is swallowed: it must
+        not raise for a caller who never asked for a refresh, and the existing
+        never-synced-cache warning must still fire, unchanged, because the
+        checkpoint honestly stays ``None``."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations,
+            "refresh_local_cache_from_github",
+            side_effect=GithubException(status=401, data={"message": "Bad credentials"}, headers={}),
+        )
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_second_cold_but_explained_call_attempts_again_without_looping(self, mocker: MockerFixture) -> None:
+        """Each call against a cache that never manages to sync tries exactly once
+        per call -- never a retry loop within a single call -- and a later call is
+        not suppressed just because an earlier one already failed: the checkpoint
+        is still honestly ``None``, so "we tried and could not" is what every
+        subsequent listing should keep attempting to upgrade to real data, not a
+        cost paid once and then silently given up on."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations, "refresh_local_cache_from_github", side_effect=BacklogError("no token configured")
+        )
+
+        operations.list_items(output=Output())
+        operations.list_items(output=Output())
+
+        assert refresh_mock.call_count == 2
+
+    def test_a_successful_refresh_returns_real_data_not_just_a_provenance_note(self, mocker: MockerFixture) -> None:
+        """The caller of a cold-cache listing that resolves gets real items back --
+        A1's honest checkpoint plus this read-through, not merely an annotation
+        that the emptiness was explained."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        def _do_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            backend._synced = True
+            backend._items = [_item("#1", title="Freshly synced")]
+            return {"refreshed": 1, "reconciled": 0, "pending_mutations": 0, "rejected_mutations": 0}
+
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_do_refresh)
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert result["count"] == 1
+        items = result["items"]
+        assert isinstance(items, list)
+        first_item = items[0]
+        assert isinstance(first_item, dict)
+        assert first_item["title"] == "Freshly synced"
+        assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_a_cold_cache_with_a_queued_mutation_never_pushes_it_implicitly(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 1 (P1, most serious): a plain ``backlog_list``
+        call is advertised ``read_only_hint=True``/``destructive_hint=False`` in
+        server.py's ``backlog_list`` tool annotation, so it must never replay a
+        queued local mutation to GitHub as a side effect of the implicit
+        cold-cache read-through. This drives the real, unmocked
+        ``refresh_local_cache_from_github`` down to ``backend.reconcile`` (a
+        recording stub standing in for ``_GitHubReconciliation``) and asserts
+        the request it builds asks for a fetch-only reconcile -- the flag that
+        gates ``_GitHubReconciliation.reconcile``'s call to
+        ``_ReconcileProvider._apply_patches``, the only step in that method
+        that writes to GitHub."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        operations.list_items(output=Output())
+
+        assert len(backend.reconcile_requests) == 1
+        assert backend.reconcile_requests[0].apply_local_patches is False
+
+    def test_a_running_background_sync_skips_the_implicit_refresh(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 1 (P2): a ``backlog_list`` call that lands
+        while the default startup sync is still RUNNING must not launch a
+        second, uncoordinated reconciliation. Routed through ``SyncState``'s
+        single-flight ``try_claim()`` (the same primitive ``try_start()`` uses
+        for startup sync and ``sync_now``) rather than a bare read-only
+        ``is_running()`` check; the implicit refresh is skipped entirely and
+        falls through to the existing "cache holds no items" warning."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "get_sync_state", return_value=mocker.Mock(try_claim=lambda: None))
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github")
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_not_called()
+        assert backend.reconcile_requests == []
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_two_overlapping_cold_cache_calls_reconcile_exactly_once(self, mocker: MockerFixture) -> None:
+        """PR #3573 review Finding 1 (P2), the concurrency regression: two
+        ``backlog_list`` calls landing on separate ``asyncio.to_thread`` worker
+        threads for the same never-synced cache must not both observe an idle
+        sync slot and both reconcile. Runs ``operations.list_items`` on two
+        real OS threads, started together via a barrier so both reach the
+        ``SyncState.try_claim()`` call at effectively the same instant,
+        against the real (unmocked) process-singleton ``SyncState`` --
+        proving the fix end to end, not just at the ``try_claim()`` primitive
+        level. The mocked ``refresh_local_cache_from_github`` sleeps briefly
+        to widen the window during which a broken, read-only ``is_running()``
+        check would let a second thread slip through before the first sets
+        ``RUNNING``."""
+
+        async def _reset() -> None:
+            reset_sync_state()
+
+        asyncio.run(_reset())
+
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        refresh_calls: list[None] = []
+        refresh_lock = threading.Lock()
+
+        def _slow_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            with refresh_lock:
+                refresh_calls.append(None)
+            time.sleep(0.05)
+            return {"pending_mutations": 0, "rejected_mutations": 0}
+
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_slow_refresh)
+
+        start_barrier = threading.Barrier(2)
+        results: list[Mapping[str, object]] = []
+        results_lock = threading.Lock()
+
+        def _call_list_items() -> None:
+            start_barrier.wait(timeout=5)
+            result = operations.list_items(output=Output())
+            with results_lock:
+                results.append(result)
+
+        threads = [threading.Thread(target=_call_list_items) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert len(refresh_calls) == 1, f"expected exactly one reconciliation attempt, got {len(refresh_calls)}"
+        assert len(results) == 2
+        assert get_sync_state().status != "running"
+
+    def test_a_content_provider_failure_during_implicit_refresh_still_serves_the_cache(
+        self, mocker: MockerFixture
+    ) -> None:
+        """PR #3573 review Finding 3 (P2): ``ContentUnavailableError``'s base is
+        ``ContentProviderError``, a tree separate from ``BacklogError`` (see
+        ``classify_sync_error``'s docstring in sync_state.py) -- a content-provider
+        failure fetching work-item bodies on a cold cache (e.g.
+        ``_work_item_contexts`` raising ``ContentUnavailableError``) must degrade
+        to the cached-result-plus-warning path, not raise uncaught out of
+        ``list_items(refresh=False)``."""
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_mock = mocker.patch.object(
+            operations,
+            "refresh_local_cache_from_github",
+            side_effect=ContentUnavailableError("GitHub work-item audit comment response was invalid"),
+        )
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        refresh_mock.assert_called_once()
+        assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))

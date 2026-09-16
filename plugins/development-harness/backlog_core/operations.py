@@ -27,7 +27,14 @@ from typing_extensions import TypedDict
 from . import models as _models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
-from .backend_types import ContentProvider, IssueCommentNode, IssueNode, MilestoneFullNode, SyncProvider
+from .backend_types import (
+    ContentProvider,
+    IssueCommentNode,
+    IssueNode,
+    MilestoneFullNode,
+    SnapshotCheckpointProvider,
+    SyncProvider,
+)
 from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
 from .models import (
     ITEM_TYPE_ALIASES,
@@ -80,7 +87,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1738,6 +1745,7 @@ def refresh_local_cache_from_github(
     output: Output | None = None,
     full_refresh: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
+    apply_local_patches: bool = True,
 ) -> dict[str, int | list[str]]:
     """Reconcile provider items through the configured backend.
 
@@ -1749,6 +1757,13 @@ def refresh_local_cache_from_github(
             incremental snapshot.
         progress_callback: Optional callable invoked after each issue is
             reconciled. Receives ``(items_done, items_total)``.
+        apply_local_patches: Forwarded to :class:`~backlog_core.models.ReconcileRequest`.
+            Defaults to ``True`` (existing explicit-refresh/sync behaviour:
+            queued local mutations may be pushed to the provider). Pass
+            ``False`` for a fetch-only reconcile that updates the local cache
+            from the provider snapshot but never pushes a queued local
+            mutation -- used by the implicit cold-cache read-through in
+            :func:`list_items`, which must stay read-only.
 
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled
@@ -1767,7 +1782,9 @@ def refresh_local_cache_from_github(
         if label and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
         else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     )
-    result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
+    result = backend.reconcile(
+        ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
+    )
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
     out.info(
@@ -1980,8 +1997,93 @@ def list_items(
         file_path, groomed, status, and milestone fields for items with a GitHub issue).
     """
     out = output or Output()
+    backend = get_config().backend
     if refresh:
         refresh_local_cache_from_github(repo, label, output=out)
+    elif (
+        isinstance(backend, SyncProvider)
+        and isinstance(backend, SnapshotCheckpointProvider)
+        and not backend.has_synced_snapshot()
+    ):
+        # A never-synced cache is shaped exactly like an empty backlog and,
+        # per A1, the checkpoint is now an honest "never" (A-critique.md
+        # Sec 5, ALT-5: "list_items already takes refresh: bool ... Make a
+        # never-synced cache trigger that path once, rather than returning
+        # an annotated zero"). Read through once for a caller that has not
+        # asked for a refresh, instead of only describing the ambiguity
+        # below. This fires whenever the checkpoint is genuinely
+        # uninitialized -- never on a warm cache, since
+        # has_synced_snapshot() then reports True -- and a successful
+        # refresh durably advances the checkpoint, so it cannot recur for
+        # this cache once it has synced. It is not the same cost as probing
+        # on every list regardless of cache state (rejected in
+        # A-critique.md Sec 6.2): a healthy repeat call never re-fetches.
+        # A failed attempt (no token, offline, still refused) is swallowed
+        # here -- an implicit read-through a caller did not ask for must
+        # never turn an unaware listing into a hard error -- and the
+        # existing "cache holds no items" warning below still fires,
+        # unchanged, since the checkpoint is honestly still None. The
+        # checkpoint staying None also means a *later* list_items() call
+        # against a cache that never manages to sync tries again -- one
+        # attempt per call, never a retry loop within one -- which the
+        # critique frames as complementary, not a defect: "we tried and
+        # could not" is a sharper answer than "we never tried".
+        #
+        # Three properties this implicit, caller-never-asked-for-it refresh
+        # must hold (PR #3573 review findings on this exact block):
+        #   1. Fetch-only: ``backlog_list(refresh=False)`` is advertised
+        #      ``read_only_hint=True``/``destructive_hint=False`` in
+        #      server.py, so this call must never push a queued local
+        #      mutation to the provider merely because the user listed
+        #      items. ``apply_local_patches=False`` keeps the reconcile
+        #      fetching and updating the local cache while skipping the
+        #      provider-patch seam entirely (see ``ReconcileRequest`` and
+        #      ``_GitHubReconciliation.reconcile``).
+        #   2. No uncoordinated second sync: two overlapping cold-cache
+        #      ``backlog_list`` calls (or a race with a concurrent
+        #      ``sync_now``) must not both observe an idle slot and both
+        #      reconcile concurrently. Claims the sync slot via
+        #      ``SyncState.try_claim()`` -- the same single-flight primitive
+        #      ``try_start()`` uses for startup sync and ``sync_now`` -- rather
+        #      than a bare read-only ``is_running()`` check, which cannot
+        #      prevent two callers from both observing "not running" and both
+        #      proceeding (PR #3573 review Finding 1). ``try_claim()`` is
+        #      guarded by a ``threading.Lock`` internal to ``SyncState``, so it
+        #      is safe to call from this function's worker thread
+        #      (``asyncio.to_thread`` from ``backlog_list``) even when it races
+        #      another worker thread or the event-loop thread -- unlike
+        #      ``SyncState.lock`` (an ``asyncio.Lock``), which is never safe to
+        #      acquire from a worker thread and is not touched here.
+        #      ``try_claim()`` returns the pre-claim status so it can be
+        #      restored via ``release_claim()`` once this one-shot attempt
+        #      finishes, leaving an existing OFFLINE/ERROR state exactly as
+        #      the background sync loop left it instead of silently clearing
+        #      it to IDLE.
+        #   3. Graceful content-provider degradation: ``ContentUnavailableError``
+        #      (and its ``ContentNotFoundError`` subclass) is the exception
+        #      ``_work_item_contexts`` / ``get_many`` raise for a cold-cache
+        #      content fetch failure. Its base is ``ContentProviderError``, a
+        #      tree separate from ``BacklogError`` (see ``classify_sync_error``'s
+        #      docstring in sync_state.py) -- omitting it here would let a
+        #      content-provider failure raise uncaught instead of degrading
+        #      to the cached-result-plus-warning path below. Mirrors the
+        #      sibling ``except (BacklogError, ContentUnavailableError)``
+        #      clauses already established in
+        #      ``_GitHubWorkItemSync.fetch_snapshot``.
+        sync_state = get_sync_state()
+        previous_sync_status = sync_state.try_claim()
+        if previous_sync_status is None:
+            out.info(
+                "  A background sync is already in progress; skipping the implicit "
+                "read-through for this never-synced cache rather than starting a second one."
+            )
+        else:
+            try:
+                refresh_local_cache_from_github(repo, label, output=out, apply_local_patches=False)
+            except (GithubException, BacklogError, ContentUnavailableError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
+                out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
+            finally:
+                sync_state.release_claim(previous_sync_status)
     items = get_config().backend.list_work_items()
     if not items and isinstance(get_config().backend, SyncProvider):
         # A provider-backed cache holding nothing reads exactly like an empty

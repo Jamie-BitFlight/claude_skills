@@ -442,6 +442,23 @@ class _GitHubReconciliation:
         """
         return [record.item for record in self.load_records()]
 
+    def has_synced_snapshot(self) -> bool:
+        """Report whether a durable, honest provider snapshot has ever completed.
+
+        Backed by the same checkpoint ``_with_snapshot_checkpoint`` reads to
+        pick ``INITIAL`` vs ``INCREMENTAL`` scope -- ``None`` means no
+        reconcile has ever advanced it (A-critique.md Sec 4.1: "the
+        checkpoint records that a reconcile happened, not what it covered",
+        but a ``None`` checkpoint unambiguously means "never"). Callers use
+        this to distinguish a never-synced cache, worth one automatic
+        read-through, from a warm cache that happens to hold nothing right
+        now.
+
+        Returns:
+            ``True`` once a reconcile has durably advanced the checkpoint.
+        """
+        return self._cache._get_snapshot_checkpoint() is not None
+
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
 
@@ -471,6 +488,27 @@ class _GitHubReconciliation:
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
+        ``request.apply_local_patches`` (default ``True``) gates the only step
+        in this method that writes to the provider: when ``False``, the
+        provider snapshot is still fetched and the local cache is still
+        updated from it (``plan.cache_actions``), but ``plan.provider_patches``
+        -- the queued local mutations the pure engine decided diverge from the
+        provider and would need pushing -- are never handed to
+        ``self._provider._apply_patches``. Those patches are reported to
+        ``finalize_reconciliation`` via ``ReconcileExecution.patches_skipped``
+        (PR #3573 review Finding 2): their paired "checkpoint" cache action is
+        still skipped and their queued mutation still stays
+        un-acknowledged/pending, exactly as before, but they now count as
+        ``result.skipped_patches`` rather than ``result.failures`` -- a
+        fetch-only pass that successfully fetched the snapshot and updated the
+        cache is not a failed reconciliation merely because it deliberately
+        never attempted a push, so it can still durably advance the snapshot
+        checkpoint (``_advance_snapshot_checkpoint``). Before this fix,
+        counting the skipped patch as a failure left ``has_synced_snapshot()``
+        permanently False for a never-synced cache carrying a divergent queued
+        mutation, forcing every subsequent default list back through a full
+        GitHub fetch.
+
         Returns:
             Completed reconciliation counts with changed logical references.
         """
@@ -487,7 +525,8 @@ class _GitHubReconciliation:
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
-        patch_results = self._provider._apply_patches(plan.provider_patches)
+        patches_skipped = not effective_request.apply_local_patches
+        patch_results = [] if patches_skipped else self._provider._apply_patches(plan.provider_patches)
         applied_revisions = {
             result.reference: result.revision for result in patch_results if result.status == "applied"
         }
@@ -505,7 +544,10 @@ class _GitHubReconciliation:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
         outcome = finalize_reconciliation(
-            plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
+            plan,
+            ReconcileExecution(
+                cache_results=cache_results, patch_results=patch_results, patches_skipped=patches_skipped
+            ),
         )
         self._advance_snapshot_checkpoint(
             effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome
