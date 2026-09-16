@@ -262,7 +262,7 @@ mutation UpdateIssue(
 _ADD_COMMENT_MUTATION = """
 mutation AddComment($subjectId: ID!, $body: String!) {
   addComment(input: {subjectId: $subjectId, body: $body}) {
-    commentEdge { node { id url } }
+    commentEdge { node { id fullDatabaseId url } }
   }
 }
 """
@@ -334,7 +334,7 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
-          databaseId
+          fullDatabaseId
           body
           url
           author { login }
@@ -353,7 +353,7 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
-      databaseId
+      fullDatabaseId
       body
       url
       author { login }
@@ -899,6 +899,25 @@ def _add_comment_graphql(repo: Repository, issue_node_id: str, body: str) -> str
     return str(comment_node.get("id", ""))
 
 
+def _parse_full_database_id(raw_full_database_id: object) -> int | None:
+    """Normalize a raw GraphQL fullDatabaseId value to int | None.
+
+    GitHub's fullDatabaseId is BigInt (exceeds signed 32-bit Int range).
+    Serialized as decimal string or JSON integer.
+
+    Args:
+        raw_full_database_id: The raw fullDatabaseId from GraphQL response.
+
+    Returns:
+        Integer database ID, or None if absent or unrecognizable.
+    """
+    if isinstance(raw_full_database_id, int) and not isinstance(raw_full_database_id, bool):
+        return raw_full_database_id
+    if isinstance(raw_full_database_id, str) and re.fullmatch(r"[0-9]+", raw_full_database_id):
+        return int(raw_full_database_id)
+    return None
+
+
 def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
     """Parse a raw GraphQL comment dict into a typed IssueCommentNode.
 
@@ -907,26 +926,23 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
 
     Returns:
         IssueCommentNode with all fields populated. ``database_id`` is set only
-        when the response carries a ``databaseId`` integer — it is the numeric
-        identifier REST addresses the comment by, and a missing or non-integer
+        when the response carries a ``fullDatabaseId`` value — it is the numeric
+        identifier REST addresses the comment by, and a missing or unrecognizable
         value is left absent rather than guessed at, so a REST caller fails
         loudly instead of requesting a comment that does not exist.
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    parsed = IssueCommentNode(
+    database_id = _parse_full_database_id(node.get("fullDatabaseId"))
+    return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
         url=str(node.get("url", "")),
         author=author,
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
+        database_id=database_id,
     )
-    # bool is an int subclass, so it is excluded explicitly — True would
-    # otherwise become comment 1.
-    if isinstance(raw_database_id := node.get("databaseId"), int) and not isinstance(raw_database_id, bool):
-        parsed["database_id"] = raw_database_id
-    return parsed
 
 
 def _fetch_issue_comments_graphql(
