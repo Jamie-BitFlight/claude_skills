@@ -216,12 +216,14 @@ import re
 import ssl
 import sys
 import threading
+import warnings
 from typing import TYPE_CHECKING, Final
 
 import certifi
 import requests.adapters
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
+from cryptography.utils import CryptographyDeprecationWarning
 from github import Auth, Github
 from github.Requester import HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass, Requester
 from urllib3.util.ssl_ import create_urllib3_context
@@ -505,8 +507,12 @@ def _parse_pem_certificate_blocks(data: bytes) -> list[x509.Certificate]:
                 continue
             der = stripped
         try:
-            certificates.append(x509.load_der_x509_certificate(der))
-        except ValueError:
+            with warnings.catch_warnings():
+                # Treat certificates scheduled for rejection as unusable now so
+                # behavior does not change when cryptography begins rejecting them.
+                warnings.simplefilter("error", CryptographyDeprecationWarning)
+                certificates.append(x509.load_der_x509_certificate(der))
+        except (ValueError, CryptographyDeprecationWarning):
             continue
     return certificates
 
@@ -831,18 +837,12 @@ def install_proxy_tls_support(*, force: bool = False) -> bool:
         custom_bundles = [(env_var, path) for env_var, path in configured if bundle_adds_new_anchor(path)]
         if not custom_bundles:
             if _InstallState.installed:
-                Requester.injectConnectionClasses(HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass)
+                Requester.resetConnectionClasses()
                 _InstallState.installed = False
             return False
         ca_bundle = configured[0][1]
         ca_bundles = tuple(path for _env_var, path in configured)
-        requests_bundle_vars = {"REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"}
-        # A proxy can send deficient intermediates that are not present in its trust
-        # bundle. Their extensions cannot be inspected before the handshake, so a
-        # Requests-specific proxy trust source is itself the relaxation boundary.
-        relax_strict = any(bundle_requires_relaxed_verification(path) for _env_var, path in custom_bundles) or any(
-            env_var in requests_bundle_vars for env_var, _path in custom_bundles
-        )
+        relax_strict = any(bundle_requires_relaxed_verification(path) for _env_var, path in custom_bundles)
         Requester.injectConnectionClasses(
             HTTPRequestsConnectionClass,
             _make_connection_class(ca_bundle, relax_strict=relax_strict, ca_bundles=ca_bundles),

@@ -14,6 +14,7 @@ import datetime as dt
 import os
 import ssl
 import sys
+import warnings
 from pathlib import Path
 
 import certifi
@@ -417,6 +418,11 @@ class TestBundleAddsNewAnchor:
     def test_the_stock_trust_store_adds_nothing(self, stock_store_file):
         assert bundle_adds_new_anchor(str(stock_store_file)) is False
 
+    def test_stock_trust_store_inspection_emits_no_warnings(self, stock_store_file):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert bundle_adds_new_anchor(str(stock_store_file)) is False
+
     def test_a_compliant_added_anchor_counts(self, compliant_ca_file):
         assert bundle_adds_new_anchor(str(compliant_ca_file)) is True
 
@@ -789,6 +795,7 @@ class TestInstallProxyTlsSupport:
         assert install_proxy_tls_support(force=True) is False
         assert _InstallState.installed is False
         assert _installed_https_connection_class() is HTTPSRequestsConnectionClass
+        assert vars(Requester)["_Requester__persist"] is True
 
     def test_force_uninstalls_when_the_bundle_no_longer_announces_a_proxy(self, monkeypatch, ca_file, stock_store_file):
         """Same requirement when the bundle still exists but no longer needs the relaxation."""
@@ -831,16 +838,13 @@ class TestInstallProxyTlsSupport:
             not connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
         )
 
-    def test_requests_bundle_relaxes_for_deficient_server_intermediates(self, monkeypatch, compliant_ca_file):
-        """A proxy's sent intermediates are unavailable for pre-handshake inspection."""
+    def test_compliant_requests_bundle_keeps_strict_verification(self, monkeypatch, compliant_ca_file):
         monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(compliant_ca_file))
 
         install_proxy_tls_support()
         connection = _installed_https_connection_class()("api.github.com")
 
-        assert (
-            not connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
-        )
+        assert connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
 
     def test_installs_a_compliant_bundle_via_github_ca_bundle_without_relaxing_strict(
         self, monkeypatch, compliant_ca_file

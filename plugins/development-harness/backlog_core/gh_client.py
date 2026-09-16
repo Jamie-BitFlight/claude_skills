@@ -35,6 +35,7 @@ from .models import (
     TYPE_TO_LABEL,
     BackendAvailability,
     BackendStatus,
+    BackendUnavailableError,
     BacklogError,
     BacklogItem,
     ContentConflictError,
@@ -1515,32 +1516,33 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
 
     Single GraphQL call replaces N+1 per-item get_issue() calls.
 
-    An empty map means "no item carries a status", so a refused query must never
-    produce one. In an environment that serves REST but rejects GraphQL, every
-    listing would otherwise render blank statuses and report no reason. The
-    refusal is raised instead, and the caller decides whether to continue.
+    An empty map means "the query succeeded and no item carries a status", so no
+    failed query may produce one. The caller catches availability failures and
+    decides whether to continue from cached statuses.
 
     Returns:
         Dict mapping issue_number -> IssueStatus model.
 
     Raises:
-        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
-            API outright.
+        BackendUnavailableError: When no GitHub client is available or the live
+            status query fails.
     """
     if not any(parse_issue_number(item.issue) is not None for item in items):
         # Nothing to look up. Returning early keeps an all-local item list from
         # spending a network round trip to build a map no caller can read.
         return {}
     if (repo_obj := try_get_github(repo)) is None:
-        return {}
+        msg = "Live GitHub status unavailable: unable to create a GitHub client"
+        raise BackendUnavailableError(msg)
     try:
         owner, repo_name = repo_obj.full_name.split("/", 1)
         all_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN")
         issue_map = {iss["number"]: iss for iss in all_issues}
-    except GraphQLUnavailableError:
+    except BackendUnavailableError:
         raise
-    except (BacklogError, GithubException):
-        return {}
+    except (BacklogError, GithubException) as exc:
+        msg = f"Live GitHub status unavailable: {exc}"
+        raise BackendUnavailableError(msg) from exc
     result: dict[int, IssueStatus] = {}
     for item in items:
         if (num := parse_issue_number(item.issue)) is None:

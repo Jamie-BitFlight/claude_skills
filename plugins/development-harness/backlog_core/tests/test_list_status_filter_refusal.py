@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backlog_core import operations
-from backlog_core.models import BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+from backlog_core.models import BackendUnavailableError, BacklogItem, GraphQLUnavailableError, IssueStatus, Output
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -283,6 +283,24 @@ class TestStatusFilterUnderARefusal:
         result = operations.list_items(status="needs-grooming", output=Output())
 
         assert result["count"] == 1
+
+
+class TestStatusFilterUnderOtherLookupFailures:
+    """Every failed live lookup must preserve cached-status filtering semantics."""
+
+    def test_generic_lookup_failure_uses_cached_status(self, mocker: MockerFixture) -> None:
+        _patch_backend(mocker, [_item("#42"), _item("#43", title="Another", status="needs-grooming")])
+        mocker.patch.object(
+            operations, "batch_fetch_statuses", side_effect=BackendUnavailableError("GitHub status query failed")
+        )
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 1
+        assert _statuses(result) == ["status:in-progress"]
+        raw_warnings = result.get("warnings", [])
+        warnings = [str(entry) for entry in raw_warnings] if isinstance(raw_warnings, list) else []
+        assert any("GitHub status query failed" in warning for warning in warnings)
 
 
 class TestRenderedStatusUnderARefusal:
