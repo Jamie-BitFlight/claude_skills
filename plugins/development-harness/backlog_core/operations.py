@@ -768,16 +768,12 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
         True if updated, False if no backend reference on item.
 
     Raises:
-        ValidationError: Raised for a non-numeric ``item.issue`` on an
-            integer-ID backend, and caught by this function's own
-            ``except (GithubException, BacklogError)`` -- ``ValidationError``
-            is a ``BacklogError`` subclass, not a plain ``ValueError``, so it
-            no longer escapes past that handler. Callers therefore see no
-            exception from this refusal: they get ``True`` plus a warning on
-            ``output``, which is the documented surface ``backlog_update``
-            (``except BacklogError``) reports instead of failing the tool call
-            with an unhandled exception. The backend-owned title write above
-            has already succeeded at this point; only the GitHub mirror is
+        ValidationError: For a non-numeric ``item.issue`` on an integer-ID
+            backend. A ``BacklogError`` subclass, so the handler below catches
+            it and nothing propagates -- ``backlog_update`` never sees it.
+            The caller gets ``True`` and the tool returns its normal success
+            shape, carrying the refusal in ``warnings``. The backend-owned
+            title write above has already succeeded; only the GitHub mirror is
             skipped.
     """
     out = output or Output()
@@ -851,17 +847,13 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
         True if updated, False otherwise.
 
     Raises:
-        ValidationError: Raised for a non-numeric ``item.issue`` on an
-            integer-ID backend, and caught by this function's own
-            ``except (GithubException, BacklogError)`` -- ``ValidationError``
-            is a ``BacklogError`` subclass, not a plain ``ValueError``, so it
-            no longer escapes past that handler. Callers therefore see no
-            exception from this refusal: they get ``True`` plus a warning on
-            ``output``, which is the documented surface ``backlog_update``
-            (``except BacklogError``) reports instead of failing the tool call
-            with an unhandled exception. The backend-owned plan write above
-            has already succeeded at this point; only the GitHub plan comment
-            is skipped.
+        ValidationError: For a non-numeric ``item.issue`` on an integer-ID
+            backend. A ``BacklogError`` subclass, so the handler below catches
+            it and nothing propagates -- ``backlog_update`` never sees it.
+            The caller gets ``True`` and the tool returns its normal success
+            shape, carrying the refusal in ``warnings``. The backend-owned
+            plan write above has already succeeded; only the GitHub plan
+            comment is skipped.
     """
     out = output or Output()
     reference = item.reference
