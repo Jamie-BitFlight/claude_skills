@@ -528,8 +528,8 @@ class TestCountOnlyPreservesOperationsLayerOutput:
         warnings = cast("list[str]", response.get("warnings", []))
         assert warnings == [
             (
-                "Reconciled 1 provider item(s): 0 local updates, 0 patches, 0 no-ops, 2 failures, "
-                "3 pending mutation(s), 4 rejected mutation(s)."
+                "Reconciled 1 provider item(s): 0 local updates, 0 patches, 0 no-ops, 0 conflicts, "
+                "2 failures, 3 pending mutation(s), 4 rejected mutation(s)."
             )
         ]
 

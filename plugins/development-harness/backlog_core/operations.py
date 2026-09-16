@@ -1875,10 +1875,11 @@ def refresh_local_cache_from_github(
         progress_callback(result.fetched_items, result.fetched_items)
     summary = (
         f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
-        f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.failures} failures, "
+        f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
+        f"{result.failures} failures, "
         f"{result.pending_mutations} pending mutation(s), {result.rejected_mutations} rejected mutation(s)."
     )
-    if result.failures or result.pending_mutations or result.rejected_mutations:
+    if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
         out.warn(summary)
     else:
         out.info(summary)
