@@ -745,9 +745,8 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
     out = output or Output()
     try:
         repository = try_get_github(repo)
-    except BackendUnavailableError:
-        # GitHub reachable-but-failing is still a local-only-create fallback
-        # here, same as no token configured — same as before #3546's fix.
+    except BackendUnavailableError as exc:
+        out.warn(f"  WARNING: Issue creation skipped because GitHub is unavailable: {exc}")
         return None
     if repository is None:
         return None
@@ -792,9 +791,8 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
             return True
         try:
             repository = try_get_github(repo)
-        except BackendUnavailableError:
-            # GitHub reachable-but-failing keeps the same local-only-update
-            # fallback as no token configured — same as before #3546's fix.
+        except BackendUnavailableError as exc:
+            out.warn(f"  WARNING: Could not update issue {issue_ref} title because GitHub is unavailable: {exc}")
             repository = None
         if repository is not None:
             try:
@@ -868,9 +866,8 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
             return True
         try:
             repository = try_get_github(repo)
-        except BackendUnavailableError:
-            # GitHub reachable-but-failing keeps the same local-only-update
-            # fallback as no token configured — same as before #3546's fix.
+        except BackendUnavailableError as exc:
+            out.warn(f"  WARNING: Could not post plan to issue {issue_ref} because GitHub is unavailable: {exc}")
             repository = None
         if repository is not None:
             try:
@@ -1952,7 +1949,8 @@ def _item_derived_status(
             *status_map_unavailable* is what tells those two apart; the map's
             contents alone cannot.
         status_live: Whether ``status_map`` came from a successful live query.
-            When False, numeric-issue statuses come from the local cache.
+            When False, numeric-issue statuses come from the local cache unless
+            *status_map_unavailable* says the attempted query failed.
         status_map_unavailable: True when the live status batch fetch itself
             failed (see ``list_items``'s ``BackendUnavailableError`` handling)
             rather than succeeding with no entry for this item. When True, a
@@ -1974,10 +1972,10 @@ def _item_derived_status(
     num = parse_issue_number(item.issue)
     if num is None:
         return item.status or "needs-grooming"
-    if not status_live:
-        return normalize_cached_github_status(item.status)
     if status_map_unavailable:
         return None
+    if not status_live:
+        return normalize_cached_github_status(item.status)
     info = status_map.get(num)
     return normalize_live_github_status(info.status) if info is not None else "needs-grooming"
 
@@ -3687,6 +3685,7 @@ def view_item(
         limit=limit,
     )
 
+    out.warnings.extend(warning for warning in result.warnings if warning not in out.warnings)
     result.messages = out.messages
     result.warnings = out.warnings
     result.errors = out.errors

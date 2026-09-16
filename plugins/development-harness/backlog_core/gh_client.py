@@ -10,7 +10,6 @@ label creation). PyGithub's repo.requester.graphql_query() is the transport.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import re
 from datetime import datetime
@@ -1961,7 +1960,8 @@ def view_enrich_from_github(
     it is used to resolve that authoritative body instead of the raw issue body, so
     callers see the same content the write path actually targets. A resolution
     failure (content store unavailable, conflicting/malformed head or comment) falls
-    back to the raw issue body rather than failing the whole view.
+    back to the raw issue body rather than failing the whole view and records the
+    degradation in ``result.warnings``.
 
     Returns:
         True if GitHub data was fetched. False if no ``GITHUB_TOKEN`` is
@@ -2005,8 +2005,12 @@ def view_enrich_from_github(
         raise GitHubUnavailableError(f"GitHub issue enrichment failed for issue {issue_num!r}: {exc}") from exc
     body = gh_issue["body"]
     if resolve_version is not None:
-        with contextlib.suppress(BacklogError, ContentConflictError, ContentUnavailableError):
+        try:
             body = resolve_version(gh_repo, owner, repo_name, gh_issue).body
+        except (BacklogError, ContentConflictError, ContentUnavailableError) as exc:
+            result.warnings.append(
+                f"Authoritative GitHub work-item body unavailable ({exc}); using the raw issue body, which may be stale"
+            )
     result.number = gh_issue["number"]
     result.title = gh_issue["title"]
     result.state = gh_issue["state"].lower()  # GraphQL returns "OPEN"/"CLOSED"; callers expect lowercase

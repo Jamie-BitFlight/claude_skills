@@ -265,9 +265,9 @@ class TestItemDerivedStatusUnavailableMap:
     """Unit-level coverage of the discriminator itself."""
 
     def test_numeric_issue_item_returns_none_when_map_unavailable(self) -> None:
-        item = _item(1, "Alpha")
+        item = BacklogItem(title="Alpha", section="P1", issue="#1", status="status:in-progress")
 
-        assert operations._item_derived_status(item, {}, status_map_unavailable=True) is None
+        assert operations._item_derived_status(item, {}, status_live=False, status_map_unavailable=True) is None
 
     def test_numeric_issue_item_still_defaults_to_needs_grooming_when_map_answered_but_empty(self) -> None:
         """A genuinely successful fetch that found nothing for this item is a real answer,
