@@ -30,6 +30,7 @@ import json
 from pathlib import Path
 
 import pytest
+from backlog_core.operations import CommentListEntry, ListCommentsResult
 from pydantic import BaseModel, ConfigDict
 
 from sam_schema.cli_output import output_json
@@ -83,6 +84,32 @@ class TestOutputJsonNestedModels:
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["comments"][0] == {"id": "IC_1", "database_id": 123, "author": "alice", "preview": "hello"}
         assert parsed["comments"][1]["database_id"] == 456
+
+    def test_comment_list_result_serializes_entries_as_objects(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The public comment-list result remains structured at the CLI boundary."""
+        result = ListCommentsResult(
+            comments=[
+                CommentListEntry(
+                    id="IC_1",
+                    database_id=123,
+                    author="alice",
+                    created_at="2026-09-16T00:00:00Z",
+                    updated_at="2026-09-16T00:00:00Z",
+                    preview="hello",
+                )
+            ],
+            count=1,
+            has_more=False,
+            messages=[],
+            warnings=[],
+            errors=[],
+        )
+
+        output_json(result)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["comments"][0]["database_id"] == 123
+        assert isinstance(parsed["comments"][0], dict)
 
     def test_database_id_is_an_int_not_embedded_in_a_repr_string(self, capsys: pytest.CaptureFixture[str]) -> None:
         """``database_id`` is reachable as ``comments[0]["database_id"]``.

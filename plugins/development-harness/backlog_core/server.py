@@ -3787,7 +3787,7 @@ async def backlog_list_comments(
         result = await asyncio.to_thread(
             operations.list_comments, issue_number=issue_number, limit=limit, offset=offset, output=out
         )
-        return _respond(BacklogListCommentsResponse, {**result, **out.to_dict()})
+        return _respond(BacklogListCommentsResponse, {**result.model_dump(), **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogListCommentsResponse, {"error": str(e), **out.to_dict()})
 
