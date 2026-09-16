@@ -68,8 +68,6 @@ def _make_list_items_result(items: list[BacklogListItem]) -> ListItemsResult:
         "status_source": "live",
         "unavailable_capabilities": [],
         "filters_evaluated_against_unavailable_data": [],
-        "from_cache": False,
-        "has_pending_writes": False,
         "messages": [],
         "warnings": [],
         "errors": [],
