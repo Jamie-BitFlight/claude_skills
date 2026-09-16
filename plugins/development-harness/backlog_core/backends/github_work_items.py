@@ -578,7 +578,9 @@ class _GitHubReconciliation:
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
-        patch_results = self._provider._apply_patches(plan.provider_patches)
+        patch_results = (
+            self._provider._apply_patches(plan.provider_patches) if effective_request.apply_local_patches else []
+        )
         applied_revisions = {
             result.reference: result.revision for result in patch_results if result.status == "applied"
         }
@@ -596,7 +598,12 @@ class _GitHubReconciliation:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
         outcome = finalize_reconciliation(
-            plan, ReconcileExecution(cache_results=cache_results, patch_results=patch_results)
+            plan,
+            ReconcileExecution(
+                cache_results=cache_results,
+                patch_results=patch_results,
+                patches_skipped=not effective_request.apply_local_patches,
+            ),
         )
         self._advance_snapshot_checkpoint(
             effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome

@@ -184,6 +184,14 @@ the accepted state.
 
 ### Listing provenance
 
+On a never-synced remote cache, `operations.list_items()` performs one
+unlabeled, fetch-only reconciliation before serving the listing. The unlabeled
+scope can establish the global snapshot checkpoint even when the caller filters
+the eventual listing by label; subsequent calls then use the cache instead of
+repeating a label-scoped initial fetch. This implicit read-through never applies
+queued local patches, shares the normal sync single-flight guard, and degrades
+documented provider or cache I/O failures to a warning plus the cached result.
+
 `operations.list_items` reports two independent, provenance-flavored bits on
 every response — `from_cache` and `has_pending_writes` — rather than one
 conflated "authoritative" boolean (backlog #3546 task A4; the two-bit shape

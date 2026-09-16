@@ -1308,6 +1308,7 @@ class ReconcileRequest(BaseModel):
     # while closed) before this point would otherwise never be observed
     # again once the fresh watermark starts being trusted.
     checkpoint_recovery: bool = False
+    apply_local_patches: bool = True
 
 
 class ContentKind(StrEnum):
@@ -1411,6 +1412,7 @@ class ReconcileResult(BaseModel):
     fetched_items: int = 0
     local_updates: int = 0
     provider_patches: int = 0
+    skipped_patches: int = 0
     no_ops: int = 0
     conflicts: int = 0
     failures: int = 0

@@ -267,6 +267,7 @@ class _CheckpointedBackend:
     def __init__(self, items: list[BacklogItem], *, synced: bool) -> None:
         self._items = items
         self._synced = synced
+        self.reconcile_requests: list[ReconcileRequest] = []
 
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
@@ -275,8 +276,10 @@ class _CheckpointedBackend:
         return self._synced
 
     def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
-        """Satisfy the ``SyncProvider`` protocol; tests patch the wrapper instead."""
-        raise NotImplementedError
+        """Record a successful reconciliation and establish the checkpoint."""
+        self.reconcile_requests.append(request)
+        self._synced = True
+        return ReconcileResult()
 
 
 class TestColdCacheReadsThroughOnce:
@@ -373,6 +376,31 @@ class TestColdCacheReadsThroughOnce:
         assert isinstance(first_item, dict)
         assert first_item["title"] == "Freshly synced"
         assert not any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_labelled_cold_cache_establishes_one_global_checkpoint(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        operations.list_items(label="status:in-progress", output=Output())
+        operations.list_items(label="status:in-progress", output=Output())
+
+        assert len(backend.reconcile_requests) == 1
+        assert backend.reconcile_requests[0].label == ""
+        assert backend.reconcile_requests[0].apply_local_patches is False
+
+    @pytest.mark.parametrize("failure", [OSError("cache is read-only"), ValueError("invalid cache state")])
+    def test_cache_io_failure_degrades_to_cached_listing(
+        self, mocker: MockerFixture, failure: OSError | ValueError
+    ) -> None:
+        backend = _CheckpointedBackend([_item("#1")], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=failure)
+        out = Output()
+
+        result = operations.list_items(output=out)
+
+        assert result["count"] == 1
+        assert any(str(failure) in warning for warning in out.warnings)
 
 
 def _snapshot(*, items: list[ProviderItem] | None = None, started_at: str = "2026-08-12T01:00:00Z") -> ProviderSnapshot:
