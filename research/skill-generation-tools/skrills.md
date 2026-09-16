@@ -228,7 +228,7 @@ cors_origins = "https://app.example.com"
 ### Integration Opportunities
 
 - **Add `skrills` as a CI step** — `skrills validate --target all` in `.github/workflows/code-quality.yml` catches skill compatibility regressions
-- **MCP integration for skill generation** — register `skrills serve` in `.claude/mcp.json` to enable project-aware skill scaffolding from within Claude Code
+- **MCP integration for skill generation** — register `skrills serve` in `.mcp.json`, this repository's MCP server registry. Read 2026-09-15, it declares two servers under `"mcpServers": {` — the first is `"Ref-local"`, whose `"command": "node"` runs `./scripts/npx-run.cjs` — so a `skrills serve` entry would sit beside them. Repointed from .claude/mcp.json, the path this entry first cited: commit 72b384373 deleted that file and moved the registry to the repository root.
 - **Cross-reference with this repository** — skills in this repository could be validated against Codex/Copilot rules using Skrills to support multi-CLI distribution
 - **Token optimization pass** — run `skrills analyze --min-tokens 1000 --suggestions` on this repository's skills to identify size reduction opportunities
 

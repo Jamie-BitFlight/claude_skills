@@ -167,7 +167,8 @@ pnpm run format     # Prettier + cargo fmt
 ### Integration Opportunities
 
 - Vibe Kanban's MCP config centralisation could be surfaced as a Claude Code plugin that writes to multiple agent config files from a single source of truth
-- The task board model aligns with Claude Code's backlog/task system — a bridge plugin could sync vibe-kanban tasks with `.claude/backlog/` entries
+- The task board model aligns with Claude Code's backlog/task system, but the sync target this entry named is superseded: commit ba4d312f5 (#3386) deleted the .claude/backlog/ markdown entries this repository kept, and the backlog now lives in GitHub Issues — `.dh/config.yaml` sets `backend.name: github`, and names the repository separately under its
+  top-level `gh.repo` key. A bridge plugin would sync vibe-kanban tasks against that issue tracker, not against files in the checkout. Re-scope before building.
 - The SSH remote editor integration pattern is reusable for any Claude Code skill that needs to open files in a local editor from a remote session
 
 ---

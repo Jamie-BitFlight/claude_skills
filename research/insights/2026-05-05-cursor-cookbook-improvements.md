@@ -2,6 +2,9 @@
 title: "Improvement Proposals: Cursor Cookbook"
 ---
 
+<!-- removed-skill-citations -->
+> **Removed-call citation:** the `TeamCreate` call cited below no longer exists in Claude Code. Since v2.1.178, naming a teammate on an `Agent` call under `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` spawns it directly, with no separate setup step (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` § "Agent teams"). This file stands as the dated record of what was analysed and is not rewritten; re-verify any conclusion below that rests on `TeamCreate` — "already covered", "already implemented", or a proposed dispatch — against the current tree before acting on it.
+
 ## Improvement 1: Persisted task results enabling parent-output injection into child task prompts
 
 **Source pattern**: "Automatically stitches upstream output into child task prompts (2,000-char snippet of parent results)" — Key Features / DAG Task Runner section, and "Parent Result Injection: Stitching upstream output (2,000-char snippets) into child prompts provides context without full re-description — reduces token overhead in multi-turn scenarios" — Patterns Worth Adopting #2

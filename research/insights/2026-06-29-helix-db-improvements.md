@@ -11,9 +11,9 @@ plus its agent-onboarding pattern (`helix chef` one-shot bootstrap + MCP docs se
 
 Per the gap assessment rules, an actionable insight-extraction gap requires a *mechanism*
 the local system lacks and could **extend itself with** — not a proposal to replace local
-storage with an external product. Adopting HelixDB as a storage/memory backend is the
-domain of the research-utilization-assessor, which has already produced
-`./research/insights/2026-06-18-helix-db-utilization.md` for this entry. No mechanism gap
+storage with an external product. Adopting HelixDB as a storage/memory backend is a
+utilization question, and it was assessed as one — that assessment is recorded in
+`./research/insights/2026-06-18-helix-db-utilization.md`. No mechanism gap
 in a local skill, agent, or workflow script was found at high confidence.
 
 ---

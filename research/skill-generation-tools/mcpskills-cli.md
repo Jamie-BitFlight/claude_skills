@@ -207,7 +207,7 @@ mcpskills --url https://mcp.example.com/sse --token <token> --multi-skills
 
 1. **MCP-to-Skill Conversion Pattern**: Demonstrates a concrete pipeline for converting MCP server tool schemas into documented skill files. This pattern could be adapted to generate Claude Code-compatible skills from any MCP server.
 
-2. **Token Optimization Reference**: The project's core thesis (skills are more token-efficient than MCP tools in agent context) aligns with Claude Code's on-demand skill loading model. The `docs/LOW_TOKEN_SKILLS.md` provides quantitative reasoning for this approach.
+2. **Token Optimization Reference**: The project's core thesis (skills are more token-efficient than MCP tools in agent context) aligns with Claude Code's on-demand skill loading model. mcpskills-cli's own `LOW_TOKEN_SKILLS.md` (dhanababum/mcpskills-cli, under its docs directory — see References) provides quantitative reasoning for this approach. That is a path in the mcpskills-cli repository, not in this one.
 
 3. **Template-Based Skill Generation**: The Jinja2 template approach for generating SKILL.md files is a pattern applicable to our skill-creator workflow — templates ensure consistent structure while allowing customization per tool.
 
