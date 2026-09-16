@@ -468,6 +468,12 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        # This listing serves items, so it reaches batch_fetch_statuses -> gh.get_repo
+        # and resolves api.github.com. Stand in the same way test_batch_status_refusal
+        # does. The resulting empty status map costs this test nothing: status_map is
+        # read only by _filter_open_items' `status` filter, which list_items() does not
+        # pass here, and none of the assertions below derive from a live status.
+        mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
         result = operations.list_items(output=Output())
 
