@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import os
 import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client
+from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client, resolve_token
 
 from .backend_types import AssigneeNode, IssueCommentNode, IssueNode, LabelNode, MilestoneFullNode, MilestoneNode
 from .entry_blocks import wrap_entry
@@ -1279,7 +1278,13 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
     except MissingGitHubTokenError:
-        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
+        # An absent token is an expected, recoverable condition for every caller of
+        # this function (local-only fallback is acceptable by design — see the
+        # docstring) — not an unexpected failure worth a traceback. logger.exception
+        # implies "something broke"; logger.warning names the same fact without
+        # manufacturing alarm for a configuration state this function exists to
+        # tolerate.
+        logger.warning("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
         return gh.get_repo(repo)
@@ -1302,8 +1307,13 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         BackendStatus with availability and live issue counts. Cache fields retain
         their defaults because the provider owns cache observation.
     """
-    if not os.environ.get("GITHUB_TOKEN"):
-        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
+    try:
+        resolve_token()
+    except MissingGitHubTokenError:
+        names = ", ".join(TOKEN_ENV_VARS)
+        return BackendStatus(
+            availability=BackendAvailability.NEEDS_AUTHENTICATION, error=f"No GitHub token found. Set one of: {names}"
+        )
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
@@ -1553,6 +1563,11 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
 
     Returns:
         Status label string or empty string.
+
+    Raises:
+        GraphQLUnavailableError: When the environment refuses GitHub's GraphQL
+            API outright -- the same refusal batch_fetch_statuses() re-raises
+            rather than reporting as an empty status.
     """
     if not item.issue:
         return ""
@@ -1565,6 +1580,14 @@ def fetch_item_status(item: BacklogItem, repo: str = "", output: Output | None =
         gh_issue = _fetch_issue_graphql(repository, owner, repo_name, num)
         labels = [lb["name"] for lb in gh_issue["labels"] if lb["name"].startswith(STATUS_LABEL_PREFIX)]
         return _pick_primary_status_label(labels)
+    except GraphQLUnavailableError:
+        # A refusal ("GitHub GraphQL is not available ...") is not "no status set" --
+        # it is the environment declining the query outright. GraphQLUnavailableError
+        # is a BackendUnavailableError/BacklogError subclass, so it would otherwise be
+        # caught by the broad except below and silently reported as an empty status,
+        # the same defect TestViewEnrichSurfacesTheRefusal and batch_fetch_statuses'
+        # own `except GraphQLUnavailableError: raise` guard above exist to prevent.
+        raise
     except (BacklogError, GithubException):
         return ""
 
