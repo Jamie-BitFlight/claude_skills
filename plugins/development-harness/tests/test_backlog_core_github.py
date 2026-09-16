@@ -1430,6 +1430,9 @@ class TestViewEnrichFromGithub:
         # Assert
         assert enriched is True
         assert result.body == "Raw human-owned body"
+        assert result.warnings == [
+            (f"Authoritative GitHub work-item body unavailable ({error}); using the raw issue body, which may be stale")
+        ]
 
 
 # ---------------------------------------------------------------------------

@@ -219,15 +219,15 @@ class TestRenderedStatusWithALiveAnswer:
 
 
 class TestStatusFilterUnderARefusal:
-    """The filter has to answer from the cache, not from a fabricated default."""
+    """A failed live lookup cannot confirm numeric-issue filter matches."""
 
-    def test_the_real_status_still_matches(self, mocker: MockerFixture) -> None:
+    def test_cached_statuses_do_not_count_as_confirmed_matches(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker, [_item("#42"), _item("#43", title="Another")])
         _refuse(mocker)
 
         result = operations.list_items(status="status:in-progress", output=Output())
 
-        assert result["count"] == 2
+        assert result["count"] == 0
 
     def test_needs_grooming_no_longer_matches_everything(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker, [_item("#42"), _item("#43", title="Another")])
@@ -251,44 +251,29 @@ class TestStatusFilterUnderARefusal:
 
         assert operations.list_items(output=Output())["count"] == 2
 
-    def test_a_bare_cached_status_matches_the_labeled_filter(self, mocker: MockerFixture) -> None:
-        """Reproduction (P1, PR #3552 Codex review): a cached GitHub item whose
-        ``item.status`` is the bare lifecycle value ``"in-progress"`` — not the
-        ``status:in-progress`` label a live answer would have produced — must
-        still be returned by ``list_items(status="status:in-progress")`` once
-        GraphQL is refused and the cache is all that is left to filter on.
-        Before the fix this returned ``count: 0``.
-        """
+    def test_a_bare_cached_status_is_not_a_confirmed_match(self, mocker: MockerFixture) -> None:
+        """A normalized cached status remains unconfirmed after the live query fails."""
         _patch_backend(mocker, [_item("#42", status="in-progress")])
         _refuse(mocker)
 
         result = operations.list_items(status="status:in-progress", output=Output())
 
-        assert result["count"] == 1
+        assert result["count"] == 0
 
-    def test_a_cached_needs_grooming_item_still_matches_the_bare_filter(self, mocker: MockerFixture) -> None:
-        """Reproduction (P1, PR #3552 Codex review, second finding): a cached
-        GitHub item whose ``item.status`` is the genuine bare lifecycle value
-        ``"needs-grooming"`` must still be returned by
-        ``list_items(status="needs-grooming")`` — the documented bare form —
-        once GraphQL is refused and the cache is all that is left to filter
-        on. Before the fix, ``normalize_cached_github_status`` promoted the
-        cached value to ``"status:needs-grooming"``, which does not equal the
-        bare ``"needs-grooming"`` filter, so this item was silently dropped
-        even though it was genuinely awaiting grooming.
-        """
+    def test_a_cached_needs_grooming_item_is_not_a_confirmed_match(self, mocker: MockerFixture) -> None:
+        """A cached needs-grooming value remains unconfirmed after live failure."""
         _patch_backend(mocker, [_item("#42", status="needs-grooming")])
         _refuse(mocker)
 
         result = operations.list_items(status="needs-grooming", output=Output())
 
-        assert result["count"] == 1
+        assert result["count"] == 0
 
 
 class TestStatusFilterUnderOtherLookupFailures:
-    """Every failed live lookup must preserve cached-status filtering semantics."""
+    """Every failed live lookup must exclude unconfirmed numeric statuses."""
 
-    def test_generic_lookup_failure_uses_cached_status(self, mocker: MockerFixture) -> None:
+    def test_generic_lookup_failure_excludes_cached_status(self, mocker: MockerFixture) -> None:
         _patch_backend(mocker, [_item("#42"), _item("#43", title="Another", status="needs-grooming")])
         mocker.patch.object(
             operations, "batch_fetch_statuses", side_effect=BackendUnavailableError("GitHub status query failed")
@@ -296,8 +281,7 @@ class TestStatusFilterUnderOtherLookupFailures:
 
         result = operations.list_items(status="status:in-progress", output=Output())
 
-        assert result["count"] == 1
-        assert _statuses(result) == ["status:in-progress"]
+        assert result["count"] == 0
         raw_warnings = result.get("warnings", [])
         warnings = [str(entry) for entry in raw_warnings] if isinstance(raw_warnings, list) else []
         assert any("GitHub status query failed" in warning for warning in warnings)

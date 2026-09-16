@@ -18,6 +18,7 @@ from backlog_core.backend_types import SyncProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogConfig,
     BacklogItem,
     BacklogItemMetadata,
@@ -351,6 +352,56 @@ class TestAddItemCreatesLocalFile:
 
         assert issue_num == 271
         assert _stored_item(reference).title == "fix: Backfill target item"
+
+    def test_backfill_issue_creation_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A configured provider failure is visible when local fallback continues."""
+        item = BacklogItem(title="Backfill")
+        output = Output()
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("rate limited"))
+
+        assert ops._create_issue_and_update_item(item, repo="owner/repo", output=output) is None
+        assert output.warnings == ["  WARNING: Issue creation skipped because GitHub is unavailable: rate limited"]
+
+    def test_title_update_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A local title update discloses that its linked GitHub write was skipped."""
+        item = BacklogItem(title="Old", issue="#42")
+        output = Output()
+        mocker.patch("backlog_core.operations.update_item_metadata")
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("transport failed"))
+
+        assert ops._rename_item_title(item, "New", repo="owner/repo", output=output) is True
+        assert output.warnings == [
+            "  WARNING: Could not update issue #42 title because GitHub is unavailable: transport failed"
+        ]
+
+    def test_plan_update_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A local plan update discloses that its linked GitHub comment was skipped."""
+        item = BacklogItem(title="Item", issue="#42")
+        output = Output()
+        mocker.patch("backlog_core.operations.update_item_metadata")
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("server error"))
+
+        assert ops._apply_plan_to_item(item, "P42", repo="owner/repo", output=output) is True
+        assert output.warnings == [
+            "  WARNING: Could not post plan to issue #42 because GitHub is unavailable: server error"
+        ]
+
+    def test_view_forwards_enrichment_fallback_warning_to_output(self, mocker: MockerFixture) -> None:
+        """An authoritative-body fallback warning reaches progressive-disclosure callers."""
+        _seed_items([BacklogItem(title="Item", section="P1", issue="#42")])
+        output = Output()
+
+        def enrich(result: ViewItemResult, _issue_num: str, _repo: str = "") -> bool:
+            result.body = "Raw issue body"
+            result.warnings.append("authoritative body unavailable; using raw issue body")
+            return True
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=enrich)
+
+        result = view_item("#42", output=output)
+
+        assert output.warnings == ["authoritative body unavailable; using raw issue body"]
+        assert result.warnings == output.warnings
 
     def test_sync_create_missing_issues_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
         """Verify sync_create_missing_issues persists the type-prefixed title too (#2963).
