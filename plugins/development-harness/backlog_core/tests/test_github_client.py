@@ -565,15 +565,21 @@ class TestSslContextKeepsVerification:
 
         assert not context.verify_flags & ssl.VERIFY_X509_STRICT
 
-    def test_relax_strict_false_leaves_verify_flags_untouched(self, compliant_ca_file):
+    def test_relax_strict_false_preserves_default_flags_and_restores_strict(self, compliant_ca_file):
         """Finding 1: loading a compliant bundle must not also clear VERIFY_X509_STRICT.
 
         Bundle loading and strict-mode relaxation are independent decisions — this proves
-        the second does not happen just because the first did.
+        the second does not happen just because the first did. The bound urllib3 builder
+        may already be patched by the pre-init shim, so derive the expected flags from it
+        and restore Python 3.13's native strict default exactly as production does.
         """
+        expected_flags = create_urllib3_context().verify_flags
+        if sys.version_info >= (3, 13):
+            expected_flags |= ssl.VERIFY_X509_STRICT
+
         context = _build_ssl_context(str(compliant_ca_file), relax_strict=False)
 
-        assert context.verify_flags == create_urllib3_context().verify_flags
+        assert context.verify_flags == expected_flags
 
     def test_certificate_verification_stays_required(self, ca_file):
         """Clearing the strict flag must not weaken chain verification to optional or off."""
