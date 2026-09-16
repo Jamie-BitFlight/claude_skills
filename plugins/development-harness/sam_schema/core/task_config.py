@@ -22,6 +22,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.beads import BeadsTaskProvider
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.backends.memory import InMemoryTaskProvider
+from sam_schema.core.exceptions import SamError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.plan_id_index import create_plan_id_index
 
@@ -130,8 +131,10 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         Configured TaskBackend instance.
 
     Raises:
-        ValueError: When *name* (or the resolved name) is not a recognised
-            backend identifier. The message lists all valid options.
+        SamError: When *name* (or the resolved name) is not a recognised
+            backend identifier. The message lists all valid options. A bare
+            ``ValueError`` here was caught by nothing on the MCP path, so a
+            misconfigured ``TASKBACKEND`` escaped as an unhandled exception.
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
@@ -151,7 +154,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
-    raise ValueError(msg)
+    raise SamError(msg)
 
 
 # ---------------------------------------------------------------------------

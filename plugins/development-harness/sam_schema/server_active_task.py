@@ -12,7 +12,6 @@ from fastmcp.exceptions import ToolError
 
 from sam_schema import server_backend
 from sam_schema.core.action_models import ActiveTaskActionConfig, SetActiveTaskConfig, UpdateActiveTaskConfig
-from sam_schema.core.context_config import get_context_config
 from sam_schema.core.models import (
     ActiveTaskClearResult,
     ActiveTaskGetResult,
@@ -48,13 +47,14 @@ def sam_active_task_impl(
     Raises:
         ToolError: When ``session_id`` is missing, empty, or the reserved
             ``"_default"`` sentinel. Also when ``action="update"`` and no
-            active task has been set.
+            active task has been set, and when the configured context backend
+            name is not recognised.
     """
     try:
         resolved_session = operations.require_session_id(session_id)
     except operations.MissingSessionIdError as exc:
         raise ToolError(str(exc)) from exc
-    ctx_backend = get_context_config().backend
+    ctx_backend = server_backend.get_context_backend()
 
     match config.action:
         case "get":

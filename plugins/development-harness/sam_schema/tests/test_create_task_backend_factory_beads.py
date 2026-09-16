@@ -5,7 +5,7 @@ Verifies that:
 - CONTEXTBACKEND=beads env var routes to BeadsContextBackend
 - .dh/config.yaml with task.backend = "beads" is respected (via DHConfig)
 - .dh/config.yaml with context.backend = "beads" is respected (via DHConfig)
-- Invalid backend names raise ValueError
+- Invalid backend names raise SamError
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from tests.helpers import make_dh_paths_mock
 
 from sam_schema.core.backends.beads import BeadsContextBackend, BeadsTaskProvider
 from sam_schema.core.context_config import create_context_backend, reset_context_config
+from sam_schema.core.exceptions import SamError
 from sam_schema.core.task_config import create_task_backend, reset_task_config
 
 if TYPE_CHECKING:
@@ -44,10 +45,10 @@ class TestCreateTaskBackendEnvVar:
         backend = create_task_backend()
         assert isinstance(backend, BeadsTaskProvider)
 
-    def test_env_var_invalid_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """TASKBACKEND=nonexistent must raise ValueError."""
+    def test_env_var_invalid_raises_sam_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """TASKBACKEND=nonexistent must raise SamError."""
         monkeypatch.setenv("TASKBACKEND", "nonexistent")
-        with pytest.raises(ValueError, match="Unknown backend"):
+        with pytest.raises(SamError, match="Unknown backend"):
             create_task_backend()
 
     def test_explicit_name_beads_returns_beads_provider(self) -> None:
@@ -100,10 +101,10 @@ class TestCreateContextBackendEnvVar:
         backend = create_context_backend()
         assert isinstance(backend, BeadsContextBackend)
 
-    def test_env_var_invalid_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """CONTEXTBACKEND=bad must raise ValueError."""
+    def test_env_var_invalid_raises_sam_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """CONTEXTBACKEND=bad must raise SamError."""
         monkeypatch.setenv("CONTEXTBACKEND", "bad")
-        with pytest.raises(ValueError, match="Unknown backend"):
+        with pytest.raises(SamError, match="Unknown backend"):
             create_context_backend()
 
     def test_explicit_name_beads_returns_beads_context_backend(self) -> None:
