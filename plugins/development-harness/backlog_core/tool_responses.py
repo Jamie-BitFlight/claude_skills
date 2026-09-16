@@ -978,6 +978,13 @@ class BacklogViewResponse(BaseModel):
 
     # --- error arms ---
     error: str | None = None
+    error_type: str | None = None
+    """Exception class name (e.g. ``"ItemNotFoundError"``), set only on the
+    generic ``BacklogError`` arm of ``_execute_disclosure_or_passthrough`` --
+    lets a caller branch on the failure's identity instead of only its
+    rendered ``error`` message. ``None`` on every other arm, including the
+    ``OrdinalNotFoundError`` arm, which already carries dedicated
+    ``requested_ordinal``/``valid_ordinals`` identity fields."""
     invalid_params: dict[str, object] | None = None
     requested_ordinal: str | None = None
     valid_ordinals: list[str] | None = None

@@ -2096,7 +2096,16 @@ def _execute_disclosure_or_passthrough(
 
     ``OrdinalNotFoundError`` and ``BacklogError`` are caught and converted to
     error dicts so the ``to_thread`` caller receives a clean return value with
-    no exception.
+    no exception. The generic ``BacklogError`` arm includes ``error_type``
+    (``type(exc).__name__``) so a caller can branch on the exception's
+    identity instead of only its rendered message — this catch site used to
+    flatten every ``BacklogError`` subtype (a missing item, a refused
+    GraphQL/REST lookup, an unsupported backend capability, ...) to a bare
+    ``{"error": str(exc)}``, discarding which one occurred (B-critique.md
+    §3.2). ``OrdinalNotFoundError`` keeps its existing dedicated
+    ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
+    carries structured identity and that shape is pinned by
+    ``test_code_fence_miss_key_set_matches_numeric_miss``.
 
     Args:
         selector: Issue selector forwarded to the disclosure handler.
@@ -2114,11 +2123,11 @@ def _execute_disclosure_or_passthrough(
         return None  # safety net — caller should never reach this branch
     try:
         response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh)
-        return dataclasses.asdict(response)
+        return response.model_dump()
     except OrdinalNotFoundError as exc:
         return {"error": str(exc), "requested_ordinal": exc.requested, "valid_ordinals": exc.valid_ordinals}
     except BacklogError as exc:
-        return {"error": str(exc)}
+        return {"error": str(exc), "error_type": type(exc).__name__}
 
 
 @mcp.tool(
