@@ -386,6 +386,7 @@ max-complexity = 12
 "**/backlog_core/sync_state.py" = ["banned-api"]
 "**/backlog_core/tests/test_open_pr_search_failure.py" = ["banned-api"]
 "**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
+"**/backlog_core/tests/test_update_item_transient_transport.py" = ["banned-api"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["start-process-with-partial-path"]
 "**/kage-bunshin/scripts/spawn.py" = ["start-process-with-partial-path"]

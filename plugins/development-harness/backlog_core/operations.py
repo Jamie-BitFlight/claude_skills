@@ -803,7 +803,7 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _update_issue_graphql(repository, issue_node["id"], title=title)
                 out.info(f"  GitHub issue {issue_ref} title updated to: {title}")
-            except (GithubException, BacklogError) as e:
+            except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
                 out.warn(f"  WARNING: Could not update issue {issue_ref} title: {e}")
 
     return True
@@ -887,7 +887,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
                 issue_node = _fetch_issue_graphql(repository, owner, repo_name, num)
                 _add_comment_graphql(repository, issue_node["id"], f"**Plan**: {plan}")
                 out.info(f"  Plan comment posted to issue {issue_ref}")
-            except (GithubException, BacklogError) as e:
+            except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
                 out.warn(f"  WARNING: Could not post plan to issue {issue_ref}: {e}")
 
     return True
