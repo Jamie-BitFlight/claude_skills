@@ -482,7 +482,7 @@ class TestCountOnlyPreservesOperationsLayerOutput:
             operations, "get_config", return_value=mocker.Mock(backend=_StatusRefusedBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(count_only=True))
+        response = await backlog_list(count_only=True)
 
         assert response.get("count") == 1
         warnings = cast("list[str]", response.get("warnings", []))
@@ -501,7 +501,7 @@ class TestCountOnlyPreservesOperationsLayerOutput:
             operations, "get_config", return_value=mocker.Mock(backend=_NoReconcileBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(refresh=True, count_only=True))
+        response = await backlog_list(refresh=True, count_only=True)
 
         assert response.get("count") == 1
         assert "messages" not in response, (
@@ -521,7 +521,7 @@ class TestCountOnlyPreservesOperationsLayerOutput:
             operations, "get_config", return_value=mocker.Mock(backend=_DegradedReconcileBackend([_item("#1")]))
         )
 
-        response = cast("dict[str, object]", await backlog_list(refresh=True, count_only=True))
+        response = await backlog_list(refresh=True, count_only=True)
 
         assert response.get("count") == 1
         assert "messages" not in response
