@@ -247,11 +247,8 @@ DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 # ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
 # plugin-root variable, which only Claude Code resolves.
 SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SAM_CLI_LINES = (
-    *tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES),
-    'uv run "$DH_SKILL_DIR/../../sam_schema/cli.py"',
-)
-DH_SCRIPTS_LINES = (*tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES), "$DH_SKILL_DIR/../../scripts")
+SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
+DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
 
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
@@ -859,7 +856,7 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         "<sam_cli> and <dh_scripts> blocks:\n" + "\n".join(outside_climbs)
     )
 
-    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES) - {"DH_SKILL_DIR"})
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
     assert not unknown_variables, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names template variable(s) other than the three "
         f"skill-dir forms: {unknown_variables}"
@@ -883,8 +880,6 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
     )
     for harness in ("Codex", "OpenCode", "Cursor"):
         assert harness in stripped, f"dh-cli-usage does not name its {harness} fallback."
-    assert "DH_SKILL_DIR='<absolute base directory displayed for dh:dh-cli-usage>'" in raw
-    assert 'uv run "$DH_SKILL_DIR/../../sam_schema/cli.py"' in stripped
 
 
 def test_implementation_manager_does_not_execute_an_unresolved_cli_token() -> None:
