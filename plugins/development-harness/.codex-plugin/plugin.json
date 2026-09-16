@@ -6,6 +6,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "11.1.29",
 =======
   "version": "11.1.13",
@@ -25,6 +26,9 @@
 =======
   "version": "11.1.11",
 >>>>>>> ebee8e371 (feat(backlog-core): classify a GraphQL refusal, and stop swallowing it in listings (#3552))
+=======
+  "version": "11.1.13",
+>>>>>>> 49d9200bd (fix(backlog-core): restore VERIFY_X509_STRICT only when Python's own default sets it)
   "description": "Language-agnostic development process harness implementing the Stateless Agent Methodology (SAM) 7-stage pipeline with ARL human touchpoint model and Voltron-style language plugin composition. Provides orchestration, workflows, planning, verification, and testing methodology that any language plugin can compose with.",
   "author": {
     "name": "Jamie Nelson",
