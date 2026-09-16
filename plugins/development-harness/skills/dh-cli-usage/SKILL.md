@@ -6,16 +6,23 @@ user-invocable: false
 
 # DH CLI Usage
 
-Determine this skill's absolute directory from the skill metadata supplied by the current harness:
+Determine this skill's absolute directory with the branch for the current harness:
 
-- Codex exposes `skill_root` when the skill is read.
-- OpenCode appends `Base directory for this skill` to the loaded skill.
-- Cursor resolves paths relative to the skill root.
-- Claude Code, Kimi, and Hermes substitute one of these skill-directory values. Use the first line
-  that became a concrete absolute path; ignore unresolved lines:
+- Claude Code: use `${CLAUDE_PLUGIN_ROOT}/skills/dh-cli-usage`. Claude Code substitutes
+  `${CLAUDE_PLUGIN_ROOT}` in plugin skill content.[1]
+- Codex: use the absolute `skill_root` value returned when this skill is read.[2]
+- OpenCode: use the `Base directory for this skill` value appended to the loaded skill.[3]
+- Kimi: use the substituted `${KIMI_SKILL_DIR}` value.[4]
+- Hermes: use the substituted `${HERMES_SKILL_DIR}` value.[5]
+- Cursor: open [this SKILL.md](./SKILL.md) with the file tool; Cursor resolves that relative
+  reference from the skill root.[6] Use the parent directory of the absolute path returned by the
+  tool. Do not use the relative path itself as `<skill-root>`.
+
+For substitution-based branches, use the first line below that became a concrete absolute path and
+ignore unresolved lines:
 
 <skill_root>
-${CLAUDE_SKILL_DIR}
+${CLAUDE_PLUGIN_ROOT}/skills/dh-cli-usage
 ${KIMI_SKILL_DIR}
 ${HERMES_SKILL_DIR}
 </skill_root>
@@ -39,3 +46,12 @@ path before acting. If no form resolves or the probe fails, report the exact err
 
 Read the [grouped command reference](./references/command-reference.md) for grouped commands. Read
 the [MCP connection check](./references/mcp-connection-check.md) when an MCP server cannot be reached.
+
+## References
+
+1. [Claude Code plugins reference](https://code.claude.com/docs/en/plugins-reference) (accessed 2026-09-16)
+2. [Codex skill read implementation](https://github.com/openai/codex/blob/ac192cd7937b0d73edc6dffe009940ae53782dd4/codex-rs/ext/skills/src/tools/read.rs#L66) (accessed 2026-09-16)
+3. [OpenCode skill tool implementation](https://github.com/anomalyco/opencode/blob/337fd144d2ba144743368f78d9579a99cce175bd/packages/opencode/src/tool/skill.ts#L34-L60) (accessed 2026-09-16)
+4. [Kimi Code agent skills](https://github.com/MoonshotAI/kimi-code/blob/main/docs/en/customization/skills.md#body-placeholders) (accessed 2026-09-16)
+5. [Hermes Agent creating skills](https://hermes-agent.nousresearch.com/docs/developer-guide/creating-skills#referencing-bundled-scripts-from-skillmd) (accessed 2026-09-16)
+6. [Cursor agent skills](https://cursor.com/docs/skills) (accessed 2026-09-16)

@@ -177,12 +177,12 @@ ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 # skill, never re-derive either value itself. These patterns are the three ways a file did that
 # derivation directly instead: a raw ``${...PLUGIN_ROOT}`` template variable, a
 # ``${...SKILL_DIR}/..`` parent-directory climb written out longhand, and the CLI's literal path.
-# Only Claude Code substitutes a plugin-root or skill-dir template variable in a skill or agent
-# body; every other measured harness ships one to the model as raw text, so a reference or doc
-# file carrying it ships broken text everywhere else (``CLAIMS-REGISTER.md``'s
-# ``${CLAUDE_PLUGIN_ROOT}`` entry; ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` instead
-# derives the root from the skill's own directory, which every measured harness except Cursor gives
-# the model.
+# Claude Code substitutes its plugin-root variable, Kimi and Hermes substitute their skill-root
+# variables, and Codex and OpenCode expose the skill root as metadata. A reference or doc file that
+# assumes any one of those harness-specific forms ships broken text to the others
+# (``CLAIMS-REGISTER.md``'s ``${CLAUDE_PLUGIN_ROOT}`` entry;
+# ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` centralizes those branches and makes
+# Cursor resolve its documented relative skill reference to an absolute file-tool result first.
 PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{?[A-Z_]*PLUGIN_ROOT\b")
 SKILL_DIR_PARENT_RE = re.compile(r"\$\{?[A-Z_]*SKILL_DIR\}?/\.\.")
 CLI_PATH_RE = re.compile(r"sam_schema[/\\.]cli\b|run_sam_cli\.py")
@@ -244,8 +244,11 @@ DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
 DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 
 FIRST_CLASS_HARNESSES = ("Claude Code", "Codex", "OpenCode", "Cursor")
-SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SKILL_ROOT_LINES = tuple(f"${{{variable}}}" for variable in SKILL_DIR_VARIABLES)
+SKILL_DIR_VARIABLES = ("KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
+SKILL_ROOT_LINES = (
+    "${CLAUDE_PLUGIN_ROOT}/skills/dh-cli-usage",
+    *tuple(f"${{{variable}}}" for variable in SKILL_DIR_VARIABLES),
+)
 SAM_CLI_LINES = ('uv run "<skill-root>/../../sam_schema/cli.py"',)
 DH_SCRIPTS_LINES = ("<skill-root>/../../scripts",)
 
@@ -798,7 +801,8 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
     directory, and states its documented failure path.
 
     The command definitions use one model-resolved skill-root token, and the instructions support
-    both harness-supplied root metadata and the three known body-substitution variables.
+    harness-supplied root metadata, known body-substitution variables, and Cursor's relative-file
+    resolution without treating that relative path as an absolute directory.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
@@ -832,13 +836,17 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
 
     missing_harnesses = [harness for harness in FIRST_CLASS_HARNESSES if harness not in raw]
     assert not missing_harnesses, f"dh-cli-usage does not explain skill-root resolution for {missing_harnesses}"
-    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
+    known_variables = {*SKILL_DIR_VARIABLES, "CLAUDE_PLUGIN_ROOT"}
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - known_variables)
     assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
-    assert "PLUGIN_ROOT" not in raw, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names PLUGIN_ROOT; it must derive the plugin root "
-        "only from its own skill directory, never from a plugin-root variable."
-    )
+    cursor_branch = next(line for line in raw.splitlines() if line.startswith("- Cursor:"))
+    assert "SKILL.md" in cursor_branch
+    assert "absolute" in raw[raw.index(cursor_branch) : raw.index("For substitution-based branches")]
+    assert "Do not use the relative path" in raw
+    for citation_number in range(1, 7):
+        assert f"[{citation_number}]" in raw, f"dh-cli-usage is missing harness citation [{citation_number}]"
+    assert "## References" in raw
     assert "<plugin_root" not in raw, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens a `<plugin_root` tag; that token is retired "
         "in favor of `<sam_cli/>` and `<dh_scripts/>`."
@@ -1017,6 +1025,15 @@ def cli_definition_tag_offenders(paths: list[Path]) -> list[str]:
                 for match in DEFINITION_TAG_RE.finditer(line)
             )
     return offenders
+
+
+def test_work_backlog_item_does_not_treat_cli_tokens_as_input_placeholders() -> None:
+    """Input substitution and CLI-token resolution remain separate operations."""
+    skill = (SKILLS_DIR / "work-backlog-item" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "whose key exists in `<input/>`" in skill
+    assert "command tokens, not input placeholders" in skill
+    assert "resolved `<sam_cli/>` command" in skill
 
 
 def test_cli_definition_blocks_live_only_in_dh_cli_usage() -> None:
