@@ -185,6 +185,19 @@ class TestListItemsStatusSource:
 
         assert result["status_source"] == "live"
 
+    def test_filtered_numeric_row_leaves_cache_only_result(self, mocker: MockerFixture) -> None:
+        items = [_item("#1", title="Filtered out"), _item("", title="Backend owned")]
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend(items)))
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(statuses={1: IssueStatus(status="open")}, attempted=True),
+        )
+
+        result = operations.list_items(title="Backend owned", output=Output())
+
+        assert result["status_source"] == "cache"
+
     def test_generic_status_and_milestone_filters_are_named_under_degradation(self, mocker: MockerFixture) -> None:
         mocker.patch.object(
             operations, "get_config", return_value=mocker.Mock(backend=_BatchCapableBackend([_item("#1")]))

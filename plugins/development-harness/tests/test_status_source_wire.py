@@ -71,8 +71,8 @@ class TestBacklogListMcpWireCarriesStatusSource:
 
     async def test_healthy_call_reports_live_status_source(self) -> None:
         op_result = {
-            "items": [],
-            "count": 0,
+            "items": [{"issue": "#1", "title": "Live", "status": "open"}],
+            "count": 1,
             "status_source": "live",
             "unavailable_capabilities": [],
             "filters_evaluated_against_unavailable_data": [],
@@ -85,8 +85,8 @@ class TestBacklogListMcpWireCarriesStatusSource:
 
     async def test_degraded_call_reports_unavailable_status_source_on_the_wire(self) -> None:
         op_result = {
-            "items": [],
-            "count": 0,
+            "items": [{"issue": "#1", "title": "Unavailable", "status": ""}],
+            "count": 1,
             "status_source": "unavailable",
             "unavailable_capabilities": ["live_status"],
             "filters_evaluated_against_unavailable_data": ["status"],
