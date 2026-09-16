@@ -28,11 +28,15 @@ from pathlib import Path
 
 # CPython puts an inherited PYTHONPATH ahead of the environment uv resolved for this script, so a
 # foreign copy of any declared dependency can shadow it, including one that imports cleanly at the
-# wrong version. Restart without PYTHONPATH; the plugin's own import roots are added below.
+# wrong version. Restart without PYTHONPATH; the plugin's own import roots are added below. Gated
+# on __name__ == "__main__": this module is also imported in-process (CliRunner-style tests, an
+# MCP server, a REPL) where os.execve would replace the *importer's* own process using the
+# importer's sys.argv, not the CLI's -- hijacking whatever host imported us instead of just
+# skipping a module-level restart it never needed.
 _RELOADED = "DH_CLI_PYTHONPATH_CLEARED"
-if os.environ.get("PYTHONPATH") and not os.environ.get(_RELOADED):
+if __name__ == "__main__" and os.environ.get("PYTHONPATH") and not os.environ.get(_RELOADED):
     _clean_env = dict(os.environ)
-    _clean_env.pop("PYTHONPATH")
+    _clean_env.pop("PYTHONPATH", None)
     _clean_env[_RELOADED] = "1"
     os.execve(sys.executable, [sys.executable, *sys.argv], _clean_env)
 

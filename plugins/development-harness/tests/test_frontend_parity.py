@@ -186,3 +186,40 @@ class TestCLIForeignCWD:
         )
         assert result.returncode == 0, f"package={package} {result.stderr[:500]}"
         json.loads(result.stdout)
+
+    def test_importing_cli_module_does_not_hijack_a_foreign_pythonpath_host(self, tmp_path: Path) -> None:
+        """Importing ``sam_schema.cli`` in-process must never re-exec the host process.
+
+        ~15 test modules do ``from sam_schema.cli import app`` (or similar) to drive it
+        in-process via ``CliRunner``. If the ``PYTHONPATH`` guard fires at import time
+        rather than only on direct script execution, importing the module while a
+        *foreign* ``PYTHONPATH`` is set (common in developer/CI shells) calls
+        ``os.execve`` using the *importing* process's own ``sys.argv`` -- pytest's, not
+        the CLI's -- silently replacing the whole pytest run instead of merely importing
+        a module. Reproduced via a nested ``uv run pytest`` so the outer test observes
+        exactly what a real in-process importer sees: either a clean pass, or the outer
+        process's collection getting hijacked.
+        """
+        probe = tmp_path / "test_import_guard_probe.py"
+        probe.write_text(
+            f"""
+import sys
+
+sys.path.insert(0, {str(_plugin_root)!r})
+
+
+def test_importing_cli_module_is_safe() -> None:
+    import sam_schema.cli
+
+    assert sam_schema.cli.app is not None
+""",
+            encoding="utf-8",
+        )
+        result = run_cli_subprocess(
+            ["uv", "run", "pytest", str(probe), "-q", "-p", "no:randomly", "--no-cov"],
+            timeout=180,
+            cwd=_plugin_root,
+            env={**os.environ, "PYTHONPATH": "/tmp"},
+        )
+        assert result.returncode == 0, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
+        assert "1 passed" in result.stdout, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
