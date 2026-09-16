@@ -2164,20 +2164,13 @@ def read_through_cold_cache(repo: str, output: Output) -> None:
 
 
 def _status_map_empty_due_to_missing_token(open_items: list[BacklogItem]) -> bool:
-    """Tell a genuinely empty live status map apart from one no query ever answered.
+    """Defensively identify an empty status map returned without configured credentials.
 
-    ``batch_fetch_statuses`` returns an empty map both when GitHub was queried
-    and genuinely found no status data for any item, and when no
-    ``GITHUB_TOKEN`` is configured at all -- the query was never even
-    attempted (see ``gh_client.batch_fetch_statuses``'s docstring: a missing
-    token is a deliberate local-only-fallback configuration state, not a
-    failure, so it folds into the same ``{}`` a real empty result produces).
-    Call this only after an empty map comes back with no exception raised;
-    the two cases are indistinguishable from the map's contents alone, and
-    conflating them reproduces the status-filter fabrication bug (#3546) via
-    a different trigger than the one already fixed for a raised, refused
-    query -- a numeric-issue item would default to ``"needs-grooming"`` in
-    ``_item_derived_status`` even though its live status was never learned.
+    The built-in GitHub backend raises ``BackendUnavailableError`` when no
+    ``GITHUB_TOKEN`` is configured, so its normal path never needs this check.
+    This guard prevents a structurally compatible backend that returns an empty
+    map in that state from turning unavailable status data into an authoritative
+    empty result. Call it only after an empty map comes back without an exception.
 
     Asks the backend through ``CredentialAvailabilityProvider`` --
     ``has_github_credentials()`` -- rather than importing
@@ -2469,17 +2462,9 @@ def list_items(
             status_map = batch_fetch_statuses(open_items, repo)
             status_live = True
             if not status_map and _status_map_empty_due_to_missing_token(open_items):
-                # gh_client.batch_fetch_statuses folds "no GITHUB_TOKEN
-                # configured" into the same empty map a genuinely-empty live
-                # fetch returns (a deliberate local-only fallback -- see its
-                # docstring), so an empty map alone cannot tell the two apart.
-                # _status_map_empty_due_to_missing_token disambiguates: this
-                # branch means the query was never even attempted, which is
-                # exactly the "nothing was learned" case the except clause
-                # below handles for a raised refusal -- treat it the same way
-                # rather than letting a numeric-issue item's status default
-                # to "needs-grooming" as though the fetch had genuinely
-                # answered (#3546, missing-token trigger).
+                # Built-in backends raise for unavailable status data. Keep a
+                # defensive check for a compatible backend that instead returns
+                # an empty map while reporting that credentials are absent.
                 status_map_unavailable = True
                 status_live = False
                 _warn_status_map_unavailable(out, status, "no GITHUB_TOKEN configured")

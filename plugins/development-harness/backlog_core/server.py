@@ -27,7 +27,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -138,25 +138,48 @@ from .tool_responses import (
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable, Mapping
 
+    from pydantic import GetJsonSchemaHandler
+    from pydantic.json_schema import JsonSchemaValue
+
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 ItemId: TypeAlias = int | str
 
-_ResponseModel = TypeVar("_ResponseModel", bound=BaseModel)
+
+class _WireSchema:
+    """Use a response model's JSON schema without changing dict serialization."""
+
+    def __init__(self, cls: type[BaseModel]) -> None:
+        self.cls = cls
+
+    def __get_pydantic_json_schema__(  # ruff: ignore[bad-dunder-method-name] - required Pydantic schema hook
+        self, _core_schema: object, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Generate the advertised schema from the response model.
+
+        Returns:
+            The response model's JSON schema.
+        """
+        return handler(self.cls.__pydantic_core_schema__)
+
+
+def _wire_schema(cls: type[BaseModel]) -> object:
+    """Build response annotation metadata for a dumped model.
+
+    Returns:
+        Metadata that advertises ``cls`` while retaining dict serialization.
+    """
+    return _WireSchema(cls)
 
 
 def _respond(
-    cls: type[_ResponseModel], payload: Mapping[str, object], *, exclude_none: bool = True, exclude_unset: bool = False
-) -> _ResponseModel:
+    cls: type[BaseModel], payload: Mapping[str, object], *, exclude_none: bool = True, exclude_unset: bool = False
+) -> dict[str, object]:
     """Validate a tool payload and return its wire dict (#3369).
 
-    Every ``@mcp.tool`` function is annotated ``-> SomeResponse`` but actually
-    returns ``response.model_dump(...)`` (a plain dict) -- ``ty`` accepts that
-    mismatch when the ``model_validate(...).model_dump(...)`` chain appears
-    directly in a ``return`` statement, but rejects it the moment the same
-    chain is wrapped in a helper annotated ``-> dict[str, object]`` (or
-    ``-> dict[str, Any]``). Declaring this helper ``-> _ResponseModel`` (a
-    TypeVar bound to ``BaseModel``, matching the class passed in) is what
-    keeps every call site's declared return type checkable.
+    Tool handlers using this helper declare dictionary return types because
+    this function deliberately dumps the validated model. Claiming a response
+    model return type while returning a dict makes FastMCP ask Pydantic to
+    serialize a dict as that model, emitting ``PydanticSerializationUnexpectedValue``.
 
     ``exclude_none`` defaults to ``True`` -- the pattern nearly all ~70+
     standard call sites use -- so a tool that legitimately needs a
@@ -185,9 +208,7 @@ def _respond(
         exclude_unset: Forwarded to ``model_dump()``. Defaults to ``False``.
 
     Returns:
-        The validated model's dumped dict, typed as ``cls`` for the
-        annotation-checking caller (FastMCP serializes the dict identically
-        to the model instance at the wire boundary either way).
+        The validated model's dumped dictionary.
     """
     return cls.model_validate(payload).model_dump(exclude_none=exclude_none, exclude_unset=exclude_unset)
 
@@ -1376,7 +1397,7 @@ async def backlog_add(
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
-) -> BacklogAddResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogAddResponse)]:
     """Add a new item through the configured backend and optionally create its native issue.
 
     For guided creation with classification and research support, use
@@ -1794,7 +1815,7 @@ async def backlog_list(
             )
         ),
     ] = None,
-) -> BacklogListResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListResponse)]:
     """List all open backlog items.
 
     When match_context=True, use page/tokens_per_page/page_token_limit to control
@@ -2153,9 +2174,8 @@ async def backlog_view(
                 "Bypass the cache and live-check an already-cached title-substring selector "
                 "against the backend. Numeric/#N/URL selectors are always live-checked "
                 "regardless of this flag. For GitHub, prefers the authoritative "
-                "head-pointer/audit-comment record; on a resolution failure it silently "
-                "falls back to the raw issue body, with no signal in the response that "
-                "this happened."
+                "head-pointer/audit-comment record; on a resolution failure it falls "
+                "back to the raw issue body and records a warning that the body may be stale."
             )
         ),
     ] = False,
@@ -2274,7 +2294,7 @@ async def backlog_view(
             ),
         ),
     ] = 0,
-) -> BacklogViewResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogViewResponse)]:
     r"""View a single backlog item or GitHub issue in detail.
 
     Ordinal format: ^\d+(\.\d+)*(\.code\.\d+)?$. Examples:
@@ -2427,7 +2447,7 @@ async def backlog_view(
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
-) -> BacklogSyncResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogSyncResponse)]:
     """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
@@ -2474,7 +2494,7 @@ async def backlog_link_followup(
             )
         ),
     ],
-) -> BacklogLinkFollowupResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogLinkFollowupResponse)]:
     """Link a follow-up backlog item to its originating plan or task.
 
     Records the origin's logical ID on the item's ``followup_to`` metadata
@@ -2514,7 +2534,7 @@ async def backlog_list_followups(
             )
         ),
     ],
-) -> BacklogListFollowupsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListFollowupsResponse)]:
     """List backlog items linked as follow-ups to the given origin.
 
     Returns all items whose ``metadata.followup_to`` exactly matches the
@@ -2561,7 +2581,7 @@ async def backlog_close(
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
-) -> BacklogCloseResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCloseResponse)]:
     """Dismiss a backlog item without completing it and close it on the configured backend.
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
@@ -2615,7 +2635,7 @@ async def backlog_resolve(
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
-) -> BacklogResolveResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogResolveResponse)]:
     """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
     plan/method/notes/follow_ups/findings become a structured completion comment
@@ -2722,7 +2742,7 @@ async def backlog_update(
             "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
-) -> BacklogUpdateResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogUpdateResponse)]:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
     Groomed content is synced to the linked work item when the item has one.
@@ -2833,7 +2853,7 @@ async def backlog_groom(
             )
         ),
     ] = False,
-) -> BacklogGroomResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogGroomResponse)]:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
     When the item has a GitHub issue, the groomed content is synced there
@@ -2889,7 +2909,7 @@ async def backlog_groom(
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
-) -> BacklogNormalizeResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogNormalizeResponse)]:
     """Normalize all work items through the configured backend.
 
     Returns:
@@ -2933,7 +2953,7 @@ async def backlog_pull(
         bool, Field(description="Overwrite local content even if local version is newer or longer")
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
-) -> BacklogPullResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogPullResponse)]:
     """Reconcile linked issue content.
 
     Only backends that support reconciliation act on this — on other backends
@@ -2998,7 +3018,7 @@ async def backlog_create_sam_task(
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> BacklogCreateSamTaskResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateSamTaskResponse)]:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
     Returns:
@@ -3041,7 +3061,7 @@ async def backlog_get_sam_tasks(
     refresh_cache: Annotated[
         bool, Field(description="Compatibility flag; the configured provider owns refresh")
     ] = True,
-) -> SamTaskLookupResult:
+) -> Annotated[dict[str, object], _wire_schema(SamTaskLookupResult)]:
     """Return SAM tasks owned by a configured-backend work item.
 
     Returns tasks plus explicit provider freshness and availability state.
@@ -3069,7 +3089,7 @@ async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (GitHub issue integer)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> BacklogUpdateSamTaskStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogUpdateSamTaskStatusResponse)]:
     """Update the status field in a SAM task sub-issue.
 
     Patches the sam:task YAML block in the issue body. No-op if status already matches.
@@ -3162,7 +3182,7 @@ async def artifact_register(
     ],
     status: Annotated[ArtifactStatus, Field(description="Lifecycle status of the artifact")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
-) -> ArtifactRegisterResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactRegisterResponse)]:
     """Upsert an artifact entry in provider-owned logical content.
 
     Idempotent by (artifact_type, artifact_id). If an entry with the same type and
@@ -3224,7 +3244,7 @@ async def artifact_list(
         ),
     ],
     artifact_type: Annotated[str | None, Field(description="Filter by artifact type (optional)")] = None,
-) -> ArtifactsListResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactsListResponse)]:
     """Return all artifacts registered for a backlog item.
 
     Returns an empty list when no manifest section exists yet — this is not an error.
@@ -3280,7 +3300,7 @@ async def artifact_get(
             )
         ),
     ] = None,
-) -> ArtifactsListResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactsListResponse)]:
     """Return metadata for artifacts registered on a backlog item under one type.
 
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
@@ -3343,7 +3363,7 @@ async def artifact_read(
             )
         ),
     ] = None,
-) -> ArtifactReadResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactReadResponse)]:
     """Read provider-owned logical content for a registered artifact.
 
     The selected ContentProvider resolves the artifact by owner, type, and
@@ -3412,7 +3432,7 @@ async def artifact_read(
 )
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
-) -> BacklogGetReadySamTasksResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogGetReadySamTasksResponse)]:
     """Return SAM tasks whose status is not-started and all dependencies are terminal.
 
     Returns:
@@ -3456,7 +3476,7 @@ async def backlog_strike_entry(
     ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
-) -> BacklogStrikeEntryResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogStrikeEntryResponse)]:
     """Strike (retract) an entry block within a backlog item.
 
     Wraps the entry in a collapsed details block with the reason,
@@ -3485,7 +3505,7 @@ async def backlog_strike_entry(
 )
 async def backlog_list_labels(
     limit: Annotated[int, Field(description="Maximum labels to return")] = 100,
-) -> BacklogListLabelsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListLabelsResponse)]:
     """List repository labels. Requires a backend with label support — errors otherwise.
 
     Returns all labels defined on the repository, up to ``limit``. There is no
@@ -3522,7 +3542,7 @@ async def backlog_list_merged_prs(
         ),
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of PRs to return")] = 20,
-) -> BacklogListMergedPrsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMergedPrsResponse)]:
     """List merged pull requests. Requires a backend with PR support — errors otherwise.
 
     Only PRs that were actually merged (not just closed) are returned.
@@ -3550,7 +3570,7 @@ async def backlog_list_merged_prs(
 )
 async def backlog_list_milestones(
     state: Annotated[str, Field(description="Milestone state filter: open | closed | all")] = "open",
-) -> BacklogListMilestonesResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMilestonesResponse)]:
     """List repository milestones filtered by state.
 
     Requires a backend with milestone support — errors otherwise. Returns
@@ -3588,7 +3608,9 @@ async def backlog_list_milestones(
         open_world_hint=True,
     )
 )
-async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
+async def backlog_get_soonest_milestone() -> Annotated[
+    dict[str, object], _wire_schema(BacklogGetSoonestMilestoneResponse)
+]:
     """Return the open milestone with the earliest due date.
 
     Requires a backend with milestone support — errors otherwise. Milestones
@@ -3633,7 +3655,7 @@ async def backlog_create_milestone(
         str | None,
         Field(description="Optional due date as ISO 8601 string, e.g. '2026-06-30' or '2026-06-30T00:00:00Z'"),
     ] = None,
-) -> BacklogCreateMilestoneResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateMilestoneResponse)]:
     """Create a new milestone on the repository.
 
     Requires a backend with milestone support — errors otherwise.
@@ -3672,7 +3694,7 @@ async def backlog_create_milestone(
 async def backlog_assign_item_to_milestone(
     issue_number: Annotated[int, Field(description="Issue number to assign")],
     milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
-) -> BacklogAssignItemToMilestoneResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogAssignItemToMilestoneResponse)]:
     """Assign a backlog item to a milestone.
 
     Requires a backend with milestone support — errors otherwise.
@@ -3709,7 +3731,7 @@ async def backlog_list_issues(
     labels: Annotated[str | None, Field(description="Comma-separated label names to filter by")] = None,
     state: Annotated[str, Field(description="Issue state: open, closed, or all")] = "open",
     limit: Annotated[int, Field(description="Maximum issues to return")] = 30,
-) -> BacklogListIssuesResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListIssuesResponse)]:
     """List GitHub issues with optional milestone, label, and state filters.
 
     Returns:
@@ -3748,7 +3770,7 @@ async def backlog_list_issues(
 async def backlog_comment_issue(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     body: Annotated[str, Field(description="Comment body (Markdown)")],
-) -> BacklogCommentIssueResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCommentIssueResponse)]:
     """Add a comment to a GitHub issue.
 
     Returns:
@@ -3780,7 +3802,7 @@ async def backlog_list_comments(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
     offset: Annotated[int, Field(description="Number of comments to skip")] = 0,
-) -> BacklogListCommentsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListCommentsResponse)]:
     """List comments on a GitHub issue.
 
     Returns:
@@ -3824,7 +3846,7 @@ async def backlog_read_comment(
             )
         ),
     ],
-) -> BacklogReadCommentResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogReadCommentResponse)]:
     """Read the full body of a single comment on a GitHub issue.
 
     Returns:
@@ -3851,7 +3873,7 @@ async def backlog_read_comment(
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
-) -> BacklogListProjectsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListProjectsResponse)]:
     """List Projects V2 for the repository owner via GraphQL.
 
     Returns:
@@ -3879,7 +3901,7 @@ async def backlog_list_projects(
 async def backlog_create_project(
     title: Annotated[str, Field(description="Project title")],
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
-) -> BacklogCreateProjectResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateProjectResponse)]:
     """Create a Projects V2 project under the repository owner.
 
     Resolves the owner node ID then runs the createProjectV2 GraphQL mutation.
@@ -3945,7 +3967,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
 )
 async def dispatch_read(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-) -> DispatchReadResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchReadResponse)]:
     """Read a dispatch plan for the given milestone.
 
     Returns an error response if no plan is stored for this milestone or it
@@ -3978,7 +4000,7 @@ async def dispatch_read(
 )
 async def dispatch_validate(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-) -> DispatchValidateResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchValidateResponse)]:
     """Validate an existing dispatch plan's structural integrity.
 
     Reads the plan file then runs five structural checks: duplicate issues,
@@ -4010,7 +4032,7 @@ async def dispatch_validate(
 async def dispatch_stale_check(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> DispatchStaleCheckResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchStaleCheckResponse)]:
     """Check whether a dispatch plan is stale relative to the current milestone.
 
     Requires a backend with milestone support — errors otherwise. Fetches the
@@ -4069,7 +4091,7 @@ async def dispatch_create_plan(
             )
         ),
     ] = None,
-) -> DispatchCreatePlanResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchCreatePlanResponse)]:
     """Create or overwrite a stored dispatch plan for a milestone.
 
     Accepts a typed ``DispatchPlan`` model, stores it atomically through the
@@ -4171,7 +4193,7 @@ async def dispatch_create_plan(
 async def dispatch_conflicts(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> DispatchConflictsResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchConflictsResponse)]:
     """Analyze Impact Radius conflicts for items in a milestone.
 
     Fetches open issues for the milestone from GitHub, extracts the
@@ -4249,7 +4271,7 @@ async def dispatch_wave_start(
     items: Annotated[
         list[dict[str, object]], Field(description="List of items, each with 'issue' (int) and 'title' (str) keys")
     ],
-) -> DispatchWaveStartResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchWaveStartResponse)]:
     """Record the start of a dispatch wave.
 
     Creates wave and item entries in the state database. Items are
@@ -4317,7 +4339,7 @@ async def dispatch_item_status(
     result: Annotated[str, Field(description="Result summary or JSON from result file")] = "",
     error: Annotated[str, Field(description="Error details on failure")] = "",
     cost: Annotated[float | None, Field(description="USD cost if available from claude output")] = None,
-) -> DispatchItemStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchItemStatusResponse)]:
     """Record completion or failure of a dispatch item.
 
     Looks up the item by milestone + issue across all waves. Updates
@@ -4385,7 +4407,7 @@ async def dispatch_item_status(
 async def dispatch_wave_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number to query (1-based)")],
-) -> DispatchWaveStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchWaveStatusResponse)]:
     """Query the current status of a dispatch wave.
 
     Returns items as a flat list (in issue order) plus per-status counts and
@@ -4683,7 +4705,7 @@ async def dispatch_spawn(
             )
         ),
     ] = None,
-) -> DispatchSpawnResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchSpawnResponse)]:
     """Spawn and monitor kage-bunshin sessions for a dispatch wave.
 
     Runs as a background task (``task=True``). Returns a task ID immediately.
