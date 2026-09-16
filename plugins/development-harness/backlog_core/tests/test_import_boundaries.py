@@ -44,3 +44,25 @@ def test_github_context_backend_does_not_import_backlog_core() -> None:
             violations.append(node.module)
 
     assert violations == []
+
+
+def test_github_context_backend_uses_shared_client_factory() -> None:
+    """The context backend retains proxy, API-root, and timeout configuration."""
+    plugin_dir = Path(__file__).resolve().parents[2]
+    path = plugin_dir / "sam_schema/core/backends/github_context_backend.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+    imports_factory = any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "github_client"
+        and any(alias.name == "make_github_client" for alias in node.names)
+        for node in ast.walk(tree)
+    )
+    direct_constructors = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Github"
+    ]
+
+    assert imports_factory
+    assert direct_constructors == []

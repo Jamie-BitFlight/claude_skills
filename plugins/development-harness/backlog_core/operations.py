@@ -92,7 +92,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -2154,10 +2154,15 @@ def list_items(
         # attempt per call, never a retry loop within one -- which the
         # critique frames as complementary, not a defect: "we tried and
         # could not" is a sharper answer than "we never tried".
-        try:
-            refresh_local_cache_from_github(repo, label, output=out)
-        except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
-            out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
+        sync_state = get_sync_state()
+        previous_sync_status = sync_state.try_claim()
+        if previous_sync_status is not None:
+            try:
+                refresh_local_cache_from_github(repo, label, output=out, apply_local_patches=False)
+            except (GithubException, BacklogError, ContentUnavailableError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
+                out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
+            finally:
+                sync_state.release_claim(previous_sync_status)
     items = get_config().backend.list_work_items()
 
     # backlog #3546 task A4: two independent, provenance-flavored bits

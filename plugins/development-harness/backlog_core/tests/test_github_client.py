@@ -16,21 +16,20 @@ from pathlib import Path
 import certifi
 import pytest
 from github.Requester import HTTPSRequestsConnectionClass, Requester
-from urllib3.util.ssl_ import create_urllib3_context
-
-from backlog_core.github_client import (
+from github_client import (
     CA_BUNDLE_ENV_VARS,
     DEFAULT_TIMEOUT,
     TOKEN_ENV_VARS,
+    InstallState,
     MissingGitHubTokenError,
-    _build_ssl_context,
-    _InstallState,
-    _make_connection_class,
+    build_ssl_context,
     install_proxy_tls_support,
+    make_connection_class,
     make_github_client,
     resolve_ca_bundle,
     resolve_token,
 )
+from urllib3.util.ssl_ import create_urllib3_context
 
 _ALL_ENV_VARS = (*CA_BUNDLE_ENV_VARS, *TOKEN_ENV_VARS, "GITHUB_API_URL")
 
@@ -55,10 +54,10 @@ def restore_pygithub_classes():
     Without this, one test that installs would change how every later test in the session
     builds its connections.
     """
-    _InstallState.installed = False
+    InstallState.installed = False
     yield
     Requester.resetConnectionClasses()
-    _InstallState.installed = False
+    InstallState.installed = False
 
 
 @pytest.fixture
@@ -137,25 +136,25 @@ class TestSslContextKeepsVerification:
 
     def test_strict_x509_flag_is_cleared(self, ca_file):
         """This is the whole point: the proxy CA carries no keyUsage extension."""
-        context = _build_ssl_context(str(ca_file))
+        context = build_ssl_context(str(ca_file))
 
         assert not context.verify_flags & ssl.VERIFY_X509_STRICT
 
     def test_certificate_verification_stays_required(self, ca_file):
         """Clearing the strict flag must not weaken chain verification to optional or off."""
-        context = _build_ssl_context(str(ca_file))
+        context = build_ssl_context(str(ca_file))
 
         assert context.verify_mode == ssl.CERT_REQUIRED
 
     def test_hostname_verification_stays_on(self, ca_file):
         """A relaxed extension check must not become a licence to accept any host."""
-        context = _build_ssl_context(str(ca_file))
+        context = build_ssl_context(str(ca_file))
 
         assert context.check_hostname is True
 
     def test_the_bundle_is_actually_loaded(self, ca_file):
         """A context trusting nothing would fail closed rather than verify."""
-        context = _build_ssl_context(str(ca_file))
+        context = build_ssl_context(str(ca_file))
 
         assert context.get_ca_certs(), "expected the CA bundle to load as a trust anchor"
 
@@ -168,7 +167,7 @@ class TestSslContextKeepsVerification:
         difference is empty, which this still accepts.
         """
         default_flags = create_urllib3_context().verify_flags
-        actual_flags = _build_ssl_context(str(ca_file)).verify_flags
+        actual_flags = build_ssl_context(str(ca_file)).verify_flags
         cleared = default_flags & ~actual_flags
 
         assert not cleared & ~ssl.VERIFY_X509_STRICT, f"cleared a flag beyond VERIFY_X509_STRICT: {cleared!r}"
@@ -185,7 +184,7 @@ class TestInstallProxyTlsSupport:
         """A no-op call must not mark the process as installed."""
         install_proxy_tls_support()
 
-        assert _InstallState.installed is False
+        assert InstallState.installed is False
 
     def test_install_reports_true_when_a_bundle_exists(self, monkeypatch, ca_file):
         monkeypatch.setenv("SSL_CERT_FILE", str(ca_file))
@@ -197,7 +196,7 @@ class TestInstallProxyTlsSupport:
 
         install_proxy_tls_support()
 
-        assert _InstallState.installed is True
+        assert InstallState.installed is True
 
     def test_second_call_is_idempotent(self, monkeypatch, ca_file):
         """Repeat calls neither reinstall nor report failure."""
@@ -220,13 +219,13 @@ class TestConnectionClassFactory:
 
     def test_returns_a_subclass_of_pygithubs_own_class(self, ca_file):
         """PyGithub builds connections from it, so it has to satisfy that contract."""
-        connection_class = _make_connection_class(str(ca_file))
+        connection_class = make_connection_class(str(ca_file))
 
         assert issubclass(connection_class, HTTPSRequestsConnectionClass)
 
     def test_each_call_builds_a_distinct_class(self, ca_file):
         """force depends on a rebuild, so the factory must not cache one class."""
-        assert _make_connection_class(str(ca_file)) is not _make_connection_class(str(ca_file))
+        assert make_connection_class(str(ca_file)) is not make_connection_class(str(ca_file))
 
 
 class TestConnectionClassPinsVerifyToTheResolvedBundle:
@@ -240,7 +239,7 @@ class TestConnectionClassPinsVerifyToTheResolvedBundle:
     """
 
     def test_verify_is_pinned_to_the_ca_bundle_when_the_caller_leaves_it_unset(self, ca_file):
-        connection_class = _make_connection_class(str(ca_file))
+        connection_class = make_connection_class(str(ca_file))
 
         connection = connection_class("api.github.com")
 
@@ -249,7 +248,7 @@ class TestConnectionClassPinsVerifyToTheResolvedBundle:
     def test_an_explicit_verify_kwarg_from_the_caller_still_wins(self, ca_file):
         """PyGithub itself is free to pass an explicit verify; this module must not
         silently override an explicit caller decision."""
-        connection_class = _make_connection_class(str(ca_file))
+        connection_class = make_connection_class(str(ca_file))
 
         connection = connection_class("api.github.com", verify=False)
 

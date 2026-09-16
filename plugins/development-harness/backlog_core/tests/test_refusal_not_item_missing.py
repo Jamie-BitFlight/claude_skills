@@ -13,6 +13,8 @@ still renders. What changes is that the answer names its own limits.
 
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
@@ -25,6 +27,7 @@ from backlog_core.file_cache import FileCache
 from backlog_core.models import (
     BacklogError,
     BacklogItem,
+    ContentUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
@@ -298,6 +301,38 @@ class TestColdCacheReadsThroughOnce:
 
         refresh_mock.assert_called_once()
 
+    def test_implicit_refresh_is_fetch_only(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+
+        operations.list_items(output=Output())
+
+        assert len(backend.reconcile_requests) == 1
+        assert backend.reconcile_requests[0].apply_local_patches is False
+
+    def test_two_overlapping_cold_cache_calls_reconcile_exactly_once(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        refresh_entered = threading.Event()
+        release_refresh = threading.Event()
+
+        def _blocking_refresh(*_args: object, **_kwargs: object) -> dict[str, int]:
+            refresh_entered.set()
+            assert release_refresh.wait(timeout=5)
+            return {"refreshed": 0, "reconciled": 0, "pending_mutations": 0, "rejected_mutations": 0}
+
+        refresh_mock = mocker.patch.object(operations, "refresh_local_cache_from_github", side_effect=_blocking_refresh)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(operations.list_items, output=Output())
+            assert refresh_entered.wait(timeout=5)
+            second = executor.submit(operations.list_items, output=Output())
+            second.result(timeout=5)
+            release_refresh.set()
+            first.result(timeout=5)
+
+        refresh_mock.assert_called_once()
+
     def test_a_warm_cache_does_not_trigger_a_spurious_refresh(self, mocker: MockerFixture) -> None:
         backend = _CheckpointedBackend([_item("#1")], synced=True)
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
@@ -335,6 +370,20 @@ class TestColdCacheReadsThroughOnce:
 
         refresh_mock.assert_called_once()
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
+
+    def test_content_unavailable_falls_back_to_the_existing_warning(self, mocker: MockerFixture) -> None:
+        backend = _CheckpointedBackend([], synced=False)
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(
+            operations,
+            "refresh_local_cache_from_github",
+            side_effect=ContentUnavailableError("provider content unavailable"),
+        )
+
+        result = operations.list_items(output=Output())
+
+        assert any("provider content unavailable" in warning for warning in _warnings(result))
+        assert any(_EMPTY_CACHE_MARKER in warning for warning in _warnings(result))
 
     def test_a_second_cold_but_explained_call_attempts_again_without_looping(self, mocker: MockerFixture) -> None:
         """Each call against a cache that never manages to sync tries exactly once
@@ -478,16 +527,7 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        # This listing serves items, so it reaches batch_fetch_statuses -> gh.get_repo
-        # and resolves api.github.com. Stand in the same way test_batch_status_refusal
-        # does. The resulting empty status map costs this test nothing -- not because
-        # nothing reads it (two things do: _filter_open_items' `status` filter, which
-        # list_items() does not pass here, and _build_list_entry, which runs on every
-        # item and does read it, blanking `status`/`milestone` for the numeric-ref
-        # "#1" item) -- but because the four assertions below read `items`, `count`,
-        # `from_cache` and `has_pending_writes`, and no key among them comes from
-        # status_map.
-        mocker.patch.object(gh_client, "try_get_github", return_value=None)
+        mocker.patch.object(backend, "batch_fetch_statuses", return_value={})
 
         result = operations.list_items(output=Output())
 

@@ -364,10 +364,6 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
-# PyGithub's HTTPSRequestsConnectionClass builds a requests.Session and mounts a
-# requests.adapters.HTTPAdapter, so substituting its TLS context means subclassing that
-# adapter — github_client.py must speak requests to do it, and adds no new HTTP client
-"**/backlog_core/github_client.py" = ["banned-api"]
 # operations.py calls _-prefixed BacklogBackend protocol methods — these are part of the public protocol surface
 # SLF001 — private-name access is intentional: protocol interface defines _-prefixed methods by design
 # I002 — PEP 563 stringifies annotations, so TypedDict cannot classify NotRequired at
@@ -384,6 +380,7 @@ max-complexity = 12
 # must reference requests.exceptions types to distinguish transient network-transport OSErrors
 # (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
 "**/backlog_core/sync_state.py" = ["banned-api"]
+# Open-PR safety tests construct requests transport exceptions because PyGithub exposes them.
 "**/backlog_core/tests/test_open_pr_search_failure.py" = ["banned-api"]
 "**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
 # Regression test for the two issue mirrors' transient-transport handling needs a genuine
@@ -391,6 +388,10 @@ max-complexity = 12
 "**/backlog_core/tests/test_update_item_transient_transport.py" = ["banned-api"]
 # dh_paths and kage-bunshin spawn call system tools by name (not full path) — intentional
 "**/dh_paths.py" = ["start-process-with-partial-path"]
+# Category 6 (maintenance burden exceeds compliance gain): PyGithub builds a
+# requests.Session and mounts a requests HTTPAdapter. Reimplementing that transport
+# with httpx would duplicate PyGithub's request stack and bypass its supported adapter interface.
+"**/github_client.py" = ["banned-api"]
 "**/kage-bunshin/scripts/spawn.py" = ["start-process-with-partial-path"]
 # GitHubTaskProvider implements every method of TaskBackend — PLR0904 does not apply to protocol implementations
 # SLF001 — BacklogBackend Protocol surface includes _-prefixed GraphQL methods by design (same justification as github_backend.py)
