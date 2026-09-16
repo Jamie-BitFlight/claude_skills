@@ -92,7 +92,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1911,7 +1911,7 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
     num = parse_issue_number(item.issue)
     if num is not None:
         info = status_map.get(num)
-        return info.status if info is not None else "needs-grooming"
+        return info.status if info is not None else item.status or "needs-grooming"
     # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
     return item.status or "needs-grooming"
 
@@ -3394,6 +3394,10 @@ def view_item(
                 enriched, reason = False, f"backend unavailable ({exc})"
             if not enriched:
                 out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
+                if reason.startswith("GitHub lookup failed"):
+                    out.warnings.append(
+                        "backend unreachable — sections_index reflects provider-backed record, may be stale"
+                    )
         # Restore groomed date from local item — the enrichment path has no
         # access to backend-owned metadata, so preserve the date string.
         result.groomed = item.metadata.groomed

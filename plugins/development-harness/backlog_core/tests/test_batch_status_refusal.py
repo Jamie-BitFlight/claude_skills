@@ -204,3 +204,15 @@ class TestListItemsReportsBlankStatuses:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any("Live status unavailable" in str(w) for w in warnings)
+
+    def test_a_status_filter_uses_the_cached_status_when_live_status_is_unavailable(
+        self, mocker: MockerFixture
+    ) -> None:
+        item = _item("#42")
+        item.status = "status:in-progress"
+        _patch_backend(mocker, [item])
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 1

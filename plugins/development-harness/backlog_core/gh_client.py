@@ -270,7 +270,7 @@ mutation UpdateIssue(
 _ADD_COMMENT_MUTATION = """
 mutation AddComment($subjectId: ID!, $body: String!) {
   addComment(input: {subjectId: $subjectId, body: $body}) {
-    commentEdge { node { id url } }
+    commentEdge { node { id fullDatabaseId url } }
   }
 }
 """
@@ -342,7 +342,7 @@ query GetIssueComments($owner: String!, $repo: String!, $number: Int!, $first: I
       comments(first: $first, after: $after) {
         nodes {
           id
-          databaseId
+          fullDatabaseId
           body
           url
           author { login }
@@ -361,7 +361,7 @@ query GetComment($id: ID!) {
   node(id: $id) {
     ... on IssueComment {
       id
-      databaseId
+      fullDatabaseId
       body
       url
       author { login }
@@ -943,19 +943,15 @@ def _parse_comment_node(node: dict[str, object]) -> IssueCommentNode:
     """
     raw_author = node.get("author")
     author = str(raw_author["login"]) if isinstance(raw_author, dict) and "login" in raw_author else ""
-    parsed = IssueCommentNode(
+    return IssueCommentNode(
         id=str(node.get("id", "")),
         body=str(node.get("body", "")),
         url=str(node.get("url", "")),
         author=author,
         created_at=str(node.get("createdAt", "")),
         updated_at=str(node.get("updatedAt", "")),
+        database_id=_parse_full_database_id(node.get("fullDatabaseId")),
     )
-    # bool is an int subclass, so it is excluded explicitly — True would
-    # otherwise become comment 1.
-    if isinstance(raw_database_id := node.get("databaseId"), int) and not isinstance(raw_database_id, bool):
-        parsed["database_id"] = raw_database_id
-    return parsed
 
 
 def _fetch_issue_comments_graphql(
