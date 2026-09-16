@@ -318,7 +318,7 @@ class ReadyPlanConfig(_ActionConfigBase):
         default=False,
         description=(
             "When False (default), return a compact 7-field routing manifest per task: "
-            "id, task, agent, skills, dependencies, status, priority. "
+            "id, title, agent, skills, dependencies, status, priority. "
             "When True, return the full Task model dump (all 30+ fields). "
             "Use False for orchestrator dispatch decisions; True for agents needing full context."
         ),
@@ -399,6 +399,14 @@ class AppendTaskConfig(_ActionConfigBase):
             "agent (str), dependencies (list of task IDs), priority (int 1-5), "
             "and complexity ('low', 'medium', or 'high'). All other TaskDefinition "
             "fields are optional and use their model defaults when omitted."
+        ),
+    )
+    conflict_group: str | None = Field(
+        default=None,
+        description=(
+            "The mutual-exclusion group this task belongs to, once the ledger holds the plan: no "
+            "two tasks sharing a group dispatch while either is in-progress or complete-unaccepted. "
+            "Ignored for a plan the ledger does not hold, matching the CLI's content-store path."
         ),
     )
 

@@ -19,18 +19,13 @@ state, so task state moves through the commands below and not through those tool
 $ARGUMENTS
 </task_input>
 
-<sam_cli>
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
-</sam_cli>
-
-<mcp_server_scripts>
-SAM server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_sam_server.py"
-Backlog server: uv run --script "${CLAUDE_PLUGIN_ROOT}/scripts/run_backlog_server.py" --project-dir .
-</mcp_server_scripts>
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>` below.
 
 ---
 
-**Tool availability**: task state moves through the `<sam_cli/>` command above, which needs no MCP server. The artifact and backlog steps below use `mcp__plugin_dh_backlog__*` tools; if one is unavailable, see the troubleshooting steps at ${CLAUDE_PLUGIN_ROOT}/docs/mcp-connection-check.md — its commands use the `<sam_cli/>` and `<mcp_server_scripts/>` values above.
+**Tool availability**: task state moves through `<sam_cli/>`, which needs no MCP server. The
+artifact and backlog steps below use `mcp__plugin_dh_backlog__*` tools; if one is unavailable, load
+`dh:dh-cli-usage` and follow its MCP connection check.
 
 ## Parse Arguments
 
@@ -49,7 +44,7 @@ With an attempt number, close the attempt. This is the runner's own close, and i
 outcome as well as the status:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan finish \
+<sam_cli/> plan finish \
   --address P{N}/T{M} --attempt {n} --result complete --note "{what was done}"
 ```
 
@@ -60,7 +55,7 @@ then run `finish` again.
 Without an attempt number, no runner is closing anything, so move the status directly and say why:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
+<sam_cli/> plan state \
   --address P{N}/T{M} --new-status complete --reason "{why this moved without a runner}"
 ```
 
@@ -73,7 +68,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
 1. Read the task via the SAM CLI, naming your attempt. This is your first command:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M} --attempt {n}
+   <sam_cli/> plan read --address P{N}/T{M} --attempt {n}
    ```
 
    Naming the attempt also pushes out your lease, so the orchestrator can tell a working runner
@@ -95,14 +90,14 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
    If the task row carries a `github_issue` value or the plan carries an `issue` field, query the artifact manifest to discover available plan artifacts:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id N
+   <sam_cli/> artifact list --item-id N
    ```
 
    If the response contains artifacts (non-empty `artifacts` list), use `artifact_read` to fetch the architect spec and feature context content:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type architect
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact read --item-id N --artifact-type feature-context
+   <sam_cli/> artifact read --item-id N --artifact-type architect
+   <sam_cli/> artifact read --item-id N --artifact-type feature-context
    ```
 
    Use the returned content as context for implementation instead of reading filesystem paths directly. This is especially important for worktree-isolated agents that cannot access uncommitted plan files from the root worktree.
@@ -141,7 +136,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
 4. Register the active-task context via the SAM CLI (required for hook-driven updates):
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" active-task set \
+   <sam_cli/> active-task set \
      --address P{N}/T{M} \
      --parent-issue N \
      --session-id "${CLAUDE_CODE_SESSION_ID}"
@@ -165,7 +160,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
    refactor — push it out:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan renew --address P{N}/T{M} --attempt {n}
+   <sam_cli/> plan renew --address P{N}/T{M} --attempt {n}
    ```
 
    `renew` prints `renew_by`: the instant the lease next expires. `plan read` and `plan update`
@@ -190,7 +185,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan state \
    count are sub-operations of a single `update`:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+   <sam_cli/> plan update \
      --plan-address P{N} --task-id T{M} --attempt {n} \
      --append-section "Divergence Notes" --section-content "{note body}" \
      --set divergence_notes={new_count}
@@ -242,7 +237,7 @@ its own.
    and `NOTES:`:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+   <sam_cli/> plan update \
      --plan-address P{N} --task-id T{M} --attempt {n} \
      --append-section "Completion Report" --section-content "{the report}"
    ```
@@ -252,7 +247,7 @@ its own.
    verification steps:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+   <sam_cli/> plan update \
      --plan-address P{N} --task-id T{M} --attempt {n} \
      --append-section "Verification Results" --section-content "{the results}"
    ```
@@ -260,7 +255,7 @@ its own.
 3. Close the attempt once, as your last ledger command:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan finish \
+   <sam_cli/> plan finish \
      --address P{N}/T{M} --attempt {n} --result complete --note "{summary}"
    ```
 

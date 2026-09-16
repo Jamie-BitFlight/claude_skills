@@ -130,18 +130,36 @@ def ready(conn: sqlite3.Connection, plan: str, task: str) -> bool:
     return bool(found)
 
 
-def ready_tasks(conn: sqlite3.Connection, plan: str) -> list[dict[str, Any]]:
+READY_MANIFEST_COLUMNS: tuple[str, ...] = ("id", "title", "agent", "skills", "dependencies", "status", "priority")
+"""The compact routing manifest :data:`_READY_QUERY_COMPACT` selects when ``full`` is False.
+
+The seven fields an orchestrator needs to decide what to dispatch next, without the body text and
+analytical metadata a full row also carries. Kept alongside the literal query text below (rather
+than joined into it at call time) so no per-call string ever builds a SQL clause.
+"""
+
+_READY_QUERY_FULL = "SELECT * FROM tasks WHERE tasks.plan = :plan AND ("
+_READY_QUERY_COMPACT = (
+    "SELECT id, title, agent, skills, dependencies, status, priority FROM tasks WHERE tasks.plan = :plan AND ("
+)
+
+
+def ready_tasks(conn: sqlite3.Connection, plan: str, *, full: bool = True) -> list[dict[str, Any]]:
     """Read every task of one plan whose ``ready`` is true.
 
     Args:
         conn: An open ledger connection.
         plan: The plan id.
+        full: When True (the default), every stored column. When False, only
+            :data:`READY_MANIFEST_COLUMNS`. Defaults to True so a caller that predates this
+            parameter keeps its existing rows unchanged.
 
     Returns:
         The rows as dictionaries, ordered by id.
 
     """
-    words = ["SELECT * FROM tasks WHERE tasks.plan = :plan AND (", READY_PREDICATE, ") ORDER BY tasks.id"]
+    select = _READY_QUERY_FULL if full else _READY_QUERY_COMPACT
+    words = [select, READY_PREDICATE, ") ORDER BY tasks.id"]
     return store.rows_of(conn.execute(" ".join(words), {**ready_parameters(), "plan": plan}))
 
 

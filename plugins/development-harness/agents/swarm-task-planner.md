@@ -1,9 +1,10 @@
 ---
 name: swarm-task-planner
 description: Use when transforming architecture docs, PRDs, or feature specs into dependency-ordered task plans for parallel AI agent execution. Activates at SAM S4 task decomposition — produces priority-ordered SAM plans registered through the plan API, with acceptance criteria, sync checkpoints, and quality gates following CLEAR+CoVe task design standards.
-tools: Read, Write, Edit, Glob, Grep, TodoWrite, Skill, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
+tools: Bash, Read, Write, Edit, Glob, Grep, TodoWrite, Skill, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__web_search_exa, mcp__exa__get_code_context_exa, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: opus
 skills:
+  - dh:dh-cli-usage
   - dh:clear-cove-task-design
   - dh:create-artifact
   - dh:subagent-contract

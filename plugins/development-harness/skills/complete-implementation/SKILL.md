@@ -15,13 +15,11 @@ metadata:
 $ARGUMENTS
 </input>
 
-<sam_cli>
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py"
-</sam_cli>
+Load `dh:dh-cli-usage` before using `<sam_cli/>` below.
 
 The `references/recursive-follow-up-handling.md` file loaded by this skill is a plain file, not
 substituted — it shows bare SAM CLI subcommands and args only (e.g. `backlog list --title "..."`),
-never the invocation prefix. Prepend the command in <sam_cli/> above to every one of them.
+never the invocation prefix. Prepend `<sam_cli/>` to every one of them.
 
 ---
 
@@ -63,7 +61,7 @@ address input.
 **Step 1 -- Fetch issue data**:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
+<sam_cli/> backlog view --selector "{item_ref}"
 ```
 
 If the response contains an `error` key:
@@ -182,7 +180,7 @@ dispatch loop.
 attempt is a work-ledger row, so bring the freshly authored plan across before the first dispatch:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{pqg_plan_address}"
+<sam_cli/> plan import --from content --plan-address "{pqg_plan_address}"
 ```
 
 **Step 4 -- SAM dispatch loop**:
@@ -332,7 +330,7 @@ If signal found — confirm all four fidelity items from the reference before pr
 When `{item_ref}` is known, query its artifact manifest to discover all plan artifacts for this feature:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact list --item-id "{item_ref}"
+<sam_cli/> artifact list --item-id "{item_ref}"
 ```
 
 If the response contains artifacts, pass the manifest and `{item_ref}` to quality gate agents
@@ -359,7 +357,7 @@ Use the `{slug}` resolved from the implementation plan's `feature` field.
 ### Step 1: Check for existing QG plan
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "qg-{slug}"
+<sam_cli/> plan list --search "qg-{slug}"
 ```
 
 ```mermaid
@@ -412,7 +410,7 @@ The plan is authored in the content store; the dispatch loop below opens an atte
 an attempt is a work-ledger row. Bring the plan across once, whether it was just created or found:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address "{qg_plan_address}"
+<sam_cli/> plan import --from content --plan-address "{qg_plan_address}"
 ```
 
 Safe to run when unsure — a plan the ledger already holds answers `exists` and changes nothing.
@@ -424,7 +422,7 @@ If the QG plan already exists and has blocked tasks, send each back before enter
 loop. `reclaim` returns the task to `not-started` and records why, in one move:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+<sam_cli/> plan reclaim \
   --address "{qg_plan_address}/{task_id}" --reason rerun \
   --response "{what changed since the block, or what to try differently}"
 ```
@@ -457,7 +455,7 @@ Repeat until `plan ready --plan-address "{qg_plan_address}"` returns an empty `i
 **1. Get next ready task:**
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address "{qg_plan_address}"
+<sam_cli/> plan ready --plan-address "{qg_plan_address}"
 ```
 
 If the result is empty, exit the loop and proceed to Completion Verification Gate.
@@ -567,7 +565,7 @@ A `NEEDS-WORK` or `FAIL` report names the follow-up plans the reviewer created. 
 search SAM for plans the reviewer created without recording them in the report:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list --search "{slug}-followup"
+<sam_cli/> plan list --search "{slug}-followup"
 ```
 
 Use the parent plan's resolved `{slug}`.
@@ -603,7 +601,7 @@ Use the resolved `{item_ref}`. If the plan did not expose an owner reference, se
 `{slug}` and store the matched item's `reference` as `{item_ref}`:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list --title "{slug}"
+<sam_cli/> backlog list --title "{slug}"
 ```
 
 If zero items match, skip this section — there is no issue to label.
@@ -642,7 +640,7 @@ git status
 **Issue number in commit message**: Read the current work item:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "{item_ref}"
+<sam_cli/> backlog view --selector "{item_ref}"
 ```
 
 Check the `issue` field on the matching item. If present, append `Fixes #NNN` to the commit message body (NNN = GitHub integer issue number; omit for beads IDs). If no issue number is found, omit it.
@@ -668,7 +666,7 @@ For both PQG and plan-linked paths, use the resolved `{item_ref}`. Skip this ste
 plan has no owner reference and the fallback lookup in Apply status:verified found no work item.
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog resolve --selector "{item_ref}" --summary "Implementation complete — AC verified PASS"
+<sam_cli/> backlog resolve --selector "{item_ref}" --summary "Implementation complete — AC verified PASS"
 ```
 
 On failure, read the error text.

@@ -5,15 +5,9 @@ user-invocable: false
 disable-model-invocation: false
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Implementation Manager
-
-## Current Task Context
-
-**Available features (if in project with plan/ directory):**
-!`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list 2>/dev/null`
-
-**Active task context (if any):**
-!`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
 
 A skill for querying and managing feature implementation tasks. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
 
@@ -28,7 +22,7 @@ Use the configured provider's native interface for native state. In a Beads work
 List all features with tasks tracked in the project's `plan/` directory:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
+<sam_cli/> plan list
 ```
 
 **Output:**
@@ -51,7 +45,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan list
 Get detailed status for a specific feature:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P1
+<sam_cli/> plan status --plan-address P1
 ```
 
 **Output:**
@@ -83,7 +77,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P1
 List tasks ready for execution (dependencies satisfied):
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready --plan-address P1
+<sam_cli/> plan ready --plan-address P1
 ```
 
 **Output:**
@@ -108,7 +102,7 @@ With `P` alone, `plan read` reads the plan document. With `P/T`, it reads that t
 sections its attempts recorded:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P1/T01
+<sam_cli/> plan read --address P1/T01
 ```
 
 Add `--attempt {A}` only when you hold that attempt; naming one you do not is refused as
@@ -122,7 +116,7 @@ second runner from taking it. It prints the attempt number, which every command 
 carries back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address P1/T01
+<sam_cli/> plan dispatch --address P1/T01
 ```
 
 Prints `leased` when a runner already holds the task and `not-ready` when its dependencies have not
@@ -136,7 +130,7 @@ way leaves the ledger row where it was. Open attempts with `dispatch`.
 Set plan-level fields on the ledger, such as the context manifest:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P1 --set context="Context Manifest content"
+<sam_cli/> plan update --plan-address P1 --set context="Context Manifest content"
 ```
 
 `--set` names the ledger column, so write field names with underscores. Setting a field replaces
@@ -247,8 +241,8 @@ export CLAUDE_SKILLS_DISABLED_HOOKS=task-status:subagent-stop
 
 The `/dh:execution` orchestrator uses this skill to:
 
-1. Query task status via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status`
-2. Find ready tasks via `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan ready`
+1. Query task status via `<sam_cli/> plan status`
+2. Find ready tasks via `<sam_cli/> plan ready`
 3. Open an attempt per task via `plan dispatch`, then launch the agent its `agent` field names,
    passing the address and the attempt number
 4. Settle each launch with `plan settle` when it returns, then judge with `plan read` and close

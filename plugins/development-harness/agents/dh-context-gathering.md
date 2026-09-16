@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash, Write, Skill, mcp__plugin_dh_sam
 model: haiku
 color: cyan
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - ccc
 ---

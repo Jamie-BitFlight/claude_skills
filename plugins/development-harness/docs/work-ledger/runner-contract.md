@@ -1,16 +1,11 @@
 # The runner contract
 
 Every command below is `sam plan <command>`:
-`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan <command> …`. The CLI is the only path to
-the ledger — there is no MCP action of the same name. `sam_schema/server.py`'s `_get_backend`
-returns `ContentTaskProvider(provider)` unconditionally, with no branch that reaches
-`dh_core.ledger`, so every `sam_task`/`sam_plan` MCP call resolves to the content store. The two
-tools' complete action sets are the discriminated unions in `sam_schema/core/action_models.py`
-(`TaskActionConfig`: `read | claim | state | update`; `PlanActionConfig`: `read | create | list |
-status | ready | update | append_task | finalize`), matched exhaustively in `server.py`'s
-`match config.action` arms; grepped both for `dispatch`, `finish`, `settle`, `renew`, `accept`,
-`reclaim` and `import` and found none of these ledger-only commands in either union. Until an
-MCP surface for the ledger exists, run every command below through the CLI.
+`uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan <command> …`. Once `plan import` puts a plan
+on the ledger, overlapping `sam_plan` and `sam_task` MCP actions route to that ledger through
+`sam_schema/server_ledger_routing.py`; before import they route to the content store. Runner lease
+and completion commands (`renew` and `finish`) are CLI-only, so run the sequence below through the
+CLI. MCP remains available for its declared read, update, and state actions on an imported plan.
 
 ## Your two facts
 

@@ -5,6 +5,8 @@ model: sonnet
 user-invocable: true
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # SAM Stage 1 — Discovery
 
 ## Role
@@ -22,7 +24,7 @@ When invoked with a `#N` argument (e.g., `Skill(skill='dh:discovery', args='#42'
 1. Load item context before doing anything else:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog view --selector "#N"
+<sam_cli/> backlog view --selector "#N"
 ```
 
 Note: the CLI's `backlog view` has no `summary`/`include_content` parameter — it always returns

@@ -434,7 +434,7 @@ async def test_mcp_sam_create_artifact_write_failure_raises_tool_error(
             hint="Check GitHub connectivity and retry.",
         )
 
-    monkeypatch.setattr("sam_schema.server.operations.create_plan", _fake_create_plan)
+    monkeypatch.setattr("sam_schema.server_plan_ops.operations.create_plan", _fake_create_plan)
 
     # Act + Assert
     async with Client(mcp) as client:

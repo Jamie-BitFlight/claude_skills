@@ -1,6 +1,6 @@
 """Parity between the CLI and MCP backend-resolution seams.
 
-``sam_plan._backend()`` (CLI) and ``server._get_backend()`` (MCP) must resolve
+``sam_plan._backend()`` (CLI) and ``server_backend.get_backend()`` (MCP) must resolve
 to the same underlying provider — a divergence here would mean the CLI and MCP
 server silently operate on different backlog state.
 """
@@ -18,7 +18,7 @@ from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 
 import sam_schema.sam_plan as sam_plan
-import sam_schema.server as server
+import sam_schema.server_backend as server_backend
 from sam_schema.core.backends.content import ContentTaskProvider
 
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ def test_cli_and_mcp_backend_resolution_match_default() -> None:
     set_config(BacklogConfig(backend=backend))
 
     cli_provider = sam_plan._backend()
-    mcp_provider = server._get_backend("")
+    mcp_provider = server_backend.get_backend("")
 
     assert isinstance(cli_provider, ContentTaskProvider)
     assert isinstance(mcp_provider, ContentTaskProvider)
@@ -57,7 +57,7 @@ def test_cli_and_mcp_backend_resolution_match_beads(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("BACKLOG_BACKEND", "beads")
 
     cli_provider = sam_plan._backend()
-    mcp_provider = server._get_backend("")
+    mcp_provider = server_backend.get_backend("")
 
     assert isinstance(cli_provider, ContentTaskProvider)
     assert isinstance(mcp_provider, ContentTaskProvider)

@@ -4,6 +4,8 @@ description: Where a dispatched step puts its output, and how it signals state u
 user-invocable: false
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Subagent Contract
 
 <status>
@@ -78,25 +80,25 @@ in the work ledger, and the ledger is where your state belongs. The CLI is how y
 `sam_task` and `sam_plan` MCP tools answer from the content store and carry none of these commands:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan <command> …
+<sam_cli/> plan <command> …
 ```
 
 Read your task first, with both facts on the command. Act on any `Orchestrator Response` the output
 carries before anything else — it is what a previous attempt was sent back for:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P/T --attempt N
+<sam_cli/> plan read --address P/T --attempt N
 ```
 
 Append what you produced as task sections, each carrying the attempt, and close the attempt once as
 your last ledger command:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P --task-id T --attempt N \
+<sam_cli/> plan update --plan-address P --task-id T --attempt N \
   --append-section "Completion Report" --section-content "<TASK:, BRANCH:, FILES_CHANGED:, COMMITS:, NOTES:>"
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P --task-id T --attempt N \
+<sam_cli/> plan update --plan-address P --task-id T --attempt N \
   --append-section "Verification Results" --section-content "<one line per verification step, or none>"
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan finish --address P/T --attempt N \
+<sam_cli/> plan finish --address P/T --attempt N \
   --result complete|failed|blocked|needs-input --note "<what stopped you, what you need, or your question>"
 ```
 

@@ -12,3 +12,25 @@
   shared-checkout path (e.g. `/Users/.../repos/claude_skills/plugins/...`) with "session is
   isolated in the worktree" — retarget the identical relative path rooted at the worktree instead
   (`.claude/worktrees/<name>/plugins/...`). Read tolerates either path; Edit/Write do not.
+- [Dispatch placeholder & shared-worktree gotchas](dispatch-placeholder-and-shared-worktree.md) —
+  `{A}` is the canonical attempt-number placeholder across the dh dispatch-line contract (four
+  files, no single source of truth); `close/start.md` handles both `close` and `resolve` routes,
+  don't conflate them; the `agent-marketplace-versioner` prek hook failing can be a concurrent
+  agent's edit in a shared worktree, not your own change — diff before reverting.
+- [backlog_core connection-failure taxonomy](backlog-core-connection-failure-taxonomy.md) — two
+  independent "provider unreachable" mechanisms (background `sync_engine`/`classify_sync_error`
+  vs. per-call `FileCache`/`try_get_github()`), their exact cause sets, and which one
+  ARCHITECTURE.md actually documents (only the per-call one, as of 2026-09-15) — check this before
+  writing offline/unreachable/unavailable cause prose in any backlog_core doc.
+- DH plugin has two separate copies of `evaluate-sdlc-layers/SKILL.md` (not a symlink):
+  `plugins/development-harness/skills/evaluate-sdlc-layers/SKILL.md` and repo-root
+  `.claude/skills/evaluate-sdlc-layers/SKILL.md`. They drift independently — check both when a
+  retired term or deleted-file link touches either one.
+- `work-backlog-item`'s `scripts/parser/parse.schema.json` documents the same argument vocabulary
+  as its `SKILL.md` frontmatter/body (no Python code reads it — the agent parses `$ARGUMENTS`
+  against it itself). Keep both in sync when a flag is added or retired; drift tests that scan
+  only `*.md` never catch this JSON silently going stale.
+- Deleting a "layer" or "profile" concept outright needs its own index doc's count/row claims
+  updated too, not just the target files removed — e.g. "Layer 1: All 6 docs present" must shrink
+  when a doc in that list is deleted, and "N-layer architecture" framing sentences at the top of
+  index READMEs need the layer count fixed.

@@ -1,5 +1,7 @@
 # Completion Verification Gate
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 Shared procedure for both the Proportional Quality Gates path and the full SAM path. The caller
 supplies `{plan_address}` (`{pqg_plan_address}` or `{qg_plan_address}`), `{gate_name}` (for the
 failure banner), `{resume_arg}` (for the re-run command), and `{next_step}` (what "Proceed" leads
@@ -9,7 +11,7 @@ After the dispatch loop exits, verify all tasks in the plan reached terminal sta
 label application:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_address}"
+<sam_cli/> plan status --plan-address "{plan_address}"
 ```
 
 ```mermaid

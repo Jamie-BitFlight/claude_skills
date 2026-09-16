@@ -245,6 +245,26 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
     return get_config().backend.check_open_prs_for_issue(issue_num, repo)
 
 
+def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
+    """Search for issue-referencing PRs, translating search failures into a refusal.
+
+    Args:
+        issue_num: GitHub issue number to search for.
+        repo: Repository slug passed to the configured backend.
+
+    Returns:
+        Open pull requests that reference the issue.
+
+    Raises:
+        BacklogError: When the search cannot establish whether open PRs exist.
+    """
+    try:
+        return check_open_prs_for_issue(issue_num, repo)
+    except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
+        msg = f"Open-PR search failed for issue #{issue_num}: {exc}. Retry, or use force=True to bypass the check."
+        raise BacklogError(msg) from exc
+
+
 def close_github_issue(
     issue_ref: str, reason: str, *, reference: str = "", comment: str = "", repo: str = "", output: Output | None = None
 ) -> None:
@@ -936,7 +956,7 @@ def _apply_groomed_entries(
         added_date: ISO date string used as id prefix for legacy seeding.
 
     Raises:
-        ValueError: When ``replace_section`` is ``True`` but ``reason`` is empty.
+        ValidationError: When ``replace_section`` is ``True`` but ``reason`` is empty.
         EntryNotFoundError: When ``entry_id`` is set but matches no entry in
             ``section`` (see :func:`_resolve_section_entry`). backlog_update
             and backlog_groom document this as the contract: an id matching no
@@ -948,7 +968,7 @@ def _apply_groomed_entries(
     if replace_section:
         if not reason:
             msg = "reason is required when replace_section=True"
-            raise ValueError(msg)
+            raise ValidationError(msg)
         struck_at = now_iso()
         for entry in section.entries:
             if not entry.struck:
@@ -3338,6 +3358,8 @@ def view_item(
                 reason = (
                     "GitHub lookup failed (authentication failure, rate limit, GitHub server error, or issue not found)"
                 )
+                if live_id and not enriched:
+                    reason = f"backend unreachable — {reason}"
             except BackendUnavailableError as exc:
                 # The cached record still answers the view, so the read succeeds.
                 # Name the cause instead of reporting the generic unreachable case.
@@ -3565,7 +3587,7 @@ def close_item(
     issue_ref = item.issue
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
-        open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
+        open_prs = _search_open_prs(issue_num_val, repo) if issue_num_val is not None else []
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
             for pr in open_prs:
@@ -3652,7 +3674,7 @@ def resolve_item(
     issue_ref = item.issue
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
-        open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
+        open_prs = _search_open_prs(issue_num_val, repo) if issue_num_val is not None else []
         if open_prs:
             out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
             for pr in open_prs:

@@ -37,7 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from dh_core import ledger_spec as spec
-from dh_core.ledger import port, store, transitions
+from dh_core.ledger import port, queries, store, transitions
 from pydantic import BaseModel, ConfigDict, Field
 from sam_schema.core.models import PlanState
 
@@ -1453,23 +1453,49 @@ def test_update_set_does_not_write_a_column_task_fields_never_sets(
 
 def test_update_set_status_does_not_bypass_the_state_machine(set_conn: sqlite3.Connection, set_plan: str) -> None:
     """A task reaches complete only through an event ``ledger_spec.COLUMNS`` names for the column."""
-    result = transitions.update(set_conn, set_plan, "T1", values={"status": spec.Status.COMPLETE.value})
-    assert result.events == [TASK_FIELDS_EVENT]
-    row = store.fetch_task(set_conn, set_plan, "T1")
     setters = set(next(c for c in spec.COLUMNS if c.table == "tasks" and c.name == "status").set_by)
     assert TASK_FIELDS_EVENT not in setters
+    with pytest.raises(ValueError, match="status"):
+        transitions.update(set_conn, set_plan, "T1", values={"status": spec.Status.COMPLETE.value})
+    row = store.fetch_task(set_conn, set_plan, "T1")
     assert row["status"] == spec.Status.NOT_STARTED.value, (
-        "update --set status=complete moved the task to complete while appending only task.fields, "
-        "so no report check, lease check or cascade ran and no event in "
-        f"{sorted(setters)} explains the column's value"
+        "update --set status=complete must refuse rather than move the task to complete while "
+        "appending only task.fields, bypassing the report check, lease check and cascade none of "
+        f"{sorted(setters)} ran"
     )
+    assert store.events_of(set_conn, set_plan, kind=TASK_FIELDS_EVENT) == []
 
 
-def test_update_set_names_the_columns_it_would_not_write(set_conn: sqlite3.Connection, set_plan: str) -> None:
-    """The names ``task.fields`` does not set come back on the result rather than passing silently."""
-    result = transitions.update(set_conn, set_plan, "T1", values={"title": "renamed", "status": COMPLETE})
-    assert result.changed == {"title": "renamed"}
-    assert result.unsettable == ["status"]
+def test_update_set_refuses_a_column_the_fields_event_does_not_write(
+    set_conn: sqlite3.Connection, set_plan: str
+) -> None:
+    """A ``--set`` name outside ``TASK_FIELD_COLUMNS`` refuses the whole call, writing nothing.
+
+    Before the fix, ``update`` wrote ``title`` and silently dropped ``status`` into the result's
+    now-removed ``unsettable`` list instead of refusing -- a caller that does not inspect that list
+    reads the call as having fully succeeded. ``settable`` (MAJOR-1) now refuses instead, the same
+    way the CLI's ``_set_values`` used to before this fix moved that check into ``dh_core.ledger``.
+    """
+    with pytest.raises(ValueError, match="status"):
+        transitions.update(set_conn, set_plan, "T1", values={"title": "renamed", "status": COMPLETE})
+    row = store.fetch_task(set_conn, set_plan, "T1")
+    assert row["title"] != "renamed", "a refused --set call must write nothing, not just skip the refused name"
+    assert store.events_of(set_conn, set_plan, kind=TASK_FIELDS_EVENT) == []
+
+
+def test_update_set_refuses_a_plan_column_plan_fields_does_not_write(
+    set_conn: sqlite3.Connection, set_plan: str
+) -> None:
+    """The plan-level ``--set`` path refuses the same way the task-level path does.
+
+    ``archived`` is a stored ``plans`` column (``ledger_spec.COLUMNS``) that only ``archive``
+    writes -- ``plan.fields`` does not name it in ``set_by``.
+    """
+    with pytest.raises(ValueError, match="archived"):
+        transitions.update(set_conn, set_plan, values={"goal": "renamed", "archived": "2020-01-01T00:00:00"})
+    row = store.fetch_plan(set_conn, set_plan)
+    assert row["goal"] != "renamed", "a refused plan --set call must write nothing"
+    assert store.events_of(set_conn, set_plan, kind="plan.fields") == []
 
 
 def test_update_set_refuses_a_value_its_field_rejects(set_conn: sqlite3.Connection, set_plan: str) -> None:
@@ -1574,3 +1600,39 @@ def test_authority_preamble_is_not_a_stored_section(tmp_path: Path) -> None:
     transitions.read(conn, plan, "T1")
     stored_names = {str(row["name"]) for row in transitions.sections_of(conn, plan, "T1")}
     assert spec.AUTHORITY_SECTION not in stored_names
+
+
+def test_state_without_a_reason_refuses_rather_than_moving_the_task(
+    set_conn: sqlite3.Connection, set_plan: str
+) -> None:
+    """``state`` must refuse with ``reason-required`` when no reason is given, not raise a bare TypeError.
+
+    Before the fix, ``reason`` was a required positional-or-keyword ``str``, so both frontends
+    hand-rolled their own "reason required" guard ahead of the call. Typing it ``str | None`` and
+    refusing here means a third caller that forwards its own optional input reaches the same
+    refusal instead of an unguarded ``TypeError`` from deep inside the transaction.
+    """
+    with pytest.raises(store.Refusal, match="reason-required"):
+        transitions.state(set_conn, set_plan, "T1", new_status=COMPLETE, reason=None)
+    row = store.fetch_task(set_conn, set_plan, "T1")
+    assert row["status"] == spec.Status.NOT_STARTED.value
+    assert store.events_of(set_conn, set_plan, kind="task.state") == []
+
+
+def test_ready_full_false_returns_the_compact_manifest(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """``queries.ready(full=False)`` must return only the 7-field routing manifest.
+
+    Before the fix, ``full`` reached nothing -- ``derive.ready_tasks`` always selected every
+    column, so an orchestrator could not ask for the compact manifest at all.
+    """
+    compact = queries.ready(set_conn, set_plan, full=False)
+    assert len(compact) == 1
+    assert set(compact[0]) == {"id", "title", "agent", "skills", "dependencies", "status", "priority"}
+
+
+def test_ready_full_true_returns_every_column(set_conn: sqlite3.Connection, set_plan: str) -> None:
+    """``queries.ready(full=True)`` (and the default) must return every stored column."""
+    full = queries.ready(set_conn, set_plan, full=True)
+    assert len(full) == 1
+    assert {"id", "title", "agent", "skills", "dependencies", "status", "priority"} < set(full[0])
+    assert queries.ready(set_conn, set_plan) == full

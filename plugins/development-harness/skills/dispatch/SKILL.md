@@ -4,6 +4,8 @@ description: Orchestrate parallel agent dispatch as a manager — not a microman
 user-invocable: true
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Dispatch — Orchestrator as Manager
 
 The orchestrator's job is experience sharing and worker health, not prompt engineering.
@@ -40,14 +42,14 @@ authored through the SAM plan operations lives in the content store; bring it ac
 answers `exists` and changes nothing when it is already there:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan import --from content --plan-address Pf1a2b3c4
+<sam_cli/> plan import --from content --plan-address Pf1a2b3c4
 ```
 
 Open the attempt. `dispatch` sets the task in-progress, starts its lease, and prints the
 attempt number — the key every command the worker runs carries back:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address Pf1a2b3c4/T42 --worktree {dir}
+<sam_cli/> plan dispatch --address Pf1a2b3c4/T42 --worktree {dir}
 ```
 
 Pass `--worktree` when this harness gives the worker its own git worktree; leave it off otherwise.
@@ -101,7 +103,7 @@ flowchart TD
 One command answers the blocker and reopens the task:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan reclaim \
+<sam_cli/> plan reclaim \
   --address P{N}/T{M} --reason answered --response "{what the worker needs to know}"
 ```
 
@@ -125,7 +127,7 @@ When all workers return:
 1. Record what came back, per worker, against the attempt you dispatched:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+   <sam_cli/> plan settle \
      --address P{N}/T{M} --attempt {A} --return-text "{the worker's response, STATUS line included}"
    ```
 
@@ -136,14 +138,14 @@ When all workers return:
 2. Judge each task against the ledger, not against the response text:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M}
+   <sam_cli/> plan read --address P{N}/T{M}
    ```
 
    Compare the `Completion Report` and `Verification Results` sections against the task's
    acceptance criteria and verification steps. Where they hold, accept:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan accept --address P{N}/T{M} --note "{why}"
+   <sam_cli/> plan accept --address P{N}/T{M} --note "{why}"
    ```
 
    Where a criterion is unmet or a step failed, send it back with what to change:

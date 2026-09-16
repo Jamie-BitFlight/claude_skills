@@ -26,7 +26,16 @@ import pytest
 _plugin_root = Path(__file__).resolve().parent.parent
 
 #: Frontend files that must remain logic-free.
-FRONTEND_FILES: list[str] = ["sam_schema/cli.py", "sam_schema/server.py", "backlog_core/server.py"]
+FRONTEND_FILES: list[str] = [
+    "sam_schema/cli.py",
+    "sam_schema/server.py",
+    "sam_schema/server_ledger_routing.py",
+    "sam_schema/server_backend.py",
+    "sam_schema/server_plan_ops.py",
+    "sam_schema/server_task_ops.py",
+    "sam_schema/server_active_task.py",
+    "backlog_core/server.py",
+]
 
 #: Allowed import roots for each frontend file.
 #: During the transition, frontends still import from legacy modules.
@@ -59,23 +68,29 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         # urllib3/httpx-importing module loads, so it cannot be deferred to a wrapper.
         "tls_compat",
     },
-    "sam_schema/server.py": {
+    "sam_schema/server.py": {"__future__", "typing", "fastmcp", "mcp", "pydantic", "dh_core", "sam_schema"},
+    "sam_schema/server_ledger_routing.py": {
         "__future__",
-        "json",
-        "logging",
-        "datetime",
-        "pathlib",
-        "typing",
         "collections",
         "collections.abc",
-        "tiktoken",
+        "typing",
         "fastmcp",
-        "mcp",
-        "pydantic",
-        "backlog_core",
         "dh_core",
         "sam_schema",
     },
+    "sam_schema/server_backend.py": {"__future__", "fastmcp", "backlog_core", "dh_core", "sam_schema"},
+    "sam_schema/server_plan_ops.py": {
+        "__future__",
+        "json",
+        "pathlib",
+        "typing",
+        "tiktoken",
+        "fastmcp",
+        "dh_core",
+        "sam_schema",
+    },
+    "sam_schema/server_task_ops.py": {"__future__", "fastmcp", "dh_core", "sam_schema"},
+    "sam_schema/server_active_task.py": {"__future__", "fastmcp", "dh_core", "sam_schema"},
     "backlog_core/server.py": {
         "__future__",
         "argparse",

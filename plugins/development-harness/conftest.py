@@ -21,9 +21,11 @@ from __future__ import annotations
 
 import os
 import socket
-from collections.abc import Iterator
+import sqlite3
+import threading
+from collections.abc import Callable, Iterator
 from socket import AddressFamily, SocketKind
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, ParamSpec
 
 import pytest
 
@@ -45,6 +47,38 @@ _state = {"allowed": False}
 # undoes it at session end, restoring the real socket functions reliably and
 # without inline type-suppression comments.
 _network_patch = pytest.MonkeyPatch()
+_P = ParamSpec("_P")
+
+
+def track_sqlite_connections(
+    connect: Callable[_P, sqlite3.Connection], connections: list[sqlite3.Connection], test_thread: int
+) -> Callable[_P, sqlite3.Connection]:
+    """Wrap a SQLite connector and retain connections created on the test thread.
+
+    Returns:
+        A connector with the same signature that records test-thread connections.
+    """
+
+    def tracked_connect(*args: _P.args, **kwargs: _P.kwargs) -> sqlite3.Connection:
+        connection = connect(*args, **kwargs)
+        if threading.get_ident() == test_thread:
+            connections.append(connection)
+        return connection
+
+    return tracked_connect
+
+
+@pytest.fixture(autouse=True)
+def close_sqlite_connections(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Close every SQLite connection a test opens on its pytest thread."""
+    connections: list[sqlite3.Connection] = []
+    real_connect = sqlite3.connect
+    test_thread = threading.get_ident()
+    monkeypatch.setattr(sqlite3, "connect", track_sqlite_connections(real_connect, connections, test_thread))
+    yield
+    for connection in reversed(connections):
+        connection.close()
+
 
 import tiktoken as _tk
 from tests.network_blocked import NetworkBlocked

@@ -1,11 +1,11 @@
-# DH CLI Usage Guide
+# DH CLI Command Reference
 
-Grouped-command reference for the DH CLI adapter (`sam_schema/cli.py`), the validated alternate
-transport for structured SAM operations outside an MCP host. Prefix every command below with the
-`<sam_cli>` value from `dh-meta-docs`' SKILL.md. Every data-bearing value is a named option;
-successful output is compact JSON on stdout and diagnostics are on stderr. `--format` is not
-supported. In a Beads workspace, use `bd` directly for Beads-native CRUD, status, dependencies, and
-readiness; use this CLI only for structured plans and workflow operations.
+Grouped-command reference for the DH CLI adapter, the validated alternate transport for structured
+SAM operations outside an MCP host. Load `dh:dh-cli-usage` and prefix every command below with its
+`<sam_cli/>` value. Every data-bearing value is a named option; successful output is compact JSON on
+stdout and diagnostics are on stderr. `--format` is not supported. In a Beads workspace, use `bd`
+directly for Beads-native CRUD, status, dependencies, and readiness; use this CLI only for structured
+plans and workflow operations.
 
 ```text
 plan list
@@ -28,8 +28,8 @@ For a task-bearing plan, repeat the validated named options shown by `plan creat
 append one task at a time with `plan append-task --plan-address ...` and the same named task
 fields, then run `plan finalize --plan-address ...`; serialize appends for the same plan.
 `plan append-task --stdin` accepts a full YAML task mapping (using `task:` as the identifier key)
-on stdin instead of the scalar options — use it when a task needs fields the scalar set omits
-(`body`, `description`, `acceptance_criteria`, `verification_steps`, `handoff`, `skills`, etc.);
+on stdin instead of the scalar options. Use it when a task needs fields the scalar set omits
+(`body`, `description`, `acceptance_criteria`, `verification_steps`, `handoff`, `skills`, etc.).
 `--stdin` cannot be combined with the scalar task options.
 
 The structured MCP composites remain MCP-only transport names (`sam_plan`, `sam_task`, and
@@ -39,6 +39,9 @@ before invoking a less common leaf.
 
 Once `plan import` puts a plan on the work ledger, `sam_plan`'s `read`, `status`, `ready`,
 `update`, `append_task`, and `finalize` actions and `sam_task`'s `read`, `state`, and `update`
-actions read and write the ledger instead of the plan's original content record — the same store
-the CLI's `plan` commands above read and write for that plan once it is imported. `sam_plan`'s
-`list` and `sam_task`'s `claim` keep answering from the content record regardless.
+actions read and write the ledger instead of the plan's original content record. The CLI's `plan`
+commands read and write that same store once the plan is imported. `sam_plan`'s `list` and
+`sam_task`'s `claim` keep answering from the content record regardless. `append_task`'s
+`conflict_group` field mirrors `plan append-task --conflict-group`. `ready`'s `full` flag takes
+effect once the ledger holds the plan: `false` returns the routing manifest; `true` returns every
+column.

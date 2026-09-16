@@ -1404,6 +1404,121 @@ async def test_sam_task_refuses_on_an_imported_plan_the_way_the_ledger_does(
     assert cli_status["tasks"][0]["status"] == "in-progress"  # the ledger row must stay untouched
 
 
+async def test_sam_plan_update_refuses_an_unwritable_set_field_like_the_cli_on_an_imported_plan(
+    dh_env: dict[str, str],
+) -> None:
+    """MCP ``sam_plan`` ``update`` must refuse a ``set_fields_json`` name no fields event writes, like the CLI.
+
+    ``archived`` is a stored ``plans`` column only ``archive`` writes. Before the fix, MCP passed
+    ``set_fields_json`` straight to ``ledger.update``, which silently dropped the name into the
+    result's ``unsettable`` list instead of refusing -- an agent that does not inspect that field
+    reads the call as having succeeded. The CLI's ``plan update --set archived=...`` already refuses
+    (``sam_plan.py``'s former ``_set_values``); green after the fix means MCP reaches the same
+    refusal, now centralised in ``dh_core.ledger.transitions.update``.
+    """
+    cli_create = _invoke_cli(["plan", "create", "--slug", "update-refusal-parity", "--goal", "Update refusal goal"])
+    plan_id = cli_create["plan_id"]
+    _invoke_cli(["plan", "append-task", "--plan-address", plan_id, *_task_args(_TASK_DEF)])
+    _invoke_cli(["plan", "finalize", "--plan-address", plan_id])
+    _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
+
+    cli_result = _runner.invoke(app, ["plan", "update", "--plan-address", plan_id, "--set", "archived=2020-01-01"])
+    assert cli_result.exit_code != 0  # non-vacuity: the CLI itself refuses this --set name
+
+    with pytest.raises(ToolError):
+        await call_mcp_tool(
+            _sam_mcp,
+            "sam_plan",
+            {"config": {"action": "update", "set_fields_json": {"archived": "2020-01-01"}}, "plan": plan_id},
+        )
+
+    cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
+    assert cli_status["row"]["archived"] is None  # the refused write must not have landed
+
+
+async def test_sam_task_update_refuses_an_unwritable_set_field_like_the_cli_on_an_imported_plan(
+    dh_env: dict[str, str],
+) -> None:
+    """MCP ``sam_task`` ``update`` must refuse a ``set_fields_json`` name no fields event writes, like the CLI.
+
+    ``status`` moves only through ``dispatch``, ``finish``, ``state``, ``reclaim`` or ``accept`` --
+    never ``update``. See the plan-level sibling test above for the same defect (MAJOR-1) on the
+    task-level path.
+    """
+    cli_create = _invoke_cli(["plan", "create", "--slug", "task-update-refusal-parity", "--goal", "Task refusal goal"])
+    plan_id = cli_create["plan_id"]
+    _invoke_cli(["plan", "append-task", "--plan-address", plan_id, *_task_args(_TASK_DEF)])
+    _invoke_cli(["plan", "finalize", "--plan-address", plan_id])
+    _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
+
+    cli_result = _runner.invoke(
+        app, ["plan", "update", "--plan-address", plan_id, "--task-id", "T01", "--set", "status=complete"]
+    )
+    assert cli_result.exit_code != 0  # non-vacuity: the CLI itself refuses this --set name
+
+    with pytest.raises(ToolError):
+        await call_mcp_tool(
+            _sam_mcp,
+            "sam_task",
+            {"plan": plan_id, "task": "T01", "config": {"action": "update", "set_fields_json": {"status": "complete"}}},
+        )
+
+    cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
+    assert cli_status["tasks"][0]["status"] == "not-started"  # the refused write must not have landed
+
+
+async def test_sam_plan_append_task_sets_the_conflict_group_on_an_imported_plan(dh_env: dict[str, str]) -> None:
+    """MCP ``sam_plan`` ``append_task`` must be able to set ``conflict_group``, like the CLI's ``--conflict-group``.
+
+    Before the fix, ``AppendTaskConfig`` had no ``conflict_group`` field, so MCP could never set it
+    even though the CLI's ledger-backed ``append-task`` command always could.
+    """
+    cli_create = _invoke_cli(["plan", "create", "--slug", "append-task-conflict-group", "--goal", "Conflict goal"])
+    plan_id = cli_create["plan_id"]
+    _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
+
+    await call_mcp_tool(
+        _sam_mcp,
+        "sam_plan",
+        {
+            "config": {
+                "action": "append_task",
+                "task": {"id": "T01", "title": "Exclusive Task", "agent": "task-worker"},
+                "conflict_group": "group-a",
+            },
+            "plan": plan_id,
+        },
+    )
+
+    cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
+    assert cli_status["tasks"][0]["conflict_group"] == "group-a"
+
+
+async def test_sam_plan_ready_full_false_returns_the_compact_manifest_on_an_imported_plan(
+    dh_env: dict[str, str],
+) -> None:
+    """MCP ``sam_plan`` ``ready`` must honor ``full`` once the ledger holds the plan.
+
+    Before the fix, ``config.full`` never reached ``ledger.ready``, so ``full=False`` and
+    ``full=True`` returned identical rows.
+    """
+    cli_create = _invoke_cli(["plan", "create", "--slug", "ready-full-parity", "--goal", "Ready full goal"])
+    plan_id = cli_create["plan_id"]
+    _invoke_cli(["plan", "append-task", "--plan-address", plan_id, *_task_args(_TASK_DEF)])
+    _invoke_cli(["plan", "finalize", "--plan-address", plan_id])
+    _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
+
+    mcp_compact = await call_mcp_tool(
+        _sam_mcp, "sam_plan", {"config": {"action": "ready", "full": False}, "plan": plan_id}
+    )
+    mcp_full = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
+
+    assert mcp_compact["count"] == 1
+    compact_keys = set(mcp_compact["items"][0])
+    assert compact_keys == {"id", "title", "agent", "skills", "dependencies", "status", "priority"}
+    assert compact_keys < set(mcp_full["items"][0])
+
+
 # ---------------------------------------------------------------------------
 # Active-task parity
 # ---------------------------------------------------------------------------

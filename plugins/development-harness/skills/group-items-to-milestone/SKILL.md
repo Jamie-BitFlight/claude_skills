@@ -5,6 +5,8 @@ argument-hint: '{milestone-number} [P0|P1|P2|title-filter]'
 user-invocable: true
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # Group Items to Milestone
 
 Assign backlog items to a GitHub milestone. Bridges .claude/backlog/ per-item files → GitHub Issues → milestone assignment.
@@ -32,7 +34,7 @@ If milestone not found or closed, report and stop.
 
 ### Step 2: Load Backlog Items
 
-Call `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" backlog list` (flags: `--section` for P0/P1/P2/Ideas, `--title` for a title filter, `--search` for full-text search — same query syntax as MCP `backlog_list(search=...)`). Parse the returned dict — each entry in `items` has `title`, `priority`, `issue`, `plan`, `status`, `milestone`, `file_path`, `groomed`. Filter items by section (P0, P1, P2, Ideas). Apply any title filter.
+Call `<sam_cli/> backlog list` (flags: `--section` for P0/P1/P2/Ideas, `--title` for a title filter, `--search` for full-text search — same query syntax as MCP `backlog_list(search=...)`). Parse the returned dict — each entry in `items` has `title`, `priority`, `issue`, `plan`, `status`, `milestone`, `file_path`, `groomed`. Filter items by section (P0, P1, P2, Ideas). Apply any title filter.
 
 For each item determine status:
 

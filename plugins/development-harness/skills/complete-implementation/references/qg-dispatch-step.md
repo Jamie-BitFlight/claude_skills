@@ -1,5 +1,7 @@
 # QG dispatch step
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 Step 2 of the SAM Dispatch Loop in `complete-implementation`: how one quality-gate task is opened,
 run, settled and judged. Steps 1 and 3 stay in the skill body.
 
@@ -15,7 +17,7 @@ flowchart TD
 **T1-T6 — delegate:** open the attempt, then launch `dh:task-worker`:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{qg_plan_address}/{task_id}"
+<sam_cli/> plan dispatch --address "{qg_plan_address}/{task_id}"
 ```
 
 `dispatch` prints the attempt number, sets the task in-progress and starts its lease. Launch
@@ -34,9 +36,9 @@ landed — either way take the next ready task. Any other code stops the loop.
 When the delegated run returns, record what came back and judge it:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+<sam_cli/> plan settle \
   --address "{qg_plan_address}/{task_id}" --attempt {A} --return-text "{what came back}"
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address "{qg_plan_address}/{task_id}"
+<sam_cli/> plan read --address "{qg_plan_address}/{task_id}"
 ```
 
 Accept when the phase's criteria hold — `plan accept --address "{qg_plan_address}/{task_id}"
@@ -53,7 +55,7 @@ reviewers, so a delegated worker would only add a hop to reach the same call.
    the Implementation Base SHA" step):
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_address}
+   <sam_cli/> plan status --plan-address {plan_address}
    ```
 
    If neither is there, or if `git cat-file -e "<sha>"` fails (the commit no longer resolves),
@@ -82,19 +84,19 @@ You are the runner for this task, so open and close its attempt yourself. `dispa
 workflow runs — it is what sets the task in-progress and holds it against a second dispatch:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address "{qg_plan_address}/T0"
+<sam_cli/> plan dispatch --address "{qg_plan_address}/T0"
 ```
 
 Afterwards, append the two report sections for that attempt and close it:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
   --append-section "Completion Report" --section-content "{the review summary}"
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address "{qg_plan_address}" --task-id T0 --attempt {A} \
   --append-section "Verification Results" --section-content "{per-perspective verdicts, or none}"
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan finish \
+<sam_cli/> plan finish \
   --address "{qg_plan_address}/T0" --attempt {A} --result complete --note "{the verdict}"
 ```
 

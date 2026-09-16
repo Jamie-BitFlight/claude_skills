@@ -550,6 +550,11 @@ REASONS: list[Reason] = [
         condition="--append-section names a report section and --attempt is absent",
     ),
     Reason(
+        code="reason-required",
+        kind=ReasonKind.REFUSAL,
+        condition="--reason is absent from a status moved without a runner",
+    ),
+    Reason(
         code="unmatched-path",
         kind=ReasonKind.REFUSAL,
         condition="no task with attempt_open 1 has a worktree that contains --path",
@@ -1143,6 +1148,7 @@ TRANSITIONS: list[Transition] = [
             command="state",
             from_status=s,
             checks=[
+                Check(reason="reason-required"),
                 Check(reason="status-invalid"),
                 Check(reason="task-accepted", unless="--force"),
                 Check(reason="leased", unless="--force, or attempt_open is 0"),

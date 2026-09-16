@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Skill, Bash, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 color: purple
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - ccc
 ---
@@ -48,7 +49,7 @@ as **STORE** for Step 4 (and Step 6, when it runs).
    when the ledger already holds `P{N}` and the content store otherwise:
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address P{N}
+   <sam_cli/> plan status --plan-address P{N}
    ```
 
    The response shape tells you which store answered:
@@ -127,7 +128,7 @@ mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "update", "context":
 through the CLI instead, naming the ledger column directly:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P{N} --set context="{combined value}"
+<sam_cli/> plan update --plan-address P{N} --set context="{combined value}"
 ```
 
 `--set` takes `field=value` and writes the named ledger column; the field name here is the bare
@@ -152,10 +153,11 @@ cat > /tmp/context-update.txt <<'CONTEXT_EOF'
 {new_section}
 CONTEXT_EOF
 python3 - <<'PYEOF'
+import shlex
 import subprocess
 content = open("/tmp/context-update.txt").read()
 subprocess.run(
-    ["uv", "run", "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py", "plan", "update",
+    [*shlex.split("<sam_cli/>"), "plan", "update",
      "--plan-address", "P{N}", "--set", f"context={content}"],
     check=True,
 )
@@ -173,7 +175,7 @@ mcp__plugin_dh_sam__sam_task(plan="P{N}", task="T{M}", config={"action": "update
 **STORE = LEDGER** (from Step 1): the same `plan update` command, addressed to the task —
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update --plan-address P{N}/T{M} --append-section "Discovered During Implementation" --section-content "{new_section}"
+<sam_cli/> plan update --plan-address P{N}/T{M} --append-section "Discovered During Implementation" --section-content "{new_section}"
 ```
 
 (the same quoting hazard applies — write `{new_section}` to a file and pass it through
@@ -230,7 +232,7 @@ here resolves a filesystem path.
 
 1. Read every task in the plan (all tasks, not just the current one), through the same STORE Step 1 found the plan on:
    - **STORE = CONTENT:** `mcp__plugin_dh_sam__sam_plan(plan="P{N}", config={"action": "read"})` returns them all.
-   - **STORE = LEDGER:** the MCP tool still cannot reach it. `plan status --plan-address P{N}` (Step 1) already named every task id; for each one, run `uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}/T{M}` — its `sections` array is where a `Divergence Notes` or `Discovered During Implementation` section (added via `--append-section`, Step 4) actually lands; the flat task fields `status` returns do not carry it.
+   - **STORE = LEDGER:** the MCP tool still cannot reach it. `plan status --plan-address P{N}` (Step 1) already named every task id; for each one, run `<sam_cli/> plan read --address P{N}/T{M}` — its `sections` array is where a `Divergence Notes` or `Discovered During Implementation` section (added via `--append-section`, Step 4) actually lands; the flat task fields `status` returns do not carry it.
 2. Collect all `## Divergence Notes` sections from task bodies
 3. Collect all `### Discovered During Implementation` sections from Context Manifests
 4. Compare key claims in the architecture spec against the actual implementation files
@@ -412,4 +414,3 @@ NEEDED:
 SUGGESTED NEXT STEP:
   - [What the orchestrator should provide or do]
 ```
-

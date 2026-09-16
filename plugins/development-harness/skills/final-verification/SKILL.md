@@ -4,6 +4,8 @@ description: Certifies that a feature achieves its original objectives via goal-
 user-invocable: false
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # SAM Stage 7 — Final Verification
 
 ## Role
@@ -111,7 +113,7 @@ For the quality gate protocol, reference `/dh:validation-protocol`.
 Append to the task with the SAM CLI, where `{verification_markdown}` follows the template below:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address {plan_id} --task-id {task_id} \
   --append-section "Final Verification" --section-content "{verification_markdown}"
 ```

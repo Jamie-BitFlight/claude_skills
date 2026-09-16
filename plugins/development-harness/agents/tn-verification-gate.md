@@ -4,6 +4,7 @@ description: Verification gate that runs after all implementation tasks complete
 tools: Read, Bash, Glob, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: haiku
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
 ---
 
@@ -43,7 +44,7 @@ mcp__plugin_dh_backlog__artifact_read(item_id={item_id}, artifact_type="T0-basel
 ```
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address P{N}
+<sam_cli/> plan read --address P{N}
 ```
 
 `plan read --address P` reads the plan document, and `plan read --address P/T` reads one task. It

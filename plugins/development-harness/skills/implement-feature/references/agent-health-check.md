@@ -1,5 +1,7 @@
 # Agent Health Check Procedure
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 Full procedure for `implement-feature`'s Agent Health Check step. Reached only when one of the
 trigger conditions in the main skill fires — most dispatches never reach this file.
 
@@ -10,7 +12,7 @@ task row carries when its lease expires, when the runner last touched it, and a 
 is true once the lease has run out:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address "{plan_ref}"
+<sam_cli/> plan status --plan-address "{plan_ref}"
 ```
 
 Read the row for the task in question and take the branch its state names:

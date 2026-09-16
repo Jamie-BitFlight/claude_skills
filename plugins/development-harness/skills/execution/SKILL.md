@@ -4,6 +4,8 @@ description: Executes SAM Stage 5 — opens an attempt on a single ARTIFACT:TASK
 user-invocable: false
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # SAM Stage 5 — Execution
 
 ## Role
@@ -47,7 +49,7 @@ flowchart TD
 Read the task through the SAM CLI, which answers from the work ledger:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_address}/T{NNN}
+<sam_cli/> plan read --address {plan_address}/T{NNN}
 ```
 
 The result carries the task row — title, requirements, constraints, acceptance criteria,
@@ -73,7 +75,7 @@ operations has to be brought across before the first one — `plan import --from
 agent carries on every command it runs:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan dispatch --address {plan_address}/T{NNN}
+<sam_cli/> plan dispatch --address {plan_address}/T{NNN}
 ```
 
 `leased` means another runner already holds the task and `not-ready` means its dependencies have
@@ -107,7 +109,7 @@ The agent runs the verification steps embedded in the task:
 The moment the launch returns, record what came back against the attempt:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan settle \
+<sam_cli/> plan settle \
   --address {plan_address}/T{NNN} --attempt {attempt} --return-text "{the agent's response}"
 ```
 
@@ -136,7 +138,7 @@ Execution results are recorded as a task section on the ledger, tagged with the 
 belong to:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address {plan_address} --task-id T{NNN} --attempt {attempt} \
   --append-section "Execution Results" --section-content "{execution markdown below}"
 ```

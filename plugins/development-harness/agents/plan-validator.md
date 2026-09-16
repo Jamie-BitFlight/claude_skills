@@ -4,6 +4,7 @@ description: Validates implementation plans BEFORE execution begins. Checks for 
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sequential_thinking__sequentialthinking, mcp__Ref__ref_search_documentation, mcp__Ref__ref_read_url, mcp__exa__get_code_context_exa, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 model: sonnet
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - ccc
 color: green

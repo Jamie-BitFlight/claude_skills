@@ -4,6 +4,8 @@ description: Use when SAM Stage 5 Execution has completed and task results need 
 user-invocable: false
 ---
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 # SAM Stage 6 — Forensic Review
 
 ## Role
@@ -48,7 +50,7 @@ flowchart TD
 Read the task and everything its attempts recorded:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan read --address {plan_id}/{task_id}
+<sam_cli/> plan read --address {plan_id}/{task_id}
 ```
 
 Read without `--attempt`: you are reviewing this task, not working an attempt on it, and naming an
@@ -119,7 +121,7 @@ from SAM — `{plan_id}` is an opaque logical identifier such as `Pdec8934d` and
 out of it:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan status --plan-address {plan_id}
+<sam_cli/> plan status --plan-address {plan_id}
 ```
 
 Take the plan row's `feature` field as `{plan_slug}`, making the expected identifier
@@ -145,7 +147,7 @@ for remediation task creation.
 Append review results to the task:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan update \
+<sam_cli/> plan update \
   --plan-address {plan_id} --task-id {task_id} \
   --append-section "Review Results" --section-content "{artifact_content}"
 ```

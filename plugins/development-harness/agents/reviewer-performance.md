@@ -4,6 +4,7 @@ description: "Performance-perspective reviewer for dh:multi-perspective-review. 
 model: sonnet
 tools: Read, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam
 skills:
+  - dh:dh-cli-usage
   - dh:subagent-contract
   - dh:file-classification
 user-invocable: false

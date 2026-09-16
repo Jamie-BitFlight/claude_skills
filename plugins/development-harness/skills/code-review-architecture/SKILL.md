@@ -3,6 +3,8 @@ name: code-review-architecture
 description: "Use when a task asks for architecture review, dependency graph visualization, module coupling analysis, or circular dependency detection. Auto-detects scope (git diff → PR diff → full project). Reads project config (pyproject.toml, tsconfig.json, go.mod, Cargo.toml) to establish the intra-project module namespace before parsing imports. Builds a module-dependency graph across Python, TypeScript, JavaScript, Go, Rust, and Java. Detects cycles via graphify output or an executable Python script. Checks Conway's Law alignment against CODEOWNERS and directory structure. For Claude plugin repos, also traces cross-language chains: hook configs → hook scripts, SKILL.md/agent docs → node/uv-run scripts, PEP 723 inline deps, and MCP tool calls. Emits Mermaid flowcharts with severity color-coding (red = circular dep, yellow = high-coupling, green = clean, blue = Conway violation). Applies recursive semantic partitioning for graphs > 40 nodes. Registers each diagram as a codebase-analysis artifact."
 user-invocable: true
 ---
+
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 # Architecture Audit — Module Dependency Graph
 
 Generates a Mermaid module-dependency graph with severity color-coding from import/include analysis of the project source. Registers the result as a `codebase-analysis` artifact.
@@ -457,7 +459,7 @@ Assemble the markdown report (see Output Format below).
 Register one artifact:
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
+<sam_cli/> artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
@@ -472,7 +474,7 @@ Register each diagram as a separate artifact. Register the parent first, then ea
 
 ```bash
 # Parent
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
+<sam_cli/> artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}" \
@@ -481,7 +483,7 @@ uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
   --agent "code-review-architecture"
 
 # Each child cluster
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" artifact register \
+<sam_cli/> artifact register \
   --item-id {issue_number} \
   --artifact-type "codebase-analysis" \
   --artifact-id "architecture-graph-{slug}-{cluster-name}" \

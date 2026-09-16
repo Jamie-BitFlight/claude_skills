@@ -1,5 +1,7 @@
 # Worktree Worker Protocol
 
+Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
+
 Each worktree worker is spawned by the milestone orchestrator as an isolated `Agent(isolation: "worktree")` subagent branched from the integration branch. This protocol governs the full lifecycle from setup through completion reporting.
 
 **Critical constraint**: Worktree workers have NO Agent tool. All work is executed directly — no delegation to subagents or the SAM pipeline. Workers self-discover task lists, acceptance criteria, and skills after spawning: the backlog item through `backlog_view`, and the plan and its tasks through the SAM CLI's `plan` group.
@@ -127,7 +129,7 @@ which matters here: a worktree worker runs where the orchestrator's session stat
 and the CLI resolves the same ledger from a linked worktree as from the main checkout.
 
 ```bash
-uv run "${CLAUDE_PLUGIN_ROOT}/sam_schema/cli.py" plan <command> …
+<sam_cli/> plan <command> …
 ```
 
 Your prompt names an address `P{N}/T{M}` and the attempt number the orchestrator opened. Carry the
