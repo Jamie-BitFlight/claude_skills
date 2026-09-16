@@ -354,6 +354,21 @@ def _is_openssl_hashed_ca_directory(path: pathlib.Path) -> bool:
         return False
 
 
+def _configured_ca_bundles() -> list[tuple[str, str]]:
+    """Return every valid configured CA source with duplicates removed."""
+    configured: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for env_var in CA_BUNDLE_ENV_VARS:
+        candidate = os.environ.get(env_var)
+        if not candidate or candidate in seen:
+            continue
+        path = pathlib.Path(candidate)
+        if path.is_file() or _is_openssl_hashed_ca_directory(path):
+            configured.append((env_var, candidate))
+            seen.add(candidate)
+    return configured
+
+
 def resolve_ca_bundle() -> str | None:
     """Return the CA bundle path an interception proxy has configured, if any.
 
@@ -363,14 +378,8 @@ def resolve_ca_bundle() -> str | None:
         variable may also name a directory" section). None when no variable is set,
         or when every path named is neither.
     """
-    for env_var in CA_BUNDLE_ENV_VARS:
-        candidate = os.environ.get(env_var)
-        if not candidate:
-            continue
-        path = pathlib.Path(candidate)
-        if path.is_file() or _is_openssl_hashed_ca_directory(path):
-            return candidate
-    return None
+    configured = _configured_ca_bundles()
+    return configured[0][1] if configured else None
 
 
 def _cert_fails_strict_checks(cert: x509.Certificate) -> bool:
@@ -600,7 +609,7 @@ def bundle_requires_relaxed_verification(ca_bundle: str) -> bool:
     return any(_cert_fails_strict_checks(cert) for cert in _new_anchors(ca_bundle))
 
 
-def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
+def _build_ssl_context(ca_bundle: str | tuple[str, ...], *, relax_strict: bool) -> ssl.SSLContext:
     """Build a context that trusts ca_bundle, clearing strict checks only when asked.
 
     Loading ca_bundle and clearing ``VERIFY_X509_STRICT`` are independent decisions
@@ -643,10 +652,12 @@ def _build_ssl_context(ca_bundle: str, *, relax_strict: bool) -> ssl.SSLContext:
     # part of urllib3's default, leave it unset to match those defaults.
     elif sys.version_info >= (3, 13) and not (context.verify_flags & ssl.VERIFY_X509_STRICT):
         context.verify_flags |= ssl.VERIFY_X509_STRICT
-    if pathlib.Path(ca_bundle).is_dir():
-        context.load_verify_locations(capath=ca_bundle)
-    else:
-        context.load_verify_locations(cafile=ca_bundle)
+    ca_bundles = (ca_bundle,) if isinstance(ca_bundle, str) else ca_bundle
+    for bundle in ca_bundles:
+        if pathlib.Path(bundle).is_dir():
+            context.load_verify_locations(capath=bundle)
+        else:
+            context.load_verify_locations(cafile=bundle)
     return context
 
 
@@ -661,7 +672,7 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
 
     def __init__(
         self,
-        ca_bundle: str,
+        ca_bundle: str | tuple[str, ...],
         *,
         relax_strict: bool,
         pool_connections: int = requests.adapters.DEFAULT_POOLSIZE,
@@ -678,7 +689,7 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
             pool_maxsize: Maximum connections to keep in each pool.
             max_retries: Retry policy handed to urllib3.
         """
-        self._ca_bundle = ca_bundle
+        self._ca_bundles = (ca_bundle,) if isinstance(ca_bundle, str) else ca_bundle
         self._relax_strict = relax_strict
         super().__init__(pool_connections=pool_connections, pool_maxsize=pool_maxsize, max_retries=max_retries)
 
@@ -693,7 +704,7 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
             block: Whether the pool blocks when it has no free connection.
             **pool_kwargs: Extra pool options, which this override extends with the context.
         """
-        pool_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle, relax_strict=self._relax_strict)
+        pool_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundles, relax_strict=self._relax_strict)
         super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
 
     def proxy_manager_for(self, proxy: str, **proxy_kwargs: object) -> PoolManager:
@@ -706,17 +717,23 @@ class _ProxyAwareAdapter(requests.adapters.HTTPAdapter):
         Returns:
             The ProxyManager the base implementation builds.
         """
-        proxy_kwargs["ssl_context"] = _build_ssl_context(self._ca_bundle, relax_strict=self._relax_strict)
+        context = _build_ssl_context(self._ca_bundles, relax_strict=self._relax_strict)
+        proxy_kwargs["ssl_context"] = context
+        if proxy.casefold().startswith("https://"):
+            proxy_kwargs["proxy_ssl_context"] = context
         return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
-def _make_connection_class(ca_bundle: str, *, relax_strict: bool) -> type[HTTPSRequestsConnectionClass]:
+def _make_connection_class(
+    ca_bundle: str, *, relax_strict: bool, ca_bundles: tuple[str, ...] | None = None
+) -> type[HTTPSRequestsConnectionClass]:
     """Build the HTTPS connection class PyGithub should use.
 
     Args:
         ca_bundle: Path passed to every SSL context the class creates.
         relax_strict: Whether every SSL context the class creates should clear
             ``ssl.VERIFY_X509_STRICT``.
+        ca_bundles: All configured trust sources to load. Defaults to ``ca_bundle``.
 
     Returns:
         A subclass that remounts PyGithub's own session on a proxy-aware adapter.
@@ -754,10 +771,10 @@ def _make_connection_class(ca_bundle: str, *, relax_strict: bool) -> type[HTTPSR
                 **kwargs: Extra options the base class reads, such as ``verify``.
             """
             super().__init__(host, port, strict, timeout, retry, pool_size, **kwargs)
-            if "verify" not in kwargs:
+            if kwargs.get("verify", True) is True:
                 self.verify = ca_bundle
             self.adapter = _ProxyAwareAdapter(
-                ca_bundle,
+                ca_bundles or (ca_bundle,),
                 relax_strict=relax_strict,
                 max_retries=self.retry,
                 pool_connections=self.pool_size,
@@ -810,15 +827,25 @@ def install_proxy_tls_support(*, force: bool = False) -> bool:
     with _InstallState.lock:
         if _InstallState.installed and not force:
             return True
-        ca_bundle = resolve_ca_bundle()
-        if ca_bundle is None or not bundle_adds_new_anchor(ca_bundle):
+        configured = _configured_ca_bundles()
+        custom_bundles = [(env_var, path) for env_var, path in configured if bundle_adds_new_anchor(path)]
+        if not custom_bundles:
             if _InstallState.installed:
                 Requester.injectConnectionClasses(HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass)
                 _InstallState.installed = False
             return False
-        relax_strict = bundle_requires_relaxed_verification(ca_bundle)
+        ca_bundle = configured[0][1]
+        ca_bundles = tuple(path for _env_var, path in configured)
+        requests_bundle_vars = {"REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"}
+        # A proxy can send deficient intermediates that are not present in its trust
+        # bundle. Their extensions cannot be inspected before the handshake, so a
+        # Requests-specific proxy trust source is itself the relaxation boundary.
+        relax_strict = any(bundle_requires_relaxed_verification(path) for _env_var, path in custom_bundles) or any(
+            env_var in requests_bundle_vars for env_var, _path in custom_bundles
+        )
         Requester.injectConnectionClasses(
-            HTTPRequestsConnectionClass, _make_connection_class(ca_bundle, relax_strict=relax_strict)
+            HTTPRequestsConnectionClass,
+            _make_connection_class(ca_bundle, relax_strict=relax_strict, ca_bundles=ca_bundles),
         )
         _InstallState.installed = True
         return True

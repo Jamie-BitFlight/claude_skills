@@ -35,6 +35,7 @@ from backlog_core.github_client import (
     _InstallState,
     _make_connection_class,
     _new_anchors,
+    _ProxyAwareAdapter,
     bundle_adds_new_anchor,
     bundle_requires_relaxed_verification,
     install_proxy_tls_support,
@@ -818,6 +819,29 @@ class TestInstallProxyTlsSupport:
         assert _InstallState.installed is True
         assert _installed_https_connection_class() is not HTTPSRequestsConnectionClass
 
+    def test_loads_github_and_requests_bundles_together(self, monkeypatch, compliant_ca_file, ca_file):
+        monkeypatch.setenv("GITHUB_CA_BUNDLE", str(compliant_ca_file))
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(ca_file))
+
+        install_proxy_tls_support()
+        connection = _installed_https_connection_class()("api.github.com")
+
+        assert connection.adapter._ca_bundles == (str(compliant_ca_file), str(ca_file))
+        assert (
+            not connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
+        )
+
+    def test_requests_bundle_relaxes_for_deficient_server_intermediates(self, monkeypatch, compliant_ca_file):
+        """A proxy's sent intermediates are unavailable for pre-handshake inspection."""
+        monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(compliant_ca_file))
+
+        install_proxy_tls_support()
+        connection = _installed_https_connection_class()("api.github.com")
+
+        assert (
+            not connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
+        )
+
     def test_installs_a_compliant_bundle_via_github_ca_bundle_without_relaxing_strict(
         self, monkeypatch, compliant_ca_file
     ):
@@ -942,6 +966,25 @@ class TestConnectionVerifyMatchesSelectedBundle:
         connection = connection_class("api.github.com", verify=False)
 
         assert connection.verify is False
+
+    def test_pygithub_factory_verify_true_is_pinned(self, compliant_ca_file):
+        connection_class = _make_connection_class(str(compliant_ca_file), relax_strict=False)
+
+        connection = connection_class("api.github.com", verify=True)
+
+        assert connection.verify == str(compliant_ca_file)
+
+
+class TestHttpsProxyContext:
+    """The outer TLS connection to an HTTPS proxy uses the configured context too."""
+
+    def test_https_proxy_receives_proxy_ssl_context(self, compliant_ca_file):
+        adapter = _ProxyAwareAdapter(str(compliant_ca_file), relax_strict=False)
+
+        manager = adapter.proxy_manager_for("https://proxy.example:8443")
+
+        assert manager.proxy_config is not None
+        assert manager.proxy_config.ssl_context is not None
 
 
 class TestMakeGithubClient:

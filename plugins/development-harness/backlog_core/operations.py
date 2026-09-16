@@ -92,6 +92,7 @@ from .parsing import (
 from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
+from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from .timestamps import now_iso
 
@@ -1865,7 +1866,38 @@ def refresh_local_cache_from_github(
     }
 
 
-def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) -> str:
+def normalize_cached_github_status(status: str) -> str:
+    """Normalize a cached numeric-issue status to GitHub's label form.
+
+    Args:
+        status: Cached status value.
+
+    Returns:
+        The canonical status token used by listing filters and output.
+    """
+    if not status or status.startswith(STATUS_LABEL_PREFIX) or status == "needs-grooming":
+        return status
+    candidate = f"{STATUS_LABEL_PREFIX}{status}"
+    try:
+        StatusLabel(candidate)
+    except ValueError:
+        return status
+    return candidate
+
+
+def normalize_live_github_status(status: str) -> str:
+    """Normalize the live needs-grooming label to the documented bare token.
+
+    Args:
+        status: Live GitHub status label.
+
+    Returns:
+        The canonical status token used by listing filters and output.
+    """
+    return "needs-grooming" if status == StatusLabel.NEEDS_GROOMING.value else status
+
+
+def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True) -> str:
     """Return the effective status string for an item.
 
     For items with a numeric issue reference, looks up the live status
@@ -1881,11 +1913,12 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus]) 
         when neither is available.
     """
     num = parse_issue_number(item.issue)
-    if num is not None:
-        info = status_map.get(num)
-        return info.status if info is not None else "needs-grooming"
-    # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
-    return item.status or "needs-grooming"
+    if num is None:
+        return item.status or "needs-grooming"
+    if not status_live:
+        return normalize_cached_github_status(item.status)
+    info = status_map.get(num)
+    return normalize_live_github_status(info.status) if info is not None else "needs-grooming"
 
 
 def _filter_open_items(
@@ -1896,6 +1929,8 @@ def _filter_open_items(
     status_map: dict[int, IssueStatus],
     type_: str | None = None,
     topic: str | None = None,
+    *,
+    status_live: bool = True,
 ) -> list[BacklogItem]:
     """Apply section, title, status, type, and topic filters to open_items.
 
@@ -1917,7 +1952,9 @@ def _filter_open_items(
         title_lower = title.lower()
         open_items = [it for it in open_items if title_lower in it.title.lower()]
     if status:
-        open_items = [it for it in open_items if _item_derived_status(it, status_map) == status]
+        open_items = [
+            it for it in open_items if _item_derived_status(it, status_map, status_live=status_live) == status
+        ]
     if type_:
         type_lower = type_.lower()
         open_items = [it for it in open_items if it.type_ and it.type_.lower() == type_lower]
@@ -1973,7 +2010,9 @@ def _build_item_search_body(item: BacklogItem) -> str:
     return " ".join(parts)
 
 
-def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> dict[str, str | bool]:
+def _build_list_entry(
+    item: BacklogItem, status_map: dict[int, IssueStatus], *, status_live: bool = True
+) -> dict[str, str | bool]:
     """Build the result dict for a single backlog item.
 
     Returns:
@@ -2000,8 +2039,12 @@ def _build_list_entry(item: BacklogItem, status_map: dict[int, IssueStatus]) -> 
         num = parse_issue_number(item.issue)
         if num is not None:
             info = status_map.get(num)
-            entry["status"] = info.status if info is not None else ""
-            entry["milestone"] = info.milestone if info is not None else ""
+            if info is not None:
+                entry["status"] = normalize_live_github_status(info.status)
+                entry["milestone"] = info.milestone
+            else:
+                entry["status"] = "" if status_live else normalize_cached_github_status(item.status)
+                entry["milestone"] = ""
         else:
             # Non-integer issue ref (e.g. beads nanoid "bd-a3f8"): status_map
             # cannot be keyed by int, so use the locally cached status field.
@@ -2217,15 +2260,21 @@ def list_items(
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
     status_map: dict[int, IssueStatus] = {}
+    status_live = False
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
         except BackendUnavailableError as exc:
-            # An empty map renders every numeric-issue item with a blank status.
-            # Name the cause, so a reader does not take the blanks for "no status set".
-            out.warn(f"  WARNING: Live status unavailable ({exc}); item statuses are shown blank.")
-    open_items = _filter_open_items(open_items, section, title, status, status_map, type_=type_, topic=topic)
-    result_items = [_build_list_entry(it, status_map) for it in open_items]
+            out.warn(
+                f"  WARNING: Live status unavailable ({exc}); statuses come from the local cache, "
+                "so a --status filter may under-report."
+            )
+        else:
+            status_live = True
+    open_items = _filter_open_items(
+        open_items, section, title, status, status_map, type_=type_, topic=topic, status_live=status_live
+    )
+    result_items = [_build_list_entry(it, status_map, status_live=status_live) for it in open_items]
     if filter_by_key:
         result_items = [it for it in result_items if all(str(it.get(k)) == v for k, v in filter_by_key.items())]
     if search is not None:
