@@ -1291,6 +1291,9 @@ def try_get_github(repo: str = "") -> Repository | None:
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
         return None
+    except OSError as exc:
+        logger.warning("try_get_github: network or transport error for repo %r: %s", repo, exc)
+        return None
 
 
 def probe_backend_status(repo: str = "") -> BackendStatus:
@@ -1478,6 +1481,9 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
         data = _graphql_request(repository, _SEARCH_PRS_QUERY, {"query": search_query, "first": 20})
     except GithubException as exc:
         msg = f"GitHub PR search failed: {exc}"
+        raise BacklogError(msg) from exc
+    except OSError as exc:
+        msg = f"GitHub PR search failed (network error or timeout): {exc}"
         raise BacklogError(msg) from exc
     nodes = (data.get("search") or {}).get("nodes") or []
     prs: list[PullRequestRef] = []
