@@ -1942,6 +1942,8 @@ def _item_derived_status(
             "the fetch failed outright and nothing was learned about anyone".
             *status_map_unavailable* is what tells those two apart; the map's
             contents alone cannot.
+        status_live: Whether ``status_map`` came from a successful live query.
+            When False, numeric-issue statuses come from the local cache.
         status_map_unavailable: True when the live status batch fetch itself
             failed (see ``list_items``'s ``BackendUnavailableError`` handling)
             rather than succeeding with no entry for this item. When True, a
@@ -2015,10 +2017,7 @@ def _filter_open_items(
             it
             for it in open_items
             if _item_derived_status(
-                it,
-                status_map,
-                status_live=status_live,
-                status_map_unavailable=status_map_unavailable,
+                it, status_map, status_live=status_live, status_map_unavailable=status_map_unavailable
             )
             == status
         ]
@@ -2429,6 +2428,7 @@ def list_items(
     if get_config().backend.supports_batch_status_fetch:
         try:
             status_map = batch_fetch_statuses(open_items, repo)
+            status_live = True
             if not status_map and _status_map_empty_due_to_missing_token(open_items):
                 # gh_client.batch_fetch_statuses folds "no GITHUB_TOKEN
                 # configured" into the same empty map a genuinely-empty live
@@ -2442,6 +2442,7 @@ def list_items(
                 # to "needs-grooming" as though the fetch had genuinely
                 # answered (#3546, missing-token trigger).
                 status_map_unavailable = True
+                status_live = False
                 _warn_status_map_unavailable(out, status, "no GITHUB_TOKEN configured")
         except BackendUnavailableError as exc:
             # The fetch failed outright -- nothing was learned about ANY
@@ -2459,8 +2460,6 @@ def list_items(
             # or failure.
             status_map_unavailable = True
             _warn_status_map_unavailable(out, status, str(exc))
-        else:
-            status_live = not status_map_unavailable
     open_items = _filter_open_items(
         open_items,
         section,
