@@ -59,9 +59,9 @@ Pre-write SK007 branch: if the existing SKILL.md is already over SK007, apply `/
 
 **Stage 2 — Parallel Read Agents**
 
-Dispatch exactly 3 `Agent()` calls in ONE turn so they run concurrently:
+Dispatch exactly 3 agents in one concurrent fan-out:
 
-1. `Agent(subagent_type="plugin-creator:skill-auditor")` — input: `<skill-path>`; output: `.tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md` (read-only)
+1. `plugin-creator:skill-auditor` — input: `<skill-path>`; output: `.tmp/scratch/reports/skill-sync-{slug}-completeness-YYYYMMDD.md` (read-only)
 2. `plugin-creator:skill-content-updater` (read role) — upstream drift scan; output: drift report with NEW/STALE/VERIFIED/UNVERIFIABLE verdicts per claim
 3. `general-purpose` — structure validation; checks progressive disclosure, frontmatter schema, broken reference links; output: structure report
 
