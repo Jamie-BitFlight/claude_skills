@@ -190,7 +190,9 @@ scope can establish the global snapshot checkpoint even when the caller filters
 the eventual listing by label; subsequent calls then use the cache instead of
 repeating a label-scoped initial fetch. This implicit read-through never applies
 queued local patches, shares the normal sync single-flight guard, and degrades
-documented provider or cache I/O failures to a warning plus the cached result.
+documented provider or cache I/O failures to warnings. The resulting
+low-confidence listing remains withheld unless the caller opts in with
+`allow_cached=True`, as described below.
 
 `operations.list_items` reports two independent, provenance-flavored bits on
 every response — `from_cache` and `has_pending_writes` — rather than one

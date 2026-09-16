@@ -196,7 +196,7 @@ class SyncState:
                 self.started_at = datetime.now(UTC)
             return previous
 
-    def release_claim(self, previous: SyncStatus) -> None:
+    def release_claim(self, previous: SyncStatus, *, started_at: datetime | None) -> None:
         """Restore the status that prevailed before a matching ``try_claim()``.
 
         Args:
@@ -205,16 +205,17 @@ class SyncState:
                 caller bug — every ``try_claim()`` caller must guard on
                 ``None`` before running the claimed work, so ``release_claim``
                 is never reached in that case.
+            started_at: The timestamp that prevailed before ``try_claim()``.
         """
         with self._claim_lock:
             self.status = previous
+            self.started_at = started_at
 
     def complete_claim(self) -> None:
-        """Complete a successful transient claim as a successful sync."""
+        """Complete a successful transient claim without changing when it started."""
         with self._claim_lock:
             now = datetime.now(UTC)
             self.status = SyncStatus.IDLE
-            self.started_at = now
             self.completed_at = now
             self.last_success_at = now
             self.last_error = ""

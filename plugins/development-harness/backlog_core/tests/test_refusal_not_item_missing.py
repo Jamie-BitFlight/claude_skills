@@ -395,7 +395,7 @@ class TestColdCacheReadsThroughOnce:
         assert backend.reconcile_requests[0].apply_local_patches is False
 
     @pytest.mark.parametrize("failure", [OSError("cache is read-only"), CacheStateCorruptError("invalid cache state")])
-    def test_cache_io_failure_degrades_to_cached_listing(
+    def test_cache_io_failure_withholds_unconfirmed_listing_by_default(
         self, mocker: MockerFixture, failure: OSError | CacheStateCorruptError
     ) -> None:
         backend = _CheckpointedBackend([_item("#1")], synced=False)
@@ -405,7 +405,8 @@ class TestColdCacheReadsThroughOnce:
 
         result = operations.list_items(output=out)
 
-        assert result["count"] == 1
+        assert result["items"] is None
+        assert result["count"] is None
         assert any(str(failure) in warning for warning in out.warnings)
 
     def test_undocumented_value_error_propagates_and_releases_claim(self, mocker: MockerFixture) -> None:
@@ -430,7 +431,10 @@ class TestColdCacheReadsThroughOnce:
 
         assert state.status == SyncStatus.IDLE
         assert state.last_success_at is not None
+        assert state.completed_at is not None
         assert state.completed_at == state.last_success_at
+        assert state.started_at is not None
+        assert state.started_at < state.completed_at
         assert state.last_error == ""
         assert state.offline_reason == ""
         assert state.retry_count == 0
@@ -477,13 +481,13 @@ class TestListingProvenance:
     (A1 checkpoint honesty) plus read-side (A4 provenance) interaction.
     """
 
-    def test_a_label_scoped_empty_reconcile_degrades_to_cached_result_after_refresh_failure(
+    def test_a_label_scoped_empty_reconcile_withholds_cached_result_after_refresh_failure(
         self, tmp_path: Path, mocker: MockerFixture
     ) -> None:
         """A-critique.md Sec 3.1's exact reproduction: a label-scoped reconcile that
         durably observes zero items keeps its checkpoint honestly unset. When
-        the implicit repair attempt fails, the documented degradation path
-        returns that cached result with explicit warnings."""
+        the implicit repair attempt fails, the default fail-safe contract still
+        withholds that cached result with explicit warnings."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
         backend._fetch_snapshot = MagicMock(return_value=_snapshot())
@@ -497,8 +501,8 @@ class TestListingProvenance:
 
         result = operations.list_items(output=Output())
 
-        assert result["items"] == []
-        assert result["count"] == 0
+        assert result["items"] is None
+        assert result["count"] is None
         assert result["from_cache"] is True
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
 
@@ -543,12 +547,10 @@ class TestListingProvenance:
 
         result = operations.list_items(output=Output())
 
-        # The failed implicit repair degrades to the readable cached item, while
+        # A failed implicit repair does not bypass the default fail-safe, while
         # has_pending_writes independently names the queued mutation.
-        items = result["items"]
-        assert isinstance(items, list)
-        assert len(items) == 1
-        assert result["count"] == 1
+        assert result["items"] is None
+        assert result["count"] is None
         assert result["from_cache"] is True
         assert result["has_pending_writes"] is True
 

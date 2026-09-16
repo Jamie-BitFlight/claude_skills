@@ -835,7 +835,7 @@ class TestSyncStateTryClaim:
         assert previous == SyncStatus.OFFLINE
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
-        fresh_sync_state.release_claim(previous)
+        fresh_sync_state.release_claim(previous, started_at=previous_started_at)
 
         assert fresh_sync_state.status == SyncStatus.OFFLINE
         assert fresh_sync_state.offline_reason == "no token configured"
@@ -846,6 +846,18 @@ class TestSyncStateTryClaim:
         assert fresh_sync_state.try_start() is True
         assert fresh_sync_state.status == SyncStatus.RUNNING
         assert fresh_sync_state.try_start() is False
+
+    def test_complete_claim_preserves_the_actual_start_time(self, fresh_sync_state: SyncState) -> None:
+        """Completing a claim must not rewrite its start time as the finish time."""
+        started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        fresh_sync_state.started_at = started_at
+        fresh_sync_state.status = SyncStatus.RUNNING
+
+        fresh_sync_state.complete_claim()
+
+        assert fresh_sync_state.started_at == started_at
+        assert fresh_sync_state.completed_at is not None
+        assert fresh_sync_state.completed_at > started_at
 
 
 # The genuine cross-thread single-flight regression (Finding 1) is proven at
