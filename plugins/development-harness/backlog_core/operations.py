@@ -621,7 +621,7 @@ class CommentListEntry(BaseModel):
 
 
 class ListCommentsResult(TypedDict):
-    """Mapping result returned by :func:`list_comments`."""
+    """Typed mapping returned by :func:`list_comments`."""
 
     comments: list[CommentListEntry]
     count: int
