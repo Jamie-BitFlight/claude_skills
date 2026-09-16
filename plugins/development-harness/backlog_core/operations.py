@@ -3189,7 +3189,10 @@ def view_item(
             live_id = _live_lookup_id(item, issue_num, selector)
             try:
                 enriched = view_enrich_from_github(result, live_id, repo) if live_id else False
-                reason = "backend unreachable"
+                if not live_id:
+                    reason = "GitHub lookup failed (authentication failure, rate limit, GitHub server error, or issue not found)"
+                else:
+                    reason = "backend unreachable"
             except BackendUnavailableError as exc:
                 # The cached record still answers the view, so the read succeeds.
                 # Name the cause instead of reporting the generic unreachable case.
@@ -3419,13 +3422,12 @@ def close_item(
         issue_num_val = parse_issue_number(issue_ref)
         open_prs = check_open_prs_for_issue(issue_num_val, repo) if issue_num_val is not None else []
         if open_prs:
-            out.warn(f"WARNING: Open PRs reference issue {issue_ref}:")
+            out.warn(f"WARNING: Open PRs mention issue {issue_ref}:")
             for pr in open_prs:
                 out.warn(f"  - PR #{pr.number}: {pr.title}")
                 out.warn(f"    {pr.url}")
-            out.warn(f"\nIssue {issue_ref} will auto-close when a PR merges with 'Fixes {issue_ref}'.")
             out.warn("Use force=True to close anyway.")
-            msg = f"Open PRs reference issue {issue_ref}. Use force=True to close anyway."
+            msg = f"Open PRs mention issue {issue_ref}. Use force=True to close anyway."
             raise BacklogError(msg)
 
     today()

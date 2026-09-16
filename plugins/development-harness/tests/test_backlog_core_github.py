@@ -1437,7 +1437,7 @@ class TestTryGetGithub:
         # Arrange
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
         mocker.patch(
-            "backlog_core.gh_client.Github"
+            "backlog_core.github_client.Github"
         ).return_value.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
 
         # Act
@@ -1456,9 +1456,9 @@ class TestTryGetGithub:
         """
         # Arrange
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.gh_client.Github").return_value.get_repo.side_effect = requests.exceptions.Timeout(
-            "request timed out"
-        )
+        mocker.patch(
+            "backlog_core.github_client.Github"
+        ).return_value.get_repo.side_effect = requests.exceptions.Timeout("request timed out")
 
         # Act
         result = try_get_github("test-owner/test-repo")
@@ -1468,9 +1468,6 @@ class TestTryGetGithub:
 
 
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-# apply_status_in_progress — fetch-then-update label pattern
-=======
 # probe_backend_status — backend availability summary
 # ---------------------------------------------------------------------------
 
@@ -1531,7 +1528,6 @@ class TestProbeBackendStatus:
 
 # ---------------------------------------------------------------------------
 # apply_status_in_progress — ADR-003 fetch-then-update label pattern
->>>>>>> 794f682f5 (fix(backlog-core): make probe_backend_status accept every token variable)
 # ---------------------------------------------------------------------------
 
 

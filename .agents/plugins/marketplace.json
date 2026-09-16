@@ -101,7 +101,7 @@
       "category": "Developer Tools"
     },
     {
-      "name": "dh",
+      "name": "development-harness",
       "source": {
         "source": "local",
         "path": "./plugins/development-harness"

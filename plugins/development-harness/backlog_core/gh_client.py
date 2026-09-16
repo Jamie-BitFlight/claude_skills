@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Final, Protocol
 from github import GithubException
 from typing_extensions import TypedDict
 
-from backlog_core.github_client import MissingGitHubTokenError, make_github_client
+from backlog_core.github_client import TOKEN_ENV_VARS, MissingGitHubTokenError, make_github_client
 
 from .backend_types import (
     AddedCommentNode,
@@ -1311,12 +1311,15 @@ def try_get_github(repo: str = "") -> Repository | None:
     try:
         gh = make_github_client(timeout=_TRY_GET_TIMEOUT)
     except MissingGitHubTokenError:
-        logger.exception("try_get_github: no GitHub token available — GitHub operations will be skipped")
+        logger.warning("try_get_github: no GitHub token available — GitHub operations will be skipped")
         return None
     try:
         return gh.get_repo(repo)
     except GithubException as exc:
         logger.warning("try_get_github: GitHub API error %s for repo %r", exc.status, repo)
+        return None
+    except OSError as exc:
+        logger.warning("try_get_github: network error for repo %r: %s", repo, exc)
         return None
 
 
@@ -1334,8 +1337,8 @@ def probe_backend_status(repo: str = "") -> BackendStatus:
         BackendStatus with availability and live issue counts. Cache fields retain
         their defaults because the provider owns cache observation.
     """
-    if not os.environ.get("GITHUB_TOKEN"):
-        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GITHUB_TOKEN not set")
+    if not any(os.environ.get(var) for var in TOKEN_ENV_VARS):
+        return BackendStatus(availability=BackendAvailability.NEEDS_AUTHENTICATION, error="GitHub token not set")
 
     if (repo_obj := try_get_github(repo)) is None:
         return BackendStatus(
@@ -1499,6 +1502,9 @@ def check_open_prs_for_issue(issue_num: int, repo: str = "") -> list[PullRequest
         search_query = f"repo:{repo} is:pr is:open #{issue_num}"
         data = _graphql_request(repository, _SEARCH_PRS_QUERY, {"query": search_query, "first": 20})
     except GithubException as exc:
+        msg = f"GitHub PR search failed: {exc}"
+        raise BacklogError(msg) from exc
+    except OSError as exc:
         msg = f"GitHub PR search failed: {exc}"
         raise BacklogError(msg) from exc
     nodes = (data.get("search") or {}).get("nodes") or []

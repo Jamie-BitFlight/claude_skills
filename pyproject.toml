@@ -461,6 +461,9 @@ max-complexity = 12
     "line-too-long",                          # Line length relaxed for test data
     "unused-async",                           # async mock side-effects must be declared async to be awaitable; semantic need linter cannot detect
 ]
+# Network error tests mock requests.exceptions.ConnectionError and requests.exceptions.Timeout
+# to verify OSError exception handling in try_get_github and check_open_prs_for_issue functions
+"**/tests/test_backlog_core_github.py" = ["banned-api"]
 # Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
 # requests exception instance to verify exact-type matching in the except clause.
 "**/tests/test_backlog_core_operations.py" = ["banned-api"]

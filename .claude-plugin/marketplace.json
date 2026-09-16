@@ -134,7 +134,7 @@
       "source": "./plugins/python-engineering"
     },
     {
-      "name": "dh",
+      "name": "development-harness",
       "source": "./plugins/development-harness"
     },
     {
