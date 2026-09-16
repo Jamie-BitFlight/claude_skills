@@ -247,8 +247,11 @@ DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 # ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
 # plugin-root variable, which only Claude Code resolves.
 SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
-DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
+SAM_CLI_LINES = (
+    *tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES),
+    'uv run "$DH_SKILL_DIR/../../sam_schema/cli.py"',
+)
+DH_SCRIPTS_LINES = (*tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES), "$DH_SKILL_DIR/../../scripts")
 
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
@@ -856,7 +859,7 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         "<sam_cli> and <dh_scripts> blocks:\n" + "\n".join(outside_climbs)
     )
 
-    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES) - {"DH_SKILL_DIR"})
     assert not unknown_variables, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names template variable(s) other than the three "
         f"skill-dir forms: {unknown_variables}"
@@ -878,6 +881,36 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not instruct `STATUS: BLOCKED` on failure "
         "outside a fenced block or HTML comment."
     )
+    for harness in ("Codex", "OpenCode", "Cursor"):
+        assert harness in stripped, f"dh-cli-usage does not name its {harness} fallback."
+    assert "DH_SKILL_DIR='<absolute base directory displayed for dh:dh-cli-usage>'" in raw
+    assert 'uv run "$DH_SKILL_DIR/../../sam_schema/cli.py"' in stripped
+
+
+def test_implementation_manager_does_not_execute_an_unresolved_cli_token() -> None:
+    """Skill load-time injection cannot execute the prose-only ``<sam_cli/>`` token."""
+    implementation_manager = SKILLS_DIR / "implementation-manager" / "SKILL.md"
+    injection_lines = [
+        line
+        for line in implementation_manager.read_text(encoding="utf-8").splitlines()
+        if line.startswith("!") and "<sam_cli/>" in line
+    ]
+    assert not injection_lines
+
+
+def test_work_ledger_docs_describe_mcp_ledger_routing() -> None:
+    """The runner docs must not deny the imported-plan MCP route implemented by the server."""
+    for relative in ("docs/work-ledger/work-loop.md", "docs/work-ledger/runner-contract.md"):
+        text = (PLUGIN_ROOT / relative).read_text(encoding="utf-8")
+        assert "server_ledger_routing.py" in text
+        assert "MCP remains available" in text
+        assert "CLI is the only path to" not in text
+
+
+def test_impact_analyst_description_fits_frontmatter_limit() -> None:
+    """Agent discovery metadata must fit the portable 1024-character description limit."""
+    frontmatter, _ = _load_frontmatter_from_path(AGENTS_DIR / "impact-analyst.md")
+    assert len(str(frontmatter["description"])) <= 1024
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:

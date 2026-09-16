@@ -352,7 +352,10 @@ def _tmux_alive(tmux_session: str) -> bool:
     Returns:
         True if the tmux session exists, False otherwise.
     """
-    result = subprocess.run(["tmux", "has-session", "-t", tmux_session], capture_output=True, check=False)
+    try:
+        result = subprocess.run(["tmux", "has-session", "-t", tmux_session], capture_output=True, check=False)
+    except FileNotFoundError:
+        return False
     return result.returncode == 0
 
 

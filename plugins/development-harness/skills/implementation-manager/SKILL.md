@@ -9,14 +9,6 @@ Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>`.
 
 # Implementation Manager
 
-## Current Task Context
-
-**Available features (if in project with plan/ directory):**
-!`<sam_cli/> plan list 2>/dev/null`
-
-**Active task context (if any):**
-!`python3 -c "from dh_paths import context_dir; import os; cdir = context_dir(os.environ.get('CLAUDE_CODE_SESSION_ID', '')); files = list(cdir.glob('active-task-*.json')) if cdir.exists() else []; print(files[0].read_text() if files else 'No active task')" 2>/dev/null || echo "No active task"`
-
 A skill for querying and managing feature implementation tasks. Provides programmatic access to task status for orchestrators coordinating multi-step feature implementations.
 
 ## SAM MCP Tool Usage
