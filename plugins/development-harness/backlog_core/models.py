@@ -16,7 +16,7 @@ import sys
 import threading
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, assert_never
+from typing import TYPE_CHECKING, Literal, TypeAlias, assert_never
 
 if TYPE_CHECKING:
     from .search import ContentDuplicateMatch
@@ -1405,6 +1405,25 @@ class ContentWrite(BaseModel):
         return self
 
 
+StatusSource: TypeAlias = Literal["live", "cache", "mixed", "unavailable"]
+"""Provenance of a read operation's status/enrichment data (#3546, B5).
+
+``"live"``: the value came from a successful live batch-status or
+enrichment fetch against the configured backend this call.
+``"cache"``: live data was not needed this call -- the backend does not support
+a fetch (e.g. a string-ID backend whose own status field is authoritative), or
+the item carried no identifier to check live -- so the locally
+cached/backend-owned value is reported as-is, with no live degradation.
+``"mixed"``: one listing contains both successfully fetched live status data
+and backend-owned cached status data, such as numeric GitHub issue references
+beside unlinked or string-ID work items.
+``"unavailable"``: a required live fetch could not run or was attempted and
+failed (missing credentials, a refused GraphQL query, a network error, a rate
+limit, ...) -- the true live value was never learned this call. Provider
+outcomes separately report whether an outbound request was attempted.
+"""
+
+
 class ReconcileResult(BaseModel):
     """Completed reconciliation outcomes and optional changed-item details."""
 
@@ -1482,6 +1501,44 @@ class IssueStatus(BaseModel):
 
     status: str = ""
     milestone: str = ""
+
+
+class StatusFetchResult(BaseModel):
+    """Provider-reported outcome of a batch status fetch."""
+
+    statuses: dict[int, IssueStatus] = Field(default_factory=dict)
+    attempted: bool
+    unavailable_reason: str = ""
+
+    @model_validator(mode="after")
+    def validate_attempt_state(self) -> StatusFetchResult:
+        """Reject statuses that could not have come from an attempted fetch.
+
+        Returns:
+            The validated provider outcome.
+        """
+        if self.statuses and not self.attempted:
+            raise ValueError("statuses require attempted=True")
+        return self
+
+
+class ViewEnrichmentResult(BaseModel):
+    """Provider-reported outcome of enriching one work-item view."""
+
+    enriched: bool
+    attempted: bool
+    unavailable_reason: str = ""
+
+    @model_validator(mode="after")
+    def validate_attempt_state(self) -> ViewEnrichmentResult:
+        """Reject successful enrichment when no provider request was attempted.
+
+        Returns:
+            The validated provider outcome.
+        """
+        if self.enriched and not self.attempted:
+            raise ValueError("enriched=True requires attempted=True")
+        return self
 
 
 class PullRequestRef(BaseModel):
@@ -1579,6 +1636,15 @@ class ViewItemResult(BaseModel):
     body_total_lines: int | None = None
     section_filter_miss: bool = False
     section_filter_valid_names: list[str] = Field(default_factory=list, exclude=True)
+    status_source: StatusSource = "cache"
+    """Provenance of this item's live-enrichment data (#3546, B5). See
+    :data:`StatusSource` for the provenance meanings. Defaults to ``"cache"``
+    for a bare ``ViewItemResult()`` constructed without going through
+    :func:`view_item` (e.g. direct test construction)."""
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Names of capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Empty
+    when nothing was degraded."""
     messages: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -1600,10 +1666,17 @@ class SectionMeta(ExtTypedDict):
 class ViewItemResultCompact(BaseModel):
     """Compact result of viewing a single backlog item.
 
-    Returned when ``include_content=False`` is passed to ``backlog_view``.
-    Contains all metadata fields from :class:`ViewItemResult` but omits the
-    full ``body`` text and per-entry ``sections`` dict.  Callers receive a
-    section inventory (names and entry counts) instead.
+    Documents the intended shape for an ``include_content=False`` response:
+    all metadata fields from :class:`ViewItemResult` but omitting the full
+    ``body`` text and per-entry ``sections`` dict in favour of a section
+    inventory (names and entry counts). Not currently constructed anywhere
+    in this codebase -- ``backlog_view``'s ``include_content=False`` path
+    returns a ``ViewItemResult`` with ``sections_metadata`` populated and
+    ``body``/``sections`` cleared instead (see ``_assemble_view_content``),
+    not this model. Kept in sync with :class:`ViewItemResult`'s field set as
+    independently evolvable duplication in case
+    a future caller wires it up; verify against current call sites before
+    relying on this class as documentation of an active response shape.
 
     Fields are duplicated from :class:`ViewItemResult` rather than inherited
     so that the two response shapes remain independently evolvable.
@@ -1627,6 +1700,12 @@ class ViewItemResultCompact(BaseModel):
         default_factory=list,
         description="Compact section inventory: section names with entry counts, no body or entry content.",
     )
+    status_source: StatusSource = "cache"
+    """Provenance of this item's live-enrichment data (#3546, B5), mirroring
+    :attr:`ViewItemResult.status_source`. See :data:`StatusSource`."""
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, mirroring
+    :attr:`ViewItemResult.unavailable_capabilities`."""
     messages: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

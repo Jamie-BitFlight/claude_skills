@@ -111,12 +111,26 @@ def test_refresh_wrapper_surfaces_a_dead_lettered_entry(tmp_path: Path, monkeypa
     # When: the main sync path runs (not the per-item grooming path)
     result = refresh_local_cache_from_github(full_refresh=True)
 
-    # Then: the dead-lettered entry is counted and named in the sync message
+    # Then: the dead-lettered entry is counted and named in the sync warning
     assert result["rejected_mutations"] == 1
     assert result["pending_mutations"] == 0
-    messages = result["messages"]
-    assert isinstance(messages, list)
-    assert any("1 rejected mutation(s)" in msg for msg in messages)
+    warnings = result["warnings"]
+    assert isinstance(warnings, list)
+    assert any("1 rejected mutation(s)" in warning for warning in warnings)
+
+
+def test_refresh_wrapper_surfaces_conflicts_as_warnings(sync_provider: _SyncProviderStub) -> None:
+    sync_provider.result = ReconcileResult(fetched_items=1, conflicts=2)
+
+    result = refresh_local_cache_from_github()
+
+    assert result["messages"] == []
+    assert result["warnings"] == [
+        (
+            "Reconciled 1 provider item(s): 0 local updates, 0 patches, 0 no-ops, 2 conflicts, 0 failures, "
+            "0 pending mutation(s), 0 rejected mutation(s)."
+        )
+    ]
 
 
 @pytest.mark.parametrize(

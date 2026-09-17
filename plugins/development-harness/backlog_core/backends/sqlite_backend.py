@@ -72,6 +72,8 @@ from backlog_core.models import (
     MergeResult,
     PullRequestRef,
     ReferenceCollisionError,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     ViewItemResult,
     reference_is_title_derived,
 )
@@ -839,7 +841,7 @@ class SQLiteBackend:
         return []
 
     @_serialized_connection_operation
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
         """Return statuses for items that have issue numbers.
 
         Args:
@@ -858,7 +860,7 @@ class SQLiteBackend:
             row = self._conn.execute("SELECT status FROM items WHERE issue_number = ?", (num,)).fetchone()
             if row is not None:
                 result[num] = IssueStatus(status=str(row["status"]))
-        return result
+        return StatusFetchResult(statuses=result, attempted=True)
 
     @_serialized_connection_operation
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
@@ -880,7 +882,7 @@ class SQLiteBackend:
         return str(row["status"]) if row is not None else "open"
 
     @_serialized_connection_operation
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> ViewEnrichmentResult:
         """Enrich a ViewItemResult from stored issue data.
 
         Args:
@@ -894,15 +896,15 @@ class SQLiteBackend:
         try:
             num = int(issue_num.lstrip("#"))
         except ValueError:
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True)
         row = self._conn.execute("SELECT * FROM items WHERE issue_number = ?", (num,)).fetchone()
         if row is None:
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True)
         state = str(row["status"])
         result.state = state
         result.body = str(row["body"] or "")
         result.number = num
-        return True
+        return ViewEnrichmentResult(enriched=True, attempted=True)
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
         """Convert an IssueNode to IssueLocalFields.

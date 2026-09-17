@@ -43,7 +43,7 @@ from typing import Literal
 from dispatch_schema import ConflictGroup
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult
+from .models import DispatchSpawnSummary, DispatchWaveSummary, Output, RegisterResult, StatusSource
 
 __all__ = [
     "AccumulatedUsage",
@@ -567,6 +567,25 @@ class BacklogListResponse(FallibleToolResponse):
     match_pages: dict[str, object] | None = None
     """Match token-pagination metadata, present only when ``match_context=True``."""
 
+    status_source: StatusSource | None = None
+    """Provenance of the live status data behind this listing's ``status``
+    values and any ``status=`` filter -- ``"live"``, ``"cache"``, or
+    ``"unavailable"``. See :data:`~backlog_core.models.StatusSource`. Present
+    on full and withheld successful listings; omitted from a healthy minimal
+    ``count_only`` response and absent (``None``) on the error arm."""
+
+    unavailable_capabilities: list[str] | None = None
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_status"]`` when ``status_source == "unavailable"``. Empty list
+    on a healthy call; absent on the error arm."""
+
+    filters_evaluated_against_unavailable_data: list[str] | None = None
+    """Names of requested filter parameters (e.g. ``"status"``) that could
+    not be honestly evaluated against live data this call -- present so a
+    caller can tell a degraded filter result apart from a genuine, confident
+    zero (#3546). Empty list when every active filter was
+    evaluated against live or authoritative cached data."""
+
 
 class CommentEntry(BaseModel):
     """One issue comment, truncated to a preview.
@@ -937,6 +956,16 @@ class BacklogViewResponse(BaseModel):
     body_remaining_lines: int | None = None
     body_total_lines: int | None = None
     section_filter_miss: bool | None = None
+    status_source: StatusSource | None = None
+    """Provenance of this item's live-enrichment data -- ``"live"``,
+    ``"cache"``, or ``"unavailable"``. See
+    :data:`~backlog_core.models.StatusSource`. Declared explicitly here
+    (not inherited) because ``BacklogViewResponse`` does not inherit
+    ``Output``/``ToolResponse`` -- an undeclared key on this model is
+    silently dropped by ``_respond``'s ``extra='ignore'`` (#3546)."""
+    unavailable_capabilities: list[str] | None = None
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``."""
     messages: list[str] | None = None
     warnings: list[str] | None = None
     errors: list[str] | None = None

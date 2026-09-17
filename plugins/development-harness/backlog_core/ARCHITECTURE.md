@@ -100,6 +100,23 @@ Direct dependencies from `operations.py`, `server.py`, or general parsing helper
 
 ## Output Pattern
 
+### Live-read provenance
+
+List and view results carry degradation provenance on their own typed result shapes rather than
+through `Output`. `Output` is a prose message collector, while the result fields are machine-readable
+contract data that every response model and compact/disclosure projection must declare and forward.
+This keeps independently modelled response shapes evolvable without allowing Pydantic's default
+handling of undeclared keys to discard provenance.
+
+`status_source` distinguishes live, cached, mixed, and unavailable status data.
+`unavailable_capabilities` names live capabilities that could not be read. List results also carry
+`filters_evaluated_against_unavailable_data`, which distinguishes a degraded zero from a confident
+zero. Pagination may narrow operation-level provenance to the rows on a page, but it must preserve
+`unavailable` and its capability list when this filter-provenance field is non-empty, including when
+the filtered page contains no rows. A live lookup is unavailable only when the provider reports an
+attempt or inability to attempt; the absence of an identifier means no live lookup was attempted and
+therefore remains a cache-only result.
+
 Functions that previously used `typer.echo()` for status/progress messages must instead use an `Output` object (defined in models.py). Each function that needs to communicate status takes an optional `output: Output | None = None` parameter.
 
 ```python
@@ -640,8 +657,8 @@ provides the `create_backend()` factory plus `get_config()` / `set_config()` / `
 This keeps operations and server code decoupled from provider APIs, native stores, and file-cache
 implementation details.
 
-**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `CredentialAvailabilityProvider`,
-`ContentProvider`, `BranchBackend`, `BacklogConfig`, provider-neutral node types, `create_backend`,
+**Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `ContentProvider`, `BranchBackend`,
+`BacklogConfig`, provider-neutral node types, `create_backend`,
 `get_config`, `set_config`, `reset_config`
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
@@ -649,14 +666,11 @@ implementation details.
   `ContentProvider` and `BranchBackend`.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
-- `CredentialAvailabilityProvider` — optional one-method `has_github_credentials() -> bool`
-  capability. A local, environment-only check (no network access), implemented by `GitHubBackend`
-  so `operations.py` can ask whether a GitHub token is configured through the backend abstraction
-  instead of importing `github_client.resolve_token()` directly, which this module's own
-  "must not import ... provider clients" restriction (below) forbids. Gate on the
-  `supports_github_extras` flag first, then treat `isinstance(backend, CredentialAvailabilityProvider)`
-  as a secondary assertion — the same flag-first pattern documented on `GitHubExtras` and
-  `BranchBackend`.
+- `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic
+  `StatusFetchResult` and `ViewEnrichmentResult` models. Their `attempted` and
+  `unavailable_reason` fields are the sole source for live-read provenance. Credential resolution
+  remains private to the provider; `operations.py` neither imports provider clients nor infers an
+  attempted request from an identifier.
 - `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
 
   ```python

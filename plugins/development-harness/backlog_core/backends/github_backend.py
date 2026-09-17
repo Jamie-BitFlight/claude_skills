@@ -60,6 +60,8 @@ from backlog_core.models import (
     ProviderSnapshot,
     ReconcileRequest,
     ReconcileResult,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     parse_issue_number,
 )
 
@@ -76,7 +78,6 @@ if TYPE_CHECKING:
         BranchInfo,
         GroomedData,
         IssueLocalFields,
-        IssueStatus,
         MergeResult,
         Output,
         PullRequestRef,
@@ -191,8 +192,7 @@ class GitHubBackend:
     def has_github_credentials(self) -> bool:
         """Report whether a GitHub token is configured for this backend.
 
-        Implements ``CredentialAvailabilityProvider`` -- a local,
-        environment-only check that performs no network access. See
+        This provider-private check performs no network access. See
         :func:`backlog_core.gh_client.has_github_credentials` for the exact
         resolution rule.
 
@@ -582,11 +582,11 @@ class GitHubBackend:
         """
         return gh_client.check_open_prs_for_issue(issue_num, repo or self._repo)
 
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
         """Fetch the current status for multiple items in one operation.
 
         Returns:
-            Dict mapping issue_number to IssueStatus model.
+            Provider-owned outcome identifying whether a request was attempted.
 
         Raises:
             GraphQLUnavailableError: When the environment refuses GitHub's
@@ -594,7 +594,9 @@ class GitHubBackend:
                 status", so the refusal reaches the caller rather than
                 disguising itself as that answer.
         """
-        return gh_client.batch_fetch_statuses(items, repo or self._repo)
+        if not self.has_github_credentials():
+            return StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured")
+        return StatusFetchResult(statuses=gh_client.batch_fetch_statuses(items, repo or self._repo), attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
         """Fetch the current status string for a single item.
@@ -604,7 +606,7 @@ class GitHubBackend:
         """
         return gh_client.fetch_item_status(item, repo or self._repo, output)
 
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> ViewEnrichmentResult:
         """Enrich a ViewItemResult with live data from the backend.
 
         Resolves the authoritative agent-managed body (head record + audit comment)
@@ -612,13 +614,20 @@ class GitHubBackend:
         ``gh_client.view_enrich_from_github`` for why the two differ.
 
         Returns:
-            True if enrichment succeeded, False if the issue was not found.
+            Provider-owned outcome identifying whether a request was attempted.
         """
-        return gh_client.view_enrich_from_github(
-            result,
-            issue_num,
-            repo or self._repo,
-            resolve_version=lambda r, o, n, i: self._work_items.work_item_version(r, o, n, i)[0],
+        if not self.has_github_credentials():
+            return ViewEnrichmentResult(
+                attempted=False, enriched=False, unavailable_reason="no GitHub credentials configured"
+            )
+        return ViewEnrichmentResult(
+            enriched=gh_client.view_enrich_from_github(
+                result,
+                issue_num,
+                repo or self._repo,
+                resolve_version=lambda r, o, n, i: self._work_items.work_item_version(r, o, n, i)[0],
+            ),
+            attempted=True,
         )
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
