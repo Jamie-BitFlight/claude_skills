@@ -71,10 +71,26 @@ class ActionResult(BaseModel):
 
 
 class ReconcileExecution(BaseModel):
-    """Durable outcomes reported after an adapter executes a plan."""
+    """Durable outcomes reported after an adapter executes a plan.
+
+    Attributes:
+        cache_results: One outcome per cache action the adapter attempted.
+        patch_results: One outcome per provider patch the adapter attempted
+            to apply.  Absent when ``patches_skipped`` is True -- see that
+            field.
+        patches_skipped: True when the adapter deliberately never attempted
+            ``plan.provider_patches`` at all (a fetch-only reconcile, e.g.
+            ``ReconcileRequest.apply_local_patches=False``), as opposed to
+            attempting them and some failing to produce a result. A queued
+            local mutation this pass could not push is not, by itself, a
+            failed reconciliation of everything else the pass *did*
+            complete (the provider snapshot fetch and the local cache
+            update) -- see ``finalize_reconciliation``.
+    """
 
     cache_results: list[ActionResult] = Field(default_factory=list)
     patch_results: list[PatchResult] = Field(default_factory=list)
+    patches_skipped: bool = False
 
 
 class ReconcileOutcome(BaseModel):
@@ -288,19 +304,48 @@ def reconcile_backlog(
     return plan
 
 
-def finalize_reconciliation(plan: ReconcilePlan, execution: ReconcileExecution) -> ReconcileOutcome:
-    """Convert durable adapter outcomes into counts and checkpoint eligibility.
+def _account_for_patch_outcomes(
+    plan: ReconcilePlan, execution: ReconcileExecution, result: ReconcileResult
+) -> set[str]:
+    """Fold each planned patch's outcome into *result* and report which applied.
+
+    Split out of :func:`finalize_reconciliation` to keep that function's
+    branch count under the project's complexity ceiling; this loop is the
+    only place a planned patch's per-status accounting happens.
+
+    A patch in ``plan.provider_patches`` with no matching entry in
+    ``execution.patch_results`` counts as ``result.skipped_patches`` when
+    ``execution.patches_skipped`` is True (a fetch-only reconcile that never
+    attempted it), and as ``result.failures`` otherwise (an attempted patch
+    the provider never returned an outcome for). Only ``failures`` gates
+    ``advance_snapshot_checkpoint`` -- an intentionally skipped patch must not
+    block the checkpoint from advancing over the snapshot fetch and cache
+    update this pass did complete, while an unexplained missing outcome
+    still must.
+
+    Args:
+        plan: The reconciliation plan whose ``provider_patches`` are being scored.
+        execution: The adapter's durable outcomes for this pass.
+        result: Mutated in place with each patch's outcome.
 
     Returns:
-        Completed outcome counts and the global checkpoint decision.
+        The references of patches whose status was ``"applied"`` -- the
+        checkpoint cache actions gate on this set.
     """
-    result = plan.result.model_copy(deep=True)
     patch_results = {patch.reference: patch for patch in execution.patch_results}
     applied_patches: set[str] = set()
     for patch in plan.provider_patches:
         patch_result = patch_results.get(patch.reference)
         if patch_result is None:
-            result.failures += 1
+            if execution.patches_skipped:
+                # Never attempted -- a fetch-only reconcile intentionally
+                # never called _apply_patches (see ReconcileExecution's
+                # patches_skipped docstring). Distinct from "attempted and
+                # the provider never returned an outcome for it", which stays
+                # a genuine failure below.
+                result.skipped_patches += 1
+            else:
+                result.failures += 1
             continue
         result.patch_results.append(patch_result)
         match patch_result.status:
@@ -313,6 +358,20 @@ def finalize_reconciliation(plan: ReconcilePlan, execution: ReconcileExecution) 
                 result.failures += 1
             case unreachable:
                 assert_never(unreachable)
+    return applied_patches
+
+
+def finalize_reconciliation(plan: ReconcilePlan, execution: ReconcileExecution) -> ReconcileOutcome:
+    """Convert durable adapter outcomes into counts and checkpoint eligibility.
+
+    See :func:`_account_for_patch_outcomes` for how a planned patch missing
+    from ``execution.patch_results`` is scored as a skip versus a failure.
+
+    Returns:
+        Completed outcome counts and the global checkpoint decision.
+    """
+    result = plan.result.model_copy(deep=True)
+    applied_patches = _account_for_patch_outcomes(plan, execution, result)
     cache_results = {(action.key, action.phase): action for action in execution.cache_results}
     updated_keys: set[str] = set()
     eligible_actions = [

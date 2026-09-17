@@ -501,6 +501,21 @@ only runtime component permitted to read or write backlog YAML and cached plan o
   withholds `items`/`count` (both `None`) by default rather than returning an ambiguous empty list —
   see `docs/backend-providers.md`'s "Listing provenance" section (backlog #3546 task A4).
 
+### Snapshot completeness and listing provenance
+
+A synchronization checkpoint proves only that reconciliation reached a provider watermark. It does
+not prove that every local snapshot represented by that watermark remains readable. Snapshot
+enumeration therefore returns every unreadable file or unenumerable directory in `skipped` while
+continuing to return readable siblings. Any non-empty `skipped` value makes the snapshot set
+incomplete, regardless of checkpoint age; listing provenance must withhold an authoritative item
+count unless the caller explicitly accepts cached, low-confidence data.
+
+Cold-cache read-through shares one process-wide sync slot with startup and explicit synchronization.
+Taking that slot atomically captures both the prior lifecycle status and `started_at` under the
+same thread lock that marks the slot running. A failed transient claimant restores only that captured
+snapshot. It must not restore state read before claiming because an intervening synchronization may
+have completed and established a newer start timestamp.
+
 **Reconnect behavior**:
 
 - The owning provider reconciles pending mutations against the last acknowledged provider revision.

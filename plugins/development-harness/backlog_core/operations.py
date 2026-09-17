@@ -93,7 +93,7 @@ from .rendering import heading_to_unknown_key, unknown_key_to_heading as _recons
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
@@ -1819,6 +1819,7 @@ def refresh_local_cache_from_github(
     output: Output | None = None,
     full_refresh: bool = False,
     progress_callback: Callable[[int, int | None], None] | None = None,
+    apply_local_patches: bool = True,
 ) -> dict[str, int | list[str]]:
     """Reconcile provider items through the configured backend.
 
@@ -1830,6 +1831,8 @@ def refresh_local_cache_from_github(
             incremental snapshot.
         progress_callback: Optional callable invoked after each issue is
             reconciled. Receives ``(items_done, items_total)``.
+        apply_local_patches: Whether reconciliation may push queued local
+            mutations to the provider.
 
     Returns:
         Dict with count of refreshed (open) issues, count of reconciled
@@ -1848,7 +1851,9 @@ def refresh_local_cache_from_github(
         if label and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
         else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
     )
-    result = backend.reconcile(ReconcileRequest(scope=scope, label=label or "", references=references))
+    result = backend.reconcile(
+        ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
+    )
     if progress_callback is not None:
         progress_callback(result.fetched_items, result.fetched_items)
     out.info(
@@ -2059,6 +2064,37 @@ def _build_list_entry(
     return entry
 
 
+def read_through_cold_cache(repo: str, output: Output) -> None:
+    """Attempt one fetch-only, unlabeled refresh for a never-synced cache."""
+    sync_state = get_sync_state()
+    previous_sync_state = sync_state.try_claim()
+    if previous_sync_state is None:
+        output.info(
+            "  A background sync is already in progress; skipping the implicit "
+            "read-through for this never-synced cache rather than starting a second one."
+        )
+        return
+    succeeded = False
+    try:
+        # A label-scoped reconcile cannot establish the global snapshot checkpoint.
+        refresh_local_cache_from_github(repo, None, output=output, apply_local_patches=False)
+        succeeded = True
+    except (
+        GithubException,
+        BackendUnavailableError,
+        CacheStateCorruptError,
+        ContentUnavailableError,
+        OSError,
+        *RETRYABLE_TRANSIENT_EXCEPTIONS,
+    ) as exc:
+        output.warn(f"  WARNING: Could not refresh the never-synced local cache: {exc}")
+    finally:
+        if succeeded:
+            sync_state.complete_claim()
+        else:
+            sync_state.release_claim(previous_sync_state)
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2159,20 +2195,18 @@ def list_items(
         # this cache once it has synced. It is not the same cost as probing
         # on every list regardless of cache state (rejected in
         # A-critique.md Sec 6.2): a healthy repeat call never re-fetches.
-        # A failed attempt (no token, offline, still refused) is swallowed
-        # here -- an implicit read-through a caller did not ask for must
-        # never turn an unaware listing into a hard error -- and the
-        # existing "cache holds no items" warning below still fires,
-        # unchanged, since the checkpoint is honestly still None. The
+        # A failed attempt (no token, offline, still refused) is reduced to
+        # a warning here -- an implicit read-through a caller did not ask for
+        # must never turn an unaware listing into a hard error -- but the
+        # low-confidence gate below still withholds the cached listing unless
+        # the caller explicitly passes allow_cached=True. The existing "cache
+        # holds no items" warning also fires since the checkpoint remains None. The
         # checkpoint staying None also means a *later* list_items() call
         # against a cache that never manages to sync tries again -- one
         # attempt per call, never a retry loop within one -- which the
         # critique frames as complementary, not a defect: "we tried and
         # could not" is a sharper answer than "we never tried".
-        try:
-            refresh_local_cache_from_github(repo, label, output=out)
-        except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
-            out.warn(f"  WARNING: Could not refresh the never-synced local cache: {e}")
+        read_through_cold_cache(repo, out)
     items = get_config().backend.list_work_items()
 
     # backlog #3546 task A4: two independent, provenance-flavored bits
