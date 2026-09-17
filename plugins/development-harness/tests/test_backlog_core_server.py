@@ -704,7 +704,15 @@ async def test_backlog_list_withheld_listing_carries_provenance_with_null_items(
     Why: an unaware caller must not be able to mistake a withheld listing for
         a confirmed-empty one.
     """
-    op_result = {"items": None, "count": None, "from_cache": True, "has_pending_writes": False}
+    op_result = {
+        "items": None,
+        "count": None,
+        "from_cache": True,
+        "has_pending_writes": False,
+        "status_source": "cache",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
     with patch("dh_core.operations.list_items", return_value=op_result):
         response = await _call("backlog_list", {})
 
@@ -712,6 +720,29 @@ async def test_backlog_list_withheld_listing_carries_provenance_with_null_items(
     assert "count" not in response
     assert response["from_cache"] is True
     assert response["has_pending_writes"] is False
+    assert response["status_source"] == "cache"
+    assert response["unavailable_capabilities"] == []
+    assert response["filters_evaluated_against_unavailable_data"] == []
+
+
+async def test_backlog_list_pagination_reports_current_page_status_source():
+    """A mixed unpaged result narrows to live when the page contains only a numeric issue row."""
+    op_result = {
+        "items": [
+            {"issue": "#1", "title": "Live", "status": "open"},
+            {"issue": "", "title": "Backend owned", "status": "open"},
+        ],
+        "count": 2,
+        "from_cache": False,
+        "has_pending_writes": False,
+        "status_source": "mixed",
+        "unavailable_capabilities": [],
+        "filters_evaluated_against_unavailable_data": [],
+    }
+    with patch("dh_core.operations.list_items", return_value=op_result):
+        response = await _call("backlog_list", {"limit": 1})
+
+    assert response["status_source"] == "live"
 
 
 async def test_backlog_list_backend_reachable_message_format():

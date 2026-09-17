@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backend_protocol import get_config
-from backlog_core.models import ReconcileRequest, ReconcileResult, ReconcileScope, Section
+from backlog_core.models import IssueStatus, ReconcileRequest, ReconcileResult, ReconcileScope, Section
 from backlog_core.server import mcp
 
 from tests.helpers import call_mcp_tool
@@ -93,10 +93,7 @@ class TestWorkBacklogItem:
     # Scenario 2: list always includes GitHub status fields
     async def test_list_includes_status_fields(self, backlog_dir, mock_github, write_test_item):
         write_test_item("Status Test Item", issue="#10")
-        status_mock = MagicMock()
-        status_mock.status = "open"
-        status_mock.milestone = "v1.0"
-        mock_github["batch_fetch_statuses"].return_value = {10: status_mock}
+        mock_github["batch_fetch_statuses"].return_value = {10: IssueStatus(status="open", milestone="v1.0")}
 
         result = await _call("backlog_list", {})
 
@@ -425,13 +422,10 @@ class TestGroupItemsToMilestone:
         write_test_item("Milestone Item B", priority="P1", issue="#11")
         write_test_item("Milestone Item C", priority="P2")
 
-        status_10 = MagicMock()
-        status_10.status = "open"
-        status_10.milestone = "v1.0"
-        status_11 = MagicMock()
-        status_11.status = "open"
-        status_11.milestone = ""
-        mock_github["batch_fetch_statuses"].return_value = {10: status_10, 11: status_11}
+        mock_github["batch_fetch_statuses"].return_value = {
+            10: IssueStatus(status="open", milestone="v1.0"),
+            11: IssueStatus(status="open", milestone=""),
+        }
 
         result = await _call("backlog_list", {})
 

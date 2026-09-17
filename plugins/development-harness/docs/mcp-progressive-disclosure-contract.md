@@ -85,7 +85,8 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 ## NavigateResponse Shape
 
 `navigate=<ordinal>` (without `head`) returns a `NavigateResponse`
-(`disclosure_types.py`, `NavigateResponse` dataclass):
+(`disclosure_types.py`, `NavigateResponse` — a frozen Pydantic `BaseModel`, not a dataclass; see
+"Degradation and Diagnostic Fields" below):
 
 | Field          | Type          | Description                                                                              |
 |----------------|---------------|------------------------------------------------------------------------------------------|
@@ -98,6 +99,24 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 | `has_children` | `bool`        | `True` iff the node has sub-heading children. `False` for code-only nodes.              |
 | `struck`       | `bool`        | `True` iff the ordinal addresses a struck (retracted) entry, or a descendant of one.    |
 | `entry_id`     | `str`         | Stable identifier of the owning entry. `""` for level-1 section ordinals (no dot).      |
+| `messages`     | `list[str]`   | Informational messages from the underlying read. Always present, defaults to `[]`.      |
+| `warnings`     | `list[str]`   | Degradation warnings from the underlying read (e.g. a refused live-enrichment lookup). Always present, defaults to `[]`. |
+| `errors`       | `list[str]`   | Non-fatal error messages from the underlying read. Always present, defaults to `[]`.    |
+
+### Degradation and Diagnostic Fields
+
+`messages`, `warnings`, and `errors` are forwarded from the underlying `operations.view_item()`
+call's `Output` collector, so a degraded read (for example a refused live-enrichment lookup)
+surfaces on every NAVIGATE response instead of being silently discarded. The fields are always
+present and default to an empty list when the underlying read produced no diagnostics — absence
+of entries, not absence of the fields, signals a clean read. An agent should inspect `warnings`
+before treating returned content as authoritative, the same way it would for a PASSTHROUGH
+response.
+
+`NavigateResponse` (and `MapResponse`/`BoundedResponse`, used by the other disclosure modes) are
+frozen Pydantic `BaseModel` subclasses, per this repo's "structured data → Pydantic, not
+dataclass/TypedDict" convention, defined in
+[`../backlog_core/disclosure_types.py`](../backlog_core/disclosure_types.py).
 
 ---
 
@@ -242,6 +261,38 @@ content: "[struck:2026-08-23T11:49:14.766159Z]\nRT-ICA Snapshot: ...\n\nRT-ICA F
 
 The marker precedes only the struck entry's own text — the live entry's text carries no marker
 anywhere.
+
+---
+
+## Generic Backend Error
+
+Every failure raised while executing a MAP, NAVIGATE, or EXTRACT request that is not an ordinal
+miss or a section-filter miss — a missing backlog item, a refused GraphQL/REST lookup, an
+unsupported backend capability, or any other `BacklogError` subclass — is caught at the same site
+and returns a small, generic error shape:
+
+```text
+{
+  "error": "No item found for: #99999",
+  "error_type": "ItemNotFoundError"
+}
+```
+
+`error` is the exception's rendered message (`str(exc)`). `error_type` is the raised exception's
+class name (`type(exc).__name__`), giving the caller a stable identity to branch on instead of
+parsing the free-text message — `BacklogError` has multiple subclasses (`ItemNotFoundError`,
+`EntryNotFoundError`, `CacheStateCorruptError`, and others defined in
+[`../backlog_core/models.py`](../backlog_core/models.py)), and prior to this field every one of
+them flattened to the same bare `{"error": str(exc)}`, discarding which failure actually occurred.
+
+This generic shape does not replace the ordinal-miss or section-miss shapes: `OrdinalNotFoundError`
+keeps its own `valid_ordinals` field, and the legacy section-filter miss keeps its own
+`valid_sections`/`suggestion` fields. A caller that needs to distinguish "ordinal not found" from
+"item not found" from "backend refused the lookup" should check for `valid_ordinals` or
+`valid_sections` first, then fall back to `error_type` for every other `BacklogError` subclass.
+
+Implemented in
+[`../backlog_core/server.py`](../backlog_core/server.py)'s `_execute_disclosure_or_passthrough`.
 
 ---
 

@@ -470,9 +470,8 @@ max-complexity = 12
 ]
 # Network error handling tests need genuine requests exception instances for test scenarios
 "**/tests/test_backlog_core_github.py" = ["banned-api"]
-# Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
-# requests exception instance to verify exact-type matching in the except clause.
 "**/tests/test_backlog_core_operations.py" = ["banned-api"]
+"**/tests/test_open_pr_search_failure.py" = ["banned-api"]
 # Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
 # (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy linters would remove the seeded defects the experiment measures.

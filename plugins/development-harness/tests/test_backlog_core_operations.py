@@ -18,6 +18,7 @@ from backlog_core.backend_types import SyncProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
+    BackendUnavailableError,
     BacklogConfig,
     BacklogItem,
     BacklogItemMetadata,
@@ -351,6 +352,56 @@ class TestAddItemCreatesLocalFile:
 
         assert issue_num == 271
         assert _stored_item(reference).title == "fix: Backfill target item"
+
+    def test_backfill_issue_creation_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A configured provider failure is visible when local fallback continues."""
+        item = BacklogItem(title="Backfill")
+        output = Output()
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("rate limited"))
+
+        assert ops._create_issue_and_update_item(item, repo="owner/repo", output=output) is None
+        assert output.warnings == ["  WARNING: Issue creation skipped because GitHub is unavailable: rate limited"]
+
+    def test_title_update_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A local title update discloses that its linked GitHub write was skipped."""
+        item = BacklogItem(title="Old", issue="#42")
+        output = Output()
+        mocker.patch("backlog_core.operations.update_item_metadata")
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("transport failed"))
+
+        assert ops._rename_item_title(item, "New", repo="owner/repo", output=output) is True
+        assert output.warnings == [
+            "  WARNING: Could not update issue #42 title because GitHub is unavailable: transport failed"
+        ]
+
+    def test_plan_update_reports_provider_unavailability(self, mocker: MockerFixture) -> None:
+        """A local plan update discloses that its linked GitHub comment was skipped."""
+        item = BacklogItem(title="Item", issue="#42")
+        output = Output()
+        mocker.patch("backlog_core.operations.update_item_metadata")
+        mocker.patch("backlog_core.operations.try_get_github", side_effect=BackendUnavailableError("server error"))
+
+        assert ops._apply_plan_to_item(item, "P42", repo="owner/repo", output=output) is True
+        assert output.warnings == [
+            "  WARNING: Could not post plan to issue #42 because GitHub is unavailable: server error"
+        ]
+
+    def test_view_forwards_enrichment_fallback_warning_to_output(self, mocker: MockerFixture) -> None:
+        """An authoritative-body fallback warning reaches progressive-disclosure callers."""
+        _seed_items([BacklogItem(title="Item", section="P1", issue="#42")])
+        output = Output()
+
+        def enrich(result: ViewItemResult, _issue_num: str, _repo: str = "") -> bool:
+            result.body = "Raw issue body"
+            result.warnings.append("authoritative body unavailable; using raw issue body")
+            return True
+
+        mocker.patch("backlog_core.operations.view_enrich_from_github", side_effect=enrich)
+
+        result = view_item("#42", output=output)
+
+        assert output.warnings == ["authoritative body unavailable; using raw issue body"]
+        assert result.warnings == output.warnings
 
     def test_sync_create_missing_issues_persists_type_prefixed_title(self, mocker: MockerFixture) -> None:
         """Verify sync_create_missing_issues persists the type-prefixed title too (#2963).
@@ -1184,17 +1235,23 @@ class TestListItemsFiltering:
         assert items[0]["milestone"] == "v2"
 
     def test_list_items_always_calls_batch_fetch(self, mocker: MockerFixture) -> None:
-        """Verify list_items always calls batch_fetch_statuses to populate status fields.
+        """Verify list_items calls batch_fetch_statuses to populate status fields.
 
-        Tests: batch_fetch_statuses is always called regardless of filter parameters.
+        Tests: batch_fetch_statuses is called regardless of filter parameters, for a
+            page that has at least one numeric-issue item to look up.
         How: Call list_items with no status filter; assert batch fetch was called.
         Why: Status fields (status, milestone) are always included in every response —
-             batch_fetch must always run to populate them.
+             batch fetch must run to populate them for numeric-issue items. A page with
+             no numeric issue reference at all is deliberately skipped instead (#3546,
+             Codex review on PR #3577) -- see
+             ``test_status_source_field.py::test_no_numeric_issue_references_reports_cache_not_live``
+             for that distinct case -- so this item is given an issue reference to keep
+             exercising the "must run" path this test names.
         """
         import backlog_core.models as models
 
         fake_dir: Path = models.get_backlog_dir()
-        _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item")
+        _write_item(fake_dir, title="No Status Item", priority="P2", topic="no-status-item", issue="#1")
         mock_batch = mocker.patch("backlog_core.operations.batch_fetch_statuses", return_value={})
 
         list_items(refresh=False)
@@ -1935,17 +1992,23 @@ class TestViewItem:
         mock_enrich.assert_called_once()
         assert mock_enrich.call_args.args[1] == "999"
 
-    def test_view_item_refresh_true_no_identifier_appends_warning_without_call(self, mocker: MockerFixture) -> None:
-        """Cached item with no resolvable id + refresh=True appends a warning, no call, no raise.
+    def test_view_item_refresh_true_no_identifier_appends_no_warning_without_call(self, mocker: MockerFixture) -> None:
+        """Cached item with no resolvable id + refresh=True: no call, no warning, no raise.
 
-        Tests: view_item's guard against calling enrich with no identifier at all.
+        Tests: view_item's guard against calling enrich with no identifier at all,
+             and (#3546 B6) that "nothing was tried" does not render identically to
+             "the backend refused us".
         How: Write a local item with no issue number set; call view_item by title
              with refresh=True; assert enrich was never called, no exception was
-             raised, and the "GitHub lookup failed" warning was appended.
+             raised, and no "backend unreachable" warning was appended — nothing
+             was ever attempted, so there is nothing to warn about.
         Why: _live_lookup_id() must never return an empty string, and its None
-             return means the caller has no identifier to send to the backend —
-             the correct outcome is a warning, not a crash or a call with an
-             invalid argument.
+             return means the caller has no identifier to send to the backend.
+             Previously this rendered the same "backend unreachable" warning as a
+             genuine attempted-and-failed live check; the
+             corrected behaviour distinguishes "not attempted" from "attempted and
+             failed" (see status_source == "cache" in test_status_source_wire.py
+             and backlog_core/tests/test_refusal_not_item_missing.py).
         """
         import backlog_core.models as models
 
@@ -1956,10 +2019,9 @@ class TestViewItem:
         result = view_item("No Identifier Item", refresh=True)
 
         mock_enrich.assert_not_called()
-        assert (
-            "GitHub lookup failed (authentication failure, rate limit, GitHub server error, "
-            "or issue not found) — sections_index reflects provider-backed record, may be stale" in result.warnings
-        )
+        assert result.warnings == []
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
 
 
 # ---------------------------------------------------------------------------

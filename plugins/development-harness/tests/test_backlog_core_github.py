@@ -52,6 +52,7 @@ from backlog_core.models import (
     BacklogItem,
     ContentConflictError,
     ContentUnavailableError,
+    GitHubUnavailableError,
     Output,
     ViewItemResult,
 )
@@ -394,20 +395,22 @@ class TestParseSearchPrNode:
 class TestIsNotFoundError:
     """Tests for _is_not_found_error() helper.
 
-    Tests: _is_not_found_error correctly classifies BacklogError as not-found.
-    Why: 404-equivalent detection drives graceful degradation in public functions
-         that must distinguish 'resource absent' from 'API failure'.
+    Tests: _is_not_found_error structurally matches only the exact
+           issue-not-found message _fetch_issue_graphql synthesizes.
+    Why: 404-equivalent detection drives graceful degradation in public
+         functions that must distinguish "issue absent" from "API failure"
+         or "repository absent" — see #3570 Findings A and B.
     """
 
-    def test_could_not_resolve_message_returns_true(self) -> None:
-        """_is_not_found_error returns True for 'Could not resolve' error messages.
+    def test_genuine_issue_not_found_message_returns_true(self) -> None:
+        """_is_not_found_error returns True for the exact synthesized message.
 
-        Tests: _is_not_found_error GraphQL not-found pattern
-        How: Create BacklogError with 'Could not resolve to ...' message.
-        Why: This is the exact phrase GitHub GraphQL returns for 404-equivalent errors.
+        Tests: _is_not_found_error genuine issue-not-found match
+        How: Pass _fetch_issue_graphql's own synthesized not-found message.
+        Why: This is the only message this predicate exists to detect.
         """
         # Arrange
-        error = BacklogError("GraphQL error: Could not resolve to an Issue with the number 999")
+        error = BacklogError("GraphQL error: Could not resolve to issue #42")
 
         # Act
         result = _is_not_found_error(error)
@@ -415,15 +418,16 @@ class TestIsNotFoundError:
         # Assert
         assert result is True
 
-    def test_not_found_message_returns_true(self) -> None:
-        """_is_not_found_error returns True for messages containing 'not found'.
+    def test_matching_is_case_insensitive(self) -> None:
+        """_is_not_found_error matches regardless of message casing.
 
-        Tests: _is_not_found_error not-found phrase matching
-        How: Create BacklogError with 'not found' in message.
-        Why: Some operations surface this phrase in their error messages.
+        Tests: _is_not_found_error case-insensitive prefix match
+        How: Pass the synthesized message with alternate casing.
+        Why: BacklogError's str() is not guaranteed to preserve a single case
+             convention across call sites; the match must not be case-brittle.
         """
         # Arrange
-        error = BacklogError("issue not found")
+        error = BacklogError("GRAPHQL ERROR: COULD NOT RESOLVE TO ISSUE #7")
 
         # Act
         result = _is_not_found_error(error)
@@ -462,6 +466,72 @@ class TestIsNotFoundError:
 
         # Assert
         assert result is False
+
+    def test_repository_not_found_message_returns_false(self) -> None:
+        """_is_not_found_error returns False for a repository-not-found error.
+
+        Tests: _is_not_found_error repository-miss negative case (#3570 Finding A)
+        How: Pass GitHub's actual GraphQL error text for an inaccessible or
+             nonexistent repository — verified against
+             https://github.com/cli/cli/issues/3591 — which contains 'could
+             not resolve' but does not start with the exact issue-not-found
+             prefix.
+        Why: A missing/inaccessible repository is a different failure from a
+             missing issue — bad/inaccessible repo, not "this issue does not
+             exist". A loose 'could not resolve' substring match made
+             view_item("#N") raise ItemNotFoundError for the issue instead of
+             preserving the repository/access failure as
+             GitHubUnavailableError.
+        """
+        # Arrange
+        error = BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'.")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is False
+
+    def test_repository_name_containing_issue_substring_returns_false(self) -> None:
+        """_is_not_found_error returns False even when the repo name contains 'issue'.
+
+        Tests: _is_not_found_error repository-name-substring negative case (#3570 Finding B)
+        How: Pass a repository-not-found error where the repository name
+             itself contains the literal substring "issue" (e.g.
+             'owner/issue-tracker').
+        Why: A prior fix required the word 'issue' alongside a not-found
+             phrase, which still matched by accident whenever the repository
+             or owner identifier happened to contain "issue" anywhere in its
+             name — a structurally unrelated failure. The exact synthesized
+             prefix this predicate now checks names the resource as
+             'issue #<N>', not a repository, so no repository or owner name
+             can spuriously satisfy it.
+        """
+        # Arrange
+        error = BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/issue-tracker'.")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is False
+
+    def test_issue_not_found_message_with_extra_whitespace_still_returns_true(self) -> None:
+        """_is_not_found_error tolerates incidental leading/trailing whitespace.
+
+        Tests: _is_not_found_error whitespace-tolerant prefix match
+        How: Pass the synthesized message with surrounding whitespace.
+        Why: str(error) callers should not have to guarantee an exact-trimmed
+             message; the predicate strips before matching.
+        """
+        # Arrange
+        error = BacklogError("  GraphQL error: Could not resolve to issue #999  ")
+
+        # Act
+        result = _is_not_found_error(error)
+
+        # Assert
+        assert result is True
 
 
 # ---------------------------------------------------------------------------
@@ -1253,16 +1323,53 @@ class TestViewEnrichFromGithub:
         # Assert
         assert enriched is False
 
-    def test_returns_false_on_backlog_error(self, mocker: MockerFixture) -> None:
-        """view_enrich_from_github returns False when _graphql_request raises BacklogError.
+    def test_raises_github_unavailable_on_backlog_error(self, mocker: MockerFixture) -> None:
+        """view_enrich_from_github raises GitHubUnavailableError when _graphql_request raises BacklogError.
 
         Tests: view_enrich_from_github error handling
         How: Raise BacklogError from _graphql_request.
-        Why: Errors must not crash the view command; False is the correct signal.
+        Why: A genuine query failure is not "issue #999 does not exist" (#3546)
+            — False used to mean both, so it is raised instead and the caller
+            (view_item's existing except BackendUnavailableError) decides.
+
+        The message deliberately avoids _is_not_found_error's "not found" /
+        "could not resolve" markers (#3570 Finding 1) — a message that does
+        match those markers is a genuine issue-not-found signal and must
+        return False instead, per test_returns_false_on_genuine_not_found
+        below; this test is only about failures that are not that case.
         """
         # Arrange
         mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
-        mocker.patch("backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: not found"))
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request", side_effect=BacklogError("GraphQL error: rate limit exceeded")
+        )
+        result = ViewItemResult()
+
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError):
+            view_enrich_from_github(result, "999")
+
+    def test_returns_false_on_genuine_not_found(self, mocker: MockerFixture) -> None:
+        """view_enrich_from_github returns False when the issue genuinely does not exist.
+
+        Tests: view_enrich_from_github not-found detection (#3570 Finding 1
+        regression). The prior blanket ``except (BacklogError, GithubException):
+        raise GitHubUnavailableError`` this file's #3546 fix introduced folded
+        _fetch_issue_graphql's own "Could not resolve to issue" 404-equivalent
+        BacklogError into the same GitHubUnavailableError as every other
+        failure, which made view_item("#999") report "GitHub is unavailable"
+        for an issue that simply does not exist instead of raising
+        ItemNotFoundError.
+        How: Raise the exact BacklogError _fetch_issue_graphql raises for a
+            missing issue from _graphql_request.
+        Why: A reachable repository confirming absence is not an outage.
+        """
+        # Arrange
+        mocker.patch("backlog_core.gh_client.try_get_github", return_value=_make_mock_repo(mocker))
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #999"),
+        )
         result = ViewItemResult()
 
         # Act
@@ -1323,6 +1430,9 @@ class TestViewEnrichFromGithub:
         # Assert
         assert enriched is True
         assert result.body == "Raw human-owned body"
+        assert result.warnings == [
+            (f"Authoritative GitHub work-item body unavailable ({error}); using the raw issue body, which may be stale")
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -1331,10 +1441,17 @@ class TestViewEnrichFromGithub:
 
 
 class TestTryGetGithub:
-    """try_get_github returns None gracefully when GitHub is unavailable.
+    """try_get_github returns None only for the config state; it raises for a real failure.
 
-    Tests: try_get_github returns None on missing token or GithubException.
-    Why: All callers that use try_get_github must handle None safely.
+    Tests: try_get_github returns None on a missing token, and raises
+        GitHubUnavailableError on a GithubException from get_repo.
+    Why: A missing token is a configuration state a caller may legitimately
+        fall back on. A GithubException from get_repo (network error, rate
+        limit, 5xx) is a genuine failure that must not collapse into the same
+        None — that indistinguishability was #3546's bug: it made a real
+        outage look identical to "GitHub is not configured here". Callers for
+        whom the old blanket local-only fallback is still correct must catch
+        GitHubUnavailableError explicitly.
     """
 
     def test_returns_none_when_no_token(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1400,69 +1517,57 @@ class TestTryGetGithub:
         assert [record.levelno for record in records] == [logging.WARNING]
         assert records[0].exc_info is None
 
-    def test_returns_none_on_github_exception(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when PyGithub raises GithubException.
+    def test_raises_github_unavailable_on_github_exception(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """try_get_github raises GitHubUnavailableError when PyGithub raises GithubException.
 
         Tests: try_get_github API failure handling
         How: Patch the shared client factory so its client's get_repo raises GithubException.
-        Why: Auth failures and network errors must not crash callers.
+        Why: A genuine API failure (auth revoked mid-session, network error, rate
+            limit, 5xx) is not the same condition as no token configured, and
+            silently returning None for both hid that #3546 was fixing.
         """
         # Arrange
         from github import GithubException
 
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = GithubException(
-            status=401, data="Bad credentials", headers={}
-        )
+        underlying = GithubException(status=401, data="Bad credentials", headers={})
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = underlying
 
-        # Act
-        result = try_get_github("test-owner/test-repo")
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError) as exc_info:
+            try_get_github("test-owner/test-repo")
+        assert exc_info.value.__cause__ is underlying
 
-        # Assert
-        assert result is None
+    def test_raises_github_unavailable_on_transport_exception(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """try_get_github raises GitHubUnavailableError when get_repo raises a transport exception.
 
-    def test_returns_none_on_connection_error(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when the transport raises ConnectionError.
-
-        Tests: try_get_github network-failure handling (defect: the docstring
-        promises None for "no token, network error, etc." but the implementation
-        only caught GithubException, so a raw ConnectionError escaped).
-        How: Mock make_github_client to return a repo object whose get_repo raises ConnectionError.
-        Why: Callers (gh_client.probe_backend_status, gh_client.batch_fetch_statuses,
-        backends/github_backend.py) treat None as "fall back to local-only" and
-        do not expect try_get_github to ever raise.
+        Tests: try_get_github transport failure handling
+        How: Patch the shared client factory so its client's get_repo raises
+            ``requests.exceptions.ConnectionError`` — one of sync_state.py's
+            RETRYABLE_TRANSIENT_EXCEPTIONS — instead of a GithubException.
+        Why: PyGithub's requester raises a transport exception directly, not a
+            GithubException, when get_repo fails before an HTTP response is
+            received at all (a dropped connection). That case bypassed the
+            GithubException-only handling this session's B1 work added, so a
+            network outage would crash callers instead of degrading to the
+            same GitHubUnavailableError/cache-fallback path a GithubException
+            failure already triggers (Codex review on PR #3570).
         """
         # Arrange
+        import requests
+
         monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mock_repo = mocker.MagicMock()
-        mock_repo.get_repo.side_effect = requests.exceptions.ConnectionError("network blocked (proxy or firewall)")
-        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
+        underlying = requests.exceptions.ConnectionError("Connection refused")
+        mocker.patch("backlog_core.gh_client.make_github_client").return_value.get_repo.side_effect = underlying
 
-        # Act
-        result = try_get_github("test-owner/test-repo")
-
-        # Assert
-        assert result is None
-
-    def test_returns_none_on_timeout(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """try_get_github returns None when the transport raises Timeout.
-
-        Tests: try_get_github network-failure handling (defect: only
-        GithubException was caught, so requests.exceptions.Timeout escaped).
-        How: Mock make_github_client to return a repo object whose get_repo raises Timeout.
-        Why: Same fallback contract as the ConnectionError case above.
-        """
-        # Arrange
-        monkeypatch.setenv("GITHUB_TOKEN", "fake-token")
-        mock_repo = mocker.MagicMock()
-        mock_repo.get_repo.side_effect = requests.exceptions.Timeout("request timed out")
-        mocker.patch("backlog_core.gh_client.make_github_client", return_value=mock_repo)
-
-        # Act
-        result = try_get_github("test-owner/test-repo")
-
-        # Assert
-        assert result is None
+        # Act / Assert
+        with pytest.raises(GitHubUnavailableError) as exc_info:
+            try_get_github("test-owner/test-repo")
+        assert exc_info.value.__cause__ is underlying
 
 
 # ---------------------------------------------------------------------------

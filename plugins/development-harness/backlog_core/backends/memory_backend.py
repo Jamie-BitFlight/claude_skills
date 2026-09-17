@@ -58,6 +58,8 @@ from backlog_core.models import (
     MergeResult,
     PullRequestRef,
     ReferenceCollisionError,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     ViewItemResult,
     reference_is_title_derived,
 )
@@ -437,7 +439,7 @@ class InMemoryBackend:
         """Return empty list — in-memory backend has no pull requests."""
         return []
 
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
         """Return statuses for items that have issue numbers."""
         result: dict[int, IssueStatus] = {}
         for item in items:
@@ -448,7 +450,7 @@ class InMemoryBackend:
             issue = self._issues.get(num)
             if issue is not None:
                 result[num] = IssueStatus(status=issue["state"].lower())
-        return result
+        return StatusFetchResult(statuses=result, attempted=True)
 
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str:
         """Return the status string for a single item."""
@@ -459,19 +461,19 @@ class InMemoryBackend:
         issue = self._issues.get(num)
         return issue["state"].lower() if issue is not None else "open"
 
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> ViewEnrichmentResult:
         """Enrich a ViewItemResult from stored issue data."""
         try:
             num = int(issue_num.lstrip("#"))
         except ValueError:
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True)
         issue = self._issues.get(num)
         if issue is None:
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True)
         result.state = issue["state"].lower()
         result.body = issue["body"]
         result.number = issue["number"]
-        return True
+        return ViewEnrichmentResult(enriched=True, attempted=True)
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
         """Convert an IssueNode to IssueLocalFields."""

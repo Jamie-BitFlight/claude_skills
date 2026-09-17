@@ -100,6 +100,23 @@ Direct dependencies from `operations.py`, `server.py`, or general parsing helper
 
 ## Output Pattern
 
+### Live-read provenance
+
+List and view results carry degradation provenance on their own typed result shapes rather than
+through `Output`. `Output` is a prose message collector, while the result fields are machine-readable
+contract data that every response model and compact/disclosure projection must declare and forward.
+This keeps independently modelled response shapes evolvable without allowing Pydantic's default
+handling of undeclared keys to discard provenance.
+
+`status_source` distinguishes live, cached, mixed, and unavailable status data.
+`unavailable_capabilities` names live capabilities that could not be read. List results also carry
+`filters_evaluated_against_unavailable_data`, which distinguishes a degraded zero from a confident
+zero. Pagination may narrow operation-level provenance to the rows on a page, but it must preserve
+`unavailable` and its capability list when this filter-provenance field is non-empty, including when
+the filtered page contains no rows. A live lookup is unavailable only when the provider reports an
+attempt or inability to attempt; the absence of an identifier means no live lookup was attempted and
+therefore remains a cache-only result.
+
 Functions that previously used `typer.echo()` for status/progress messages must instead use an `Output` object (defined in models.py). Each function that needs to communicate status takes an optional `output: Output | None = None` parameter.
 
 ```python
@@ -209,7 +226,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
 - `DuplicateItemError(duplicates)` — content-based duplicate detected
-- `GitHubUnavailableError` — GITHUB_TOKEN missing from the environment; retries only after a token is set
+- `GitHubUnavailableError` — GitHub credentials are missing, or authenticated API/transport access failed
 - `ValidationError` — input validation failure
 
 ---
@@ -641,14 +658,19 @@ This keeps operations and server code decoupled from provider APIs, native store
 implementation details.
 
 **Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `ContentProvider`, `BranchBackend`,
-`BacklogConfig`, provider-neutral node types, `create_backend`, `get_config`, `set_config`,
-`reset_config`
+`BacklogConfig`, provider-neutral node types, `create_backend`,
+`get_config`, `set_config`, `reset_config`
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
   contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
   `ContentProvider` and `BranchBackend`.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
+- `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic
+  `StatusFetchResult` and `ViewEnrichmentResult` models. Their `attempted` and
+  `unavailable_reason` fields are the sole source for live-read provenance. Credential resolution
+  remains private to the provider; `operations.py` neither imports provider clients nor infers an
+  attempted request from an identifier.
 - `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
 
   ```python

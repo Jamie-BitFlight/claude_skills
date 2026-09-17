@@ -801,9 +801,10 @@ def test_view_enrich_from_github_populates_result_fields() -> None:
     backend = BeadsBackend(runner=runner)
     result = ViewItemResult(title="", status="", state="", source="")
 
-    success = backend.view_enrich_from_github(result, "bd-a3f8")
+    outcome = backend.view_enrich_from_github(result, "bd-a3f8")
 
-    assert success is True
+    assert outcome.enriched is True
+    assert outcome.attempted is True
     runner.run_json.assert_called_once_with(["show", "bd-a3f8"])
     assert result.status == "open"
     assert result.state == "open"
@@ -827,9 +828,11 @@ def test_view_enrich_from_github_returns_false_on_bd_invocation_error() -> None:
     backend = BeadsBackend(runner=runner)
     result = ViewItemResult(title="cached title", status="unknown", state="open", source="")
 
-    success = backend.view_enrich_from_github(result, "bd-a3f8")
+    outcome = backend.view_enrich_from_github(result, "bd-a3f8")
 
-    assert success is False
+    assert outcome.enriched is False
+    assert outcome.attempted is True
+    assert outcome.unavailable_reason == "bd show exited 1"
     # result must be left untouched on failure
     assert result.title == "cached title"
     assert result.status == "unknown"
@@ -849,9 +852,11 @@ def test_view_enrich_from_github_returns_false_on_bd_not_installed() -> None:
     backend = BeadsBackend(runner=runner)
     result = ViewItemResult(title="", status="", state="", source="")
 
-    success = backend.view_enrich_from_github(result, "bd-a3f8")
+    outcome = backend.view_enrich_from_github(result, "bd-a3f8")
 
-    assert success is False
+    assert outcome.enriched is False
+    assert outcome.attempted is True
+    assert outcome.unavailable_reason == "bd not found"
 
 
 @pytest.mark.unit
@@ -867,9 +872,9 @@ def test_view_enrich_from_github_sets_state_closed_for_closed_status() -> None:
     backend = BeadsBackend(runner=runner)
     result = ViewItemResult(title="", status="", state="", source="")
 
-    success = backend.view_enrich_from_github(result, "bd-a3f8")
+    outcome = backend.view_enrich_from_github(result, "bd-a3f8")
 
-    assert success is True
+    assert outcome.enriched is True
     assert result.state == "closed"
     assert result.status == "closed"
 

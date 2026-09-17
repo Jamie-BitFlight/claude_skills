@@ -212,6 +212,17 @@ of the ambiguous `[]`/`0` an unaware caller could misread as a confirmed-empty
 backlog. Pass `allow_cached=True` (`--allow-cached` on the CLI) to opt into
 the best-effort cached list anyway.
 
+Status provenance is independent of listing provenance. `status_source` is
+`live` when all returned status-bearing rows came from a successful provider
+fetch, `cache` when returned rows use only backend-owned status, `mixed` when
+live numeric-issue rows and backend-owned string/unlinked rows occur together,
+and `unavailable` when numeric-issue rows could not be read live. Pagination
+reports provenance for the current page, not rows outside it. Providers return
+`StatusFetchResult`, whose
+`attempted` and `unavailable_reason` fields are authoritative; operations do
+not inspect provider credentials or infer an attempt from an issue identifier.
+`ViewEnrichmentResult` provides the same boundary for a single-item view.
+
 **Configuration caveat**: `SQLiteBackend` defaults to `db_path=":memory:"` (an
 ephemeral in-process database). A freshly started process on that default is
 structurally in the same "never populated" state as a cold GitHub cache, even

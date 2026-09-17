@@ -39,6 +39,14 @@ if str(_DH_DIR) not in sys.path:
     sys.path.insert(0, str(_DH_DIR))
 
 import dh_paths
+from backlog_core import gh_client
+from backlog_core.models import GitHubUnavailableError
+
+# The real backlog_core package (as opposed to im._BACKLOG_CORE's legacy
+# ``.claude/skills/backlog/backlog_core`` path, which does not exist in this
+# checkout) — used to make fetch_tasks_from_github's ``_BACKLOG_CORE.exists()``
+# guard pass so tests can exercise its internal try_get_github() call.
+_REAL_BACKLOG_CORE = Path(__file__).resolve().parents[1] / "backlog_core"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -442,3 +450,90 @@ def test_backlog_core_path_not_found(tmp_path: Path, mocker: MockerFixture) -> N
 
     # Assert — warning about backlog_core appears somewhere in the output
     assert "backlog_core" in output or "WARNING" in output
+
+
+def test_fetch_tasks_from_github_falls_back_to_cache_on_unavailable(tmp_path: Path, mocker: MockerFixture) -> None:
+    """A GitHubUnavailableError from try_get_github() falls back to cache
+    instead of propagating — the same outcome as try_get_github() returning
+    None, per fetch_tasks_from_github's own no-token fallback branch above.
+
+    Tests: fetch_tasks_from_github's GitHubUnavailableError handling
+    (regression for #3570 Finding 2 — a token configured but a rate limit or
+    5xx during get_repo() used to raise uncaught out of this function, since
+    ready-tasks --github/status --github's caller only checked for None).
+    How:
+        1. Point ``im._BACKLOG_CORE`` at the real backlog_core package so the
+           function proceeds past its existence guard.
+        2. Write a cache file at the path fetch_tasks_from_github reads on
+           fallback.
+        3. Patch ``backlog_core.gh_client.try_get_github`` to raise
+           GitHubUnavailableError, simulating a transient GitHub outage with a
+           token configured.
+        4. Call fetch_tasks_from_github directly.
+        5. Assert it returns the cached Task list rather than raising.
+    Why: ready-tasks --github and status --github must keep working from a
+    stale cache during a transient GitHub outage rather than crashing the
+    orchestrator loop.
+    """
+    # Arrange
+    mocker.patch.object(im, "_BACKLOG_CORE", _REAL_BACKLOG_CORE)
+    cache_path = tmp_path / "sam-tasks-my-feature.json"
+    payload = {
+        "feature_slug": "my-feature",
+        "parent_issue_number": 480,
+        "synced_at": "2026-03-06T10:00:00+00:00",
+        "tasks": [
+            {
+                "task_id": "T1",
+                "status": "not-started",
+                "agent": "python3-development:python-cli-architect",
+                "priority": 2,
+                "skills": [],
+                "dependencies": [],
+            }
+        ],
+    }
+    cache_path.write_text(json.dumps(payload), encoding="utf-8")
+    mocker.patch.object(
+        gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+    )
+
+    # Act
+    result = im.fetch_tasks_from_github(480, "my-feature", cache_path)
+
+    # Assert — cached tasks returned, no exception propagated
+    assert result is not None
+    assert [t.id for t in result] == ["T1"]
+
+
+def test_fetch_tasks_from_github_unavailable_without_cache_returns_none(tmp_path: Path, mocker: MockerFixture) -> None:
+    """A GitHubUnavailableError with no cache present returns None, matching
+    the pre-existing "GitHub unavailable and no cache" branch rather than
+    raising.
+
+    Tests: fetch_tasks_from_github's GitHubUnavailableError handling when the
+    cache fallback itself has nothing to offer.
+    How:
+        1. Point ``im._BACKLOG_CORE`` at the real backlog_core package.
+        2. Do not create a cache file at the expected path.
+        3. Patch ``backlog_core.gh_client.try_get_github`` to raise
+           GitHubUnavailableError.
+        4. Call fetch_tasks_from_github directly.
+        5. Assert it returns None rather than raising.
+    Why: The caller's existing ``if tasks is None`` handling (see
+    fetch_tasks_from_backend and the ready-tasks/status commands) must still
+    see the documented None contract when both GitHub and the cache are
+    unavailable, whether GitHub was never configured or is transiently down.
+    """
+    # Arrange
+    mocker.patch.object(im, "_BACKLOG_CORE", _REAL_BACKLOG_CORE)
+    cache_path = tmp_path / "sam-tasks-my-feature.json"
+    mocker.patch.object(
+        gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+    )
+
+    # Act
+    result = im.fetch_tasks_from_github(480, "my-feature", cache_path)
+
+    # Assert
+    assert result is None

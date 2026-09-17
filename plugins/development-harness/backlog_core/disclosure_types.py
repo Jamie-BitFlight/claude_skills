@@ -3,14 +3,23 @@
 This module is the single source of truth for all disclosure-related types.
 Downstream tasks (T13-T16) import from here -- no other module redefines these types.
 
-All response types are frozen dataclasses (not Pydantic models — they are internal
-value objects or MCP response shapes, not ingress validators).
+``MapResponse``/``NavigateResponse``/``BoundedResponse`` (the three MCP response
+shapes ``BacklogViewDisclosureHandler`` returns) are frozen Pydantic ``BaseModel``
+subclasses, per this repo's "structured data -> Pydantic, not dataclass/TypedDict" convention
+(AGENTS.md), matching the ``ConfigDict(frozen=True)`` value-object pattern already
+used in ``file_cache_state.py``. ``BoundedContent`` stays a frozen dataclass -- it is
+a purely internal intermediate value, never an MCP response shape or ingress
+validator (see its own docstring).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .models import StatusSource
 
 
 class DisclosureMode(StrEnum):
@@ -34,12 +43,13 @@ class DisclosureMode(StrEnum):
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True, slots=True)
-class MapResponse:
+class MapResponse(BaseModel):
     """Response for ``map=True`` calls.
 
     ``map_text`` is always < 2,000 tokens regardless of item size.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     selector: str
     """Item selector echoed from the request (e.g. ``'#2515'``)."""
@@ -60,7 +70,7 @@ class MapResponse:
     over_budget: bool
     """``True`` when ``total_est_tokens`` exceeds the configured token budget."""
 
-    struck_ordinals: list[str] = field(default_factory=list)
+    struck_ordinals: list[str] = Field(default_factory=list)
     """Ordinals of every struck (retracted) entry or descendant in the map (#3187).
 
     Explicit field rather than requiring callers to parse ``[struck] `` markers
@@ -68,9 +78,36 @@ class MapResponse:
     this project follows requires struck state to be addressable, not merely
     visible in formatted text."""
 
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
 
-@dataclass(frozen=True, slots=True)
-class NavigateResponse:
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
+
+    messages: list[str] = Field(default_factory=list)
+    """Informational messages from the underlying ``operations.view_item()`` read,
+    e.g. a reconcile summary. Forwarded from that call's ``Output`` collector so
+    this disclosure mode does not silently drop them."""
+
+    warnings: list[str] = Field(default_factory=list)
+    """Degradation warnings from the underlying ``operations.view_item()`` read,
+    e.g. "backend unreachable — sections_index reflects provider-backed record,
+    may be stale". Forwarded from that call's ``Output`` collector so this
+    disclosure mode does not silently drop them."""
+
+    errors: list[str] = Field(default_factory=list)
+    """Non-fatal error messages from the underlying ``operations.view_item()``
+    read. Forwarded from that call's ``Output`` collector so this disclosure mode
+    does not silently drop them."""
+
+
+class NavigateResponse(BaseModel):
     """Response for ``navigate=ordinal`` without ``head``.
 
     When ``has_children`` is ``True`` the node has sub-heading children and
@@ -82,6 +119,8 @@ class NavigateResponse:
     node) and ``content`` carries the full body text or raw fence body.
     ``child_map`` is ``None``.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     ordinal: str
     """Echoed ordinal string (e.g. ``'4.0'``)."""
@@ -126,15 +165,44 @@ class NavigateResponse:
     """Stable identifier of the owning entry; ``""`` when the resolved ordinal
     has no entry identity (level-1 sections)."""
 
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
 
-@dataclass(frozen=True, slots=True)
-class BoundedResponse:
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
+
+    messages: list[str] = Field(default_factory=list)
+    """Informational messages from the underlying ``operations.view_item()`` read.
+    Forwarded from that call's ``Output`` collector so this disclosure mode does
+    not silently drop them."""
+
+    warnings: list[str] = Field(default_factory=list)
+    """Degradation warnings from the underlying ``operations.view_item()`` read,
+    e.g. "backend unreachable — sections_index reflects provider-backed record,
+    may be stale". Forwarded from that call's ``Output`` collector so this
+    disclosure mode does not silently drop them."""
+
+    errors: list[str] = Field(default_factory=list)
+    """Non-fatal error messages from the underlying ``operations.view_item()``
+    read. Forwarded from that call's ``Output`` collector so this disclosure mode
+    does not silently drop them."""
+
+
+class BoundedResponse(BaseModel):
     """Response for ``navigate=ordinal`` with ``head=N``.
 
     ``BoundedResponse`` is a value object — it carries no ``selector`` field.
     The ``next_call`` hint is assembled by ``BacklogViewDisclosureHandler._handle_extract()``
     where the selector is in scope.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     ordinal: str
     title: str
@@ -164,6 +232,34 @@ class BoundedResponse:
     entry_id: str = ""
     """Stable identifier of the owning entry; ``""`` when the resolved ordinal
     has no entry identity (level-1 sections)."""
+
+    status_source: StatusSource = "cache"
+    """Provenance of the underlying ``operations.view_item()`` read's
+    live-enrichment data (#3546, B5/B6). See :data:`~backlog_core.models.StatusSource`
+    for the provenance meanings. Forwarded from that call's ``ViewItemResult`` so a
+    disclosure-mode response never silently drops the signal a passthrough
+    ``backlog_view`` call already carries (Codex review, PR #3577)."""
+
+    unavailable_capabilities: list[str] = Field(default_factory=list)
+    """Capabilities that could not be read live this call, e.g.
+    ``["live_enrichment"]`` when ``status_source == "unavailable"``. Forwarded
+    from the underlying ``ViewItemResult``; empty when nothing was degraded."""
+
+    messages: list[str] = Field(default_factory=list)
+    """Informational messages from the underlying ``operations.view_item()`` read.
+    Forwarded from that call's ``Output`` collector so this disclosure mode does
+    not silently drop them."""
+
+    warnings: list[str] = Field(default_factory=list)
+    """Degradation warnings from the underlying ``operations.view_item()`` read,
+    e.g. "backend unreachable — sections_index reflects provider-backed record,
+    may be stale". Forwarded from that call's ``Output`` collector so this
+    disclosure mode does not silently drop them."""
+
+    errors: list[str] = Field(default_factory=list)
+    """Non-fatal error messages from the underlying ``operations.view_item()``
+    read. Forwarded from that call's ``Output`` collector so this disclosure mode
+    does not silently drop them."""
 
 
 @dataclass(frozen=True, slots=True)

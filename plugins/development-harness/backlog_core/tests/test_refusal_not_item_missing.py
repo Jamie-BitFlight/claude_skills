@@ -9,6 +9,30 @@ shaped exactly like an empty one.
 
 Neither read is made fatal here. A cached record still answers a view, and a list
 still renders. What changes is that the answer names its own limits.
+
+A third read told a quieter version of the same lie: ``view_enrich_from_github``
+folded a genuine failure (network error, 500, rate limit) into the identical
+``False`` a missing token produces (#3546), so a real outage rendered exactly like
+"GitHub is not configured here". Only the actually-benign case — no
+``GITHUB_TOKEN`` configured at all — keeps that ``False``/local-fallback behaviour
+now; a genuine failure propagates as ``GitHubUnavailableError`` instead, which
+``view_item``'s existing ``except BackendUnavailableError`` clause already catches.
+
+A fourth read told a narrower version of the same lie: the #3546 fix's own
+``_is_not_found_error`` helper matched any 'could not resolve'/'not found'
+text, so GitHub's GraphQL error for an inaccessible or incorrect repository
+('Could not resolve to a Repository with the name ...') was misclassified as
+the requested issue being not found (#3570 Finding). ``_is_not_found_error``
+now only matches an error that specifically names the issue as unresolvable.
+
+A fifth read told the same lie once more, this time triggered by naming: the
+prior fix's 'issue' + not-found substring check still matched a
+repository-not-found error whenever the repository or owner name itself
+contained the literal substring "issue" (e.g. 'owner/issue-tracker'), because
+it scanned the whole message rather than anchoring on the exact
+issue-not-found form (#3570 Finding B). ``_is_not_found_error`` now matches
+only the exact prefix ``_fetch_issue_graphql`` synthesizes, so no repository
+or owner name can influence the result.
 """
 
 from __future__ import annotations
@@ -29,6 +53,7 @@ from backlog_core.models import (
     BacklogError,
     BacklogItem,
     CacheStateCorruptError,
+    GitHubUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
@@ -37,6 +62,8 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     ViewItemResult,
 )
 from backlog_core.sync_state import SyncState, SyncStatus
@@ -63,7 +90,8 @@ def _item(issue: str, title: str = "An item") -> BacklogItem:
 
 
 class TestViewEnrichSurfacesTheRefusal:
-    """``False`` from this function means "no such issue", so a refusal must not return it."""
+    """``False`` from this function means "no such issue", so neither a refusal nor a
+    genuine failure may return it."""
 
     def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
@@ -72,14 +100,15 @@ class TestViewEnrichSurfacesTheRefusal:
         with pytest.raises(GraphQLUnavailableError):
             gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
-    def test_a_generic_backlog_error_still_returns_false(self, mocker: MockerFixture) -> None:
-        """An ordinary failure keeps the existing local-only fallback."""
+    def test_a_generic_backlog_error_now_propagates_instead_of_hiding_as_false(self, mocker: MockerFixture) -> None:
+        """A non-refusal failure must not read as "issue #519 does not exist"."""
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(gh_client, "_fetch_issue_graphql", side_effect=BacklogError("query rejected"))
 
-        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
-    def test_a_github_exception_still_returns_false(self, mocker: MockerFixture) -> None:
+    def test_a_github_exception_now_propagates_instead_of_hiding_as_false(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(
             gh_client,
@@ -87,12 +116,89 @@ class TestViewEnrichSurfacesTheRefusal:
             side_effect=GithubException(status=404, data={"message": "Not Found"}, headers={}),
         )
 
-        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
+
+    def test_a_try_get_github_failure_propagates_as_github_unavailable(self, mocker: MockerFixture) -> None:
+        """A network error/500/rate limit resolving the repo itself is not a refusal either.
+
+        This is the earlier of the two swallow points #3546 fixed: ``try_get_github``
+        itself used to fold *any* ``GithubException`` from ``get_repo`` — not just a
+        missing token — into the same ``None`` a missing token produces.
+        """
+        mocker.patch.object(
+            gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
 
     def test_an_unreachable_backend_still_returns_false(self, mocker: MockerFixture) -> None:
+        """``try_get_github`` returning None is the no-token config state, not a failure."""
         mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
         assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+
+    def test_a_genuine_issue_not_found_still_returns_false(self, mocker: MockerFixture) -> None:
+        """A reachable repository confirming the issue does not exist must not
+        become GitHubUnavailableError — that reads as an outage, not an absence.
+
+        Regression for #3570 Finding 1: the blanket ``except (BacklogError,
+        GithubException)`` this file's own #3546 fix introduced converted
+        ``_fetch_issue_graphql``'s genuine "Could not resolve to issue" 404
+        equivalent into GitHubUnavailableError alongside every other failure,
+        which made ``view_item("#999")`` report "GitHub is unavailable" for an
+        issue that simply does not exist instead of raising ItemNotFoundError.
+        """
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #519"),
+        )
+
+        assert gh_client.view_enrich_from_github(ViewItemResult(), "519") is False
+
+    def test_a_repository_not_found_error_now_propagates_instead_of_becoming_item_not_found(
+        self, mocker: MockerFixture
+    ) -> None:
+        """An inaccessible/nonexistent repository is not a missing-issue answer.
+
+        Regression for #3570 Finding: ``_is_not_found_error`` matched any
+        'could not resolve'/'not found' text, so GitHub's actual GraphQL error
+        for an inaccessible or incorrect repository — 'Could not resolve to a
+        Repository with the name ...' (verified against
+        https://github.com/cli/cli/issues/3591) — was misclassified as the
+        issue itself being not found. That made ``view_item("#N")`` raise
+        ItemNotFoundError for the issue instead of preserving the
+        repository/access failure as GitHubUnavailableError.
+        """
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'."),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.view_enrich_from_github(ViewItemResult(), "519")
+
+
+class _LiveGitHubBackend:
+    """Backend stand-in whose ``view_enrich_from_github`` delegates to the real
+    ``gh_client.view_enrich_from_github`` (unlike ``_ViewBackend`` below, which
+    is patched directly at the ``operations`` boundary) — used to prove the
+    not-found detection propagates correctly end-to-end through ``view_item``.
+    """
+
+    issue_id_type = "int"
+    supports_batch_status_fetch = False
+
+    def list_work_items(self) -> list[BacklogItem]:
+        return []
+
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+        return gh_client.view_enrich_from_github(result, issue_num, repo)
 
 
 class _ViewBackend:
@@ -156,17 +262,110 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
 
     def test_a_plain_lookup_failure_names_unreachable_backend_and_possible_causes(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
-        mocker.patch.object(operations, "view_enrich_from_github", return_value=False)
+        mocker.patch.object(
+            operations,
+            "view_enrich_from_github",
+            return_value=ViewEnrichmentResult(
+                enriched=False, attempted=True, unavailable_reason="GitHub lookup failed (network error)"
+            ),
+        )
         out = Output()
 
         operations.view_item("#519", output=out)
 
-        assert any(
-            w.startswith("backend unreachable — GitHub lookup failed (")
-            and "authentication failure" in w
-            and "issue not found" in w
-            for w in out.warnings
+        assert any(w.startswith("backend unreachable — GitHub lookup failed (network error)") for w in out.warnings)
+
+    def test_a_genuinely_nonexistent_issue_on_a_reachable_repo_raises_not_found(self, mocker: MockerFixture) -> None:
+        """End-to-end regression for #3570 Finding 1.
+
+        Unlike ``test_a_genuinely_absent_item_still_reports_not_found`` above
+        (which patches ``operations.view_enrich_from_github`` directly and so
+        never exercises the not-found detection itself), this test runs the
+        real ``gh_client.view_enrich_from_github`` chain — a reachable
+        repository whose GraphQL issue lookup genuinely fails to resolve —
+        through ``view_item`` and asserts the result is ``ItemNotFoundError``,
+        not ``GitHubUnavailableError``.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to issue #999"),
         )
+
+        with pytest.raises(ItemNotFoundError):
+            operations.view_item("#999", output=Output())
+
+    def test_a_repository_not_found_error_raises_github_unavailable_not_item_not_found(
+        self, mocker: MockerFixture
+    ) -> None:
+        """End-to-end regression for #3570 Finding.
+
+        Mirrors ``test_a_genuinely_nonexistent_issue_on_a_reachable_repo_raises_not_found``
+        above, but with GitHub's actual GraphQL error text for an inaccessible
+        or incorrect repository — 'Could not resolve to a Repository with the
+        name ...' (verified against https://github.com/cli/cli/issues/3591) —
+        instead of the issue-specific not-found message. Asserts the result is
+        ``GitHubUnavailableError``, not ``ItemNotFoundError``: the repository
+        being unresolvable is not the same failure as the issue being absent,
+        and must not report the issue as missing.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError("GraphQL error: Could not resolve to a Repository with the name 'owner/repo'."),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            operations.view_item("#999", output=Output())
+
+    def test_a_repository_named_with_issue_substring_raises_github_unavailable(self, mocker: MockerFixture) -> None:
+        """End-to-end regression for #3570 Finding B.
+
+        Mirrors ``test_a_repository_not_found_error_raises_github_unavailable_not_item_not_found``
+        above, but the unresolvable repository's name itself contains the
+        literal substring "issue" (``owner/issue-tracker``). A predicate that
+        scans the whole error message for 'issue' alongside a not-found
+        phrase would misclassify this as the requested issue being absent;
+        the exact-prefix match must not be swayed by the repository's name.
+        Asserts the result is ``GitHubUnavailableError``, not
+        ``ItemNotFoundError``.
+        """
+        mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=_LiveGitHubBackend()))
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(
+            gh_client,
+            "_fetch_issue_graphql",
+            side_effect=BacklogError(
+                "GraphQL error: Could not resolve to a Repository with the name 'owner/issue-tracker'."
+            ),
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            operations.view_item("#999", output=Output())
+
+    def test_nothing_attempted_emits_no_warning_or_degradation_signal(self, mocker: MockerFixture) -> None:
+        """ "Nothing was tried" must not render identically to "the backend refused us".
+
+        A cached item with no resolvable identifier (no issue number, no issue
+        ref) and a title selector with ``refresh=True`` reaches the live-check
+        branch, but ``_live_lookup_id`` returns ``None`` -- no lookup is ever
+        made. Neither the "backend unreachable" prose warning nor the
+        ``status_source``/``unavailable_capabilities`` degradation fields (#3546)
+        may fire for a call that never attempted anything.
+        """
+        _patch_view_backend(mocker, [_item("", title="Untracked cached title")])
+        enrich_mock = mocker.patch.object(operations, "view_enrich_from_github")
+
+        result = operations.view_item("Untracked cached title", refresh=True, output=Output())
+
+        enrich_mock.assert_not_called()
+        assert result.warnings == []
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
 
 
 class _CacheBackend:
@@ -504,6 +703,9 @@ class TestListingProvenance:
         assert result["items"] is None
         assert result["count"] is None
         assert result["from_cache"] is True
+        assert result["status_source"] == "cache"
+        assert result["unavailable_capabilities"] == []
+        assert result["filters_evaluated_against_unavailable_data"] == []
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
 
     def test_a_label_scoped_empty_reconcile_serves_items_when_allow_cached(
@@ -572,7 +774,11 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
-        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(output=Output())
 

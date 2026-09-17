@@ -27,7 +27,7 @@ import sys
 import time as _time
 from datetime import UTC, datetime as _datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard, TypeVar
+from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 
 import dh_paths as _dh_paths
 import dispatch_schema as _ds
@@ -72,9 +72,11 @@ from .models import (
     DispatchWaveSummary as _DispatchWaveSummary,
     Output,
     RegisterResult,
+    StatusSource,
     UnsupportedCapabilityError,
     init as _init_models,
 )
+from .parsing import parse_issue_number
 from .search import (
     _DEFAULT_SNIPPET_CONTEXT,
     _META_FIELDS,
@@ -136,27 +138,50 @@ from .tool_responses import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Mapping
+    from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+
+    from pydantic import GetJsonSchemaHandler
+    from pydantic.json_schema import JsonSchemaValue
 
 EffortLevel: TypeAlias = Literal["low", "medium", "high", "max"]
 ItemId: TypeAlias = int | str
 
-_ResponseModel = TypeVar("_ResponseModel", bound=BaseModel)
+
+class _WireSchema:
+    """Use a response model's JSON schema without changing dict serialization."""
+
+    def __init__(self, cls: type[BaseModel]) -> None:
+        self.cls = cls
+
+    def __get_pydantic_json_schema__(  # ruff: ignore[bad-dunder-method-name] - required Pydantic schema hook
+        self, _core_schema: object, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Generate the advertised schema from the response model.
+
+        Returns:
+            The response model's JSON schema.
+        """
+        return handler(self.cls.__pydantic_core_schema__)
+
+
+def _wire_schema(cls: type[BaseModel]) -> object:
+    """Build response annotation metadata for a dumped model.
+
+    Returns:
+        Metadata that advertises ``cls`` while retaining dict serialization.
+    """
+    return _WireSchema(cls)
 
 
 def _respond(
-    cls: type[_ResponseModel], payload: Mapping[str, object], *, exclude_none: bool = True, exclude_unset: bool = False
-) -> _ResponseModel:
+    cls: type[BaseModel], payload: Mapping[str, object], *, exclude_none: bool = True, exclude_unset: bool = False
+) -> dict[str, object]:
     """Validate a tool payload and return its wire dict (#3369).
 
-    Every ``@mcp.tool`` function is annotated ``-> SomeResponse`` but actually
-    returns ``response.model_dump(...)`` (a plain dict) -- ``ty`` accepts that
-    mismatch when the ``model_validate(...).model_dump(...)`` chain appears
-    directly in a ``return`` statement, but rejects it the moment the same
-    chain is wrapped in a helper annotated ``-> dict[str, object]`` (or
-    ``-> dict[str, Any]``). Declaring this helper ``-> _ResponseModel`` (a
-    TypeVar bound to ``BaseModel``, matching the class passed in) is what
-    keeps every call site's declared return type checkable.
+    Tool handlers using this helper declare dictionary return types because
+    this function deliberately dumps the validated model. Claiming a response
+    model return type while returning a dict makes FastMCP ask Pydantic to
+    serialize a dict as that model, emitting ``PydanticSerializationUnexpectedValue``.
 
     ``exclude_none`` defaults to ``True`` -- the pattern nearly all ~70+
     standard call sites use -- so a tool that legitimately needs a
@@ -185,9 +210,7 @@ def _respond(
         exclude_unset: Forwarded to ``model_dump()``. Defaults to ``False``.
 
     Returns:
-        The validated model's dumped dict, typed as ``cls`` for the
-        annotation-checking caller (FastMCP serializes the dict identically
-        to the model instance at the wire boundary either way).
+        The validated model's dumped dictionary.
     """
     return cls.model_validate(payload).model_dump(exclude_none=exclude_none, exclude_unset=exclude_unset)
 
@@ -1376,7 +1399,7 @@ async def backlog_add(
         str, Field(description="Item type: Feature, Bug, Refactor, Docs, or Chore", alias="type")
     ] = "Feature",
     force: Annotated[bool, Field(description="Skip content-based duplicate check")] = False,
-) -> BacklogAddResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogAddResponse)]:
     """Add a new item through the configured backend and optionally create its native issue.
 
     For guided creation with classification and research support, use
@@ -1577,6 +1600,57 @@ def _apply_sync_state_to_response(
     response["sync_state"] = sync_state_block
     existing = response.get("warnings", [])
     response["warnings"] = (list(existing) + sync_warnings) if isinstance(existing, list) else sync_warnings
+
+
+def _build_count_only_response(
+    total: int,
+    result: Mapping[str, object],
+    output: Output,
+    sync_state_block: dict[str, object] | None,
+    sync_warnings: list[str],
+) -> dict[str, object]:
+    """Build the minimal count response while preserving degradation signals.
+
+    Returns:
+        Serialized count-only response.
+    """
+    response: dict[str, object] = {
+        "count": total,
+        "from_cache": result.get("from_cache"),
+        "has_pending_writes": result.get("has_pending_writes"),
+    }
+    if output.warnings:
+        response["warnings"] = list(output.warnings)
+    if output.errors:
+        response["errors"] = list(output.errors)
+    if result.get("status_source") == "unavailable":
+        response["status_source"] = result["status_source"]
+    for field in ("unavailable_capabilities", "filters_evaluated_against_unavailable_data"):
+        if result.get(field):
+            response[field] = result[field]
+    _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
+    return BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True)
+
+
+def _page_status_source(
+    source: object, items: Sequence[Mapping[str, object]], has_filters_evaluated_against_unavailable_data: bool = False
+) -> StatusSource:
+    """Narrow operation-level status provenance to the rows on this page.
+
+    Returns:
+        Status provenance for the returned page rows.
+    """
+    if source == "unavailable" and has_filters_evaluated_against_unavailable_data:
+        return "unavailable"
+    if source == "cache":
+        return "cache"
+    has_numeric = any(parse_issue_number(str(item.get("issue", ""))) is not None for item in items)
+    if not has_numeric:
+        return "cache"
+    has_backend_owned = any(parse_issue_number(str(item.get("issue", ""))) is None for item in items)
+    if source == "unavailable":
+        return "unavailable"
+    return "mixed" if has_backend_owned else "live"
 
 
 def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
@@ -1794,7 +1868,7 @@ async def backlog_list(
             )
         ),
     ] = None,
-) -> BacklogListResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListResponse)]:
     """List all open backlog items.
 
     When match_context=True, use page/tokens_per_page/page_token_limit to control
@@ -1812,13 +1886,22 @@ async def backlog_list(
         When count_only=True, the response carries count plus from_cache/
         has_pending_writes (backlog #3546 task A4/Codex review PR #3576
         finding 2) -- a warm cache holding unconfirmed local writes must not
-        be handed back as an unqualified count -- and, when a background
-        sync is running, sync_state/warnings.
+        be handed back as an unqualified count. warnings/errors are added when
+        the operations layer recorded a genuine degradation; routine
+        operational info is omitted. When a background sync is running,
+        sync_state/warnings are also added.
         When a provider-private cache listing cannot be confirmed complete and
         allow_cached=False (default), items and count are both null and
         from_cache/has_pending_writes name the provenance instead (backlog
         #3546 task A4) — pass allow_cached=True to see the best-effort cached
         list anyway.
+        status_source ("live", "cache", "mixed", or "unavailable") reports where the
+        listing's status data came from; unavailable_capabilities names any
+        capability (e.g. "live_status") that could not be read live this
+        call; filters_evaluated_against_unavailable_data names any active
+        filter (e.g. "status") that could not be honestly evaluated against
+        live data. On count_only=True, these three appear only when they
+        signal a genuine degradation (never on a healthy call).
         On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1869,6 +1952,9 @@ async def backlog_list(
         withheld: dict[str, object] = {
             "from_cache": result.get("from_cache"),
             "has_pending_writes": result.get("has_pending_writes"),
+            "status_source": result.get("status_source"),
+            "unavailable_capabilities": result.get("unavailable_capabilities"),
+            "filters_evaluated_against_unavailable_data": result.get("filters_evaluated_against_unavailable_data"),
             "backend": backend_status.model_dump(),
             **out.to_dict(),
         }
@@ -1902,6 +1988,13 @@ async def backlog_list(
     # Output's messages/warnings/errors, whose Field(default_factory=list) default
     # is [] rather than None, so exclude_none alone would leave them in the
     # response and contradict this branch's documented minimal shape.
+    #
+    # `out` (the operations-layer Output collector `list_items` wrote into) is
+    # merged here on its `warnings`/`errors` channels only — never `messages`.
+    # `list_items(refresh=True)` records a healthy reconciliation summary with
+    # `out.info()`, while reconciliation failures and pending/rejected mutations
+    # use `out.warn()`. This keeps routine prose out of the documented minimal
+    # shape without discarding side-effect degradation results.
     if count_only:
         # from_cache/has_pending_writes are sourced from the same `result`
         # dict list_items already returned above -- operations.list_items
@@ -1909,13 +2002,7 @@ async def backlog_list(
         # Without them, a caller reading a bare count from a warm cache that
         # still holds unconfirmed local writes could mistake local-only rows
         # for provider-acknowledged data (Codex review, PR #3576 finding 2).
-        count_resp: dict[str, object] = {
-            "count": total,
-            "from_cache": result.get("from_cache"),
-            "has_pending_writes": result.get("has_pending_writes"),
-        }
-        _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
+        return _build_count_only_response(total, result, out, sync_state_block, sync_warnings)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
@@ -1941,6 +2028,10 @@ async def backlog_list(
     else:
         enriched_items: list[dict[str, object]] | list[dict[str, str | bool]] = page_items
 
+    page_status_source = _page_status_source(
+        result.get("status_source"), enriched_items, bool(result.get("filters_evaluated_against_unavailable_data"))
+    )
+
     if item_depth > 0:
         enriched_items = [_apply_item_depth(dict(it), item_depth) for it in enriched_items]
 
@@ -1951,6 +2042,10 @@ async def backlog_list(
         **result,
         "items": enriched_items,
         "count": len(enriched_items),
+        "status_source": page_status_source,
+        "unavailable_capabilities": (
+            result.get("unavailable_capabilities", []) if page_status_source == "unavailable" else []
+        ),
         "available_fields": list(_AVAILABLE_FIELDS),
         "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
         "backend": backend_status.model_dump(),
@@ -1994,6 +2089,8 @@ def _build_compact_manifest(
         "status": status,
         "plan_address": plan_address,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_summary": True,
         "_full_chars": full_chars,
         "_hint": (
@@ -2067,6 +2164,8 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
         "status": result.status,
         "description": result.description,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_over_budget": True,
         "_full_chars": full_chars,
         "_usage": (
@@ -2096,7 +2195,15 @@ def _execute_disclosure_or_passthrough(
 
     ``OrdinalNotFoundError`` and ``BacklogError`` are caught and converted to
     error dicts so the ``to_thread`` caller receives a clean return value with
-    no exception.
+    no exception. The generic ``BacklogError`` arm includes ``error_type``
+    (``type(exc).__name__``) so a caller can branch on the exception's
+    identity instead of only its rendered message — flattening every
+    ``BacklogError`` subtype (a missing item, a refused GraphQL/REST lookup,
+    an unsupported backend capability, ...) to a bare ``{"error": str(exc)}``
+    would discard which one occurred. ``OrdinalNotFoundError`` keeps its
+    existing dedicated ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
+    carries structured identity and that shape is pinned by
+    ``test_code_fence_miss_key_set_matches_numeric_miss``.
 
     Args:
         selector: Issue selector forwarded to the disclosure handler.
@@ -2114,11 +2221,11 @@ def _execute_disclosure_or_passthrough(
         return None  # safety net — caller should never reach this branch
     try:
         response = BacklogViewDisclosureHandler().handle(selector, req, refresh=refresh)
-        return dataclasses.asdict(response)
+        return response.model_dump()
     except OrdinalNotFoundError as exc:
         return {"error": str(exc), "requested_ordinal": exc.requested, "valid_ordinals": exc.valid_ordinals}
     except BacklogError as exc:
-        return {"error": str(exc)}
+        return {"error": str(exc), "error_type": type(exc).__name__}
 
 
 @mcp.tool(
@@ -2144,9 +2251,8 @@ async def backlog_view(
                 "Bypass the cache and live-check an already-cached title-substring selector "
                 "against the backend. Numeric/#N/URL selectors are always live-checked "
                 "regardless of this flag. For GitHub, prefers the authoritative "
-                "head-pointer/audit-comment record; on a resolution failure it silently "
-                "falls back to the raw issue body, with no signal in the response that "
-                "this happened."
+                "head-pointer/audit-comment record; on a resolution failure it falls "
+                "back to the raw issue body and records a warning that the body may be stale."
             )
         ),
     ] = False,
@@ -2265,7 +2371,7 @@ async def backlog_view(
             ),
         ),
     ] = 0,
-) -> BacklogViewResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogViewResponse)]:
     r"""View a single backlog item or GitHub issue in detail.
 
     Ordinal format: ^\d+(\.\d+)*(\.code\.\d+)?$. Examples:
@@ -2291,6 +2397,10 @@ async def backlog_view(
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings. file_path is for reference
         only — use backlog_update or backlog_groom for all modifications.
+        Both summary=True and summary=False shapes carry status_source ("live",
+        "cache", or "unavailable"), reporting where this item's live-enrichment
+        data came from, and unavailable_capabilities, naming any capability
+        (e.g. "live_enrichment") that could not be read live this call.
         When navigate targets an ordinal that does not exist in the item: dict with
         error, requested_ordinal, and valid_ordinals (every ordinal actually present).
         On error, dict contains an error key.
@@ -2418,7 +2528,7 @@ async def backlog_view(
 async def backlog_sync(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview what would be synced without making changes")] = False,
-) -> BacklogSyncResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogSyncResponse)]:
     """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
@@ -2465,7 +2575,7 @@ async def backlog_link_followup(
             )
         ),
     ],
-) -> BacklogLinkFollowupResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogLinkFollowupResponse)]:
     """Link a follow-up backlog item to its originating plan or task.
 
     Records the origin's logical ID on the item's ``followup_to`` metadata
@@ -2505,7 +2615,7 @@ async def backlog_list_followups(
             )
         ),
     ],
-) -> BacklogListFollowupsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListFollowupsResponse)]:
     """List backlog items linked as follow-ups to the given origin.
 
     Returns all items whose ``metadata.followup_to`` exactly matches the
@@ -2552,7 +2662,7 @@ async def backlog_close(
     comment: Annotated[str, Field(description="Additional context about why this item is being closed")] = "",
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Close even if open PRs reference the issue")] = False,
-) -> BacklogCloseResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCloseResponse)]:
     """Dismiss a backlog item without completing it and close it on the configured backend.
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
@@ -2606,7 +2716,7 @@ async def backlog_resolve(
     findings: Annotated[str | None, Field(description="Retrospective learnings from this work")] = None,
     cleanup: Annotated[bool, Field(description="Reserved; currently has no effect")] = False,
     force: Annotated[bool, Field(description="Resolve even if open PRs reference the issue")] = False,
-) -> BacklogResolveResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogResolveResponse)]:
     """Mark a backlog item as DONE (completed) and close it on the configured backend.
 
     plan/method/notes/follow_ups/findings become a structured completion comment
@@ -2713,7 +2823,7 @@ async def backlog_update(
             "May be a no-op depending on the active backend — check the returned messages."
         ),
     ] = False,
-) -> BacklogUpdateResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogUpdateResponse)]:
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
     Groomed content is synced to the linked work item when the item has one.
@@ -2824,7 +2934,7 @@ async def backlog_groom(
             )
         ),
     ] = False,
-) -> BacklogGroomResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogGroomResponse)]:
     """Write groomed content through the configured backend and sync its linked GitHub issue.
 
     When the item has a GitHub issue, the groomed content is synced there
@@ -2880,7 +2990,7 @@ async def backlog_groom(
 async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
-) -> BacklogNormalizeResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogNormalizeResponse)]:
     """Normalize all work items through the configured backend.
 
     Returns:
@@ -2924,7 +3034,7 @@ async def backlog_pull(
         bool, Field(description="Overwrite local content even if local version is newer or longer")
     ] = False,
     diff: Annotated[bool, Field(description="Include entry-level diff output showing local vs remote changes")] = False,
-) -> BacklogPullResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogPullResponse)]:
     """Reconcile linked issue content.
 
     Only backends that support reconciliation act on this — on other backends
@@ -2989,7 +3099,7 @@ async def backlog_create_sam_task(
     acceptance_criteria: Annotated[list[str] | None, Field(description="Acceptance criteria strings")] = None,
     labels: Annotated[list[str] | None, Field(description="GitHub label names to apply")] = None,
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> BacklogCreateSamTaskResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateSamTaskResponse)]:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
     Returns:
@@ -3032,7 +3142,7 @@ async def backlog_get_sam_tasks(
     refresh_cache: Annotated[
         bool, Field(description="Compatibility flag; the configured provider owns refresh")
     ] = True,
-) -> SamTaskLookupResult:
+) -> Annotated[dict[str, object], _wire_schema(SamTaskLookupResult)]:
     """Return SAM tasks owned by a configured-backend work item.
 
     Returns tasks plus explicit provider freshness and availability state.
@@ -3060,7 +3170,7 @@ async def backlog_update_sam_task_status(
     issue_number: Annotated[int, Field(description="Task sub-issue number (GitHub issue integer)")],
     new_status: Annotated[str, Field(description="Target status: not-started | in-progress | complete | blocked")],
     repo: Annotated[str, Field(description="Repository slug (owner/name)")] = "",
-) -> BacklogUpdateSamTaskStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogUpdateSamTaskStatusResponse)]:
     """Update the status field in a SAM task sub-issue.
 
     Patches the sam:task YAML block in the issue body. No-op if status already matches.
@@ -3153,7 +3263,7 @@ async def artifact_register(
     ],
     status: Annotated[ArtifactStatus, Field(description="Lifecycle status of the artifact")] = ArtifactStatus.CURRENT,
     agent: Annotated[str, Field(description="Name of the producing agent")] = "",
-) -> ArtifactRegisterResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactRegisterResponse)]:
     """Upsert an artifact entry in provider-owned logical content.
 
     Idempotent by (artifact_type, artifact_id). If an entry with the same type and
@@ -3215,7 +3325,7 @@ async def artifact_list(
         ),
     ],
     artifact_type: Annotated[str | None, Field(description="Filter by artifact type (optional)")] = None,
-) -> ArtifactsListResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactsListResponse)]:
     """Return all artifacts registered for a backlog item.
 
     Returns an empty list when no manifest section exists yet — this is not an error.
@@ -3271,7 +3381,7 @@ async def artifact_get(
             )
         ),
     ] = None,
-) -> ArtifactsListResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactsListResponse)]:
     """Return metadata for artifacts registered on a backlog item under one type.
 
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
@@ -3334,7 +3444,7 @@ async def artifact_read(
             )
         ),
     ] = None,
-) -> ArtifactReadResponse:
+) -> Annotated[dict[str, object], _wire_schema(ArtifactReadResponse)]:
     """Read provider-owned logical content for a registered artifact.
 
     The selected ContentProvider resolves the artifact by owner, type, and
@@ -3403,7 +3513,7 @@ async def artifact_read(
 )
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
-) -> BacklogGetReadySamTasksResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogGetReadySamTasksResponse)]:
     """Return SAM tasks whose status is not-started and all dependencies are terminal.
 
     Returns:
@@ -3447,7 +3557,7 @@ async def backlog_strike_entry(
     ],
     reason: Annotated[str, Field(description="Human-readable reason for striking the entry")],
     section: Annotated[str | None, Field(description="Optional section name to scope the search within")] = None,
-) -> BacklogStrikeEntryResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogStrikeEntryResponse)]:
     """Strike (retract) an entry block within a backlog item.
 
     Wraps the entry in a collapsed details block with the reason,
@@ -3476,7 +3586,7 @@ async def backlog_strike_entry(
 )
 async def backlog_list_labels(
     limit: Annotated[int, Field(description="Maximum labels to return")] = 100,
-) -> BacklogListLabelsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListLabelsResponse)]:
     """List repository labels. Requires a backend with label support — errors otherwise.
 
     Returns all labels defined on the repository, up to ``limit``. There is no
@@ -3513,7 +3623,7 @@ async def backlog_list_merged_prs(
         ),
     ] = None,
     limit: Annotated[int, Field(description="Maximum number of PRs to return")] = 20,
-) -> BacklogListMergedPrsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMergedPrsResponse)]:
     """List merged pull requests. Requires a backend with PR support — errors otherwise.
 
     Only PRs that were actually merged (not just closed) are returned.
@@ -3541,7 +3651,7 @@ async def backlog_list_merged_prs(
 )
 async def backlog_list_milestones(
     state: Annotated[str, Field(description="Milestone state filter: open | closed | all")] = "open",
-) -> BacklogListMilestonesResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListMilestonesResponse)]:
     """List repository milestones filtered by state.
 
     Requires a backend with milestone support — errors otherwise. Returns
@@ -3579,7 +3689,9 @@ async def backlog_list_milestones(
         open_world_hint=True,
     )
 )
-async def backlog_get_soonest_milestone() -> BacklogGetSoonestMilestoneResponse:
+async def backlog_get_soonest_milestone() -> Annotated[
+    dict[str, object], _wire_schema(BacklogGetSoonestMilestoneResponse)
+]:
     """Return the open milestone with the earliest due date.
 
     Requires a backend with milestone support — errors otherwise. Milestones
@@ -3624,7 +3736,7 @@ async def backlog_create_milestone(
         str | None,
         Field(description="Optional due date as ISO 8601 string, e.g. '2026-06-30' or '2026-06-30T00:00:00Z'"),
     ] = None,
-) -> BacklogCreateMilestoneResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateMilestoneResponse)]:
     """Create a new milestone on the repository.
 
     Requires a backend with milestone support — errors otherwise.
@@ -3663,7 +3775,7 @@ async def backlog_create_milestone(
 async def backlog_assign_item_to_milestone(
     issue_number: Annotated[int, Field(description="Issue number to assign")],
     milestone_number: Annotated[int, Field(description="Milestone number to assign the issue to")],
-) -> BacklogAssignItemToMilestoneResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogAssignItemToMilestoneResponse)]:
     """Assign a backlog item to a milestone.
 
     Requires a backend with milestone support — errors otherwise.
@@ -3700,7 +3812,7 @@ async def backlog_list_issues(
     labels: Annotated[str | None, Field(description="Comma-separated label names to filter by")] = None,
     state: Annotated[str, Field(description="Issue state: open, closed, or all")] = "open",
     limit: Annotated[int, Field(description="Maximum issues to return")] = 30,
-) -> BacklogListIssuesResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListIssuesResponse)]:
     """List GitHub issues with optional milestone, label, and state filters.
 
     Returns:
@@ -3739,7 +3851,7 @@ async def backlog_list_issues(
 async def backlog_comment_issue(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     body: Annotated[str, Field(description="Comment body (Markdown)")],
-) -> BacklogCommentIssueResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCommentIssueResponse)]:
     """Add a comment to a GitHub issue.
 
     Returns:
@@ -3771,7 +3883,7 @@ async def backlog_list_comments(
     issue_number: Annotated[int, Field(description="GitHub issue number (integer)")],
     limit: Annotated[int, Field(description="Maximum comments to return")] = 20,
     offset: Annotated[int, Field(description="Number of comments to skip")] = 0,
-) -> BacklogListCommentsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListCommentsResponse)]:
     """List comments on a GitHub issue.
 
     Returns:
@@ -3815,7 +3927,7 @@ async def backlog_read_comment(
             )
         ),
     ],
-) -> BacklogReadCommentResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogReadCommentResponse)]:
     """Read the full body of a single comment on a GitHub issue.
 
     Returns:
@@ -3842,7 +3954,7 @@ async def backlog_read_comment(
 async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
-) -> BacklogListProjectsResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogListProjectsResponse)]:
     """List Projects V2 for the repository owner via GraphQL.
 
     Returns:
@@ -3870,7 +3982,7 @@ async def backlog_list_projects(
 async def backlog_create_project(
     title: Annotated[str, Field(description="Project title")],
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
-) -> BacklogCreateProjectResponse:
+) -> Annotated[dict[str, object], _wire_schema(BacklogCreateProjectResponse)]:
     """Create a Projects V2 project under the repository owner.
 
     Resolves the owner node ID then runs the createProjectV2 GraphQL mutation.
@@ -3936,7 +4048,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
 )
 async def dispatch_read(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-) -> DispatchReadResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchReadResponse)]:
     """Read a dispatch plan for the given milestone.
 
     Returns an error response if no plan is stored for this milestone or it
@@ -3969,7 +4081,7 @@ async def dispatch_read(
 )
 async def dispatch_validate(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-) -> DispatchValidateResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchValidateResponse)]:
     """Validate an existing dispatch plan's structural integrity.
 
     Reads the plan file then runs five structural checks: duplicate issues,
@@ -4001,7 +4113,7 @@ async def dispatch_validate(
 async def dispatch_stale_check(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> DispatchStaleCheckResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchStaleCheckResponse)]:
     """Check whether a dispatch plan is stale relative to the current milestone.
 
     Requires a backend with milestone support — errors otherwise. Fetches the
@@ -4060,7 +4172,7 @@ async def dispatch_create_plan(
             )
         ),
     ] = None,
-) -> DispatchCreatePlanResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchCreatePlanResponse)]:
     """Create or overwrite a stored dispatch plan for a milestone.
 
     Accepts a typed ``DispatchPlan`` model, stores it atomically through the
@@ -4162,7 +4274,7 @@ async def dispatch_create_plan(
 async def dispatch_conflicts(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
     repo: Annotated[str, Field(description="Repository slug owner/name. Defaults to repo from project")] = "",
-) -> DispatchConflictsResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchConflictsResponse)]:
     """Analyze Impact Radius conflicts for items in a milestone.
 
     Fetches open issues for the milestone from GitHub, extracts the
@@ -4240,7 +4352,7 @@ async def dispatch_wave_start(
     items: Annotated[
         list[dict[str, object]], Field(description="List of items, each with 'issue' (int) and 'title' (str) keys")
     ],
-) -> DispatchWaveStartResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchWaveStartResponse)]:
     """Record the start of a dispatch wave.
 
     Creates wave and item entries in the state database. Items are
@@ -4308,7 +4420,7 @@ async def dispatch_item_status(
     result: Annotated[str, Field(description="Result summary or JSON from result file")] = "",
     error: Annotated[str, Field(description="Error details on failure")] = "",
     cost: Annotated[float | None, Field(description="USD cost if available from claude output")] = None,
-) -> DispatchItemStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchItemStatusResponse)]:
     """Record completion or failure of a dispatch item.
 
     Looks up the item by milestone + issue across all waves. Updates
@@ -4376,7 +4488,7 @@ async def dispatch_item_status(
 async def dispatch_wave_status(
     milestone: Annotated[int, Field(description="GitHub milestone number")],
     wave_num: Annotated[int, Field(description="Wave number to query (1-based)")],
-) -> DispatchWaveStatusResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchWaveStatusResponse)]:
     """Query the current status of a dispatch wave.
 
     Returns items as a flat list (in issue order) plus per-status counts and
@@ -4674,7 +4786,7 @@ async def dispatch_spawn(
             )
         ),
     ] = None,
-) -> DispatchSpawnResponse:
+) -> Annotated[dict[str, object], _wire_schema(DispatchSpawnResponse)]:
     """Spawn and monitor kage-bunshin sessions for a dispatch wave.
 
     Runs as a background task (``task=True``). Returns a task ID immediately.
