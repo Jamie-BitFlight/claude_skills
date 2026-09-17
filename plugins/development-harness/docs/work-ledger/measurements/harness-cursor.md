@@ -247,6 +247,11 @@ optional `scripts/`, `references/`, `assets/`. Frontmatter: `name`, `description
 your SKILL.md using relative paths from the skill root." Plugin skills: `<plugin>/skills/<name>/SKILL.md`
 `[repo + docs-snippet]`.
 
+The skills documentation establishes resolution of bundled-resource references relative to the skill root. It
+does not state that the model receives that root as an absolute path, or that opening a relative reference with a
+file tool returns an absolute path. The docs and repositories searched in this section and under the path-variable
+heading below did not establish either behavior.
+
 ### Plugin manifest — **`.cursor-plugin/plugin.json`** (Cursor format) or root `plugin.json` (Agent Plugins standard)
 
 - `[docs-snippet]` `https://cursor.com/docs/reference/plugins` ("Plugins Reference | Cursor Docs"): "Every Cursor

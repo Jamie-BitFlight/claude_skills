@@ -91,13 +91,53 @@ Consequences the design draws, each a claim in its own right:
 - **MCP is not in the shared layer**, since pi has no native MCP. The CLI over a shell is.
   Every other harness measured, Kilo Code included, registers MCP servers from project config.
   Confidence: source. Re-check: `earendil-works/pi` README.
-- **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Codex, Kimi
-  and Hermes substitute their own variables in a skill body, and Codex additionally substitutes
-  `${CLAUDE_PLUGIN_ROOT}` in a plugin's hook commands; pi removed `{baseDir}` in 0.24.0;
-  OpenCode returns the body verbatim; for Cursor, looked in the documentation snippets, both
-  Cursor repositories and the plugin template's validator, and did not find it. Confidence:
-  source, Cursor by snippet. Re-check: section 4 of each file.
+- **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Kimi and
+  Hermes substitute their own skill-directory variables in a skill body; Codex substitutes
+  nothing in a skill body, expanding `${CLAUDE_PLUGIN_ROOT}`/`${PLUGIN_ROOT}`/`${PLUGIN_DATA}`
+  only in a plugin's hook command strings and in Agent-Plugins MCP stdio
+  `command`/`args`/`env`/`cwd`; pi removed `{baseDir}` in 0.24.0; OpenCode returns the body
+  verbatim; for Cursor, looked in the documentation snippets, both Cursor repositories and the
+  plugin template's validator, and did not find it. Confidence: source, Cursor by snippet.
+  Re-check: section 4 of each file.
   `plugins/plugin-creator/CLAIMS-REGISTER.md` holds this claim for the skill-portability rule.
+- **`${CLAUDE_SKILL_DIR}` is substituted in a skill body by Claude Code.** Measured 2026-09-18 by
+  invoking `dh:dh-cli-usage` in a Claude Code session: the `<sam_cli>` line arrived as an absolute
+  path, and the two other variables stayed literal. The vendor's substitution table states the same
+  and adds that for a plugin skill it is the skill's own subdirectory, not the plugin root.
+  Confidence: measured. Re-check: invoke the skill and read the rendered body.
+- **The other two skill-directory variables `dh:dh-cli-usage` writes a line for are the ones
+  their harnesses substitute.** `${KIMI_SKILL_DIR}` is Kimi's documented body placeholder, "The
+  directory containing the current Skill file" (`skills.md` "Body Placeholders", and the
+  `replaceAll` chain in `registry.ts`). `${HERMES_SKILL_DIR}` is substituted by
+  `agent/skill_preprocessing.py` line 15's `_SKILL_TEMPLATE_RE` through `substitute_template_vars`,
+  on by default and turned off by `skills.template_vars: false`. Both read 2026-09-06 and recorded
+  in section 4 of `harness-kimi.md` and `harness-hermes.md`. Confidence: source. Re-check: section
+  4 of those two files.
+- **A harness that substitutes nothing can still state the skill's own directory, and does it one
+  of two ways.** OpenCode and Kilo Code append `Base directory for this skill: <dirname of
+  SKILL.md>` after the body (`packages/opencode/src/tool/skill.ts`, read 2026-09-06;
+  `harness-opencode.md` section 4 and `harness-kilo-code.md` section 4), and Claude Code emits the
+  same line (measured 2026-09-18, `harness-claude-code.md` section 4). Codex emits no such line and
+  states the directory in a tool result instead: `skills.read` returns `skill_root`, "the skill's
+  absolute directory in the executor filesystem" (`openai/codex` `ac192cd7`,
+  `codex-rs/ext/skills/src/tools/read.rs` line 66, read 2026-09-18). That field is conditional —
+  it is declared `Option<String>` (line 49) and filled only when
+  `output_authority == SkillToolAuthoritySelector::Executor` (line 241) — so a skill body may name
+  it as a source but must still fail closed when neither way states a directory, which
+  `dh-cli-usage` does. Confidence: source. Re-check: `read.rs` lines 49, 66 and 241 at `main`, and
+  section 4 of the other three files.
+- **A dh MCP server that was still connecting answers the same call made a second time.**
+  `skills/dh-cli-usage/references/mcp-connection-check.md` step 1 rests on it. No harness
+  documentation establishing it was read: the citation that file used to carry covered Claude
+  Code's `MCP_TIMEOUT` and connection-waiting behaviour only, and the procedure now runs on any
+  harness. The step costs the one call it repeats. Confidence: unestablished. Re-check: fail an
+  `mcp__plugin_dh_*` call during session startup and repeat it.
+- **Cursor exposes no absolute skill root.** Its skills documentation says bundled-resource
+  references resolve relative to the skill root, and states nothing about the model receiving that
+  root as an absolute path. Searched: `cursor.com/docs/skills`, `/docs/plugins`,
+  `/docs/reference/plugins`, both Cursor repositories and the plugin template's validator.
+  Confidence: unestablished — absence of evidence, not evidence of absence. Re-check: load a skill
+  in Cursor and record what the model receives.
 
 ## Lease
 

@@ -1,34 +1,34 @@
-# MCP Server Connection Check
+# MCP server connection check
 
-Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers to be
-connected before use. Agent harnesses normally wait for connecting servers automatically. Apply
-this procedure only when the harness reports that a server failed or a tool call returns a
-connection error.
+Load `dh:dh-cli-usage` before resolving `<sam_cli/>` or `<dh_scripts/>` below.
 
-1. Inspect the harness's MCP server status. If the DH backlog and SAM servers are connected, rerun
-   the original tool call.
-2. Restart the agent session so plugin MCP servers restart.
-3. If the failure persists, load `dh:dh-cli-usage` and run both source commands below, substituting
-   `<dh_scripts/>` from that skill:
+You are here because an `mcp__plugin_dh_backlog__*` or `mcp__plugin_dh_sam__*` call failed.
 
-   ```text
+1. Make the failed call once more. A server that was still starting answers on the second call.
+
+2. When it fails again, start each server directly and read what it prints:
+
+   ```bash
+   uv run --script "<dh_scripts/>/run_backlog_server.py"
    uv run --script "<dh_scripts/>/run_sam_server.py"
-   uv run --script "<dh_scripts/>/run_backlog_server.py" --project-dir .
    ```
 
-4. If either command reports missing dependencies, run `uv self update` and retry. Each script
-   resolves its own PEP 723 dependencies.
-5. Check the harness's MCP startup timeout and restore its default when a local override aborts
-   startup before either source command initializes.
+   Each runs as a long-running stdio server. A process that stays up and prints no error is a
+   working server; stop it before you start the next one. On `Error: missing dependencies`, run
+   `uv self update` and start it again — each script resolves its own dependencies from its PEP 723
+   metadata.
 
-If a structured SAM operation is needed while the SAM server is unavailable, use the validated
-CLI transport. Load `dh:dh-cli-usage`, prefix each line with `<sam_cli/>`, and use named options:
+3. Use the CLI for any operation that has one:
 
-```text
-plan list
-plan status --plan-address P{N}
-plan ready --plan-address P{N}
-```
+   ```bash
+   <sam_cli/> plan list
+   <sam_cli/> plan status --plan-address P{N}
+   <sam_cli/> plan ready --plan-address P{N}
+   ```
 
-Do not use the retired standalone console script, flat commands, or selectable output-format
-flags. Call MCP composites only through connected `mcp__plugin_dh_*` tools.
+   Pass addresses and task data as named options; read
+   [command reference](./command-reference.md) for the full set. The MCP composites have no CLI
+   form.
+
+4. When a server fails to start and the operation has no CLI form, report `STATUS: BLOCKED` with the
+   exact command and its stderr, and make no further `mcp__plugin_dh_*` call against that server.
