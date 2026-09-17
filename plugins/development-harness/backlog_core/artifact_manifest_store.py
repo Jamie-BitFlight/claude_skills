@@ -77,8 +77,12 @@ def artifact_content_reference(item_id: int | str, entry: ArtifactEntry) -> Cont
     ``pydantic.ValidationError`` -- a ``ValueError`` subclass, not a ``BacklogError``, so
     ``artifact_read``'s ``except BacklogError`` missed it and an entry stored with an empty
     ``artifact_id`` failed the tool call instead of returning the documented ``error`` response.
-    Converting it here matches ``backlog_core.server._manifest_reference`` and covers both
-    callers of this helper, the MCP tool and ``dh_core.operations``.
+    Converting it here matches ``backlog_core.server._manifest_reference`` and covers all three
+    call sites. ``backlog_core.server.artifact_read`` (the MCP tool) and
+    ``dh_core.operations.artifact_read`` both read an entry straight out of a stored manifest, so
+    an empty ``artifact_id`` reaches the validator from either. ``publish_artifact`` below cannot
+    reach it: it stamps a sha256 ``content_revision`` onto the entry first, so the name this
+    helper builds ends in ``@sha256:<digest>`` and is never empty.
 
     Returns:
         The content ``ContentRef`` for the entry.
