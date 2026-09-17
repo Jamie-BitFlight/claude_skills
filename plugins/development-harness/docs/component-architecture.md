@@ -31,11 +31,14 @@ Owns: parsing markdown into an addressable tree, assigning addresses, pagination
 result including a table of contents, token budgeting, and the content-provider protocol
 that lets markdown arrive from any source.
 
-Consumed by: `backlog_core`, `sam_schema`.
+Current consumers: backlog's dot-ordinal mapper and token-window extractor. The default item read,
+the general navigator, plan/task reads, artifact reads, and CLI address navigation are not yet
+routed through the engine; #3057, #3058, #3059, #3078, and #3063 track those consumer migrations.
 
-Backlog's shipped dot-ordinal navigation and token windowing live here alongside the
-general navigator. `backlog_core` supplies generated item content and preserves its public
-response envelopes, but it does not assign addresses or slice Markdown tokens.
+Backlog's shipped dot-ordinal mapping and token windowing primitives live here alongside the
+general navigator. `backlog_core.disclosure_handler` consumes those primitives while supplying
+generated item content and preserving its public response envelopes. Other hand-built backlog
+read and pagination paths remain until the issue-backed consumer migrations above are complete.
 
 Two numbering schemes exist today and they are not the same thing. The engine's dot-path
 addresses reach sections, sub-headings, and code fences at any depth; they are the surviving
@@ -51,7 +54,10 @@ synchronisation.
 Owns: item lifecycle, the canonical section-name registry, entry identity and timestamps,
 provider adapters, and reconciliation between local and remote state.
 
-Consumes: `progressive_markdown` for all markdown handling.
+Consumes today: `progressive_markdown.ordinal_mapper` and
+`progressive_markdown.token_bounded` for explicit MAP/NAVIGATE/EXTRACT requests. It still owns
+unmigrated default-read, compact-manifest, section-index, and paged-body paths tracked by #3057 and
+#3059.
 
 Detail: [backlog_core/ARCHITECTURE.md](../backlog_core/ARCHITECTURE.md).
 
@@ -70,7 +76,8 @@ Role: the plan and task domain, plus the CLI application.
 
 Owns: plan and task models, plan lifecycle, and the CLI entry point.
 
-Consumes: `progressive_markdown` for all markdown handling; `dh_core` for shared operations.
+Consumes today: `dh_core` for shared operations. Routing plan and task reads through
+`progressive_markdown` remains tracked by #3058.
 
 Constraint: plan mutation is single-writer. Operations that append a task or finalise a plan
 must not be performed concurrently by more than one writer — this constraint is easy to

@@ -17,16 +17,15 @@ Does NOT:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, replace
 from collections.abc import Sequence
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 from progressive_markdown.exceptions import OrdinalNotFoundError
 from progressive_markdown.indexer import MarkdownIndexer
 from progressive_markdown.list_navigator import ENCODING as _ENCODING, TOKEN_BUDGET
-from progressive_markdown.parser import MarkdownItParser
-
 from progressive_markdown.models import CodeBlock, SectionNode
+from progressive_markdown.parser import MarkdownItParser
 
 
 class NormalizedEntry(Protocol):
@@ -57,9 +56,11 @@ class NormalizedSection(Protocol):
     @property
     def entries(self) -> Sequence[NormalizedEntry]: ...
 
+
 # ---------------------------------------------------------------------------
 # Format constants (architect spec §5.5)
 # ---------------------------------------------------------------------------
+
 
 _TITLE_MAX: int = 50
 _PREVIEW_MAX: int = 60

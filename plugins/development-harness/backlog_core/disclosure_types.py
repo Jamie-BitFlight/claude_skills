@@ -45,7 +45,9 @@ class DisclosureMode(StrEnum):
 class MapResponse(BaseModel):
     """Response for ``map=True`` calls.
 
-    ``map_text`` is always < 2,000 tokens regardless of item size.
+    ``map_text`` contains the complete formatted map. ``over_budget`` reports whether
+    the represented content exceeds the navigation budget; it does not truncate or
+    paginate the map.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -64,7 +66,7 @@ class MapResponse(BaseModel):
     """
 
     map_text: str
-    """Full formatted map — ordinal lines joined by newlines (≤ 2,000 tokens)."""
+    """Complete formatted map with ordinal lines joined by newlines."""
 
     over_budget: bool
     """``True`` when ``total_est_tokens`` exceeds the configured token budget."""

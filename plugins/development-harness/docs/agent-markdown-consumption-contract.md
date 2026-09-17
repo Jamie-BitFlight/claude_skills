@@ -337,7 +337,11 @@ The engine described by R1 exists as the `progressive_markdown` package:
 
 `ProgressiveMarkdownNavigator` and `Paginator` currently have no consumers. The engine's
 parser and indexer are imported by the address-navigation path; its navigation and
-pagination layer is not used by anything.
+pagination layer is not used by anything. The migrated runtime surface is narrower:
+`backlog_core.disclosure_handler` consumes `progressive_markdown.ordinal_mapper` for MAP/NAVIGATE
+addressing and `progressive_markdown.token_bounded` for EXTRACT windows. Default item reads,
+plan/task reads, artifact reads, CLI address navigation, the general navigator, and MAP pagination
+remain tracked by #3057, #3058, #3078, #3063, #3059, and #3062.
 
 **A naming caveat on stage boundaries, flagged in review.** `ProgressiveMarkdownNavigator.load()`
 itself calls `provider.get_markdown(source, ...)` — the class named "Navigator" contains a method

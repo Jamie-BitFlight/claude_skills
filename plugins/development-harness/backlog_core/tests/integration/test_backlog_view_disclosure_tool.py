@@ -15,7 +15,7 @@ Architecture reference:
   DN-2 — RT-ICA is ~560 tokens; head=100 used for truncation (not 4000)
 
 Test cases:
-  TC-T1: map=True on #2515 → map_text under 2000 tokens with ordinals (AC-1).
+  TC-T1: map=True on #2515 → complete map_text with ordinals.
   TC-T2: navigate=<RT-ICA ordinal> + head=100 → truncated=True, skip_tokens hint.
   TC-T3: navigate="99.99" (miss) → error response with valid_ordinals listed.
   TC-T4: Zero params → PASSTHROUGH → exact legacy key set unchanged.
@@ -228,10 +228,10 @@ def normalized_2515() -> list[NormalizedSection]:
 
 
 class TestMapMode:
-    """TC-T1: map=True on #2515 returns map_text under 2000 tokens with ordinals.
+    """TC-T1: map=True on #2515 returns complete map_text with ordinals.
 
-    Validates AC-1 (map under 2000 tokens) at the MCP tool boundary using the
-    FastMCP in-memory transport (``Client(mcp)``).
+    Validates MAP routing at the MCP tool boundary using the FastMCP in-memory
+    transport (``Client(mcp)``).
 
     Spy contract: patches ``backlog_core.operations.view_item`` (module attr).
     RED until T24 adds ``map: bool = False`` parameter to backlog_view().
@@ -250,11 +250,10 @@ class TestMapMode:
         assert "map_text" in data, f"map=True must produce 'map_text' key. Got keys: {sorted(data.keys())}"
 
     @_skip_without_2515
-    @_skip_without_real_enc
-    async def test_map_text_under_2000_tokens(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
-        """map_text from #2515 must be < 2000 tokens (AC-1 budget guarantee)."""
-        from progressive_markdown.list_navigator import ENCODING
-
+    async def test_map_text_contains_complete_mapper_output(
+        self, view_result_2515: ViewItemResult, normalized_2515: list[NormalizedSection], mocker: MockerFixture
+    ) -> None:
+        """MAP returns every mapper line rather than imposing an undocumented bound."""
         mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
@@ -264,11 +263,9 @@ class TestMapMode:
         assert "map_text" in data, f"Precondition: map_text missing from keys: {sorted(data.keys())}"
         map_text = data["map_text"]
         assert isinstance(map_text, str), f"map_text must be str, got {type(map_text)}"
-        token_count = len(ENCODING.encode(map_text))
-        assert token_count < 2000, (
-            f"map_text must be < 2000 tokens (AC-1). "
-            f"Got {token_count} tokens for #2515 with {len(map_text.splitlines())} lines."
-        )
+        mapper = OrdinalPathMapper(normalized_2515)
+        expected = "\n".join(mapper.format_map_line(entry) for entry in mapper.build_map())
+        assert map_text == expected
 
     @_skip_without_2515
     @_skip_without_real_enc

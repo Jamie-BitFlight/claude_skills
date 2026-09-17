@@ -332,12 +332,15 @@ backlog_view(selector="#2529", map=true)
 The resolution index inside `OrdinalPathMapper` is built eagerly to all depths during
 `build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
 
-The `map_text` field in `MapResponse` is bounded by the token budget (from
-`progressive_markdown.list_navigator.TOKEN_BUDGET`). See R2 in the behaviour contract for the
-pagination requirement governing what happens when the full index exceeds that budget — no
-addressable ordinal may be dropped or elided.
+The `map_text` field in `MapResponse` currently contains the complete formatted index. It is not
+bounded or paginated. `over_budget` compares the represented level-1 content estimate with
+`progressive_markdown.list_navigator.TOKEN_BUDGET`; it is diagnostic and does not alter
+`map_text`. This preserves every addressable ordinal but means MAP responses can exceed the
+window budget. Paginating this response remains tracked by #3059; content-identity follow-up
+requests remain tracked by #3062.
 
-Source: architecture spec §5.3 and `progressive_markdown/ordinal_mapper.py`.
+Source: `backlog_core/disclosure_handler.py::_handle_map` and
+`progressive_markdown/ordinal_mapper.py`.
 
 ---
 

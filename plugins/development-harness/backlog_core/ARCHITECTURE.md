@@ -3,10 +3,12 @@
 > **Audience: contributor/developer.** This document describes package seams, ownership, and
 > implementation constraints for maintainers; consumer setup and usage belong in the plugin docs.
 >
-> **Status: target architecture.** The provider-owned `FileCache` boundary described here is the
-> required end state. Direct YAML access and independently selected artifact/task providers named
-> as migration debt below remain in the current implementation until the linked implementation
-> tasks remove them.
+> **Status: current architecture with tracked migration boundaries.** Runtime work-item and content
+> operations resolve one configured backend through `create_backend()`; remote-provider cache
+> construction is factory-owned. Legacy Markdown/YAML parsing and independently selected artifact
+> providers remain only in migration tooling, not in `operations.py` or `server.py`. #3158 tracks
+> removal of the superseded artifact-provider surface, and #912 tracks the remaining task-storage
+> migration.
 
 ## Overview
 
@@ -28,8 +30,9 @@ Do not treat this document's approximate line references as an extraction checkl
 ## Storage Ownership and File Cache
 
 The configured backend is the only storage boundary visible to the CLI, MCP server, and operations
-layer. Work items, grooming, plans, artifact manifests, and artifact content are always accessed
-through that backend's protocols.
+layer for runtime work-item and content operations. Work items, grooming, plans, artifact manifests,
+and artifact content are accessed through that backend's protocols. Migration tooling still reads
+legacy local representations through the explicit exceptions described below.
 
 Backends fall into two storage categories:
 
@@ -853,8 +856,9 @@ implementation details.
   injection to `operations.py` and `server.py`. It does not expose a cache object.
 - `create_backend(name)` — sole composition root for backend storage. It resolves the configured
   provider, creates a `FileCache` for remote-capable providers, and injects it into that provider.
-  GitHub also privately composes its existing issue/Gist plan and artifact persistence adapters
-  behind `ContentProvider`; their provider wire formats do not escape the backend.
+  GitHub also privately composes its issue adapter, authoritative Contents API store, and read-only
+  legacy Gist/index migration stores behind `ContentProvider`; their provider wire formats do not
+  escape the backend.
   Local providers are created without a cache. Resolution order is explicit name →
   `BACKLOG_BACKEND` environment variable → `backlog.backend` in `.dh/config.yaml` →
   `.beads/dh-backend` marker auto-detect → default `"github"`.
@@ -913,9 +917,11 @@ mutation rules as work-item content. For Beads, SQLite, and Memory, those values
 backend storage only. Unsupported capabilities fail explicitly through the selected backend; they
 must not fall back to YAML or another provider.
 
-The existing independent `create_artifact_provider()` calls in `operations.py` and `server.py`,
-including the server's `LocalFilesystemArtifactProvider` fallback, are migration debt. They must be
-replaced by artifact capabilities obtained from the configured backend.
+`operations.py` and `server.py` obtain artifact capabilities from the configured backend; they no
+longer call `create_artifact_provider()` or select `LocalFilesystemArtifactProvider`. The
+independent provider factory and local fallback remain reachable from `artifact_migration.py` only.
+#3158 tracks removing or explicitly retiring that superseded migration surface; #3086 tracks the
+migration helper's bypass of the current artifact identity computation.
 
 ### GitHub writable records
 
@@ -1008,8 +1014,9 @@ and artifact access go through `get_config().backend`.
 - Protocols and `get_config()` from `backend_protocol.py`
 
 `operations.py` must not import `yaml_io.py`, `file_cache.py`, provider clients, provider-format
-adapters, or local backend implementations. Existing direct YAML, provider-client, and independent
-artifact-provider access is migration debt and does not describe a permitted architecture.
+adapters, or local backend implementations. It currently satisfies this boundary. Legacy parsing
+and independent artifact-provider access are confined to migration modules and do not describe a
+permitted runtime architecture.
 
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.
