@@ -1,20 +1,20 @@
 {
   ".claude-plugin/plugin.json": {
-    "mtime": 1789630013.0392134,
-    "seen": 1789684382.836489,
-    "ast_hash": "5dae1e0ebea1510f1fdd42b5f253d58e",
+    "mtime": 1789684609.901347,
+    "seen": 1789684652.643183,
+    "ast_hash": "17eb65866ac9f8ae5a387e4becadeb16",
     "semantic_hash": ""
   },
   ".codex-plugin/plugin.json": {
-    "mtime": 1789630013.0623474,
-    "seen": 1789684382.8365004,
-    "ast_hash": "ecbf390cde8e7a426ff48f64225158ec",
+    "mtime": 1789684609.9023468,
+    "seen": 1789684652.6431975,
+    "ast_hash": "ccf0364fee3650c7354a40b05d19f380",
     "semantic_hash": ""
   },
   ".cursor-plugin/plugin.json": {
-    "mtime": 1789630013.0833993,
-    "seen": 1789684382.836504,
-    "ast_hash": "1dd150a398097021ab30ad5bb7d5f6d6",
+    "mtime": 1789684609.9033468,
+    "seen": 1789684652.6432028,
+    "ast_hash": "ff87f0d30c2f3b14c914c3c28a4adb3c",
     "semantic_hash": ""
   },
   ".mcp.codex.json": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "backlog_core/operations.py": {
-    "mtime": 1789629306.5474544,
-    "seen": 1789684382.836579,
-    "ast_hash": "9cc0bad946b45006260cd27923e2a8e8",
+    "mtime": 1789684598.1983275,
+    "seen": 1789684652.6433127,
+    "ast_hash": "f348ae2ec1d6c99d216903e17fe0c307",
     "semantic_hash": ""
   },
   "backlog_core/parsing.py": {
@@ -1830,15 +1830,15 @@
     "semantic_hash": ""
   },
   "skills/kage-bunshin/scripts/health.py": {
-    "mtime": 1789629306.6815403,
-    "seen": 1789684382.8368804,
-    "ast_hash": "ea68a6eb59f2ca4d159e6e0e2f4d2710",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6437647,
+    "ast_hash": "76b2fb853317391e0b7fb63cca512e39",
     "semantic_hash": ""
   },
   "skills/kage-bunshin/scripts/monitor.py": {
-    "mtime": 1789629306.6816618,
-    "seen": 1789684382.8368814,
-    "ast_hash": "26ff316aa9b6a7c8cfa681701b6f4550",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6437669,
+    "ast_hash": "fcc001392c86a1b6ef3bc409136a5768",
     "semantic_hash": ""
   },
   "skills/kage-bunshin/scripts/spawn.py": {
@@ -2004,9 +2004,9 @@
     "semantic_hash": ""
   },
   "tests/test_agent_portability_and_verdict_drift.py": {
-    "mtime": 1789629796.5749576,
-    "seen": 1789684382.8369129,
-    "ast_hash": "c03f40e6f2796b96096c084eddf6b58a",
+    "mtime": 1789684598.3253279,
+    "seen": 1789684652.6438217,
+    "ast_hash": "07f888a188b97fe7b8b2093790dcc3eb",
     "semantic_hash": ""
   },
   "tests/test_agent_profile/__init__.py": {
@@ -3276,9 +3276,9 @@
     "semantic_hash": ""
   },
   "CLAIMS-REGISTER.md": {
-    "mtime": 1789629517.9823132,
-    "seen": 1789684382.83717,
-    "ast_hash": "cddd9fa1596ed6f204cab3e4ec236a51",
+    "mtime": 1789684598.1943276,
+    "seen": 1789684652.6442025,
+    "ast_hash": "3c1fdb84d9f4ab5744d46d0ce77a615a",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -3810,9 +3810,9 @@
     "semantic_hash": ""
   },
   "docs/work-ledger/measurements/harness-claude-code.md": {
-    "mtime": 1789629306.562428,
-    "seen": 1789684382.8372703,
-    "ast_hash": "f038c85a9a6257200d727d85b47ef422",
+    "mtime": 1789684598.1983275,
+    "seen": 1789684652.644359,
+    "ast_hash": "465bf5d9973ee6d1133eec79c0323129",
     "semantic_hash": ""
   },
   "docs/work-ledger/measurements/harness-codex.md": {
@@ -3822,9 +3822,9 @@
     "semantic_hash": ""
   },
   "docs/work-ledger/measurements/harness-cursor.md": {
-    "mtime": 1789629518.0537553,
-    "seen": 1789684382.8372724,
-    "ast_hash": "179a0b16e5513e4f0899b23ff8d580a8",
+    "mtime": 1789684598.1983275,
+    "seen": 1789684652.6443622,
+    "ast_hash": "5d18d234497088e94bf13fec3798fdaf",
     "semantic_hash": ""
   },
   "docs/work-ledger/measurements/harness-hermes.md": {
@@ -4032,9 +4032,9 @@
     "semantic_hash": ""
   },
   "skills/complete-implementation/references/final-handoff.md": {
-    "mtime": 1789629518.1437283,
-    "seen": 1789684382.8373137,
-    "ast_hash": "e08d883d221a8b4659393d0f86a96f5e",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.644421,
+    "ast_hash": "02a946e328f08834aa9e49ee0a4bfb8f",
     "semantic_hash": ""
   },
   "skills/complete-implementation/references/migration-fidelity-gate.md": {
@@ -4098,9 +4098,9 @@
     "semantic_hash": ""
   },
   "skills/dh-cli-usage/SKILL.md": {
-    "mtime": 1789629477.7469726,
-    "seen": 1789684382.837335,
-    "ast_hash": "d08edeada4e674fcd1d70d4cbd6fbe73",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6444395,
+    "ast_hash": "5277a6a9f521d855848d92bda1106758",
     "semantic_hash": ""
   },
   "skills/dh-cli-usage/references/command-reference.md": {
@@ -4110,9 +4110,9 @@
     "semantic_hash": ""
   },
   "skills/dh-cli-usage/references/mcp-connection-check.md": {
-    "mtime": 1789629477.7499726,
-    "seen": 1789684382.8373375,
-    "ast_hash": "1bbc52b0d92b56baeeae956356a82efd",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6444426,
+    "ast_hash": "f7c7451bd8aef1f3d8b330d361ff7eb8",
     "semantic_hash": ""
   },
   "skills/dh-glossary/SKILL.md": {
@@ -4296,9 +4296,9 @@
     "semantic_hash": ""
   },
   "skills/kage-bunshin/SKILL.md": {
-    "mtime": 1789629306.6809194,
-    "seen": 1789684382.8373718,
-    "ast_hash": "11d0941a6abb66ea3f3792725efc2296",
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6444988,
+    "ast_hash": "fb4422412773cbb6c84ffb38727904eb",
     "semantic_hash": ""
   },
   "skills/kage-bunshin/references/stream-json-protocol.md": {
@@ -5025,6 +5025,18 @@
     "mtime": 1789629306.5434544,
     "seen": 1789684382.8375208,
     "ast_hash": "43555b04e735dd7d524f9739ff793f21",
+    "semantic_hash": ""
+  },
+  "skills/kage-bunshin/tests/test_health.py": {
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.643773,
+    "ast_hash": "9e1ffa56092334e6e7fbfa304fc90796",
+    "semantic_hash": ""
+  },
+  "skills/kage-bunshin/references/team-health-check.md": {
+    "mtime": 1789684598.3243277,
+    "seen": 1789684652.6445022,
+    "ast_hash": "251ab2d7868350e575f8954bffc2f5b6",
     "semantic_hash": ""
   }
 }
