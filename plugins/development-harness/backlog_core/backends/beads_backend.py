@@ -83,9 +83,10 @@ from backlog_core.models import (
     ContentWrite,
     GroomedData,
     IssueLocalFields,
-    IssueStatus,
     MilestoneInfo,
     PullRequestRef,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     ViewItemResult,
 )
 
@@ -723,7 +724,7 @@ class BeadsBackend:
         _ = issue_num, repo
         return []
 
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult:
         """Raise NotImplementedError — beads IDs are strings.
 
         The Protocol signature uses ``int`` keys (GitHub issue numbers).
@@ -766,14 +767,14 @@ class BeadsBackend:
         parsed = parse_show_issue(raw)
         return str(parsed.status)
 
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool:
+    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> ViewEnrichmentResult:
         """Enrich a ViewItemResult with live data from beads via ``bd show``.
 
         Populates ``result.status``, ``result.state``, ``result.title``,
         ``result.source``, ``result.issue`` (the beads nanoid), and
         ``result.body`` (from the issue description and notes) from the
-        beads issue.  Returns ``False`` when the issue cannot be found or
-        the data is malformed.
+        beads issue. Returns a typed provider outcome when the issue cannot be
+        found or the data is malformed.
 
         Args:
             result: ViewItemResult to enrich in place.
@@ -781,7 +782,7 @@ class BeadsBackend:
             repo: Ignored for the beads backend.
 
         Returns:
-            True if enrichment succeeded, False otherwise.
+            Provider-reported enrichment outcome.
         """
         _ = repo
         try:
@@ -789,13 +790,13 @@ class BeadsBackend:
             parsed = parse_show_issue(raw)
         except (BdNotInstalledError, BdInvocationError) as exc:
             _log.debug("view_enrich_from_github: bd invocation failed for %r: %s", issue_num, exc)
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True, unavailable_reason=str(exc))
         except ValidationError as exc:
             _log.debug("view_enrich_from_github: validation error for %r: %s", issue_num, exc)
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True, unavailable_reason=str(exc))
         except ValueError as exc:
             _log.debug("view_enrich_from_github: bd show returned empty result for %r: %s", issue_num, exc)
-            return False
+            return ViewEnrichmentResult(enriched=False, attempted=True, unavailable_reason=str(exc))
 
         result.status = str(parsed.status)
         result.state = _collapse_beads_status(parsed.status).lower()
@@ -807,7 +808,7 @@ class BeadsBackend:
             result.body = parsed.description
         if parsed.notes:
             result.body = f"{result.body}\n\n## Notes\n\n{parsed.notes}" if result.body else parsed.notes
-        return True
+        return ViewEnrichmentResult(enriched=True, attempted=True)
 
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields:
         """Convert an IssueNode TypedDict to an IssueLocalFields model.

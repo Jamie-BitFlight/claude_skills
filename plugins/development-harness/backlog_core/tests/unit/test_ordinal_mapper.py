@@ -1,7 +1,7 @@
 """Tests for OrdinalPathMapper — TDD, authored before T14 implementation.
 
 These tests intentionally fail at collection (ModuleNotFoundError on
-``backlog_core.ordinal_mapper``) until T14 creates that module.  That is the
+``progressive_markdown.ordinal_mapper``) until T14 creates that module. That is the
 correct TDD state.
 
 Behavioral contract pinned by this file:
@@ -9,8 +9,8 @@ Behavioral contract pinned by this file:
 1. **Level-1 ordinals**: every ``NormalizedSection`` at index N produces an
    ``OrdinalEntry`` with ``ordinal=str(N)``.  Empty sections (entries=[]) are
    included in the map.
-2. **Level-2 emission gate**: level-2 lines are emitted only when
-   ``entry_count > 1`` OR ``section_est_tokens > TOKEN_BUDGET``.
+2. **Complete ordinal map**: every resolvable entry, sub-heading, and code-fence
+   ordinal is emitted without a size or entry-count gate.
 3. **est_tokens exact cl100k_base**: ``est_tokens == len(ENCODING.encode(body))``
    — chars//4 approximation would fail the assertion.
 4. **resolve() raises OrdinalNotFoundError on miss**: the exception carries
@@ -21,7 +21,7 @@ Behavioral contract pinned by this file:
    found by searching the built map by title — never hardcoded.
 
 Implementation note for T14:
-  Import surface is ``backlog_core.ordinal_mapper`` (module not yet written).
+  Import surface is ``progressive_markdown.ordinal_mapper``.
   Once T14 ships, pytest runs will show these tests passing instead of erroring
   at collection.
 """
@@ -36,19 +36,19 @@ import pytest
 import tiktoken
 import tiktoken.registry
 from hypothesis import given, settings, strategies as st
-
-from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
-from backlog_core.disclosure_handler import _ORDINAL_PATTERN
-from backlog_core.disclosure_types import OrdinalNotFoundError
+from progressive_markdown.exceptions import OrdinalNotFoundError
 
 # T14 creates this module — ModuleNotFoundError at collection until then (TDD state)
-from backlog_core.ordinal_mapper import (
+from progressive_markdown.ordinal_mapper import (
     OrdinalEntry,
     OrdinalPathMapper,
     ResolvedUnit,
     _entry_ordinal_for_code,
     _entry_ordinal_for_sub_heading,
 )
+
+from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
+from backlog_core.disclosure_handler import _ORDINAL_PATTERN
 
 # ---------------------------------------------------------------------------
 # Real-encoding availability guard
@@ -160,6 +160,22 @@ def _make_struck_sections(*specs: tuple[str, list[tuple[str, bool, str]]]) -> li
     return out
 
 
+def test_duplicate_section_titles_keep_distinct_occurrence_ordinals() -> None:
+    """The moved engine boundary preserves both duplicate-heading occurrences (#3190)."""
+    mapper = OrdinalPathMapper(_make_sections(("Duplicate", ["first"]), ("Duplicate", ["second"])))
+
+    entries = mapper.build_map()
+
+    assert [(entry.ordinal, entry.title) for entry in entries] == [
+        ("0", "Duplicate"),
+        ("0.0", "first"),
+        ("1", "Duplicate"),
+        ("1.0", "second"),
+    ]
+    assert mapper.resolve("0").content == "first"
+    assert mapper.resolve("1").content == "second"
+
+
 # ---------------------------------------------------------------------------
 # Module-level fixtures
 # ---------------------------------------------------------------------------
@@ -175,13 +191,11 @@ def groomed_body_doc() -> list[NormalizedSection]:
         [1] Description            - 1 entry (short, under budget)
         [2] Acceptance Criteria    - 1 entry (short, under budget)
         [3] Context                - 1 entry (short, under budget)
-        [4] Groomed (2026-06-01)   - 2 entries (entry_count > 1 -> gate fires):
+        [4] Groomed (2026-06-01)   - 2 addressable entries:
               entry 0: "### Concerns\\nPre-existing concerns in progressive_markdown/..."
               entry 1: "### RT-ICA\\nRT-ICA Final: MCP progressive disclosure..."
 
-    Section [4] has entry_count=2 so the level-2 emission gate fires for both
-    "4.0" and "4.1" regardless of token size.  This makes level-2 assertions
-    deterministic across real and stub encoders.
+    Section [4] has two entries, so both "4.0" and "4.1" are present.
     """
     return _make_sections(
         ("Story", ["As a **developer** using Claude Code skills, I want token-efficient MCP access."]),
@@ -298,32 +312,30 @@ class TestOrdinalAssignment:
 
 
 # ---------------------------------------------------------------------------
-# TC-O2: Level-2 emission gate
+# TC-O2: Complete level-2 emission
 # ---------------------------------------------------------------------------
 
 
-class TestLevelTwoEmissionGate:
-    """Level-2 lines emitted iff ``entry_count > 1`` OR ``est_tokens > TOKEN_BUDGET``."""
+class TestCompleteOrdinalMap:
+    """Every resolvable ordinal is present in the map and recovery metadata."""
 
-    def test_single_entry_under_budget_emits_level1_only(self, single_entry_doc: list[NormalizedSection]) -> None:
-        """Single-entry sections with short content emit level-1 ONLY — no level-2."""
+    def test_single_entry_under_budget_emits_entry_ordinal(self, single_entry_doc: list[NormalizedSection]) -> None:
+        """Small single-entry sections still expose their entry addresses."""
         mapper = OrdinalPathMapper(single_entry_doc)
         entries = mapper.build_map()
 
-        level2 = [e for e in entries if "." in e.ordinal]
-        assert level2 == [], (
-            f"Single-entry under-budget sections must emit no level-2 lines; got {[e.ordinal for e in level2]}."
-        )
+        assert [entry.ordinal for entry in entries] == ["0", "0.0", "1", "1.0", "2", "2.0"]
+        assert mapper.valid_ordinals() == [entry.ordinal for entry in entries]
 
     def test_multiple_entries_emit_level2_regardless_of_size(self, groomed_body_doc: list[NormalizedSection]) -> None:
-        """Section with entry_count > 1 emits level-2 lines for all entries."""
+        """Sections with multiple entries expose every entry address."""
         mapper = OrdinalPathMapper(groomed_body_doc)
         entries = mapper.build_map()
 
         ordinals = {e.ordinal for e in entries}
-        # Section [4] has 2 entries → both "4.0" and "4.1" must appear
-        assert "4.0" in ordinals, "Section [4] has 2 entries; ordinal '4.0' must be emitted (entry_count > 1 gate)."
-        assert "4.1" in ordinals, "Section [4] has 2 entries; ordinal '4.1' must be emitted (entry_count > 1 gate)."
+        # Section [4] has two entries, so both addresses must appear.
+        assert "4.0" in ordinals, "Section [4] has 2 entries; ordinal '4.0' must be emitted."
+        assert "4.1" in ordinals, "Section [4] has 2 entries; ordinal '4.1' must be emitted."
 
     @_skip_without_real_enc
     def test_single_entry_over_budget_emits_level2(self) -> None:
@@ -364,7 +376,7 @@ class TestLevelTwoEmissionGate:
         ordinals = {e.ordinal for e in entries}
         assert "1.0" in ordinals, (
             f"'OverBudget' section (1 entry, {actual_tokens}t > TOKEN_BUDGET={TOKEN_BUDGET}) "
-            f"must emit level-2 ordinal '1.0'. Got ordinals: {sorted(ordinals)}."
+            f"must expose level-2 ordinal '1.0'. Got ordinals: {sorted(ordinals)}."
         )
 
     def test_empty_section_emits_no_level2(self, empty_section_doc: list[NormalizedSection]) -> None:
@@ -374,6 +386,25 @@ class TestLevelTwoEmissionGate:
 
         children_of_empty = [e.ordinal for e in entries if e.ordinal.startswith("1.")]
         assert children_of_empty == [], f"Empty section [1] must emit no level-2 ordinals; got {children_of_empty}."
+
+    def test_single_entry_structured_section_exposes_all_resolvable_ordinals(self) -> None:
+        """The former gate-false shape exposes headings at the document edges and fences."""
+        content = (
+            "## First\n\nopening\n\n```python\nprint('first')\n```\n\n"
+            "### Nested\n\ninside\n\n## Last\n\nclosing\n\n```text\nlast\n```"
+        )
+        mapper = OrdinalPathMapper(_make_sections(("Only", [content])))
+
+        entries = mapper.build_map()
+        map_ordinals = [entry.ordinal for entry in entries]
+
+        assert map_ordinals == ["0", "0.0", "0.0.0", "0.0.0.code.0", "0.0.0.0", "0.0.1", "0.0.1.code.0"]
+        assert mapper.valid_ordinals() == map_ordinals
+        assert [mapper.resolve(ordinal).ordinal for ordinal in map_ordinals] == map_ordinals
+
+        with pytest.raises(OrdinalNotFoundError) as exc_info:
+            mapper.resolve("9")
+        assert exc_info.value.valid_ordinals == map_ordinals
 
 
 # ---------------------------------------------------------------------------
@@ -674,62 +705,34 @@ class TestIssue2515RTICADynamic:
     @_skip_without_2515
     @_skip_without_real_enc
     def test_rt_ica_level2_ordinal_is_in_valid_ordinals(self, normalized_2515: list[NormalizedSection]) -> None:
-        """RT-ICA (single-entry, under TOKEN_BUDGET) emits only level-1; level-1 is in valid_ordinals().
-
-        Ground truth from T10 phase gate: RT-ICA in #2515 fixture is ~560 tokens — below
-        TOKEN_BUDGET.  With entry_count=1 AND est_tokens < TOKEN_BUDGET, the level-2 emission
-        gate does NOT fire.  Level-2 must therefore be absent; the level-1 ordinal must be
-        present in ``valid_ordinals()``.
-        """
+        """Every RT-ICA entry ordinal is exposed regardless of section size."""
         mapper = OrdinalPathMapper(normalized_2515)
         entries = mapper.build_map()
 
-        # Level-2 must NOT be emitted for a single-entry under-budget section
         rt_ica_level2 = [e for e in entries if "RT-ICA" in e.title and "." in e.ordinal]
-        assert rt_ica_level2 == [], (
-            f"RT-ICA section (1 entry, ~560 tokens) is under TOKEN_BUDGET={TOKEN_BUDGET}; "
-            f"level-2 must NOT be emitted. Got: {[e.ordinal for e in rt_ica_level2]}."
-        )
-
-        # Level-1 ordinal is derived dynamically and must appear in valid_ordinals()
-        rt_ica_level1 = [e for e in entries if "RT-ICA" in e.title and "." not in e.ordinal]
-        assert rt_ica_level1, (
-            f"Precondition: RT-ICA level-1 entry must be in map. All entries: {[(e.ordinal, e.title) for e in entries]}"
-        )
-        rt_ica_ordinal = rt_ica_level1[0].ordinal
-        assert rt_ica_ordinal in mapper.valid_ordinals(), (
-            f"Derived RT-ICA level-1 ordinal {rt_ica_ordinal!r} must appear in valid_ordinals()."
-        )
+        assert rt_ica_level2
+        assert all(entry.ordinal in mapper.valid_ordinals() for entry in rt_ica_level2)
+        assert all(mapper.resolve(entry.ordinal).ordinal == entry.ordinal for entry in rt_ica_level2)
 
 
 # ---------------------------------------------------------------------------
-# AC-1: Map of #2515 stays under 2 000 tokens (architect spec §5.6)
+# AC-1: Map of #2515 remains complete regardless of its rendered size
 # ---------------------------------------------------------------------------
 
 
-class TestIssue2515MapBudget:
-    """AC-1: map_text for the 53-section #2515 must remain under 2 000 tokens."""
+class TestIssue2515MapCompleteness:
+    """The real large fixture exposes every map address through recovery metadata."""
 
     @_skip_without_2515
     @_skip_without_real_enc
-    def test_map_2515_under_2000_tokens(self, normalized_2515: list[NormalizedSection]) -> None:
-        """Full map for 53-section #2515 must stay under 2 000 cl100k_base tokens.
-
-        Verifies the level-2 emission gate keeps the map compact.  Worst-case bound
-        (architect spec SS5.6): 53 sections x ~40t + small number of over-budget entry
-        lines x ~40t < 2000t.
-        """
-        assert ENCODING is not None
+    def test_map_2515_has_identical_map_and_recovery_ordinals(self, normalized_2515: list[NormalizedSection]) -> None:
+        """The complete map is not shortened to satisfy an invented token limit."""
         mapper = OrdinalPathMapper(normalized_2515)
         entries = mapper.build_map()
-        map_text = "\n".join(mapper.format_map_line(e) for e in entries)
-        actual_tokens = len(ENCODING.encode(map_text))
+        map_ordinals = [entry.ordinal for entry in entries]
 
-        assert actual_tokens < 2000, (
-            f"Map of #2515 must be < 2 000 tokens; got {actual_tokens}. "
-            f"Number of map lines: {len(entries)}. "
-            f"Check the level-2 emission gate — too many level-2 lines push over budget."
-        )
+        assert mapper.valid_ordinals() == map_ordinals
+        assert [mapper.resolve(ordinal).ordinal for ordinal in map_ordinals] == map_ordinals
 
 
 # ---------------------------------------------------------------------------
@@ -758,7 +761,7 @@ def structured_entry_doc() -> list[NormalizedSection]:
     - ### Sub-heading B  → ordinal 4.0.1 (leaf, content with bash fence token)
       - bash fence        → ordinal 4.0.1.code.0
 
-    Two entries in section [4] keep the level-2 emission gate deterministic.
+    Two entries in section [4] exercise sibling entry ordinals.
     Entry 4.1 is 'Second entry.' — genuinely flat (no headings, no fences).
     """
     return _make_sections(
@@ -775,7 +778,7 @@ def code_only_entry_doc() -> list[NormalizedSection]:
     """Section [0] with two entries; entry 0.1 has prose + code fence, NO sub-headings.
 
     Verifies code fences alone do NOT set has_sub_heading_children=True.
-    Two entries trigger the level-2 gate so entry 0.1 receives its own ordinal.
+    Two entries exercise sibling entry ordinals.
     """
     return _make_sections(("Alpha", ["Other content.", "Prose text.\n\n```python\nprint('hi')\n```"]))
 
@@ -834,7 +837,7 @@ class TestRecursiveSubHeadingOrdinals:
 
         subtree_4 = {e.ordinal for e in entries if e.ordinal.startswith("4.")}
         # "4.1" is the flat second entry ("Second entry.") in section [4].
-        # It is emitted by the level-2 gate (entry_count=2 > 1) and correctly
+        # It is emitted as an addressable sibling entry and correctly
         # starts with "4.".  The §5.1 spec lists the 4.0 sub-structure (5
         # ordinals); "4.1" is the sibling entry, also in the 4.x set.
         expected = {"4.0", "4.0.code.0", "4.0.0", "4.0.1", "4.0.1.code.0", "4.1"}
@@ -1111,7 +1114,7 @@ class TestBackwardCompatibilityInvariant:
         states; actual field name verified from progressive_markdown/models.py),
         build_map() output is identical to the pre-feature implementation.
         """
-        # Two flat entries in one section → level-2 gate fires, produces 0, 0.0, 0.1 only
+        # Two flat entries in one section produce 0, 0.0, and 0.1 only.
         sections = _make_sections(("Alpha", ["flat one", "flat two"]))
         mapper = OrdinalPathMapper(sections)
         entries = mapper.build_map()
@@ -1361,9 +1364,6 @@ class TestResolveSubHeadingInsideStruckEntryInheritsStruckState:
         (sub-headings have no independent entry identity).
         """
         content = "### First\n\nFirst body.\n\n### Second\n\nSecond body.\n"
-        # Two entries in the section (not one) so the level-2 emission gate
-        # (entry_count > 1) fires and level-3 sub-ordinals are indexed — mirrors
-        # the module's own structured_entry_doc fixture convention.
         sections = _make_struck_sections((
             "Groomed",
             [(content, True, "ts-parent"), ("Second entry.", False, "ts-sibling")],

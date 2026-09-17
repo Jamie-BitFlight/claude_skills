@@ -6,6 +6,7 @@ __all__ = [
     "AmbiguousSectionRefError",
     "CodeBlockNotFoundError",
     "DocumentNotLoadedError",
+    "OrdinalNotFoundError",
     "PaginationError",
     "ParserError",
     "ProgressiveMarkdownError",
@@ -20,6 +21,16 @@ class ProgressiveMarkdownError(Exception):
 
 class DocumentNotLoadedError(ProgressiveMarkdownError):
     """Raised when a navigation method is called before load()."""
+
+
+class OrdinalNotFoundError(ProgressiveMarkdownError):
+    """Raised when an ordinal does not match a node in the document map."""
+
+    def __init__(self, requested: str, valid_ordinals: list[str]) -> None:
+        """Initialize with the missing ordinal and complete valid-ordinal list."""
+        super().__init__(f"Ordinal {requested!r} not found. Valid ordinals: {valid_ordinals}")
+        self.requested = requested
+        self.valid_ordinals = valid_ordinals
 
 
 class SectionNotFoundError(ProgressiveMarkdownError):

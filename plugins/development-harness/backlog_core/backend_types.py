@@ -23,13 +23,14 @@ if TYPE_CHECKING:
         ContentWrite,
         GroomedData,
         IssueLocalFields,
-        IssueStatus,
         MergeResult,
         Output,
         PullRequestRef,
         ReconcileRequest,
         ReconcileResult,
         SamTask,
+        StatusFetchResult,
+        ViewEnrichmentResult,
         ViewItemResult,
     )
 
@@ -274,9 +275,11 @@ class WorkItemBackend(Protocol):
         self, repo_obj: Repository, issue_num: int, output: Output | None = None
     ) -> str | None: ...
     def check_open_prs_for_issue(self, issue_num: int, repo: str = "") -> list[PullRequestRef]: ...
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]: ...
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult: ...
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str: ...
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool: ...
+    def view_enrich_from_github(
+        self, result: ViewItemResult, issue_num: str, repo: str = ""
+    ) -> ViewEnrichmentResult: ...
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields: ...
 
     # Status mutations (generic — BeadsBackend really implements these)

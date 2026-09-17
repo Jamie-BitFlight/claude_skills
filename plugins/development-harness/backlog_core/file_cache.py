@@ -10,8 +10,8 @@ import warnings
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
-from typing import NamedTuple
 
+from pydantic import BaseModel, ConfigDict
 from ruamel.yaml import YAML, YAMLError
 
 from .file_cache_state import (
@@ -38,22 +38,35 @@ class LegacyMigrationError(ValueError):
     """Legacy item cannot be migrated without data loss."""
 
 
-class WorkItemSnapshotBatch(NamedTuple):
+class WorkItemSnapshotBatch(BaseModel):
     """Result of enumerating every durable work-item snapshot beneath the cache root.
 
-    ``skipped`` names every snapshot file that existed but failed to load,
-    relative to the cache's ``items/`` root, in the same sorted order they
-    were discovered. A warm ``snapshot_checkpoint`` only records that a
-    reconcile ran, never that the item files it should have produced are
-    still readable (A-critique.md Sec 2.5, Sec 3.2): a cache whose files were
-    truncated, restored from a partial backup, or otherwise made unreadable
-    keeps its checkpoint but silently returns an empty snapshot set unless a
-    caller inspects ``skipped``. ``bool(skipped)`` is the discoverable flag;
-    ``len(skipped)`` is the count. This is the load-path signal a later
-    provenance check (backlog #3546 task A4) needs to distinguish "warm
-    checkpoint, complete snapshot set" from "warm checkpoint, partial or
-    corrupted snapshot set" -- neither of which this batch alone decides.
+    ``skipped`` names every relative path, beneath the cache's ``items/``
+    root, that kept the batch from being complete -- in sorted order. Most
+    entries name a snapshot file that existed but failed to load (bad YAML,
+    invalid UTF-8, a symlink escaping the cache root, or any other
+    ``OSError``). An entry may also name a subdirectory whose contents could
+    not even be enumerated (permission denied while scanning it): that
+    failure happens one level above any individual file, so it is recorded
+    once for the directory rather than once per file that would otherwise
+    have been found inside it. Both cases share this one field deliberately
+    -- a caller only needs to know the snapshot set is incomplete, not which
+    of the two ways it became incomplete. A warm ``snapshot_checkpoint`` only
+    records that a reconcile ran, never that the item files it should have
+    produced are still readable (see
+    ``plugins/development-harness/backlog_core/ARCHITECTURE.md`` under
+    "Snapshot completeness and listing provenance"): a cache
+    whose files were truncated, restored from a partial backup, or otherwise
+    made unreadable keeps its checkpoint but silently returns an empty
+    snapshot set unless a caller inspects ``skipped``. ``bool(skipped)`` is
+    the discoverable flag; ``len(skipped)`` is the count. This is the
+    load-path signal a later provenance check (backlog #3546 task A4) needs
+    to distinguish "warm checkpoint, complete snapshot set" from "warm
+    checkpoint, partial or corrupted snapshot set" -- neither of which this
+    batch alone decides.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     snapshots: list[tuple[str, BacklogItem]]
     skipped: list[str]
@@ -455,6 +468,28 @@ class FileCache:
             relative_path = Path(f"{relative_path}.yaml")
         self._save_item_snapshot(item, relative_path)
 
+    def _record_unreadable_snapshot_directory(self, item_root: Path, skipped: set[str], exc: OSError) -> None:
+        """Fold a directory-level traversal failure into ``skipped`` as ``os.walk``'s ``onerror`` callback.
+
+        ``exc.filename`` is the directory ``os.scandir`` failed to open, set
+        by the stdlib for every ``OSError`` a scan failure inside ``os.walk``
+        raises. Falls back to ``item_root`` itself only for the defensive
+        case where the stdlib ever leaves ``filename`` unset.
+
+        Args:
+            item_root: The cache's ``items/`` root, used to relativize the
+                failed path the same way every other entry in ``skipped`` is
+                relativized.
+            skipped: The batch's in-progress skip set, mutated in place.
+            exc: The ``OSError`` raised while scanning one directory.
+        """
+        failed_path = Path(exc.filename) if exc.filename else item_root
+        relative_directory = failed_path
+        with contextlib.suppress(ValueError):
+            relative_directory = failed_path.relative_to(item_root)
+        _log.warning("Work item snapshot directory %s: skipping unreadable subtree: %s", failed_path, exc)
+        skipped.add(relative_directory.as_posix())
+
     def _work_item_snapshots(self) -> WorkItemSnapshotBatch:
         """Return every durable work-item snapshot beneath the cache root.
 
@@ -471,24 +506,56 @@ class FileCache:
         complete snapshot set from a partial one, not just a log line it may
         never see (A-critique.md Sec 2.5, Sec 3.2).
 
+        Enumeration walks with :func:`os.walk`, not ``Path.rglob``, for
+        that same reason -- and not :meth:`pathlib.Path.walk` either, since
+        that method requires Python 3.12 and this project's
+        ``requires-python`` floor is 3.11. Verified against this
+        repository's pinned Python 3.13: when a subdirectory beneath
+        ``item_root`` has lost read/search permission, ``os.scandir``
+        raises ``PermissionError`` while ``rglob`` is descending into it,
+        and CPython's glob implementation swallows that error internally --
+        the whole subtree is silently dropped, with no path from it ever
+        reaching the per-file ``try``/``except`` below. ``os.walk``'s
+        ``onerror`` callback (see :meth:`_record_unreadable_snapshot_directory`)
+        is the stdlib-documented way to observe that same failure instead of
+        losing it, so an unreadable directory is folded into ``skipped`` too
+        -- keeping ``skipped`` the single discoverable signal for every way
+        the snapshot set can be incomplete, not just the file-level ones the
+        old ``rglob`` call could still see. Candidate snapshot paths are
+        still gathered from both a directory's files *and* its
+        subdirectories, matching ``rglob("*.yaml")``'s own behaviour of
+        yielding a directory whose name ends in ``.yaml`` too (see the
+        ``unreadable_path`` regression case in ``tests_backlog``): such a
+        directory still fails to load as a snapshot the same way a corrupt
+        file does, via the same per-path ``try``/``except`` below.
+
         Returns:
             A :class:`WorkItemSnapshotBatch` of the ordered ``(logical_key,
             item)`` pairs for every snapshot that loaded successfully, plus
-            the relative paths of every snapshot that did not.
+            the relative paths -- corrupt files and unreadable directories
+            alike -- of everything that did not.
         """
         item_root = self._root / "items"
         if not item_root.exists():
             return WorkItemSnapshotBatch(snapshots=[], skipped=[])
         snapshots: list[tuple[str, BacklogItem]] = []
-        skipped: list[str] = []
-        for path in sorted(item_root.rglob("*.yaml")):
+        skipped: set[str] = set()
+        candidate_paths = [
+            Path(directory) / name
+            for directory, subdirectories, files in os.walk(
+                item_root, onerror=lambda exc: self._record_unreadable_snapshot_directory(item_root, skipped, exc)
+            )
+            for name in (*subdirectories, *files)
+            if name.endswith(".yaml")
+        ]
+        for path in sorted(candidate_paths):
             relative = path.relative_to(item_root)
             try:
                 snapshots.append((relative.as_posix(), self._load_item_snapshot(relative)))
             except (ValueError, YAMLError, OSError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
-                skipped.append(relative.as_posix())
-        return WorkItemSnapshotBatch(snapshots=snapshots, skipped=skipped)
+                skipped.add(relative.as_posix())
+        return WorkItemSnapshotBatch(snapshots=snapshots, skipped=sorted(skipped))
 
     @staticmethod
     def _serialize_item(item: BacklogItem) -> str:

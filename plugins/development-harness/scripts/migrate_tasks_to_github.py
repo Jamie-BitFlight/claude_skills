@@ -64,10 +64,6 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from tls_compat import relax_verify_x509_strict
-
-relax_verify_x509_strict()
-
 import dh_paths
 import typer
 from backlog_core.gh_client import create_task_issue, get_github

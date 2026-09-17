@@ -17,12 +17,14 @@ Source: design doc sections 2.3, 3.1-3.3, 5.2, Risk #2.
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 
 import requests
 from github import GithubException
+from pydantic import BaseModel, ConfigDict
 
 from .models import BackendUnavailableError, BacklogError, ContentProviderError, UnsupportedBackendCapabilityError
 
@@ -44,6 +46,7 @@ RETRYABLE_TRANSIENT_EXCEPTIONS = (
 
 __all__ = [
     "RETRYABLE_TRANSIENT_EXCEPTIONS",
+    "SyncClaim",
     "SyncErrorKind",
     "SyncState",
     "SyncStatus",
@@ -90,6 +93,15 @@ class SyncErrorKind(StrEnum):
     UNKNOWN = "unknown"
 
 
+class SyncClaim(BaseModel):
+    """State captured atomically when a caller claims the sync slot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: SyncStatus
+    started_at: datetime | None
+
+
 @dataclass
 class SyncState:
     """Process-singleton dataclass holding all background sync bookkeeping.
@@ -107,8 +119,11 @@ class SyncState:
         pending_mutations: Offline-queue depth as of the last completed sync.
         rejected_mutations: Dead-lettered mutation count as of the last
             completed sync (key mismatches plus schema-invalid entries).
-        lock: asyncio.Lock serialising sync workers.  Named without underscore
-            so sync_engine can access it without triggering SLF001.
+        lock: asyncio.Lock serialising sync workers for the duration of a full
+            sync attempt.  Named without underscore so sync_engine can access
+            it without triggering SLF001.  Only ever awaited from the event
+            loop thread — never safe to acquire from a worker thread (see
+            ``try_claim``/``release_claim`` below for the cross-thread case).
     """
 
     status: SyncStatus = SyncStatus.IDLE
@@ -123,6 +138,14 @@ class SyncState:
     pending_mutations: int = 0
     rejected_mutations: int = 0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False, compare=False)
+    # Guards the ``status``/``started_at`` check-and-set in try_claim()/try_start()
+    # so it is atomic across OS threads, not just across coroutines. A plain
+    # ``threading.Lock`` (not the asyncio.Lock above) because callers include
+    # asyncio.to_thread worker threads (operations.list_items's implicit
+    # cold-cache read-through), where an asyncio.Lock cannot safely be awaited.
+    # Never accessed outside this class, so it stays private -- unlike ``lock``,
+    # which is genuinely public API for sync_engine.
+    _claim_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     @property
     def percent(self) -> int | None:
@@ -144,23 +167,84 @@ class SyncState:
         """
         return self.status == SyncStatus.RUNNING
 
+    def try_claim(self, *, track_started_at: bool = True) -> SyncClaim | None:
+        """Atomically claim the sync slot, returning the state held before the claim.
+
+        The single-flight primitive underlying both ``try_start()`` (startup
+        sync and ``sync_now``, always called from the event-loop thread) and
+        the implicit cold-cache read-through in ``operations.list_items``
+        (called from an ``asyncio.to_thread`` worker thread, and potentially
+        from two such worker threads racing each other on overlapping
+        ``backlog_list`` calls). The check-and-set is guarded by
+        ``_claim_lock``, a plain ``threading.Lock``, so it is atomic across
+        OS threads — the single-threaded-event-loop assumption a bare
+        ``if status == RUNNING`` check relies on does not hold once a worker
+        thread is a caller.
+
+        Returns the pre-claim status and start time (rather than assuming the
+        caller should restore ``IDLE`` or reading the timestamp before taking
+        the lock) so a transient, one-shot claim can hand the atomic snapshot
+        back to ``release_claim()``. This leaves the state exactly as the
+        preceding sync completed it, even if another claim completed before
+        this caller acquired the slot.
+
+        Args:
+            track_started_at: Whether to replace ``started_at`` when taking
+                the claim. Transient callers that restore prior state after a
+                handled failure leave this false so they do not corrupt the
+                previous sync's bookkeeping.
+
+        Returns:
+            The state that prevailed before the claim when the slot was
+            claimed (status was not ``RUNNING``, and is now); ``None`` when a
+            sync is already ``RUNNING`` and the claim was refused.
+        """
+        with self._claim_lock:
+            if self.status == SyncStatus.RUNNING:
+                return None
+            previous = SyncClaim(status=self.status, started_at=self.started_at)
+            self.status = SyncStatus.RUNNING
+            if track_started_at:
+                self.started_at = datetime.now(UTC)
+            return previous
+
+    def release_claim(self, previous: SyncClaim) -> None:
+        """Restore the status that prevailed before a matching ``try_claim()``.
+
+        Args:
+            previous: The state ``try_claim()`` returned when it succeeded.
+                Passing the value from an unsuccessful claim (``None``) is a
+                caller bug — every ``try_claim()`` caller must guard on
+                ``None`` before running the claimed work, so ``release_claim``
+                is never reached in that case.
+        """
+        with self._claim_lock:
+            self.status = previous.status
+            self.started_at = previous.started_at
+
+    def complete_claim(self) -> None:
+        """Complete a successful transient claim without changing when it started."""
+        with self._claim_lock:
+            now = datetime.now(UTC)
+            self.status = SyncStatus.IDLE
+            self.completed_at = now
+            self.last_success_at = now
+            self.last_error = ""
+            self.retry_count = 0
+            self.offline_reason = ""
+
     def try_start(self) -> bool:
         """Atomically claim the sync slot, returning True when claimed.
 
-        Synchronous and await-free: under the single-threaded event loop the
-        check-and-set cannot interleave with another coroutine. Callers use this
-        in place of a separate ``is_running()`` check followed by ``create_task``,
-        which races and can launch duplicate sync workers.
+        Thread-safe wrapper around ``try_claim()`` for callers — startup sync
+        and ``sync_now`` — that only need a boolean claim result and always
+        run the full sync to completion (never restoring a prior status).
 
         Returns:
             True if the slot was claimed (status was not RUNNING); False if a
             sync is already RUNNING.
         """
-        if self.status == SyncStatus.RUNNING:
-            return False
-        self.status = SyncStatus.RUNNING
-        self.started_at = datetime.now(UTC)
-        return True
+        return self.try_claim() is not None
 
     def to_dict(self) -> dict[str, object]:
         """Return a JSON-serialisable representation of the sync state.
@@ -320,7 +404,8 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
 
     Classification table (from design doc section 5.1):
 
-    - ``BackendUnavailableError`` (includes ``GitHubUnavailableError``) — NON_RETRYABLE.
+    - ``BackendUnavailableError`` (includes ``GitHubUnavailableError`` and
+      ``GraphQLUnavailableError``) — NON_RETRYABLE.
     - ``UnsupportedBackendCapabilityError`` (backend lacks an optional capability;
       retrying will not change what the backend supports) — NON_RETRYABLE.
     - ``ContentProviderError`` (unrelated exception tree from ``BacklogError``, so
@@ -328,7 +413,14 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
       which inspects ``__cause__``: a wrapped ``GithubException`` (e.g. a transient
       503 from ``get_many()``) gets that exception's own classification; otherwise
       NON_RETRYABLE (a genuine capability gap, not-found, or conflict).
-    - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE.
+    - ``BacklogError`` (generic backend/GraphQL fetch failure) — RETRYABLE. An
+      environment-wide GraphQL refusal is *not* generic: it raises
+      ``GraphQLUnavailableError`` and is caught by the first entry above, so it is
+      NON_RETRYABLE. That is the same verdict its underlying 403-without-``Retry-After``
+      already gets as a raw ``GithubException`` (below); before the refusal had its own
+      type, wrapping it in a plain ``BacklogError`` erased the status code and landed it
+      here by accident. OFFLINE with the refusal named beats spending the retry budget on
+      an environment that refuses the next attempt identically.
     - ``GithubException`` with status 401 or 404 — NON_RETRYABLE.
     - ``GithubException`` with status 403 and no ``Retry-After`` header — NON_RETRYABLE.
     - ``GithubException`` with status 403 and ``Retry-After`` header — RETRYABLE.
@@ -352,7 +444,9 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         ``SyncErrorKind`` indicating whether the sync should retry.
     """
     if isinstance(exc, (BackendUnavailableError, UnsupportedBackendCapabilityError)):
-        # Structural, not transient: a capability gap won't resolve by retrying.
+        # Structural, not transient: a capability gap won't resolve by retrying, and an
+        # environment that refuses GraphQL outright (GraphQLUnavailableError) refuses the
+        # next attempt on the same grounds.
         return SyncErrorKind.NON_RETRYABLE
     if isinstance(exc, ContentProviderError):
         # Unrelated exception tree from BacklogError (see models.py) — needs its own
@@ -365,7 +459,10 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         # Generic BacklogError (e.g. from sync_issues_graphql) and the transient
         # network exceptions both mean "worth retrying" — merged into one branch to
         # stay under ruff's too-many-return-statements limit. Checked after the
-        # structural non-retryable cases above so those stay non-retryable, and
+        # structural non-retryable cases above so those stay non-retryable: a
+        # GraphQLUnavailableError is a BacklogError by inheritance and must not reach
+        # this branch, or an environment-wide refusal would burn the retry budget
+        # before landing in the ERROR state it was never going to escape. Checked
         # after GithubException so a raw GithubException still gets status-code
         # classification rather than a blanket RETRYABLE.
         return SyncErrorKind.RETRYABLE

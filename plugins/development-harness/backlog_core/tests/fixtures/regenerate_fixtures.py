@@ -90,9 +90,9 @@ def main() -> None:
 #
 # Represents the canonical §5.1 shape from the architecture spec
 # (artifact_type="architect", item_id=2529):
-#   - One section "Analysis" with two entries (fires the level-2 emission gate).
+#   - One section "Analysis" with two addressable entries.
 #   - Entry 0 (ordinal 0.0): preamble + one ```python``` fence + two ### sub-headings.
-#   - Entry 1 (ordinal 0.1): plain content (present only to guarantee gate fires).
+#   - Entry 1 (ordinal 0.1): plain content for sibling-address coverage.
 #
 # This fixture must be updated manually whenever:
 #   1) The NormalizedEntry → SubtreeNode conversion contract changes (T08/T10).

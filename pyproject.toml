@@ -364,6 +364,9 @@ max-complexity = 12
     "private-member-access",
     "too-many-public-methods",
 ]
+# PyGithub's Requester can surface requests transport exceptions directly, so
+# gh_client.py translates connection and timeout failures at its provider boundary.
+"**/backlog_core/gh_client.py" = ["banned-api"]
 # PyGithub's HTTPSRequestsConnectionClass builds a requests.Session and mounts a
 # requests.adapters.HTTPAdapter, so substituting its TLS context means subclassing that
 # adapter — github_client.py must speak requests to do it, and adds no new HTTP client
@@ -384,6 +387,7 @@ max-complexity = 12
 # must reference requests.exceptions types to distinguish transient network-transport OSErrors
 # (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
 "**/backlog_core/sync_state.py" = ["banned-api"]
+"**/backlog_core/tests/test_batch_status_refusal.py" = ["banned-api"]
 "**/backlog_core/tests/test_open_pr_search_failure.py" = ["banned-api"]
 "**/backlog_core/tests/test_startup_sync.py" = ["banned-api"]
 # Regression test for the two issue mirrors' transient-transport handling needs a genuine
@@ -469,9 +473,8 @@ max-complexity = 12
 ]
 # Network error handling tests need genuine requests exception instances for test scenarios
 "**/tests/test_backlog_core_github.py" = ["banned-api"]
-# Regression test for RETRYABLE_TRANSIENT_EXCEPTIONS handling needs a genuine
-# requests exception instance to verify exact-type matching in the except clause.
 "**/tests/test_backlog_core_operations.py" = ["banned-api"]
+"**/tests/test_open_pr_search_failure.py" = ["banned-api"]
 # Corpus files for the SOLID A/B experiment — intentional violations at known line numbers
 # (linting-exceptions.md category 3: negative/bad-code examples or fixtures).
 # Modifying these to satisfy linters would remove the seeded defects the experiment measures.

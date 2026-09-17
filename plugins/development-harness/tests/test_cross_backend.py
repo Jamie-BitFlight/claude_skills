@@ -233,8 +233,9 @@ class TestCreateItem:
         # backends additionally expose _fetch_issue_graphql; that path is
         # covered in test_github_extras.py.
         result = ViewItemResult(title="Fetchable Feature")
-        enriched = backend.view_enrich_from_github(result, str(number))
-        assert enriched is True
+        enrichment = backend.view_enrich_from_github(result, str(number))
+        assert enrichment.enriched is True
+        assert enrichment.attempted is True
         assert result.title == "Fetchable Feature"
 
     def test_create_item_initial_state_is_open(self, backend: WorkItemBackend) -> None:
@@ -577,11 +578,11 @@ class TestBatchStatus:
         tracked = _make_item_with_issue(number)
 
         # Act
-        statuses = backend.batch_fetch_statuses([tracked])
+        status_result = backend.batch_fetch_statuses([tracked])
 
         # Assert
-        assert number in statuses
-        assert statuses[number].status.lower() in {"open", "closed"}
+        assert number in status_result.statuses
+        assert status_result.statuses[number].status.lower() in {"open", "closed"}
 
     def test_batch_status_empty_for_items_without_issue(self, backend: WorkItemBackend) -> None:
         """batch_fetch_statuses returns an empty dict for items with no issue number.
@@ -595,10 +596,11 @@ class TestBatchStatus:
         item = _make_item()  # no issue reference
 
         # Act
-        statuses = backend.batch_fetch_statuses([item])
+        status_result = backend.batch_fetch_statuses([item])
 
         # Assert
-        assert statuses == {}
+        assert status_result.statuses == {}
+        assert status_result.attempted is True
 
 
 # ---------------------------------------------------------------------------
@@ -622,10 +624,11 @@ class TestViewEnrich:
         result = ViewItemResult(title="Enrichable")
 
         # Act
-        enriched = backend.view_enrich_from_github(result, str(number))
+        enrichment = backend.view_enrich_from_github(result, str(number))
 
         # Assert
-        assert enriched is True
+        assert enrichment.enriched is True
+        assert enrichment.attempted is True
 
     def test_enrich_populates_number_field(self, backend: WorkItemBackend) -> None:
         """view_enrich_from_github populates result.number with the issue number.
@@ -656,10 +659,11 @@ class TestViewEnrich:
         result = ViewItemResult(title="Ghost")
 
         # Act
-        enriched = backend.view_enrich_from_github(result, "99999")
+        enrichment = backend.view_enrich_from_github(result, "99999")
 
         # Assert
-        assert enriched is False
+        assert enrichment.enriched is False
+        assert enrichment.attempted is True
 
 
 # ---------------------------------------------------------------------------
@@ -831,9 +835,10 @@ class TestBeadsBackendConformance:
         bd_runner.run_json.return_value = bd_show_fixture
         result = ViewItemResult(title="", status="", state="", source="")
 
-        ok = beads_backend.view_enrich_from_github(result, "bd-a3f8")
+        outcome = beads_backend.view_enrich_from_github(result, "bd-a3f8")
 
-        assert ok is True
+        assert outcome.enriched is True
+        assert outcome.attempted is True
         assert result.status == "open"
         assert result.state == "open"
         assert result.source == "beads"
@@ -847,9 +852,9 @@ class TestBeadsBackendConformance:
         bd_runner.run_json.return_value = bd_show_fixture
         result = ViewItemResult(title="", status="", state="", source="")
 
-        ok = beads_backend.view_enrich_from_github(result, "bd-a3f8")
+        outcome = beads_backend.view_enrich_from_github(result, "bd-a3f8")
 
-        assert ok is True
+        assert outcome.enriched is True
         assert result.body == (
             "The authentication module fails on expired tokens.\n\n## Notes\n\nEscalated by support team."
         )
@@ -861,7 +866,7 @@ class TestBeadsBackendConformance:
         bd_runner.run_json.return_value = bd_show_fixture
         result = ViewItemResult(title="", status="", state="", source="")
 
-        ok = beads_backend.view_enrich_from_github(result, "bd-a3f8")
+        outcome = beads_backend.view_enrich_from_github(result, "bd-a3f8")
 
-        assert ok is True
+        assert outcome.enriched is True
         assert result.body == "Escalated by support team."

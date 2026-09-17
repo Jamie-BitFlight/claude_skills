@@ -5,10 +5,9 @@
 refusal used to be converted into that same empty mapping, so every listing rendered
 blank statuses and reported no reason.
 
-Two guarantees are protected here. The refusal reaches the caller as a distinct
-exception, and the caller that chooses to continue with blank statuses says so in
-its output. Every other failure keeps its existing local-fallback behaviour, so an
-offline read still serves the cache rather than raising.
+Two guarantees are protected here. Every failed lookup reaches the caller as an
+availability exception, and the caller that chooses to continue from cached statuses
+says so in its output.
 """
 
 from __future__ import annotations
@@ -16,10 +15,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+import requests
 from github import GithubException
 
 from backlog_core import gh_client, operations
-from backlog_core.models import BacklogError, BacklogItem, GraphQLUnavailableError, IssueStatus, Output
+from backlog_core.models import (
+    BackendUnavailableError,
+    BacklogError,
+    BacklogItem,
+    GitHubUnavailableError,
+    GraphQLUnavailableError,
+    IssueStatus,
+    Output,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -41,7 +49,7 @@ class _Repo:
 
 
 class TestBatchFetchStatusesSurfacesTheRefusal:
-    """The GraphQL refusal must not arrive at the caller disguised as an empty map."""
+    """Neither the GraphQL refusal nor a genuine failure may arrive disguised as an empty map."""
 
     def test_a_refusal_propagates(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
@@ -50,14 +58,14 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         with pytest.raises(GraphQLUnavailableError):
             gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_generic_backlog_error_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """Offline continuity is deliberate: an ordinary failure keeps serving the cache."""
+    def test_a_generic_backlog_error_is_an_availability_failure(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=BacklogError("query rejected"))
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="query rejected"):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_a_github_exception_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
+    def test_a_github_exception_is_an_availability_failure(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
         mocker.patch.object(
             gh_client,
@@ -65,13 +73,68 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
             side_effect=GithubException(status=500, data={"message": "Server Error"}, headers={}),
         )
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="Server Error"):
+            gh_client.batch_fetch_statuses([_item("#42")])
 
-    def test_an_unreachable_backend_still_falls_back_to_an_empty_map(self, mocker: MockerFixture) -> None:
-        """``try_get_github`` returning None is the no-token/no-network path, not a refusal."""
+    @pytest.mark.parametrize(
+        "transport_error",
+        [
+            requests.exceptions.ConnectionError("connection dropped"),
+            requests.exceptions.Timeout("request timed out"),
+            requests.exceptions.ChunkedEncodingError("chunk lost"),
+            requests.exceptions.ContentDecodingError("bad encoding"),
+        ],
+    )
+    def test_a_transport_failure_is_an_availability_failure(
+        self, mocker: MockerFixture, transport_error: requests.exceptions.RequestException
+    ) -> None:
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=transport_error)
+
+        with pytest.raises(BackendUnavailableError, match=str(transport_error)):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_a_non_transport_exception_preserves_its_semantics(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=RuntimeError("invalid response shape"))
+
+        with pytest.raises(RuntimeError, match="invalid response shape"):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_a_try_get_github_failure_propagates_as_github_unavailable(self, mocker: MockerFixture) -> None:
+        """A network error/500/rate limit resolving the repo itself is not a refusal either.
+
+        This is the earlier of the two swallow points #3546 fixed: ``try_get_github``
+        itself used to fold *any* ``GithubException`` from ``get_repo`` — not just a
+        missing token — into the same ``None`` a missing token produces.
+        """
+        mocker.patch.object(
+            gh_client, "try_get_github", side_effect=GitHubUnavailableError("GitHub repository unavailable")
+        )
+
+        with pytest.raises(GitHubUnavailableError):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_an_unreachable_backend_is_an_availability_failure(self, mocker: MockerFixture) -> None:
         mocker.patch.object(gh_client, "try_get_github", return_value=None)
 
-        assert gh_client.batch_fetch_statuses([_item("#42")]) == {}
+        with pytest.raises(BackendUnavailableError, match="unable to create a GitHub client"):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_fetches_open_and_closed_issues_and_records_unlabeled_issues(self, mocker: MockerFixture) -> None:
+        """Closed and unlabeled issues remain distinguishable from absent issues."""
+        repo = _Repo()
+        mocker.patch.object(gh_client, "try_get_github", return_value=repo)
+        fetch = mocker.patch.object(
+            gh_client,
+            "sync_issues_graphql",
+            return_value=[{"number": 42, "labels": [], "milestone": None, "state": "CLOSED"}],
+        )
+
+        result = gh_client.batch_fetch_statuses([_item("#42")])
+
+        assert result == {42: IssueStatus(status="", milestone="", state="CLOSED")}
+        fetch.assert_called_once_with(repo, "owner", "repo", state="OPEN,CLOSED")
 
 
 class TestFetchItemStatusSurfacesTheRefusal:
@@ -151,6 +214,9 @@ class _Backend:
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
 
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+        return gh_client.batch_fetch_statuses(items, repo)
+
 
 def _patch_backend(mocker: MockerFixture, items: list[BacklogItem]) -> None:
     """Point ``operations.get_config()`` at a backend serving *items*."""
@@ -204,3 +270,24 @@ class TestListItemsReportsBlankStatuses:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any("Live status unavailable" in str(w) for w in warnings)
+
+    @pytest.mark.parametrize(
+        "transport_error",
+        [
+            requests.exceptions.ConnectionError("connection dropped"),
+            requests.exceptions.Timeout("request timed out"),
+            requests.exceptions.ChunkedEncodingError("chunk lost"),
+            requests.exceptions.ContentDecodingError("bad encoding"),
+        ],
+    )
+    def test_a_transport_failure_excludes_unverified_statuses(
+        self, mocker: MockerFixture, transport_error: requests.exceptions.RequestException
+    ) -> None:
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=transport_error)
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 0
+        assert any(str(transport_error) in warning for warning in _warnings(result))

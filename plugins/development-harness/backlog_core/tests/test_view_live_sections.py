@@ -109,9 +109,9 @@ class TestViewItemSectionsCoherence:
     def test_view_returns_local_sections_when_backend_unreachable(self, mocker: MockerFixture) -> None:
         """sections_index falls back to the provider record and warns when enrichment is unavailable.
 
-        When view_enrich_from_github returns False, result.body is not populated.
-        view_item must fall back to item.sections from the provider and append a
-        staleness warning.
+        When view_enrich_from_github reports unavailability, result.body is not
+        populated. view_item must fall back to item.sections from the provider
+        and append a staleness warning.
         """
         # Arrange — local item: two sections available as offline fallback
         local_item = BacklogItem(
@@ -129,8 +129,8 @@ class TestViewItemSectionsCoherence:
 
         # Assert — staleness warning present
         assert any("GitHub lookup failed" in w for w in result.warnings), (
-            "result.warnings must contain 'GitHub lookup failed' when view_enrich_from_github "
-            "returns False.  Callers must be able to detect that "
+            "result.warnings must contain 'GitHub lookup failed' when view enrichment is unavailable. "
+            "Callers must be able to detect that "
             "sections_index reflects the stored provider record, not live GitHub state."
         )
 

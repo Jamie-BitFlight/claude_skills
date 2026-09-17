@@ -112,6 +112,18 @@ List pagination and disclosure (``list_navigator`` sub-module)
 ``paginate_results``
     Paginates a list of structured items using offset/limit pagination,
     producing MCP-ready index and page responses.
+``OrdinalPathMapper``
+    Assigns and resolves canonical dot ordinals for generated Markdown sections.
+``OrdinalEntry``
+    One addressable entry in a dot-ordinal table of contents.
+``ResolvedUnit``
+    Complete navigation result for one resolved dot ordinal.
+``OrdinalNotFoundError``
+    Raised when a dot ordinal does not resolve, carrying every valid ordinal.
+``TokenBoundedExtractor``
+    Returns a caller-sized token window over complete Markdown content.
+``BoundedContent``
+    Structured token-window content and complete-content token metadata.
 
 Module-level constants
 ----------------------
@@ -157,6 +169,7 @@ from .exceptions import (
     AmbiguousSectionRefError,
     CodeBlockNotFoundError,
     DocumentNotLoadedError,
+    OrdinalNotFoundError,
     PaginationError,
     ParserError,
     ProgressiveMarkdownError,
@@ -185,13 +198,16 @@ from .models import (
     SourceSpan,
 )
 from .navigator import ProgressiveMarkdownNavigator
+from .ordinal_mapper import OrdinalEntry, OrdinalPathMapper, ResolvedUnit
 from .parser import MarkdownItParser, ParserResult
 from .providers import CallableMarkdownContentProvider, MarkdownContentProvider, MCPMarkdownContentProvider
+from .token_bounded import BoundedContent, TokenBoundedExtractor
 
 __all__ = [
     "ENCODING",
     "TOKEN_BUDGET",
     "AmbiguousSectionRefError",
+    "BoundedContent",
     "CallableMarkdownContentProvider",
     "CodeBlock",
     "CodeBlockNotFoundError",
@@ -207,6 +223,9 @@ __all__ = [
     "NavigationKind",
     "NavigationResult",
     "NavigatorOptions",
+    "OrdinalEntry",
+    "OrdinalNotFoundError",
+    "OrdinalPathMapper",
     "Page",
     "PaginationError",
     "ParserError",
@@ -215,9 +234,11 @@ __all__ = [
     "ProgressiveMarkdownError",
     "ProgressiveMarkdownNavigator",
     "ProviderError",
+    "ResolvedUnit",
     "SectionNode",
     "SectionNotFoundError",
     "SourceSpan",
+    "TokenBoundedExtractor",
     "chunk_text",
     "paginate_results",
 ]

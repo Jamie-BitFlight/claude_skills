@@ -335,7 +335,8 @@ class TestNormalizerIssue2521Fixture:
     """Under-budget fixture #2521: all sections returned, Groomed appears with entries=[]."""
 
     @pytest.fixture(scope="class")
-    def data_2521(self) -> dict[str, object]:
+    @classmethod
+    def data_2521(cls) -> dict[str, object]:
         return _load_fixture("issue-2521-full.json")
 
     def test_returns_one_section_per_fixture_section(self, data_2521: dict[str, object]) -> None:
@@ -400,11 +401,13 @@ class TestNormalizerIssue2515Fixture:
     """
 
     @pytest.fixture(scope="class")
-    def data_2515(self) -> dict[str, object]:
+    @classmethod
+    def data_2515(cls) -> dict[str, object]:
         return _load_fixture("issue-2515-full.json")
 
     @pytest.fixture(scope="class")
-    def normalized_2515(self, data_2515: dict[str, object]) -> list[NormalizedSection]:
+    @classmethod
+    def normalized_2515(cls, data_2515: dict[str, object]) -> list[NormalizedSection]:
         result = ViewItemResult.model_validate(data_2515)
         return ItemContentNormalizer().normalize(result)
 

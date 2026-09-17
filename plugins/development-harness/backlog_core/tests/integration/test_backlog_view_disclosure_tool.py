@@ -15,7 +15,7 @@ Architecture reference:
   DN-2 — RT-ICA is ~560 tokens; head=100 used for truncation (not 4000)
 
 Test cases:
-  TC-T1: map=True on #2515 → map_text under 2000 tokens with ordinals (AC-1).
+  TC-T1: map=True on #2515 → complete map_text with ordinals.
   TC-T2: navigate=<RT-ICA ordinal> + head=100 → truncated=True, skip_tokens hint.
   TC-T3: navigate="99.99" (miss) → error response with valid_ordinals listed.
   TC-T4: Zero params → PASSTHROUGH → exact legacy key set unchanged.
@@ -32,8 +32,8 @@ Spy contract:
 
 RT-ICA ordinal:
   Derived dynamically via _find_rt_ica_ordinal() — never hardcoded.
-  Ground truth (DN-2): RT-ICA in the #2515 fixture is ~560 tokens, single entry,
-  below TOKEN_BUDGET=4000.  Level-2 emission gate does NOT fire → level-1 ordinal.
+  Ground truth (DN-2): RT-ICA in the #2515 fixture is ~560 tokens. Its section
+  and entry ordinals are both present in the complete map.
 
 DN-2 correction:
   Task spec originally stated head=4000 / total_tokens>10000.
@@ -61,11 +61,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastmcp.client import Client
+from progressive_markdown.ordinal_mapper import OrdinalPathMapper
 
 from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedSection
 from backlog_core.models import ItemNotFoundError
 from backlog_core.operations import ViewItemResult
-from backlog_core.ordinal_mapper import OrdinalPathMapper
 from backlog_core.server import mcp
 
 if TYPE_CHECKING:
@@ -110,12 +110,20 @@ _PASSTHROUGH_LEGACY_KEYS: frozenset[str] = frozenset({
     "section_filter_miss",
     "sections_index",
     "status",
+    "status_source",
     "title",
+    "unavailable_capabilities",
 })
 """Exact key set returned by backlog_view(selector='#2515', summary=True) today.
 
 Captured by running the tool against the mocked fixture (summary=True default).
 If this assertion ever fails post-T24, the PASSTHROUGH contract is broken.
+
+Updated for #3546 B5: status_source/unavailable_capabilities are new typed
+degradation-provenance fields on ViewItemResult/BacklogViewResponse, carried
+through the compact PASSTHROUGH manifest by _build_compact_manifest
+(server.py) so they are not silently dropped on the default (summary=True)
+call path.
 """
 
 # ---------------------------------------------------------------------------
@@ -135,8 +143,8 @@ def _find_rt_ica_ordinal(normalized: list[NormalizedSection]) -> str:
     first OrdinalEntry with 'RT-ICA' in its title.  The ordinal is NEVER
     hardcoded — this function is the single source of truth for it.
 
-    Ground truth (DN-2): RT-ICA in #2515 is ~560 tokens, single entry, below
-    TOKEN_BUDGET=4000.  Level-2 emission gate does NOT fire → level-1 ordinal.
+    Ground truth (DN-2): RT-ICA in #2515 is ~560 tokens. The helper selects its
+    first matching address dynamically from the complete map.
 
     Args:
         normalized: Ordered NormalizedSection list from ItemContentNormalizer.
@@ -220,10 +228,10 @@ def normalized_2515() -> list[NormalizedSection]:
 
 
 class TestMapMode:
-    """TC-T1: map=True on #2515 returns map_text under 2000 tokens with ordinals.
+    """TC-T1: map=True on #2515 returns complete map_text with ordinals.
 
-    Validates AC-1 (map under 2000 tokens) at the MCP tool boundary using the
-    FastMCP in-memory transport (``Client(mcp)``).
+    Validates MAP routing at the MCP tool boundary using the FastMCP in-memory
+    transport (``Client(mcp)``).
 
     Spy contract: patches ``backlog_core.operations.view_item`` (module attr).
     RED until T24 adds ``map: bool = False`` parameter to backlog_view().
@@ -242,11 +250,10 @@ class TestMapMode:
         assert "map_text" in data, f"map=True must produce 'map_text' key. Got keys: {sorted(data.keys())}"
 
     @_skip_without_2515
-    @_skip_without_real_enc
-    async def test_map_text_under_2000_tokens(self, view_result_2515: ViewItemResult, mocker: MockerFixture) -> None:
-        """map_text from #2515 must be < 2000 tokens (AC-1 budget guarantee)."""
-        from progressive_markdown.list_navigator import ENCODING
-
+    async def test_map_text_contains_complete_mapper_output(
+        self, view_result_2515: ViewItemResult, normalized_2515: list[NormalizedSection], mocker: MockerFixture
+    ) -> None:
+        """MAP returns every mapper line rather than imposing an undocumented bound."""
         mocker.patch("backlog_core.operations.view_item", return_value=view_result_2515)
 
         async with Client(mcp) as client:
@@ -256,11 +263,9 @@ class TestMapMode:
         assert "map_text" in data, f"Precondition: map_text missing from keys: {sorted(data.keys())}"
         map_text = data["map_text"]
         assert isinstance(map_text, str), f"map_text must be str, got {type(map_text)}"
-        token_count = len(ENCODING.encode(map_text))
-        assert token_count < 2000, (
-            f"map_text must be < 2000 tokens (AC-1). "
-            f"Got {token_count} tokens for #2515 with {len(map_text.splitlines())} lines."
-        )
+        mapper = OrdinalPathMapper(normalized_2515)
+        expected = "\n".join(mapper.format_map_line(entry) for entry in mapper.build_map())
+        assert map_text == expected
 
     @_skip_without_2515
     @_skip_without_real_enc
@@ -664,6 +669,34 @@ class TestBacklogErrorInDisclosurePath:
             f"Got: {data['error']!r}"
         )
 
+    async def test_item_not_found_error_type_survives_flattening(self, mocker: MockerFixture) -> None:
+        """'error_type' names the raised exception's class, not just its message.
+
+        Before this fix, ``_execute_disclosure_or_passthrough``'s
+        ``except BacklogError`` arm
+        returned only ``{"error": str(exc)}`` -- indistinguishable from any
+        other ``BacklogError`` subtype (a refused GraphQL/REST lookup, an
+        unsupported backend capability, ...) with a similar-looking message.
+        A caller had to string-match the rendered message to recover the
+        failure's identity. This asserts the exception's *type* survives
+        instead, via a discriminating field -- not string content.
+        """
+        mocker.patch("backlog_core.operations.view_item", side_effect=ItemNotFoundError("#99999"))
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("backlog_view", {"selector": "#99999", "map": True})
+
+        data = _extract_response_dict(result)
+        assert "error_type" in data, (
+            f"BacklogError arm must include 'error_type' so the exception's identity "
+            f"survives instead of being flattened to a bare error string. "
+            f"Got keys: {sorted(data.keys())}"
+        )
+        assert data["error_type"] == "ItemNotFoundError", (
+            f"'error_type' must name the raised exception's class. "
+            f"Expected 'ItemNotFoundError', got: {data['error_type']!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Synthetic fixture support (recursive-nav shape)
@@ -673,8 +706,7 @@ class TestBacklogErrorInDisclosurePath:
 #
 #   Entry 0.0  — preamble + one ```python``` fence + two ### sub-headings.
 #                Used to verify AC#2, AC#3, AC#4, AC#5 (issue #2529).
-#   Entry 0.1  — plain content; present only to make entry_count=2 > 1 so the
-#                level-2 emission gate fires and 0.0 / 0.1 ordinals are emitted.
+#   Entry 0.1  — plain content; verifies sibling entry addressing.
 #
 # Provenance: hand-crafted to represent the canonical §5.1 shape described in
 # the architecture spec (artifact_type="architect", item_id=2529, §5 Data
@@ -683,7 +715,7 @@ class TestBacklogErrorInDisclosurePath:
 #
 # Design decisions:
 #   - sections_index (not body) provides document order — summary path used.
-#   - Two entries in "Analysis" guarantee level-2 gate fires: entry_count=2 > 1.
+#   - Two entries in "Analysis" exercise sibling entry addressing.
 #   - Entry 0 content contains one ```python``` fence and two ### sub-headings.
 #   - All ordinals derived dynamically from _find_subheading_entry_ordinal().
 # ---------------------------------------------------------------------------

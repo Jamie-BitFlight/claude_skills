@@ -30,10 +30,12 @@ from unittest.mock import MagicMock
 
 import pytest
 from progressive_markdown.list_navigator import ENCODING
+from progressive_markdown.token_bounded import BoundedContent, TokenBoundedExtractor
 
 # Intentionally fails at collection until T18 creates this module.
-from backlog_core.disclosure_handler import BacklogViewDisclosureHandler, TokenBoundedExtractor
-from backlog_core.disclosure_types import BoundedContent, BoundedResponse
+from backlog_core.disclosure_handler import BacklogViewDisclosureHandler
+from backlog_core.disclosure_types import BoundedResponse
+from backlog_core.models import Output
 from backlog_core.tests.conftest import REAL_CL100K_AVAILABLE
 
 # ---------------------------------------------------------------------------
@@ -471,13 +473,24 @@ class TestSubHeadingBoundaryExtract:
         # False here keeps leaf path active so these GREEN tests stay green after T10.
         mock_unit.has_sub_heading_children = False
         mock_unit.is_code_block = False
+        # BoundedResponse is a Pydantic model (B3) — struck/entry_id must be real
+        # bool/str values, not an unset MagicMock's auto-vivified attribute.
+        mock_unit.struck = False
+        mock_unit.entry_id = ""
 
         mock_mapper = MagicMock()
         mock_mapper.resolve.return_value = mock_unit
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper
+            selector="#2529",
+            ordinal="4.0.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         assert isinstance(result, BoundedResponse)
@@ -498,13 +511,24 @@ class TestSubHeadingBoundaryExtract:
         mock_unit.content = _SUB_HEADING_CONTENT
         mock_unit.has_sub_heading_children = False  # leaf — stays green after T10
         mock_unit.is_code_block = False
+        # BoundedResponse is a Pydantic model (B3) — struck/entry_id must be real
+        # bool/str values, not an unset MagicMock's auto-vivified attribute.
+        mock_unit.struck = False
+        mock_unit.entry_id = ""
 
         mock_mapper = MagicMock()
         mock_mapper.resolve.return_value = mock_unit
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0.0", head_tokens=total, skip_tokens=0, mapper=mock_mapper
+            selector="#2529",
+            ordinal="4.0.0",
+            head_tokens=total,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         assert isinstance(result, BoundedResponse)
@@ -546,13 +570,24 @@ class TestExtractOnParentNode:
         mock_unit.has_sub_heading_children = True
         mock_unit.is_code_block = False
         mock_unit.child_map = _CHILD_MAP_TEXT
+        # BoundedResponse is a Pydantic model (B3) — struck/entry_id must be real
+        # bool/str values, not an unset MagicMock's auto-vivified attribute.
+        mock_unit.struck = False
+        mock_unit.entry_id = ""
 
         mock_mapper = MagicMock()
         mock_mapper.resolve.return_value = mock_unit
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper
+            selector="#2529",
+            ordinal="4.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         # T10 contract: content is bounded child_map text (token-roundtrip canonical form)
@@ -581,13 +616,24 @@ class TestExtractOnParentNode:
         mock_unit.has_sub_heading_children = True
         mock_unit.is_code_block = False
         mock_unit.child_map = long_child_map
+        # BoundedResponse is a Pydantic model (B3) — struck/entry_id must be real
+        # bool/str values, not an unset MagicMock's auto-vivified attribute.
+        mock_unit.struck = False
+        mock_unit.entry_id = ""
 
         mock_mapper = MagicMock()
         mock_mapper.resolve.return_value = mock_unit
 
         handler = BacklogViewDisclosureHandler()
         result = handler._handle_extract(
-            selector="#2529", ordinal="4.0", head_tokens=head, skip_tokens=0, mapper=mock_mapper
+            selector="#2529",
+            ordinal="4.0",
+            head_tokens=head,
+            skip_tokens=0,
+            mapper=mock_mapper,
+            output=Output(),
+            status_source="cache",
+            unavailable_capabilities=[],
         )
 
         # T10 contract: truncation reflects child_map size, not empty-string content

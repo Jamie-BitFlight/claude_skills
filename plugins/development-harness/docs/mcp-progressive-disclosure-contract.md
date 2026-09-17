@@ -85,7 +85,8 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 ## NavigateResponse Shape
 
 `navigate=<ordinal>` (without `head`) returns a `NavigateResponse`
-(`disclosure_types.py`, `NavigateResponse` dataclass):
+(`disclosure_types.py`, `NavigateResponse` — a frozen Pydantic `BaseModel`, not a dataclass; see
+"Degradation and Diagnostic Fields" below):
 
 | Field          | Type          | Description                                                                              |
 |----------------|---------------|------------------------------------------------------------------------------------------|
@@ -98,6 +99,24 @@ Navigate to the ordinal in each token to retrieve the raw fence body.
 | `has_children` | `bool`        | `True` iff the node has sub-heading children. `False` for code-only nodes.              |
 | `struck`       | `bool`        | `True` iff the ordinal addresses a struck (retracted) entry, or a descendant of one.    |
 | `entry_id`     | `str`         | Stable identifier of the owning entry. `""` for level-1 section ordinals (no dot).      |
+| `messages`     | `list[str]`   | Informational messages from the underlying read. Always present, defaults to `[]`.      |
+| `warnings`     | `list[str]`   | Degradation warnings from the underlying read (e.g. a refused live-enrichment lookup). Always present, defaults to `[]`. |
+| `errors`       | `list[str]`   | Non-fatal error messages from the underlying read. Always present, defaults to `[]`.    |
+
+### Degradation and Diagnostic Fields
+
+`messages`, `warnings`, and `errors` are forwarded from the underlying `operations.view_item()`
+call's `Output` collector, so a degraded read (for example a refused live-enrichment lookup)
+surfaces on every NAVIGATE response instead of being silently discarded. The fields are always
+present and default to an empty list when the underlying read produced no diagnostics — absence
+of entries, not absence of the fields, signals a clean read. An agent should inspect `warnings`
+before treating returned content as authoritative, the same way it would for a PASSTHROUGH
+response.
+
+`NavigateResponse` (and `MapResponse`/`BoundedResponse`, used by the other disclosure modes) are
+frozen Pydantic `BaseModel` subclasses, per this repo's "structured data → Pydantic, not
+dataclass/TypedDict" convention, defined in
+[`../backlog_core/disclosure_types.py`](../backlog_core/disclosure_types.py).
 
 ---
 
@@ -245,6 +264,38 @@ anywhere.
 
 ---
 
+## Generic Backend Error
+
+Every failure raised while executing a MAP, NAVIGATE, or EXTRACT request that is not an ordinal
+miss or a section-filter miss — a missing backlog item, a refused GraphQL/REST lookup, an
+unsupported backend capability, or any other `BacklogError` subclass — is caught at the same site
+and returns a small, generic error shape:
+
+```text
+{
+  "error": "No item found for: #99999",
+  "error_type": "ItemNotFoundError"
+}
+```
+
+`error` is the exception's rendered message (`str(exc)`). `error_type` is the raised exception's
+class name (`type(exc).__name__`), giving the caller a stable identity to branch on instead of
+parsing the free-text message — `BacklogError` has multiple subclasses (`ItemNotFoundError`,
+`EntryNotFoundError`, `CacheStateCorruptError`, and others defined in
+[`../backlog_core/models.py`](../backlog_core/models.py)), and prior to this field every one of
+them flattened to the same bare `{"error": str(exc)}`, discarding which failure actually occurred.
+
+This generic shape does not replace the ordinal-miss or section-miss shapes: `OrdinalNotFoundError`
+keeps its own `valid_ordinals` field, and the legacy section-filter miss keeps its own
+`valid_sections`/`suggestion` fields. A caller that needs to distinguish "ordinal not found" from
+"item not found" from "backend refused the lookup" should check for `valid_ordinals` or
+`valid_sections` first, then fall back to `error_type` for every other `BacklogError` subclass.
+
+Implemented in
+[`../backlog_core/server.py`](../backlog_core/server.py)'s `_execute_disclosure_or_passthrough`.
+
+---
+
 ## Typical Navigation Flow
 
 Per R3 in the behaviour contract, the compact form — including the table of contents — returns
@@ -281,19 +332,22 @@ backlog_view(selector="#2529", map=true)
 The resolution index inside `OrdinalPathMapper` is built eagerly to all depths during
 `build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
 
-The `map_text` field in `MapResponse` is bounded by the token budget (from
-`progressive_markdown.list_navigator.TOKEN_BUDGET`). See R2 in the behaviour contract for the
-pagination requirement governing what happens when the full index exceeds that budget — no
-addressable ordinal may be dropped or elided.
+The `map_text` field in `MapResponse` currently contains the complete formatted index. It is not
+bounded or paginated. `over_budget` compares the represented level-1 content estimate with
+`progressive_markdown.list_navigator.TOKEN_BUDGET`; it is diagnostic and does not alter
+`map_text`. This preserves every addressable ordinal but means MAP responses can exceed the
+window budget. Paginating this response remains tracked by #3059; content-identity follow-up
+requests remain tracked by #3062.
 
-Source: architecture spec §5.3 and `backlog_core/ordinal_mapper.py`.
+Source: `backlog_core/disclosure_handler.py::_handle_map` and
+`progressive_markdown/ordinal_mapper.py`.
 
 ---
 
 ## Backward Compatibility
 
 For entries that contain no headings and no code fences, `OrdinalPathMapper` short-circuits
-and emits no level-3+ ordinals. The ordinal list for that entry is byte-for-byte identical to
-pre-feature output.
+and emits no level-3+ ordinals. The entry's level-2 ordinal remains in the complete map because
+every resolvable ordinal is discoverable.
 
-Source: architecture spec §5.2 and `backlog_core/ordinal_mapper.py`.
+Source: architecture spec §5.2 and `progressive_markdown/ordinal_mapper.py`.

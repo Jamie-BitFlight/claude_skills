@@ -57,10 +57,6 @@ if isinstance(sys.stderr, TextIOWrapper):
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from tls_compat import relax_verify_x509_strict
-
-relax_verify_x509_strict()
-
 import typer
 
 from sam_schema import artifacts, backlog, cli_active_task, cli_known_failure_types, dispatch, sam_plan
