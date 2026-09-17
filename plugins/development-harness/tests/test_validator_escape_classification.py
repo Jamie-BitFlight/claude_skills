@@ -79,7 +79,7 @@ async def test_a_bad_added_date_in_a_pulled_body_is_reported_as_an_error_respons
     )
     set_config(BacklogConfig(backend=backend))
 
-    result = await call_mcp_tool(mcp, "backlog_pull", {})
+    result = await call_mcp_tool(mcp, tool, {})
 
     assert "added must be YYYY-MM-DD" in result["error"], result
 
