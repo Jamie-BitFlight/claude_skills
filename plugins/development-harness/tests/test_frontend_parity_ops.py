@@ -60,7 +60,7 @@ def _run_cli(args: list[str], env: dict[str, str]) -> dict[str, Any]:
 
     result = run_cli_subprocess(["uv", "run", str(_plugin_root / "sam_schema" / "cli.py"), *args], timeout=30, env=env)
     if result.returncode != 0:
-        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:5000]}")
+        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr}")
     assert result.stdout.endswith("\n")
     assert result.stdout.count("\n") == 1
     assert '": "' not in result.stdout
@@ -78,7 +78,7 @@ def _invoke_cli(args: list[str]) -> dict[str, Any]:
     """
     result = _runner.invoke(app, args)
     if result.exit_code != 0:
-        raise RuntimeError(f"CLI exited {result.exit_code}: {result.stderr[:5000]}")
+        raise RuntimeError(f"CLI exited {result.exit_code}: {result.stderr}")
     assert result.stdout.endswith("\n")
     assert result.stdout.count("\n") == 1
     assert '": "' not in result.stdout

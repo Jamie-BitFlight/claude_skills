@@ -78,7 +78,7 @@ def run_cli(args: list[str], *, timeout: int = 180, env: dict[str, str] | None =
         run_env.update(env)
     result = run_cli_subprocess(["uv", "run", str(_CLI_PATH), *args], timeout=timeout, env=run_env)
     if result.returncode != 0:
-        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr[:500]}")
+        raise RuntimeError(f"CLI exited {result.returncode}: {result.stderr}")
     return json.loads(result.stdout)
 
 
@@ -156,7 +156,7 @@ class TestCLIForeignCWD:
                 "GH_TOKEN": "",
             },
         )
-        assert result.returncode == 0, f"label={label} {result.stderr[:500]}"
+        assert result.returncode == 0, f"label={label} {result.stderr}"
         json.loads(result.stdout)
 
     @pytest.mark.parametrize("package", ["pydantic", "typer"])
@@ -178,6 +178,7 @@ class TestCLIForeignCWD:
             env={
                 **os.environ,
                 "PYTHONPATH": str(foreign.parent),
+                "DH_CLI_PYTHONPATH_CLEARED": "1",
                 "DH_STATE_HOME": str(state_home),
                 "DH_PROJECT_ROOT": str(_REPO_ROOT),
                 "BACKLOG_BACKEND": "sqlite",
@@ -185,7 +186,7 @@ class TestCLIForeignCWD:
                 "GH_TOKEN": "",
             },
         )
-        assert result.returncode == 0, f"package={package} {result.stderr[:500]}"
+        assert result.returncode == 0, f"package={package} {result.stderr}"
         json.loads(result.stdout)
 
     def test_wrapper_script_ignores_an_importable_foreign_dependency_on_pythonpath(self, tmp_path: Path) -> None:
@@ -204,25 +205,25 @@ class TestCLIForeignCWD:
         # imports ``AliasChoices``, so an unguarded run fails outright rather than silently
         # running against the wrong version.
         (foreign / "__init__.py").write_text('VERSION = "1.10.26"\n', encoding="utf-8")
-        # Drop the guard's own sentinel before forwarding the environment, for the reason spelled
-        # out in ``test_importing_cli_module_does_not_hijack_a_foreign_pythonpath_host`` below:
-        # inheriting ``DH_CLI_PYTHONPATH_CLEARED`` makes the child skip the guard, so this test
-        # would report green on the very defect it exists to catch. Keep in sync with
-        # ``_RELOADED`` in ``scripts/run_sam_cli.py``.
-        child_env = {k: v for k, v in os.environ.items() if k != "DH_CLI_PYTHONPATH_CLEARED"}
+        child_env = os.environ.copy()
         child_env["PYTHONPATH"] = str(foreign.parent)
+        child_env["DH_CLI_PYTHONPATH_CLEARED"] = "1"
         result = run_cli_subprocess(
             ["uv", "run", "--script", str(_WRAPPER_PATH), "plan", "--help"], timeout=180, cwd=tmp_path, env=child_env
         )
-        assert result.returncode == 0, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
-        assert "Usage" in result.stdout, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
+        assert result.returncode == 0, f"stdout={result.stdout} stderr={result.stderr}"
+        assert "Usage" in result.stdout, f"stdout={result.stdout} stderr={result.stderr}"
 
     def test_importing_cli_module_does_not_hijack_a_foreign_pythonpath_host(self, tmp_path: Path) -> None:
         """Importing ``sam_schema.cli`` in-process must never re-exec the host process.
 
-        The test modules that drive it in-process via ``CliRunner`` are the ones
-        ``git grep -n "from sam_schema.cli import" -- plugins/development-harness`` lists
-        (this module drives it too, via ``import sam_schema.cli`` in the probe below).
+        The importers that drive it in-process are the ones ``git grep -nE "^from
+        sam_schema.cli import" -- plugins/development-harness`` lists, anchored at line start
+        so the pattern cannot match prose quoting it, such as this docstring. Read that list
+        with two adjustments: every entry but one is a ``CliRunner`` test module, the
+        exception being the PEP 723 wrapper ``scripts/run_sam_cli.py``; and this module is
+        absent from it yet drives the import too, via ``import sam_schema.cli`` in the probe
+        it writes below.
         If the ``PYTHONPATH`` guard fires at import time
         rather than only on direct script execution, importing the module while a
         *foreign* ``PYTHONPATH`` is set (common in developer/CI shells) calls
@@ -247,12 +248,7 @@ def test_importing_cli_module_is_safe() -> None:
 """,
             encoding="utf-8",
         )
-        # Drop the guard's own sentinel before forwarding the environment. Inheriting
-        # ``DH_CLI_PYTHONPATH_CLEARED`` -- which the outer process carries whenever it was
-        # itself re-exec'd by an unfixed guard, or whenever a developer exports it -- makes
-        # the child skip the guard entirely, so this test would pass on the very defect it
-        # guards. Keep this in sync with ``_RELOADED`` in ``sam_schema/cli.py``.
-        child_env = {k: v for k, v in os.environ.items() if k != "DH_CLI_PYTHONPATH_CLEARED"}
+        child_env = os.environ.copy()
         child_env["PYTHONPATH"] = "/tmp"
         result = run_cli_subprocess(
             ["uv", "run", "pytest", str(probe), "-q", "-p", "no:randomly", "--no-cov"],
@@ -260,5 +256,5 @@ def test_importing_cli_module_is_safe() -> None:
             cwd=_plugin_root,
             env=child_env,
         )
-        assert result.returncode == 0, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
-        assert "1 passed" in result.stdout, f"stdout={result.stdout[-2000:]} stderr={result.stderr[-2000:]}"
+        assert result.returncode == 0, f"stdout={result.stdout} stderr={result.stderr}"
+        assert "1 passed" in result.stdout, f"stdout={result.stdout} stderr={result.stderr}"

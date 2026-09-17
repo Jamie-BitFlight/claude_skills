@@ -29,12 +29,10 @@ from pathlib import Path
 # repeated here because it has to run *before* the package import below: ``sam_schema/__init__``
 # reaches pydantic, so a foreign copy on PYTHONPATH raises inside the package and cli.py's own
 # module body never executes. This wrapper is the entry point the implementation-manager
-# task_status_hook invokes, so this is the path that has to survive. Keep ``_RELOADED`` in sync.
-_RELOADED = "DH_CLI_PYTHONPATH_CLEARED"
-if __name__ == "__main__" and os.environ.get("PYTHONPATH") and not os.environ.get(_RELOADED):
+# task_status_hook invokes, so this is the path that has to survive.
+if __name__ == "__main__" and os.environ.get("PYTHONPATH"):
     _clean_env = dict(os.environ)
     _clean_env.pop("PYTHONPATH", None)
-    _clean_env[_RELOADED] = "1"
     os.execve(sys.executable, [sys.executable, *sys.argv], _clean_env)
 
 _plugin_root = Path(__file__).resolve().parent.parent

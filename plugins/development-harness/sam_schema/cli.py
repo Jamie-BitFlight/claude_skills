@@ -29,19 +29,21 @@ from pathlib import Path
 # CPython puts an inherited PYTHONPATH ahead of the environment uv resolved for this script, so a
 # foreign copy of any declared dependency can shadow it, including one that imports cleanly at the
 # wrong version. Restart without PYTHONPATH; the plugin's own import roots are added below. Gated
-# on __name__ == "__main__": this module is also imported in-process -- by every CliRunner test
-# module that ``git grep -n "from sam_schema.cli import" -- plugins/development-harness`` lists,
-# and by the PEP 723 wrapper scripts/run_sam_cli.py -- where os.execve would replace the
-# *importer's* own process using the importer's sys.argv, not the CLI's -- hijacking whatever host
-# imported us instead of just skipping a module-level restart it never needed. The wrapper
+# on __name__ == "__main__": this module is also imported in-process. ``git grep -nE "^from
+# sam_schema.cli import" -- plugins/development-harness`` lists those importers, anchored at line
+# start so the pattern cannot match prose quoting it, such as this comment. Read that list with two
+# adjustments: the PEP 723 wrapper scripts/run_sam_cli.py is in it but is not a test, and
+# tests/test_frontend_parity.py is absent from it yet imports this module anyway, from a probe it
+# writes at run time. Every remaining entry is a CliRunner test module. On any of those paths
+# os.execve would replace the *importer's* own process using the importer's sys.argv, not the
+# CLI's -- hijacking whatever host imported us instead of just skipping a module-level restart it
+# never needed. The wrapper
 # therefore carries its own copy of this guard above its package import, which is the only place it
 # can still fire: sam_schema's __init__ reaches pydantic, so a foreign copy on PYTHONPATH raises
 # before this module body runs.
-_RELOADED = "DH_CLI_PYTHONPATH_CLEARED"
-if __name__ == "__main__" and os.environ.get("PYTHONPATH") and not os.environ.get(_RELOADED):
+if __name__ == "__main__" and os.environ.get("PYTHONPATH"):
     _clean_env = dict(os.environ)
     _clean_env.pop("PYTHONPATH", None)
-    _clean_env[_RELOADED] = "1"
     os.execve(sys.executable, [sys.executable, *sys.argv], _clean_env)
 
 # Keep direct script invocation safe on platforms whose default streams are not UTF-8.
