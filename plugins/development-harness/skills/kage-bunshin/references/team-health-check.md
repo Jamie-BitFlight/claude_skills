@@ -19,7 +19,7 @@ uv run "${CLAUDE_SKILL_DIR}/scripts/monitor.py" health {team-name} --action-limi
 
 ## Team name discovery
 
-Team names come from `~/.claude/teams/`; each subdirectory is a team. The script defaults to the most recently modified team by `config.json` mtime. Pass an explicit name to target a specific team. SOURCE: `scripts/health.py:63-70,172-182`; verified by `tests/test_health.py::test_run_health_uses_latest_team_and_prints_member_snapshot`.
+Team names come from `~/.claude/teams/`; each subdirectory is a team. The script defaults to the most recently modified team by `config.json` mtime. Pass an explicit name to target a specific team. SOURCE: `scripts/health.py:63-70,176-184,191-194`; verified by `tests/test_health.py::test_run_health_uses_latest_team_and_prints_member_snapshot`.
 
 ## Output per member
 
@@ -33,7 +33,7 @@ SOURCE: `scripts/health.py:16-43,73-112,176-240` and `scripts/monitor.py:427-478
 
 ## Session file lookup
 
-JSONL session files are searched under `~/.claude/projects/{project-slug}/`, derived from the current git repository root. For each member, the script searches every candidate `.jsonl` file and picks the one where the member's `name` or `agentId` (`{name}@{team-name}`) appears earliest. The team-lead session is resolved directly from `leadSessionId` in the team config. SOURCE: `scripts/health.py:46-60,115-173`; verified by `tests/test_health.py::test_agent_last_actions_searches_all_files_and_complete_contents`.
+JSONL session files are searched under `~/.claude/projects/{project-slug}/`, derived from the current git repository root. For each member, the script searches every candidate `.jsonl` file and picks the one where the member's `name` or `agentId` (`{name}@{team-name}`) appears earliest. The team-lead session is resolved directly from `leadSessionId` in the team config. SOURCE: `scripts/health.py:46-60,115-173,203,212-225`; verified by `tests/test_health.py::test_agent_last_actions_searches_all_files_and_complete_contents`.
 
 ## When to use
 
