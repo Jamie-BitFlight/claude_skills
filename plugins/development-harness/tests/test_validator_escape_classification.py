@@ -43,14 +43,20 @@ _BAD_ADDED_BODY = (
 )
 
 
-async def test_a_bad_added_date_in_a_pulled_body_is_reported_as_an_error_response(tmp_path: Path) -> None:
-    """``backlog_pull`` names the refusal in ``error`` instead of failing the call.
+@pytest.mark.parametrize("tool", ["backlog_pull", "backlog_sync"])
+async def test_a_bad_added_date_in_a_pulled_body_is_reported_as_an_error_response(tmp_path: Path, tool: str) -> None:
+    """Each tool names the refusal in ``error`` instead of failing the call.
 
     ``BacklogItem.added``'s validator refuses a non-``YYYY-MM-DD`` value with ``raise ValueError``.
     ``github_sync.parse_issue_body`` is the single boundary where a provider issue body becomes a
     ``BacklogItem``, and reconciliation calls it for every pulled item, so a body whose metadata
     block carries a malformed ``added`` reached the tool as ``pydantic.ValidationError`` -- a
-    ``ValueError`` subclass that ``backlog_pull``'s ``except BacklogError`` never caught.
+    ``ValueError`` subclass that an ``except BacklogError`` never caught.
+
+    Both tools are covered because both reach that boundary through the same reconcile call:
+    ``backlog_pull`` via ``operations.pull_items`` and ``backlog_sync`` via
+    ``operations.sync_items``, which reconciles every already-linked item. Parametrised rather
+    than duplicated so a future tool that reconciles is one list entry away from coverage.
     """
     backend = GitHubBackend(cache=FileCache(tmp_path))
     backend.put_work_item(BacklogItem(title="An item", issue="#1", section="P1"))
