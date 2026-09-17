@@ -1,12 +1,14 @@
 """The content backend every MCP action falls back to when the ledger does not hold its plan.
 
-Bootstraps the session-scoped active-task context backend at import time and resolves the
-content-store task provider ``sam_plan``, ``sam_task``, and ``sam_active_task`` share -- the one
-piece of server-construction plumbing more than one of those tools' operation modules needs, so it
-lives here rather than in any one of them.
+Resolves the session-scoped active-task context backend and the content-store task provider
+``sam_plan``, ``sam_task``, and ``sam_active_task`` share -- the one piece of server-construction
+plumbing more than one of those tools' operation modules needs, so it lives here rather than in
+any one of them.
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from backlog_core.backend_protocol import get_config as get_backlog_config
 from backlog_core.backend_types import ContentProvider
@@ -14,15 +16,44 @@ from fastmcp.exceptions import ToolError
 
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
+from sam_schema.core.exceptions import SamError
 
-__all__ = ["get_backend"]
+if TYPE_CHECKING:
+    from sam_schema.core.context_backend import ContextBackend
 
-# Initialize the context backend at module import time.
-# Tests may call set_context_config() before importing this module to inject a custom backend.
-try:
-    get_context_config()
-except RuntimeError:
-    set_context_config(ContextConfig(backend=create_context_backend()))
+__all__ = ["get_backend", "get_context_backend"]
+
+
+def get_context_backend() -> ContextBackend:
+    """Resolve the active-task context backend, initialising it on first use.
+
+    Building this at import time made a misconfigured ``CONTEXTBACKEND`` an import error:
+    the whole MCP server failed to start, which is worse than a failed call on the one
+    tool that needs this backend. Mirrors ``cli_active_task._context_backend``'s lazy
+    init so both transports resolve through the same chain -- including which refusals
+    they convert: the factory raises ``NotImplementedError`` for ``"github"`` as well as
+    ``SamError`` for an unrecognised name, and ``"github"`` is listed among the valid
+    options the ``SamError`` message prints, so a user who follows that message lands on
+    the other type. Catching only one of the two let ``CONTEXTBACKEND=github`` escape
+    ``sam_active_task`` as a raw ``NotImplementedError``. Tests may still call
+    ``set_context_config()`` first to inject their own backend.
+
+    Returns:
+        The active ContextBackend implementation.
+
+    Raises:
+        ToolError: When the configured backend name is not a recognised backend, or is
+            ``"github"``, which is recognised but has no implementation yet.
+    """
+    try:
+        return get_context_config().backend
+    except RuntimeError:
+        try:
+            backend = create_context_backend()
+        except (SamError, NotImplementedError) as exc:
+            raise ToolError(str(exc)) from exc
+        set_context_config(ContextConfig(backend=backend))
+        return backend
 
 
 def get_backend(plan_dir_str: str) -> ContentTaskProvider:

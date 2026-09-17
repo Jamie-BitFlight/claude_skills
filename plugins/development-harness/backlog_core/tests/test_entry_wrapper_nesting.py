@@ -13,7 +13,7 @@ from typing import cast
 import pytest
 
 from backlog_core.entry_blocks import _parse_entry_timestamp, parse_entries, rewrite_section, wrap_entry
-from backlog_core.models import EntryNotFoundError, Section
+from backlog_core.models import EntryNotFoundError, Section, ValidationError
 from backlog_core.parsing import parse_md_body_sections
 
 _AGENT_SUBMITTED_PREWRAPPED = (
@@ -201,12 +201,12 @@ class TestUnknownTimestampSurvivesSinceFilter:
 
     def test_genuinely_malformed_id_still_raises(self) -> None:
         """The fix is scoped to the zero-date sentinel — other bad IDs remain loud."""
-        with pytest.raises(ValueError, match="does not contain a valid ISO timestamp prefix"):
+        with pytest.raises(ValidationError, match="does not contain a valid ISO timestamp prefix"):
             _parse_entry_timestamp("not-a-timestamp")
 
     def test_empty_id_still_raises(self) -> None:
         """The empty ID produced by the old orphan-entry corruption is not silently accepted."""
-        with pytest.raises(ValueError, match="does not contain a valid ISO timestamp prefix"):
+        with pytest.raises(ValidationError, match="does not contain a valid ISO timestamp prefix"):
             _parse_entry_timestamp("")
 
 

@@ -1059,7 +1059,12 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
         Dict mapping label name to GraphQL node ID.
 
     Raises:
-        ValueError: If a label name contains disallowed characters.
+        ValidationError: If a label name contains disallowed characters.  The names are
+            not caller-supplied — ``_apply_status_label`` reads them off the live issue
+            and sends the whole set back — so one repository label outside the pattern
+            refuses every status update on every issue wearing it.  It is a
+            ``BacklogError``, which that caller's own handler turns into a
+            "Could not set status" warning instead of failing the MCP tool call.
         BacklogError: On GraphQL auth/network/permission failures.
     """
     if not label_names:
@@ -1075,7 +1080,7 @@ def _resolve_label_ids_graphql(repo: Repository, owner: str, repo_name: str, lab
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
             msg = f"Label name contains disallowed characters: {name!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
 
     # Build aliased query: labelN: label(name: "...") { id name }
     alias_lines = [f'    label{i}: label(name: "{n}") {{ id name }}' for i, n in enumerate(unique_names)]
@@ -1117,7 +1122,14 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
         List of label name strings that exist in the repository.
 
     Raises:
-        ValueError: If a label name contains disallowed characters.
+        ValidationError: If a label name contains disallowed characters.  A
+            ``BacklogError`` subclass -- the type a caller would need to catch, not
+            one any caller sees today: nothing in the project calls this helper.  Its
+            only reference is ``GitHubBackend._resolve_labels_graphql``
+            (``backends/github_backend.py``), a ``WorkItemBackend`` protocol delegate
+            that no production code invokes; the direct callers are the tests in
+            ``tests/test_graphql_helpers.py``.  ``_resolve_label_ids_graphql`` is the
+            sibling that is live, through ``_apply_status_label``.
         BacklogError: If the GraphQL request fails (auth, network, permissions).
     """
     if not label_names:
@@ -1133,7 +1145,7 @@ def _resolve_labels_graphql(repo: Repository, repo_owner: str, repo_name: str, l
     for name in unique_names:
         if not _LABEL_NAME_PATTERN.match(name):
             msg = f"Label name contains disallowed characters: {name!r}"
-            raise ValueError(msg)
+            raise ValidationError(msg)
 
     alias_lines = [f'    label{i}: label(name: "{n}") {{ name }}' for i, n in enumerate(unique_names)]
     query = f"""
@@ -2102,7 +2114,7 @@ def create_task_issue(
     labels: list[str] | None = None,
     output: Output | None = None,
 ) -> IssueNode | None:
-    """Create a GitHub issue for a SAM task and link it as a sub-issue of the parent story.
+    r"""Create a GitHub issue for a SAM task and link it as a sub-issue of the parent story.
 
     The issue body uses ``build_sam_task_body()``: human-readable sections are
     visible in the GitHub UI, machine-readable metadata is stored in an invisible
@@ -2116,11 +2128,22 @@ def create_task_issue(
         task: ``SamTask`` with ``task_id``, ``feature``, ``task_type``, and other fields.
         description: Short human-readable description of the task.
         acceptance_criteria: Optional list of acceptance criteria strings.
-        labels: Optional list of label names to apply (e.g. ``["sam-task"]``).
+        labels: Optional list of label names to apply (e.g. ``["sam-task"]``).  Resolution
+            has three outcomes, not two.  Every name resolves; or a name is not a label in
+            the repository, which warns and skips that one label; or resolution itself
+            refuses -- ``_resolve_label_ids_graphql`` rejects a name outside
+            ``^[a-zA-Z0-9:_\-. ]+$`` with a ``ValidationError``, and a failed GraphQL
+            request raises ``BacklogError`` -- and the issue is then created with *no*
+            labels at all, under a single warning.  Both refusal branches are reachable:
+            ``labels`` arrives from the ``backlog_create_sam_task`` tool through
+            ``operations.create_sam_task``, and the transport branch fires on any auth,
+            network, or permission failure.  The issue is still created either way, so a
+            caller that needs its labels must read them back off the returned issue.
         output: Optional Output collector.
 
     Returns:
-        The created IssueNode dict, or None on failure.
+        The created IssueNode dict, or None on failure.  The dict's ``labels`` key is
+        always ``[]`` -- it describes the request, not the labels GitHub stored.
     """
     out = output or Output()
     title = build_sam_task_issue_title(task, description)

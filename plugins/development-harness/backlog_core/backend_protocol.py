@@ -48,6 +48,7 @@ from .models import (
     ContentProviderError,
     ContentUnavailableError,
     UnsupportedCapabilityError,
+    ValidationError,
 )
 
 if TYPE_CHECKING:
@@ -124,7 +125,7 @@ def get_config() -> BacklogConfig:
         The active BacklogConfig instance.
 
     Raises:
-        ValueError: When the resolved backend name is not recognised.
+        ValidationError: When the resolved backend name is not recognised.
     """
     global _active_config  # ruff: ignore[global-statement]
     if _active_config is None:
@@ -200,8 +201,12 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
         Configured ``WorkItemBackend`` instance.
 
     Raises:
-        ValueError: When *name* (or the resolved name) is not a recognised
-            backend identifier.  The message lists all valid options.
+        ValidationError: When *name* (or the resolved name) is not a recognised
+            backend identifier.  The message lists all valid options.  Every MCP tool
+            reaches this through ``get_config()``, so the refusal has to be a
+            ``BacklogError`` for a misconfigured ``BACKLOG_BACKEND`` or
+            ``.dh/config.yaml`` to report as an ``error`` field rather than fail the
+            tool call.
     """
     resolved = name or DHConfig().get_backend(subsystem="backlog")
 
@@ -222,4 +227,4 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
         return BeadsBackend()
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
-    raise ValueError(msg)
+    raise ValidationError(msg)

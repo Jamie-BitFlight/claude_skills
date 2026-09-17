@@ -48,6 +48,7 @@ from backlog_core.models import (
     ContentConflictError,
     ContentUnavailableError,
     Output,
+    ValidationError,
     ViewItemResult,
 )
 
@@ -594,8 +595,8 @@ class TestResolveLabelIdsGraphql:
         assert result == {}
         repo.requester.graphql_query.assert_not_called()
 
-    def test_invalid_label_name_raises_value_error(self, mocker: MockerFixture) -> None:
-        """_resolve_label_ids_graphql raises ValueError for label names with disallowed characters.
+    def test_invalid_label_name_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """_resolve_label_ids_graphql raises ValidationError for label names with disallowed characters.
 
         Tests: _resolve_label_ids_graphql label name validation
         How: Pass a label name containing a semicolon.
@@ -605,7 +606,7 @@ class TestResolveLabelIdsGraphql:
         repo = _make_mock_repo(mocker)
 
         # Act / Assert
-        with pytest.raises(ValueError, match="disallowed characters"):
+        with pytest.raises(ValidationError, match="disallowed characters"):
             _resolve_label_ids_graphql(repo, "test-owner", "test-repo", ["valid-label", "bad;label"])
 
     def test_deduplicates_label_names(self, mocker: MockerFixture) -> None:
