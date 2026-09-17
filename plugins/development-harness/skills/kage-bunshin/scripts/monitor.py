@@ -14,7 +14,7 @@ Subcommands:
 
 Usage:
     uv run monitor.py poll --session-id <id> [--state-dir <path>] [--interval <s>] [--timeout <s>]
-    uv run monitor.py health [team-name] [--jsonl-dir <path>]
+    uv run monitor.py health [team-name] [--jsonl-dir <path>] [--action-limit <count>]
 
 Exit codes (poll subcommand):
     0: Success (all_complete, intervention_needed, or timeout — check JSON status field).
@@ -439,6 +439,13 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help="Directory containing .jsonl session files (default: derived from git repo slug)",
     )
+    health.add_argument(
+        "--action-limit",
+        type=int,
+        default=0,
+        metavar="COUNT",
+        help="Maximum actions per member (default: 0, which prints all actions)",
+    )
 
     return parser
 
@@ -461,8 +468,14 @@ def main() -> None:
             sys.exit(1)
 
     elif args.subcommand == "health":
+        if args.action_limit < 0:
+            parser.error("--action-limit must be zero or greater")
         jsonl_dir = Path(args.jsonl_dir).expanduser() if args.jsonl_dir else None
-        run_health(team_name=args.team_name, jsonl_dir=jsonl_dir)
+        run_health(
+            team_name=args.team_name,
+            jsonl_dir=jsonl_dir,
+            action_limit=None if args.action_limit == 0 else args.action_limit,
+        )
 
     else:
         parser.print_help()
