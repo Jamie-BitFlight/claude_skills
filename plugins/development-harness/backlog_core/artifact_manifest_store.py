@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 from typing import Final
 
+from pydantic import ValidationError as _PydanticValidationError
+
 from .artifact_registry import ArtifactRegistry
 from .backend_types import ContentProvider
 from .models import (
@@ -14,6 +16,7 @@ from .models import (
     ContentNotFoundError,
     ContentRef,
     ContentWrite,
+    ValidationError,
 )
 
 # ponytail: three CAS attempts, use provider-side atomic registration if conflicts persist.
@@ -67,13 +70,31 @@ def register_manifest_entry(
 
 
 def artifact_content_reference(item_id: int | str, entry: ArtifactEntry) -> ContentRef:
-    """Return the immutable content identity referenced by an artifact entry."""
+    """Return the immutable content identity referenced by an artifact entry.
+
+    The manifest reference's boundary, one model deeper: ``ContentRef``'s validator refuses an
+    empty content name with ``raise ValueError``, which pydantic re-raises as
+    ``pydantic.ValidationError`` -- a ``ValueError`` subclass, not a ``BacklogError``, so
+    ``artifact_read``'s ``except BacklogError`` missed it and an entry stored with an empty
+    ``artifact_id`` failed the tool call instead of returning the documented ``error`` response.
+    Converting it here matches ``backlog_core.server._manifest_reference`` and covers both
+    callers of this helper, the MCP tool and ``dh_core.operations``.
+
+    Returns:
+        The content ``ContentRef`` for the entry.
+
+    Raises:
+        ValidationError: When *entry* does not name a usable content identity.
+    """
     name = entry.artifact_id
     if entry.content_revision:
         name = f"{name}@sha256:{entry.content_revision}"
-    return ContentRef(
-        kind="artifact_content", namespace=str(item_id), artifact_type=entry.artifact_type.value, name=name
-    )
+    try:
+        return ContentRef(
+            kind="artifact_content", namespace=str(item_id), artifact_type=entry.artifact_type.value, name=name
+        )
+    except _PydanticValidationError as exc:
+        raise ValidationError("; ".join(error["msg"] for error in exc.errors())) from exc
 
 
 def publish_artifact(
