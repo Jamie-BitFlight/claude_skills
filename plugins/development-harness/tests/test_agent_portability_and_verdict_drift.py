@@ -246,6 +246,47 @@ SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
 SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
 DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
 
+# Every instruction ``dh-cli-usage``'s body carries, written as the whole sentence it spans rather
+# than a phrase inside it. ``test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed``
+# matches these against the body with its whitespace collapsed, so deleting any one line of a
+# paragraph breaks the sentence crossing that line, while rewrapping the paragraph does not. The
+# two blocks are checked separately, by content, in the same test.
+DH_CLI_USAGE_INSTRUCTIONS = (
+    "# dh CLI usage",
+    (
+        "Use the line whose path is absolute. A line still reading `${…}` names a variable this "
+        "harness does not fill in; pass over it."
+    ),
+    (
+        "When no line is absolute, take the directory your harness stated for this skill: a `Base "
+        "directory for this skill:` line above this body, or the `skill_root` value a `skills.read` "
+        'call returns. Then `<sam_cli/>` is `uv run "<that directory>/../../sam_schema/cli.py"`, and '
+        "`<dh_scripts/>` is `<that directory>/../../scripts`."
+    ),
+    (
+        "When no line is absolute and no such directory is stated, report `STATUS: BLOCKED` naming "
+        "this skill, and run no `<sam_cli/>` command. Use the `mcp__plugin_dh_*` tools for any "
+        "operation that has one."
+    ),
+    (
+        "Wherever a dh skill, agent or reference writes `<sam_cli/> plan read …`, run your "
+        "`<sam_cli>` line followed by the words written after `<sam_cli/>`. The path in the line is "
+        "complete; run it as written. A path written `<dh_scripts/>/name.py` is your `<dh_scripts>` "
+        "line followed by `/name.py`. A dh command written without `<sam_cli/>`, such as `plan read "
+        "--address …`, runs the same way: your `<sam_cli>` line followed by the command."
+    ),
+    (
+        "When a `<sam_cli/>` command fails, run `<sam_cli/> plan --help`. When that also exits "
+        "non-zero, report the exact command and its stderr as `STATUS: BLOCKED`, and run no other "
+        "`<sam_cli/>` command."
+    ),
+    ("For the grouped commands and their options, read [command reference](./references/command-reference.md)."),
+    (
+        "When an `mcp__plugin_dh_*` server failed to connect, read [MCP connection check]"
+        "(./references/mcp-connection-check.md)."
+    ),
+)
+
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
 # this guard's defect, so an empty reason is never mistaken for an oversight the next person deletes.
@@ -808,16 +849,43 @@ def test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed() -> None:
     tells the model which line to take, and states where it stops.
 
     Each ``<sam_cli>`` and ``<dh_scripts>`` line is already whole, so a harness that substitutes its
-    variable leaves an absolute path and the model runs it without assembling one. The body must
-    also say to skip a line still reading ``${...}``, name the directory it falls back to, and run
-    no CLI command once it has reported ``STATUS: BLOCKED``.
+    variable leaves an absolute path and the model runs it without assembling one.
+
+    The prose is checked as whole instructions, not as substrings: every sentence in
+    ``DH_CLI_USAGE_INSTRUCTIONS`` spans the lines it is written on, and the body is matched with its
+    whitespace collapsed, so deleting any one line of a paragraph breaks the sentence crossing it.
+    A guard that asked only for a phrase such as ``STATUS: BLOCKED`` passed while the instruction
+    telling the model what to do about it was deleted around it.
+
+    The frontmatter is checked for the same reason: losing a delimiter, the ``name`` or the
+    ``description`` stops the skill being loaded or found at all, and every caller that preloads
+    ``dh:dh-cli-usage`` then silently gets nothing.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
         "plugin-creator:skill-creator's init_skill.py, then write its <sam_cli>/<dh_scripts> body."
     )
+
+    meta, _ = _load_frontmatter_from_path(DH_CLI_USAGE)
+    assert meta.get("name") == "dh-cli-usage", (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)}'s frontmatter does not parse to `name: "
+        "dh-cli-usage`; without it the skill is never loaded by the URI its callers preload."
+    )
+    assert meta.get("user-invocable") is False, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} must stay `user-invocable: false` -- it hands a "
+        "resolved command to other skills rather than running one for a user."
+    )
+    description = str(meta.get("description", ""))
+    undescribed = [phrase for phrase in ("dh CLI command", "mcp__plugin_dh_") if phrase not in description]
+    assert not undescribed, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)}'s description no longer says both what it gives "
+        f"and when to load it (missing {undescribed}); that text is all a harness reads when "
+        "deciding to load the skill."
+    )
+
     raw = DH_CLI_USAGE.read_text(encoding="utf-8")
     stripped = HTML_COMMENT_RE.sub("", FENCED_BLOCK_RE.sub("", raw))
+    collapsed = " ".join(stripped.split())
 
     sam_cli_blocks = _extract_tag_block(stripped, "sam_cli")
     assert len(sam_cli_blocks) == 1, (
@@ -839,33 +907,21 @@ def test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed() -> None:
         f"expected {list(DH_SCRIPTS_LINES)!r}."
     )
 
+    missing = [instruction for instruction in DH_CLI_USAGE_INSTRUCTIONS if instruction not in collapsed]
+    assert not missing, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} no longer carries instruction(s) its callers rely "
+        "on:\n"
+        + "\n".join(f"  {instruction}" for instruction in missing)
+        + "\nRestore the instruction, or change DH_CLI_USAGE_INSTRUCTIONS in the same commit that "
+        "deliberately rewords the body."
+    )
+
     unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
     assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
-    assert "pass over it" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not tell the agent to skip a line that is "
-        "still an unsubstituted ${…} variable."
-    )
-    assert "Base directory for this skill:" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not name the harness-stated directory it falls back to."
-    )
-    assert "run no `<sam_cli/>` command" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not fail closed when no path resolves."
-    )
-    assert "run no other `<sam_cli/>` command" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not bound what follows a STATUS: BLOCKED."
-    )
     assert "<plugin_root" not in raw, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens a `<plugin_root` tag; that token is retired "
         "in favor of `<sam_cli/>` and `<dh_scripts/>`."
-    )
-    assert "plan --help" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not name the `plan --help` probe outside a "
-        "fenced block or HTML comment."
-    )
-    assert "STATUS: BLOCKED" in stripped, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not instruct `STATUS: BLOCKED` on failure "
-        "outside a fenced block or HTML comment."
     )
 
 
