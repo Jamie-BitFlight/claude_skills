@@ -2114,7 +2114,7 @@ def create_task_issue(
     labels: list[str] | None = None,
     output: Output | None = None,
 ) -> IssueNode | None:
-    """Create a GitHub issue for a SAM task and link it as a sub-issue of the parent story.
+    r"""Create a GitHub issue for a SAM task and link it as a sub-issue of the parent story.
 
     The issue body uses ``build_sam_task_body()``: human-readable sections are
     visible in the GitHub UI, machine-readable metadata is stored in an invisible
@@ -2128,11 +2128,22 @@ def create_task_issue(
         task: ``SamTask`` with ``task_id``, ``feature``, ``task_type``, and other fields.
         description: Short human-readable description of the task.
         acceptance_criteria: Optional list of acceptance criteria strings.
-        labels: Optional list of label names to apply (e.g. ``["sam-task"]``).
+        labels: Optional list of label names to apply (e.g. ``["sam-task"]``).  Resolution
+            has three outcomes, not two.  Every name resolves; or a name is not a label in
+            the repository, which warns and skips that one label; or resolution itself
+            refuses -- ``_resolve_label_ids_graphql`` rejects a name outside
+            ``^[a-zA-Z0-9:_\-. ]+$`` with a ``ValidationError``, and a failed GraphQL
+            request raises ``BacklogError`` -- and the issue is then created with *no*
+            labels at all, under a single warning.  Both refusal branches are reachable:
+            ``labels`` arrives from the ``backlog_create_sam_task`` tool through
+            ``operations.create_sam_task``, and the transport branch fires on any auth,
+            network, or permission failure.  The issue is still created either way, so a
+            caller that needs its labels must read them back off the returned issue.
         output: Optional Output collector.
 
     Returns:
-        The created IssueNode dict, or None on failure.
+        The created IssueNode dict, or None on failure.  The dict's ``labels`` key is
+        always ``[]`` -- it describes the request, not the labels GitHub stored.
     """
     out = output or Output()
     title = build_sam_task_issue_title(task, description)
