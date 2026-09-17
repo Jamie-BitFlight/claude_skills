@@ -91,12 +91,14 @@ Consequences the design draws, each a claim in its own right:
 - **MCP is not in the shared layer**, since pi has no native MCP. The CLI over a shell is.
   Every other harness measured, Kilo Code included, registers MCP servers from project config.
   Confidence: source. Re-check: `earendil-works/pi` README.
-- **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Codex, Kimi
-  and Hermes substitute their own variables in a skill body, and Codex additionally substitutes
-  `${CLAUDE_PLUGIN_ROOT}` in a plugin's hook commands; pi removed `{baseDir}` in 0.24.0;
-  OpenCode returns the body verbatim; for Cursor, looked in the documentation snippets, both
-  Cursor repositories and the plugin template's validator, and did not find it. Confidence:
-  source, Cursor by snippet. Re-check: section 4 of each file.
+- **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Kimi and
+  Hermes substitute their own skill-directory variables in a skill body; Codex substitutes
+  nothing in a skill body, expanding `${CLAUDE_PLUGIN_ROOT}`/`${PLUGIN_ROOT}`/`${PLUGIN_DATA}`
+  only in a plugin's hook command strings and in Agent-Plugins MCP stdio
+  `command`/`args`/`env`/`cwd`; pi removed `{baseDir}` in 0.24.0; OpenCode returns the body
+  verbatim; for Cursor, looked in the documentation snippets, both Cursor repositories and the
+  plugin template's validator, and did not find it. Confidence: source, Cursor by snippet.
+  Re-check: section 4 of each file.
   `plugins/plugin-creator/CLAIMS-REGISTER.md` holds this claim for the skill-portability rule.
 - **`${CLAUDE_SKILL_DIR}` is substituted in a skill body by Claude Code.** Measured 2026-09-18 by
   invoking `dh:dh-cli-usage` in a Claude Code session: the `<sam_cli>` line arrived as an absolute
