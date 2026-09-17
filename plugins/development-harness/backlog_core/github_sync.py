@@ -327,7 +327,14 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         parsed_sections[target_key] = Section(entries=entries)
 
     # This is the boundary where a provider issue body becomes a model: reconciliation calls it
-    # for every pulled item, and the metadata block it reads is free-form remote text.
+    # for every pulled item, and the metadata block it reads is free-form remote text. The
+    # conversion below covers the ``BacklogItem`` construction only -- not the parse above it,
+    # which needs none: ``Section`` and ``GroomedData`` declare no validators, and ``Entry``'s
+    # one (``struck`` requires a non-empty ``struck_at``) is fenced by ``_STRUCK_HEADER_RE`` --
+    # ``entry_blocks._entry_from_span`` is the only construction that sets ``struck=True``, and
+    # it takes ``struck_at`` from that regex's ``(\S+)`` capture, so a blank timestamp fails the
+    # match outright and the entry parses unstruck instead. ``parse_entries``' own
+    # ``ValidationError`` is raised for a malformed ``since``, which this caller never passes.
     # ``BacklogItem.added``'s validator refuses a non-``YYYY-MM-DD`` value with ``raise
     # ValueError``, which pydantic re-raises as ``pydantic.ValidationError`` -- a ``ValueError``
     # subclass, not a ``BacklogError``, so ``backlog_pull``'s and ``backlog_sync``'s ``except
