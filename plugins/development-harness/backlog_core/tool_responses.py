@@ -121,17 +121,18 @@ class FallibleToolResponse(ToolResponse):
 # the wire shape and the domain result computed by artifact_register's
 # _run() closure cannot drift apart. Its BacklogError arm never has a
 # RegisterResult to report, so those four fields are widened to optional
-# here (dropped by exclude_none=True on that arm) without touching
+# here (excluded from serialization when ``None``) without touching
 # RegisterResult itself, which stays required for every other caller.
 # Docstring kept to one line -- see BacklogListResponse's design note on
 # the total outputSchema token budget.
 class ArtifactRegisterResponse(RegisterResult, FallibleToolResponse):
     """Response for ``artifact_register``."""
 
-    registered: bool | None = None
-    artifact_count: int | None = None
-    action: Literal["added", "updated"] | None = None
-    content_stored: bool | None = None
+    error: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    registered: bool | None = Field(default=None, exclude_if=lambda value: value is None)
+    artifact_count: int | None = Field(default=None, exclude_if=lambda value: value is None)
+    action: Literal["added", "updated"] | None = Field(default=None, exclude_if=lambda value: value is None)
+    content_stored: bool | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Milestone(BaseModel):
@@ -177,33 +178,35 @@ class ArtifactEntryOut(BaseModel):
 # Shared by artifact_list and artifact_get. Both have a BacklogError arm
 # (artifact_get also treats "type not found"/"id not found" as BacklogError,
 # per its docstring) that returns only error plus the Output triad, so
-# artifacts/count are widened to optional.
+# artifacts/count are widened to optional and excluded from serialization when ``None``.
 class ArtifactsListResponse(FallibleToolResponse):
     """Response for ``artifact_list``/``artifact_get``."""
 
-    artifacts: list[ArtifactEntryOut] | None = None
+    error: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    artifacts: list[ArtifactEntryOut] | None = Field(default=None, exclude_if=lambda value: value is None)
     """Registered artifact entries matching the request. Absent on the error arm."""
 
-    count: int | None = None
+    count: int | None = Field(default=None, exclude_if=lambda value: value is None)
     """Total number of artifacts returned; ``0`` alongside an empty ``artifacts``. Absent on the error arm."""
 
 
 # Mirrors ArtifactContent's model_dump(mode="json") shape. Its
 # BacklogError arm (raised for "type not found" and "id not found") never
-# has content to report, so every field is widened to optional.
+# has content to report, so every field is widened to optional and excluded when ``None``.
 class ArtifactReadResponse(FallibleToolResponse):
     """Response for ``artifact_read``."""
 
-    artifact_type: str | None = None
+    error: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    artifact_type: str | None = Field(default=None, exclude_if=lambda value: value is None)
     """Category of the returned artifact."""
 
-    path: str | None = None
+    path: str | None = Field(default=None, exclude_if=lambda value: value is None)
     """Repo-relative path (or logical artifact id) that was read."""
 
-    content: str | None = None
+    content: str | None = Field(default=None, exclude_if=lambda value: value is None)
     """Raw artifact content."""
 
-    status: str | None = None
+    status: str | None = Field(default=None, exclude_if=lambda value: value is None)
     """Lifecycle state of the artifact."""
 
 

@@ -49,3 +49,9 @@ def test_since_read_over_a_calendar_impossible_entry_refuses_as_a_backlog_error(
 def test_a_since_less_read_is_unaffected() -> None:
     """Only the ``since`` filter parses IDs, so the default read still returns the entry."""
     assert [e.content for e in parse_entries(_UNTIMESTAMPED_BODY)] == ["legacy content"]
+
+
+def test_invalid_since_refuses_as_a_backlog_error() -> None:
+    """Caller-supplied filter errors use the family ``backlog_view`` catches."""
+    with pytest.raises(BacklogError, match="Invalid since date or datetime"):
+        parse_entries(_UNTIMESTAMPED_BODY, since="not-a-date")

@@ -130,13 +130,11 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
             misconfigured ``CONTEXTBACKEND`` escaped as an unhandled exception;
             ``server_backend.get_context_backend`` converts a ``SamError`` into
             the ``ToolError`` a caller can read.
-        NotImplementedError: When the resolved name is ``"github"`` (pending T02
-            GitHubContextBackend implementation). ``"github"`` is in ``_VALID_BACKENDS``
-            and so in the "Valid options" list the ``SamError`` message prints, which
-            makes this a caller's path and not only a developer's: both transports
-            convert it the same way they convert the ``SamError`` --
-            ``server_backend.get_context_backend`` into a ``ToolError``,
-            ``cli_active_task._context_backend`` into a clean CLI error.
+        NotImplementedError: When the resolved name is ``"github"``. A
+            ``GitHubContextBackend`` implementation exists, but its process-local
+            session-to-issue index cannot recover active sessions after restart, so the
+            factory keeps it unavailable pending #3455. Both CLI and MCP transports
+            convert this distinct refusal into their normal error surfaces.
     """
     resolved = name or DHConfig().get_backend(subsystem="context")
 
@@ -150,7 +148,7 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         return BeadsContextBackend()
 
     if resolved == "github":
-        msg = "GitHub context backend is implemented in T02. Use 'local' or 'memory' instead."
+        msg = "GitHub context backend is not constructible pending #3455. Use 'local' or 'memory' instead."
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"

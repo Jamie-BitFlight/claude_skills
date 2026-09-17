@@ -31,10 +31,9 @@ def get_context_backend() -> ContextBackend:
     the whole MCP server failed to start, which is worse than a failed call on the one
     tool that needs this backend. Mirrors ``cli_active_task._context_backend``'s lazy
     init so both transports resolve through the same chain -- including which refusals
-    they convert: the factory raises ``NotImplementedError`` for ``"github"`` as well as
-    ``SamError`` for an unrecognised name, and ``"github"`` is listed among the valid
-    options the ``SamError`` message prints, so a user who follows that message lands on
-    the other type. Catching only one of the two let ``CONTEXTBACKEND=github`` escape
+    they convert: the factory raises ``NotImplementedError`` for the existing but
+    factory-disabled ``"github"`` backend as well as ``SamError`` for an unrecognised
+    name. Catching only one of the two let ``CONTEXTBACKEND=github`` escape
     ``sam_active_task`` as a raw ``NotImplementedError``. Tests may still call
     ``set_context_config()`` first to inject their own backend.
 
@@ -42,8 +41,8 @@ def get_context_backend() -> ContextBackend:
         The active ContextBackend implementation.
 
     Raises:
-        ToolError: When the configured backend name is not a recognised backend, or is
-            ``"github"``, which is recognised but has no implementation yet.
+        ToolError: When the configured backend name is not recognised, or when the
+            existing GitHub backend remains factory-disabled pending #3455.
     """
     try:
         return get_context_config().backend

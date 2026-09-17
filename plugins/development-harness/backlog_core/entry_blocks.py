@@ -454,6 +454,9 @@ def parse_entries(
 
     Returns:
         List of Entry objects, in chronological order.
+
+    Raises:
+        ValidationError: If ``since`` is not a valid ISO date or datetime.
     """
     spans = find_entry_spans(section_body)
 
@@ -472,7 +475,10 @@ def parse_entries(
         _deduplicate_timestamps(raw_entries)
 
     if since:
-        since_dt = datetime.fromisoformat(since)
+        try:
+            since_dt = datetime.fromisoformat(since)
+        except ValueError as exc:
+            raise ValidationError(f"Invalid since date or datetime: {since!r}") from exc
         if since_dt.tzinfo is None:
             since_dt = since_dt.replace(tzinfo=UTC)
 

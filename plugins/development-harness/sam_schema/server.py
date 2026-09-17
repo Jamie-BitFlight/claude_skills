@@ -237,8 +237,8 @@ def sam_active_task(
         ToolError: When ``session_id`` is missing, empty, or the reserved
             ``"_default"`` sentinel. Also when ``action="update"`` and no
             active task has been set, and when the configured context backend
-            cannot be built -- an unrecognised ``CONTEXTBACKEND`` name, or
-            ``"github"``, which is recognised but has no implementation yet.
+            cannot be built -- an unrecognised ``CONTEXTBACKEND`` name, or the
+            existing GitHub backend while it remains factory-disabled pending #3455.
     """
     return sam_active_task_impl(config, session_id)
 

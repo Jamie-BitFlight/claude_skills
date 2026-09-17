@@ -16,6 +16,7 @@ import pytest
 from backlog_core.backend_types import ContentProvider
 from backlog_core.models import ArtifactEntry, ArtifactManifest, ArtifactType, ContentKind, ContentRecord, ContentRef
 from backlog_core.server import mcp
+from fastmcp.exceptions import ToolError
 
 from tests.helpers import call_mcp_tool
 
@@ -34,6 +35,16 @@ async def test_empty_item_id_is_reported_as_an_error_response(tool_name: str) ->
         result = await call_mcp_tool(mcp, tool_name, _TOOL_PARAMS[tool_name])
 
     assert "namespace" in result["error"], result
+
+
+@pytest.mark.parametrize("tool_name", ["artifact_get", "artifact_list", "artifact_read"])
+async def test_unknown_artifact_type_is_reported_as_an_error_response(tool_name: str) -> None:
+    """Every string artifact-type input fails the MCP call as ``ToolError``."""
+    with (
+        patch("backlog_core.server._get_artifact_provider", return_value=MagicMock(spec=ContentProvider)),
+        pytest.raises(ToolError, match="Unknown artifact type"),
+    ):
+        await call_mcp_tool(mcp, tool_name, {"item_id": 42, "artifact_type": "not-a-type"})
 
 
 async def test_empty_artifact_id_in_the_manifest_is_reported_as_an_error_response() -> None:

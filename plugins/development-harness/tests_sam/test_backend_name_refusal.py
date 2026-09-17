@@ -72,7 +72,7 @@ def test_context_backend_refusal_reaches_the_tool_as_a_tool_error(monkeypatch: p
 
 
 def test_github_context_backend_reaches_the_tool_as_a_tool_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``"github"`` is a listed valid name, so its pending-implementation refusal is a caller's path too.
+    """The existing but factory-disabled GitHub backend refuses through ``ToolError``.
 
     ``create_context_backend`` refuses it with ``NotImplementedError``, not ``SamError``, and the
     name appears in the "Valid options" list the sibling refusal prints -- so a user who follows
@@ -81,7 +81,7 @@ def test_github_context_backend_reaches_the_tool_as_a_tool_error(monkeypatch: py
     monkeypatch.setenv("CONTEXTBACKEND", "github")
     reset_context_config()
     try:
-        with pytest.raises(ToolError, match="GitHub context backend"):
+        with pytest.raises(ToolError, match="#3455"):
             sam_active_task_impl(GetActiveTaskConfig(), "sess-1")
     finally:
         reset_context_config()

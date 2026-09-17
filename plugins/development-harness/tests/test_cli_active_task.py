@@ -161,7 +161,7 @@ def test_parser_rejects_positional_address_removed_format_and_unknown_option() -
     _assert_rejected("get", "--unknown", message="--unknown")
 
 
-@pytest.mark.parametrize(("backend_name", "expected"), [("nope", "Unknown backend"), ("github", "implemented in T02")])
+@pytest.mark.parametrize(("backend_name", "expected"), [("nope", "Unknown backend"), ("github", "pending #3455")])
 def test_bad_backend_reports_clean_error(monkeypatch, backend_name: str, expected: str) -> None:
     """A misconfigured CONTEXTBACKEND exits cleanly, not with a raw traceback."""
     monkeypatch.setenv("CONTEXTBACKEND", backend_name)

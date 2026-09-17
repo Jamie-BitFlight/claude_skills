@@ -34,6 +34,7 @@ import dispatch_schema as _ds
 import tiktoken
 from dh_core import operations
 from fastmcp import Context, FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp_tasks import TasksExtension
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
@@ -3138,6 +3139,14 @@ def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManife
     return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
+def _artifact_type(value: str) -> ArtifactType:
+    """Return a validated artifact type or fail the MCP call with ``ToolError``."""
+    try:
+        return ArtifactType(value)
+    except ValueError as exc:
+        raise ToolError(f"Unknown artifact type: {value!r}") from exc
+
+
 @mcp.tool(
     annotations=ToolAnnotations(
         title="Register Artifact",
@@ -3213,14 +3222,11 @@ async def artifact_register(
             )
 
         result = await asyncio.to_thread(_run)
-        response = ArtifactRegisterResponse(
+        return ArtifactRegisterResponse(
             **result.model_dump(), messages=out.messages, warnings=out.warnings, errors=out.errors
         )
-        return response.model_dump(exclude_none=True)
     except BacklogError as e:
-        return ArtifactRegisterResponse(
-            error=str(e), messages=out.messages, warnings=out.warnings, errors=out.errors
-        ).model_dump(exclude_none=True)
+        return ArtifactRegisterResponse(error=str(e), messages=out.messages, warnings=out.warnings, errors=out.errors)
 
 
 @mcp.tool(
@@ -3246,7 +3252,7 @@ async def artifact_list(
         artifacts, count (int), and output messages/warnings.
 
     Raises:
-        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
         ContentUnavailableError: The selected backend could not resolve the
             manifest. Not caught here — surfaces as a tool call error, not
             the documented error dict.
@@ -3254,7 +3260,7 @@ async def artifact_list(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        type_filter: ArtifactType | None = ArtifactType(artifact_type) if artifact_type else None
+        type_filter: ArtifactType | None = _artifact_type(artifact_type) if artifact_type else None
 
         def _run() -> list[dict]:
             manifest = _load_manifest(provider, item_id)
@@ -3265,9 +3271,9 @@ async def artifact_list(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
+        return ArtifactsListResponse.model_validate({"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactsListResponse, {"error": str(e), **out.to_dict()})
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3306,7 +3312,7 @@ async def artifact_get(
         failed call.
 
     Raises:
-        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
         ContentUnavailableError: The selected backend could not resolve the
             manifest. Not caught here — surfaces as a tool call error, not
             the documented error dict.
@@ -3314,7 +3320,7 @@ async def artifact_get(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        type_enum = ArtifactType(artifact_type)
+        type_enum = _artifact_type(artifact_type)
 
         def _run() -> list[dict]:
             manifest = _load_manifest(provider, item_id)
@@ -3328,9 +3334,9 @@ async def artifact_get(
             return [e.model_dump(mode="json") for e in entries]
 
         artifacts = await asyncio.to_thread(_run)
-        return _respond(ArtifactsListResponse, {"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
+        return ArtifactsListResponse.model_validate({"artifacts": artifacts, "count": len(artifacts), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactsListResponse, {"error": str(e), **out.to_dict()})
+        return ArtifactsListResponse.model_validate({"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
@@ -3371,7 +3377,7 @@ async def artifact_read(
         no matching content — an absent artifact is data, not a failed call.
 
     Raises:
-        ValueError: ``artifact_type`` is not an ``ArtifactType`` member.
+        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
         ContentUnavailableError: The selected backend could not resolve the
             manifest. Not caught here — surfaces as a tool call error, not
             the documented error dict.
@@ -3379,7 +3385,7 @@ async def artifact_read(
     out = Output()
     try:
         provider = _get_artifact_provider()
-        type_enum = ArtifactType(artifact_type)
+        type_enum = _artifact_type(artifact_type)
 
         def _run() -> ArtifactContent:
             manifest = _load_manifest(provider, item_id)
@@ -3408,9 +3414,9 @@ async def artifact_read(
             )
 
         result = await asyncio.to_thread(_run)
-        return _respond(ArtifactReadResponse, {**result.model_dump(mode="json"), **out.to_dict()})
+        return ArtifactReadResponse.model_validate({**result.model_dump(mode="json"), **out.to_dict()})
     except BacklogError as e:
-        return _respond(ArtifactReadResponse, {"error": str(e), **out.to_dict()})
+        return ArtifactReadResponse.model_validate({"error": str(e), **out.to_dict()})
 
 
 @mcp.tool(
