@@ -12,6 +12,15 @@ a repository other than the harness's own, such as a plugin template or sample p
 verbatim; **snippet** = search-result excerpts of a page a proxy blocked; **reported** = a
 third-party report, unconfirmed by the vendor.
 
+## Claude Code agent teams
+
+- **With `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in an interactive session, an Agent call with a
+  `name` creates a teammate unless it is a fork or passes `isolation`; named calls in `-p` mode and
+  unnamed, forked, or isolated calls remain ordinary subagents.** Source: Claude Code official
+  documentation, "Enable agent teams" and "How Claude starts agent teams," read 2026-09-17.
+  Confidence: source. Re-check: fetch <https://code.claude.com/docs/en/agent-teams> and compare
+  those two sections with the conditions stated here.
+
 ## Harness capability matrix (read 2026-09-06)
 
 One measurement file per harness, under `docs/work-ledger/measurements/`, holds the answer to

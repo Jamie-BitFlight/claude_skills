@@ -42,10 +42,10 @@ flowchart TD
 
 **Explore agent constraint (hard rule from CLAUDE.md):** Explore uses Haiku internally. Validated failure rate ~50% for reasoning tasks (2026-02-02). Use Explore ONLY for verbatim retrieval — exact file contents, directory listings, keyword searches with no interpretation required. Any task requiring analysis, comparison, or judgment goes to plugin-creator:plugin-assessor or general-purpose.
 
-**How to spawn agents:**
+**How to dispatch agents:**
 
-- **Agent tool** (`subagent_type=...`) — for focused, isolated work where only the result matters
-- **Named teammate** (`Agent(name=...)`) — for multi-agent coordination where agents need to communicate (see `agent-orchestration:parallel-work` "Persistent teams")
+- **Isolated sub-agent dispatch** — for focused work where only the result matters
+- **Persistent teammate dispatch (where supported)** — for multi-agent coordination where agents need to communicate. In Claude Code, first enable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, then follow `agent-orchestration:parallel-work` "Persistent teams" and its harness notes for the mechanics. SOURCE: [Orchestrate teams of Claude Code sessions](https://code.claude.com/docs/en/agent-teams) (accessed 2026-09-06).
 
 **Why delegation matters:**
 
@@ -814,7 +814,7 @@ VERDICT: [COMPLETE / NOT COMPLETE - reason]
 
 ## Quick Reference: Agent Delegation
 
-Use concurrent **Agent** calls for parallel work (`agent-orchestration:parallel-work`); reach for a **named teammate** (`Agent(name=...)`) only when agents must exchange messages mid-task.
+Use concurrent sub-agent dispatches for parallel work (`agent-orchestration:parallel-work`). Use persistent teammates only when agents must exchange messages mid-task; in Claude Code, first enable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`, then follow that skill's harness notes for the dispatch mechanics. SOURCE: [Orchestrate teams of Claude Code sessions](https://code.claude.com/docs/en/agent-teams) (accessed 2026-09-06).
 
 | Phase    | Agent Type                  | Purpose                                                                       |
 | -------- | --------------------------- | ----------------------------------------------------------------------------- |
