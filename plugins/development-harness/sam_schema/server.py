@@ -237,8 +237,13 @@ def sam_active_task(
         ToolError: When ``session_id`` is missing, empty, or the reserved
             ``"_default"`` sentinel. Also when ``action="update"`` and no
             active task has been set, and when the configured context backend
-            cannot be built -- an unrecognised ``CONTEXTBACKEND`` name, or
-            ``"github"``, which is recognised but has no implementation yet.
+            cannot be built -- the resolved name is not a recognised backend, or
+            it is ``"github"``, which is recognised but has no implementation yet.
+            ``dh_config.DHConfig.get_backend`` resolves that name, so the input to
+            correct is whichever of these is in force: the ``CONTEXTBACKEND``
+            environment variable, ``context.backend`` or the global
+            ``backend.name`` in ``.dh/config.yaml``, or the ``.beads/dh-backend``
+            marker file, which selects ``"beads"``.
     """
     return sam_active_task_impl(config, session_id)
 

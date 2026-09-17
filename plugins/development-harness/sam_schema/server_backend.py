@@ -27,7 +27,7 @@ __all__ = ["get_backend", "get_context_backend"]
 def get_context_backend() -> ContextBackend:
     """Resolve the active-task context backend, initialising it on first use.
 
-    Building this at import time made a misconfigured ``CONTEXTBACKEND`` an import error:
+    Building this at import time made a misconfigured backend name an import error:
     the whole MCP server failed to start, which is worse than a failed call on the one
     tool that needs this backend. Mirrors ``cli_active_task._context_backend``'s lazy
     init so both transports resolve through the same chain -- including which refusals
@@ -44,6 +44,10 @@ def get_context_backend() -> ContextBackend:
     Raises:
         ToolError: When the configured backend name is not a recognised backend, or is
             ``"github"``, which is recognised but has no implementation yet.
+            ``dh_config.DHConfig.get_backend`` resolves that name, so the input to correct
+            is whichever of these is in force: the ``CONTEXTBACKEND`` environment variable,
+            ``context.backend`` or the global ``backend.name`` in ``.dh/config.yaml``, or
+            the ``.beads/dh-backend`` marker file, which selects ``"beads"``.
     """
     try:
         return get_context_config().backend
