@@ -21,10 +21,10 @@ ${HERMES_SKILL_DIR}/../../scripts
 Use the line whose path is absolute. A line still reading `${…}` names a variable this harness does
 not fill in; pass over it.
 
-When no line is absolute, take the directory your harness stated above this body on a
-`Base directory for this skill:` line. Then `<sam_cli/>` is
-`uv run "<that directory>/../../sam_schema/cli.py"`, and `<dh_scripts/>` is
-`<that directory>/../../scripts`.
+When no line is absolute, take the directory your harness stated for this skill: a
+`Base directory for this skill:` line above this body, or the `skill_root` value a `skills.read`
+call returns. Then `<sam_cli/>` is `uv run "<that directory>/../../sam_schema/cli.py"`, and
+`<dh_scripts/>` is `<that directory>/../../scripts`.
 
 When no line is absolute and no such directory is stated, report `STATUS: BLOCKED` naming this
 skill, and run no `<sam_cli/>` command. Use the `mcp__plugin_dh_*` tools for any operation that has
