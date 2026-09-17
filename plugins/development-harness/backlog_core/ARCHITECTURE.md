@@ -66,6 +66,7 @@ conversion, serialisation, and round-trip verification to `FileCache`. The scrip
 ## Module Dependency Graph
 
 ```text
+github_client.py       ← plugin-root dependency-neutral PyGithub client factory; imported by backlog_core and sam_schema
 section_registry.py   ← standalone, no imports from other mcp modules; canonical section/subsection name registry
 models.py             ← standalone, no imports from other mcp modules
 timestamps.py         ← standalone, no imports from other mcp modules; shared now_iso() UTC timestamp helper
@@ -93,7 +94,16 @@ The required storage dependency direction is:
 CLI / MCP → operations → configured backend protocol
                          ├─ remote provider → remote API + private FileCache → yaml_io
                          └─ local provider  → native store only
+
+backlog_core ─┐
+              ├─→ plugin-root github_client → PyGithub
+sam_schema ───┘
 ```
+
+The plugin-root `github_client.py` owns token and API-root resolution, timeout defaults, and
+proxy-aware TLS setup. `backlog_core/github_client.py` only re-exports that leaf for compatibility;
+it must not become a policy layer. `sam_schema` imports the plugin-root leaf directly so neither MCP
+package depends on the other.
 
 Direct dependencies from `operations.py`, `server.py`, or general parsing helpers to `file_cache.py`,
 `yaml_io.py`, or cache paths are forbidden. Import-boundary tests must enforce this rule.

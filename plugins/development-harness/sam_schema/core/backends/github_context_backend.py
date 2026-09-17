@@ -26,7 +26,7 @@ Architecture notes:
 
 Dependency direction (acyclic):
 
-    github_context_backend imports from: models
+    github_context_backend imports from: models, plugin-root github_client
     github_context_backend does NOT import from: server, context_config,
     context_backend (Protocol), backlog_core
 """
