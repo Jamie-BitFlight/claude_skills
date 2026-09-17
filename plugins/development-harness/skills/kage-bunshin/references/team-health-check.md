@@ -29,11 +29,11 @@ For each team member the script prints:
 - **JSONL actions**: all complete tool inputs and non-empty assistant text. Set `--action-limit` to a positive count only when a smaller most-recent window is wanted; zero prints all recorded actions.
 - **tmux pane snapshot**: full visible content of the member's assigned tmux pane
 
-SOURCE: `scripts/health.py:16-43,73-100,164-229` and `scripts/monitor.py:427-478`; verified by `tests/test_health.py`.
+SOURCE: `scripts/health.py:16-43,73-112,176-240` and `scripts/monitor.py:427-478`; verified by `tests/test_health.py`.
 
 ## Session file lookup
 
-JSONL session files are searched under `~/.claude/projects/{project-slug}/`, derived from the current git repository root. For each member, the script searches every candidate `.jsonl` file and picks the one where the member's `name` or `agentId` (`{name}@{team-name}`) appears earliest. The team-lead session is resolved directly from `leadSessionId` in the team config. SOURCE: `scripts/health.py:46-60,103-163`; verified by `tests/test_health.py::test_agent_last_actions_searches_all_files_and_complete_contents`.
+JSONL session files are searched under `~/.claude/projects/{project-slug}/`, derived from the current git repository root. For each member, the script searches every candidate `.jsonl` file and picks the one where the member's `name` or `agentId` (`{name}@{team-name}`) appears earliest. The team-lead session is resolved directly from `leadSessionId` in the team config. SOURCE: `scripts/health.py:46-60,115-173`; verified by `tests/test_health.py::test_agent_last_actions_searches_all_files_and_complete_contents`.
 
 ## When to use
 
