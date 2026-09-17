@@ -40,6 +40,7 @@ from backlog_core.gh_client import (
     _ADD_COMMENT_MUTATION,
     _COMMENT_BY_ID_QUERY,
     _ISSUE_COMMENTS_QUERY,
+    _add_comment_graphql,
     _parse_comment_node,
     _parse_full_database_id,
 )
@@ -115,6 +116,16 @@ class TestParsingCarriesTheIdentifier:
         assert parsed.author == "octocat"
         assert parsed.created_at == "2026-09-14T05:00:00Z"
         assert parsed.updated_at == "2026-09-14T05:00:00Z"
+
+    def test_comment_creation_carries_both_identifiers(self, mocker):
+        mocker.patch(
+            "backlog_core.gh_client._graphql_request", return_value={"addComment": {"commentEdge": {"node": _RAW_NODE}}}
+        )
+
+        comment = _add_comment_graphql(mocker.Mock(), "issue-node", "body")
+
+        assert comment.id == _RAW_NODE["id"]
+        assert comment.database_id == _LARGE_DATABASE_ID
 
 
 class TestAnAbsentOrUnusableValueStaysAbsent:

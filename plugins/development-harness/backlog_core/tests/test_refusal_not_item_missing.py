@@ -541,6 +541,7 @@ class TestListingProvenance:
         assert cache._get_snapshot_checkpoint() is None  # still honestly never-synced
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
         mocker.patch.object(
             operations, "refresh_local_cache_from_github", side_effect=BackendUnavailableError("offline")
         )
@@ -571,6 +572,7 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(operations, "batch_fetch_statuses", return_value={})
 
         result = operations.list_items(output=Output())
 
