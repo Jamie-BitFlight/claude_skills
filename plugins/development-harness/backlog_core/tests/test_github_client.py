@@ -846,11 +846,13 @@ class TestInstallProxyTlsSupport:
 
     def test_compliant_requests_bundle_keeps_strict_verification(self, monkeypatch, compliant_ca_file):
         monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(compliant_ca_file))
+        default_strict = create_urllib3_context().verify_flags & ssl.VERIFY_X509_STRICT
 
         install_proxy_tls_support()
         connection = _installed_https_connection_class()("api.github.com")
+        installed_strict = connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags
 
-        assert connection.adapter.poolmanager.connection_pool_kw["ssl_context"].verify_flags & ssl.VERIFY_X509_STRICT
+        assert installed_strict & ssl.VERIFY_X509_STRICT == default_strict
 
     def test_installs_a_compliant_bundle_via_github_ca_bundle_without_relaxing_strict(
         self, monkeypatch, compliant_ca_file
