@@ -180,12 +180,12 @@ ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 # skill, never re-derive either value itself. These patterns are the three ways a file did that
 # derivation directly instead: a raw ``${...PLUGIN_ROOT}`` template variable, a
 # ``${...SKILL_DIR}/..`` parent-directory climb written out longhand, and the CLI's literal path.
-# Claude Code substitutes its plugin-root variable, Kimi and Hermes substitute their skill-root
-# variables, and Codex and OpenCode expose the skill root as metadata. A reference or doc file that
+# Claude Code, Kimi and Hermes each substitute their own skill-directory variable into a skill
+# body; a harness that substitutes none leaves the line literal. A reference or doc file that
 # assumes any one of those harness-specific forms ships broken text to the others
 # (``CLAIMS-REGISTER.md``'s ``${CLAUDE_PLUGIN_ROOT}`` entry;
-# ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` centralizes those branches and makes
-# Cursor use the configured MCP surface because no absolute skill-root exposure is established.
+# ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` carries one complete command line per
+# variable so the model picks the absolute one instead of assembling a path.
 PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{?[A-Z_]*PLUGIN_ROOT\b")
 SKILL_DIR_PARENT_RE = re.compile(r"\$\{?[A-Z_]*SKILL_DIR\}?/\.\.")
 CLI_PATH_RE = re.compile(r"sam_schema[/\\.]cli\b|run_sam_cli\.py")
@@ -195,10 +195,6 @@ CLI_TOKEN_RE = re.compile(r"<sam_cli\s*/>|<dh_scripts\s*/>")
 # pattern runs, so a bare mention such as `<sam_cli>` in backticks does not count.
 DEFINITION_TAG_RE = re.compile(r"<(?:sam_cli|mcp_server_scripts|dh_scripts|plugin_root)\b(?!\s*/>)")
 
-# Checked separately from DEFINITION_TAG_RE: only a genuine block-opening line counts here, so an
-# inline mention such as `<sam_cli>` in prose does not inflate the open-tag count the way an
-# unanchored scan would.
-BLOCK_OPEN_RE = re.compile(r"^\s*<(sam_cli|dh_scripts)\b(?!\s*/>)", re.MULTILINE)
 NAMES_DH_CLI_USAGE_RE = re.compile(r"dh-cli-usage(?!-guide)")
 TEMPLATE_VARIABLE_RE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
 FENCED_BLOCK_RE = re.compile(r"^(```|~~~).*?^\1", re.MULTILINE | re.DOTALL)
@@ -246,14 +242,12 @@ DH_CLI_USAGE_DIR = SKILLS_DIR / "dh-cli-usage"
 DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
 DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 
-FIRST_CLASS_HARNESSES = ("Claude Code", "Codex", "OpenCode", "Cursor")
-SKILL_DIR_VARIABLES = ("KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SKILL_ROOT_LINES = (
-    "${CLAUDE_PLUGIN_ROOT}/skills/dh-cli-usage",
-    *tuple(f"${{{variable}}}" for variable in SKILL_DIR_VARIABLES),
-)
-SAM_CLI_LINES = ('uv run "<skill-root>/../../sam_schema/cli.py"',)
-DH_SCRIPTS_LINES = ("<skill-root>/../../scripts",)
+# The three forms a harness substitutes a skill's own directory into its body as.
+# ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
+# plugin-root variable, which needs a hand-built path suffix that breaks when the skill is renamed.
+SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
+SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
+DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
 
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
@@ -812,13 +806,14 @@ def test_agent_skill_preloads_are_unique() -> None:
     assert not duplicates, "Agent frontmatter contains duplicate skill preloads:\n" + "\n".join(duplicates)
 
 
-def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() -> None:
-    """``dh-cli-usage``'s SKILL.md derives ``<sam_cli/>`` and ``<dh_scripts/>`` only from its own
-    directory, and states its documented failure path.
+def test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed() -> None:
+    """``dh-cli-usage``'s SKILL.md gives one complete command line per skill-directory variable,
+    tells the model which line to take, and states where it stops.
 
-    The command definitions use one model-resolved skill-root token, and the instructions support
-    harness-supplied root metadata and known body-substitution variables. Cursor instead uses the
-    configured MCP surface because its absolute skill-root exposure is unestablished.
+    Each ``<sam_cli>`` and ``<dh_scripts>`` line is already whole, so a harness that substitutes its
+    variable leaves an absolute path and the model runs it without assembling one. The body must
+    also say to skip a line still reading ``${...}``, name the directory it falls back to, and run
+    no CLI command once it has reported ``STATUS: BLOCKED``.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
@@ -826,9 +821,6 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
     )
     raw = DH_CLI_USAGE.read_text(encoding="utf-8")
     stripped = HTML_COMMENT_RE.sub("", FENCED_BLOCK_RE.sub("", raw))
-
-    skill_root_blocks = _extract_tag_block(stripped, "skill_root")
-    assert skill_root_blocks == [list(SKILL_ROOT_LINES)]
 
     sam_cli_blocks = _extract_tag_block(stripped, "sam_cli")
     assert len(sam_cli_blocks) == 1, (
@@ -850,22 +842,22 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
         f"expected {list(DH_SCRIPTS_LINES)!r}."
     )
 
-    missing_harnesses = [harness for harness in FIRST_CLASS_HARNESSES if harness not in raw]
-    assert not missing_harnesses, f"dh-cli-usage does not explain skill-root resolution for {missing_harnesses}"
-    known_variables = {*SKILL_DIR_VARIABLES, "CLAUDE_PLUGIN_ROOT"}
-    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - known_variables)
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
     assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
-    cursor_branch = next(line for line in raw.splitlines() if line.startswith("- Cursor:"))
-    cursor_section = raw[raw.index(cursor_branch) : raw.index("For substitution-based branches")]
-    assert "do not construct `<skill-root>`" in cursor_section
-    assert "no source establishes" in cursor_section
-    assert "mcp__plugin_dh_*" in cursor_section
-    assert "STATUS: BLOCKED" in cursor_section
-    assert "absolute path returned" not in cursor_section
-    for citation_number in range(1, 7):
-        assert f"[{citation_number}]" in raw, f"dh-cli-usage is missing harness citation [{citation_number}]"
-    assert "## References" in raw
+    assert "pass over it" in stripped, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not tell the agent to skip a line that is "
+        "still an unsubstituted ${…} variable."
+    )
+    assert "Base directory for this skill:" in stripped, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not name the harness-stated directory it falls back to."
+    )
+    assert "run no `<sam_cli/>` command" in stripped, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not fail closed when no path resolves."
+    )
+    assert "run no other `<sam_cli/>` command" in stripped, (
+        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not bound what follows a STATUS: BLOCKED."
+    )
     assert "<plugin_root" not in raw, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens a `<plugin_root` tag; that token is retired "
         "in favor of `<sam_cli/>` and `<dh_scripts/>`."
@@ -1049,14 +1041,14 @@ def test_workflow_refresh_references_follow_the_relocated_documents() -> None:
     assert "references/workflow-trace-methodology.md" in active_text
 
 
-def test_final_handoff_skips_issue_only_concerns_read_without_an_issue_id() -> None:
-    """A missing GitHub issue ID is a valid local-item path, not a backend failure."""
+def test_final_handoff_skips_the_concerns_read_without_an_item_reference() -> None:
+    """A missing backend reference is a valid item path, not a backend failure."""
     final_handoff = (SKILLS_DIR / "complete-implementation" / "references" / "final-handoff.md").read_text(
         encoding="utf-8"
     )
 
-    assert 'HasIssue -->|"No — no issue ID"| Fetch' in final_handoff
-    assert "Do not emit this warning when no GitHub issue" in final_handoff
+    assert 'HasRef -->|"No"| Fetch' in final_handoff
+    assert "Emit no warning when the item carries no" in final_handoff
 
 
 def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:
