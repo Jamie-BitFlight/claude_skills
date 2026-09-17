@@ -156,8 +156,8 @@ class SyncState:
         """
         return self.status == SyncStatus.RUNNING
 
-    def try_claim(self) -> SyncStatus | None:
-        """Atomically claim the sync slot, returning the status held before the claim.
+    def try_claim(self) -> tuple[SyncStatus, datetime | None] | None:
+        """Atomically claim the sync slot, returning the state held before the claim.
 
         The single-flight primitive underlying both ``try_start()`` (startup
         sync and ``sync_now``, always called from the event-loop thread) and
@@ -170,37 +170,37 @@ class SyncState:
         ``if status == RUNNING`` check relies on does not hold once a worker
         thread is a caller.
 
-        Returns the pre-claim status (rather than assuming the caller should
-        restore ``IDLE``) so a transient, one-shot claim — like the cold-cache
-        read-through — can hand it back to ``release_claim()`` and leave an
-        existing ``OFFLINE``/``ERROR`` state exactly as the background sync
-        loop left it, instead of silently clearing it to ``IDLE``.
+        Returns the pre-claim status and start time (rather than assuming the
+        caller should restore ``IDLE``) so a transient, one-shot claim — like
+        the cold-cache read-through — can hand them back to ``release_claim()``
+        and leave an existing ``OFFLINE``/``ERROR`` state exactly as the
+        background sync loop left it.
 
         Returns:
-            The ``SyncStatus`` that prevailed before the claim when the slot
-            was claimed (status was not ``RUNNING``, and is now); ``None``
-            when a sync is already ``RUNNING`` and the claim was refused.
+            The ``(status, started_at)`` state that prevailed before the claim
+            when the slot was claimed (status was not ``RUNNING``, and is now);
+            ``None`` when a sync is already ``RUNNING`` and the claim was refused.
         """
         with self._claim_lock:
             if self.status == SyncStatus.RUNNING:
                 return None
-            previous = self.status
+            previous = (self.status, self.started_at)
             self.status = SyncStatus.RUNNING
             self.started_at = datetime.now(UTC)
             return previous
 
-    def release_claim(self, previous: SyncStatus) -> None:
-        """Restore the status that prevailed before a matching ``try_claim()``.
+    def release_claim(self, previous: tuple[SyncStatus, datetime | None]) -> None:
+        """Restore the state that prevailed before a matching ``try_claim()``.
 
         Args:
-            previous: The status ``try_claim()`` returned when it succeeded.
+            previous: The status and start time ``try_claim()`` returned when it succeeded.
                 Passing the value from an unsuccessful claim (``None``) is a
                 caller bug — every ``try_claim()`` caller must guard on
                 ``None`` before running the claimed work, so ``release_claim``
                 is never reached in that case.
         """
         with self._claim_lock:
-            self.status = previous
+            self.status, self.started_at = previous
 
     def try_start(self) -> bool:
         """Atomically claim the sync slot, returning True when claimed.

@@ -4,6 +4,16 @@ How the harness achieves what [docs/PURPOSE.md](./docs/PURPOSE.md) states it is 
 design is in the [root ARCHITECTURE.md](../../ARCHITECTURE.md); storage internals are in
 [backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md).
 
+## Runtime dependency boundaries
+
+`github_client.py` is the dependency-neutral leaf for authenticated PyGithub client construction.
+It owns token and API-root resolution, request timeout defaults, and proxy-aware TLS setup. Both
+`backlog_core` and `sam_schema` import that leaf rather than depending on one another or constructing
+`Github` clients directly. `backlog_core/github_client.py` is a compatibility import surface for
+existing backlog callers; it adds no policy or behavior. This direction keeps the independently
+loadable MCP packages acyclic while ensuring every GitHub integration uses the same connection
+policy.
+
 ## The workflow
 
 One loop, from a requirement to a closed change with evidence. Each stage below states what it

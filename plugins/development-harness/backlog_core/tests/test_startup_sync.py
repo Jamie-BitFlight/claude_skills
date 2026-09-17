@@ -814,7 +814,8 @@ class TestSyncStateTryClaim:
 
         previous = fresh_sync_state.try_claim()
 
-        assert previous == SyncStatus.IDLE
+        assert previous is not None
+        assert previous[0] == SyncStatus.IDLE
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
     def test_try_claim_returns_none_when_already_running(self, fresh_sync_state: SyncState) -> None:
@@ -831,13 +832,29 @@ class TestSyncStateTryClaim:
         fresh_sync_state.offline_reason = "no token configured"
 
         previous = fresh_sync_state.try_claim()
-        assert previous == SyncStatus.OFFLINE
+        assert previous is not None
+        assert previous[0] == SyncStatus.OFFLINE
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
         fresh_sync_state.release_claim(previous)
 
         assert fresh_sync_state.status == SyncStatus.OFFLINE
         assert fresh_sync_state.offline_reason == "no token configured"
+
+    def test_release_claim_restores_previous_started_at(self, fresh_sync_state: SyncState) -> None:
+        """A transient claim must not replace the prior sync attempt's timestamp."""
+        previous_started_at = datetime(2026, 9, 17, 10, 30, tzinfo=UTC)
+        fresh_sync_state.status = SyncStatus.ERROR
+        fresh_sync_state.started_at = previous_started_at
+
+        previous = fresh_sync_state.try_claim()
+        assert previous is not None
+        assert fresh_sync_state.started_at != previous_started_at
+
+        fresh_sync_state.release_claim(previous)
+
+        assert fresh_sync_state.status == SyncStatus.ERROR
+        assert fresh_sync_state.started_at == previous_started_at
 
     def test_try_start_still_returns_bool_and_claims(self, fresh_sync_state: SyncState) -> None:
         """try_start() keeps its existing bool contract for sync_now/lifespan."""
