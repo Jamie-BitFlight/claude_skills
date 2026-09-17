@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from backlog_core.gh_client import _resolve_labels_graphql
-from backlog_core.models import BacklogError
+from backlog_core.models import BacklogError, ValidationError
 from github import GithubException
 
 if TYPE_CHECKING:
@@ -343,11 +343,11 @@ class TestResolveLabelsDeduplication:
 class TestResolveLabelsInvalidName:
     """_resolve_labels_graphql rejects label names with disallowed characters."""
 
-    def test_label_with_injection_characters_raises_value_error(self, mocker: MockerFixture) -> None:
-        """Label name containing '{' raises ValueError before any GraphQL call.
+    def test_label_with_injection_characters_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """Label name containing '{' raises ValidationError before any GraphQL call.
 
         Tests: Input validation / injection prevention.
-        How: Pass label name with curly brace character; assert ValueError raised
+        How: Pass label name with curly brace character; assert ValidationError raised
              and graphql_query never called.
         Why: Label names are embedded in the query string template; characters
              that could break GraphQL syntax must be rejected at validation time.
@@ -356,23 +356,23 @@ class TestResolveLabelsInvalidName:
         repo = _make_mock_repo(mocker)
 
         # Act / Assert
-        with pytest.raises(ValueError, match="disallowed characters"):
+        with pytest.raises(ValidationError, match="disallowed characters"):
             _resolve_labels_graphql(repo, "owner", "repo", ["valid-label", "bad{name}"])
 
         repo.requester.graphql_query.assert_not_called()
 
-    def test_label_with_newline_raises_value_error(self, mocker: MockerFixture) -> None:
-        """Label name containing newline raises ValueError.
+    def test_label_with_newline_raises_validation_error(self, mocker: MockerFixture) -> None:
+        """Label name containing newline raises ValidationError.
 
         Tests: Newline in label name injection prevention.
-        How: Pass label with embedded newline; assert ValueError raised.
+        How: Pass label with embedded newline; assert ValidationError raised.
         Why: Newlines in the query template would produce malformed GraphQL syntax.
         """
         # Arrange
         repo = _make_mock_repo(mocker)
 
         # Act / Assert
-        with pytest.raises(ValueError, match="disallowed characters"):
+        with pytest.raises(ValidationError, match="disallowed characters"):
             _resolve_labels_graphql(repo, "owner", "repo", ["valid", "bad\nname"])
 
         repo.requester.graphql_query.assert_not_called()

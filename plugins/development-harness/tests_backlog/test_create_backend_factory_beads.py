@@ -18,6 +18,7 @@ import dh_config as _dh_config
 import pytest
 from backlog_core.backend_protocol import BEADS_DIR, BEADS_OPT_IN_MARKER, create_backend, reset_config
 from backlog_core.backends.beads_backend import BeadsBackend
+from backlog_core.models import ValidationError
 from tests.helpers import make_dh_paths_mock
 
 if TYPE_CHECKING:
@@ -269,14 +270,16 @@ def test_get_config_returns_same_instance_without_reset(monkeypatch: pytest.Monk
 
 
 @pytest.mark.unit
-def test_create_backend_unknown_name_raises_value_error() -> None:
-    """create_backend('unknown') raises ValueError with the invalid name.
+def test_create_backend_unknown_name_raises_validation_error() -> None:
+    """create_backend('unknown') raises ValidationError with the invalid name.
 
-    Why: An unknown backend name indicates a misconfiguration; ValueError
+    Why: An unknown backend name indicates a misconfiguration; the refusal
          surfaces the problem at configuration time rather than silently
-         returning a default backend.
+         returning a default backend.  ValidationError, not ValueError, because
+         every MCP tool reaches this factory through get_config() and catches
+         only BacklogError.
     """
-    with pytest.raises(ValueError, match="Unknown backend"):
+    with pytest.raises(ValidationError, match="Unknown backend"):
         create_backend("not-a-real-backend")
 
 

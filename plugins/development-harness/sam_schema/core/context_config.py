@@ -20,6 +20,7 @@ from dh_config import DHConfig
 from sam_schema.core.backends.beads import BeadsContextBackend
 from sam_schema.core.backends.local_context_backend import LocalContextBackend
 from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
+from sam_schema.core.exceptions import SamError
 
 if TYPE_CHECKING:
     from sam_schema.core.context_backend import ContextBackend
@@ -123,10 +124,17 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         Configured ContextBackend instance.
 
     Raises:
-        ValueError: When *name* (or the resolved name) is not a recognised
-            backend identifier. The message lists all valid options.
-        NotImplementedError: When the resolved name is ``"github"`` (pending T02
-            GitHubContextBackend implementation).
+        SamError: When *name* (or the resolved name) is not a recognised
+            backend identifier. The message lists all valid options. A bare
+            ``ValueError`` here was caught by nothing on the MCP path, so a
+            misconfigured ``CONTEXTBACKEND`` escaped as an unhandled exception;
+            ``server_backend.get_context_backend`` converts a ``SamError`` into
+            the ``ToolError`` a caller can read.
+        NotImplementedError: When the resolved name is ``"github"``. A
+            ``GitHubContextBackend`` implementation exists, but its process-local
+            session-to-issue index cannot recover active sessions after restart, so the
+            factory keeps it unavailable pending #3455. Both CLI and MCP transports
+            convert this distinct refusal into their normal error surfaces.
     """
     resolved = name or DHConfig().get_backend(subsystem="context")
 
@@ -140,8 +148,8 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         return BeadsContextBackend()
 
     if resolved == "github":
-        msg = "GitHub context backend is implemented in T02. Use 'local' or 'memory' instead."
+        msg = "GitHub context backend is not constructible pending #3455. Use 'local' or 'memory' instead."
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
-    raise ValueError(msg)
+    raise SamError(msg)

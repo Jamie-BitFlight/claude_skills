@@ -26,6 +26,7 @@ from sam_schema.core.addressing import AddressingError, parse_address
 from sam_schema.core.backends.content import ContentTaskProvider
 from sam_schema.core.context_backend import ContextBackend
 from sam_schema.core.context_config import ContextConfig, create_context_backend, get_context_config, set_context_config
+from sam_schema.core.exceptions import SamError
 
 __all__ = ["DEFAULT_SESSION_ID", "app"]
 
@@ -65,7 +66,7 @@ def _context_backend() -> ContextBackend:
     except RuntimeError:
         try:
             backend = create_context_backend()
-        except (ValueError, NotImplementedError) as exc:
+        except (SamError, NotImplementedError) as exc:
             # Surface misconfiguration as a clean CLI error rather than a
             # raw traceback from the factory.
             err(str(exc))

@@ -78,7 +78,7 @@ ALLOWED_IMPORTS: dict[str, set[str]] = {
         "dh_core",
         "sam_schema",
     },
-    "sam_schema/server_backend.py": {"__future__", "fastmcp", "backlog_core", "dh_core", "sam_schema"},
+    "sam_schema/server_backend.py": {"__future__", "typing", "fastmcp", "backlog_core", "dh_core", "sam_schema"},
     "sam_schema/server_plan_ops.py": {
         "__future__",
         "json",

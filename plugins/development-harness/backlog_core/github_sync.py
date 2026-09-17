@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import re
 
+from pydantic import ValidationError as _PydanticValidationError
+
 from . import rendering as _rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
 from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
-from .models import BacklogItem, GroomedData, Section, parse_issue_number
+from .models import BacklogItem, GroomedData, Section, ValidationError, parse_issue_number
 from .parsing import _GROOMED_DATE_RE, extract_sections
 
 __all__ = [
@@ -261,6 +263,10 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
 
     Returns:
         BacklogItem populated from the parsed issue body.
+
+    Raises:
+        ValidationError: When the body's metadata block names a value ``BacklogItem`` refuses,
+            such as an ``added`` that is not ``YYYY-MM-DD``.
     """
     base = existing or BacklogItem()
     metadata = _parse_metadata_block(body)
@@ -320,20 +326,47 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
             _deduplicate_timestamps(entries)
         parsed_sections[target_key] = Section(entries=entries)
 
-    return BacklogItem(
-        title=base.title,
-        description=description,
-        sections=parsed_sections,
-        priority=metadata.get("priority", base.priority),
-        item_type=metadata.get("type", base.item_type),
-        status=metadata.get("status", base.status),
-        added=metadata.get("added", base.added),
-        issue=base.issue,
-        source=base.source,
-        plan=base.plan,
-        section=base.section,
-        file_path=base.file_path,
-    )
+    # This is the boundary where a provider issue body becomes a model: reconciliation calls it
+    # for every pulled item, and the metadata block it reads is free-form remote text. The
+    # conversion below covers the ``BacklogItem`` construction only -- not the parse above it,
+    # which needs none: ``Section`` and ``GroomedData`` declare no validators, and ``Entry``'s
+    # one (``struck`` requires a non-empty ``struck_at``) is fenced by ``_STRUCK_HEADER_RE`` --
+    # ``entry_blocks._entry_from_span`` is the only construction that sets ``struck=True``, and
+    # it takes ``struck_at`` from that regex's ``(\S+)`` capture, so a blank timestamp fails the
+    # match outright and the entry parses unstruck instead. ``parse_entries``' own
+    # ``ValidationError`` is raised for a malformed ``since``, which this caller never passes.
+    # ``BacklogItem.added``'s validator refuses a non-``YYYY-MM-DD`` value with ``raise
+    # ValueError``, which pydantic re-raises as ``pydantic.ValidationError`` -- a ``ValueError``
+    # subclass, not a ``BacklogError``, so ``backlog_pull``'s and ``backlog_sync``'s ``except
+    # BacklogError`` missed it. Worse than an unhandled crash: FastMCP reads a stray
+    # ``pydantic.ValidationError`` as an input-schema failure and told the caller its own
+    # arguments were invalid. Converting here rather than in the validator keeps the salvage
+    # paths that rescue a corrupt stored item working. Converting the validator instead would
+    # break all three: the project's ``ValidationError`` is a ``BacklogError``, and pydantic
+    # wraps only ``ValueError``/``AssertionError``, so a validator raising it propagates raw
+    # past every one of these catches -- ``_CacheStateStore._salvage_field`` (catches
+    # ``pydantic.ValidationError``), ``FileCache._work_item_snapshots`` (catches ``ValueError``)
+    # and ``beads_backend.list_work_items`` (catches ``(ValidationError, ValueError)``, where
+    # that name is imported from ``pydantic`` -- so it is a ``ValueError``-only catch too, not
+    # the belt-and-braces pair it reads as). Converting here also covers every validator on the
+    # model rather than one field.
+    try:
+        return BacklogItem(
+            title=base.title,
+            description=description,
+            sections=parsed_sections,
+            priority=metadata.get("priority", base.priority),
+            item_type=metadata.get("type", base.item_type),
+            status=metadata.get("status", base.status),
+            added=metadata.get("added", base.added),
+            issue=base.issue,
+            source=base.source,
+            plan=base.plan,
+            section=base.section,
+            file_path=base.file_path,
+        )
+    except _PydanticValidationError as exc:
+        raise ValidationError("; ".join(error["msg"] for error in exc.errors())) from exc
 
 
 # ---------------------------------------------------------------------------

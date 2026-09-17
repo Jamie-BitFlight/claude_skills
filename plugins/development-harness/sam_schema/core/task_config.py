@@ -22,6 +22,7 @@ from sam_schema.core.artifact_registry_client import ArtifactRegistryClient
 from sam_schema.core.backends.beads import BeadsTaskProvider
 from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
 from sam_schema.core.backends.memory import InMemoryTaskProvider
+from sam_schema.core.exceptions import SamError
 from sam_schema.core.gist_task_layer import GistTaskLayer
 from sam_schema.core.plan_id_index import create_plan_id_index
 
@@ -130,8 +131,19 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         Configured TaskBackend instance.
 
     Raises:
-        ValueError: When *name* (or the resolved name) is not a recognised
-            backend identifier. The message lists all valid options.
+        SamError: When *name* (or the resolved name) is not a recognised
+            backend identifier. The message lists all valid options. The type a
+            caller would need to catch, not one any caller sees today: nothing in
+            the project calls this factory, so no misconfigured ``TASKBACKEND`` has
+            ever escaped through here. Its only callers are tests
+            (``tests/test_lazy_migration.py``, ``tests/test_backend_config_search.py``,
+            ``sam_schema/tests/test_create_task_backend_factory_beads.py``,
+            ``tests_sam/test_backend_name_refusal.py``); no production module imports
+            ``sam_schema.core.task_config`` at all, and
+            ``tests_backlog/test_high_level_storage_boundaries.py`` pins that for the MCP
+            server. ``backlog_core.backend_protocol.create_backend`` is the live sibling --
+            the one ``server_backend.get_backend`` and ``sam_plan._backend`` resolve
+            through, reading ``BACKLOG_BACKEND`` rather than ``TASKBACKEND``.
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
@@ -151,7 +163,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
-    raise ValueError(msg)
+    raise SamError(msg)
 
 
 # ---------------------------------------------------------------------------
