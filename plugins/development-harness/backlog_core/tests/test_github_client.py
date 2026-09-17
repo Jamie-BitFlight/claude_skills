@@ -35,6 +35,7 @@ from backlog_core.github_client import (
     _InstallState,
     _make_connection_class,
     _new_anchors,
+    _parse_pem_certificate_blocks,
     bundle_adds_new_anchor,
     bundle_requires_relaxed_verification,
     install_proxy_tls_support,
@@ -82,7 +83,12 @@ def restore_pygithub_classes():
 
 
 def _self_signed_ca(
-    *, key_usage: bool, basic_constraints: bool = True, basic_critical: bool = True, subject_key_identifier: bool = True
+    *,
+    key_usage: bool,
+    basic_constraints: bool = True,
+    basic_critical: bool = True,
+    subject_key_identifier: bool = True,
+    serial_number: int | None = None,
 ) -> str:
     """Build a self-signed anchor in PEM form, with the extensions under test toggled.
 
@@ -96,6 +102,8 @@ def _self_signed_ca(
             left at its default is genuinely RFC 5280-compliant and satisfies all four
             checks ``_cert_fails_strict_checks`` enforces (see the module docstring's
             "Why a missing SubjectKeyIdentifier also forces relaxation" section).
+        serial_number: Explicit positive serial for DER edge-case fixtures. A random
+            positive serial is generated when omitted.
 
     Returns:
         The certificate as a PEM string.
@@ -109,7 +117,7 @@ def _self_signed_ca(
         .subject_name(name)
         .issuer_name(name)
         .public_key(key.public_key())
-        .serial_number(x509.random_serial_number())
+        .serial_number(serial_number if serial_number is not None else x509.random_serial_number())
         .not_valid_before(now - dt.timedelta(days=1))
         .not_valid_after(now + dt.timedelta(days=1))
     )
@@ -168,6 +176,32 @@ def _trusted_certificate_pem(*, key_usage: bool = True) -> str:
     cert = x509.load_pem_x509_certificate(cert_pem.encode("ascii"))
     trusted_der = cert.public_bytes(serialization.Encoding.DER) + _TRUSTED_CERT_AUX_TRAILER
     return _pem_encode("TRUSTED CERTIFICATE", trusted_der)
+
+
+def _certificate_with_zero_serial() -> str:
+    """Build a parseable legacy certificate whose serial number violates RFC 5280."""
+    cert = x509.load_pem_x509_certificate(_self_signed_ca(key_usage=True, serial_number=1).encode("ascii"))
+    der = bytearray(cert.public_bytes(serialization.Encoding.DER))
+
+    def content_start(offset: int) -> int:
+        length_octet = der[offset + 1]
+        return offset + 2 if length_octet < 0x80 else offset + 2 + (length_octet & 0x7F)
+
+    def tlv_end(offset: int) -> int:
+        start = content_start(offset)
+        length_octet = der[offset + 1]
+        length = length_octet if length_octet < 0x80 else int.from_bytes(der[offset + 2 : start], "big")
+        return start + length
+
+    tbs_tlv = content_start(0)
+    serial_tlv = content_start(tbs_tlv)
+    if der[serial_tlv] == 0xA0:
+        serial_tlv = tlv_end(serial_tlv)
+    assert der[serial_tlv] == 0x02
+    serial_start = content_start(serial_tlv)
+    assert der[serial_tlv + 1] == 1
+    der[serial_start] = 0
+    return _pem_encode("CERTIFICATE", bytes(der))
 
 
 def _installed_https_connection_class() -> type:
@@ -454,6 +488,14 @@ class TestBundleAddsNewAnchor:
         counted once each.
         """
         assert len(_new_anchors(str(mixed_trusted_and_compliant_bundle))) == 2
+
+    def test_a_non_positive_serial_is_skipped_without_erasing_a_valid_neighbor(self):
+        """Legacy invalid serials are future parse errors, so they are not trust anchors."""
+        valid = _self_signed_ca(key_usage=True)
+        parsed = _parse_pem_certificate_blocks((_certificate_with_zero_serial() + valid).encode("ascii"))
+
+        assert len(parsed) == 1
+        assert parsed[0].serial_number > 0
 
 
 class TestBundleRequiresRelaxedVerification:

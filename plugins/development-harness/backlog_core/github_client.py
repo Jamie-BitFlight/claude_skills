@@ -158,12 +158,14 @@ import re
 import ssl
 import sys
 import threading
+import warnings
 from typing import TYPE_CHECKING, Final
 
 import certifi
 import requests.adapters
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
+from cryptography.utils import CryptographyDeprecationWarning
 from github import Auth, Github
 from github.Requester import HTTPRequestsConnectionClass, HTTPSRequestsConnectionClass, Requester
 from urllib3.util.ssl_ import create_urllib3_context
@@ -438,8 +440,10 @@ def _parse_pem_certificate_blocks(data: bytes) -> list[x509.Certificate]:
                 continue
             der = stripped
         try:
-            certificates.append(x509.load_der_x509_certificate(der))
-        except ValueError:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", CryptographyDeprecationWarning)
+                certificates.append(x509.load_der_x509_certificate(der))
+        except (CryptographyDeprecationWarning, ValueError):
             continue
     return certificates
 

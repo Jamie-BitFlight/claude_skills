@@ -77,7 +77,8 @@ yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
-gh_client.py          ← imports from models, parsing
+github_client.py      ← sole PyGithub construction and TLS policy boundary; imports no business-logic modules
+gh_client.py          ← GitHub work-item operations; imports github_client, models, parsing
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
@@ -615,6 +616,36 @@ ensuring identical logical section rendering where the provider representation r
 **Imports from other modules**:
 - `from .models import ...` (constants, Output, exceptions)
 - `from .parsing import ...` (build_issue_body, infer_type, normalize_issue_title, etc.)
+- `from .github_client import make_github_client` (the sole PyGithub construction boundary)
+
+---
+
+## Module: github_client.py
+
+**Responsibility**: Construct every PyGithub client and own the HTTP/TLS compatibility policy. No
+business-logic module constructs `Github(...)` directly; `gh_client.py`, provider collaborators,
+and migration adapters call `make_github_client()` so token precedence, API URL selection, timeout,
+and transport behavior remain consistent.
+
+Custom trust loading and strict-verification relaxation are separate decisions. The selected bundle
+follows `GITHUB_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, then `SSL_CERT_FILE`; files and
+OpenSSL hash directories are supported. A bundle is loaded only when it adds an anchor absent from
+certifi. `ssl.VERIFY_X509_STRICT` is cleared only when an added CA lacks an extension strict OpenSSL
+requires. Hostname verification, certificate-chain verification, and `ssl.CERT_REQUIRED` remain
+enabled. A compliant added anchor is loaded without clearing strict mode, while a stock-only bundle
+does not replace PyGithub's connection class.
+
+Certificate inspection is block-isolated: malformed blocks, OpenSSL `TRUSTED CERTIFICATE` auxiliary
+trailers that cannot be decoded, and RFC 5280-invalid non-positive serial numbers are ignored without
+discarding valid neighboring anchors. Invalid serials are rejected at this boundary because
+`cryptography` no longer guarantees they can be parsed; they never influence anchor identity or the
+decision to relax strict verification.
+
+**Dependency direction**: GitHub callers → `github_client.py` → PyGithub/requests/urllib3/OpenSSL.
+The module imports no models, operations, backend implementations, cache, or MCP server code.
+
+**Security invariant**: This compatibility path may load a selected trust anchor and may clear only
+`VERIFY_X509_STRICT`; it must never disable hostname or chain verification.
 
 ---
 
