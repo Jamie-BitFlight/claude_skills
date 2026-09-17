@@ -869,6 +869,33 @@ def test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed() -> None:
     )
 
 
+def test_dh_cli_usage_directory_sources_are_warranted_in_the_claims_register() -> None:
+    """Every source ``dh-cli-usage`` resolves its directory from is warranted in the register.
+
+    ``rules/citation-requirements.md`` requires a cited source for every factual claim;
+    ``rules/runtime-vs-design-time.md`` keeps provenance out of runtime text. So the body names the
+    source and ``CLAIMS-REGISTER.md`` records how it was established. The skill-directory variables
+    are read out of the body rather than listed here, so a fourth harness's line added to the
+    ``<sam_cli>`` block without a register entry fails this test. The two stated-directory sources
+    are named literally: adding a third kind of source means adding it here as well.
+    """
+    body = DH_CLI_USAGE.read_text(encoding="utf-8")
+    register = (PLUGIN_ROOT / "CLAIMS-REGISTER.md").read_text(encoding="utf-8")
+
+    stated_directory_sources = ("Base directory for this skill:", "skills.read", "skill_root")
+    claimed = set(TEMPLATE_VARIABLE_RE.findall(body)) | {
+        source for source in stated_directory_sources if source in body
+    }
+    unwarranted = sorted(name for name in claimed if name not in register)
+
+    assert not unwarranted, (
+        "dh-cli-usage's body resolves a directory from source(s) the claims register does not "
+        f"warrant: {unwarranted}\nAdd an entry to {(PLUGIN_ROOT / 'CLAIMS-REGISTER.md').name} giving "
+        "the source, the date it was read, the confidence, and the re-check — the body itself stays "
+        "free of citations (rules/runtime-vs-design-time.md)."
+    )
+
+
 def test_implementation_manager_does_not_execute_an_unresolved_cli_token() -> None:
     """Skill load-time injection cannot execute the prose-only ``<sam_cli/>`` token."""
     implementation_manager = SKILLS_DIR / "implementation-manager" / "SKILL.md"
