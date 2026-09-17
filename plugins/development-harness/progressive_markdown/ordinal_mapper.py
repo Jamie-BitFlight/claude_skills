@@ -23,7 +23,7 @@ from typing import Protocol
 
 from progressive_markdown.exceptions import OrdinalNotFoundError
 from progressive_markdown.indexer import MarkdownIndexer
-from progressive_markdown.list_navigator import ENCODING as _ENCODING, TOKEN_BUDGET
+from progressive_markdown.list_navigator import ENCODING as _ENCODING
 from progressive_markdown.models import CodeBlock, SectionNode
 from progressive_markdown.parser import MarkdownItParser
 
@@ -350,13 +350,9 @@ class OrdinalPathMapper:
     - Level 3+ (``"N.M.K"`` etc.): recursive sub-headings inside an entry.
     - Code fence (``"N.M.code.K"``): k-th fence in the direct body of ``N.M``.
 
-    Level-2 lines are emitted only when the emission gate fires
-    (architect spec §5.6)::
-
-        entry_count > 1  OR  section_est_tokens > TOKEN_BUDGET
-
-    Level-3+ and code-fence ordinals are emitted when the parsed entry content
-    contains at least one sub-heading or code fence (§5.4 structural gate).
+    Every entry receives a level-2 line. Level-3+ and code-fence ordinals are
+    emitted when the parsed entry content contains at least one sub-heading or
+    code fence (§5.4 structural gate).
 
     Empty sections (0 entries) always produce a level-1 entry with
     ``est_tokens=0`` and no level-2 children.
@@ -365,8 +361,7 @@ class OrdinalPathMapper:
     ``progressive_markdown.list_navigator`` (cl100k_base), never a freshly
     registered encoding instance.
 
-    Backward-compatibility invariant (§5.2): flat content (no headings, no
-    fences) produces an identical ordinal set to the pre-feature implementation.
+    Flat content (no headings, no fences) produces no level-3+ ordinals.
 
     Example usage::
 
@@ -408,9 +403,7 @@ class OrdinalPathMapper:
         """Build the ordinal map for all sections.
 
         Produces one level-1 ``OrdinalEntry`` per section in document order,
-        plus level-2 entries when the emission gate fires::
-
-            entry_count > 1  OR  section_est_tokens > TOKEN_BUDGET
+        plus one level-2 entry per source entry.
 
         For entries that contain markdown sub-headings or code fences,
         recursive sub-ordinals (level 3+) and code-fence ordinals are added
@@ -468,16 +461,11 @@ class OrdinalPathMapper:
                 code_block_ordinals=[],
             )
 
-            # Level-2 emission gate (architect spec §5.6).
-            emit_level2: bool = len(section.entries) > 1 or section_tokens > TOKEN_BUDGET
-
             for entry in section.entries:
                 level2_ordinal = f"{section.index}.{entry.index}"
                 entry_content = entry.content
                 entry_title = _extract_entry_title(entry_content)
 
-                # Always index the subtree so deep ordinals remain resolvable
-                # even when the level-2 map line is suppressed by the gate.
                 final_content, final_tokens, final_preview, sub_ents, sub_idx = self._index_entry_subtree(
                     level2_ordinal, entry_content
                 )
@@ -502,19 +490,19 @@ class OrdinalPathMapper:
                 )
                 resolution_index.update(sub_idx)
 
-                if emit_level2:
-                    # Append level-2 entry BEFORE its sub-ordinals (document order).
-                    entries.append(
-                        OrdinalEntry(
-                            ordinal=level2_ordinal,
-                            title=entry_title,
-                            est_tokens=final_tokens,
-                            first_line_preview=final_preview,
-                            struck=entry.struck,
-                            entry_id=entry.entry_id,
-                        )
+                # Append level-2 entry before its sub-ordinals so every
+                # resolvable address is discoverable in document order.
+                entries.append(
+                    OrdinalEntry(
+                        ordinal=level2_ordinal,
+                        title=entry_title,
+                        est_tokens=final_tokens,
+                        first_line_preview=final_preview,
+                        struck=entry.struck,
+                        entry_id=entry.entry_id,
                     )
-                    entries.extend(sub_ents)
+                )
+                entries.extend(sub_ents)
 
         self._map_entries = entries
         self._resolution_index = resolution_index

@@ -32,8 +32,8 @@ Spy contract:
 
 RT-ICA ordinal:
   Derived dynamically via _find_rt_ica_ordinal() — never hardcoded.
-  Ground truth (DN-2): RT-ICA in the #2515 fixture is ~560 tokens, single entry,
-  below TOKEN_BUDGET=4000.  Level-2 emission gate does NOT fire → level-1 ordinal.
+  Ground truth (DN-2): RT-ICA in the #2515 fixture is ~560 tokens. Its section
+  and entry ordinals are both present in the complete map.
 
 DN-2 correction:
   Task spec originally stated head=4000 / total_tokens>10000.
@@ -143,8 +143,8 @@ def _find_rt_ica_ordinal(normalized: list[NormalizedSection]) -> str:
     first OrdinalEntry with 'RT-ICA' in its title.  The ordinal is NEVER
     hardcoded — this function is the single source of truth for it.
 
-    Ground truth (DN-2): RT-ICA in #2515 is ~560 tokens, single entry, below
-    TOKEN_BUDGET=4000.  Level-2 emission gate does NOT fire → level-1 ordinal.
+    Ground truth (DN-2): RT-ICA in #2515 is ~560 tokens. The helper selects its
+    first matching address dynamically from the complete map.
 
     Args:
         normalized: Ordered NormalizedSection list from ItemContentNormalizer.
@@ -706,8 +706,7 @@ class TestBacklogErrorInDisclosurePath:
 #
 #   Entry 0.0  — preamble + one ```python``` fence + two ### sub-headings.
 #                Used to verify AC#2, AC#3, AC#4, AC#5 (issue #2529).
-#   Entry 0.1  — plain content; present only to make entry_count=2 > 1 so the
-#                level-2 emission gate fires and 0.0 / 0.1 ordinals are emitted.
+#   Entry 0.1  — plain content; verifies sibling entry addressing.
 #
 # Provenance: hand-crafted to represent the canonical §5.1 shape described in
 # the architecture spec (artifact_type="architect", item_id=2529, §5 Data
@@ -716,7 +715,7 @@ class TestBacklogErrorInDisclosurePath:
 #
 # Design decisions:
 #   - sections_index (not body) provides document order — summary path used.
-#   - Two entries in "Analysis" guarantee level-2 gate fires: entry_count=2 > 1.
+#   - Two entries in "Analysis" exercise sibling entry addressing.
 #   - Entry 0 content contains one ```python``` fence and two ### sub-headings.
 #   - All ordinals derived dynamically from _find_subheading_entry_ordinal().
 # ---------------------------------------------------------------------------

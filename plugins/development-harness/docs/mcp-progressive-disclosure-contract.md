@@ -347,7 +347,7 @@ Source: `backlog_core/disclosure_handler.py::_handle_map` and
 ## Backward Compatibility
 
 For entries that contain no headings and no code fences, `OrdinalPathMapper` short-circuits
-and emits no level-3+ ordinals. The ordinal list for that entry is byte-for-byte identical to
-pre-feature output.
+and emits no level-3+ ordinals. The entry's level-2 ordinal remains in the complete map because
+every resolvable ordinal is discoverable.
 
 Source: architecture spec §5.2 and `progressive_markdown/ordinal_mapper.py`.

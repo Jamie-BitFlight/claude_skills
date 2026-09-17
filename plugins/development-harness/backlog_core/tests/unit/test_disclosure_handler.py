@@ -37,9 +37,7 @@ RT-ICA ordinal derivation:
   The ordinal for RT-ICA in #2515 is ALWAYS derived at runtime via
   ``_find_rt_ica_ordinal()``.  It is NEVER hardcoded in this file.
   Ground truth from T10 phase gate: RT-ICA in regenerated #2515 fixture is
-  ~560 tokens (2,422 chars), single entry, below TOKEN_BUDGET=4000.
-  The level-2 emission gate (entry_count > 1 OR est_tokens > TOKEN_BUDGET)
-  does NOT fire → only a level-1 ordinal is emitted.
+  ~560 tokens (2,422 chars). Its section and entry addresses are both present.
 
 Divergence note DN-2:
   Task spec stated EXTRACT with head=4000 and total_tokens>10000 for RT-ICA.
@@ -194,8 +192,8 @@ def multi_entry_view_result() -> ViewItemResult:
     tests (TC-H2) and navigate-miss tests (TC-H5).
 
     Structure:
-      [0] AlphaSection (2 entries) — level-2 emission gate fires (entry_count > 1).
-      [1] BetaSection  (1 entry)   — level-2 gate does NOT fire.
+      [0] AlphaSection (2 entries) — two level-2 entry addresses.
+      [1] BetaSection  (1 entry)   — one level-2 entry address.
 
     The double-count regression guard (TC-H1) relies on AlphaSection emitting
     level-2 lines so the buggy all-entries sum diverges from the correct
@@ -1121,8 +1119,8 @@ def struck_view_result() -> ViewItemResult:
     """Two-entry section where entry 0 is struck and entry 1 is live (#3187 shape).
 
     Mirrors item #3187's own RT-ICA section: a struck snapshot entry followed by
-    a live final entry, both within one section - the level-2 emission gate fires
-    (entry_count > 1) so both ordinals ("0.0", "0.1") are independently addressable.
+    a live final entry, both within one section and independently addressable as
+    ordinals "0.0" and "0.1".
     """
     sections: dict[str, SectionEntryMetadata | GroomedSectionMetadata] = {
         "RT-ICA": SectionEntryMetadata(

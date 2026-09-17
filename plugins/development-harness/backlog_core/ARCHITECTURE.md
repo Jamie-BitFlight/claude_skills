@@ -1209,7 +1209,8 @@ response shapes.
 ### Progressive-disclosure migration debt
 
 The moved mapper and token-window extractor consolidate primitive ownership only. They do not
-complete the agent markdown-consumption requirements. Remaining work is issue-backed:
+complete the agent markdown-consumption requirements. The table below is the persistent inventory
+of remaining ownership and consumer work; each row links that work to its issue-backed owner:
 
 | Source or boundary | Current state | Remaining owner |
 |---|---|---|
