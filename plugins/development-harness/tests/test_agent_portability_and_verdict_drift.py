@@ -998,6 +998,44 @@ def test_final_handoff_skips_the_concerns_read_without_an_item_reference() -> No
     assert "Emit no warning when the item carries no" in final_handoff
 
 
+def test_final_handoff_takes_the_item_reference_from_a_backend_neutral_step() -> None:
+    """The handoff's ``{item_ref}`` source must be a step that runs on either backend.
+
+    ``Apply status:verified Label`` is skipped whole on beads, so a pointer into it leaves a beads
+    run with no stated source for the selector it is about to pass. ``Step 3 -- Extract context for
+    proportional gates`` stores the same value from the ``backlog_view`` response and precedes the
+    backend-gated section.
+    """
+    complete_implementation = SKILLS_DIR / "complete-implementation"
+    final_handoff = (complete_implementation / "references" / "final-handoff.md").read_text(encoding="utf-8")
+    skill = (complete_implementation / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Apply status:verified" not in final_handoff, (
+        "final-handoff.md points at the Apply status:verified Label section, which SKILL.md tells a "
+        "beads run to skip whole."
+    )
+
+    source_step = "Step 3 -- Extract context for proportional gates"
+    assert source_step in final_handoff, f"final-handoff.md does not name `{source_step}` as the {{item_ref}} source."
+
+    heading_at = skill.find(f"**{source_step}**")
+    assert heading_at != -1, (
+        f"complete-implementation/SKILL.md has no `{source_step}` step for final-handoff.md to cite."
+    )
+    assert "- `item_ref`: str (the response's opaque `reference`)" in skill, (
+        f"`{source_step}` no longer stores `item_ref` from the response's opaque `reference`."
+    )
+
+    beads_skip_at = skill.find("**Beads backend**: No `dh:state:verified` label — skip this section")
+    assert beads_skip_at != -1, (
+        "complete-implementation/SKILL.md no longer marks a section beads skips; re-check which "
+        "steps a beads run reaches before confirming this pointer."
+    )
+    assert beads_skip_at > heading_at, (
+        "The cited step no longer precedes the beads-skipped section, so a beads run may reach the handoff without it."
+    )
+
+
 def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:
     """Every governed file that writes ``<sam_cli/>`` or ``<dh_scripts/>`` names ``dh-cli-usage``
     at or before the first line that does.

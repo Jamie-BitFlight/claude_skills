@@ -13,7 +13,7 @@ The first step reads the Concerns section of the just-resolved item before routi
 item. When the item carries no backend reference, skip that read and go to the slug search; a
 missing reference is not a backend failure.
 
-**Selector source (`{item_ref}`)**: The matched item's own reference is available from the **"Apply status:verified Label" Step 2** of the `complete-implementation` skill — that step calls `backlog_list(title="{slug}")` and finds the matched item. Its reference is a GitHub integer on a GitHub backend (from the item's `issue` field, e.g. `"#2437"` → `2437`) and a string such as `bd-a3f8` on beads. Use it as `{item_ref}` in the `backlog_view` call below.
+**Selector source (`{item_ref}`)**: `{item_ref}` is what the `complete-implementation` skill stored in **Step 3 -- Extract context for proportional gates**: the `backlog_view` response's opaque `reference`. That step runs on either backend. The value is a GitHub integer on a GitHub backend and a string such as `bd-a3f8` on beads; pass it unchanged as `{item_ref}` in the `backlog_view` call below.
 
 **Call signature**:
 
@@ -46,7 +46,7 @@ reference, because no call was attempted.
 ```mermaid
 flowchart TD
     %% Step 1: Read Concerns from the just-resolved item — MUST run before slug-search routing
-    %% {item_ref} = the matched item's reference, from 'Apply status:verified Label' Step 2
+    %% {item_ref} = the item reference stored by 'Extract context for proportional gates' Step 3
     Start([Final handoff]) --> HasRef{"Item reference<br>available?"}
     HasRef -->|"No"| Fetch
     HasRef -->|Yes| ConcernsCheck["backlog_view(selector='{item_ref}', summary=False, section='Concerns')<br>Read Concerns from the just-resolved item"]
