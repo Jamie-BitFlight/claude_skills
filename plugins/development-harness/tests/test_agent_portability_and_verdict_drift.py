@@ -177,12 +177,12 @@ ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 # skill, never re-derive either value itself. These patterns are the three ways a file did that
 # derivation directly instead: a raw ``${...PLUGIN_ROOT}`` template variable, a
 # ``${...SKILL_DIR}/..`` parent-directory climb written out longhand, and the CLI's literal path.
-# Only Claude Code substitutes a plugin-root or skill-dir template variable in a skill or agent
-# body; every other measured harness ships one to the model as raw text, so a reference or doc
-# file carrying it ships broken text everywhere else (``CLAIMS-REGISTER.md``'s
-# ``${CLAUDE_PLUGIN_ROOT}`` entry; ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` instead
-# derives the root from the skill's own directory, which every measured harness except Cursor gives
-# the model.
+# Claude Code substitutes its plugin-root variable, Kimi and Hermes substitute their skill-root
+# variables, and Codex and OpenCode expose the skill root as metadata. A reference or doc file that
+# assumes any one of those harness-specific forms ships broken text to the others
+# (``CLAIMS-REGISTER.md``'s ``${CLAUDE_PLUGIN_ROOT}`` entry;
+# ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` centralizes those branches and makes
+# Cursor use the configured MCP surface because no absolute skill-root exposure is established.
 PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{?[A-Z_]*PLUGIN_ROOT\b")
 SKILL_DIR_PARENT_RE = re.compile(r"\$\{?[A-Z_]*SKILL_DIR\}?/\.\.")
 CLI_PATH_RE = re.compile(r"sam_schema[/\\.]cli\b|run_sam_cli\.py")
@@ -243,12 +243,14 @@ DH_CLI_USAGE_DIR = SKILLS_DIR / "dh-cli-usage"
 DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
 DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 
-# The three forms a harness substitutes a skill's own directory into its body as.
-# ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
-# plugin-root variable, which only Claude Code resolves.
-SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
-SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
-DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
+FIRST_CLASS_HARNESSES = ("Claude Code", "Codex", "OpenCode", "Cursor")
+SKILL_DIR_VARIABLES = ("KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
+SKILL_ROOT_LINES = (
+    "${CLAUDE_PLUGIN_ROOT}/skills/dh-cli-usage",
+    *tuple(f"${{{variable}}}" for variable in SKILL_DIR_VARIABLES),
+)
+SAM_CLI_LINES = ('uv run "<skill-root>/../../sam_schema/cli.py"',)
+DH_SCRIPTS_LINES = ("<skill-root>/../../scripts",)
 
 # (file, substring of the matched line) -> reason the line is data describing the variable, not an
 # invocation of it. Mirrors SKILL_PATH_CITATION_EXCEPTIONS: every entry states why the match is not
@@ -794,21 +796,26 @@ def test_every_agent_running_the_cli_preloads_dh_cli_usage() -> None:
     )
 
 
-def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
+def test_agent_skill_preloads_are_unique() -> None:
+    """Loading one skill twice wastes context and can repeat load-time instructions."""
+    duplicates: list[str] = []
+    for path in agent_files():
+        meta, _ = _load_frontmatter_from_path(path)
+        skills = _normalize_skills(meta.get("skills"))
+        repeated = sorted({skill for skill in skills if skills.count(skill) > 1})
+        if repeated:
+            duplicates.append(f"{path.relative_to(PLUGIN_ROOT)}: {', '.join(repeated)}")
+
+    assert not duplicates, "Agent frontmatter contains duplicate skill preloads:\n" + "\n".join(duplicates)
+
+
+def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() -> None:
     """``dh-cli-usage``'s SKILL.md derives ``<sam_cli/>`` and ``<dh_scripts/>`` only from its own
     directory, and states its documented failure path.
 
-    Structure, not substrings: exactly one line-anchored ``<sam_cli>`` open and one
-    ``<dh_scripts>`` open -- an inline mention such as `` `<sam_cli>` `` in prose does not count --
-    each pairing with a close into a block holding the three skill-dir command or script-directory
-    lines. Every ``${...SKILL_DIR}/..`` climb outside those two blocks is banned by position: the
-    blocks' own content is removed first, then the remainder is scanned, so a hand-written duplicate
-    of an allowed line placed outside the blocks still convicts even though its text matches one of
-    them. Every ``${...}`` template name used is one of the three skill-dir variables, never a
-    plugin-root variable, and the skill still gives the caller its documented failure path --
-    ``plan --help``, then ``STATUS: BLOCKED`` -- checked with fenced blocks and HTML comments
-    stripped, so a comment-only mention of either string does not satisfy the model-visible
-    instruction it stands in for.
+    The command definitions use one model-resolved skill-root token, and the instructions support
+    harness-supplied root metadata and known body-substitution variables. Cursor instead uses the
+    configured MCP surface because its absolute skill-root exposure is unestablished.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
@@ -817,13 +824,8 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
     raw = DH_CLI_USAGE.read_text(encoding="utf-8")
     stripped = HTML_COMMENT_RE.sub("", FENCED_BLOCK_RE.sub("", raw))
 
-    open_tags = BLOCK_OPEN_RE.findall(stripped)
-    for tag in ("sam_cli", "dh_scripts"):
-        opens = open_tags.count(tag)
-        assert opens == 1, (
-            f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens <{tag}> {opens} time(s) at the start of "
-            "a line; expected exactly one."
-        )
+    skill_root_blocks = _extract_tag_block(stripped, "skill_root")
+    assert skill_root_blocks == [list(SKILL_ROOT_LINES)]
 
     sam_cli_blocks = _extract_tag_block(stripped, "sam_cli")
     assert len(sam_cli_blocks) == 1, (
@@ -845,27 +847,22 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         f"expected {list(DH_SCRIPTS_LINES)!r}."
     )
 
-    remainder = re.sub(r"<(sam_cli|dh_scripts)>.*?</\1>", "", raw, flags=re.DOTALL)
-    outside_climbs = [
-        f"  {DH_CLI_USAGE.relative_to(PLUGIN_ROOT)}:{lineno} — {line.strip()}"
-        for lineno, line in enumerate(remainder.splitlines(), start=1)
-        if SKILL_DIR_PARENT_RE.search(line)
-    ]
-    assert not outside_climbs, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} climbs out of the skill directory outside its "
-        "<sam_cli> and <dh_scripts> blocks:\n" + "\n".join(outside_climbs)
-    )
+    missing_harnesses = [harness for harness in FIRST_CLASS_HARNESSES if harness not in raw]
+    assert not missing_harnesses, f"dh-cli-usage does not explain skill-root resolution for {missing_harnesses}"
+    known_variables = {*SKILL_DIR_VARIABLES, "CLAUDE_PLUGIN_ROOT"}
+    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - known_variables)
+    assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
-    unknown_variables = sorted(set(TEMPLATE_VARIABLE_RE.findall(raw)) - set(SKILL_DIR_VARIABLES))
-    assert not unknown_variables, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names template variable(s) other than the three "
-        f"skill-dir forms: {unknown_variables}"
-    )
-
-    assert "PLUGIN_ROOT" not in raw, (
-        f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} names PLUGIN_ROOT; it must derive the plugin root "
-        "only from its own skill directory, never from a plugin-root variable."
-    )
+    cursor_branch = next(line for line in raw.splitlines() if line.startswith("- Cursor:"))
+    cursor_section = raw[raw.index(cursor_branch) : raw.index("For substitution-based branches")]
+    assert "do not construct `<skill-root>`" in cursor_section
+    assert "no source establishes" in cursor_section
+    assert "mcp__plugin_dh_*" in cursor_section
+    assert "STATUS: BLOCKED" in cursor_section
+    assert "absolute path returned" not in cursor_section
+    for citation_number in range(1, 7):
+        assert f"[{citation_number}]" in raw, f"dh-cli-usage is missing harness citation [{citation_number}]"
+    assert "## References" in raw
     assert "<plugin_root" not in raw, (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} opens a `<plugin_root` tag; that token is retired "
         "in favor of `<sam_cli/>` and `<dh_scripts/>`."
@@ -878,8 +875,6 @@ def test_dh_cli_usage_resolves_only_through_skill_dir_lines() -> None:
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not instruct `STATUS: BLOCKED` on failure "
         "outside a fenced block or HTML comment."
     )
-    for harness in ("Codex", "OpenCode", "Cursor"):
-        assert harness in stripped, f"dh-cli-usage does not name its {harness} fallback."
 
 
 def test_implementation_manager_does_not_execute_an_unresolved_cli_token() -> None:
@@ -906,6 +901,23 @@ def test_impact_analyst_description_fits_frontmatter_limit() -> None:
     """Agent discovery metadata must fit the portable 1024-character description limit."""
     frontmatter, _ = _load_frontmatter_from_path(AGENTS_DIR / "impact-analyst.md")
     assert len(str(frontmatter["description"])) <= 1024
+
+
+def test_context_refinement_splits_the_resolved_cli_command_for_subprocess() -> None:
+    """The safe argv example must not pass a complete CLI command as one executable argument."""
+    context_refinement = (AGENTS_DIR / "context-refinement.md").read_text(encoding="utf-8")
+
+    assert 'shlex.split("<sam_cli/>")' in context_refinement
+    assert '["uv", "run", "<sam_cli/>"' not in context_refinement
+
+
+def test_mcp_connection_check_names_both_server_commands() -> None:
+    """Manual recovery must provide runnable commands for both shipped MCP servers."""
+    connection_check = (DH_CLI_USAGE_DIR / "references" / "mcp-connection-check.md").read_text(encoding="utf-8")
+
+    assert 'uv run --script "<dh_scripts/>/run_backlog_server.py"' in connection_check
+    assert 'uv run --script "<dh_scripts/>/run_sam_server.py"' in connection_check
+    assert "<mcp_server_scripts" not in connection_check
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
@@ -965,6 +977,35 @@ def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
     )
 
 
+def test_workflow_refresh_references_follow_the_relocated_documents() -> None:
+    """Workflow-refresh entry points must resolve within the skill that now owns the documents."""
+    refresh_dir = SKILLS_DIR / "meta-workflow-graph-refresh"
+    coverage = refresh_dir / "references" / "COVERAGE.md"
+    methodology = refresh_dir / "references" / "workflow-trace-methodology.md"
+    rule = PLUGIN_ROOT / ".claude" / "rules" / "workflow-extraction.md"
+
+    assert coverage.is_file()
+    assert methodology.is_file()
+    assert not (PLUGIN_ROOT / "docs" / "workflow-layers" / "COVERAGE.md").exists()
+    assert not (PLUGIN_ROOT / "docs" / "workflow-trace-methodology.md").exists()
+
+    active_text = "\n".join(path.read_text(encoding="utf-8") for path in (refresh_dir / "SKILL.md", methodology, rule))
+    assert "docs/workflow-layers/COVERAGE.md" not in active_text
+    assert "docs/workflow-trace-methodology.md" not in active_text
+    assert "references/COVERAGE.md" in active_text
+    assert "references/workflow-trace-methodology.md" in active_text
+
+
+def test_final_handoff_skips_issue_only_concerns_read_without_an_issue_id() -> None:
+    """A missing GitHub issue ID is a valid local-item path, not a backend failure."""
+    final_handoff = (SKILLS_DIR / "complete-implementation" / "references" / "final-handoff.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'HasIssue -->|"No — no issue ID"| Fetch' in final_handoff
+    assert "Do not emit this warning when no GitHub issue" in final_handoff
+
+
 def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:
     """Every governed file that writes ``<sam_cli/>`` or ``<dh_scripts/>`` names ``dh-cli-usage``
     at or before the first line that does.
@@ -993,6 +1034,15 @@ def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:
         + "\nAdd the reference pointer, naming `dh:dh-cli-usage`, before the file's first use of "
         "`<sam_cli/>` or `<dh_scripts/>`."
     )
+
+
+def test_work_backlog_item_does_not_treat_cli_tokens_as_input_placeholders() -> None:
+    """Input substitution and CLI-token resolution remain separate operations."""
+    skill = (SKILLS_DIR / "work-backlog-item" / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "whose key exists in `<input/>`" in skill
+    assert "command tokens, not input placeholders" in skill
+    assert "resolved `<sam_cli/>` command" in skill
 
 
 def cli_definition_tag_offenders(paths: list[Path]) -> list[str]:

@@ -98,6 +98,13 @@ Consequences the design draws, each a claim in its own right:
   Cursor repositories and the plugin template's validator, and did not find it. Confidence:
   source, Cursor by snippet. Re-check: section 4 of each file.
   `plugins/plugin-creator/CLAIMS-REGISTER.md` holds this claim for the skill-portability rule.
+- **Cursor does not have an established absolute skill-root exposure mechanism.** Its skills
+  documentation says bundled-resource references are relative to the skill root, but does not say
+  that the model receives the root as an absolute path or that a file tool returns an absolute path
+  after opening a relative reference. The Cursor documentation and repositories listed in
+  `harness-cursor.md` section 4 were searched for either behavior and neither was found. Use the
+  configured MCP surface when no filesystem path is required; otherwise fail closed. Confidence:
+  unestablished. Re-check: `harness-cursor.md` section 4 and a live Cursor skill invocation.
 
 ## Lease
 
