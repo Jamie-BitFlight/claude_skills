@@ -138,7 +138,7 @@ from .tool_responses import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Callable, Mapping
+    from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 
     from pydantic import GetJsonSchemaHandler
     from pydantic.json_schema import JsonSchemaValue
@@ -1633,7 +1633,7 @@ def _build_count_only_response(
 
 
 def _page_status_source(
-    source: object, items: list[dict[str, str | bool]], has_filters_evaluated_against_unavailable_data: bool = False
+    source: object, items: Sequence[Mapping[str, object]], has_filters_evaluated_against_unavailable_data: bool = False
 ) -> StatusSource:
     """Narrow operation-level status provenance to the rows on this page.
 
@@ -2009,9 +2009,6 @@ async def backlog_list(
 
     effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
-    page_status_source = _page_status_source(
-        result.get("status_source"), page_items, bool(result.get("filters_evaluated_against_unavailable_data"))
-    )
     has_more = (offset + effective_limit) < total
 
     # Primitive 2 and 1: enrich page items when depth or match context is requested.
@@ -2030,6 +2027,10 @@ async def backlog_list(
         )
     else:
         enriched_items: list[dict[str, object]] | list[dict[str, str | bool]] = page_items
+
+    page_status_source = _page_status_source(
+        result.get("status_source"), enriched_items, bool(result.get("filters_evaluated_against_unavailable_data"))
+    )
 
     if item_depth > 0:
         enriched_items = [_apply_item_depth(dict(it), item_depth) for it in enriched_items]

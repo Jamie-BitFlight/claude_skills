@@ -112,6 +112,52 @@ class TestBacklogListMcpWireCarriesStatusSource:
         assert response["unavailable_capabilities"] == ["live_status"]
         assert response["filters_evaluated_against_unavailable_data"] == ["status"]
 
+    async def test_mixed_result_live_only_match_page_reports_live(self) -> None:
+        op_result = {
+            "items": [
+                {"issue": "#1", "title": "Item one", "status": "open"},
+                {"issue": "", "title": "Item two", "status": "open"},
+            ],
+            "count": 2,
+            "status_source": "mixed",
+            "unavailable_capabilities": [],
+            "filters_evaluated_against_unavailable_data": [],
+        }
+        with (
+            patch("dh_core.operations.list_items", return_value=op_result),
+            patch("backlog_core.server._enc.encode", return_value=list(range(200))),
+        ):
+            response = await _call(
+                "backlog_list",
+                {"search": "item", "match_context": True, "page": 1, "tokens_per_page": 200, "page_token_limit": 300},
+            )
+
+        assert [item["issue"] for item in response["items"]] == ["#1"]
+        assert response["status_source"] == "live"
+
+    async def test_mixed_result_cache_only_match_page_reports_cache(self) -> None:
+        op_result = {
+            "items": [
+                {"issue": "#1", "title": "Item one", "status": "open"},
+                {"issue": "", "title": "Item two", "status": "open"},
+            ],
+            "count": 2,
+            "status_source": "mixed",
+            "unavailable_capabilities": [],
+            "filters_evaluated_against_unavailable_data": [],
+        }
+        with (
+            patch("dh_core.operations.list_items", return_value=op_result),
+            patch("backlog_core.server._enc.encode", return_value=list(range(200))),
+        ):
+            response = await _call(
+                "backlog_list",
+                {"search": "item", "match_context": True, "page": 2, "tokens_per_page": 200, "page_token_limit": 300},
+            )
+
+        assert [item["issue"] for item in response["items"]] == [""]
+        assert response["status_source"] == "cache"
+
 
 class TestBacklogViewMcpWireCarriesStatusSource:
     """``backlog_view`` over the in-memory FastMCP transport, both response shapes."""
