@@ -96,7 +96,13 @@ class TestDerivedStatusWithoutALiveAnswer:
         assert operations._item_derived_status(_item("#42"), status_map, status_live=True) == "status:done"
 
     def test_a_string_issue_reference_keeps_its_needs_grooming_default(self) -> None:
-        """ADR-002: beads nanoids never key the map, and their default is unchanged."""
+        """The backend architecture makes non-GitHub work-item status backend-owned.
+
+        String references cannot key the numeric GitHub status map, so the configured
+        backend's stored status contract applies instead. See ``backlog_core/ARCHITECTURE.md``
+        under "Storage Ownership and File Cache" and ``backend_types.py``'s
+        ``issue_id_type`` capability contract.
+        """
         assert operations._item_derived_status(_item("bd-a3f8", status=""), {}, status_live=False) == "needs-grooming"
 
     def test_a_bare_cached_lifecycle_value_is_normalized_to_its_label_form(self) -> None:

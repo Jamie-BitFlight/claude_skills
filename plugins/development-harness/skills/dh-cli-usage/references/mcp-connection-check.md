@@ -3,13 +3,14 @@
 Load `dh:dh-cli-usage` before resolving `<sam_cli/>` or `<dh_scripts/>` below.
 
 Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers
-to be connected before use. After a session restart, these servers initialize in
-approximately 1–2 seconds, starting in parallel at session startup.
+to be connected before use. Claude Code starts enabled plugin MCP servers automatically
+at session startup.
 
 ## When to Apply This Procedure
 
-In normal operation you do not need to apply any procedure. Claude Code handles
-MCP server connection waiting automatically:
+In normal operation you do not need to apply any procedure. Claude Code's
+[MCP tool-availability contract](https://code.claude.com/docs/en/mcp#tool-availability)
+handles connection waiting automatically:
 
 - When **tool search** is enabled (the default), `ToolSearch` internally waits for
   any server that is still connecting before returning results. You do not need
@@ -47,9 +48,9 @@ If a server shows as failed in `/mcp` or tool calls return connection errors:
    on invocation (PEP 723 inline metadata) — run `uv self update` and retry rather than looking for
    a separate install step.
 
-4. Check `MCP_TIMEOUT` — if set too low, Claude Code may abort the connection
-   before the server finishes starting. The default is sufficient for these
-   servers (~1–2 s startup well within the default timeout).
+4. Check `MCP_TIMEOUT` against Anthropic's
+   [documented startup-timeout setting](https://code.claude.com/docs/en/mcp).
+   Remove an override that is shorter than the server's observed startup time, then retry.
 
 ## Adapter Selection
 
@@ -68,3 +69,6 @@ Use named options for addresses and task data. Do not use the retired standalone
 
 
 Resolve `<sam_cli/>` and `<dh_scripts/>` through `dh:dh-cli-usage`.
+
+SOURCE: [Anthropic Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers)
+— plugin server lifecycle, connection waiting, status inspection, and `MCP_TIMEOUT` behavior; read 2026-09-17.

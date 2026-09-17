@@ -512,7 +512,7 @@ def _parse_search_pr_node(raw: dict[str, Any]) -> SearchPRNode | None:
 GRAPHQL_UNAVAILABLE_MARKERS: Final[tuple[str, ...]] = ("graphql is not available",)
 
 
-def _github_exception_message(exc: GithubException) -> str:
+def github_exception_message(exc: GithubException) -> str:
     """Return the human-readable message a GithubException carries.
 
     Args:
@@ -546,7 +546,7 @@ def is_graphql_unavailable(exc: GithubException) -> bool:
     """
     if exc.status != _HTTP_FORBIDDEN:
         return False
-    message = _github_exception_message(exc).casefold()
+    message = github_exception_message(exc).casefold()
     return any(marker in message for marker in GRAPHQL_UNAVAILABLE_MARKERS)
 
 
@@ -576,7 +576,7 @@ def _graphql_request(repo: _GraphQLCapable, query: str, variables: dict[str, obj
         _headers, response = repo.requester.graphql_query(query, variables or {})
     except GithubException as exc:
         if is_graphql_unavailable(exc):
-            msg = f"GraphQL is unavailable in this environment: {_github_exception_message(exc)}"
+            msg = f"GraphQL is unavailable in this environment: {github_exception_message(exc)}"
             raise GraphQLUnavailableError(msg) from exc
         msg = f"GraphQL request failed: {exc}"
         raise BacklogError(msg) from exc

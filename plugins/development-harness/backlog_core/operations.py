@@ -1884,7 +1884,7 @@ def refresh_local_cache_from_github(
     }
 
 
-def _normalize_github_status(status: str) -> str:
+def normalize_github_status(status: str) -> str:
     """Normalize cached and live GitHub statuses to the listing filter vocabulary.
 
     Returns:
@@ -1913,10 +1913,10 @@ def _item_derived_status(item: BacklogItem, status_map: dict[int, IssueStatus], 
     if num is not None:
         info = status_map.get(num)
         if info is not None:
-            return _normalize_github_status(info.status)
+            return normalize_github_status(info.status)
         if status_live:
             return "needs-grooming"
-        return _normalize_github_status(item.status)
+        return normalize_github_status(item.status)
     # Non-integer issue ref (beads nanoid) or no issue — use backend-owned status.
     return item.status or "needs-grooming"
 

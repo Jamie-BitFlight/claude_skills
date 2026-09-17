@@ -17,8 +17,8 @@ from github import GithubException
 
 from backlog_core.gh_client import (
     GRAPHQL_UNAVAILABLE_MARKERS,
-    _github_exception_message,
     _graphql_request,
+    github_exception_message,
     is_graphql_unavailable,
 )
 from backlog_core.models import BackendUnavailableError, BacklogError, GraphQLUnavailableError
@@ -60,22 +60,22 @@ class TestMessageExtraction:
     def test_reads_the_message_key_from_a_dict_body(self):
         exc = _github_exception(403, {"message": _SANDBOX_MESSAGE})
 
-        assert _github_exception_message(exc) == _SANDBOX_MESSAGE
+        assert github_exception_message(exc) == _SANDBOX_MESSAGE
 
     def test_falls_back_to_the_whole_body_when_not_a_dict(self):
         exc = _github_exception(403, "Forbidden")
 
-        assert "Forbidden" in _github_exception_message(exc)
+        assert "Forbidden" in github_exception_message(exc)
 
     def test_falls_back_when_the_dict_carries_no_message(self):
         exc = _github_exception(403, {"documentation_url": "https://example.invalid"})
 
-        assert "example.invalid" in _github_exception_message(exc)
+        assert "example.invalid" in github_exception_message(exc)
 
     def test_falls_back_when_message_is_not_a_string(self):
         exc = _github_exception(403, {"message": {"nested": "value"}})
 
-        assert "nested" in _github_exception_message(exc)
+        assert "nested" in github_exception_message(exc)
 
 
 class TestIsGraphqlUnavailable:
