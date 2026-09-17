@@ -646,6 +646,7 @@ class TestSslContextKeepsVerification:
 class TestBuildSslContextIndependentOfPreInitShim:
     """The strict path must not inherit a shim applied before this module imports."""
 
+    @pytest.mark.skipif(sys.version_info < (3, 13), reason="VERIFY_X509_STRICT is not enabled below Python 3.13")
     def test_strict_flag_survives_a_pre_init_shim_that_already_ran(self, compliant_ca_file):
         import urllib3.connection
         import urllib3.util.ssl_
