@@ -110,12 +110,20 @@ _PASSTHROUGH_LEGACY_KEYS: frozenset[str] = frozenset({
     "section_filter_miss",
     "sections_index",
     "status",
+    "status_source",
     "title",
+    "unavailable_capabilities",
 })
 """Exact key set returned by backlog_view(selector='#2515', summary=True) today.
 
 Captured by running the tool against the mocked fixture (summary=True default).
 If this assertion ever fails post-T24, the PASSTHROUGH contract is broken.
+
+Updated for #3546 B5: status_source/unavailable_capabilities are new typed
+degradation-provenance fields on ViewItemResult/BacklogViewResponse, carried
+through the compact PASSTHROUGH manifest by _build_compact_manifest
+(server.py) so they are not silently dropped on the default (summary=True)
+call path.
 """
 
 # ---------------------------------------------------------------------------
@@ -662,6 +670,34 @@ class TestBacklogErrorInDisclosurePath:
             f"'error' must contain the selector '#99999' from ItemNotFoundError. "
             f"ItemNotFoundError.__init__ formats as 'No item found for: #99999'. "
             f"Got: {data['error']!r}"
+        )
+
+    async def test_item_not_found_error_type_survives_flattening(self, mocker: MockerFixture) -> None:
+        """'error_type' names the raised exception's class, not just its message.
+
+        Before this fix, ``_execute_disclosure_or_passthrough``'s
+        ``except BacklogError`` arm
+        returned only ``{"error": str(exc)}`` -- indistinguishable from any
+        other ``BacklogError`` subtype (a refused GraphQL/REST lookup, an
+        unsupported backend capability, ...) with a similar-looking message.
+        A caller had to string-match the rendered message to recover the
+        failure's identity. This asserts the exception's *type* survives
+        instead, via a discriminating field -- not string content.
+        """
+        mocker.patch("backlog_core.operations.view_item", side_effect=ItemNotFoundError("#99999"))
+
+        async with Client(mcp) as client:
+            result = await client.call_tool("backlog_view", {"selector": "#99999", "map": True})
+
+        data = _extract_response_dict(result)
+        assert "error_type" in data, (
+            f"BacklogError arm must include 'error_type' so the exception's identity "
+            f"survives instead of being flattened to a bare error string. "
+            f"Got keys: {sorted(data.keys())}"
+        )
+        assert data["error_type"] == "ItemNotFoundError", (
+            f"'error_type' must name the raised exception's class. "
+            f"Expected 'ItemNotFoundError', got: {data['error_type']!r}"
         )
 
 

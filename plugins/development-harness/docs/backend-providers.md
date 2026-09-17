@@ -184,6 +184,16 @@ the accepted state.
 
 ### Listing provenance
 
+On a never-synced remote cache, `operations.list_items()` performs one
+unlabeled, fetch-only reconciliation before serving the listing. The unlabeled
+scope can establish the global snapshot checkpoint even when the caller filters
+the eventual listing by label; subsequent calls then use the cache instead of
+repeating a label-scoped initial fetch. This implicit read-through never applies
+queued local patches, shares the normal sync single-flight guard, and degrades
+documented provider or cache I/O failures to warnings. The resulting
+low-confidence listing remains withheld unless the caller opts in with
+`allow_cached=True`, as described below.
+
 `operations.list_items` reports two independent, provenance-flavored bits on
 every response — `from_cache` and `has_pending_writes` — rather than one
 conflated "authoritative" boolean (backlog #3546 task A4; the two-bit shape
@@ -201,6 +211,17 @@ listing is withheld by default: `items` and `count` are both `None` instead
 of the ambiguous `[]`/`0` an unaware caller could misread as a confirmed-empty
 backlog. Pass `allow_cached=True` (`--allow-cached` on the CLI) to opt into
 the best-effort cached list anyway.
+
+Status provenance is independent of listing provenance. `status_source` is
+`live` when all returned status-bearing rows came from a successful provider
+fetch, `cache` when returned rows use only backend-owned status, `mixed` when
+live numeric-issue rows and backend-owned string/unlinked rows occur together,
+and `unavailable` when numeric-issue rows could not be read live. Pagination
+reports provenance for the current page, not rows outside it. Providers return
+`StatusFetchResult`, whose
+`attempted` and `unavailable_reason` fields are authoritative; operations do
+not inspect provider credentials or infer an attempt from an issue identifier.
+`ViewEnrichmentResult` provides the same boundary for a single-item view.
 
 **Configuration caveat**: `SQLiteBackend` defaults to `db_path=":memory:"` (an
 ephemeral in-process database). A freshly started process on that default is

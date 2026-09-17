@@ -25,6 +25,7 @@ from backlog_core.disclosure_types import (
     MapResponse,
     NavigateResponse,
 )
+from backlog_core.models import Output, StatusSource
 from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 
 # ---------------------------------------------------------------------------
@@ -319,7 +320,14 @@ class BacklogViewDisclosureHandler:
 
         Returns:
             ``MapResponse``, ``NavigateResponse``, or ``BoundedResponse``
-            depending on ``request.mode``.
+            depending on ``request.mode``. Every response's ``messages``/
+            ``warnings``/``errors`` fields carry whatever the underlying
+            ``operations.view_item()`` read recorded (e.g. a degraded live
+            lookup) — see ``output`` below. Every response's ``status_source``/
+            ``unavailable_capabilities`` fields mirror that same read's
+            ``ViewItemResult`` provenance (#3546, B5/B6), so a degraded read
+            surfaces identically whether the caller used a disclosure mode or
+            plain passthrough (Codex review, PR #3577).
 
         Raises:
             ValueError: When ``request.mode`` is ``PASSTHROUGH`` — the caller
@@ -332,8 +340,19 @@ class BacklogViewDisclosureHandler:
         # Un-gated fetch — call via module reference so spy on
         # ``backlog_core.operations.view_item`` intercepts the call.
         # ``include_content=True`` is the default — full body and sections.
-        view_result = operations.view_item(selector, refresh=refresh)
+        # An explicit ``Output`` collector is threaded through so a degraded
+        # read (e.g. a refused live-enrichment lookup) surfaces on the
+        # returned MapResponse/NavigateResponse/BoundedResponse instead of
+        # being silently dropped.
+        output = Output()
+        view_result = operations.view_item(selector, refresh=refresh, output=output)
         sections = self._normalizer.normalize(view_result)
+        # Provenance of this read's live-enrichment data, forwarded onto every
+        # disclosure response constructed below (#3546, B5/B6; Codex review,
+        # PR #3577) -- extracted once here since every mode shares one
+        # ``view_item()`` call and therefore one provenance answer.
+        status_source: StatusSource = view_result.status_source
+        unavailable_capabilities: list[str] = view_result.unavailable_capabilities
 
         # Fresh mapper per call — OrdinalPathMapper is stateful per-item.
         mapper = OrdinalPathMapper(sections)
@@ -341,11 +360,13 @@ class BacklogViewDisclosureHandler:
 
         match request.mode:
             case DisclosureMode.MAP:
-                return self._handle_map(selector, entries, mapper)
+                return self._handle_map(selector, entries, mapper, output, status_source, unavailable_capabilities)
             case DisclosureMode.NAVIGATE:
                 if request.navigate_ordinal is None:  # parser invariant: always set for NAVIGATE
                     raise ValueError("NAVIGATE mode requires navigate_ordinal.")
-                return self._handle_navigate(request.navigate_ordinal, mapper)
+                return self._handle_navigate(
+                    request.navigate_ordinal, mapper, output, status_source, unavailable_capabilities
+                )
             case DisclosureMode.EXTRACT:
                 if request.navigate_ordinal is None:  # parser invariant: always set for EXTRACT
                     raise ValueError("EXTRACT mode requires navigate_ordinal.")
@@ -369,9 +390,21 @@ class BacklogViewDisclosureHandler:
                         has_children=True,
                         struck=unit.struck,
                         entry_id=unit.entry_id,
+                        status_source=status_source,
+                        unavailable_capabilities=unavailable_capabilities,
+                        messages=output.messages,
+                        warnings=output.warnings,
+                        errors=output.errors,
                     )
                 return self._handle_extract(
-                    selector, request.navigate_ordinal, request.head_tokens, request.skip_tokens, mapper
+                    selector,
+                    request.navigate_ordinal,
+                    request.head_tokens,
+                    request.skip_tokens,
+                    mapper,
+                    output,
+                    status_source,
+                    unavailable_capabilities,
                 )
             case _:
                 raise ValueError(
@@ -380,7 +413,15 @@ class BacklogViewDisclosureHandler:
                     f"code path before calling handle()."
                 )
 
-    def _handle_map(self, selector: str, entries: list[OrdinalEntry], mapper: OrdinalPathMapper) -> MapResponse:
+    def _handle_map(
+        self,
+        selector: str,
+        entries: list[OrdinalEntry],
+        mapper: OrdinalPathMapper,
+        output: Output,
+        status_source: StatusSource,
+        unavailable_capabilities: list[str],
+    ) -> MapResponse:
         """Build a structural map response.
 
         ``MapResponse.total_est_tokens`` sums LEVEL-1 section estimates only
@@ -392,12 +433,21 @@ class BacklogViewDisclosureHandler:
             selector: Item selector echoed into the response.
             entries: Map entries from ``OrdinalPathMapper.build_map()``.
             mapper: Mapper used for ``format_map_line()`` formatting.
+            output: ``Output`` collector from the ``operations.view_item()``
+                call this map was built from; its ``messages``/``warnings``/
+                ``errors`` are mirrored onto the returned response.
+            status_source: Provenance of the underlying ``operations.view_item()``
+                read's live-enrichment data, mirrored onto the returned response.
+            unavailable_capabilities: Capabilities that could not be read live
+                this call, mirrored onto the returned response.
 
         Returns:
             ``MapResponse`` with formatted ``map_text``, ``total_sections``
             (level-1 count), ``total_est_tokens`` (level-1 sum only),
-            ``over_budget`` flag, and ``struck_ordinals`` — the
-            ordinals of every struck entry or descendant in the map.
+            ``over_budget`` flag, ``struck_ordinals`` — the
+            ordinals of every struck entry or descendant in the map —
+            ``status_source``/``unavailable_capabilities`` (#3546, B5/B6),
+            and ``messages``/``warnings``/``errors`` forwarded from ``output``.
         """
         level1_entries = [e for e in entries if "." not in e.ordinal]
         total_est_tokens = sum(e.est_tokens for e in level1_entries)
@@ -409,9 +459,21 @@ class BacklogViewDisclosureHandler:
             map_text=map_text,
             over_budget=total_est_tokens > TOKEN_BUDGET,
             struck_ordinals=[e.ordinal for e in entries if e.struck],
+            status_source=status_source,
+            unavailable_capabilities=unavailable_capabilities,
+            messages=output.messages,
+            warnings=output.warnings,
+            errors=output.errors,
         )
 
-    def _handle_navigate(self, ordinal: str, mapper: OrdinalPathMapper) -> NavigateResponse:
+    def _handle_navigate(
+        self,
+        ordinal: str,
+        mapper: OrdinalPathMapper,
+        output: Output,
+        status_source: StatusSource,
+        unavailable_capabilities: list[str],
+    ) -> NavigateResponse:
         """Resolve an ordinal to full section/entry content (§4.4 NAVIGATE).
 
         Implements the navigate-on-parent branch: when the resolved node has
@@ -422,6 +484,13 @@ class BacklogViewDisclosureHandler:
             ordinal: Validated dot-path ordinal (e.g. ``"4.0"``).
             mapper: Mapper with a populated resolution map (``build_map()``
                 already called by ``handle()``).
+            output: ``Output`` collector from the ``operations.view_item()``
+                call this navigation was built from; its ``messages``/
+                ``warnings``/``errors`` are mirrored onto the returned response.
+            status_source: Provenance of the underlying ``operations.view_item()``
+                read's live-enrichment data, mirrored onto the returned response.
+            unavailable_capabilities: Capabilities that could not be read live
+                this call, mirrored onto the returned response.
 
         Returns:
             ``NavigateResponse`` with either:
@@ -432,7 +501,10 @@ class BacklogViewDisclosureHandler:
               raw fence body, ``child_map=None`` for leaves and code blocks.
 
             Both branches carry ``struck``/``entry_id`` mirrored
-            directly from the resolved ``ResolvedUnit``.
+            directly from the resolved ``ResolvedUnit``, ``status_source``/
+            ``unavailable_capabilities`` (#3546, B5/B6) mirrored from the
+            underlying read, and ``messages``/``warnings``/``errors``
+            forwarded from ``output``.
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
@@ -453,6 +525,11 @@ class BacklogViewDisclosureHandler:
                 has_children=True,
                 struck=unit.struck,
                 entry_id=unit.entry_id,
+                status_source=status_source,
+                unavailable_capabilities=unavailable_capabilities,
+                messages=output.messages,
+                warnings=output.warnings,
+                errors=output.errors,
             )
         # Leaf or code-block node: return full content directly.
         return NavigateResponse(
@@ -463,10 +540,23 @@ class BacklogViewDisclosureHandler:
             truncated=False,
             struck=unit.struck,
             entry_id=unit.entry_id,
+            status_source=status_source,
+            unavailable_capabilities=unavailable_capabilities,
+            messages=output.messages,
+            warnings=output.warnings,
+            errors=output.errors,
         )
 
     def _handle_extract(
-        self, selector: str, ordinal: str, head_tokens: int, skip_tokens: int, mapper: OrdinalPathMapper
+        self,
+        selector: str,
+        ordinal: str,
+        head_tokens: int,
+        skip_tokens: int,
+        mapper: OrdinalPathMapper,
+        output: Output,
+        status_source: StatusSource,
+        unavailable_capabilities: list[str],
     ) -> BoundedResponse:
         """Extract a token-bounded window from a section/entry (§4.4 EXTRACT).
 
@@ -487,6 +577,13 @@ class BacklogViewDisclosureHandler:
             skip_tokens: Token offset from the ``DisclosureRequest`` (0 for
                 the first window).
             mapper: Mapper with a populated resolution map.
+            output: ``Output`` collector from the ``operations.view_item()``
+                call this extraction was built from; its ``messages``/
+                ``warnings``/``errors`` are mirrored onto the returned response.
+            status_source: Provenance of the underlying ``operations.view_item()``
+                read's live-enrichment data, mirrored onto the returned response.
+            unavailable_capabilities: Capabilities that could not be read live
+                this call, mirrored onto the returned response.
 
         Returns:
             ``BoundedResponse`` with ``next_call`` populated when truncated,
@@ -495,6 +592,9 @@ class BacklogViewDisclosureHandler:
             ``entry_id`` are mirrored from the resolved
             ``ResolvedUnit`` — struck state is metadata, not content, so it
             survives windowing even when ``content`` is truncated.
+            ``status_source``/``unavailable_capabilities`` (#3546, B5/B6) are
+            mirrored from the underlying read, and ``messages``/``warnings``/
+            ``errors`` are forwarded from ``output``.
 
         Raises:
             OrdinalNotFoundError: When ``ordinal`` is not in the resolution
@@ -521,4 +621,9 @@ class BacklogViewDisclosureHandler:
             next_call=next_call,
             struck=unit.struck,
             entry_id=unit.entry_id,
+            status_source=status_source,
+            unavailable_capabilities=unavailable_capabilities,
+            messages=output.messages,
+            warnings=output.warnings,
+            errors=output.errors,
         )

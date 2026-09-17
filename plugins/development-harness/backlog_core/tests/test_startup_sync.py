@@ -799,6 +799,110 @@ class TestSyncStateIsRunning:
 
 
 # ---------------------------------------------------------------------------
+# Behaviour 1 -- SyncState.try_claim()/release_claim() single-flight primitive
+# ---------------------------------------------------------------------------
+
+
+class TestSyncStateTryClaim:
+    """try_claim()/release_claim() are the single-flight primitive shared by
+    startup sync, sync_now (via try_start()), and operations.list_items's
+    implicit cold-cache read-through (PR #3573 review Finding 1)."""
+
+    def test_try_claim_returns_previous_status_and_sets_running(self, fresh_sync_state: SyncState) -> None:
+        """A successful claim reports what the status was, not just that it worked."""
+        fresh_sync_state.status = SyncStatus.IDLE
+
+        previous = fresh_sync_state.try_claim()
+
+        assert previous is not None
+        assert previous.status == SyncStatus.IDLE
+        assert previous.started_at is None
+        assert fresh_sync_state.status == SyncStatus.RUNNING
+
+    def test_try_claim_returns_none_when_already_running(self, fresh_sync_state: SyncState) -> None:
+        """A second claim while RUNNING is refused, not silently overwritten."""
+        fresh_sync_state.status = SyncStatus.RUNNING
+
+        assert fresh_sync_state.try_claim() is None
+
+    def test_release_claim_restores_offline_rather_than_forcing_idle(self, fresh_sync_state: SyncState) -> None:
+        """Releasing a transient claim must not silently clear a genuine
+        OFFLINE/ERROR state the background sync loop left behind -- unlike
+        assuming the caller should always reset to IDLE."""
+        fresh_sync_state.status = SyncStatus.OFFLINE
+        fresh_sync_state.offline_reason = "no token configured"
+        previous_started_at = fresh_sync_state.started_at
+
+        previous = fresh_sync_state.try_claim(track_started_at=False)
+        assert previous is not None
+        assert previous.status == SyncStatus.OFFLINE
+        assert fresh_sync_state.status == SyncStatus.RUNNING
+
+        fresh_sync_state.release_claim(previous)
+
+        assert fresh_sync_state.status == SyncStatus.OFFLINE
+        assert fresh_sync_state.offline_reason == "no token configured"
+        assert fresh_sync_state.started_at == previous_started_at
+
+    def test_release_restores_timestamp_captured_after_an_intervening_completed_claim(
+        self, fresh_sync_state: SyncState
+    ) -> None:
+        """A stale timestamp read before another claim cannot overwrite that claim's start time."""
+        stale_started_at = datetime(2025, 1, 1, tzinfo=UTC)
+        fresh_sync_state.started_at = stale_started_at
+
+        intervening = fresh_sync_state.try_claim()
+        assert intervening is not None
+        fresh_sync_state.complete_claim()
+        completed_claim_started_at = fresh_sync_state.started_at
+        assert completed_claim_started_at != stale_started_at
+
+        later = fresh_sync_state.try_claim(track_started_at=False)
+        assert later is not None
+        fresh_sync_state.release_claim(later)
+
+        assert fresh_sync_state.status == SyncStatus.IDLE
+        assert fresh_sync_state.started_at == completed_claim_started_at
+
+    def test_try_start_still_returns_bool_and_claims(self, fresh_sync_state: SyncState) -> None:
+        """try_start() keeps its existing bool contract for sync_now/lifespan."""
+        assert fresh_sync_state.try_start() is True
+        assert fresh_sync_state.status == SyncStatus.RUNNING
+        assert fresh_sync_state.try_start() is False
+
+    def test_complete_claim_preserves_the_actual_start_time(self, fresh_sync_state: SyncState) -> None:
+        """Completing a claim must not rewrite its start time as the finish time."""
+        started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        fresh_sync_state.started_at = started_at
+        fresh_sync_state.status = SyncStatus.RUNNING
+
+        fresh_sync_state.complete_claim()
+
+        assert fresh_sync_state.started_at == started_at
+        assert fresh_sync_state.completed_at is not None
+        assert fresh_sync_state.completed_at > started_at
+
+
+# The genuine cross-thread single-flight regression (Finding 1) is proven at
+# the operations.list_items level, not against this bare primitive: real OS
+# threads racing try_claim()'s two-statement check-and-set almost never get
+# interrupted by CPython's GIL scheduler in that narrow a window (verified
+# empirically -- even a deliberately unguarded check-and-set, raced 500 times
+# with sys.setswitchinterval(1e-6), did not reproduce a double-claim), so a
+# test built that way cannot actually distinguish a correct implementation
+# from a broken one. See
+# backlog_core/tests/test_refusal_not_item_missing.py::
+# TestColdCacheReadsThroughOnce::test_two_overlapping_cold_cache_calls_reconcile_exactly_once
+# for the concurrency proof: it drives the real operations.list_items() from
+# two real threads through the real SyncState singleton, and the mocked
+# refresh_local_cache_from_github's sleep gives the underlying bug (skipped
+# entirely by the pre-fix code -- no claim taken at all) a wide, deterministic
+# window, which is confirmed by running that test against the pre-fix
+# is_running()-only code: it fails 3/3 runs there and passes 5/5 runs against
+# the fix.
+
+
+# ---------------------------------------------------------------------------
 # Behaviour 1 -- SyncState.percent computation
 # ---------------------------------------------------------------------------
 

@@ -21,7 +21,7 @@ from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata, Output
+from backlog_core.models import BacklogError, BacklogItem, BacklogItemMetadata, Output, ViewItemResult
 from typer.testing import CliRunner
 
 from sam_schema.cli import app
@@ -296,3 +296,61 @@ class TestBacklogAddCliContentDuplicateEndToEnd:
         payload = json.loads(result.stdout)
         assert "Similar backlog items found" in payload["error"]
         assert "Sync engine mishandles retryable network errors" in payload["error"]
+
+
+class TestBacklogListCliCarriesStatusSourceFields:
+    """``backlog list`` surfaces #3546 B5's typed degradation fields in its CLI JSON output.
+
+    The CLI transport consumes the same dict ``operations.list_items()`` returns
+    directly (``cli_output.output_json``), so this proves the fields survive the
+    CLI path with no intermediate model to silently drop them -- unlike the MCP
+    transport's ``_respond`` boundary, which is covered separately in
+    ``tests/test_status_source_wire.py``.
+    """
+
+    def test_degraded_listing_reports_unavailable_status_source(self, mocker: MockerFixture) -> None:
+        op_result = {
+            "items": [],
+            "count": 0,
+            "status_source": "unavailable",
+            "unavailable_capabilities": ["live_status"],
+            "filters_evaluated_against_unavailable_data": ["status"],
+            "messages": [],
+            "warnings": [],
+            "errors": [],
+        }
+        mocker.patch("sam_schema.backlog.operations.list_items", return_value=op_result)
+
+        result = runner.invoke(app, ["backlog", "list", "--status", "in-progress"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["status_source"] == "unavailable"
+        assert payload["unavailable_capabilities"] == ["live_status"]
+        assert payload["filters_evaluated_against_unavailable_data"] == ["status"]
+
+
+class TestBacklogViewCliCarriesStatusSourceFields:
+    """``backlog view`` surfaces #3546 B5's typed degradation fields in its CLI JSON output.
+
+    ``view`` emits the ``ViewItemResult`` model directly via
+    ``model_dump_json`` (``cli_output.output_json``), so this proves the
+    fields declared on the model reach the CLI caller with no separate
+    response-shape function to drop them.
+    """
+
+    def test_degraded_view_reports_unavailable_status_source(self, mocker: MockerFixture) -> None:
+        op_result = ViewItemResult.model_validate({
+            "title": "An item",
+            "issue": "#42",
+            "status_source": "unavailable",
+            "unavailable_capabilities": ["live_enrichment"],
+        })
+        mocker.patch("sam_schema.backlog.operations.view_item", return_value=op_result)
+
+        result = runner.invoke(app, ["backlog", "view", "--selector", "#42"], env=_CLI_ENV)
+
+        assert result.exit_code == 0, result.stderr
+        payload = json.loads(result.stdout)
+        assert payload["status_source"] == "unavailable"
+        assert payload["unavailable_capabilities"] == ["live_enrichment"]

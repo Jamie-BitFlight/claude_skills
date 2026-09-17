@@ -239,15 +239,30 @@ class TestCLIForeignCWD:
         probe = tmp_path / "test_import_guard_probe.py"
         probe.write_text(
             f"""
+import ssl
 import sys
+
+import urllib3.connection
+import urllib3.util.ssl_
 
 sys.path.insert(0, {str(_plugin_root)!r})
 
 
 def test_importing_cli_module_is_safe() -> None:
+    tls_factories = (
+        ssl.create_default_context,
+        urllib3.util.ssl_.create_urllib3_context,
+        urllib3.connection.create_urllib3_context,
+    )
+
     import sam_schema.cli
 
     assert sam_schema.cli.app is not None
+    assert (
+        ssl.create_default_context,
+        urllib3.util.ssl_.create_urllib3_context,
+        urllib3.connection.create_urllib3_context,
+    ) == tls_factories
 """,
             encoding="utf-8",
         )

@@ -309,6 +309,7 @@ class TestListComments:
         result = list_comments(issue_number=42)
 
         # Assert
+        assert isinstance(result, dict)
         assert result["count"] == 2
         assert result["has_more"] is False
         comments = result["comments"]

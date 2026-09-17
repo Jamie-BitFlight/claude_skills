@@ -77,7 +77,8 @@ yaml_io.py            ← private YAML codec imported only by file_cache.py
 file_cache.py         ← remote-provider cache, artifact files, checkpoints, and pending-write queue
 reconciliation.py     ← filesystem-free classification/merge engine; imports models and pure format helpers
 github_sync.py        ← GitHub issue body conversion (render/parse/merge); imports from models, parsing, entry_blocks
-gh_client.py          ← imports from models, parsing
+github_client.py      ← shared PyGithub construction, authentication, and TLS policy; no cache or backend access
+gh_client.py          ← GitHub work-item operations; imports from models, parsing, github_client
 rendering.py          ← shared rendering utilities (section_display_title, render_groomed_section); imports section_registry; imported by backend implementations
 backend_protocol.py   ← re-exports backend_types contracts plus config/composition root; imports backend constructors
 backends/             ← provider implementations; remote providers privately compose FileCache
@@ -99,6 +100,30 @@ Direct dependencies from `operations.py`, `server.py`, or general parsing helper
 `yaml_io.py`, or cache paths are forbidden. Import-boundary tests must enforce this rule.
 
 ## Output Pattern
+
+### Live-read provenance
+
+List and view results carry degradation provenance on their own typed result shapes rather than
+through `Output`. `Output` is a prose message collector, while the result fields are machine-readable
+contract data that every response model and compact/disclosure projection must declare and forward.
+This keeps independently modelled response shapes evolvable without allowing Pydantic's default
+handling of undeclared keys to discard provenance.
+
+`status_source` distinguishes live, cached, mixed, and unavailable status data.
+`unavailable_capabilities` names live capabilities that could not be read. List results also carry
+`filters_evaluated_against_unavailable_data`, which distinguishes a degraded zero from a confident
+zero. Pagination may narrow operation-level provenance to the rows on a page, but it must preserve
+`unavailable` and its capability list when this filter-provenance field is non-empty, including when
+the filtered page contains no rows. A live lookup is unavailable only when the provider reports an
+attempt or inability to attempt; the absence of an identifier means no live lookup was attempted and
+therefore remains a cache-only result.
+
+For numeric issue references, a successful status fetch covers both open and closed provider
+issues. Every fetched issue produces an `IssueStatus` entry carrying provider state even when it
+has no workflow status label. An open fetched issue with no status label derives to
+`needs-grooming`; a closed fetched issue remains unlabeled, and an issue absent from the fetched
+map remains unknown. Neither a closed nor an absent issue may be fabricated as a
+`needs-grooming` filter match.
 
 Functions that previously used `typer.echo()` for status/progress messages must instead use an `Output` object (defined in models.py). Each function that needs to communicate status takes an optional `output: Output | None = None` parameter.
 
@@ -209,7 +234,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
 - `DuplicateItemError(duplicates)` — content-based duplicate detected
-- `GitHubUnavailableError` — GITHUB_TOKEN missing from the environment; retries only after a token is set
+- `GitHubUnavailableError` — GitHub credentials are missing, or authenticated API/transport access failed
 - `ValidationError` — input validation failure
 
 ---
@@ -501,6 +526,21 @@ only runtime component permitted to read or write backlog YAML and cached plan o
   withholds `items`/`count` (both `None`) by default rather than returning an ambiguous empty list —
   see `docs/backend-providers.md`'s "Listing provenance" section (backlog #3546 task A4).
 
+### Snapshot completeness and listing provenance
+
+A synchronization checkpoint proves only that reconciliation reached a provider watermark. It does
+not prove that every local snapshot represented by that watermark remains readable. Snapshot
+enumeration therefore returns every unreadable file or unenumerable directory in `skipped` while
+continuing to return readable siblings. Any non-empty `skipped` value makes the snapshot set
+incomplete, regardless of checkpoint age; listing provenance must withhold an authoritative item
+count unless the caller explicitly accepts cached, low-confidence data.
+
+Cold-cache read-through shares one process-wide sync slot with startup and explicit synchronization.
+Taking that slot atomically captures both the prior lifecycle status and `started_at` under the
+same thread lock that marks the slot running. A failed transient claimant restores only that captured
+snapshot. It must not restore state read before claiming because an intervening synchronization may
+have completed and established a newer start timestamp.
+
 **Reconnect behavior**:
 
 - The owning provider reconciles pending mutations against the last acknowledged provider revision.
@@ -594,13 +634,83 @@ ensuring identical logical section rendering where the provider representation r
 
 ---
 
+## Module: github_client.py
+
+**Responsibility**: The shared PyGithub construction and transport-security boundary. Every plugin
+caller that needs a `Github` instance uses `make_github_client()` rather than constructing one
+directly. Current consumers are the issue adapter in `gh_client.py`, the legacy artifact-provider
+adapter, and the SAM GitHub context backend. This keeps token precedence, API endpoint selection,
+timeouts, and TLS behavior identical across those independently loaded surfaces.
+
+**Public API** (`__all__`): `CA_BUNDLE_ENV_VARS`, `DEFAULT_TIMEOUT`, `TOKEN_ENV_VARS`,
+`MissingGitHubTokenError`, `bundle_adds_new_anchor`, `bundle_requires_relaxed_verification`,
+`install_proxy_tls_support`, `make_github_client`, `resolve_ca_bundle`, `resolve_token`.
+
+- `resolve_token(token)` accepts an explicit non-empty token first, then checks `GITHUB_TOKEN`,
+  `GH_TOKEN`, and `GITHUB_PERSONAL_ACCESS_TOKEN` in that order. Absence is an explicit
+  `MissingGitHubTokenError`; unauthenticated client construction is not a fallback.
+- `make_github_client()` installs the transport policy before constructing the client, applies the
+  caller's timeout (30 seconds by default), and resolves the API root from an explicit `base_url`,
+  then `GITHUB_API_URL`, then the public GitHub API.
+
+### TLS and trust-store invariants
+
+Python 3.13 enables `VERIFY_X509_STRICT`; TLS-intercepting proxies and private GitHub installations
+can supply otherwise trusted CA certificates that strict mode rejects because an extension is
+missing or non-critical. The compatibility policy permits those configured trust anchors without
+turning certificate verification off:
+
+- Custom trust sources are resolved in `GITHUB_CA_BUNDLE`, `REQUESTS_CA_BUNDLE`,
+  `CURL_CA_BUNDLE`, `SSL_CERT_FILE` order. The middle two match `requests`' own precedence;
+  `SSL_CERT_FILE` remains a final explicit source because `requests` does not read it itself.
+  Existing PEM files and OpenSSL-hashed CA directories are accepted; missing paths and ordinary
+  directories are ignored.
+- Merely setting a CA environment variable is insufficient to alter transport behavior. A valid
+  source must add at least one certificate, compared by SHA-256 identity, beyond certifi's public
+  trust store. This keeps the native strict defaults and connection reuse on ordinary Nix/conda
+  environments that only republish the public roots. Certificate inspection handles each PEM block
+  independently, including OpenSSL `TRUSTED CERTIFICATE` blocks, so one malformed block cannot erase
+  valid neighboring anchors from the decision.
+- Loading custom trust and relaxing strict extension checks are separate decisions. Every configured
+  trust source is loaded when custom trust is warranted, but `VERIFY_X509_STRICT` is cleared only
+  when a newly added anchor lacks `keyUsage`, lacks `basicConstraints`, has non-critical
+  `basicConstraints`, or lacks `SubjectKeyIdentifier`. A compliant private anchor is loaded without
+  relaxing strict mode.
+- Relaxation removes only `VERIFY_X509_STRICT`. The resulting context retains
+  `ssl.CERT_REQUIRED`, hostname verification, and all other verification flags. On Python 3.13 and
+  later, the non-relaxed path explicitly restores the strict flag even if an entry-point pre-init
+  compatibility shim patched urllib3 before `github_client.py` was imported.
+- The same judged SSL context is mounted for direct and proxied pools. The PyGithub connection also
+  pins per-request `verify` to the selected source so `requests` cannot inject a different,
+  uninspected bundle during environment merging. This preserves one trust decision from
+  certificate inspection through the live handshake.
+- PyGithub stores connection classes process-wide and copies them when each client is constructed,
+  so installation is thread-safe, idempotent, and always occurs before client construction. The
+  custom path uses PyGithub's public connection-class injection API; its loss of connection reuse is
+  accepted rather than mutating PyGithub private state. A forced re-evaluation resets the native
+  classes when custom trust is no longer warranted.
+
+These constraints are exercised by `tests/test_github_client.py`, including direct and proxy
+adapter paths, trust-source precedence, bundle and hashed-directory parsing, strict/non-strict
+contexts, hostname and chain verification, pre-init shim ordering, client authentication, timeout,
+and API-root selection.
+
+**Dependency direction**: callers → `github_client.py` → PyGithub/requests/urllib3 and trust-store
+libraries. The module has no `FileCache`, backend, artifact, issue-domain, or filesystem-state
+ownership; filesystem reads are limited to configured trust stores and certifi's baseline bundle.
+
+---
+
 ## Module: gh_client.py
 
-**Responsibility**: GitHub API connection, issue CRUD, status/label management, view enrichment.
+**Responsibility**: GitHub issue CRUD, status/label management, and view enrichment. Shared client
+construction, authentication, timeout defaults, API-root selection, and TLS policy belong to
+`github_client.py`; this module obtains clients through that factory.
 
 **Functions extracted from backlog.py**:
 
-- Connection: `_get_github()` → `get_github()`, `_try_get_github()` → `try_get_github()`
+- Client access: `_get_github()` → `get_github()`, `_try_get_github()` → `try_get_github()`; both
+  delegate construction to `github_client.make_github_client()`
 - Issue CRUD: `create_issue_for_item()`, `_close_github_issue()` → `close_github_issue()`, `_resolve_github_issue()` → `resolve_github_issue()`
 - PR check: `_check_open_prs_for_issue()` → `check_open_prs_for_issue()`
 - Status: `_batch_fetch_statuses()` → `batch_fetch_statuses()`, `_fetch_item_status()` → `fetch_item_status()`, `_apply_status_in_progress()` → `apply_status_in_progress()`
@@ -615,6 +725,7 @@ ensuring identical logical section rendering where the provider representation r
 **Imports from other modules**:
 - `from .models import ...` (constants, Output, exceptions)
 - `from .parsing import ...` (build_issue_body, infer_type, normalize_issue_title, etc.)
+- `from .github_client import ...` (shared token resolution and PyGithub construction)
 
 ---
 
@@ -626,14 +737,19 @@ This keeps operations and server code decoupled from provider APIs, native store
 implementation details.
 
 **Public API** (`__all__`): `WorkItemBackend`, `SyncProvider`, `ContentProvider`, `BranchBackend`,
-`BacklogConfig`, provider-neutral node types, `create_backend`, `get_config`, `set_config`,
-`reset_config`
+`BacklogConfig`, provider-neutral node types, `create_backend`,
+`get_config`, `set_config`, `reset_config`
 
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
   contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
   `ContentProvider` and `BranchBackend`.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
+- `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic
+  `StatusFetchResult` and `ViewEnrichmentResult` models. Their `attempted` and
+  `unavailable_reason` fields are the sole source for live-read provenance. Credential resolution
+  remains private to the provider; `operations.py` neither imports provider clients nor infers an
+  attempted request from an identifier.
 - `ContentProvider` — logical plan/artifact capability implemented by the configured backend:
 
   ```python

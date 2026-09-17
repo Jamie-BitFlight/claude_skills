@@ -40,6 +40,10 @@ if __name__ == "__main__" and os.environ.get("PYTHONPATH") and not os.environ.ge
 _plugin_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_plugin_root))
 
+from scripts.tls_compat import relax_verify_x509_strict
+
+relax_verify_x509_strict()
+
 from sam_schema.cli import app
 
 app()
