@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final, Protocol
 
+import requests
 from github import GithubException
 from typing_extensions import TypedDict
 
@@ -1540,7 +1541,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
         issue_map = {iss["number"]: iss for iss in all_issues}
     except BackendUnavailableError:
         raise
-    except (BacklogError, GithubException) as exc:
+    except (BacklogError, GithubException, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
         msg = f"Live GitHub status unavailable: {exc}"
         raise BackendUnavailableError(msg) from exc
     result: dict[int, IssueStatus] = {}

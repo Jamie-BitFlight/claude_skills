@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+import requests
 from github import GithubException
 
 from backlog_core import gh_client, operations
@@ -72,6 +73,26 @@ class TestBatchFetchStatusesSurfacesTheRefusal:
         )
 
         with pytest.raises(BackendUnavailableError, match="Server Error"):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    @pytest.mark.parametrize(
+        "transport_error",
+        [requests.exceptions.ConnectionError("connection dropped"), requests.exceptions.Timeout("request timed out")],
+    )
+    def test_a_transport_failure_is_an_availability_failure(
+        self, mocker: MockerFixture, transport_error: requests.exceptions.RequestException
+    ) -> None:
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=transport_error)
+
+        with pytest.raises(BackendUnavailableError, match=str(transport_error)):
+            gh_client.batch_fetch_statuses([_item("#42")])
+
+    def test_a_non_transport_exception_preserves_its_semantics(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=RuntimeError("invalid response shape"))
+
+        with pytest.raises(RuntimeError, match="invalid response shape"):
             gh_client.batch_fetch_statuses([_item("#42")])
 
     def test_an_unreachable_backend_is_an_availability_failure(self, mocker: MockerFixture) -> None:
@@ -158,6 +179,9 @@ class _Backend:
     def list_work_items(self) -> list[BacklogItem]:
         return self._items
 
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]:
+        return gh_client.batch_fetch_statuses(items, repo)
+
 
 def _patch_backend(mocker: MockerFixture, items: list[BacklogItem]) -> None:
     """Point ``operations.get_config()`` at a backend serving *items*."""
@@ -211,3 +235,19 @@ class TestListItemsReportsBlankStatuses:
         warnings = _warnings(operations.list_items(output=Output()))
 
         assert not any("Live status unavailable" in str(w) for w in warnings)
+
+    @pytest.mark.parametrize(
+        "transport_error",
+        [requests.exceptions.ConnectionError("connection dropped"), requests.exceptions.Timeout("request timed out")],
+    )
+    def test_a_transport_failure_uses_cached_statuses(
+        self, mocker: MockerFixture, transport_error: requests.exceptions.RequestException
+    ) -> None:
+        _patch_backend(mocker, [_item("#42")])
+        mocker.patch.object(gh_client, "try_get_github", return_value=_Repo())
+        mocker.patch.object(gh_client, "sync_issues_graphql", side_effect=transport_error)
+
+        result = operations.list_items(status="status:in-progress", output=Output())
+
+        assert result["count"] == 1
+        assert any(str(transport_error) in warning for warning in _warnings(result))
