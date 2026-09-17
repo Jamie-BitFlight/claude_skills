@@ -148,10 +148,14 @@ def get_github(repo: str = "", timeout: int = 15) -> Repository:
 
 
 def try_get_github(repo: str = "") -> Repository | None:
-    """Return PyGithub Repository or None if unavailable.
+    """Return a PyGithub Repository, or None when credentials are absent.
 
     Returns:
-        Repository object, or None if the backend is unavailable.
+        Repository object, or None if no GitHub token is configured.
+
+    Raises:
+        GitHubUnavailableError: If the GitHub API or transport fails after
+            credentials are resolved.
     """
     return get_config().backend.try_get_github(repo)
 

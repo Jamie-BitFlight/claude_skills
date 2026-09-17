@@ -617,7 +617,7 @@ class BackendUnavailableError(BacklogError):
 
 
 class GitHubUnavailableError(BackendUnavailableError):
-    """Raised when GITHUB_TOKEN is missing from the environment."""
+    """Raised when GitHub credentials, API access, or transport are unavailable."""
 
 
 class GraphQLUnavailableError(BackendUnavailableError):

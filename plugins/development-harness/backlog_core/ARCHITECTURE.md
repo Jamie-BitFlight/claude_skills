@@ -209,7 +209,7 @@ Functions that previously raised `typer.Exit(1)` must instead raise one of:
 - `BacklogError` — general errors
 - `ItemNotFoundError(selector)` — item not found
 - `DuplicateItemError(duplicates)` — content-based duplicate detected
-- `GitHubUnavailableError` — GITHUB_TOKEN missing from the environment; retries only after a token is set
+- `GitHubUnavailableError` — GitHub credentials are missing, or authenticated API/transport access failed
 - `ValidationError` — input validation failure
 
 ---
