@@ -24,6 +24,7 @@ from enum import StrEnum
 
 import requests
 from github import GithubException
+from pydantic import BaseModel, ConfigDict
 
 from .models import BackendUnavailableError, BacklogError, ContentProviderError, UnsupportedBackendCapabilityError
 
@@ -45,6 +46,7 @@ RETRYABLE_TRANSIENT_EXCEPTIONS = (
 
 __all__ = [
     "RETRYABLE_TRANSIENT_EXCEPTIONS",
+    "SyncClaim",
     "SyncErrorKind",
     "SyncState",
     "SyncStatus",
@@ -89,6 +91,15 @@ class SyncErrorKind(StrEnum):
     RETRYABLE = "retryable"
     NON_RETRYABLE = "non_retryable"
     UNKNOWN = "unknown"
+
+
+class SyncClaim(BaseModel):
+    """State captured atomically when a caller claims the sync slot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: SyncStatus
+    started_at: datetime | None
 
 
 @dataclass
@@ -156,8 +167,8 @@ class SyncState:
         """
         return self.status == SyncStatus.RUNNING
 
-    def try_claim(self, *, track_started_at: bool = True) -> SyncStatus | None:
-        """Atomically claim the sync slot, returning the status held before the claim.
+    def try_claim(self, *, track_started_at: bool = True) -> SyncClaim | None:
+        """Atomically claim the sync slot, returning the state held before the claim.
 
         The single-flight primitive underlying both ``try_start()`` (startup
         sync and ``sync_now``, always called from the event-loop thread) and
@@ -170,11 +181,12 @@ class SyncState:
         ``if status == RUNNING`` check relies on does not hold once a worker
         thread is a caller.
 
-        Returns the pre-claim status (rather than assuming the caller should
-        restore ``IDLE``) so a transient, one-shot claim — like the cold-cache
-        read-through — can hand it back to ``release_claim()`` and leave an
-        existing ``OFFLINE``/``ERROR`` state exactly as the background sync
-        loop left it, instead of silently clearing it to ``IDLE``.
+        Returns the pre-claim status and start time (rather than assuming the
+        caller should restore ``IDLE`` or reading the timestamp before taking
+        the lock) so a transient, one-shot claim can hand the atomic snapshot
+        back to ``release_claim()``. This leaves the state exactly as the
+        preceding sync completed it, even if another claim completed before
+        this caller acquired the slot.
 
         Args:
             track_started_at: Whether to replace ``started_at`` when taking
@@ -183,33 +195,32 @@ class SyncState:
                 previous sync's bookkeeping.
 
         Returns:
-            The ``SyncStatus`` that prevailed before the claim when the slot
-            was claimed (status was not ``RUNNING``, and is now); ``None``
-            when a sync is already ``RUNNING`` and the claim was refused.
+            The state that prevailed before the claim when the slot was
+            claimed (status was not ``RUNNING``, and is now); ``None`` when a
+            sync is already ``RUNNING`` and the claim was refused.
         """
         with self._claim_lock:
             if self.status == SyncStatus.RUNNING:
                 return None
-            previous = self.status
+            previous = SyncClaim(status=self.status, started_at=self.started_at)
             self.status = SyncStatus.RUNNING
             if track_started_at:
                 self.started_at = datetime.now(UTC)
             return previous
 
-    def release_claim(self, previous: SyncStatus, *, started_at: datetime | None) -> None:
+    def release_claim(self, previous: SyncClaim) -> None:
         """Restore the status that prevailed before a matching ``try_claim()``.
 
         Args:
-            previous: The status ``try_claim()`` returned when it succeeded.
+            previous: The state ``try_claim()`` returned when it succeeded.
                 Passing the value from an unsuccessful claim (``None``) is a
                 caller bug — every ``try_claim()`` caller must guard on
                 ``None`` before running the claimed work, so ``release_claim``
                 is never reached in that case.
-            started_at: The timestamp that prevailed before ``try_claim()``.
         """
         with self._claim_lock:
-            self.status = previous
-            self.started_at = started_at
+            self.status = previous.status
+            self.started_at = previous.started_at
 
     def complete_claim(self) -> None:
         """Complete a successful transient claim without changing when it started."""

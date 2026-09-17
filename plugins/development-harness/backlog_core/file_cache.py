@@ -53,7 +53,9 @@ class WorkItemSnapshotBatch(BaseModel):
     -- a caller only needs to know the snapshot set is incomplete, not which
     of the two ways it became incomplete. A warm ``snapshot_checkpoint`` only
     records that a reconcile ran, never that the item files it should have
-    produced are still readable (A-critique.md Sec 2.5, Sec 3.2): a cache
+    produced are still readable (see
+    ``plugins/development-harness/backlog_core/ARCHITECTURE.md`` under
+    "Snapshot completeness and listing provenance"): a cache
     whose files were truncated, restored from a partial backup, or otherwise
     made unreadable keeps its checkpoint but silently returns an empty
     snapshot set unless a caller inspects ``skipped``. ``bool(skipped)`` is

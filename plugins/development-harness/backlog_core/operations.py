@@ -2067,9 +2067,8 @@ def _build_list_entry(
 def read_through_cold_cache(repo: str, output: Output) -> None:
     """Attempt one fetch-only, unlabeled refresh for a never-synced cache."""
     sync_state = get_sync_state()
-    previous_started_at = sync_state.started_at
-    previous_sync_status = sync_state.try_claim()
-    if previous_sync_status is None:
+    previous_sync_state = sync_state.try_claim()
+    if previous_sync_state is None:
         output.info(
             "  A background sync is already in progress; skipping the implicit "
             "read-through for this never-synced cache rather than starting a second one."
@@ -2093,7 +2092,7 @@ def read_through_cold_cache(repo: str, output: Output) -> None:
         if succeeded:
             sync_state.complete_claim()
         else:
-            sync_state.release_claim(previous_sync_status, started_at=previous_started_at)
+            sync_state.release_claim(previous_sync_state)
 
 
 def list_items(

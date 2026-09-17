@@ -282,8 +282,9 @@ def test_file_cache_work_item_snapshots_skips_corrupt_sibling_without_crashing(
     good snapshot offline with it. See ``reason`` above for why each case
     is caught now.
 
-    A-critique.md Sec 2.5/Sec 3.2 (backlog #3546 task A2): skipping a
-    corrupt sibling must also be *discoverable*, not just logged, so a
+    Per ``plugins/development-harness/backlog_core/ARCHITECTURE.md`` under
+    "Snapshot completeness and listing provenance", skipping a corrupt sibling must also be
+    *discoverable*, not just logged, so a
     caller can distinguish a warm checkpoint over a complete snapshot set
     from one over a partial/corrupted set. Every corrupt (as opposed to
     invisible-orphan) sibling here must therefore also show up in the
@@ -324,8 +325,9 @@ def _permission_bits_are_unenforced() -> bool:
 def test_file_cache_work_item_snapshots_records_unreadable_directory_as_skipped(tmp_path: Path) -> None:
     """A subdirectory that loses read/search permission must show up in ``skipped``, not vanish silently.
 
-    Regression test (backlog #3546, A-critique.md Sec 2.5/Sec 3.2): on
-    Python 3.13, ``Path.rglob`` swallows the ``PermissionError`` that
+    Per ``plugins/development-harness/backlog_core/ARCHITECTURE.md`` under
+    "Snapshot completeness and listing provenance": on Python 3.13, ``Path.rglob`` swallows the
+    ``PermissionError`` that
     ``os.scandir`` raises when it cannot open a subdirectory beneath
     ``item_root`` -- CPython's glob implementation suppresses that error
     internally and simply yields nothing from the unreadable subtree.

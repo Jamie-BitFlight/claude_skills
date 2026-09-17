@@ -814,7 +814,9 @@ class TestSyncStateTryClaim:
 
         previous = fresh_sync_state.try_claim()
 
-        assert previous == SyncStatus.IDLE
+        assert previous is not None
+        assert previous.status == SyncStatus.IDLE
+        assert previous.started_at is None
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
     def test_try_claim_returns_none_when_already_running(self, fresh_sync_state: SyncState) -> None:
@@ -829,17 +831,38 @@ class TestSyncStateTryClaim:
         assuming the caller should always reset to IDLE."""
         fresh_sync_state.status = SyncStatus.OFFLINE
         fresh_sync_state.offline_reason = "no token configured"
-
         previous_started_at = fresh_sync_state.started_at
+
         previous = fresh_sync_state.try_claim(track_started_at=False)
-        assert previous == SyncStatus.OFFLINE
+        assert previous is not None
+        assert previous.status == SyncStatus.OFFLINE
         assert fresh_sync_state.status == SyncStatus.RUNNING
 
-        fresh_sync_state.release_claim(previous, started_at=previous_started_at)
+        fresh_sync_state.release_claim(previous)
 
         assert fresh_sync_state.status == SyncStatus.OFFLINE
         assert fresh_sync_state.offline_reason == "no token configured"
         assert fresh_sync_state.started_at == previous_started_at
+
+    def test_release_restores_timestamp_captured_after_an_intervening_completed_claim(
+        self, fresh_sync_state: SyncState
+    ) -> None:
+        """A stale timestamp read before another claim cannot overwrite that claim's start time."""
+        stale_started_at = datetime(2025, 1, 1, tzinfo=UTC)
+        fresh_sync_state.started_at = stale_started_at
+
+        intervening = fresh_sync_state.try_claim()
+        assert intervening is not None
+        fresh_sync_state.complete_claim()
+        completed_claim_started_at = fresh_sync_state.started_at
+        assert completed_claim_started_at != stale_started_at
+
+        later = fresh_sync_state.try_claim(track_started_at=False)
+        assert later is not None
+        fresh_sync_state.release_claim(later)
+
+        assert fresh_sync_state.status == SyncStatus.IDLE
+        assert fresh_sync_state.started_at == completed_claim_started_at
 
     def test_try_start_still_returns_bool_and_claims(self, fresh_sync_state: SyncState) -> None:
         """try_start() keeps its existing bool contract for sync_now/lifespan."""
