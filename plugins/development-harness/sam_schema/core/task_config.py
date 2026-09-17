@@ -132,9 +132,18 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
 
     Raises:
         SamError: When *name* (or the resolved name) is not a recognised
-            backend identifier. The message lists all valid options. A bare
-            ``ValueError`` here was caught by nothing on the MCP path, so a
-            misconfigured ``TASKBACKEND`` escaped as an unhandled exception.
+            backend identifier. The message lists all valid options. The type a
+            caller would need to catch, not one any caller sees today: nothing in
+            the project calls this factory, so no misconfigured ``TASKBACKEND`` has
+            ever escaped through here. Its only callers are tests
+            (``tests/test_lazy_migration.py``, ``tests/test_backend_config_search.py``,
+            ``sam_schema/tests/test_create_task_backend_factory_beads.py``,
+            ``tests_sam/test_backend_name_refusal.py``); no production module imports
+            ``sam_schema.core.task_config`` at all, and
+            ``tests_backlog/test_high_level_storage_boundaries.py`` pins that for the MCP
+            server. ``backlog_core.backend_protocol.create_backend`` is the live sibling --
+            the one ``server_backend.get_backend`` and ``sam_plan._backend`` resolve
+            through, reading ``BACKLOG_BACKEND`` rather than ``TASKBACKEND``.
         NotImplementedError: When the resolved name is ``"github"`` (pending
             IssueBackend + DocumentBackend implementation in #984).
     """
