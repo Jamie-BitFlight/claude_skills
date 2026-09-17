@@ -48,7 +48,8 @@ def sam_active_task_impl(
         ToolError: When ``session_id`` is missing, empty, or the reserved
             ``"_default"`` sentinel. Also when ``action="update"`` and no
             active task has been set, and when the configured context backend
-            name is not recognised.
+            cannot be built -- an unrecognised name, or ``"github"``, which is
+            recognised but has no implementation yet.
     """
     try:
         resolved_session = operations.require_session_id(session_id)

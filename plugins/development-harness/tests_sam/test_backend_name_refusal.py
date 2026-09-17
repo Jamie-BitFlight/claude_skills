@@ -23,9 +23,11 @@ from pathlib import Path
 
 import pytest
 from fastmcp.exceptions import ToolError
+from sam_schema.core.action_models import GetActiveTaskConfig
 from sam_schema.core.context_config import create_context_backend, reset_context_config
 from sam_schema.core.exceptions import SamError
 from sam_schema.core.task_config import create_task_backend
+from sam_schema.server_active_task import sam_active_task_impl
 
 _PLUGIN_DIR = Path(__file__).resolve().parents[1]
 
@@ -65,5 +67,21 @@ def test_context_backend_refusal_reaches_the_tool_as_a_tool_error(monkeypatch: p
     try:
         with pytest.raises(ToolError, match="Unknown backend"):
             server_backend.get_context_backend()
+    finally:
+        reset_context_config()
+
+
+def test_github_context_backend_reaches_the_tool_as_a_tool_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``"github"`` is a listed valid name, so its pending-implementation refusal is a caller's path too.
+
+    ``create_context_backend`` refuses it with ``NotImplementedError``, not ``SamError``, and the
+    name appears in the "Valid options" list the sibling refusal prints -- so a user who follows
+    that message reaches this one. It has to report as the same ``ToolError``.
+    """
+    monkeypatch.setenv("CONTEXTBACKEND", "github")
+    reset_context_config()
+    try:
+        with pytest.raises(ToolError, match="GitHub context backend"):
+            sam_active_task_impl(GetActiveTaskConfig(), "sess-1")
     finally:
         reset_context_config()

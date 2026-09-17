@@ -131,7 +131,12 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
             ``server_backend.get_context_backend`` converts a ``SamError`` into
             the ``ToolError`` a caller can read.
         NotImplementedError: When the resolved name is ``"github"`` (pending T02
-            GitHubContextBackend implementation).
+            GitHubContextBackend implementation). ``"github"`` is in ``_VALID_BACKENDS``
+            and so in the "Valid options" list the ``SamError`` message prints, which
+            makes this a caller's path and not only a developer's: both transports
+            convert it the same way they convert the ``SamError`` --
+            ``server_backend.get_context_backend`` into a ``ToolError``,
+            ``cli_active_task._context_backend`` into a clean CLI error.
     """
     resolved = name or DHConfig().get_backend(subsystem="context")
 
