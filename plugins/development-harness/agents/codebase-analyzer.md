@@ -6,7 +6,6 @@ model: haiku
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
-  - dh:dh-cli-usage
   - ccc
   - dh:create-artifact
 color: cyan

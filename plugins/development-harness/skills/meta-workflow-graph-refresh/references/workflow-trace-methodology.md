@@ -4,7 +4,7 @@ Defines how to systematically collect, store, and query the DH workflow executio
 Written after two failed collection passes (pass 1: 67 agents; pass 2: 120 agents) to
 record the root causes and the corrected approach.
 
-See `docs/workflow-layers/COVERAGE.md` for what has been collected and how to answer
+See [COVERAGE.md](./COVERAGE.md) for what has been collected and how to answer
 follow-up questions without restarting.
 
 ---

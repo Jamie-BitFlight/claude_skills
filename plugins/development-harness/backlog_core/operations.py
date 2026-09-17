@@ -3604,22 +3604,6 @@ def sync_items(
 # ---------------------------------------------------------------------------
 
 
-def _search_open_prs(issue_num: int, repo: str) -> list[PullRequestRef]:
-    """Search for open PRs, preserving failure as a close/resolve refusal.
-
-    Returns:
-        Open pull requests that reference ``issue_num``.
-
-    Raises:
-        BacklogError: The search did not complete, so absence cannot be established.
-    """
-    try:
-        return check_open_prs_for_issue(issue_num, repo)
-    except (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as exc:
-        msg = f"Open-PR search failed for issue #{issue_num}; retry, or pass force=True to bypass this safety check"
-        raise BacklogError(msg) from exc
-
-
 def close_item(
     selector: str,
     reason: str,

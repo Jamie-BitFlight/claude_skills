@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import requests
+from github import GithubException
 
 from backlog_core import gh_client
 from backlog_core.backend_types import BacklogConfig
@@ -131,10 +132,11 @@ def test_resolve_with_force_skips_failing_open_pr_search(mocker: MockerFixture) 
 @pytest.mark.parametrize(
     "network_error",
     [
+        GithubException(500, "server error"),
         requests.exceptions.ConnectionError("network blocked (proxy or firewall)"),
         requests.exceptions.Timeout("request timed out"),
     ],
-    ids=["connection-error", "timeout"],
+    ids=["github-error", "connection-error", "timeout"],
 )
 def test_resolve_refuses_when_open_pr_search_fails_on_network_error(
     mocker: MockerFixture, network_error: Exception
@@ -157,10 +159,11 @@ def test_resolve_refuses_when_open_pr_search_fails_on_network_error(
 @pytest.mark.parametrize(
     "network_error",
     [
+        GithubException(500, "server error"),
         requests.exceptions.ConnectionError("network blocked (proxy or firewall)"),
         requests.exceptions.Timeout("request timed out"),
     ],
-    ids=["connection-error", "timeout"],
+    ids=["github-error", "connection-error", "timeout"],
 )
 def test_close_refuses_when_open_pr_search_fails_on_network_error(
     mocker: MockerFixture, network_error: Exception

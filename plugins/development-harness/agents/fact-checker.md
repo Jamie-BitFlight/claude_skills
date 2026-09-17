@@ -7,7 +7,6 @@ memory: project
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
-  - dh:dh-cli-usage
 ---
 
 # Fact Checker Agent

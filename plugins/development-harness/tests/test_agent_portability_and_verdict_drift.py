@@ -796,6 +796,19 @@ def test_every_agent_running_the_cli_preloads_dh_cli_usage() -> None:
     )
 
 
+def test_agent_skill_preloads_are_unique() -> None:
+    """Loading one skill twice wastes context and can repeat load-time instructions."""
+    duplicates: list[str] = []
+    for path in agent_files():
+        meta, _ = _load_frontmatter_from_path(path)
+        skills = _normalize_skills(meta.get("skills"))
+        repeated = sorted({skill for skill in skills if skills.count(skill) > 1})
+        if repeated:
+            duplicates.append(f"{path.relative_to(PLUGIN_ROOT)}: {', '.join(repeated)}")
+
+    assert not duplicates, "Agent frontmatter contains duplicate skill preloads:\n" + "\n".join(duplicates)
+
+
 def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() -> None:
     """``dh-cli-usage``'s SKILL.md derives ``<sam_cli/>`` and ``<dh_scripts/>`` only from its own
     directory, and states its documented failure path.
@@ -971,6 +984,35 @@ def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
         "add both reference links to dh-cli-usage/SKILL.md, and repoint every remaining referrer at "
         "dh-cli-usage instead of the old location."
     )
+
+
+def test_workflow_refresh_references_follow_the_relocated_documents() -> None:
+    """Workflow-refresh entry points must resolve within the skill that now owns the documents."""
+    refresh_dir = SKILLS_DIR / "meta-workflow-graph-refresh"
+    coverage = refresh_dir / "references" / "COVERAGE.md"
+    methodology = refresh_dir / "references" / "workflow-trace-methodology.md"
+    rule = PLUGIN_ROOT / ".claude" / "rules" / "workflow-extraction.md"
+
+    assert coverage.is_file()
+    assert methodology.is_file()
+    assert not (PLUGIN_ROOT / "docs" / "workflow-layers" / "COVERAGE.md").exists()
+    assert not (PLUGIN_ROOT / "docs" / "workflow-trace-methodology.md").exists()
+
+    active_text = "\n".join(path.read_text(encoding="utf-8") for path in (refresh_dir / "SKILL.md", methodology, rule))
+    assert "docs/workflow-layers/COVERAGE.md" not in active_text
+    assert "docs/workflow-trace-methodology.md" not in active_text
+    assert "references/COVERAGE.md" in active_text
+    assert "references/workflow-trace-methodology.md" in active_text
+
+
+def test_final_handoff_skips_issue_only_concerns_read_without_an_issue_id() -> None:
+    """A missing GitHub issue ID is a valid local-item path, not a backend failure."""
+    final_handoff = (SKILLS_DIR / "complete-implementation" / "references" / "final-handoff.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'HasIssue -->|"No — no issue ID"| Fetch' in final_handoff
+    assert "Do not emit this warning when no GitHub issue" in final_handoff
 
 
 def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:

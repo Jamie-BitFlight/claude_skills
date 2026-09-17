@@ -7,7 +7,6 @@ tools: Read, Grep, Glob, Bash, Write, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_
 skills:
   - dh:dh-cli-usage
   - dh:subagent-contract
-  - dh:dh-cli-usage
   - ccc
 ---
 
