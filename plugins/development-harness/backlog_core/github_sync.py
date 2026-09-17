@@ -334,9 +334,15 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
     # BacklogError`` missed it. Worse than an unhandled crash: FastMCP reads a stray
     # ``pydantic.ValidationError`` as an input-schema failure and told the caller its own
     # arguments were invalid. Converting here rather than in the validator keeps the salvage
-    # paths that catch ``pydantic.ValidationError``/``ValueError`` to rescue a corrupt cached
-    # item working (``_CacheStateStore._salvage_field``, ``FileCache._work_item_snapshots``,
-    # ``beads_backend``), and covers every validator on the model rather than one field.
+    # paths that rescue a corrupt stored item working. Converting the validator instead would
+    # break all three: the project's ``ValidationError`` is a ``BacklogError``, and pydantic
+    # wraps only ``ValueError``/``AssertionError``, so a validator raising it propagates raw
+    # past every one of these catches -- ``_CacheStateStore._salvage_field`` (catches
+    # ``pydantic.ValidationError``), ``FileCache._work_item_snapshots`` (catches ``ValueError``)
+    # and ``beads_backend.list_work_items`` (catches ``(ValidationError, ValueError)``, where
+    # that name is imported from ``pydantic`` -- so it is a ``ValueError``-only catch too, not
+    # the belt-and-braces pair it reads as). Converting here also covers every validator on the
+    # model rather than one field.
     try:
         return BacklogItem(
             title=base.title,
