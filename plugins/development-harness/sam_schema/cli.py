@@ -59,7 +59,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from tls_compat import relax_verify_x509_strict
 
-relax_verify_x509_strict()
+# Importers use ``app`` in-process and must not inherit an executable entry point's
+# process-wide TLS policy. Direct script execution still applies the shim before any
+# urllib3/httpx-importing application module is loaded below.
+if __name__ == "__main__":
+    relax_verify_x509_strict()
 
 import typer
 
