@@ -87,14 +87,26 @@ def extract_actions(text: str, n: int | None) -> list[str]:
             rec = json.loads(ln)
         except json.JSONDecodeError:
             continue
-        if rec.get("type") != "assistant":
+        if not isinstance(rec, dict) or rec.get("type") != "assistant":
             continue
-        ts = rec.get("timestamp", "")[:19].replace("T", " ")
-        for item in rec.get("content", []):
+        message = rec.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        timestamp = rec.get("timestamp")
+        ts = timestamp[:19].replace("T", " ") if isinstance(timestamp, str) else ""
+        for item in content:
+            if not isinstance(item, dict):
+                continue
             if item.get("type") == "tool_use":
+                name = item.get("name")
+                if not isinstance(name, str):
+                    continue
                 inp = str(item.get("input", {})).replace("\n", " ")
-                actions.append(f"  {ts}  {item['name']}({inp})")
-            elif item.get("type") == "text" and item.get("text", "").strip():
+                actions.append(f"  {ts}  {name}({inp})")
+            elif item.get("type") == "text" and isinstance(item.get("text"), str) and item["text"].strip():
                 text_content = item["text"].strip().replace("\n", " ")
                 actions.append(f"  {ts}  [text] {text_content}")
     return actions[-n:] if n is not None else actions

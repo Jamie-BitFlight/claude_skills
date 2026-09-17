@@ -20,7 +20,11 @@ import monitor
 
 def assistant_record(content: list[dict[str, object]]) -> str:
     """Serialize one assistant JSONL record."""
-    return json.dumps({"type": "assistant", "timestamp": "2026-09-17T12:00:00Z", "content": content})
+    return json.dumps({
+        "type": "assistant",
+        "timestamp": "2026-09-17T12:00:00Z",
+        "message": {"role": "assistant", "content": content},
+    })
 
 
 def test_extract_actions_reads_complete_jsonl_and_returns_mixed_actions() -> None:
@@ -39,6 +43,22 @@ def test_extract_actions_reads_complete_jsonl_and_returns_mixed_actions() -> Non
     assert complete_input in actions[0]
     assert "Bash(" in actions[1]
     assert complete_text in actions[2]
+
+
+def test_extract_actions_ignores_non_action_and_malformed_record_variants() -> None:
+    records = [
+        "not json",
+        json.dumps([]),
+        json.dumps({"type": "user", "message": {"content": [{"type": "text", "text": "prompt"}]}}),
+        json.dumps({"type": "assistant"}),
+        json.dumps({"type": "assistant", "message": {"content": "plain text"}}),
+        json.dumps({"type": "assistant", "message": {"content": [None, {"type": "thinking"}]}}),
+        assistant_record([{"type": "text", "text": "kept action"}]),
+    ]
+
+    actions = health.extract_actions("\n".join(records), None)
+
+    assert actions == ["  2026-09-17 12:00:00  [text] kept action"]
 
 
 def test_agent_last_actions_searches_all_files_and_complete_contents(tmp_path: Path) -> None:
