@@ -255,7 +255,7 @@ class TestListItemsReportsBlankStatuses:
         "transport_error",
         [requests.exceptions.ConnectionError("connection dropped"), requests.exceptions.Timeout("request timed out")],
     )
-    def test_a_transport_failure_uses_cached_statuses(
+    def test_a_transport_failure_excludes_unverified_statuses(
         self, mocker: MockerFixture, transport_error: requests.exceptions.RequestException
     ) -> None:
         _patch_backend(mocker, [_item("#42")])
@@ -264,5 +264,5 @@ class TestListItemsReportsBlankStatuses:
 
         result = operations.list_items(status="status:in-progress", output=Output())
 
-        assert result["count"] == 1
+        assert result["count"] == 0
         assert any(str(transport_error) in warning for warning in _warnings(result))
