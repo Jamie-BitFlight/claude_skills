@@ -1,14 +1,13 @@
-"""Wire-level regression tests for #3546 B5's typed degradation-provenance fields.
+"""Wire-level regression tests for #3546's typed degradation-provenance fields.
 
 Proves ``status_source``/``unavailable_capabilities``/
 ``filters_evaluated_against_unavailable_data`` actually reach the MCP wire on
 both ``backlog_list`` and ``backlog_view`` -- not silently dropped by
 ``_respond``'s ``model_validate(...).model_dump(...)`` chain, whose default
-``extra='ignore'`` is exactly the failure mode B-critique.md §2.1/§2.2 proved
-for the rejected ``Output.degradations`` side-channel design (nine response
-models, including ``BacklogViewResponse``, do not inherit ``Output`` and would
+``extra='ignore'`` would drop an undeclared ``Output.degradations`` side channel
+because response models including ``BacklogViewResponse`` do not inherit ``Output`` and would
 silently drop an undeclared key). ``BacklogViewResponse`` is covered
-explicitly here since it is the model the critique proved was missed.
+explicitly because it has an independent field declaration.
 
 Two layers:
   1. Direct model round-trip proofs -- ``cls.model_validate(payload).model_dump(...)``,
@@ -19,8 +18,7 @@ Two layers:
      compact manifest via ``_build_compact_manifest``, and the
      ``summary=False`` full response via ``result.model_dump()``) -- the
      compact-manifest path builds its payload dict from scratch and would
-     silently drop any field not explicitly listed there, the same failure
-     mode at a different call site.
+      silently drop any field not explicitly listed there.
 """
 
 from __future__ import annotations
@@ -39,7 +37,7 @@ async def _call(tool_name: str, params: dict | None = None) -> dict:
 
 
 class TestRespondDoesNotDropStatusSourceFields:
-    """Direct proof that ``_respond`` preserves the new fields (B-critique.md §2.2)."""
+    """Direct proof that ``_respond`` preserves the new fields."""
 
     def test_backlog_list_response_keeps_status_source_fields(self) -> None:
         payload = {
@@ -57,7 +55,7 @@ class TestRespondDoesNotDropStatusSourceFields:
         assert wire["filters_evaluated_against_unavailable_data"] == ["status"]
 
     def test_backlog_view_response_keeps_status_source_fields(self) -> None:
-        """The model the B-critique.md §2.1 proof found missed by the rejected design."""
+        """The independent response model must declare the provenance fields explicitly."""
         payload = {"title": "An item", "status_source": "unavailable", "unavailable_capabilities": ["live_enrichment"]}
 
         wire = BacklogViewResponse.model_validate(payload).model_dump(exclude_none=False, exclude_unset=True)
@@ -94,6 +92,22 @@ class TestBacklogListMcpWireCarriesStatusSource:
         with patch("dh_core.operations.list_items", return_value=op_result):
             response = await _call("backlog_list", {"status": "in-progress"})
 
+        assert response["status_source"] == "unavailable"
+        assert response["unavailable_capabilities"] == ["live_status"]
+        assert response["filters_evaluated_against_unavailable_data"] == ["status"]
+
+    async def test_empty_degraded_filter_result_remains_unavailable_on_the_wire(self) -> None:
+        op_result = {
+            "items": [],
+            "count": 0,
+            "status_source": "unavailable",
+            "unavailable_capabilities": ["live_status"],
+            "filters_evaluated_against_unavailable_data": ["status"],
+        }
+        with patch("dh_core.operations.list_items", return_value=op_result):
+            response = await _call("backlog_list", {"status": "in-progress"})
+
+        assert response["items"] == []
         assert response["status_source"] == "unavailable"
         assert response["unavailable_capabilities"] == ["live_status"]
         assert response["filters_evaluated_against_unavailable_data"] == ["status"]

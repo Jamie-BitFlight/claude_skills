@@ -343,7 +343,7 @@ class BacklogViewDisclosureHandler:
         # An explicit ``Output`` collector is threaded through so a degraded
         # read (e.g. a refused live-enrichment lookup) surfaces on the
         # returned MapResponse/NavigateResponse/BoundedResponse instead of
-        # being silently dropped (B-critique.md §3.2).
+        # being silently dropped.
         output = Output()
         view_result = operations.view_item(selector, refresh=refresh, output=output)
         sections = self._normalizer.normalize(view_result)

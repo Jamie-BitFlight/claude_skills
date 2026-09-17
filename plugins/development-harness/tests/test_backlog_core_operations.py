@@ -2005,7 +2005,7 @@ class TestViewItem:
         Why: _live_lookup_id() must never return an empty string, and its None
              return means the caller has no identifier to send to the backend.
              Previously this rendered the same "backend unreachable" warning as a
-             genuine attempted-and-failed live check (B-critique.md §3.4); the
+             genuine attempted-and-failed live check; the
              corrected behaviour distinguishes "not attempted" from "attempted and
              failed" (see status_source == "cache" in test_status_source_wire.py
              and backlog_core/tests/test_refusal_not_item_missing.py).

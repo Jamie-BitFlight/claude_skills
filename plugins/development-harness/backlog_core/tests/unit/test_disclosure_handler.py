@@ -1226,7 +1226,7 @@ class TestExtractModeStruckSurvivesWindowing:
 
 
 # ---------------------------------------------------------------------------
-# B3: degraded-read warnings surface through MAP/NAVIGATE/EXTRACT (B-critique.md §3.2)
+# B3: degraded-read warnings surface through MAP/NAVIGATE/EXTRACT
 # ---------------------------------------------------------------------------
 
 
@@ -1251,8 +1251,8 @@ def _view_item_side_effect(view_result: ViewItemResult, warning_text: str):
 class TestDegradedReadWarningsSurfaceThroughDisclosure:
     """A degraded underlying read must surface on every disclosure mode.
 
-    Regression guard for B-critique.md §3.2: ``disclosure_handler.py``'s call
-    into ``operations.view_item()`` used to omit ``output=``, and
+    ``disclosure_handler.py``'s call into ``operations.view_item()`` used to
+    omit ``output=``, and
     ``MapResponse``/``NavigateResponse``/``BoundedResponse`` had no
     ``messages``/``warnings``/``errors`` field to carry it even if it had been
     passed — so a degraded read (e.g. a refused live-enrichment lookup) was

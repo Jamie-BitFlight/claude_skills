@@ -3,8 +3,8 @@
 ``list_items``/``view_item`` compute ``status_source``, ``unavailable_capabilities``,
 and (list only) ``filters_evaluated_against_unavailable_data`` directly on their own
 result shapes, following the ``ReconcileResult`` precedent already shipped in this
-module (``models.py``), per B-critique.md §5/§2.4's ranking of Alt-1 over a universal
-``Output.degradations`` side-channel.
+module (``models.py``). This avoids a universal ``Output.degradations`` side channel
+that independent response models could silently drop.
 
 Mirrors the fixture patterns already established in
 ``test_status_filter_fabrication.py`` (list) and ``test_refusal_not_item_missing.py``
@@ -371,8 +371,8 @@ class TestViewItemStatusSource:
     def test_no_live_id_to_check_reports_cache_not_unavailable(self, mocker: MockerFixture) -> None:
         """The false-positive #3546 §3.4 bug: nothing was attempted here (no issue ref,
         no refresh requested). status_source must say "cache", never "unavailable" --
-        a caller asking specifically for this field must not receive the B-critique.md
-        §3.4 false positive. Plan task B6 fixed the analogous false positive in the
+        a caller asking specifically for this field must not receive a false positive.
+        Plan task B6 fixed the analogous false positive in the
         *prose* warning (now gated on the same live_attempted flag); this is the
         field this test suite exists to keep honest.
         """

@@ -1671,8 +1671,8 @@ class ViewItemResultCompact(BaseModel):
     in this codebase -- ``backlog_view``'s ``include_content=False`` path
     returns a ``ViewItemResult`` with ``sections_metadata`` populated and
     ``body``/``sections`` cleared instead (see ``_assemble_view_content``),
-    not this model. Kept in sync with :class:`ViewItemResult`'s field set
-    per ADR-1's stated intent (independently evolvable duplication) in case
+    not this model. Kept in sync with :class:`ViewItemResult`'s field set as
+    independently evolvable duplication in case
     a future caller wires it up; verify against current call sites before
     relying on this class as documentation of an active response shape.
 

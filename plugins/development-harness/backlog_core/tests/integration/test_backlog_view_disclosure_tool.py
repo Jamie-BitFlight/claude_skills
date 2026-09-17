@@ -123,8 +123,7 @@ Updated for #3546 B5: status_source/unavailable_capabilities are new typed
 degradation-provenance fields on ViewItemResult/BacklogViewResponse, carried
 through the compact PASSTHROUGH manifest by _build_compact_manifest
 (server.py) so they are not silently dropped on the default (summary=True)
-call path -- the same silent-drop failure mode B-critique.md §2.1/§2.2 found
-for BacklogViewResponse generally.
+call path.
 """
 
 # ---------------------------------------------------------------------------
@@ -676,8 +675,8 @@ class TestBacklogErrorInDisclosurePath:
     async def test_item_not_found_error_type_survives_flattening(self, mocker: MockerFixture) -> None:
         """'error_type' names the raised exception's class, not just its message.
 
-        Regression guard for B-critique.md §3.2: before this fix,
-        ``_execute_disclosure_or_passthrough``'s ``except BacklogError`` arm
+        Before this fix, ``_execute_disclosure_or_passthrough``'s
+        ``except BacklogError`` arm
         returned only ``{"error": str(exc)}`` -- indistinguishable from any
         other ``BacklogError`` subtype (a refused GraphQL/REST lookup, an
         unsupported backend capability, ...) with a similar-looking message.

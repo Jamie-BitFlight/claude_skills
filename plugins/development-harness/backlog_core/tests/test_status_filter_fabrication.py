@@ -1,4 +1,4 @@
-"""Regression tests for the status-filter fabrication bug (#3546, B-critique.md §3.1).
+"""Regression tests for the status-filter fabrication bug (#3546).
 
 ``_item_derived_status`` used to return the literal ``"needs-grooming"`` for *every*
 numeric-issue item whenever the live status map was empty, with no way to tell "the
@@ -7,15 +7,14 @@ never answered at all". Since B1 (``claude/gh-client-stop-swallowing-3546``) mad
 degraded/refused status batch fetch raise a typed, distinguishable exception instead
 of silently returning ``{}``, ``list_items`` can catch that exception — but merely
 catching it and falling through to the same empty ``status_map`` reproduced the exact
-bug the critique proved: a ``status="needs-grooming"`` filter *fabricated* matches for
+bug: a ``status="needs-grooming"`` filter *fabricated* matches for
 items whose true live status was something else entirely, while a
 ``status="in-progress"`` filter silently dropped items that do match, with nothing in
 the response to say the result was unreliable.
 
-This mirrors ``scratchpad/design/proofs/test_critique_proofs.py``'s P1/P2 reproduction
-shape (three items, two genuinely ``in-progress``, one genuinely ``needs-grooming``),
-adapted to patch ``operations.batch_fetch_statuses`` with the typed exception B1
-introduced rather than the pre-B1 empty-map behaviour the original proof used.
+The reproduction uses three items: two genuinely ``in-progress`` and one genuinely
+``needs-grooming``. It patches ``operations.batch_fetch_statuses`` with the typed
+exception B1 introduced rather than the pre-B1 empty-map behaviour.
 
 A second trigger is a provider that cannot attempt the request because credentials are
 unavailable. The provider reports that distinction through ``StatusFetchResult``;
@@ -41,7 +40,7 @@ def _item(num: int, title: str) -> BacklogItem:
     """Build an open P1 backlog item with a numeric issue reference.
 
     The local ``status`` field is left at its default (``"needs-grooming"``,
-    same as every fixture in the critique's own proof) so a fix that fell back
+    same as every fixture in this regression suite) so a fix that fell back
     to the locally cached status under degradation would reproduce the same
     fabrication rather than fixing it.
     """
@@ -109,7 +108,7 @@ class TestStatusFilterDoesNotFabricateMatches:
         assert _titles(result) == ["Gamma"]
 
     def test_degraded_fetch_does_not_invent_matches(self, mocker: MockerFixture) -> None:
-        """The critique's exact reproduction: a refusal must not turn 1 real match into 3."""
+        """A refusal must not turn one real match into three fabricated matches."""
         _patch_backend(mocker)
         mocker.patch.object(operations, "batch_fetch_statuses", side_effect=GraphQLUnavailableError(_REFUSAL_MESSAGE))
 

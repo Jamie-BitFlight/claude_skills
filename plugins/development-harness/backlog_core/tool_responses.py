@@ -583,7 +583,7 @@ class BacklogListResponse(FallibleToolResponse):
     """Names of requested filter parameters (e.g. ``"status"``) that could
     not be honestly evaluated against live data this call -- present so a
     caller can tell a degraded filter result apart from a genuine, confident
-    zero (#3546, B-critique.md §3.1). Empty list when every active filter was
+    zero (#3546). Empty list when every active filter was
     evaluated against live or authoritative cached data."""
 
 
@@ -962,8 +962,7 @@ class BacklogViewResponse(BaseModel):
     :data:`~backlog_core.models.StatusSource`. Declared explicitly here
     (not inherited) because ``BacklogViewResponse`` does not inherit
     ``Output``/``ToolResponse`` -- an undeclared key on this model is
-    silently dropped by ``_respond``'s ``extra='ignore'`` (#3546,
-    B-critique.md §2.1/§2.2)."""
+    silently dropped by ``_respond``'s ``extra='ignore'`` (#3546)."""
     unavailable_capabilities: list[str] | None = None
     """Capabilities that could not be read live this call, e.g.
     ``["live_enrichment"]`` when ``status_source == "unavailable"``."""

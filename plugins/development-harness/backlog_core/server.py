@@ -1632,12 +1632,16 @@ def _build_count_only_response(
     return BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True)
 
 
-def _page_status_source(source: object, items: list[dict[str, str | bool]]) -> StatusSource:
+def _page_status_source(
+    source: object, items: list[dict[str, str | bool]], has_filters_evaluated_against_unavailable_data: bool = False
+) -> StatusSource:
     """Narrow operation-level status provenance to the rows on this page.
 
     Returns:
         Status provenance for the returned page rows.
     """
+    if source == "unavailable" and has_filters_evaluated_against_unavailable_data:
+        return "unavailable"
     if source == "cache":
         return "cache"
     has_numeric = any(parse_issue_number(str(item.get("issue", ""))) is not None for item in items)
@@ -2005,7 +2009,9 @@ async def backlog_list(
 
     effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
-    page_status_source = _page_status_source(result.get("status_source"), page_items)
+    page_status_source = _page_status_source(
+        result.get("status_source"), page_items, bool(result.get("filters_evaluated_against_unavailable_data"))
+    )
     has_more = (offset + effective_limit) < total
 
     # Primitive 2 and 1: enrich page items when depth or match context is requested.
@@ -2190,12 +2196,11 @@ def _execute_disclosure_or_passthrough(
     error dicts so the ``to_thread`` caller receives a clean return value with
     no exception. The generic ``BacklogError`` arm includes ``error_type``
     (``type(exc).__name__``) so a caller can branch on the exception's
-    identity instead of only its rendered message — this catch site used to
-    flatten every ``BacklogError`` subtype (a missing item, a refused
-    GraphQL/REST lookup, an unsupported backend capability, ...) to a bare
-    ``{"error": str(exc)}``, discarding which one occurred (B-critique.md
-    §3.2). ``OrdinalNotFoundError`` keeps its existing dedicated
-    ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
+    identity instead of only its rendered message — flattening every
+    ``BacklogError`` subtype (a missing item, a refused GraphQL/REST lookup,
+    an unsupported backend capability, ...) to a bare ``{"error": str(exc)}``
+    would discard which one occurred. ``OrdinalNotFoundError`` keeps its
+    existing dedicated ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
     carries structured identity and that shape is pinned by
     ``test_code_fence_miss_key_set_matches_numeric_miss``.
 

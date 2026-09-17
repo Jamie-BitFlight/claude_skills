@@ -349,9 +349,8 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
         ref) and a title selector with ``refresh=True`` reaches the live-check
         branch, but ``_live_lookup_id`` returns ``None`` -- no lookup is ever
         made. Neither the "backend unreachable" prose warning nor the
-        ``status_source``/``unavailable_capabilities`` degradation fields (#3546
-        B5) may fire for a call that never attempted anything (B-critique.md
-        §3.4).
+        ``status_source``/``unavailable_capabilities`` degradation fields (#3546)
+        may fire for a call that never attempted anything.
         """
         _patch_view_backend(mocker, [_item("", title="Untracked cached title")])
         enrich_mock = mocker.patch.object(operations, "view_enrich_from_github")

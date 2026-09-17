@@ -93,18 +93,18 @@ class MapResponse(BaseModel):
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read,
     e.g. a reconcile summary. Forwarded from that call's ``Output`` collector so
-    this disclosure mode does not silently drop them (B-critique.md §3.2)."""
+    this disclosure mode does not silently drop them."""
 
     warnings: list[str] = Field(default_factory=list)
     """Degradation warnings from the underlying ``operations.view_item()`` read,
     e.g. "backend unreachable — sections_index reflects provider-backed record,
     may be stale". Forwarded from that call's ``Output`` collector so this
-    disclosure mode does not silently drop them (B-critique.md §3.2)."""
+    disclosure mode does not silently drop them."""
 
     errors: list[str] = Field(default_factory=list)
     """Non-fatal error messages from the underlying ``operations.view_item()``
     read. Forwarded from that call's ``Output`` collector so this disclosure mode
-    does not silently drop them (B-critique.md §3.2)."""
+    does not silently drop them."""
 
 
 class NavigateResponse(BaseModel):
@@ -180,18 +180,18 @@ class NavigateResponse(BaseModel):
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read.
     Forwarded from that call's ``Output`` collector so this disclosure mode does
-    not silently drop them (B-critique.md §3.2)."""
+    not silently drop them."""
 
     warnings: list[str] = Field(default_factory=list)
     """Degradation warnings from the underlying ``operations.view_item()`` read,
     e.g. "backend unreachable — sections_index reflects provider-backed record,
     may be stale". Forwarded from that call's ``Output`` collector so this
-    disclosure mode does not silently drop them (B-critique.md §3.2)."""
+    disclosure mode does not silently drop them."""
 
     errors: list[str] = Field(default_factory=list)
     """Non-fatal error messages from the underlying ``operations.view_item()``
     read. Forwarded from that call's ``Output`` collector so this disclosure mode
-    does not silently drop them (B-critique.md §3.2)."""
+    does not silently drop them."""
 
 
 class BoundedResponse(BaseModel):
@@ -248,18 +248,18 @@ class BoundedResponse(BaseModel):
     messages: list[str] = Field(default_factory=list)
     """Informational messages from the underlying ``operations.view_item()`` read.
     Forwarded from that call's ``Output`` collector so this disclosure mode does
-    not silently drop them (B-critique.md §3.2)."""
+    not silently drop them."""
 
     warnings: list[str] = Field(default_factory=list)
     """Degradation warnings from the underlying ``operations.view_item()`` read,
     e.g. "backend unreachable — sections_index reflects provider-backed record,
     may be stale". Forwarded from that call's ``Output`` collector so this
-    disclosure mode does not silently drop them (B-critique.md §3.2)."""
+    disclosure mode does not silently drop them."""
 
     errors: list[str] = Field(default_factory=list)
     """Non-fatal error messages from the underlying ``operations.view_item()``
     read. Forwarded from that call's ``Output`` collector so this disclosure mode
-    does not silently drop them (B-critique.md §3.2)."""
+    does not silently drop them."""
 
 
 @dataclass(frozen=True, slots=True)
