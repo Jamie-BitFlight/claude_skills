@@ -2362,6 +2362,27 @@ def _listing_status_metadata(
     return (source, ["live_status"] if source == "unavailable" else [], sorted(keys) if untrustworthy else [])
 
 
+def _listing_provenance(backend: object) -> tuple[bool, bool, bool, bool]:
+    """Compute cache provenance after the backend has loaded its items.
+
+    Returns:
+        ``(from_cache, has_pending_writes, low_confidence, confirmed_complete)``.
+    """
+    from_cache = bool(getattr(backend, "supports_cached_listing", False))
+    has_pending_writes_fn = getattr(backend, "has_pending_writes", None)
+    has_pending_writes = bool(has_pending_writes_fn()) if callable(has_pending_writes_fn) else False
+    low_confidence = from_cache and (
+        (isinstance(backend, SnapshotCheckpointProvider) and not backend.has_synced_snapshot())
+        or (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
+    )
+    confirmed_complete = (
+        isinstance(backend, SnapshotCheckpointProvider)
+        and backend.has_synced_snapshot()
+        and not (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
+    )
+    return from_cache, has_pending_writes, low_confidence, confirmed_complete
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2476,39 +2497,7 @@ def list_items(
         read_through_cold_cache(repo, out)
     items = get_config().backend.list_work_items()
 
-    # backlog #3546 task A4: two independent, provenance-flavored bits
-    # (critique ALT-4, Firestore's fromCache/hasPendingWrites) computed after
-    # list_work_items() so has_skipped_snapshots() reflects this call's load
-    # (see _GitHubReconciliation.has_skipped_snapshots). Deliberately not one
-    # conflated "authoritative" boolean (critique Sec 4.3): a fully-synced
-    # cache holding locally-queued mutations (has_pending_writes) must not be
-    # reported as unqualified-confident just because from_cache alone would
-    # suggest it, and vice versa.
-    from_cache = bool(getattr(backend, "supports_cached_listing", False))
-    has_pending_writes = bool(backend.has_pending_writes()) if hasattr(backend, "has_pending_writes") else False
-    # "Cannot be served with confidence" gates on two independent, structurally
-    # separate protocols for the same reason SnapshotCheckpointProvider is kept
-    # apart from SyncProvider (see that protocol's docstring): a backend or
-    # test double satisfying one must not be silently required to satisfy the
-    # other just to keep behaving as it already does.
-    low_confidence = from_cache and (
-        (isinstance(backend, SnapshotCheckpointProvider) and not backend.has_synced_snapshot())
-        or (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
-    )
-    # Positive confirmation that an empty listing is a genuine zero, not an
-    # unexplained one (A-approach.md Sec 1.3, "GitHub backend, checkpoint
-    # present, zero items ... must stay quiet"). Deliberately stronger than
-    # `not low_confidence`: a backend that cannot report checkpoint state at
-    # all (no SnapshotCheckpointProvider -- e.g. a SyncProvider test double
-    # that only implements `reconcile`) makes `low_confidence` compute to
-    # `False` for lack of a negative signal, which must NOT be read as a
-    # positive one -- the ambiguity warning below still needs to fire for
-    # that backend, exactly as before A4.
-    confirmed_complete = (
-        isinstance(backend, SnapshotCheckpointProvider)
-        and backend.has_synced_snapshot()
-        and not (isinstance(backend, SnapshotCompletenessProvider) and backend.has_skipped_snapshots())
-    )
+    from_cache, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
     if not items and isinstance(get_config().backend, SyncProvider) and not confirmed_complete:
         # A provider-backed cache holding nothing reads exactly like an empty
         # backlog. They are different answers and only one is worth acting on,
