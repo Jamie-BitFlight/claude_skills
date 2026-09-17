@@ -1,4 +1,4 @@
-"""Canonical type definitions for the MCP progressive disclosure contract.
+"""Canonical backlog response types for progressive Markdown disclosure.
 
 This module is the single source of truth for all disclosure-related types.
 Downstream tasks (T13-T16) import from here -- no other module redefines these types.
@@ -7,14 +7,13 @@ Downstream tasks (T13-T16) import from here -- no other module redefines these t
 shapes ``BacklogViewDisclosureHandler`` returns) are frozen Pydantic ``BaseModel``
 subclasses, per this repo's "structured data -> Pydantic, not dataclass/TypedDict" convention
 (AGENTS.md), matching the ``ConfigDict(frozen=True)`` value-object pattern already
-used in ``file_cache_state.py``. ``BoundedContent`` stays a frozen dataclass -- it is
-a purely internal intermediate value, never an MCP response shape or ingress
-validator (see its own docstring).
+used in ``file_cache_state.py``. Internal navigation models belong to
+``progressive_markdown``; this module owns only backlog response envelopes and
+request-mode validation.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -262,19 +261,6 @@ class BoundedResponse(BaseModel):
     does not silently drop them."""
 
 
-@dataclass(frozen=True, slots=True)
-class BoundedContent:
-    """Internal intermediate value produced by ``TokenBoundedExtractor``.
-
-    Not returned to MCP callers — converted to ``BoundedResponse`` by the handler.
-    """
-
-    content: str
-    total_tokens: int
-    returned_tokens: int
-    truncated: bool
-
-
 # ---------------------------------------------------------------------------
 # Error types
 # ---------------------------------------------------------------------------
@@ -294,27 +280,4 @@ class DisclosureParamError(Exception):
         self.invalid_params = invalid_params
 
 
-class OrdinalNotFoundError(Exception):
-    """Ordinal did not match any node in the document map.
-
-    Attributes:
-        requested: The ordinal string that was requested.
-        valid_ordinals: Ordered list of all valid ordinals in the document.
-    """
-
-    def __init__(self, requested: str, valid_ordinals: list[str]) -> None:
-        """Initialize with the missing ordinal and the full list of valid ordinals."""
-        super().__init__(f"Ordinal {requested!r} not found. Valid ordinals: {valid_ordinals}")
-        self.requested = requested
-        self.valid_ordinals = valid_ordinals
-
-
-__all__ = [
-    "BoundedContent",
-    "BoundedResponse",
-    "DisclosureMode",
-    "DisclosureParamError",
-    "MapResponse",
-    "NavigateResponse",
-    "OrdinalNotFoundError",
-]
+__all__ = ["BoundedResponse", "DisclosureMode", "DisclosureParamError", "MapResponse", "NavigateResponse"]

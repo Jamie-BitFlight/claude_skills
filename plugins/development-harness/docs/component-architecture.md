@@ -33,10 +33,9 @@ that lets markdown arrive from any source.
 
 Consumed by: `backlog_core`, `sam_schema`.
 
-Do not confuse with: the navigation and pagination logic currently living inside
-`backlog_core`. That logic duplicates this package's `Navigator` and `Paginator` and is
-scheduled for deletion, not maintenance. A second implementation of addressing or pagination
-is a defect regardless of whether it works.
+Backlog's shipped dot-ordinal navigation and token windowing live here alongside the
+general navigator. `backlog_core` supplies generated item content and preserves its public
+response envelopes, but it does not assign addresses or slice Markdown tokens.
 
 Two numbering schemes exist today and they are not the same thing. The engine's dot-path
 addresses reach sections, sub-headings, and code fences at any depth; they are the surviving
@@ -63,8 +62,7 @@ generalise to the other.
   is addressed consistently across providers.
 - Navigation indexing decides how an agent walks a document's tree.
 
-These answer different questions. Navigation belongs to `progressive_markdown`; where
-`backlog_core` implements it, that is a gap.
+These answer different questions. Navigation belongs exclusively to `progressive_markdown`.
 
 ### `sam_schema`
 

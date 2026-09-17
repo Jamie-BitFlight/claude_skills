@@ -43,10 +43,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from tls_compat import relax_verify_x509_strict
-
-relax_verify_x509_strict()
-
 from backlog_core.gh_client import GitHubUnavailableError, close_github_issue, get_github, sync_issues_graphql
 from backlog_core.models import Output
 

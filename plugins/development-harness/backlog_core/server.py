@@ -38,6 +38,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp_tasks import TasksExtension
 from github import GithubException as _GithubException
 from mcp.types import ToolAnnotations
+from progressive_markdown.exceptions import OrdinalNotFoundError
 from pydantic import BaseModel, Field, ValidationError as _PydanticValidationError
 from ruamel.yaml import YAML as _YAML
 
@@ -51,7 +52,7 @@ from .artifact_registry import ArtifactRegistry
 from .backend_protocol import get_config as _get_config
 from .backend_types import ContentProvider, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
-from .disclosure_types import DisclosureMode, DisclosureParamError, OrdinalNotFoundError
+from .disclosure_types import DisclosureMode, DisclosureParamError
 from .dispatch_state import DispatchStateManager as _DispatchStateManager
 from .models import (
     ArtifactContent,

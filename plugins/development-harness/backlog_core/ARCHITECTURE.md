@@ -678,8 +678,7 @@ turning certificate verification off:
   relaxing strict mode.
 - Relaxation removes only `VERIFY_X509_STRICT`. The resulting context retains
   `ssl.CERT_REQUIRED`, hostname verification, and all other verification flags. On Python 3.13 and
-  later, the non-relaxed path explicitly restores the strict flag even if an entry-point pre-init
-  compatibility shim patched urllib3 before `github_client.py` was imported.
+  later, the non-relaxed path explicitly retains the strict flag.
 - The same judged SSL context is mounted for direct and proxied pools. The PyGithub connection also
   pins per-request `verify` to the selected source so `requests` cannot inject a different,
   uninspected bundle during environment merging. This preserves one trust decision from
@@ -1184,18 +1183,18 @@ These are CLI-specific display concerns that don't belong in core logic.
 
 ---
 
-## Module: Progressive Disclosure (ordinal_mapper.py, disclosure_handler.py, disclosure_types.py)
+## Progressive Disclosure Integration
 
 **Responsibility**: Deliver backlog item content progressively. Large items are navigated
 via a token-efficient ordinal map rather than returned in a single call.
 
-**Ownership**: navigation and pagination belong to the `progressive_markdown` package, which
-provides them for markdown from any source. The modules described here predate that
-consolidation and reimplement navigation on top of the engine's parser and indexer. They are
-a transitional implementation, not the owner of this concern — see
+**Ownership**: navigation and pagination belong exclusively to the `progressive_markdown`
+package, which provides them for markdown from any source. `backlog_core.disclosure_handler`
+owns backlog fetching, request adaptation, and response-envelope assembly; it delegates ordinal
+assignment/resolution and token windowing to that package. See
 [Component Architecture](../docs/component-architecture.md) for the boundary and
 [Agent Markdown Consumption](../docs/agent-markdown-consumption-contract.md) for the
-behaviour they must converge on. Do not extend them; add capability to the engine instead.
+behaviour they implement. Add navigation capability to the engine, not this package.
 
 Contract reference: `docs/mcp-progressive-disclosure-contract.md` for ordinal addressing and
 response shapes.
@@ -1266,6 +1265,7 @@ No additional tiktoken instantiation occurs in this subsystem.
 
 | File | Responsibility |
 |---|---|
-| `ordinal_mapper.py` | Ordinal assignment, `_ResolutionIndex`, `_SubtreeNode`, fence extraction |
-| `disclosure_handler.py` | Request parsing, navigate-on-parent dispatch, `_ORDINAL_PATTERN` |
-| `disclosure_types.py` | `NavigateResponse`, `MapResponse`, `BoundedResponse`, `OrdinalNotFoundError` |
+| `progressive_markdown/ordinal_mapper.py` | Ordinal assignment, `_ResolutionIndex`, `_SubtreeNode`, fence extraction |
+| `progressive_markdown/token_bounded.py` | Token-window extraction |
+| `backlog_core/disclosure_handler.py` | Backlog request parsing and response adaptation |
+| `backlog_core/disclosure_types.py` | Backlog response envelopes and request modes |

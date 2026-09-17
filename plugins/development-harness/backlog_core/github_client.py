@@ -180,30 +180,9 @@ own re-derivation entirely — the only bundle that can reach the handshake is t
 
 Why _build_ssl_context sets VERIFY_X509_STRICT explicitly, not only clears it
 ---------------------------------------------------------------------------------
-``_build_ssl_context`` builds its context by calling ``create_urllib3_context()``, a
-name this module binds once, at import time, via ``from urllib3.util.ssl_ import
-create_urllib3_context``. Several of this module's own callers — the backlog MCP
-server, the SAM MCP server, and the SAM CLI entry point (``scripts/run_backlog_server.py``,
-``scripts/run_sam_server.py``, ``sam_schema/cli.py``) — import and call
-``scripts/tls_compat.py``'s ``relax_verify_x509_strict()`` before importing anything
-from ``backlog_core``, specifically because ``urllib3.connection`` binds that same
-function the same way and must be patched before that binding happens (see that
-module's own docstring). That shim monkeypatches
-``urllib3.util.ssl_.create_urllib3_context`` itself, process-wide, to a wrapper that
-always clears ``VERIFY_X509_STRICT`` from whatever context the original builder
-returns. Because this module's own import runs *after* that shim in every one of
-those entry points, ``from urllib3.util.ssl_ import create_urllib3_context`` binds the
-*already-patched* wrapper, not the original — so a bare ``context =
-create_urllib3_context()`` inside ``_build_ssl_context`` returns a context with the
-flag already cleared, before this function's own ``relax_strict`` branch ever runs.
-Only clearing the flag when ``relax_strict`` is True therefore silently inherits the
-shim's unconditional relaxation on the ``relax_strict=False`` path too, defeating the
-per-bundle judgment ``bundle_requires_relaxed_verification`` exists to make. The
-``else`` branch sets the flag explicitly instead, independent of whatever the
-(possibly patched) ``create_urllib3_context`` already did, reproducing urllib3's own
-*unpatched* default (gated on ``sys.version_info >= (3, 13)``, the same guard
-``urllib3/util/ssl_.py`` uses internally) rather than trusting the return value's
-current state.
+``_build_ssl_context`` owns both branches of the transport decision. It clears
+``VERIFY_X509_STRICT`` only after certificate inspection authorizes that change, and
+explicitly retains Python 3.13's strict default for compliant configured anchors.
 """
 
 from __future__ import annotations

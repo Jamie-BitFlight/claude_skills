@@ -47,10 +47,6 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from tls_compat import relax_verify_x509_strict
-
-relax_verify_x509_strict()
-
 from backlog_core import models as _models
 from backlog_core.artifact_provider import GitHubArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry

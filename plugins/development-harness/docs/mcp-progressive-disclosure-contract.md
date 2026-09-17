@@ -337,7 +337,7 @@ The `map_text` field in `MapResponse` is bounded by the token budget (from
 pagination requirement governing what happens when the full index exceeds that budget — no
 addressable ordinal may be dropped or elided.
 
-Source: architecture spec §5.3 and `backlog_core/ordinal_mapper.py`.
+Source: architecture spec §5.3 and `progressive_markdown/ordinal_mapper.py`.
 
 ---
 
@@ -347,4 +347,4 @@ For entries that contain no headings and no code fences, `OrdinalPathMapper` sho
 and emits no level-3+ ordinals. The ordinal list for that entry is byte-for-byte identical to
 pre-feature output.
 
-Source: architecture spec §5.2 and `backlog_core/ordinal_mapper.py`.
+Source: architecture spec §5.2 and `progressive_markdown/ordinal_mapper.py`.

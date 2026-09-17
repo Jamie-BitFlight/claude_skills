@@ -38,18 +38,16 @@ No component may hand-build a table of contents, a section listing, a content ex
 bounded response of its own. Where such an implementation exists today it is deleted, not
 maintained in parallel. A second implementation is a defect regardless of whether it works.
 
-**Known gap, blocks deletion of the duplicate implementation until resolved.** Today's two
-engines address content differently: `backlog_core`'s `ordinal_mapper.py`/`disclosure_handler.py`
-accepts dot ordinals (`4.0.1`, `4.0.1.code.0`, validated by `_ORDINAL_PATTERN`), while
-`progressive_markdown`'s `indexer.py::_build_selector()` emits hierarchical selectors
+The backlog response adapter accepts dot ordinals (`4.0.1`, `4.0.1.code.0`, validated by
+`_ORDINAL_PATTERN`) assigned by `progressive_markdown.ordinal_mapper`, while the package's
+general `indexer.py::_build_selector()` emits hierarchical selectors
 (`h2.1.2`) and `ProgressiveMarkdownNavigator.view_code()` addresses code blocks by ID
-(`code_0001`). Deleting the `ordinal_mapper` path as this requirement mandates, before
-reconciling these grammars, would mean agents can no longer copy an address from a table of
-contents into a follow-up retrieval request (R4) — the surviving engine wouldn't accept the
-addresses the deleted one taught callers to expect. This requirement does not resolve which
-grammar wins or how the reconciliation is built; it records the constraint so the deletion is
-sequenced correctly: the surviving engine must emit or accept the canonical ordinal grammar
-before, not after, `ordinal_mapper` is removed.
+(`code_0001`). The dot-ordinal implementation is now owned by the engine rather than duplicated
+in `backlog_core`. It remains available until the general navigator emits and accepts the same
+canonical addresses, because removing it first would prevent agents from copying an address from
+a table of contents into a follow-up retrieval request (R4). Reconciling the general navigator's
+selector grammar remains part of R4 and does not permit a source package to own a second
+navigation implementation.
 
 Sources include, and are not limited to: issue and item bodies, plan documents, task
 documents, and the reports and artifacts produced during grooming.
@@ -364,8 +362,9 @@ that call it:
 - the entry-block pagination and paged-body rendering, which duplicate `Paginator`
 - the section-filter assembly, which duplicates parser-level node extraction
 
-The address-based navigation path (`disclosure_handler`, `ordinal_mapper`) already routes
-through the engine and is the reference for how the remaining paths should call it.
+The address-based navigation path uses `progressive_markdown.ordinal_mapper` and
+`progressive_markdown.token_bounded`; `backlog_core.disclosure_handler` only adapts backlog
+Collection/Generation and public response envelopes to those APIs.
 
 ## Related documents
 

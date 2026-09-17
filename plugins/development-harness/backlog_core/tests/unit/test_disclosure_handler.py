@@ -55,21 +55,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
+from progressive_markdown.exceptions import OrdinalNotFoundError
+from progressive_markdown.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
+from progressive_markdown.token_bounded import BoundedContent
 
 from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedSection
 
 # T20 creates BacklogViewDisclosureHandler — ImportError at collection until then.
 from backlog_core.disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
-from backlog_core.disclosure_types import (
-    BoundedContent,
-    BoundedResponse,
-    DisclosureMode,
-    MapResponse,
-    NavigateResponse,
-    OrdinalNotFoundError,
-)
+from backlog_core.disclosure_types import BoundedResponse, DisclosureMode, MapResponse, NavigateResponse
 from backlog_core.models import GroomedSectionMetadata, Output, SectionEntryDict, SectionEntryMetadata, ViewItemResult
-from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

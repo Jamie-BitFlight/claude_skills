@@ -61,11 +61,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 from fastmcp.client import Client
+from progressive_markdown.ordinal_mapper import OrdinalPathMapper
 
 from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedSection
 from backlog_core.models import ItemNotFoundError
 from backlog_core.operations import ViewItemResult
-from backlog_core.ordinal_mapper import OrdinalPathMapper
 from backlog_core.server import mcp
 
 if TYPE_CHECKING:

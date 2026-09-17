@@ -13,12 +13,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from progressive_markdown.list_navigator import ENCODING, TOKEN_BUDGET
+from progressive_markdown.list_navigator import TOKEN_BUDGET
+from progressive_markdown.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
+from progressive_markdown.token_bounded import TokenBoundedExtractor
 
 from backlog_core import operations
 from backlog_core.content_normalizer import ItemContentNormalizer
 from backlog_core.disclosure_types import (
-    BoundedContent,
     BoundedResponse,
     DisclosureMode,
     DisclosureParamError,
@@ -26,7 +27,6 @@ from backlog_core.disclosure_types import (
     NavigateResponse,
 )
 from backlog_core.models import Output, StatusSource
-from backlog_core.ordinal_mapper import OrdinalEntry, OrdinalPathMapper
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -187,64 +187,6 @@ class DisclosureRequestParser:
 # ---------------------------------------------------------------------------
 # TokenBoundedExtractor — Phase 3 (T18): cl100k_base token windowing (SRP)
 # ---------------------------------------------------------------------------
-
-
-class TokenBoundedExtractor:
-    """Apply cl100k_base token-bounded windowing to text content.
-
-    **Responsibility boundary**: token bounding only.  This class encodes content,
-    slices a token window, and decodes it back to a string.  It does NOT construct
-    ``next_call`` hints (that is the handler's responsibility per architect spec §5.7)
-    and does NOT fetch content from any external source.
-
-    Uses the shared ``ENCODING`` singleton from ``progressive_markdown.list_navigator``
-    so token counts are consistent with budget gates, map estimates, and the
-    rest of the progressive disclosure pipeline.
-
-    Example::
-
-        extractor = TokenBoundedExtractor()
-        result = extractor.extract(content, head_tokens=4000)
-        if result.truncated:
-            # next window: pass result.returned_tokens as skip_tokens
-            rest = extractor.extract(content, head_tokens=4000, skip_tokens=result.returned_tokens)
-    """
-
-    def extract(self, content: str, head_tokens: int, skip_tokens: int = 0) -> BoundedContent:
-        """Return the token window ``[skip_tokens : skip_tokens + head_tokens]``.
-
-        The full content is encoded once with ``cl100k_base``.  The requested slice
-        is decoded back to a string.  When ``skip_tokens`` meets or exceeds the total
-        token count the window is empty, ``returned_tokens`` is 0, and
-        ``truncated`` is ``False`` (the caller has read past the end of content).
-
-        Args:
-            content: Source text to window.  Encoded once per call; the token list
-                is not cached between calls.
-            head_tokens: Maximum number of tokens to return in this window.  A value
-                larger than the remaining tokens after skipping is clamped to the
-                actual remaining count (no padding).
-            skip_tokens: Token offset for pagination continuation.  ``0`` starts
-                from the beginning of content.  Defaults to ``0``.
-
-        Returns:
-            A ``BoundedContent`` value object with:
-
-            - ``content``: Decoded token window (empty string when skip overshots).
-            - ``total_tokens``: cl100k_base count of the FULL original content —
-              invariant across all window positions.
-            - ``returned_tokens``: Token count of the decoded window (≤ ``head_tokens``).
-            - ``truncated``: ``True`` when there are tokens beyond the returned window.
-        """
-        all_tokens: list[int] = ENCODING.encode(content)
-        total_tokens: int = len(all_tokens)
-        window_tokens: list[int] = all_tokens[skip_tokens : skip_tokens + head_tokens]
-        returned_tokens: int = len(window_tokens)
-        decoded: str = ENCODING.decode(window_tokens)
-        truncated: bool = skip_tokens + returned_tokens < total_tokens
-        return BoundedContent(
-            content=decoded, total_tokens=total_tokens, returned_tokens=returned_tokens, truncated=truncated
-        )
 
 
 # ---------------------------------------------------------------------------

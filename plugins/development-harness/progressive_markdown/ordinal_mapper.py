@@ -18,18 +18,44 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
+from typing import Protocol
 
+from progressive_markdown.exceptions import OrdinalNotFoundError
 from progressive_markdown.indexer import MarkdownIndexer
 from progressive_markdown.list_navigator import ENCODING as _ENCODING, TOKEN_BUDGET
 from progressive_markdown.parser import MarkdownItParser
 
-from backlog_core.disclosure_types import OrdinalNotFoundError
+from progressive_markdown.models import CodeBlock, SectionNode
 
-if TYPE_CHECKING:
-    from progressive_markdown.models import CodeBlock, SectionNode
 
-    from backlog_core.content_normalizer import NormalizedEntry, NormalizedSection
+class NormalizedEntry(Protocol):
+    """Source-neutral generated entry consumed by ordinal navigation."""
+
+    @property
+    def index(self) -> int: ...
+
+    @property
+    def content(self) -> str: ...
+
+    @property
+    def struck(self) -> bool: ...
+
+    @property
+    def entry_id(self) -> str: ...
+
+
+class NormalizedSection(Protocol):
+    """Source-neutral generated section consumed by ordinal navigation."""
+
+    @property
+    def index(self) -> int: ...
+
+    @property
+    def title(self) -> str: ...
+
+    @property
+    def entries(self) -> Sequence[NormalizedEntry]: ...
 
 # ---------------------------------------------------------------------------
 # Format constants (architect spec §5.5)
@@ -350,7 +376,7 @@ class OrdinalPathMapper:
         unit = mapper.resolve("4.0")
     """
 
-    def __init__(self, sections: list[NormalizedSection], encoding_name: str = "cl100k_base") -> None:
+    def __init__(self, sections: Sequence[NormalizedSection], encoding_name: str = "cl100k_base") -> None:
         """Initialise the mapper.
 
         Args:

@@ -658,74 +658,24 @@ class TestSslContextKeepsVerification:
         assert not cleared & ~ssl.VERIFY_X509_STRICT, f"cleared a flag beyond VERIFY_X509_STRICT: {cleared!r}"
 
 
-class TestBuildSslContextIndependentOfPreInitShim:
-    """New Finding 2 (P2, PR #3551 second review round): the strict path must not
-    silently inherit a monkeypatch that ran before this module was imported.
-
-    The shipped backlog MCP server, SAM MCP server, and SAM CLI entry points
-    (``scripts/run_backlog_server.py``, ``scripts/run_sam_server.py``,
-    ``sam_schema/cli.py``) each import ``tls_compat`` and call
-    ``relax_verify_x509_strict()`` *before* importing anything from ``backlog_core``
-    or ``sam_schema`` — confirmed by reading each file's own import order. That shim
-    monkeypatches ``urllib3.util.ssl_.create_urllib3_context`` process-wide to a
-    wrapper that always clears ``VERIFY_X509_STRICT``. Because
-    ``backlog_core/github_client.py`` binds that same name via
-    ``from urllib3.util.ssl_ import create_urllib3_context`` at its own import time,
-    importing it after the shim has already run binds the patched wrapper, not the
-    original — so a bare ``create_urllib3_context()`` call inside
-    ``_build_ssl_context`` would return a context with the flag already cleared,
-    before ``_build_ssl_context``'s own ``relax_strict`` branch runs at all.
-    """
-
-    @pytest.mark.skipif(
-        sys.version_info < (3, 13),
-        reason=(
-            "tls_compat.relax_verify_x509_strict() is a documented no-op below Python 3.13 "
-            "(see tls_compat.py's own `if sys.version_info < (3, 13): return`), so on 3.11/3.12 "
-            "this test's setup patches nothing and the scenario it simulates cannot occur."
-        ),
+def test_executable_entrypoints_do_not_install_process_wide_tls_policy() -> None:
+    """Only the shared GitHub client factory may alter PyGithub's TLS transport."""
+    plugin_root = Path(__file__).parents[2]
+    entrypoints = (
+        plugin_root / "scripts/run_backlog_server.py",
+        plugin_root / "scripts/run_sam_server.py",
+        plugin_root / "scripts/run_sam_cli.py",
+        plugin_root / "scripts/migrate_plan_artifacts.py",
+        plugin_root / "scripts/migrate_tasks_to_github.py",
+        plugin_root / "scripts/close_test_issues.py",
+        plugin_root / "sam_schema/cli.py",
     )
-    def test_strict_flag_survives_a_pre_init_shim_that_already_ran(self, compliant_ca_file):
-        """Reproduces the deployed import order instead of testing this module in
-        isolation: the real ``relax_verify_x509_strict()`` runs first (producing its
-        actual patched wrapper, not a hand-rolled stand-in), and
-        ``backlog_core.github_client``'s own ``create_urllib3_context`` name is then
-        rebound to that wrapper — exactly what a fresh import of this module would
-        bind had it happened after the shim, as it does in every shipped entry point.
-        ``_build_ssl_context(..., relax_strict=False)`` must still produce a context
-        with ``VERIFY_X509_STRICT`` set: a compliant custom bundle must not be
-        silently relaxed just because some earlier, unrelated import patched a
-        function this module happens to share a name with.
-        """
-        import urllib3.connection
-        import urllib3.util.ssl_
 
-        import backlog_core.github_client as github_client_module
-        import tls_compat
-
-        original_create_default_context = ssl.create_default_context
-        original_create_urllib3_context = urllib3.util.ssl_.create_urllib3_context
-        original_connection_create_urllib3_context = urllib3.connection.create_urllib3_context
-        original_module_create_urllib3_context = github_client_module.create_urllib3_context
-        try:
-            tls_compat.relax_verify_x509_strict()
-            # Simulate github_client.py's own `from urllib3.util.ssl_ import
-            # create_urllib3_context` having executed *after* the shim already ran, by
-            # rebinding this module's name the same way a fresh import would: to
-            # whatever urllib3.util.ssl_.create_urllib3_context now points at.
-            github_client_module.create_urllib3_context = urllib3.util.ssl_.create_urllib3_context
-
-            context = github_client_module._build_ssl_context(str(compliant_ca_file), relax_strict=False)
-
-            assert context.verify_flags & ssl.VERIFY_X509_STRICT, (
-                "the pre-init shim's monkeypatched create_urllib3_context silently cleared "
-                "VERIFY_X509_STRICT even though relax_strict=False was asked"
-            )
-        finally:
-            ssl.create_default_context = original_create_default_context
-            urllib3.util.ssl_.create_urllib3_context = original_create_urllib3_context
-            urllib3.connection.create_urllib3_context = original_connection_create_urllib3_context
-            github_client_module.create_urllib3_context = original_module_create_urllib3_context
+    for entrypoint in entrypoints:
+        source = entrypoint.read_text(encoding="utf-8")
+        assert "relax_verify_x509_strict" not in source
+        assert "tls_compat" not in source
+    assert not (plugin_root / "scripts/tls_compat.py").exists()
 
 
 class TestInstallProxyTlsSupport:
@@ -846,9 +796,7 @@ class TestInstallProxyTlsSupport:
 
     def test_compliant_requests_bundle_keeps_strict_verification(self, monkeypatch, compliant_ca_file):
         monkeypatch.setenv("REQUESTS_CA_BUNDLE", str(compliant_ca_file))
-        # A previously imported CLI may have installed tls_compat's process-wide
-        # urllib3 wrapper. The production contract restores Python 3.13's strict
-        # default even in that import order; older versions retain urllib3's default.
+        # Compliant custom roots are loaded without weakening urllib3's strict default.
         expected_strict = (
             ssl.VERIFY_X509_STRICT
             if sys.version_info >= (3, 13)

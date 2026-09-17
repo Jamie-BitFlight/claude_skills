@@ -1,7 +1,7 @@
 """Tests for OrdinalPathMapper — TDD, authored before T14 implementation.
 
 These tests intentionally fail at collection (ModuleNotFoundError on
-``backlog_core.ordinal_mapper``) until T14 creates that module.  That is the
+``progressive_markdown.ordinal_mapper``) until T14 creates that module. That is the
 correct TDD state.
 
 Behavioral contract pinned by this file:
@@ -21,7 +21,7 @@ Behavioral contract pinned by this file:
    found by searching the built map by title — never hardcoded.
 
 Implementation note for T14:
-  Import surface is ``backlog_core.ordinal_mapper`` (module not yet written).
+  Import surface is ``progressive_markdown.ordinal_mapper``.
   Once T14 ships, pytest runs will show these tests passing instead of erroring
   at collection.
 """
@@ -36,19 +36,19 @@ import pytest
 import tiktoken
 import tiktoken.registry
 from hypothesis import given, settings, strategies as st
-
-from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
-from backlog_core.disclosure_handler import _ORDINAL_PATTERN
-from backlog_core.disclosure_types import OrdinalNotFoundError
+from progressive_markdown.exceptions import OrdinalNotFoundError
 
 # T14 creates this module — ModuleNotFoundError at collection until then (TDD state)
-from backlog_core.ordinal_mapper import (
+from progressive_markdown.ordinal_mapper import (
     OrdinalEntry,
     OrdinalPathMapper,
     ResolvedUnit,
     _entry_ordinal_for_code,
     _entry_ordinal_for_sub_heading,
 )
+
+from backlog_core.content_normalizer import ItemContentNormalizer, NormalizedEntry, NormalizedSection
+from backlog_core.disclosure_handler import _ORDINAL_PATTERN
 
 # ---------------------------------------------------------------------------
 # Real-encoding availability guard

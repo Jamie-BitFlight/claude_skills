@@ -38,13 +38,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from progressive_markdown.ordinal_mapper import OrdinalPathMapper
 
 from backlog_core.content_normalizer import ItemContentNormalizer
 from backlog_core.disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequestParser
 from backlog_core.disclosure_types import MapResponse
 from backlog_core.entry_blocks import parse_entries, strike_entry, wrap_entry_with_timestamp
 from backlog_core.models import Entry, SectionEntryDict, SectionEntryMetadata, ViewItemResult
-from backlog_core.ordinal_mapper import OrdinalPathMapper
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
