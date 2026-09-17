@@ -1,7 +1,6 @@
 ---
 paths:
-- docs/workflow-layers/**
-- docs/workflow-trace-methodology.md
+- skills/meta-workflow-graph-refresh/references/**
 ---
 
 # Workflow Extraction Rules
@@ -21,7 +20,7 @@ fields are accurate and which are hallucinated. Data enters a layer JSON file on
 3. A sonnet reducer assembles the layer JSON and self-checks source citations
 
 This is the ensemble pattern from `plugin-creator:ensemble-rule-review`. The full
-methodology is in `docs/workflow-trace-methodology.md`.
+methodology is in `skills/meta-workflow-graph-refresh/references/workflow-trace-methodology.md`.
 
 ## Agent roles
 
@@ -46,7 +45,7 @@ Do not write a schema before reading the source files. The correct order is:
 
 ## Coverage manifest
 
-Before any collection pass, read `docs/workflow-layers/COVERAGE.md`. It records what is
+Before any collection pass, read `skills/meta-workflow-graph-refresh/references/COVERAGE.md`. It records what is
 already collected, the update process for each tier of change, and how to scope gaps
 without restarting the whole collection.
 
@@ -54,4 +53,5 @@ without restarting the whole collection.
 
 DH workflow files are a graph-of-graphs. A Mermaid node that says "Load X.md" is an
 expansion link — follow it into the referenced file and continue reading. Do not record
-it as a step and stop. The full methodology is in `docs/workflow-trace-methodology.md`.
+it as a step and stop. The full methodology is in
+`skills/meta-workflow-graph-refresh/references/workflow-trace-methodology.md`.

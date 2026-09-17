@@ -9,7 +9,9 @@ The following diagram is the authoritative procedure for Final Handoff Output. E
 
 ## Concerns Check — Implementation Notes
 
-The first step reads the Concerns section of the just-resolved issue before routing to the next work item.
+When a GitHub issue number exists, the first step reads its Concerns section before routing to the
+next work item. When the work item has no GitHub issue number, skip that issue-only read and proceed
+directly to the slug search; absence of an issue ID is not a backend failure.
 
 **Selector source (`#{N}`)**: The resolved issue number is available from the **"Apply status:verified Label" Step 2** of the `complete-implementation` skill — that step calls `backlog_list(title="{slug}")`, finds the matched item, and extracts `issue_number` from the item's `issue` field (e.g., `"#2437"` → `issue_number = 2437`). Use that integer as `#{N}` in the `backlog_view` call below.
 
@@ -34,7 +36,10 @@ Review these concerns before proceeding. You may choose to create backlog items 
 
 The Concerns block is displayed first, followed by a blank line separator, before any slug-search output.
 
-**Error handling**: If `backlog_view` returns an `error` key, output `⚠ Could not read Concerns section: {error}` and continue to the slug search. The Concerns check is advisory — backend errors must not block Final Handoff.
+**Error handling**: Only after a call was made, if `backlog_view` returns an `error` key, output
+`⚠ Could not read Concerns section: {error}` and continue to the slug search. The Concerns check is
+advisory — backend errors must not block Final Handoff. Do not emit this warning when no GitHub issue
+number exists, because no backend call was attempted.
 
 **`section=` caveat**: The `section=` parameter has no effect on GitHub-only items with a raw body — the full body may be returned. When this occurs, scan the response body for a `## Concerns` heading and extract the list items beneath it. Apply active-entry detection to those items only.
 
@@ -42,7 +47,10 @@ The Concerns block is displayed first, followed by a blank line separator, befor
 flowchart TD
     %% Step 1: Read Concerns from just-resolved issue — MUST run before slug-search routing
     %% #{N} = issue_number extracted in 'Apply status:verified Label' Step 2
-    ConcernsCheck["backlog_view(selector='#{N}', summary=False, section='Concerns')<br>Read Concerns from just-resolved issue"] --> ConcernsError{"Call returned<br>error key?"}
+    Start([Final handoff]) --> HasIssue{"GitHub issue_number<br>exists?"}
+    HasIssue -->|"No — no issue ID"| Fetch
+    HasIssue -->|Yes| ConcernsCheck["backlog_view(selector='#{N}', summary=False, section='Concerns')<br>Read Concerns from just-resolved issue"]
+    ConcernsCheck --> ConcernsError{"Call returned<br>error key?"}
     ConcernsError -->|"Yes — backend error"| WarnContinue["⚠ 'Could not read Concerns section: {error}'<br>Non-blocking — continue to slug search"]
     ConcernsError -->|"No — call succeeded"| HasActiveConcerns{"Active entries in<br>Concerns section?<br>(not strikethrough, not checked)"}
     HasActiveConcerns -->|"Yes — 1+ active entries"| DisplayConcerns["Display concerns block:<br>## Unresolved Concerns from #{N}<br>- {each active entry verbatim}<br>Review — you may create backlog items if needed"]
