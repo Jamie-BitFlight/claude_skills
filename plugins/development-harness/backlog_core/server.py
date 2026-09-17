@@ -72,9 +72,11 @@ from .models import (
     DispatchWaveSummary as _DispatchWaveSummary,
     Output,
     RegisterResult,
+    StatusSource,
     UnsupportedCapabilityError,
     init as _init_models,
 )
+from .parsing import parse_issue_number
 from .search import (
     _DEFAULT_SNIPPET_CONTEXT,
     _META_FIELDS,
@@ -1600,6 +1602,57 @@ def _apply_sync_state_to_response(
     response["warnings"] = (list(existing) + sync_warnings) if isinstance(existing, list) else sync_warnings
 
 
+def _build_count_only_response(
+    total: int,
+    result: Mapping[str, object],
+    output: Output,
+    sync_state_block: dict[str, object] | None,
+    sync_warnings: list[str],
+) -> dict[str, object]:
+    """Build the minimal count response while preserving degradation signals.
+
+    Returns:
+        Serialized count-only response.
+    """
+    response: dict[str, object] = {
+        "count": total,
+        "from_cache": result.get("from_cache"),
+        "has_pending_writes": result.get("has_pending_writes"),
+    }
+    if output.warnings:
+        response["warnings"] = list(output.warnings)
+    if output.errors:
+        response["errors"] = list(output.errors)
+    if result.get("status_source") == "unavailable":
+        response["status_source"] = result["status_source"]
+    for field in ("unavailable_capabilities", "filters_evaluated_against_unavailable_data"):
+        if result.get(field):
+            response[field] = result[field]
+    _apply_sync_state_to_response(response, sync_state_block, sync_warnings)
+    return BacklogListResponse.model_validate(response).model_dump(exclude_defaults=True)
+
+
+def _page_status_source(
+    source: object, items: list[dict[str, str | bool]], has_filters_evaluated_against_unavailable_data: bool = False
+) -> StatusSource:
+    """Narrow operation-level status provenance to the rows on this page.
+
+    Returns:
+        Status provenance for the returned page rows.
+    """
+    if source == "unavailable" and has_filters_evaluated_against_unavailable_data:
+        return "unavailable"
+    if source == "cache":
+        return "cache"
+    has_numeric = any(parse_issue_number(str(item.get("issue", ""))) is not None for item in items)
+    if not has_numeric:
+        return "cache"
+    has_backend_owned = any(parse_issue_number(str(item.get("issue", ""))) is None for item in items)
+    if source == "unavailable":
+        return "unavailable"
+    return "mixed" if has_backend_owned else "live"
+
+
 def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int, limit: int) -> int:
     """Resolve the effective page limit for a ``backlog_list`` response.
 
@@ -1842,6 +1895,13 @@ async def backlog_list(
         from_cache/has_pending_writes name the provenance instead (backlog
         #3546 task A4) — pass allow_cached=True to see the best-effort cached
         list anyway.
+        status_source ("live", "cache", "mixed", or "unavailable") reports where the
+        listing's status data came from; unavailable_capabilities names any
+        capability (e.g. "live_status") that could not be read live this
+        call; filters_evaluated_against_unavailable_data names any active
+        filter (e.g. "status") that could not be honestly evaluated against
+        live data. On count_only=True, these three appear only when they
+        signal a genuine degradation (never on a healthy call).
         On error, ``error`` is set.
         Items are deduplicated by issue number — if the cache contained duplicate
         entries, only the first occurrence of each issue number is returned.
@@ -1892,6 +1952,9 @@ async def backlog_list(
         withheld: dict[str, object] = {
             "from_cache": result.get("from_cache"),
             "has_pending_writes": result.get("has_pending_writes"),
+            "status_source": result.get("status_source"),
+            "unavailable_capabilities": result.get("unavailable_capabilities"),
+            "filters_evaluated_against_unavailable_data": result.get("filters_evaluated_against_unavailable_data"),
             "backend": backend_status.model_dump(),
             **out.to_dict(),
         }
@@ -1939,23 +2002,16 @@ async def backlog_list(
         # Without them, a caller reading a bare count from a warm cache that
         # still holds unconfirmed local writes could mistake local-only rows
         # for provider-acknowledged data (Codex review, PR #3576 finding 2).
-        count_resp: dict[str, object] = {
-            "count": total,
-            "from_cache": result.get("from_cache"),
-            "has_pending_writes": result.get("has_pending_writes"),
-        }
-        if out.warnings:
-            count_resp["warnings"] = list(out.warnings)
-        if out.errors:
-            count_resp["errors"] = list(out.errors)
-        _apply_sync_state_to_response(count_resp, sync_state_block, sync_warnings)
-        return BacklogListResponse.model_validate(count_resp).model_dump(exclude_defaults=True)
+        return _build_count_only_response(total, result, out, sync_state_block, sync_warnings)
 
     # Append the human-readable backend status line to the messages list.
     out.info(_format_backend_status_message(backend_status))
 
     effective_limit = _resolve_effective_limit(all_items, offset, limit)
     page_items = all_items[offset : offset + effective_limit]
+    page_status_source = _page_status_source(
+        result.get("status_source"), page_items, bool(result.get("filters_evaluated_against_unavailable_data"))
+    )
     has_more = (offset + effective_limit) < total
 
     # Primitive 2 and 1: enrich page items when depth or match context is requested.
@@ -1985,6 +2041,10 @@ async def backlog_list(
         **result,
         "items": enriched_items,
         "count": len(enriched_items),
+        "status_source": page_status_source,
+        "unavailable_capabilities": (
+            result.get("unavailable_capabilities", []) if page_status_source == "unavailable" else []
+        ),
         "available_fields": list(_AVAILABLE_FIELDS),
         "pagination": {"offset": offset, "limit": effective_limit, "total": total, "has_more": has_more},
         "backend": backend_status.model_dump(),
@@ -2028,6 +2088,8 @@ def _build_compact_manifest(
         "status": status,
         "plan_address": plan_address,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_summary": True,
         "_full_chars": full_chars,
         "_hint": (
@@ -2101,6 +2163,8 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
         "status": result.status,
         "description": result.description,
         "section_filter_miss": result.section_filter_miss,
+        "status_source": result.status_source,
+        "unavailable_capabilities": result.unavailable_capabilities,
         "_over_budget": True,
         "_full_chars": full_chars,
         "_usage": (
@@ -2132,12 +2196,11 @@ def _execute_disclosure_or_passthrough(
     error dicts so the ``to_thread`` caller receives a clean return value with
     no exception. The generic ``BacklogError`` arm includes ``error_type``
     (``type(exc).__name__``) so a caller can branch on the exception's
-    identity instead of only its rendered message — this catch site used to
-    flatten every ``BacklogError`` subtype (a missing item, a refused
-    GraphQL/REST lookup, an unsupported backend capability, ...) to a bare
-    ``{"error": str(exc)}``, discarding which one occurred (B-critique.md
-    §3.2). ``OrdinalNotFoundError`` keeps its existing dedicated
-    ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
+    identity instead of only its rendered message — flattening every
+    ``BacklogError`` subtype (a missing item, a refused GraphQL/REST lookup,
+    an unsupported backend capability, ...) to a bare ``{"error": str(exc)}``
+    would discard which one occurred. ``OrdinalNotFoundError`` keeps its
+    existing dedicated ``requested_ordinal``/``valid_ordinals`` fields unchanged — it already
     carries structured identity and that shape is pinned by
     ``test_code_fence_miss_key_set_matches_numeric_miss``.
 
@@ -2333,6 +2396,10 @@ async def backlog_view(
         When summary=False: dict with title, priority, issue, plan, file_path, body,
         sections metadata, and output messages/warnings. file_path is for reference
         only — use backlog_update or backlog_groom for all modifications.
+        Both summary=True and summary=False shapes carry status_source ("live",
+        "cache", or "unavailable"), reporting where this item's live-enrichment
+        data came from, and unavailable_capabilities, naming any capability
+        (e.g. "live_enrichment") that could not be read live this call.
         When navigate targets an ordinal that does not exist in the item: dict with
         error, requested_ordinal, and valid_ordinals (every ordinal actually present).
         On error, dict contains an error key.

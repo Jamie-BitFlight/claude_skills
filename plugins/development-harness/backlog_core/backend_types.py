@@ -23,13 +23,14 @@ if TYPE_CHECKING:
         ContentWrite,
         GroomedData,
         IssueLocalFields,
-        IssueStatus,
         MergeResult,
         Output,
         PullRequestRef,
         ReconcileRequest,
         ReconcileResult,
         SamTask,
+        StatusFetchResult,
+        ViewEnrichmentResult,
         ViewItemResult,
     )
 
@@ -274,9 +275,11 @@ class WorkItemBackend(Protocol):
         self, repo_obj: Repository, issue_num: int, output: Output | None = None
     ) -> str | None: ...
     def check_open_prs_for_issue(self, issue_num: int, repo: str = "") -> list[PullRequestRef]: ...
-    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> dict[int, IssueStatus]: ...
+    def batch_fetch_statuses(self, items: list[BacklogItem], repo: str = "") -> StatusFetchResult: ...
     def fetch_item_status(self, item: BacklogItem, repo: str = "", output: Output | None = None) -> str: ...
-    def view_enrich_from_github(self, result: ViewItemResult, issue_num: str, repo: str = "") -> bool: ...
+    def view_enrich_from_github(
+        self, result: ViewItemResult, issue_num: str, repo: str = ""
+    ) -> ViewEnrichmentResult: ...
     def issue_to_local_fields(self, issue: IssueNode) -> IssueLocalFields: ...
 
     # Status mutations (generic — BeadsBackend really implements these)
@@ -355,32 +358,6 @@ class SnapshotCompletenessProvider(Protocol):
     """
 
     def has_skipped_snapshots(self) -> bool: ...
-
-
-@runtime_checkable
-class CredentialAvailabilityProvider(Protocol):
-    """Optional capability: report whether GitHub credentials are configured.
-
-    A local, environment-only yes/no question ("is a token configured"), not
-    a live GitHub operation — distinct from ``GitHubExtras``, whose methods
-    perform real GraphQL/REST calls. Implemented by ``GitHubBackend`` so
-    ``operations.py`` can ask this question through the backend abstraction
-    instead of importing ``github_client.resolve_token()`` directly, which
-    ``ARCHITECTURE.md``'s "Module: operations.py" section forbids
-    (``operations.py`` must not import provider clients).
-
-    Like ``GitHubExtras`` and ``BranchBackend``, this Protocol is
-    ``runtime_checkable`` — ``isinstance`` checks method *names* only, so a
-    backend with no credential concept at all could still satisfy it
-    structurally via a local simulation. Callers MUST gate on the
-    ``supports_github_extras`` flag first (a backend with no live GitHub
-    connection concept has no credential concept either) and treat
-    ``isinstance(backend, CredentialAvailabilityProvider)`` only as a
-    secondary assertion — the same pattern ``GitHubExtras``'s docstring
-    documents.
-    """
-
-    def has_github_credentials(self) -> bool: ...
 
 
 @runtime_checkable

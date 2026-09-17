@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
@@ -1226,7 +1226,7 @@ class TestExtractModeStruckSurvivesWindowing:
 
 
 # ---------------------------------------------------------------------------
-# B3: degraded-read warnings surface through MAP/NAVIGATE/EXTRACT (B-critique.md §3.2)
+# B3: degraded-read warnings surface through MAP/NAVIGATE/EXTRACT
 # ---------------------------------------------------------------------------
 
 
@@ -1251,8 +1251,8 @@ def _view_item_side_effect(view_result: ViewItemResult, warning_text: str):
 class TestDegradedReadWarningsSurfaceThroughDisclosure:
     """A degraded underlying read must surface on every disclosure mode.
 
-    Regression guard for B-critique.md §3.2: ``disclosure_handler.py``'s call
-    into ``operations.view_item()`` used to omit ``output=``, and
+    ``disclosure_handler.py``'s call into ``operations.view_item()`` used to
+    omit ``output=``, and
     ``MapResponse``/``NavigateResponse``/``BoundedResponse`` had no
     ``messages``/``warnings``/``errors`` field to carry it even if it had been
     passed — so a degraded read (e.g. a refused live-enrichment lookup) was
@@ -1325,4 +1325,104 @@ class TestDegradedReadWarningsSurfaceThroughDisclosure:
         assert self._WARNING in result.warnings, (
             f"BoundedResponse.warnings must carry the degraded-read warning instead of "
             f"silently dropping it. Got: {result.warnings!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# B5/B6: status_source/unavailable_capabilities surface through MAP/NAVIGATE/
+# EXTRACT (Codex review, PR #3577)
+# ---------------------------------------------------------------------------
+
+
+class TestDegradedStatusSourceSurfacesThroughDisclosure:
+    """A degraded underlying read's ``status_source``/``unavailable_capabilities``
+    must surface on every disclosure mode.
+
+    Regression guard: ``backlog_view()`` already reports ``status_source``/
+    ``unavailable_capabilities`` on its passthrough response (B5), but
+    ``_execute_disclosure_or_passthrough()`` returns early through
+    ``BacklogViewDisclosureHandler.handle()`` for map/navigate/head, whose
+    ``MapResponse``/``NavigateResponse``/``BoundedResponse`` payloads did not
+    carry these fields at all -- so a degraded read was silently downgraded to
+    "no signal" the moment a caller used a disclosure mode instead of plain
+    passthrough. Each test builds a ``ViewItemResult`` with
+    ``status_source="unavailable"`` (the same value ``view_item()`` reports
+    for a genuine attempted-and-failed live-enrichment lookup) and asserts the
+    disclosure response mirrors it.
+    """
+
+    _UNAVAILABLE_CAPABILITIES: ClassVar[list[str]] = ["live_enrichment"]
+
+    @_skip_without_real_enc
+    def test_map_mode_surfaces_unavailable_status_source(
+        self, multi_entry_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """MAP response's ``status_source``/``unavailable_capabilities`` mirror a degraded read."""
+        degraded = multi_entry_view_result.model_copy(
+            update={"status_source": "unavailable", "unavailable_capabilities": self._UNAVAILABLE_CAPABILITIES}
+        )
+        mocker.patch("backlog_core.operations.view_item", return_value=degraded)
+
+        handler = BacklogViewDisclosureHandler()
+        request = DisclosureRequestParser().parse(map=True)
+        result = handler.handle("synthetic-selector", request)
+
+        assert isinstance(result, MapResponse), f"Expected MapResponse; got {type(result).__name__}."
+        assert result.status_source == "unavailable", (
+            f"MapResponse.status_source must mirror the degraded ViewItemResult's "
+            f"'unavailable' provenance instead of silently dropping it. Got: {result.status_source!r}"
+        )
+        assert result.unavailable_capabilities == self._UNAVAILABLE_CAPABILITIES, (
+            f"MapResponse.unavailable_capabilities must mirror the degraded ViewItemResult's "
+            f"value. Got: {result.unavailable_capabilities!r}"
+        )
+
+    @_skip_without_real_enc
+    def test_navigate_mode_surfaces_unavailable_status_source(
+        self, multi_entry_view_result: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """NAVIGATE response's ``status_source``/``unavailable_capabilities`` mirror a degraded read."""
+        degraded = multi_entry_view_result.model_copy(
+            update={"status_source": "unavailable", "unavailable_capabilities": self._UNAVAILABLE_CAPABILITIES}
+        )
+        mocker.patch("backlog_core.operations.view_item", return_value=degraded)
+
+        handler = BacklogViewDisclosureHandler()
+        request = DisclosureRequestParser().parse(navigate="0")
+        result = handler.handle("synthetic-selector", request)
+
+        assert isinstance(result, NavigateResponse), f"Expected NavigateResponse; got {type(result).__name__}."
+        assert result.status_source == "unavailable", (
+            f"NavigateResponse.status_source must mirror the degraded ViewItemResult's "
+            f"'unavailable' provenance instead of silently dropping it. Got: {result.status_source!r}"
+        )
+        assert result.unavailable_capabilities == self._UNAVAILABLE_CAPABILITIES, (
+            f"NavigateResponse.unavailable_capabilities must mirror the degraded ViewItemResult's "
+            f"value. Got: {result.unavailable_capabilities!r}"
+        )
+
+    @_skip_without_2515
+    @_skip_without_real_enc
+    def test_extract_mode_surfaces_unavailable_status_source(
+        self, normalized_2515: list[NormalizedSection], view_result_2515: ViewItemResult, mocker: MockerFixture
+    ) -> None:
+        """EXTRACT (BoundedResponse) status_source/unavailable_capabilities mirror a degraded read."""
+        degraded = view_result_2515.model_copy(
+            update={"status_source": "unavailable", "unavailable_capabilities": self._UNAVAILABLE_CAPABILITIES}
+        )
+        mocker.patch("backlog_core.operations.view_item", return_value=degraded)
+        rt_ica_ordinal = _find_rt_ica_ordinal(normalized_2515)
+
+        handler = BacklogViewDisclosureHandler()
+        request = DisclosureRequestParser().parse(navigate=rt_ica_ordinal, head=100)
+        result = handler.handle("synthetic-selector", request)
+
+        assert isinstance(result, BoundedResponse), f"Expected BoundedResponse; got {type(result).__name__}."
+        assert result.status_source == "unavailable", (
+            f"BoundedResponse.status_source must mirror the degraded ViewItemResult's "
+            f"'unavailable' provenance instead of silently dropping it. Got: {result.status_source!r}"
+        )
+        assert result.unavailable_capabilities == self._UNAVAILABLE_CAPABILITIES, (
+            f"BoundedResponse.unavailable_capabilities must mirror the degraded ViewItemResult's "
+            f"value. Got: {result.unavailable_capabilities!r}"
         )

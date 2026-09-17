@@ -58,6 +58,8 @@ from backlog_core.models import (
     ReconcileRequest,
     ReconcileResult,
     ReconcileScope,
+    StatusFetchResult,
+    ViewEnrichmentResult,
     ViewItemResult,
 )
 
@@ -255,17 +257,18 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
 
     def test_a_plain_lookup_failure_names_unreachable_backend_and_possible_causes(self, mocker: MockerFixture) -> None:
         _patch_view_backend(mocker, [_item("#519", title="Cached title")])
-        mocker.patch.object(operations, "view_enrich_from_github", return_value=False)
+        mocker.patch.object(
+            operations,
+            "view_enrich_from_github",
+            return_value=ViewEnrichmentResult(
+                enriched=False, attempted=True, unavailable_reason="GitHub lookup failed (network error)"
+            ),
+        )
         out = Output()
 
         operations.view_item("#519", output=out)
 
-        assert any(
-            w.startswith("backend unreachable — GitHub lookup failed (")
-            and "authentication failure" in w
-            and "issue not found" in w
-            for w in out.warnings
-        )
+        assert any(w.startswith("backend unreachable — GitHub lookup failed (network error)") for w in out.warnings)
 
     def test_a_genuinely_nonexistent_issue_on_a_reachable_repo_raises_not_found(self, mocker: MockerFixture) -> None:
         """End-to-end regression for #3570 Finding 1.
@@ -338,6 +341,26 @@ class TestViewItemDoesNotCallARefusalAMissingItem:
 
         with pytest.raises(GitHubUnavailableError):
             operations.view_item("#999", output=Output())
+
+    def test_nothing_attempted_emits_no_warning_or_degradation_signal(self, mocker: MockerFixture) -> None:
+        """ "Nothing was tried" must not render identically to "the backend refused us".
+
+        A cached item with no resolvable identifier (no issue number, no issue
+        ref) and a title selector with ``refresh=True`` reaches the live-check
+        branch, but ``_live_lookup_id`` returns ``None`` -- no lookup is ever
+        made. Neither the "backend unreachable" prose warning nor the
+        ``status_source``/``unavailable_capabilities`` degradation fields (#3546)
+        may fire for a call that never attempted anything.
+        """
+        _patch_view_backend(mocker, [_item("", title="Untracked cached title")])
+        enrich_mock = mocker.patch.object(operations, "view_enrich_from_github")
+
+        result = operations.view_item("Untracked cached title", refresh=True, output=Output())
+
+        enrich_mock.assert_not_called()
+        assert result.warnings == []
+        assert result.status_source == "cache"
+        assert result.unavailable_capabilities == []
 
 
 class _CacheBackend:
@@ -585,6 +608,9 @@ class TestListingProvenance:
         assert result["items"] is None
         assert result["count"] is None
         assert result["from_cache"] is True
+        assert result["status_source"] == "cache"
+        assert result["unavailable_capabilities"] == []
+        assert result["filters_evaluated_against_unavailable_data"] == []
         assert any(_EMPTY_CACHE_MARKER in w for w in _warnings(result))
 
     def test_a_label_scoped_empty_reconcile_serves_items_when_allow_cached(
@@ -648,6 +674,11 @@ class TestListingProvenance:
         backend.put_work_item(_item("#1", title="Queued locally"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
+        mocker.patch.object(
+            operations,
+            "batch_fetch_statuses",
+            return_value=StatusFetchResult(attempted=False, unavailable_reason="no GitHub credentials configured"),
+        )
 
         result = operations.list_items(output=Output())
 

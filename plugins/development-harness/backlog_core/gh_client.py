@@ -1364,12 +1364,9 @@ def has_github_credentials() -> bool:
 
     Performs no network access -- delegates to :func:`resolve_token`, the same
     local-only environment check :func:`try_get_github` performs before it
-    ever reaches the network. Exists so ``GitHubBackend`` can answer this
-    yes/no question for ``operations.py`` through the backend abstraction
-    (``CredentialAvailabilityProvider`` in ``backend_types.py``) instead of
-    ``operations.py`` importing ``github_client.resolve_token`` directly,
-    which the ``operations.py`` module boundary in ``ARCHITECTURE.md``
-    forbids.
+    ever reaches the network. ``GitHubBackend`` uses it privately when
+    constructing provider-owned fetch outcomes; provider-neutral operations
+    never inspect GitHub credentials or import provider clients.
 
     Returns:
         True when :func:`resolve_token` finds a token among ``TOKEN_ENV_VARS``;
