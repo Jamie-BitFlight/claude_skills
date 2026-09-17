@@ -14,9 +14,12 @@ Determine this skill's absolute directory with the branch for the current harnes
 - OpenCode: use the `Base directory for this skill` value appended to the loaded skill.[3]
 - Kimi: use the substituted `${KIMI_SKILL_DIR}` value.[4]
 - Hermes: use the substituted `${HERMES_SKILL_DIR}` value.[5]
-- Cursor: open [this SKILL.md](./SKILL.md) with the file tool; Cursor resolves that relative
-  reference from the skill root.[6] Use the parent directory of the absolute path returned by the
-  tool. Do not use the relative path itself as `<skill-root>`.
+- Cursor: do not construct `<skill-root>`; Cursor documents skill-root-relative bundled resources,
+  but no source establishes that it exposes the absolute skill root.[6] The
+  [Cursor harness measurement](../../docs/work-ledger/measurements/harness-cursor.md#skillmd--loaded)
+  records the evidence search. Use the configured `mcp__plugin_dh_*` tools instead. If the operation
+  specifically requires the CLI or a server-script path, report that Cursor exposes no verified
+  absolute skill root and return `STATUS: BLOCKED`.
 
 For substitution-based branches, use the first line below that became a concrete absolute path and
 ignore unresolved lines:

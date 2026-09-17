@@ -182,7 +182,7 @@ ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 # assumes any one of those harness-specific forms ships broken text to the others
 # (``CLAIMS-REGISTER.md``'s ``${CLAUDE_PLUGIN_ROOT}`` entry;
 # ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` centralizes those branches and makes
-# Cursor resolve its documented relative skill reference to an absolute file-tool result first.
+# Cursor use the configured MCP surface because no absolute skill-root exposure is established.
 PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{?[A-Z_]*PLUGIN_ROOT\b")
 SKILL_DIR_PARENT_RE = re.compile(r"\$\{?[A-Z_]*SKILL_DIR\}?/\.\.")
 CLI_PATH_RE = re.compile(r"sam_schema[/\\.]cli\b|run_sam_cli\.py")
@@ -814,8 +814,8 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
     directory, and states its documented failure path.
 
     The command definitions use one model-resolved skill-root token, and the instructions support
-    harness-supplied root metadata, known body-substitution variables, and Cursor's relative-file
-    resolution without treating that relative path as an absolute directory.
+    harness-supplied root metadata and known body-substitution variables. Cursor instead uses the
+    configured MCP surface because its absolute skill-root exposure is unestablished.
     """
     assert DH_CLI_USAGE.is_file(), (
         f"{DH_CLI_USAGE.relative_to(PLUGIN_ROOT)} does not exist. Scaffold it with "
@@ -854,9 +854,12 @@ def test_dh_cli_usage_resolves_through_every_first_class_harness_skill_root() ->
     assert not unknown_variables, f"dh-cli-usage names unknown template variables: {unknown_variables}"
 
     cursor_branch = next(line for line in raw.splitlines() if line.startswith("- Cursor:"))
-    assert "SKILL.md" in cursor_branch
-    assert "absolute" in raw[raw.index(cursor_branch) : raw.index("For substitution-based branches")]
-    assert "Do not use the relative path" in raw
+    cursor_section = raw[raw.index(cursor_branch) : raw.index("For substitution-based branches")]
+    assert "do not construct `<skill-root>`" in cursor_section
+    assert "no source establishes" in cursor_section
+    assert "mcp__plugin_dh_*" in cursor_section
+    assert "STATUS: BLOCKED" in cursor_section
+    assert "absolute path returned" not in cursor_section
     for citation_number in range(1, 7):
         assert f"[{citation_number}]" in raw, f"dh-cli-usage is missing harness citation [{citation_number}]"
     assert "## References" in raw
