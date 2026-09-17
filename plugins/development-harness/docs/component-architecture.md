@@ -25,7 +25,8 @@ Never describe a behaviour as belonging to MCP or to the CLI.
 
 ### `progressive_markdown`
 
-Role: the markdown engine. The single path through which markdown reaches an agent.
+Role: the markdown engine and target single path through which markdown reaches an agent. Current
+adoption is partial and listed below.
 
 Owns: parsing markdown into an addressable tree, assigning addresses, pagination of every
 result including a table of contents, token budgeting, and the content-provider protocol
@@ -42,9 +43,9 @@ read and pagination paths remain until the issue-backed consumer migrations abov
 
 Two numbering schemes exist today and they are not the same thing. The engine's dot-path
 addresses reach sections, sub-headings, and code fences at any depth; they are the surviving
-scheme. The bracket-numbered index emitted by the hand-built section directory addresses only
-top-level sections, does not paginate, and is removed with the code that produces it. When a
-document refers to an address, it means the dot-path form.
+scheme. The still-shipped bracket-numbered index emitted by the hand-built section directory
+addresses only top-level sections and does not paginate; #3057 tracks removing it with the code
+that produces it. When a document refers to a target address, it means the dot-path form.
 
 ### `backlog_core`
 

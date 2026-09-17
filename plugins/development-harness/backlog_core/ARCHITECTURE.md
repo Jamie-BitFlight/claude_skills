@@ -1206,6 +1206,26 @@ behaviour they implement. Add navigation capability to the engine, not this pack
 Contract reference: `docs/mcp-progressive-disclosure-contract.md` for ordinal addressing and
 response shapes.
 
+### Progressive-disclosure migration debt
+
+The moved mapper and token-window extractor consolidate primitive ownership only. They do not
+complete the agent markdown-consumption requirements. Remaining work is issue-backed:
+
+| Source or boundary | Current state | Remaining owner |
+|---|---|---|
+| Default item/PASSTHROUGH reads and grooming gates | Legacy compact manifest, bracket index, and paged-body paths remain | #3057 |
+| Plan, task, and artifact reads | Do not use the engine's serving path; artifact delivery still returns provider content directly | #3058, #3078 |
+| MAP/NAVIGATE/EXTRACT serving | Backlog handler adapts moved primitives; general navigator and paginator have no consumers; MAP is complete but unpaginated | #3059, #2969 |
+| Section and artifact discovery | Separate inventories remain | #3061, blocked by #3055 |
+| Content identity and control set | No content-ID follow-up, global control set, or write invalidation is implemented | #3062, #3079, #3081 |
+| CLI navigation | CLI has no MAP/NAVIGATE/EXTRACT or content-identity parameters | #3063 |
+| Consumer guidance and contract identity | Transitional parameters and duplicate contract paths remain documented | #3054, #3060, #3064, #3071 |
+
+#1676's YAML sidecar and #3085's session key are superseded mechanisms, not implementation tasks
+for this architecture. Duplicate-heading semantics remain unsettled in #3190; an engine-boundary
+test preserves the current occurrence-based ordinal behavior until that issue chooses the final
+contract.
+
 ### MarkdownIndexer Integration
 
 `OrdinalPathMapper.build_map()` calls `_index_entry_subtree()` for each level-2 entry to
@@ -1259,9 +1279,10 @@ Source: `ordinal_mapper.py`, `_MIN_ROOT_SECTIONS_FOR_PARENT` constant and
 `_ResolutionIndex: dict[str, _SubtreeNode]` is built eagerly to all depths during
 `build_map()`. `resolve()` and `valid_ordinals()` operate on this complete index.
 
-`MapResponse.map_text` is bounded by `TOKEN_BUDGET` (from
-`progressive_markdown.list_navigator`) and may omit deep ordinals from the rendered listing.
-Deep ordinals remain resolvable via `navigate=`.
+`MapResponse.map_text` contains every formatted entry returned by `build_map()`. It is not bounded
+or paginated and does not omit entries. `MapResponse.over_budget` compares the represented
+level-1 content estimate with `TOKEN_BUDGET`; it is diagnostic only. #3059 tracks paginating MAP
+without dropping any address, and #3062 tracks content-identity follow-up requests.
 
 ### Token Counting
 

@@ -160,6 +160,17 @@ def _make_struck_sections(*specs: tuple[str, list[tuple[str, bool, str]]]) -> li
     return out
 
 
+def test_duplicate_section_titles_keep_distinct_occurrence_ordinals() -> None:
+    """The moved engine boundary preserves both duplicate-heading occurrences (#3190)."""
+    mapper = OrdinalPathMapper(_make_sections(("Duplicate", ["first"]), ("Duplicate", ["second"])))
+
+    entries = mapper.build_map()
+
+    assert [(entry.ordinal, entry.title) for entry in entries] == [("0", "Duplicate"), ("1", "Duplicate")]
+    assert mapper.resolve("0").content == "first"
+    assert mapper.resolve("1").content == "second"
+
+
 # ---------------------------------------------------------------------------
 # Module-level fixtures
 # ---------------------------------------------------------------------------
