@@ -320,11 +320,13 @@ def classify(dep: Dependency, project_groups: list[str]) -> None:
         dep.verdict = "WITH_SUPPLIED"
         dep.reason = "only reached through `uv run --with` or `uvx`, which supply it independently"
     elif dep.pep723_sites:
-        dep.verdict = "PEP723_ONLY"
+        # Same verdict as any other import: the declaration stays required. A PEP 723 importer is
+        # not a separate category of dependency, and naming one invites a dependency group that
+        # partitions nothing. `pep723_sites` already records which files these are.
+        dep.verdict = "DIRECT_IMPORT"
         dep.reason = (
-            f"declared inline by {len(dep.pep723_sites)} PEP 723 script(s); the runtime resolves it "
-            "in an isolated environment, but `ty check` resolves the same imports against the project "
-            "environment, so the declaration stays required"
+            f"imported by {len(dep.pep723_sites)} PEP 723 script(s); `ty check` resolves those "
+            "imports against the project environment, so the declaration stays required"
         )
     elif dep.required_by:
         dep.verdict = "TRANSITIVE_ONLY"
