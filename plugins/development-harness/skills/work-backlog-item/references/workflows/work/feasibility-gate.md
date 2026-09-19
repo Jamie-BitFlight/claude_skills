@@ -26,21 +26,21 @@ flowchart TD
     C2 -->|"Effort=FULL for P2 or Ideas item"| FBlock2(["BLOCKED: effort/priority mismatch<br>P2/Ideas with FULL effort requires human confirmation"])
     EffortWarn --> C3
 
-    C3(["Criterion 3 — Blast radius check"]) --> PatternCheck
-    PatternCheck{"Any Impact Radius row<br>(or Resources row, fallback for older templates)<br>contains pattern: field?"}
-    PatternCheck -->|"No pattern: fields present"| ManualCount["Use manual row count"]
-    PatternCheck -->|"Yes — pattern: field found"| RunRg["Run: rg -l '<pattern>' | wc -l<br>Capture as live_count"]
-    RunRg --> Compare{"live_count > 1.5 * manual_count?"}
+    C3(["Criterion 3 — Blast radius check"]) --> InventoryCount["Count distinct Systems Inventory rows<br>as estimated_impact_count"]
+    InventoryCount --> PatternCheck
+    PatternCheck{"Any Systems Inventory row contains<br>pattern: and pattern_count: fields?"}
+    PatternCheck -->|"No complete pattern annotations"| C3Decision
+    PatternCheck -->|"Yes — complete annotation found"| RunRg["For each annotated row run:<br>rg -l '<pattern>' | wc -l<br>Capture current_pattern_count"]
+    RunRg --> Compare{"Any current_pattern_count > 1.5 * recorded pattern_count?"}
     Compare -->|"Yes — count diverged"| FBlock3b(["Emit STALE_GROOM warning<br>Require re-grooming before proceeding"])
-    Compare -->|"No — counts within threshold"| UseLive["Use live_count as blast radius value"]
-    UseLive --> C3Decision
-    ManualCount --> C3Decision{"Blast radius total?"}
+    Compare -->|"No — annotations remain current"| C3Decision
+    C3Decision{"estimated_impact_count?"}
     C3Decision -->|"0 to 10 systems"| C4
     C3Decision -->|"11 to 20 systems"| RiskWarn["WARN: high blast radius — proceed with warning logged"]
     C3Decision -->|"Over 20 systems"| FBlock3(["BLOCKED: blast radius exceeds safe threshold<br>Over 20 affected systems requires human confirmation"])
     RiskWarn --> C4
 
-    C4{"Criterion 4 — Prior attempt check<br>Does item body contain 'tried', 'previous attempt', or 'failed'?<br>Does Impact Radius (or Resources fallback) list exactly 1 file total AND Effort lists 4 or more tasks?"}
+    C4{"Criterion 4 — Prior attempt check<br>Does item body contain 'tried', 'previous attempt', or 'failed'?<br>Does Systems Inventory (or Resources fallback) list exactly 1 affected file AND Effort lists 4 or more tasks?"}
     C4 -->|"No prior failure refs, scope appropriate"| PASS(["FEASIBILITY: PASS<br>Proceed to Step 4.1 — Compose Feature Request"])
     C4 -->|"Prior failure reference found"| AltWarn["WARN: prior attempt referenced — include in feature request"]
     C4 -->|"Impact Radius (or Resources fallback) = 1 file total AND task count >= 4"| AltBlock(["BLOCKED: potential over-engineering<br>1-file scope with 4+ tasks — offer --quick path"])
@@ -49,10 +49,12 @@ flowchart TD
 
 **Criterion 4 — observable thresholds:**
 
-Extract file paths using the same priority order as [groom-check.md](./groom-check.md)'s "Extract
-Impact Radius files" step:
+Extract affected file paths using the same priority order as [groom-check.md](./groom-check.md)'s
+"Extract Impact Radius files" step:
 
-1. Primary key: `sections["Impact Radius"]` (Code, Docs, Config, Agent Instructions rows) — count rows to get the total affected-file count.
+1. Primary key: `sections["Impact Radius"]` — count only distinct file-valued rows under
+   `### Systems Inventory`. Do not count paths in evidence, categorized views, excluded candidates,
+   or unknown-frontier notes.
 2. Fallback key: `sections["Resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius) — count rows here only when the primary key is absent or empty.
 
 - Count task entries in the item's Effort section (lines starting with `- [ ]` or `- [x]`) to get the estimated task count.
@@ -71,36 +73,39 @@ When all criteria pass (or result in WARN), append the following to the feature 
 
 **Technical path**: VERIFIED — suggested_location resolves, Impact Radius systems accessible
 **Effort tier**: {effort from grooming OR "Not estimated — proceed with caution"}
-**Blast radius**: {N} systems affected
+**Blast radius**: {N} systems in the estimated impact set
 **Prior attempts**: {None OR description of prior attempt from item body}
 **Warnings**: {list of WARN conditions OR "None"}
-**Live count**: {live_count: N (from rg) alongside manual_count: M | "Not applicable — no pattern: fields"}
+**Pattern refresh**: {pattern: recorded N, current M | "Not applicable — no complete pattern annotations"}
 ```
 
-All fields shown above are required. Do not omit fields with empty values — use `"None"`, `"Not estimated"`, or
-`"Not applicable — no pattern: fields"` as appropriate. The **Live count** field must be populated when
-any Impact Radius row has a `pattern:` field; use `"Not applicable — no pattern: fields"` when no
-patterns are present.
+All fields shown above are required. Do not omit fields with empty values — use `"None"`,
+`"Not estimated"`, or `"Not applicable — no complete pattern annotations"` as appropriate. The
+**Pattern refresh** field reports lexical staleness only. It never changes the blast-radius value,
+which is always the distinct `Systems Inventory` row count.
 
 ---
 
 ## STALE_GROOM Output Contract
 
-When `live_count > 1.5 * manual_count` (Criterion 3 pattern path), do NOT proceed. Report the
-following and stop:
+When a row's `current_pattern_count > 1.5 * pattern_count` (Criterion 3 pattern path), do NOT
+proceed. Report the following and stop:
 
 ```text
 STALE_GROOM: Impact Radius count stale
-  manual_count: {M} (from Impact Radius section, groomed {date})
-  live_count: {N} (from rg -l '{pattern}' | wc -l)
+  pattern: {literal from the annotated Systems Inventory row}
+  recorded_pattern_count: {M} (groomed {date})
+  current_pattern_count: {N} (from rg -l '{pattern}' | wc -l)
   ratio: {ratio:.1f}x (threshold: 1.5x)
 
 Required action: Re-groom this item to refresh the Impact Radius count before proceeding.
 Run: /dh:work-backlog-item groom {item title}
 ```
 
-The fields `manual_count`, `live_count`, `ratio`, and `Required action` are all required. Do not
-omit any field or substitute prose explanations.
+The fields `pattern`, `recorded_pattern_count`, `current_pattern_count`, `ratio`, and
+`Required action` are all required. Do not omit any field or substitute prose explanations. This
+warning means the lexical baseline for one row is stale; it does not redefine the estimated impact
+set.
 
 ---
 

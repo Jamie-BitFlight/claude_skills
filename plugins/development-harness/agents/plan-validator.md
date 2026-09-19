@@ -410,11 +410,16 @@ issue:
    - If neither is present, skip this dimension and record as `skipped — no backlog item reference`
 2. Extract the Impact Radius section from the backlog item:
    - Find the section headed `## Impact Radius` or `**Impact Radius**`
-   - Extract the Systems Inventory and all categorized lists: Code Producers, Code Consumers, Documentation, Configuration/CI, Agent Instructions
-   - Each list entry is a file path, glob pattern, or descriptive scope item
+   - Extract only rows under `### Systems Inventory`; this is the canonical estimated impact set
+   - Each row begins with a file path, component, service, model, prompt, dataset, control, role, or
+     process and carries its verification and action obligations
+   - Use legacy categorized lists only when the section has no Systems Inventory
 3. For each Impact Radius entry, determine coverage:
-   - **Direct match** — a task's Required Inputs, Expected Outputs, or acceptance criteria explicitly names that file or path
-   - **Category-level match** — a task explicitly states it covers an entire category (e.g., "sync all development-harness agent copies" covers every harness agent file listed under Agent Instructions)
+   - **Direct match** — a task's Required Inputs, Expected Outputs, or acceptance criteria explicitly
+     names that system or its required verification/action
+   - **Category-level match** — a task explicitly states it covers an entire category (e.g.,
+     "sync all development-harness agent copies" covers every harness agent system in the
+     inventory)
    - **UNMATCHED** — no task addresses the entry by name or by a covering category task
 4. Apply severity rules:
    - Entries marked `MUST` or with no qualifier: UNMATCHED → **blocker**

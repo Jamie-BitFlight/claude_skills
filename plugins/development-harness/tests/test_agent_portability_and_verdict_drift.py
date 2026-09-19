@@ -83,6 +83,7 @@ AGENTS_DIR = PLUGIN_ROOT / "agents"
 SKILLS_DIR = PLUGIN_ROOT / "skills"
 
 ALIGNMENT_ANALYST = AGENTS_DIR / "alignment-analyst.md"
+IMPACT_ANALYST = AGENTS_DIR / "impact-analyst.md"
 
 # The section body field that ``groom/finalize.md``'s validation gate matches, and the three values
 # it accepts. This is the one part of the report a consumer does read.
@@ -904,8 +905,43 @@ def test_work_ledger_docs_describe_mcp_ledger_routing() -> None:
 
 def test_impact_analyst_description_fits_frontmatter_limit() -> None:
     """Agent discovery metadata must fit the portable 1024-character description limit."""
-    frontmatter, _ = _load_frontmatter_from_path(AGENTS_DIR / "impact-analyst.md")
+    frontmatter, _ = _load_frontmatter_from_path(IMPACT_ANALYST)
     assert len(str(frontmatter["description"])) <= 1024
+
+
+def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+    required_contracts = (
+        "A zero-match search does not prove zero impact",
+        "change -> dependency or control edge -> changed state or decision -> outcome -> stakeholder",
+        "**Estimated impact set**",
+        "**Unknown frontier**",
+        "Never use the count as evidence that a system is affected or unaffected",
+        "Never calculate risk from the count",
+    )
+
+    missing = [contract for contract in required_contracts if contract not in prompt]
+    assert not missing, f"impact-analyst lost semantic impact-analysis contracts: {missing}"
+
+    feasibility_gate = (
+        SKILLS_DIR / "work-backlog-item" / "references" / "workflows" / "work" / "feasibility-gate.md"
+    ).read_text(encoding="utf-8")
+    count_override = re.compile(
+        r"(?is)(?:"
+        r"\b(?:use|set|replace|calculate|derive)\b[^.\n]{0,120}"
+        r"\b(?:current_?pattern_count|pattern_count|live_count|match count|grep count)\b"
+        r"[^.\n]{0,80}\bblast[ -]radius\b"
+        r"|\bblast[ -]radius\b[^.\n]{0,80}\b(?:uses?|equals?|derives?)\b"
+        r"[^.\n]{0,80}\b(?:current_?pattern_count|pattern_count|live_count|match count|grep count)\b"
+        r")"
+    )
+    combined_contract = f"{prompt}\n{feasibility_gate}"
+    assert count_override.search(combined_contract) is None
+    assert "always the distinct `Systems Inventory` row count" in feasibility_gate
+    assert 'Compare -->|"No — annotations remain current"| C3Decision' in feasibility_gate
+
+    regression_mutation = "Use current_pattern_count as the blast radius whenever an annotation exists."
+    assert count_override.search(regression_mutation) is not None
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
