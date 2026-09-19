@@ -373,12 +373,6 @@ wheels = [
 name = "claude-skills"
 version = "0.1.0"
 source = { virtual = "." }
-dependencies = [
-    { name = "fastmcp", extra = ["tasks"] },
-    { name = "idna" },
-    { name = "marko" },
-    { name = "pygithub" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -386,14 +380,18 @@ dev = [
     { name = "cairosvg" },
     { name = "defusedxml" },
     { name = "duckdb" },
+    { name = "fastmcp", extra = ["tasks"] },
     { name = "gitpython" },
     { name = "httpx" },
     { name = "hypothesis" },
+    { name = "idna" },
     { name = "markdown-it-py" },
+    { name = "marko" },
     { name = "mcp", extra = ["cli"] },
     { name = "prefixspan" },
     { name = "prek" },
     { name = "pydantic" },
+    { name = "pygithub" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -419,12 +417,6 @@ tools = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "fastmcp", extras = ["tasks"], specifier = ">=4.0.0" },
-    { name = "idna", specifier = ">=3.15" },
-    { name = "marko", specifier = ">=2.2.2" },
-    { name = "pygithub", specifier = ">=2.9.0" },
-]
 
 [package.metadata.requires-dev]
 dev = [
@@ -432,14 +424,18 @@ dev = [
     { name = "cairosvg", specifier = ">=2.9.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "duckdb", specifier = ">=1.5.5" },
+    { name = "fastmcp", extras = ["tasks"], specifier = ">=4.0.0" },
     { name = "gitpython", specifier = ">=3.1.58" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.164.0" },
+    { name = "idna", specifier = ">=3.15" },
     { name = "markdown-it-py", specifier = ">=4.0.0" },
+    { name = "marko", specifier = ">=2.2.2" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.27.0" },
     { name = "prefixspan", specifier = ">=0.5.2" },
     { name = "prek", specifier = ">=0.5.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "pygithub", specifier = ">=2.9.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
