@@ -6107,14 +6107,14 @@ def _repository_path(system: str) -> str | None:
         return posixpath.normpath(system)
     if re.search(r"\.[A-Za-z0-9_-]+$", system):
         return posixpath.normpath(system)
+    if system and not any(character.isspace() for character in system):
+        return posixpath.normpath(system)
     return None
 
 
 def _path_contains(ancestor: str, descendant: str) -> bool:
     ancestor_path = _repository_path(ancestor)
     descendant_path = _repository_path(descendant)
-    if ancestor_path is None and ancestor and not any(character.isspace() for character in ancestor):
-        ancestor_path = posixpath.normpath(ancestor)
     if ancestor_path is None or descendant_path is None or ancestor_path == descendant_path:
         return False
     if ancestor_path == ".":

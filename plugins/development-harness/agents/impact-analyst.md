@@ -233,14 +233,17 @@ The optional `pattern:` annotation exists only to let the later feasibility gate
 lexically enumerable scope such as an old import, route, flag, or type name.
 
 - Add it only when one literal grep pattern precisely enumerates that row's scope.
-- Record `pattern_count:` as the observed baseline count when adding `pattern:`.
+- Record `pattern_count:` as the number of matching files returned by
+  `rg --hidden --glob '!.git/**' -F -l -- "$pattern"` when adding `pattern:`. Use this exact
+  fixed-string, hidden-path search and exclude `.git` so the later refresh compares the same unit
+  and scope.
 - Omit it for semantic dependencies, conceptual categories, dynamic dispatch, generated values,
   indirect consumers, and human or process effects.
 - Never use the count as evidence that a system is affected or unaffected.
 - Never calculate risk from the count.
 
 Format it at the end of an inventory row:
-`| pattern: '<grep-value>' | pattern_count: {baseline count}`.
+`| pattern: '<grep-value>' | pattern_count: {matched-file baseline count}`.
 
 ## Output contract
 

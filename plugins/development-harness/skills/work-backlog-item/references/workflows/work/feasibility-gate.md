@@ -30,7 +30,7 @@ flowchart TD
     InventoryCount --> PatternCheck
     PatternCheck{"Any Systems Inventory row contains<br>pattern: and pattern_count: fields?"}
     PatternCheck -->|"No complete pattern annotations"| C3Decision
-    PatternCheck -->|"Yes — complete annotation found"| RunRg["For each annotated row:<br>fixed-string rg scan; capture output and status<br>Count matched files as current_pattern_count"]
+    PatternCheck -->|"Yes — complete annotation found"| RunRg["For each annotated row:<br>hidden-inclusive fixed-string rg scan; capture output and status<br>Count matched files as current_pattern_count"]
     RunRg --> Compare{"Any current_pattern_count > 1.5 * recorded pattern_count?"}
     Compare -->|"Yes — count diverged"| FBlock3b(["Emit STALE_GROOM warning<br>Require re-grooming before proceeding"])
     Compare -->|"No — annotations remain current"| C3Decision
@@ -55,11 +55,14 @@ flowchart TD
   its legacy categories.
 - Do not count categorized views, evidence, excluded candidates, or unknown-frontier entries.
 - `pattern_count` is only the lexical-staleness baseline for its own row; it never replaces or
-  increments `estimated_impact_count`.
-- For every complete annotation, run `rg -F -l -- "$pattern"` and capture its output and exit
-  status before counting lines. Exit status 0 means matches, Exit status 1 means zero matches, and
-  an exit status greater than 1 is a scan failure: report the exact error and stop instead of using
-  a count. Do not pipe `rg` directly to `wc`, because the pipeline can hide the scan failure.
+  increments `estimated_impact_count`. It uses the same matched-file unit and search semantics as
+  `current_pattern_count`.
+- For every complete annotation, run
+  `rg --hidden --glob '!.git/**' -F -l -- "$pattern"` and capture its output and exit status before
+  counting lines. This includes tracked hidden paths while excluding Git internals. Exit status 0
+  means matches, Exit status 1 means zero matches, and an exit status greater than 1 is a scan
+  failure: report the exact error and stop instead of using a count. Do not pipe `rg` directly to
+  `wc`, because the pipeline can hide the scan failure.
 - The 10-system and 20-system thresholds are coordination-policy signals. They do not determine a
   system's risk level; use the Impact Radius risk assessment for that judgment.
 

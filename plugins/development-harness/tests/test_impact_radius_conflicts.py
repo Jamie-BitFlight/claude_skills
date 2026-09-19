@@ -314,6 +314,28 @@ def test_analyze_impact_radius_conflicts_normalizes_repository_relative_paths(di
     assert result[0].items == ["A", "B"]
 
 
+@pytest.mark.parametrize(("first_system", "second_system"), [("./", "Dockerfile"), ("./Dockerfile", "Dockerfile")])
+def test_analyze_impact_radius_conflicts_normalizes_extensionless_root_files(
+    first_system: str, second_system: str
+) -> None:
+    first = f"### Systems Inventory\n- `{first_system}` | Role: repository scope"
+    second = f"### Systems Inventory\n- `{second_system}` | Role: root file"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].items == ["A", "B"]
+
+
+def test_analyze_impact_radius_conflicts_does_not_treat_multiword_system_as_root_file() -> None:
+    first = "### Systems Inventory\n- `./` | Role: repository scope"
+    second = "### Systems Inventory\n- `release approval control` | Role: process control"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
 def test_analyze_impact_radius_conflicts_detects_shared_non_file_system() -> None:
     system = "release approval control"
     first = f"### Systems Inventory\n- `{system}` | Role: process control"
