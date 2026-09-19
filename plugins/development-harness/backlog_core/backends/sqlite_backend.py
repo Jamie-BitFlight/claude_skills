@@ -713,6 +713,10 @@ class SQLiteBackend:
                 callback(issue)
         return issues
 
+    def resolve_issue_body(self, repo: Repository, owner: str, repo_name: str, issue: IssueNode) -> str:
+        """Return the current body from the local issue store."""
+        return self._fetch_issue_graphql(repo, owner, repo_name, issue["number"])["body"]
+
     @_serialized_connection_operation
     def create_issue_for_item(
         self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None

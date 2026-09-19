@@ -20,7 +20,8 @@ from collections.abc import Iterator
 import pytest
 from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
-from backlog_core.backend_types import BacklogConfig
+from backlog_core.backend_types import BacklogConfig, GitHubExtras
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import UnsupportedBackendCapabilityError
 
@@ -63,6 +64,16 @@ def test_list_milestones_under_sqlite_backend_no_longer_requires_github_extras(s
     # Assert
     assert result["milestones"] == []
     assert result["count"] == 0
+
+
+def test_local_github_simulators_remain_structurally_complete() -> None:
+    memory_backend = InMemoryBackend()
+    sqlite_backend = SQLiteBackend(":memory:")
+    try:
+        assert isinstance(memory_backend, GitHubExtras)
+        assert isinstance(sqlite_backend, GitHubExtras)
+    finally:
+        sqlite_backend._conn.close()
 
 
 def test_list_milestones_under_beads_backend_raises_typed_milestones_capability_error() -> None:
