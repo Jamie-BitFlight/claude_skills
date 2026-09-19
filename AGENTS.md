@@ -263,6 +263,15 @@ add what you establish back to it.
   and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
   design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
   no pip access) — not a default posture.
+- **Dependency groups carry meaning**: `[project].dependencies` holds what repository code
+  imports at runtime; `dev` holds what project-environment code imports; `scripts` holds what only
+  PEP 723 scripts import, declared so `ty check .` can resolve those imports; `tools` holds
+  executables and pytest plugins that nothing imports. `dev` pulls the other two in with
+  `include-group`, so `uv sync` still installs everything. Put a new dependency in the group that
+  matches how it is consumed. `uv run --with <tool>`, `uvx <tool>`, and a prek hook pinning its own
+  `repo:`/`rev:` each supply a tool independently, so none of them justifies a declaration. Run
+  `uv run scripts/audit_dependencies.py` to classify every declared dependency by the evidence
+  found for it; the `audit-dependencies` prek hook runs it whenever `pyproject.toml` changes.
 - **Public by default**: name new functions and modules without a leading underscore. Early
   "private" naming gets cargo-culted onto things that aren't private, then breaks tests that
   legitimately need the name — add privacy once actually needed. Existing underscored code stays
