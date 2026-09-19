@@ -1,36 +1,10 @@
 # Memory Index
 
-- [DH MCP-vs-CLI Documentation Structure](dh-mcp-cli-docs.md) — canonical CLI-mapping source, which
-  dh docs already pair MCP-reference sections with a dedicated CLI section, and the drift patterns
-  found there (stale tool names, overstated parity, extraction-rule blind spots).
-- [Unenforced map guarantee](unenforced-map-guarantee.md) — backlog_view map mode's "under 2,000
-  tokens" claim is not enforced by disclosure_handler.py; other locations asserting the same false
-  bound; tracking issue #3059.
-- [skilllint token threshold](skilllint-token-threshold.md) — prek passing does not mean
-  skilllint's 4400-token SKILL.md ceiling still passes; re-run skilllint directly after edits.
-- Worktree isolation: when cwd is under `.claude/worktrees/<name>/`, Edit/Write reject the
-  shared-checkout path (e.g. `/Users/.../repos/claude_skills/plugins/...`) with "session is
-  isolated in the worktree" — retarget the identical relative path rooted at the worktree instead
-  (`.claude/worktrees/<name>/plugins/...`). Read tolerates either path; Edit/Write do not.
-- [Dispatch placeholder & shared-worktree gotchas](dispatch-placeholder-and-shared-worktree.md) —
-  `{A}` is the canonical attempt-number placeholder across the dh dispatch-line contract (four
-  files, no single source of truth); `close/start.md` handles both `close` and `resolve` routes,
-  don't conflate them; the `agent-marketplace-versioner` prek hook failing can be a concurrent
-  agent's edit in a shared worktree, not your own change — diff before reverting.
-- [backlog_core connection-failure taxonomy](backlog-core-connection-failure-taxonomy.md) — two
-  independent "provider unreachable" mechanisms (background `sync_engine`/`classify_sync_error`
-  vs. per-call `FileCache`/`try_get_github()`), their exact cause sets, and which one
-  ARCHITECTURE.md actually documents (only the per-call one, as of 2026-09-15) — check this before
-  writing offline/unreachable/unavailable cause prose in any backlog_core doc.
-- DH plugin has two separate copies of `evaluate-sdlc-layers/SKILL.md` (not a symlink):
-  `plugins/development-harness/skills/evaluate-sdlc-layers/SKILL.md` and repo-root
-  `.claude/skills/evaluate-sdlc-layers/SKILL.md`. They drift independently — check both when a
-  retired term or deleted-file link touches either one.
-- `work-backlog-item`'s `scripts/parser/parse.schema.json` documents the same argument vocabulary
-  as its `SKILL.md` frontmatter/body (no Python code reads it — the agent parses `$ARGUMENTS`
-  against it itself). Keep both in sync when a flag is added or retired; drift tests that scan
-  only `*.md` never catch this JSON silently going stale.
-- Deleting a "layer" or "profile" concept outright needs its own index doc's count/row claims
-  updated too, not just the target files removed — e.g. "Layer 1: All 6 docs present" must shrink
-  when a doc in that list is deleted, and "N-layer architecture" framing sentences at the top of
-  index READMEs need the layer count fixed.
+- [skilllint token threshold](skilllint-token-threshold.md) — a green prek run can hide
+  skilllint's SK006 token warning on a SKILL.md edit; run skilllint directly and read warnings.
+- [backlog_core connection-failure taxonomy](backlog-core-connection-failure-taxonomy.md) —
+  writing offline/unreachable/unavailable cause prose in a backlog_core doc: first pick the path,
+  background sync (OFFLINE vs ERROR) or per-call cache fallback.
+- `evaluate-sdlc-layers/SKILL.md` exists as two regular-file copies that have drifted apart:
+  `plugins/development-harness/skills/evaluate-sdlc-layers/` and `.claude/skills/evaluate-sdlc-layers/`.
+  Apply every edit to both.

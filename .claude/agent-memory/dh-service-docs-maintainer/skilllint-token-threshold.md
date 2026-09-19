@@ -1,22 +1,14 @@
 ---
 name: skilllint-token-threshold
-description: prek passing on a SKILL.md edit does not mean skilllint's 4400-token AS005/SK006 threshold still passes — re-run skilllint after every SKILL.md edit, not just once at the end
+description: A green prek run on a SKILL.md edit can hide skilllint's SK006 token-size warning — run skilllint directly and read its warnings after each SKILL.md edit
 metadata:
   type: feedback
 ---
 
-`uv run prek run --files <SKILL.md>` does not check the skilllint token-count thresholds (AS005
-"body exceeds 4400 tokens", SK006 "skill body is large") — the plugin-validator hook it runs is a
-separate, narrower check. A `SKILL.md` already sitting close to the 4400-token ceiling can cross it
-from a single added sentence in a table cell, and prek will still report green.
+prek runs `skilllint check --fix` on every `SKILL.md` under `plugins/` and `.claude/`, but SK006 (body over the token warning
+threshold) is a warning: it exits 0 and prek reports green without printing it. The hook fails on
+SK007 (the error threshold, error severity) and whenever it applies a fix.
 
-**Why**: discovered while fixing a doc claim in `plugins/development-harness/skills/backlog/
-SKILL.md` — a one-sentence correction pushed the file from clean to 4408 tokens (AS005 + SK006
-both fired), even though prek passed throughout.
-
-**How to apply**: after editing any `SKILL.md`, run `uvx skilllint@latest check <path>` directly
-(not just prek) and treat AS005/SK006 warnings as a signal to tighten wording, not as acceptable
-noise — they are warnings (exit 0) but still real regressions worth trimming for, especially when
-the edit is a correction rather than new required content. Re-run after each trim; token count
-does not shrink linearly with word count in an obvious way (chained edits took two trim passes
-to clear the threshold in this case).
+After editing a `SKILL.md`, run `uvx skilllint@latest check <path>` and read the output. Treat a
+new SK006 as a regression to trim, especially when the edit was a correction and not new required
+content. Re-run after each trim.
