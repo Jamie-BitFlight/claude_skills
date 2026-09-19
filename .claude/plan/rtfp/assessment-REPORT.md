@@ -95,7 +95,7 @@ At 124 lines / ~4,800 characters, this SKILL.md is well within the recommended l
 
 ### `list_sessions.py` (Stage 1) -- Referenced in SKILL.md Step 1
 
-- **PEP 723 shebang**: Correct (`#!/usr/bin/env -S uv --quiet run --active --script`)
+- **PEP 723 shebang**: Correct (`#!/usr/bin/env -S uv run --quiet --script`)
 - **Dependencies**: None (stdlib only)
 - **Purpose**: Discovers JSONL session files under `~/.claude/projects/`, outputs JSON metadata
 - **Quality**: Well-structured with proper argparse, error handling, progress reporting to stderr

@@ -30,10 +30,9 @@ dev = [
     { include-group = "scripts" },
     { include-group = "tools" },
 ]
-# Imported only by PEP 723 scripts. Two consumers still need them in the project
-# environment: `ty check .` resolves those imports against it, and the scripts that
-# carry a `--active` shebang run against it (see rules/script-invocation.md, which
-# forbids `--active`; 38 of 102 PEP 723 scripts still use it).
+# Imported only by PEP 723 scripts. The runtime resolves these from the inline
+# metadata in an isolated environment; they stay declared here because `ty check .`
+# resolves the same imports against the project environment.
 scripts = [
     "cairosvg>=2.9.0",
     "duckdb>=1.5.5",

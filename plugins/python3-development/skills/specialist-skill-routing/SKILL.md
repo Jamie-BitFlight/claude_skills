@@ -94,7 +94,7 @@ Key facts — do not guess these from training data:
 - Use `uv run` not `source .venv/bin/activate`
 - Use `uv add` not `uv pip install` for project dependencies
 - `uv sync --frozen` for CI; `uv sync --locked` to fail if lockfile is stale
-- PEP 723 shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
+- PEP 723 shebang: `#!/usr/bin/env -S uv run --quiet --script`
 
 ---
 

@@ -32,7 +32,7 @@ decisions, component templates, and integration patterns that go into `architect
 
 **Strategy 1 — PEP 723 Standalone Script** (single-file tools, <500 lines, 1-5 deps):
 
-- Shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
+- Shebang: `#!/usr/bin/env -S uv run --quiet --script`
 - PEP 723 metadata block with `requires-python` and `dependencies`
 - Executable permissions required
 - Reference: activate `python3-development:shebangpython` for compliance
@@ -265,7 +265,7 @@ The spec must prescribe:
 
 The spec's Distribution Architecture section must prescribe:
 
-- **Standalone scripts with external deps**: shebang `#!/usr/bin/env -S uv --quiet run --active --script` + PEP 723 metadata block
+- **Standalone scripts with external deps**: shebang `#!/usr/bin/env -S uv run --quiet --script` + PEP 723 metadata block
 - **Stdlib-only scripts**: shebang `#!/usr/bin/env python3` — no PEP 723 block
 - **Package modules**: no shebang (not directly executable)
 - **Transitive deps**: typer bundles rich and shellingham — never list them separately in PEP 723
