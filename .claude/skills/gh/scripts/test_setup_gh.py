@@ -1,10 +1,11 @@
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
 #   "typer>=0.21.0",
 #   "httpx>=0.28.1",
 #   "ruamel.yaml>=0.18.0",
+#   "pytest>=9.1.1",
 # ]
 #
 # [tool.ty.environment]
