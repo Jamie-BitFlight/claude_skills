@@ -6057,7 +6057,7 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         backticked = re.match(r"`([^`]+)`", line)
         candidate = backticked.group(1) if backticked else re.split(r"\s+(?:\||-|—)\s+", line, maxsplit=1)[0]
         candidate = candidate.partition("::")[0].strip()
-        if " " not in candidate and ("/" in candidate or re.search(r"\.[A-Za-z0-9_-]+$", candidate)):
+        if backticked or (" " not in candidate and ("/" in candidate or re.search(r"\.[A-Za-z0-9_-]+$", candidate))):
             paths.add(candidate)
     return paths
 

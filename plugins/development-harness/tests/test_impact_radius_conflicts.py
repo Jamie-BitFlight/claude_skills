@@ -177,6 +177,17 @@ def test_analyze_impact_radius_conflicts_bullet_markers_stripped() -> None:
     assert "plugins/foo.py" in result[0].reason
 
 
+@pytest.mark.parametrize("root_file", ["Dockerfile", "Makefile"])
+def test_analyze_impact_radius_conflicts_preserves_backticked_extensionless_root_files(root_file: str) -> None:
+    first = f"- `{root_file}` — build input"
+    second = f"- `{root_file}` — build consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {root_file}"
+
+
 def test_analyze_impact_radius_conflicts_markdown_headers_excluded_from_paths() -> None:
     # Arrange: body includes a section header line that must not become a path
     body = "## Impact Radius\n- plugins/baz.py"
