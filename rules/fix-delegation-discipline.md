@@ -8,14 +8,14 @@ Delegation prompts for bug fixes MUST follow the reproduction-first cycle — ap
 flowchart TD
     Entry{"Root cause known<br>or strongly suspected?"}
     Entry -->|"Yes — proceed with fix cycle"| P
-    Entry -->|"No — root cause unclear"| FindCause(["Escalate — load /find-cause<br>to establish root cause first"])
+    Entry -->|"No — root cause unclear"| FindCause(["Escalate — load /dh:root-cause-tracing-process<br>to establish root cause first"])
 
     P["[Orchestrator] Problem stated<br>Record error message, CI job name,<br>or observed behavior exactly as given"]
     P --> R["[Agent] Research root cause<br>Read the error output<br>Trace the failing code path<br>Identify the exact line or condition that fails<br>Output: one-sentence root cause statement"]
 
     R --> Repro{"[Agent] Can a failing command,<br>test, or assertion be written<br>that demonstrates this exact bug?"}
     Repro -->|"Yes — reproduction is possible"| WriteRepro["[Agent] Write the reproduction<br>Record the exact command and expected<br>failing output before any code change"]
-    Repro -->|"No — cannot reproduce reliably"| CannotRepro(["Escalate — report to orchestrator<br>State what was attempted and why<br>reproduction is not possible<br>Orchestrator routes to /find-cause"])
+    Repro -->|"No — cannot reproduce reliably"| CannotRepro(["Escalate — report to orchestrator<br>State what was attempted and why<br>reproduction is not possible<br>Orchestrator routes to /dh:root-cause-tracing-process"])
 
     WriteRepro --> RunRepro{"[Agent] Run the reproduction command<br>Does it fail as expected?"}
     RunRepro -->|"Fails as expected — confirmed"| Impl
@@ -102,6 +102,6 @@ Commit only after all reproduction commands pass. After 3 cycles on any single f
 ## Cross-References
 
 - For CoVe methodology applied to self-checking prompts, activate `/cove-prompt-design`.
-- For unknown root cause requiring hypothesis testing before writing the reproduction, activate `/find-cause`.
+- For unknown root cause requiring hypothesis testing before writing the reproduction, activate `/dh:root-cause-tracing-process`.
 - For post-fix validation protocol where the reproduction command IS the validation artifact, activate `/dh:validation-protocol`.
 - For unknown failures requiring structured hypothesis testing across multiple cycles, activate `/scientific-method:scientific-thinking`.

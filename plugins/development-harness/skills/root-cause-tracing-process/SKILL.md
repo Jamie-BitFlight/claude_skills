@@ -1,14 +1,27 @@
 ---
-name: find-cause
-description: Wraps investigation requests with evidence-chain discipline. Use when asked to find out why something happens, research a root cause, debug an issue, or investigate unexpected behavior. Transforms vague investigation requests into reproducible-proof investigations with a 5-step protocol — disambiguate, reproduce, read source, build evidence chain, present findings. Invoke with /find-cause followed by a description of what to investigate.
-argument-hint: <what to investigate>
+name: root-cause-tracing-process
+description: Root-cause tracing with an evidence chain — reproduce the failure, read the source, and cite every claim from symptom to root cause; when the failure does not reproduce, falsify H0/Ha hypotheses by experiment until one survives. Use when an agent must establish why a bug, test failure, or unexpected behavior happens before fixing it.
+argument-hint: <QUESTION and SUCCESS CRITERIA>
 ---
 
-<investigation_request>$ARGUMENTS</investigation_request>
+<tracing_input>$ARGUMENTS</tracing_input>
 
-# Find Cause
+# Root-Cause Tracing Process
 
-Rewrite the user's investigation request using the evidence-chain protocol below, then execute it. The user's original request is in `<investigation_request/>`.
+## Inputs
+
+`<tracing_input/>` holds the caller's QUESTION and SUCCESS CRITERIA in this format, a raw request, or nothing:
+
+```text
+QUESTION: [confirmed interpretation]
+SUCCESS CRITERIA:
+- Reproduced the behavior with observed evidence
+- Traced the mechanism from symptom to cause with file:line citations
+- Can state root cause as: "[observable condition X] causes [observable behavior Y] because [mechanism Z]"
+- All claims in the evidence chain are VERIFIED: yes
+```
+
+When `<tracing_input/>` holds a raw request, write the QUESTION and SUCCESS CRITERIA from it in this format before Step 0. When it is empty, take them from the conversation that loaded this skill, and write them from the request there when the conversation has none.
 
 ## Evidence-Chain Protocol
 
@@ -53,43 +66,6 @@ AVAILABLE CAPABILITIES:
 ```
 
 This matrix informs which verification paths are fastest in Step 1.5 and which advanced tools to leverage in Steps 2-3.
-
-### Step 1 — Disambiguate the question and define success criteria
-
-Read the user's request in `<investigation_request/>`. Perform two tasks:
-
-#### A. Formulate distinct interpretations
-
-Formulate 2 or more distinct interpretations of what they are asking. Present these interpretations to the user using the `AskUserQuestion` tool so the user can select the correct one or provide their own clarification.
-
-Each interpretation MUST be a concrete, falsifiable question — not a vague restatement. Frame each as "Are you asking X?" where X is specific enough to investigate.
-
-Example for the request "find out why the tests fail":
-
-- **Interpretation A**: "Why do tests fail when run locally but pass in CI?"
-- **Interpretation B**: "Why does a specific test case produce an unexpected assertion error?"
-- **Interpretation C**: "Why did tests start failing after a recent change?"
-
-Do NOT proceed until the user has confirmed which interpretation is correct or provided their own.
-
-If the user selects "Other" and provides additional context, reformulate the interpretations and ask again. Only proceed when you have a single, unambiguous question to investigate.
-
-#### B. Define success criteria
-
-For the confirmed interpretation, state what a conclusive answer looks like:
-
-```text
-QUESTION: [confirmed interpretation]
-SUCCESS CRITERIA:
-- Reproduced the behavior with observed evidence
-- Traced the mechanism from symptom to cause with file:line citations
-- Can state root cause as: "[observable condition X] causes [observable behavior Y] because [mechanism Z]"
-- All claims in the evidence chain are VERIFIED: yes
-```
-
-Present the success criteria to the user for confirmation. Adjust if the user's definition of "done" differs.
-
-Do NOT proceed to Step 1.5 until both interpretation and success criteria are confirmed.
 
 ### Step 1.5 — Prerequisite check and reproduction safety
 
@@ -189,9 +165,27 @@ DEPENDS ON: none (reproduction — primary observation)
 
 If reproduction diverges from the user's report (succeeds when it should fail, or vice versa), document what you did differently and what environmental differences might explain the divergence.
 
-If you cannot reproduce the operation, state that and ask the user for reproduction steps.
+If you cannot reproduce the operation, state that. When a user is in the conversation, ask for their reproduction steps and retry Step 2 with them. Otherwise, or if their steps also fail, continue at Step 2B.
 
 Do NOT skip this step by relying on a transcript or description of the failure. Run it yourself.
+
+### Step 2B — Non-reproducible failure: falsify a hypothesis
+
+Work the failure as an experiment.
+
+1. Record every observation you hold — the report, logs, timings, and the conditions of each failing and passing run — as evidence entries.
+2. State a falsifiable pair about one condition X that you can set:
+   - **H0**: X has no effect on the failure.
+   - **Ha**: X causes the failure.
+3. Write the prediction: "If Ha holds, running the operation with X set produces observable Z. If H0 holds, it does not produce Z."
+4. Design the experiment that could falsify Ha: vary X, hold the other conditions fixed, and list each confound that could produce Z without X.
+5. Run the experiment as many times as the failure's observed frequency needs for Z to appear, and record each output verbatim as evidence entries.
+6. Decide from the evidence:
+   - Z absent in every run: Ha is falsified. Record it, form the next Ha from what the runs showed, and return to item 2.
+   - Z present with a confound uncontrolled: control that confound and return to item 5.
+   - Z present with the confounds controlled: Ha survives. Setting X is now the reproduction. Continue at Step 3 with it.
+
+Step 2B is complete when Ha survives and gives a reproduction, or when you stop and list every falsified Ha, with its evidence and the next experiment to run, under UNVERIFIED ITEMS in Step 5.
 
 ### Step 3 — Read the source
 
@@ -239,9 +233,9 @@ If a claim cannot be verified with available tools, mark it `VERIFIED: no` and s
 Structure the output as:
 
 ```text
-QUESTION: [Restated from Step 1]
+QUESTION: [the QUESTION from Inputs]
 
-SUCCESS CRITERIA MET: [yes/partial/no — against criteria defined in Step 1B]
+SUCCESS CRITERIA MET: [yes/partial/no — against the SUCCESS CRITERIA from Inputs]
 
 EVIDENCE CHAIN:
 1. CLAIM: ...

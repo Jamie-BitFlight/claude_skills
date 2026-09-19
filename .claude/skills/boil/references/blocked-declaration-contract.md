@@ -84,7 +84,7 @@ because pyproject.toml is read-only in the current CI environment.
 |---|---|
 | Problem is difficult but solvable | Solve it — difficulty is not a blocker |
 | Workaround exists | Apply the real fix, not the workaround |
-| Uncertain how to proceed | Load `/find-cause` or `/scientific-method:scientific-thinking` |
+| Uncertain how to proceed | Load `/dh:root-cause-tracing-process` or `/scientific-method:scientific-thinking` |
 | Requires more research | Do the research, then continue |
 | Task scope is larger than expected | Extend scope — do not truncate |
 

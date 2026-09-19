@@ -19,7 +19,7 @@ Evidence-chain protocol for investigations:
 - **Valid**: Command output, file content, direct observation
 - **Invalid**: Docs intent, training recall, inference from absence
 
-Steps: Disambiguate → Reproduce → Read source → Build evidence chain → Present findings.
+Steps: Disambiguate (`/dh:find-cause`, with the user) → Reproduce, or falsify H0/Ha by experiment when the failure does not reproduce → Read source → Build evidence chain → Present findings. Every step after Disambiguate lives in `dh:root-cause-tracing-process`.
 
 ---
 
@@ -37,4 +37,5 @@ Use for: bugs, architecture, refactor, strange behavior. Not for trivial tasks.
 
 - [fact-check SKILL.md](../../../skills/fact-check/SKILL.md)
 - [find-cause SKILL.md](../../../skills/find-cause/SKILL.md)
+- [root-cause-tracing-process SKILL.md](../../../skills/root-cause-tracing-process/SKILL.md)
 - [scientific-thinking SKILL.md](../../../../plugins/scientific-method/skills/scientific-thinking/SKILL.md)

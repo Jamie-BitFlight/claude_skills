@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Bash, mcp__Ref__ref_r
 model: haiku
 skills:
   - fact-check
-  - find-cause
+  - dh:root-cause-tracing-process
   - research-curator
   - gh
 ---

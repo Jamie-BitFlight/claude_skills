@@ -251,7 +251,8 @@ Validation patterns and checklists for verifying task completion. Defines what "
 - `/dh:subagent-contract` — Defines contracts subagents must satisfy when executing SAM tasks
 - `/dh:dh-meta-docs` — Plugin meta-documentation and internals reference
 - `/dh:fact-check` — Verify claims in backlog items against primary sources
-- `/dh:find-cause` — Structured root-cause investigation before fixing
+- `/dh:find-cause` — Structured root-cause investigation before fixing; confirms the question with you, then runs `dh:root-cause-tracing-process`
+- `/dh:root-cause-tracing-process` — Evidence-chain tracing from symptom to root cause, run by agents or directly, with an H0/Ha experiment branch for failures that do not reproduce
 
 ---
 

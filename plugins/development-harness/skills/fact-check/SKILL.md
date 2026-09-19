@@ -21,7 +21,7 @@ Verify factual claims against primary sources using web lookups. Training data r
 ## When NOT to Use
 
 - Structural findings (broken links, missing files, malformed YAML) — those are filesystem checks, not fact checks
-- Code logic bugs — use `/dh:find-cause` instead
+- Code logic bugs — use `/dh:root-cause-tracing-process` instead
 - Research on new tools — use `/research-curator` instead
 
 ---
