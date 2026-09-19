@@ -1578,7 +1578,7 @@ def _extract_impact_radius_section(body: str) -> str:
     matches = [
         (index, section)
         for index, section in enumerate(sections)
-        if section.name.strip().removesuffix(":").strip().casefold() == "impact radius"
+        if section.plain_name.strip().removesuffix(":").strip().casefold() == "impact radius"
     ]
     if not matches:
         return ""

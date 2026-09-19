@@ -234,7 +234,8 @@ def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> 
 
 
 @pytest.mark.parametrize("level", range(1, 7))
-def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fences(level: int) -> None:
+@pytest.mark.parametrize("closing", ["", " ##"])
+def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fences(level: int, closing: str) -> None:
     shared = "plugins/development-harness/backlog_core/operations.py"
 
     def radius(example: str) -> str:
@@ -243,15 +244,15 @@ def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fence
 ### Systems Inventory
 - `{example}` | Role: example
 ```
-{"#" * level} Systems Inventory
+{"#" * level} Systems Inventory{closing}
 - `{shared}` | Role: runtime system
 ### Excluded Candidates and Unknown Frontier
 - None identified.
 """
 
     result = analyze_impact_radius_conflicts([
-        _item("A", 1, radius("plugins/example-a.py")),
-        _item("B", 2, radius("plugins/example-b.py")),
+        _item("A", 1, radius("plugins/fenced-example.py")),
+        _item("B", 2, radius("plugins/fenced-example.py")),
     ])
 
     assert len(result) == 1

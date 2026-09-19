@@ -170,6 +170,26 @@ def test_dispatch_conflicts_reads_rendered_impact_radius_shapes(body_shape: str,
 
 
 @pytest.mark.unit
+def test_dispatch_conflicts_accepts_atx_closing_hashes(mocker: MockerFixture) -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    body = f"## Impact Radius ##\n- `{shared}`\n## Fact-Check ##\nVerified."
+    github_backend = mocker.Mock()
+    github_backend.get_github.return_value = mocker.Mock(full_name="owner/repo")
+    github_backend.sync_issues_graphql.return_value = [
+        {"id": f"issue-{number}", "title": title, "number": number, "body": "Human-owned body"}
+        for number, title in enumerate(("A", "B"), start=1)
+    ]
+    github_backend.resolve_issue_body.side_effect = [body, body]
+    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+
+    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+
+    assert result["count"] == 1
+    assert result["conflict_groups"][0]["reason"] == f"Shared systems: {shared}"
+
+
+@pytest.mark.unit
 def test_dispatch_conflicts_ignores_impact_radius_headings_inside_fences(mocker: MockerFixture) -> None:
     shared = "plugins/development-harness/backlog_core/operations.py"
     authoritative_bodies = [

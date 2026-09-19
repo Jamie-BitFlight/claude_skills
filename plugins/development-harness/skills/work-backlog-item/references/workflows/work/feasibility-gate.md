@@ -30,7 +30,7 @@ flowchart TD
     InventoryCount --> PatternCheck
     PatternCheck{"Any Systems Inventory row contains<br>pattern: and pattern_count: fields?"}
     PatternCheck -->|"No complete pattern annotations"| C3Decision
-    PatternCheck -->|"Yes — complete annotation found"| RunRg["For each annotated row run:<br>rg -l '<pattern>' | wc -l<br>Capture current_pattern_count"]
+    PatternCheck -->|"Yes — complete annotation found"| RunRg["For each annotated row:<br>fixed-string rg scan; capture output and status<br>Count matched files as current_pattern_count"]
     RunRg --> Compare{"Any current_pattern_count > 1.5 * recorded pattern_count?"}
     Compare -->|"Yes — count diverged"| FBlock3b(["Emit STALE_GROOM warning<br>Require re-grooming before proceeding"])
     Compare -->|"No — annotations remain current"| C3Decision
@@ -56,6 +56,10 @@ flowchart TD
 - Do not count categorized views, evidence, excluded candidates, or unknown-frontier entries.
 - `pattern_count` is only the lexical-staleness baseline for its own row; it never replaces or
   increments `estimated_impact_count`.
+- For every complete annotation, run `rg -F -l -- "$pattern"` and capture its output and exit
+  status before counting lines. Exit status 0 means matches, Exit status 1 means zero matches, and
+  an exit status greater than 1 is a scan failure: report the exact error and stop instead of using
+  a count. Do not pipe `rg` directly to `wc`, because the pipeline can hide the scan failure.
 - The 10-system and 20-system thresholds are coordination-policy signals. They do not determine a
   system's risk level; use the Impact Radius risk assessment for that judgment.
 
@@ -109,7 +113,7 @@ proceed. Report the following and stop:
 STALE_GROOM: Impact Radius count stale
   pattern: {literal from the annotated Systems Inventory row}
   recorded_pattern_count: {M} (groomed {date})
-  current_pattern_count: {N} (from rg -l '{pattern}' | wc -l)
+  current_pattern_count: {N} (matched-file count from fixed-string rg)
   ratio: {ratio:.1f}x (threshold: 1.5x)
 
 Required action: Re-groom this item to refresh the Impact Radius count before proceeding.

@@ -6030,7 +6030,7 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         (
             section
             for section in split_body_sections(impact_radius, levels=frozenset(range(1, 7)))
-            if section.name.strip().casefold() == "systems inventory"
+            if section.plain_name.strip().casefold() == "systems inventory"
         ),
         None,
     )
