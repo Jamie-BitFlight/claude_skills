@@ -263,12 +263,13 @@ add what you establish back to it.
   and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
   design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
   no pip access) — not a default posture.
-- **Dependency groups carry meaning**: `[project].dependencies` holds what repository code
-  imports at runtime; `dev` holds what project-environment code imports; `scripts` holds what only
-  PEP 723 scripts import, declared so `ty check .` can resolve those imports; `tools` holds
-  executables and pytest plugins that nothing imports. `dev` pulls the other two in with
-  `include-group`, so `uv sync` still installs everything. Put a new dependency in the group that
-  matches how it is consumed. `uv run --with <tool>`, `uvx <tool>`, and a prek hook pinning its own
+- **Dependency groups carry meaning**: a dependency is either imported or invoked, and the groups
+  record which. `[project].dependencies` holds what repository code imports at runtime; `dev` holds
+  everything else repository code imports, whether the importer is a package module or a PEP 723
+  script; `tools` holds executables and pytest plugins that nothing imports. Do not add a group for
+  PEP 723 scripts — almost every Python file here is one, so it partitions nothing. `dev` pulls
+  `tools` in with `include-group`, so `uv sync` still installs everything. Put a new dependency in
+  the group that matches how it is consumed. `uv run --with <tool>`, `uvx <tool>`, and a prek hook pinning its own
   `repo:`/`rev:` each supply a tool independently, so none of them justifies a declaration. Run
   `uv run scripts/audit_dependencies.py` to classify every declared dependency by the evidence
   found for it; the `audit-dependencies` prek hook runs it whenever `pyproject.toml` changes.
