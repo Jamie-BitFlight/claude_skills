@@ -3923,6 +3923,37 @@ def test_sections_index_from_result_empty_sections_returns_empty_string() -> Non
 
 
 # ---------------------------------------------------------------------------
+# _build_compact_manifest  (unit tests — pure function, no MCP transport)
+# ---------------------------------------------------------------------------
+
+
+def test_build_compact_manifest_hint_recommends_section_narrowing_first() -> None:
+    """_build_compact_manifest's _hint recommends section narrowing before full-content load.
+
+    Tests: R7 prohibition-1 compliance — the first line of _hint must not recommend
+           loading everything as the first suggestion.
+    Why: An agent reading a two-line hint acts on the first line.  If it recommends
+         full-content load first, the agent reloads the same over-budget content it
+         is trying to avoid.
+    """
+    from backlog_core.server import _build_compact_manifest
+
+    # Arrange
+    selector = "#3060"
+    result = _make_view_result({"title": "Big Item", "sections_index": "## Sections\n[0] Huge (1 entries)\n"})
+
+    # Act
+    compact = _build_compact_manifest(result, full_response={}, selector=selector)
+    first_line = str(compact["_hint"]).split("\n", 1)[0]
+
+    # Assert — first line narrows to a section, not full-content load
+    assert "section=" in first_line, f"First _hint line must mention 'section=', got: {first_line!r}"
+    assert first_line != f"Load full content: backlog_view(selector='{selector}', summary=False)", (
+        f"First _hint line must not be the full-content-load recommendation, got: {first_line!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # _build_over_budget_view  (unit tests — pure function, no MCP transport)
 # ---------------------------------------------------------------------------
 
@@ -3999,6 +4030,40 @@ def test_build_over_budget_view_usage_mentions_sections_param() -> None:
     usage = str(compact["_usage"])
     assert "sections=" in usage, f"_usage must mention 'sections=', got: {usage!r}"
     assert "#7" in usage, f"_usage must embed the selector '#7', got: {usage!r}"
+
+
+def test_build_over_budget_view_narrowed_usage_advises_ordinal_map_not_section_narrowing() -> None:
+    """_build_over_budget_view with narrowed_to_single_section=True advises map=True, not section narrowing.
+
+    Tests: R7 prohibition-2 compliance — when the caller already narrowed to a single
+           section that is itself over budget, _usage must not repeat exhausted
+           section-narrowing advice; it must point to the ordinal map instead.
+    Why: Recommending section= narrowing again when the caller already narrowed to one
+         section and is still over budget sends the caller in a loop.
+    """
+    from backlog_core.server import _build_over_budget_view
+
+    # Arrange
+    result = _make_view_result({
+        "number": 3060,
+        "title": "Huge Section Item",
+        "priority": "P1",
+        "status": "open",
+        "description": "An item with one oversized section.",
+        "sections_index": "## Sections\n[0] Huge (1 entries)\n",
+    })
+
+    # Act
+    compact = _build_over_budget_view(result, full_chars=99999, selector="#3060", narrowed_to_single_section=True)
+    usage = str(compact["_usage"])
+
+    # Assert — present: ordinal-map advice and the selector
+    assert "map=True" in usage, f"_usage must mention 'map=True', got: {usage!r}"
+    assert "#3060" in usage, f"_usage must embed the selector '#3060', got: {usage!r}"
+    # Assert — absent: the exhausted section-narrowing call-expression forms
+    assert "sections=['" not in usage, f"_usage must not repeat sections=[' narrowing, got: {usage!r}"
+    assert "section='0" not in usage, f"_usage must not repeat section='0 narrowing, got: {usage!r}"
+    assert "section='/" not in usage, f"_usage must not repeat section='/ narrowing, got: {usage!r}"
 
 
 # ---------------------------------------------------------------------------

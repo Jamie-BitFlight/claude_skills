@@ -2099,8 +2099,8 @@ def _build_compact_manifest(
         "_summary": True,
         "_full_chars": full_chars,
         "_hint": (
-            f"Load full content: backlog_view(selector='{selector}', summary=False)\n"
-            f"Load specific sections: backlog_view(selector='{selector}', summary=False, section='<index, title, or /regex/>')"
+            f"Load specific sections: backlog_view(selector='{selector}', summary=False, section='<index, title, or /regex/>')\n"
+            f"Load full content: backlog_view(selector='{selector}', summary=False)"
         ),
     }
     sections_index = _sections_index_from_result(result)
@@ -2144,7 +2144,9 @@ def _sections_index_from_result(result: _models.ViewItemResult) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, selector: str) -> dict[str, object]:
+def _build_over_budget_view(
+    result: _models.ViewItemResult, full_chars: int, selector: str, *, narrowed_to_single_section: bool = False
+) -> dict[str, object]:
     """Build a compact section-directory response for an over-budget backlog_view call.
 
     When the full response would exceed ``_VIEW_TOKEN_BUDGET`` tokens and the caller
@@ -2157,11 +2159,37 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
         result: Typed ViewItemResult from view_item.
         full_chars: Character length of the serialised full response (size hint).
         selector: Original selector string used to build the usage hint.
+        narrowed_to_single_section: True when the caller already narrowed the
+            request to one section (``section=`` or ``sections=[...]``) and that
+            section alone is still over budget. ``_usage`` then names ``map=True``
+            instead of repeating section-narrowing advice the caller has already
+            exhausted (R7 in docs/agent-markdown-consumption-contract.md). It names
+            no ``navigate=`` ordinal because ``sections_index`` numbering is not
+            guaranteed to match the ordinals ``navigate=`` resolves.
 
     Returns:
         Compact dict with number, title, priority, status, description,
         sections_index, _over_budget, _full_chars, and _usage.
     """
+    if narrowed_to_single_section:
+        usage = (
+            f"This response exceeded the {_VIEW_TOKEN_BUDGET}-token budget "
+            f"({full_chars} chars in full form), even after narrowing to a single section — "
+            "further section= narrowing is not available for this request. "
+            "Get this item's ordinal map, then page through the oversized section with "
+            "navigate=/head=/skip_tokens=:\n"
+            f"  backlog_view(selector='{selector}', map=True)"
+        )
+    else:
+        usage = (
+            f"This response exceeded the {_VIEW_TOKEN_BUDGET}-token budget "
+            f"({full_chars} chars in full form). "
+            "Use the sections_index below to identify which sections you need, "
+            "then request them individually:\n"
+            f"  backlog_view(selector='{selector}', summary=False, sections=['Section Name'])\n"
+            f"  backlog_view(selector='{selector}', summary=False, section='0,1,3')\n"
+            f"  backlog_view(selector='{selector}', summary=False, section='/regex/')"
+        )
     compact: dict[str, object] = {
         "number": result.number,
         "title": result.title,
@@ -2173,15 +2201,7 @@ def _build_over_budget_view(result: _models.ViewItemResult, full_chars: int, sel
         "unavailable_capabilities": result.unavailable_capabilities,
         "_over_budget": True,
         "_full_chars": full_chars,
-        "_usage": (
-            f"This response exceeded the {_VIEW_TOKEN_BUDGET}-token budget "
-            f"({full_chars} chars in full form). "
-            "Use the sections_index below to identify which sections you need, "
-            "then request them individually:\n"
-            f"  backlog_view(selector='{selector}', summary=False, sections=['Section Name'])\n"
-            f"  backlog_view(selector='{selector}', summary=False, section='0,1,3')\n"
-            f"  backlog_view(selector='{selector}', summary=False, section='/regex/')"
-        ),
+        "_usage": usage,
     }
     sections_index = _sections_index_from_result(result)
     if sections_index:
@@ -2508,9 +2528,20 @@ async def backlog_view(
             # serialised char length of the full payload the caller would receive.
             serialised = _json.dumps(full_response)
             if _view_payload_token_count(full_response) > _VIEW_TOKEN_BUDGET:
+                # Read the narrowed section count from full_response, not result:
+                # _filter_view_sections() narrows full_response["sections"] for the
+                # plural sections=[...] path but leaves result untouched.
+                narrowed_sections = full_response.get("sections")
+                narrowed_to_single_section = (
+                    (section is not None or sections_filter is not None)
+                    and isinstance(narrowed_sections, dict)
+                    and len(narrowed_sections) == 1
+                )
                 return _respond(
                     BacklogViewResponse,
-                    _build_over_budget_view(result, len(serialised), selector),
+                    _build_over_budget_view(
+                        result, len(serialised), selector, narrowed_to_single_section=narrowed_to_single_section
+                    ),
                     exclude_none=False,
                     exclude_unset=True,
                 )

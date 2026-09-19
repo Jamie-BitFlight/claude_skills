@@ -285,6 +285,38 @@ class TestReviewRoundContract:
             "(narrowing must not bypass budget enforcement).  Got keys: " + repr(sorted(resp))
         )
 
+    def test_over_budget_narrowed_single_section_usage_advises_ordinal_map(self, mocker: MockerFixture) -> None:
+        """A single over-budget section's ``_usage`` advises the ordinal map, not section= again.
+
+        R7 request-level proof: when ``section='Huge'`` narrows to exactly ONE
+        section that is itself still over budget, the call-site predicate in
+        ``backlog_view`` must pass ``narrowed_to_single_section=True`` through to
+        ``_build_over_budget_view`` so ``_usage`` advises ``map=True`` instead of
+        repeating the section-narrowing the caller already exhausted.
+
+        Uses ``_SINGLE_OVER_BUDGET_BODY`` (one oversized section) deliberately, not
+        ``_GENUINELY_OVER_BUDGET_BODY`` (two headers sharing the 'Huge' substring —
+        widening would match both, ``len(sections) == 2``, and the predicate would
+        correctly evaluate False for a reason unrelated to this fix).
+        """
+        _patch_github_body(mocker, 2495, _SINGLE_OVER_BUDGET_BODY)
+        from backlog_core import server
+
+        resp = _call_view(selector="2495", summary=False, section="Huge")
+
+        assert resp.get("_over_budget") is True, (
+            "section='Huge' narrows to a single slice that itself exceeds the "
+            f"{server._VIEW_TOKEN_BUDGET}-token budget; the over-budget gate must still fire.  "
+            "Got keys: " + repr(sorted(resp))
+        )
+        usage = str(resp.get("_usage"))
+        assert "map=True" in usage, (
+            f"_usage for a narrowed single over-budget section must advise 'map=True', got: {usage!r}"
+        )
+        assert "sections=['" not in usage, f"_usage must not repeat sections=[' narrowing, got: {usage!r}"
+        assert "section='0" not in usage, f"_usage must not repeat section='0 narrowing, got: {usage!r}"
+        assert "section='/" not in usage, f"_usage must not repeat section='/ narrowing, got: {usage!r}"
+
     def test_substring_section_returns_all_matching_sections_in_order(self) -> None:
         """section='Section' returns BOTH '## Section 1' and '## Section 2' in order.
 
