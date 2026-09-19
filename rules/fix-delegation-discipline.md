@@ -8,7 +8,7 @@ Delegation prompts for bug fixes MUST follow the reproduction-first cycle — ap
 flowchart TD
     Entry{"Root cause known<br>or strongly suspected?"}
     Entry -->|"Yes — proceed with fix cycle"| P
-    Entry -->|"No — root cause unclear"| FindCause(["Escalate — load /dh:root-cause-tracing-process<br>to establish root cause first"])
+    Entry -->|"No — root cause unclear"| TraceCause(["Escalate — load /dh:root-cause-tracing-process<br>to establish root cause first"])
 
     P["[Orchestrator] Problem stated<br>Record error message, CI job name,<br>or observed behavior exactly as given"]
     P --> R["[Agent] Research root cause<br>Read the error output<br>Trace the failing code path<br>Identify the exact line or condition that fails<br>Output: one-sentence root cause statement"]
