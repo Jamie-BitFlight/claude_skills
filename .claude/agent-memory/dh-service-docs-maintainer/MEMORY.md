@@ -34,3 +34,13 @@
   updated too, not just the target files removed — e.g. "Layer 1: All 6 docs present" must shrink
   when a doc in that list is deleted, and "N-layer architecture" framing sentences at the top of
   index READMEs need the layer count fixed.
+- `plugins/development-harness/tests/test_retired_terms.py` guards the plugin's runtime-read docs
+  against retired mechanisms; its module docstring states the scan scope. Run it after any edit that
+  renames or deletes a mechanism the plugin's docs describe — it prints each `file:line` hit. Retire
+  a new term by appending one `RetiredTerm(...)` to `_RETIRED_TERMS`. Turn a red row green by
+  editing the prose it names.
+- Rewriting stale "language manifest" prose: roles and quality gates resolve live through
+  `mcp__plugin_dh_backlog__profile_list()`, with no manifest file. The quality-gate discovery order
+  lives only in Step 4 of `skills/dh-meta-docs/references/role-resolution-protocol.md`. Point at it
+  with the sentence `skills/execution/SKILL.md` already uses ("Activate `dh:dh-meta-docs` for the
+  Role Resolution Protocol's quality-gate discovery sequence") instead of restating the order.
