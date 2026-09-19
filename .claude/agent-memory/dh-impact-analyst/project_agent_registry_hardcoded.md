@@ -5,6 +5,6 @@ metadata:
   type: project
 ---
 
-`plugins/plugin-creator/skills/agent-capability-analyzer/scripts/populate-agent-descriptions.mjs` holds hard-coded agent registries as JS literals (`{ key: 'plugin-creator:<agent>', ... }`, plus user and project agent arrays). The skill's SKILL.md describes the script only as seeding `description` fields from frontmatter.
+`plugins/plugin-creator/skills/agent-capability-analyzer/scripts/populate-agent-descriptions.mjs` holds hard-coded agent registries as JS literals (`{ key: 'plugin-creator:<agent>', ... }`, plus user and project agent arrays). Its SKILL.md mentions only frontmatter seeding, so read the script itself for the key lists.
 
-**How to apply:** When a change adds, renames, or removes an agent in any plugin, list this script in the Impact Radius as a code change, and diff its keys against the plugin's `agents/` directory. The registry already lags `plugins/plugin-creator/agents/`, so report existing gaps too.
+**How to apply:** When a change adds, renames, or removes an agent in any plugin, list this script in the Impact Radius as a code change, and diff its keys against the plugin's `agents/` directory. Report every gap that diff shows, including gaps that predate the change.

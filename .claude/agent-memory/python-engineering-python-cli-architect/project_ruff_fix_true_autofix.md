@@ -1,6 +1,6 @@
 ---
 name: project-ruff-fix-true-autofix
-description: "`ruff check` rewrites files in this repo (pyproject sets fix = true); use --no-fix for a read-only lint"
+description: "`ruff check` rewrites files in this repo, unsafe fixes included (pyproject sets fix = true, unsafe-fixes = true); use --no-fix for a read-only lint"
 metadata:
   type: project
 ---
