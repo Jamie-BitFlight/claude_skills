@@ -409,13 +409,6 @@ dev = [
     { name = "ty" },
     { name = "typer" },
 ]
-scripts = [
-    { name = "cairosvg" },
-    { name = "duckdb" },
-    { name = "prefixspan" },
-    { name = "python-gitlab" },
-    { name = "tomlkit" },
-]
 tools = [
     { name = "prek" },
     { name = "pytest-asyncio" },
@@ -461,13 +454,6 @@ dev = [
     { name = "tomlkit", specifier = ">=0.15.1" },
     { name = "ty", specifier = ">=0.0.75" },
     { name = "typer", specifier = ">=0.27.0" },
-]
-scripts = [
-    { name = "cairosvg", specifier = ">=2.9.0" },
-    { name = "duckdb", specifier = ">=1.5.5" },
-    { name = "prefixspan", specifier = ">=0.5.2" },
-    { name = "python-gitlab", specifier = ">=8.5.0" },
-    { name = "tomlkit", specifier = ">=0.15.1" },
 ]
 tools = [
     { name = "prek", specifier = ">=0.5.0" },
