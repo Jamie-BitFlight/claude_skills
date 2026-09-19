@@ -1220,7 +1220,7 @@ of remaining ownership and consumer work; each row links that work to its issue-
 | Section and artifact discovery | Separate inventories remain | #3061, blocked by #3055 |
 | Content identity and control set | No content-ID follow-up, global control set, or write invalidation is implemented | #3062, #3079, #3081 |
 | CLI navigation | CLI has no MAP/NAVIGATE/EXTRACT or content-identity parameters | #3063 |
-| Consumer guidance and contract identity | Transitional parameters and duplicate contract paths remain documented | #3054, #3060, #3064, #3071 |
+| Consumer guidance and contract identity | Transitional parameters and duplicate contract paths remain documented | #3054, #3064, #3071 |
 
 #1676's YAML sidecar and #3085's session key are superseded mechanisms, not implementation tasks
 for this architecture. Duplicate-heading semantics remain unsettled in #3190; an engine-boundary
