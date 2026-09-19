@@ -285,7 +285,7 @@ def test_analyze_impact_radius_conflicts_normalizes_symbols_to_owning_system() -
     assert result[0].reason == "Shared systems: plugins/shared.py"
 
 
-@pytest.mark.parametrize("directory", ["plugins/example", "plugins/example/"])
+@pytest.mark.parametrize("directory", ["plugins", "plugins/example", "plugins/example/"])
 def test_analyze_impact_radius_conflicts_detects_directory_and_nested_file_overlap(directory: str) -> None:
     first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
     second = "### Systems Inventory\n- `plugins/example/nested.py` | Role: file scope"
@@ -294,6 +294,24 @@ def test_analyze_impact_radius_conflicts_detects_directory_and_nested_file_overl
 
     assert len(result) == 1
     assert result[0].reason == f"Shared systems: {directory}"
+
+
+@pytest.mark.parametrize(
+    ("directory", "nested_file"),
+    [
+        ("./plugins/example/", "plugins/example/nested.py"),
+        ("plugins/other/../example/", "plugins/example/nested.py"),
+        ("./", "plugins/example/nested.py"),
+    ],
+)
+def test_analyze_impact_radius_conflicts_normalizes_repository_relative_paths(directory: str, nested_file: str) -> None:
+    first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
+    second = f"### Systems Inventory\n- `{nested_file}` | Role: file scope"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].items == ["A", "B"]
 
 
 def test_analyze_impact_radius_conflicts_detects_shared_non_file_system() -> None:

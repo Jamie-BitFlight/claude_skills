@@ -8,6 +8,7 @@ parameter and returns ``{...result, **out.to_dict()}``.
 from __future__ import annotations
 
 import operator
+import posixpath
 import re
 import sys
 from collections import defaultdict
@@ -6099,14 +6100,40 @@ def _collect_items_with_paths(items: list[ImpactRadiusItem]) -> tuple[list[str],
     return titles, path_sets
 
 
+def _repository_path(system: str) -> str | None:
+    if "://" in system:
+        return None
+    if system in {".", "./"} or system.startswith(("./", "../")) or "/" in system:
+        return posixpath.normpath(system)
+    if re.search(r"\.[A-Za-z0-9_-]+$", system):
+        return posixpath.normpath(system)
+    return None
+
+
+def _path_contains(ancestor: str, descendant: str) -> bool:
+    ancestor_path = _repository_path(ancestor)
+    descendant_path = _repository_path(descendant)
+    if ancestor_path is None and ancestor and not any(character.isspace() for character in ancestor):
+        ancestor_path = posixpath.normpath(ancestor)
+    if ancestor_path is None or descendant_path is None or ancestor_path == descendant_path:
+        return False
+    if ancestor_path == ".":
+        return True
+    return descendant_path.startswith(f"{ancestor_path.rstrip('/')}/")
+
+
 def _overlapping_systems(first: set[str], second: set[str]) -> set[str]:
     overlap = first & second
-    overlap.update(
-        ancestor for ancestor in first if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in second)
-    )
-    overlap.update(
-        ancestor for ancestor in second if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in first)
-    )
+    for first_system in first:
+        for second_system in second:
+            first_path = _repository_path(first_system)
+            second_path = _repository_path(second_system)
+            if first_path is not None and first_path == second_path:
+                overlap.add(first_path)
+            elif _path_contains(first_system, second_system):
+                overlap.add(first_system)
+            elif _path_contains(second_system, first_system):
+                overlap.add(second_system)
     return overlap
 
 
