@@ -61,7 +61,7 @@ Domain is derived from the item's Impact Radius and the worker's files planned a
 ```mermaid
 flowchart TD
     Start(["Determine worker domain"]) --> IR["Read item's Impact Radius<br>from groomed backlog entry or prompt"]
-    IR --> Extract["Extract top-level directories<br>from all listed file paths"]
+    IR --> Extract["Extract top-level directories from file-valued<br>Systems Inventory rows; use legacy affected-system<br>paths only when the heading is absent"]
     Extract --> Classify{"File paths share<br>a common prefix?"}
     Classify -->|"All under plugins/X/"| SinglePlugin["Domain = plugins/X"]
     Classify -->|"All under .claude/skills/"| Skills["Domain = .claude/skills"]
@@ -72,6 +72,10 @@ flowchart TD
 ```
 
 Domain detection is informational — it is used in the completion report `NOTES` field to describe what was changed. No coordination with other workers is needed: items in the same wave are guaranteed non-overlapping by the dispatch plan's conflict group analysis.
+
+Do not derive the domain from evidence citations, categorized views, excluded candidates, or
+unknown-frontier paths. Non-file inventory systems remain planning obligations but do not define a
+filesystem worktree domain.
 
 ## Blocker Handling
 

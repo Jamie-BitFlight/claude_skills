@@ -1591,10 +1591,16 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     except (BacklogError, GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
-    ir_re = re.compile(r"##\s+Impact\s+Radius\b(.*?)(?=\n##|\Z)", re.IGNORECASE | re.DOTALL)
+    ir_re = re.compile(r"^##(?!#)\s+Impact\s+Radius\b(.*?)(?=^##(?!#)\s+|\Z)", re.IGNORECASE | re.DOTALL | re.MULTILINE)
     items: list[ImpactRadiusItem] = []
     for issue in issue_nodes:
-        body = issue["body"] or ""
+        try:
+            body = github_backend.resolve_issue_body(gh_repo, owner, repo_name, issue)
+        except (BacklogError, ContentConflictError, ContentUnavailableError, GithubException) as exc:
+            return {
+                "error": f"Could not resolve authoritative body for issue #{issue['number']}: {exc}",
+                "milestone_number": milestone_number,
+            }
         match = ir_re.search(body)
         impact_radius = match.group(1).strip() if match else ""
         items.append({"title": issue["title"], "issue": issue["number"], "impact_radius": impact_radius})
