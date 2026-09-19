@@ -5,10 +5,10 @@ metadata:
   type: feedback
 ---
 
-prek runs `skilllint check --fix` on every `SKILL.md`, but SK006 (body over the token warning
-threshold) is a warning: it exits 0 and prek reports green without printing it. Only SK007 (the
-error threshold) fails the hook.
+prek runs `skilllint check --fix` on every `SKILL.md` under `plugins/` and `.claude/`, but SK006 (body over the token warning
+threshold) is a warning: it exits 0 and prek reports green without printing it. SK007 (the
+error threshold) has error severity, and a fix the hook applies also fails it.
 
 After editing a `SKILL.md`, run `uvx skilllint@latest check <path>` and read the output. Treat a
 new SK006 as a regression to trim, especially when the edit was a correction and not new required
-content. Re-run after each trim — one sentence can tip a file near the threshold either way.
+content. Re-run after each trim.
