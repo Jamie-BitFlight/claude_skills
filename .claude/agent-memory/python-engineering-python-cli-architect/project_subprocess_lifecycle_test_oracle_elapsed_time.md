@@ -1,12 +1,11 @@
 ---
 name: project-subprocess-lifecycle-test-oracle-elapsed-time
-description: Process-tree-kill regression tests here use elapsed time of a capture_output subprocess.run() as the liveness oracle; os.kill/ps give false ESRCH on live PIDs in this sandbox
+description: Process-tree-kill regression tests here use elapsed time of a capture_output subprocess.run() as the liveness oracle
 metadata:
   type: project
 ---
 
-In this sandboxed shell, `os.kill(pid, 0)` and `ps -p <pid>` report a still-running orphaned
-descendant as dead (ESRCH, no EPERM). Use timing as the liveness oracle instead:
+Use timing as the liveness oracle:
 
 - Launch the runner with `subprocess.run(..., capture_output=True)`. Every descendant inherits the
   pipe fds, so `communicate()` blocks until the last surviving descendant exits.
