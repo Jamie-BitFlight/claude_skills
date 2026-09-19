@@ -35,7 +35,7 @@ If the user selects "Other" and provides additional context, reformulate the int
 
 #### B. Define success criteria
 
-Load the `dh:root-cause-tracing-process` skill with the Skill tool now, for its Inputs format only. Its steps run at Step 2, after the user confirms. For the confirmed interpretation, write the QUESTION and SUCCESS CRITERIA block its Inputs section defines.
+Load the `dh:root-cause-tracing-process` skill with the Skill tool now. For the confirmed interpretation, write the QUESTION and SUCCESS CRITERIA block its Inputs section defines. You run its steps at Step 2 below.
 
 Present the success criteria to the user for confirmation. Adjust if the user's definition of "done" differs.
 

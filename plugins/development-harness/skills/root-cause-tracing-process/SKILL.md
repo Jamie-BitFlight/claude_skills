@@ -1,7 +1,7 @@
 ---
 name: root-cause-tracing-process
-description: Root-cause tracing with an evidence chain — reproduce the failure, read the source, and cite every claim from symptom to root cause; when the failure does not reproduce, falsify H0/Ha hypotheses by experiment until one survives. Use when an agent must establish why a bug, test failure, or unexpected behavior happens before fixing it.
-argument-hint: <QUESTION and SUCCESS CRITERIA>
+description: Root-cause tracing with an evidence chain — reproduce the failure, read the source, and cite every claim from symptom to root cause; when the failure does not reproduce, falsify H0/Ha hypotheses by experiment until one survives. Use to establish why a bug, test failure, or unexpected behavior happens.
+argument-hint: <failure to trace>
 ---
 
 <tracing_input>$ARGUMENTS</tracing_input>
@@ -10,7 +10,7 @@ argument-hint: <QUESTION and SUCCESS CRITERIA>
 
 ## Inputs
 
-`<tracing_input/>` holds the caller's QUESTION and SUCCESS CRITERIA in this format, a raw request, or nothing:
+Before Step 0, write the QUESTION and SUCCESS CRITERIA in this format from `<tracing_input/>` and the conversation that loaded this skill:
 
 ```text
 QUESTION: [confirmed interpretation]
@@ -20,8 +20,6 @@ SUCCESS CRITERIA:
 - Can state root cause as: "[observable condition X] causes [observable behavior Y] because [mechanism Z]"
 - All claims in the evidence chain are VERIFIED: yes
 ```
-
-When `<tracing_input/>` holds a raw request, write the QUESTION and SUCCESS CRITERIA from it in this format before Step 0. When it is empty, take them from the conversation that loaded this skill, and write them from the request there when the conversation has none.
 
 ## Evidence-Chain Protocol
 
@@ -165,7 +163,9 @@ DEPENDS ON: none (reproduction — primary observation)
 
 If reproduction diverges from the user's report (succeeds when it should fail, or vice versa), document what you did differently and what environmental differences might explain the divergence.
 
-If you cannot reproduce the operation, state that. When a user is in the conversation, ask for their reproduction steps and retry Step 2 with them. Otherwise, or if their steps also fail, continue at Step 2B.
+If you cannot reproduce the operation, state that and ask the user for reproduction steps.
+
+Retry Step 2 with their steps. If none come, or they also fail, continue at Step 2B.
 
 Do NOT skip this step by relying on a transcript or description of the failure. Run it yourself.
 
@@ -177,13 +177,13 @@ Work the failure as an experiment.
 2. State a falsifiable pair about one condition X that you can set:
    - **H0**: X has no effect on the failure.
    - **Ha**: X causes the failure.
-3. Write the prediction: "If Ha holds, running the operation with X set produces observable Z. If H0 holds, it does not produce Z."
+3. Write the prediction: "If Ha holds, every run with X set produces observable Z and no run with X unset does. If H0 holds, Z appears as often with X unset as with X set."
 4. Design the experiment that could falsify Ha: vary X, hold the other conditions fixed, and list each confound that could produce Z without X.
-5. Run the experiment as many times as the failure's observed frequency needs for Z to appear, and record each output verbatim as evidence entries.
+5. Run each arm, X set and X unset, at least as many times as the runs in item 1 took to show one failure, and record each output verbatim as evidence entries.
 6. Decide from the evidence:
-   - Z absent in every run: Ha is falsified. Record it, form the next Ha from what the runs showed, and return to item 2.
    - Z present with a confound uncontrolled: control that confound and return to item 5.
-   - Z present with the confounds controlled: Ha survives. Setting X is now the reproduction. Continue at Step 3 with it.
+   - Z in every X-set run and in no X-unset run, with the confounds controlled: Ha survives. Setting X is now the reproduction. Continue at Step 3 with it.
+   - Any other result: Ha is falsified. Record it, form the next Ha from what the runs showed, and return to item 2.
 
 Step 2B is complete when Ha survives and gives a reproduction, or when you stop and list every falsified Ha, with its evidence and the next experiment to run, under UNVERIFIED ITEMS in Step 5.
 
