@@ -1055,7 +1055,7 @@ class DispatchConflictsResponse(MilestoneEchoError):
     """Response for ``dispatch_conflicts``."""
 
     conflict_groups: list[ConflictGroup] | None = None
-    """Groups of items whose Impact Radii share a file path."""
+    """Groups of items whose Impact Radii share a system identifier."""
 
     count: int | None = None
     """Number of conflict groups found."""

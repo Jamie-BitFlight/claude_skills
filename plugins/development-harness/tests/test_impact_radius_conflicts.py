@@ -123,7 +123,7 @@ def test_analyze_impact_radius_conflicts_reason_contains_sorted_shared_files() -
     # Assert
     assert len(result) == 1
     # Reason must list shared files in sorted order
-    assert result[0].reason == "Shared files: a-file.py, z-file.py"
+    assert result[0].reason == "Shared systems: a-file.py, z-file.py"
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +190,93 @@ def test_analyze_impact_radius_conflicts_markdown_headers_excluded_from_paths() 
     # Header must not appear in the reason
     assert "##" not in result[0].reason
     assert "plugins/baz.py" in result[0].reason
+
+
+def test_analyze_impact_radius_conflicts_uses_system_from_inventory_row() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    first = f"""### Systems Inventory
+- `{shared}` | Role: producer | Action: CODE_CHANGE | Risk: HIGH
+### Unknown Frontier
+- `plugins/unknown-a.py` | Owner: team-a
+"""
+    second = f"""### Systems Inventory
+- `{shared}` | Role: consumer | Action: VERIFY_COMPATIBLE | Risk: MEDIUM
+### Unknown Frontier
+- `plugins/unknown-b.py` | Owner: team-b
+"""
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    first = f"### Systems Inventory\n- `{shared}` — producer connected to dispatch"
+    second = f"### Systems Inventory\n- `{shared}` | Role: consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_ignores_unknown_frontier_paths() -> None:
+    first = """### Systems Inventory
+- `plugins/a.py` | Role: producer
+### Excluded Candidates and Unknown Frontier
+- Unknown: `plugins/shared-unknown.py` - owner must inspect
+"""
+    second = """### Systems Inventory
+- `plugins/b.py` | Role: consumer
+### Excluded Candidates and Unknown Frontier
+- Unknown: `plugins/shared-unknown.py` - owner must inspect
+"""
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_normalizes_symbols_to_owning_system() -> None:
+    first = "### Systems Inventory\n- `plugins/shared.py::first` | Role: producer"
+    second = "### Systems Inventory\n- `plugins/shared.py::second` | Role: consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result[0].reason == "Shared systems: plugins/shared.py"
+
+
+@pytest.mark.parametrize("directory", ["plugins/example", "plugins/example/"])
+def test_analyze_impact_radius_conflicts_detects_directory_and_nested_file_overlap(directory: str) -> None:
+    first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
+    second = "### Systems Inventory\n- `plugins/example/nested.py` | Role: file scope"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {directory}"
+
+
+def test_analyze_impact_radius_conflicts_detects_shared_non_file_system() -> None:
+    system = "release approval control"
+    first = f"### Systems Inventory\n- `{system}` | Role: process control"
+    second = f"### Systems Inventory\n- `{system}` | Role: human handoff"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {system}"
+
+
+def test_analyze_impact_radius_conflicts_legacy_ignores_shared_status_lines() -> None:
+    first = "SCOPE_EXPANSION: None.\n- plugins/a.py - changed producer"
+    second = "SCOPE_EXPANSION: None.\n- plugins/b.py - changed consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +431,7 @@ def test_analyze_impact_radius_conflicts_reason_format_multiple_shared_files() -
 
     # Assert
     assert len(result) == 1
-    assert result[0].reason == "Shared files: aardvark.py, middle.py, zoo.py"
+    assert result[0].reason == "Shared systems: aardvark.py, middle.py, zoo.py"
 
 
 # ---------------------------------------------------------------------------

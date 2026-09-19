@@ -6,9 +6,9 @@ Each agent's section is how the others reach its findings — an agent that must
 
 ## Agents
 
-1. **impact-analyst** — Build affected systems inventory (Phase 1), run 5-question impact
-   checklist per system (Phase 2). Write to `section="Impact Radius"`, leading the section with a
-   `SCOPE_EXPANSION:` line when systems beyond the original description are found.
+1. **impact-analyst** — Build the starting impact set, expand it through causal dependency and
+   control paths, then write the canonical Systems Inventory to `section="Impact Radius"`. Lead
+   the section with a `SCOPE_EXPANSION:` line when systems beyond the starting set are found.
 
 2. **fact-checker** — Verify item claims against primary sources. Training data recall is NOT
    evidence. Valid evidence: WebFetch, WebSearch, command output, source code, MCP tool output.
@@ -84,7 +84,7 @@ sequenceDiagram
     FC->>FC: verify claims against primary sources
     FC->>FC: write Fact-Check, recording "REFUTED: task_format.py multi-doc support"
 
-    IA->>IA: run 5-question checklist per system
+    IA->>IA: prove causal paths, outcomes, owners, evidence, and verification obligations
     IA-->>O: STATUS: DONE — Impact Radius written
     FC-->>O: STATUS: DONE — Fact-Check written
 
@@ -145,65 +145,17 @@ on every run and the halt looks like a correct gate doing its job.
 
 ## Impact Radius — what the impact-analyst produces
 
-#### Phase 1: Build Affected Systems Inventory
+The canonical procedure and output contract live in
+[impact-analyst.md](../../../../../agents/impact-analyst.md). Do not restate or narrow that schema
+here.
 
-Start from known files (Files section, Output/Evidence section, suggested_location). Expand:
+Downstream stages must treat the `### Systems Inventory` rows as the authoritative estimated
+impact set. Categorized lists are human-readable views. `pattern:` and `pattern_count:` fields are
+optional lexical staleness probes for one inventory row; their grep results never replace the
+inventory count, prove impact, or determine risk.
 
-- Files that import from or call into known systems
-- Documentation describing current behavior
-- Agent/skill files that instruct AI to use these systems
-- Configuration files referencing these modules
-- CI workflows testing these modules
-- Test files exercising these systems
-
-Exclude: plan artifacts, `docs/plans/`, `.claude/archive/`, test fixtures.
-
-#### Phase 2: Impact Checklist (per system)
-
-For each system, answer:
-
-1. Will this file break when the item ships?
-2. Will this file become stale?
-3. Does this file need a code change?
-4. Does this file need a content update?
-5. Is there a test covering this file's interaction with the changed interface?
-
-#### Output format — 6 named categories
-
-```markdown
-## Impact Radius
-
-### Code — Producers (write the changed interface)
-- `{path}::{function}` — {what it produces, what change needed}
-
-### Code — Consumers (read the changed interface)
-- `{path}::{function}` — {what it consumes, what migration needed}
-
-### Code — Other References
-- `{path}` — {import/constant/type reference, what change needed}
-
-### Documentation (will become stale)
-- `{path}` — {what section becomes inaccurate}
-
-### Configuration / CI
-- `{path}` — {what change needed}
-
-### Agent Instructions (instruct AI to use current interface)
-- `{path}` — {what instruction needs updating}
-
-### Systems Inventory
-{full list with roles and connections}
-
-### Ecosystem Completeness Checklist
-- [ ] Every code producer updated or verified compatible
-- [ ] Every code consumer migrated to new interface
-- [ ] Every stale document updated
-- [ ] Every agent instruction updated
-- [ ] Old interface deprecated or removed (if replacing)
-- [ ] CI/config files updated and validated
-```
-
-If a category has no affected files, write `None identified.` — do not omit the category.
+The agent runs before implementation. Any post-change observation in the supporting principles is
+an owned verification obligation and review trigger, not a completion condition for grooming.
 
 ## Fact-Checker output contract
 

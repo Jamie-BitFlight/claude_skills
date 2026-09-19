@@ -66,7 +66,10 @@ Spawn a haiku agent (`subagent_type="dh:task-worker"`, model=haiku):
 
 1. Call `backlog view --selector "{title}"`.
 2. Extract file paths from groomed sections:
-   - `sections["Impact Radius"]` — file paths under Code, Documentation, Configuration/CI
+   - `sections["Impact Radius"]` — read only rows under `### Systems Inventory`; take the leading
+     backticked `{system}` value when it is a repository file or directory path. Do not scan paths
+     in evidence, categorized views, excluded candidates, or unknown-frontier notes. When the
+     heading is absent, use leading paths from legacy affected-system categories.
    - `sections["Resources"]` — fallback for older grooming templates that wrote file lists here instead of Impact Radius; use only when `sections["Impact Radius"]` is absent or empty
    - `sections["Files"]` — explicit file paths
    - `sections["Output / Evidence"]` — cited file paths

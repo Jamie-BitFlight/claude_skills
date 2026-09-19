@@ -6016,24 +6016,49 @@ class _UnionFind:
 
 
 def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
-    """Extract normalised file paths from an Impact Radius markdown body.
+    """Extract systems used for Impact Radius conflict detection.
 
     Args:
-        impact_radius: Raw markdown section body (may contain bullet markers,
-            blank lines, or section headers).
+        impact_radius: Raw markdown section body. Current reports use canonical
+            rows under ``Systems Inventory``; older reports use flat path lists.
 
     Returns:
-        Set of stripped file-path strings. Empty set when the body is blank
-        or contains only headers/whitespace.
+        Set of system identifiers. Empty set when the body contains no
+        inventory rows or legacy paths.
     """
+    lines = impact_radius.splitlines()
+    inventory_heading = next(
+        (
+            index
+            for index, raw_line in enumerate(lines)
+            if re.fullmatch(r"#{1,6}\s+Systems Inventory\s*", raw_line.strip(), re.IGNORECASE)
+        ),
+        None,
+    )
+
+    if inventory_heading is not None:
+        systems: set[str] = set()
+        for raw_line in lines[inventory_heading + 1 :]:
+            line = raw_line.strip()
+            if re.match(r"#{1,6}\s+", line):
+                break
+            match = re.match(r"[-*]\s+`([^`]+)`", line)
+            if match:
+                systems.add(match.group(1).partition("::")[0].strip())
+        return systems
+
     paths: set[str] = set()
-    for raw_line in impact_radius.splitlines():
+    for raw_line in lines:
         # Strip bullet markers (-, *) and surrounding whitespace
         line = raw_line.strip().lstrip("-*").strip()
         # Discard empty lines and pure markdown headers
         if not line or line.startswith("#"):
             continue
-        paths.add(line)
+        backticked = re.match(r"`([^`]+)`", line)
+        candidate = backticked.group(1) if backticked else re.split(r"\s+(?:\||-|—)\s+", line, maxsplit=1)[0]
+        candidate = candidate.partition("::")[0].strip()
+        if " " not in candidate and ("/" in candidate or re.search(r"\.[A-Za-z0-9_-]+$", candidate)):
+            paths.add(candidate)
     return paths
 
 
@@ -6043,8 +6068,8 @@ class ImpactRadiusItem(TypedDict, total=False):
     Attributes:
         title: Item title used in ConflictGroup.items list.
         issue: GitHub issue number (present but unused in conflict output).
-        impact_radius: Markdown section body containing file paths, one per
-            line, optionally prefixed with bullet markers (``-`` / ``*``).
+        impact_radius: Markdown section body containing canonical Systems
+            Inventory rows or legacy file paths, one per line.
             Items without this key, or with an empty/whitespace-only value,
             are excluded from conflict analysis.
     """
@@ -6077,12 +6102,23 @@ def _collect_items_with_paths(items: list[ImpactRadiusItem]) -> tuple[list[str],
     return titles, path_sets
 
 
+def _overlapping_systems(first: set[str], second: set[str]) -> set[str]:
+    overlap = first & second
+    overlap.update(
+        ancestor for ancestor in first if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in second)
+    )
+    overlap.update(
+        ancestor for ancestor in second if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in first)
+    )
+    return overlap
+
+
 def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list[ConflictGroup]:
-    """Run union-find over path_sets and return ConflictGroup models.
+    """Run union-find over system identifier sets and return ConflictGroup models.
 
     Args:
         titles: Item title per index (parallel to path_sets).
-        path_sets: Parsed file-path sets per index.
+        path_sets: Parsed system identifier sets per index.
 
     Returns:
         List of ConflictGroup models for connected components with two or more
@@ -6091,10 +6127,10 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
     n = len(titles)
     uf = _UnionFind(n)
 
-    # Union pairs sharing at least one file path
+    # Union pairs with overlapping systems
     for i in range(n):
         for j in range(i + 1, n):
-            if path_sets[i] & path_sets[j]:
+            if _overlapping_systems(path_sets[i], path_sets[j]):
                 uf.union(i, j)
 
     # Collect connected components
@@ -6102,11 +6138,11 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
     for i in range(n):
         components[uf.find(i)].append(i)
 
-    # Gather shared paths per group root
+    # Gather overlapping systems per group root
     group_shared: dict[int, set[str]] = defaultdict(set)
     for i in range(n):
         for j in range(i + 1, n):
-            overlap = path_sets[i] & path_sets[j]
+            overlap = _overlapping_systems(path_sets[i], path_sets[j])
             if overlap and uf.find(i) == uf.find(j):
                 group_shared[uf.find(i)].update(overlap)
 
@@ -6119,7 +6155,7 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
             continue
         member_titles = sorted(titles[i] for i in members)
         shared = group_shared.get(root, set())
-        reason = "Shared files: " + ", ".join(sorted(shared))
+        reason = "Shared systems: " + ", ".join(sorted(shared))
         conflict_groups.append(ConflictGroup(group_id=group_id, reason=reason, items=member_titles))
         group_id += 1
 
@@ -6127,17 +6163,17 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
 
 
 def analyze_impact_radius_conflicts(items: list[ImpactRadiusItem]) -> list[ConflictGroup]:
-    """Compute conflict groups from Impact Radius file-path overlap.
+    """Compute conflict groups from Impact Radius system overlap.
 
     Each item dict must contain:
 
     - ``"title"`` (str): item title used in ConflictGroup.items list.
     - ``"issue"`` (int): issue number (unused in output but validates input).
-    - ``"impact_radius"`` (str): markdown section body containing file paths,
-      one per line, optionally with bullet markers (``-`` / ``*``).
+    - ``"impact_radius"`` (str): markdown section body containing canonical
+      Systems Inventory rows or legacy file paths, one per line.
 
-    Two items form a conflict group when they share any file path (exact
-    string match after stripping whitespace and bullet markers).
+    Two items form a conflict group when they share a canonical system
+    identifier or legacy file path.
 
     Items with no ``impact_radius`` key or an empty value are excluded from
     conflict analysis — they conflict with nothing.
@@ -6153,7 +6189,7 @@ def analyze_impact_radius_conflicts(items: list[ImpactRadiusItem]) -> list[Confl
     Returns:
         List of :class:`~dispatch_schema.core.models.ConflictGroup` models,
         one per connected component with two or more members.  Items with no
-        file overlap are not included.  Returns an empty list when no
+        system overlap are not included.  Returns an empty list when no
         conflicts are found.
     """
     titles, path_sets = _collect_items_with_paths(items)

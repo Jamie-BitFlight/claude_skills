@@ -245,6 +245,19 @@ that change depends on.
 - Nearest-first: check the touched module's own subtree for an `ARCHITECTURE.md` or `CONTEXT.md` before designing from scratch — extend what exists rather than re-deriving it.
 - ADRs are deliberation, not the design. Read the nearest `ARCHITECTURE.md` for what the system is expected to do, and see [rules/adr-lifecycle.md](../../rules/adr-lifecycle.md) for why nothing links to an ADR. Existing ADR filenames embed an issue number, which is the same staleness this rule removes elsewhere; that convention has not yet been reworked.
 
+**Impact analysis for a change to behavior, interfaces, data or state, models or prompts, controls,
+people, or processes:**
+
+- Load [Impact Analysis Principles](./docs/impact-analysis-principals.md) when explaining the
+  cross-domain method, designing an impact-analysis process, or selecting worked examples.
+- For backlog impact analysis, follow the executable contract in
+  [impact-analyst.md](./agents/impact-analyst.md); it contains the complete pre-change procedure.
+- When the change involves implicit behavior, an external delta, control removal, delayed feedback,
+  or unsafe interaction, also load [Impact Analysis Gap
+  Supplement](./docs/impact-analysis-gap-supplement.md#integrated-additions).
+- When the analysis needs source-backed evidence, load [Change-Impact Analysis
+  Research](./docs/change-impact-analysis-research.md).
+
 **Modifying the pipeline process, stage sequencing, or touchpoint gates:**
 
 - Load `dh:dh-meta-docs` — routes the S1-S7 pipeline, ARL gates, stage handoffs, artifact naming, and cross-reference tokens

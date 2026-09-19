@@ -41,9 +41,9 @@ criteria) → **S7 Final Verification** (certify the feature meets the original 
 every stage requires human review — ARL-derived constraint analysis decides when to escalate, not
 a fixed checkpoint per stage. Canonical: `plugins/development-harness/AGENTS.md` ("How It Works").
 
-**Impact Radius** — the backlog-item section listing every system a proposed change affects
-(code, docs, configuration, CI, tests, agent instructions), written by `@dh:impact-analyst` before
-planning. The feasibility gate and grooming staleness checks read this section to size a change's
-blast radius; an item using an older grooming template may have this content under a `Resources`
-section instead — readers of the primary key fall back to it. Canonical:
+**Impact Radius** — the backlog-item section whose `Systems Inventory` records the estimated impact
+set across software, data, runtime, prompts, controls, people, and processes, with causal paths,
+risk, verification, exclusions, and owned unknowns. It is written by `@dh:impact-analyst` before
+planning; the feasibility and staleness gates consume it. Older items may hold a file-centric
+version under `Impact Radius` or `Resources`; consumers retain that fallback. Canonical:
 `plugins/development-harness/agents/impact-analyst.md`.
