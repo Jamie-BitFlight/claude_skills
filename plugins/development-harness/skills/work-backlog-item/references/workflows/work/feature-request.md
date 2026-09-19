@@ -37,7 +37,12 @@ Build this string for `add-new-feature`:
 {full content of the ## Impact Radius section from the `backlog_view` response — fall back to the
 `## Resources` section when Impact Radius is absent (older grooming template; see groom-check.md)}
 
-**Planner constraint**: Create tasks for every item listed above, or document the exclusion reason inline. The plan is incomplete if any row in the Impact Radius is unaddressed.
+**Planner constraint**: Address every row under `### Systems Inventory` with an implementation,
+verification, content, configuration, agent, process, or other task appropriate to its `Action`
+field, or document why an existing task covers it. Do not create tasks for categorized views,
+excluded candidates, or evidence citations. Convert each unknown-frontier closure condition into a
+research task or an explicit planning assumption. The plan is incomplete when a canonical system
+or unresolved unknown has no disposition.
 
 **Ecosystem Completeness Checklist** (must all be checked before the plan can be marked complete):
 - [ ] Every upstream producer updated or verified compatible

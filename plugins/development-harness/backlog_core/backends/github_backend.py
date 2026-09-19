@@ -509,6 +509,10 @@ class GitHubBackend:
             callback=callback,
         )
 
+    def resolve_issue_body(self, repo: Repository, owner: str, repo_name: str, issue: IssueNode) -> str:
+        """Return the authoritative agent-managed body for an issue."""
+        return self._work_items.work_item_version(repo, owner, repo_name, issue)[0].body
+
     def create_issue_for_item(
         self, repo: Repository, item: BacklogItem, dry_run: bool = False, output: Output | None = None
     ) -> int | None:

@@ -918,6 +918,8 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
         "**Unknown frontier**",
         "Never use the count as evidence that a system is affected or unaffected",
         "Never calculate risk from the count",
+        "In direct mode, return `<report>` inline and do not call `backlog_groom`",
+        "Use a stable conflict identifier in the leading backticks",
     )
 
     missing = [contract for contract in required_contracts if contract not in prompt]
@@ -937,7 +939,7 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
     )
     combined_contract = f"{prompt}\n{feasibility_gate}"
     assert count_override.search(combined_contract) is None
-    assert "always the distinct `Systems Inventory` row count" in feasibility_gate
+    assert "distinct `Systems Inventory` row count, or the legacy affected-system row count" in feasibility_gate
     assert 'Compare -->|"No — annotations remain current"| C3Decision' in feasibility_gate
 
     regression_mutation = "Use current_pattern_count as the blast radius whenever an annotation exists."

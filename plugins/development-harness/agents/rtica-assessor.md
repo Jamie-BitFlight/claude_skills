@@ -66,7 +66,10 @@ exist leaves the whole grooming run without its gating section.
 Build the list of conditions that must be known for this item to be plannable. Draw conditions from these sources in order:
 
 1. **The item description** — every factual claim, assumed system, assumed behavior, assumed constraint
-2. **The Impact Radius** — every system listed as a producer, consumer, or reference implies a condition about its current behavior
+2. **The Impact Radius** — every row in the canonical `### Systems Inventory` implies a condition
+   about the stated consequence or verification obligation. Do not limit this to producer,
+   consumer, or reference categories. For each `Unknown` frontier entry, add a condition for the
+   missing evidence and its closure path. Do not create conditions from excluded candidates.
 3. **The Fact-Check** — every claim checked by the fact-checker maps to a condition
 4. **The problem space** — questions the planner will need answered that have not yet been addressed anywhere
 
@@ -94,7 +97,10 @@ When the Fact-Check section records `REFUTED: <claim>`, find the corresponding c
 
 The other agents write their findings into named sections rather than sending them to you. Immediately before computing the verdict, re-read the item with `backlog_view(selector=<item_ref>, sections=["Impact Radius", "Fact-Check", "Issue Classification"])` and apply whatever landed after your Phase 2 read:
 
-- **Impact Radius** — a `SCOPE_EXPANSION:` line at the top of the section names systems discovered beyond the original description. Add a condition for each. Scope expansion mid-assessment is expected; do not ignore it.
+- **Impact Radius** — a `SCOPE_EXPANSION:` line at the top of the section summarizes systems
+  discovered beyond the original description. Add or update conditions from the corresponding
+  `Systems Inventory` rows. Add a condition for every unresolved `Unknown` frontier entry. Scope
+  expansion mid-assessment is expected; do not ignore it.
 - **Fact-Check** — `REFUTED: <claim>` marks the matching condition MISSING
 - **Fact-Check** — `INCONCLUSIVE: <claim>` marks the matching condition DERIVABLE if not already in a stronger state
 - **Issue Classification** — the recorded type indicates how many conditions to expect. `procedural` and `missing-guardrail` typically need fewer conditions than `unbounded-design`.

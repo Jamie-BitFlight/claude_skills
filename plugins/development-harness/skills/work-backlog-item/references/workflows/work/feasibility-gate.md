@@ -26,7 +26,7 @@ flowchart TD
     C2 -->|"Effort=FULL for P2 or Ideas item"| FBlock2(["BLOCKED: effort/priority mismatch<br>P2/Ideas with FULL effort requires human confirmation"])
     EffortWarn --> C3
 
-    C3(["Criterion 3 — Blast radius check"]) --> InventoryCount["Count distinct Systems Inventory rows<br>as estimated_impact_count"]
+    C3(["Criterion 3 — Blast radius check"]) --> InventoryCount["Count distinct Systems Inventory rows<br>or legacy affected-system rows<br>as estimated_impact_count"]
     InventoryCount --> PatternCheck
     PatternCheck{"Any Systems Inventory row contains<br>pattern: and pattern_count: fields?"}
     PatternCheck -->|"No complete pattern annotations"| C3Decision
@@ -47,6 +47,16 @@ flowchart TD
     AltWarn --> PASS
 ```
 
+**Criterion 3 — estimated impact count:**
+
+- Count every distinct row under `### Systems Inventory`, including non-file systems. This is the
+  estimated impact set used for the 10-system and 20-system blast-radius thresholds.
+- When a legacy Impact Radius has no `Systems Inventory`, count distinct affected-system rows from
+  its legacy categories.
+- Do not count categorized views, evidence, excluded candidates, or unknown-frontier entries.
+- `pattern_count` is only the lexical-staleness baseline for its own row; it never replaces or
+  increments `estimated_impact_count`.
+
 **Criterion 4 — observable thresholds:**
 
 Extract affected file paths using the same priority order as [groom-check.md](./groom-check.md)'s
@@ -54,7 +64,8 @@ Extract affected file paths using the same priority order as [groom-check.md](./
 
 1. Primary key: `sections["Impact Radius"]` — count only distinct file-valued rows under
    `### Systems Inventory`. Do not count paths in evidence, categorized views, excluded candidates,
-   or unknown-frontier notes.
+   or unknown-frontier notes. If the heading is absent, count distinct leading file paths from the
+   legacy affected-system categories.
 2. Fallback key: `sections["Resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius) — count rows here only when the primary key is absent or empty.
 
 - Count task entries in the item's Effort section (lines starting with `- [ ]` or `- [x]`) to get the estimated task count.
@@ -82,7 +93,8 @@ When all criteria pass (or result in WARN), append the following to the feature 
 All fields shown above are required. Do not omit fields with empty values — use `"None"`,
 `"Not estimated"`, or `"Not applicable — no complete pattern annotations"` as appropriate. The
 **Pattern refresh** field reports lexical staleness only. It never changes the blast-radius value,
-which is always the distinct `Systems Inventory` row count.
+which is the distinct `Systems Inventory` row count, or the legacy affected-system row count when
+the canonical heading is absent.
 
 ---
 
