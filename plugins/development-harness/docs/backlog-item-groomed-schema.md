@@ -78,7 +78,7 @@ Do **not** duplicate `title`, `description`, `source`, `added`, `priority`, `typ
 | **Blockers** | Missing prerequisites; RT-ICA BLOCKED reason | When BLOCKED |
 | **Effort** | Small / Medium / High | When estimable |
 | **Issue Classification** | Classification type and rationale | When groomed after Issue #314 |
-| **Root-Cause Analysis** | Evidence chain from `/find-cause` or 6 Sigma measurement | When `issue-classification` is `defect` or `recurring-pattern` |
+| **Root-Cause Analysis** | Evidence chain from `dh:root-cause-tracing-process` or 6 Sigma measurement | When `issue-classification` is `defect` or `recurring-pattern` |
 
 ### Issue Classification Section Format
 

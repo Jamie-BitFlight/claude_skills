@@ -21,7 +21,7 @@ Verify factual claims against primary sources using web lookups. Training data r
 ## When NOT to Use
 
 - Structural findings (broken links, missing files, malformed YAML) — those are filesystem checks, not fact checks
-- Code logic bugs — use `/find-cause` instead
+- Code logic bugs — use `/dh:root-cause-tracing-process` instead
 - Research on new tools — use `/research-curator` instead
 
 ---
@@ -30,7 +30,7 @@ Verify factual claims against primary sources using web lookups. Training data r
 
 <evidence_rules>
 
-Adapted from the `find-cause` evidence chain protocol.
+Adapted from the `root-cause-tracing-process` evidence chain protocol.
 
 **Valid evidence** (one of these MUST support each verdict):
 
@@ -196,7 +196,7 @@ For INCONCLUSIVE claims, add a note to the backlog item describing what addition
 
 ## References
 
-- Evidence chain protocol adapted from [find-cause](./../../skills/find-cause/SKILL.md)
+- Evidence chain protocol adapted from [root-cause-tracing-process](../../../plugins/development-harness/skills/root-cause-tracing-process/SKILL.md)
 - Wave spawning pattern from [research-curator](./../../skills/research-curator/SKILL.md)
 - Anti-hallucination checkpoint from [skill-research-process](./../../skills/skill-research-process/SKILL.md)
 - Chain of Verification from [cove-prompt-design](./../../skills/cove-prompt-design/SKILL.md)

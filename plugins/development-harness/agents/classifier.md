@@ -1,6 +1,6 @@
 ---
 name: classifier
-description: Classifies a backlog item into one of five issue types (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design) and conditionally runs root-cause analysis. Use when grooming a backlog item that requires issue type classification. Reads the item description, walks the classification decision tree, writes an Issue Classification section with type, rationale, analysis method, and scenario target. For defect items, invokes the find-cause skill to build an evidence chain. For recurring-pattern items, searches resolved backlog history for keyword matches to measure frequency. Writes findings to the item via MCP backlog_groom. Runs as a Wave 1 agent in the parallel grooming swarm with no blocking dependencies.
+description: Classifies a backlog item into one of five issue types (procedural, recurring-pattern, defect, missing-guardrail, unbounded-design) and conditionally runs root-cause analysis. Use when grooming a backlog item that requires issue type classification. Reads the item description, walks the classification decision tree, writes an Issue Classification section with type, rationale, analysis method, and scenario target. For defect items, invokes the root-cause-tracing-process skill to build an evidence chain. For recurring-pattern items, searches resolved backlog history for keyword matches to measure frequency. Writes findings to the item via MCP backlog_groom. Runs as a Wave 1 agent in the parallel grooming swarm with no blocking dependencies.
 model: haiku
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, mcp__plugin_dh_sam, mcp__plugin_dh_backlog
 memory: project
@@ -58,16 +58,16 @@ Two classifications require a root-cause analysis artifact. The other three do n
 
 ### If type is `defect`
 
-Invoke the find-cause skill to structure the evidence chain:
+Invoke the root-cause-tracing-process skill to structure the evidence chain:
 
 ```text
-Skill(skill="find-cause", args="<item description verbatim>")
+Skill(skill="dh:root-cause-tracing-process", args="<item description verbatim>")
 ```
 
-The skill returns a 5-whys evidence chain. Capture the chain and the line or condition identified as the root cause. Write the result to the item via a second `backlog_groom` call to `section="Root-Cause Analysis"` with this format:
+The skill returns an evidence chain from symptom to root cause in its Step 5 report. Capture the chain and the line or condition identified as the root cause. Write the result to the item via a second `backlog_groom` call to `section="Root-Cause Analysis"` with this format:
 
 ```text
-**Method**: 5-whys via /find-cause skill
+**Method**: 5-whys via dh:root-cause-tracing-process
 **Evidence chain**:
 1. Observed failure: <what happens>
 2. Why: <proximate cause>
@@ -78,7 +78,7 @@ The skill returns a 5-whys evidence chain. Capture the chain and the line or con
 **Fix locus**: <file:line or condition>
 ```
 
-If `/find-cause` cannot produce a chain (insufficient information), write `**Method**: 5-whys attempted — chain incomplete` and list the information gaps as bullet points. Do not fabricate a chain.
+If `dh:root-cause-tracing-process` cannot produce a chain (insufficient information), write `**Method**: 5-whys attempted — chain incomplete` and list the information gaps as bullet points. Do not fabricate a chain.
 
 ### If type is `recurring-pattern`
 
@@ -129,7 +129,7 @@ The rtica-assessor agent reads the Issue Classification section to gauge how man
 
 ## Behavioral Constraints
 
-- **No fabricated evidence** — if `/find-cause` returns no chain, report it honestly. Do not invent whys.
+- **No fabricated evidence** — if `dh:root-cause-tracing-process` returns no chain, report it honestly. Do not invent whys.
 - **One classification per run** — the decision tree yields exactly one type. Do not write multiple classifications "to cover options".
 - **Do not restate the description** — the rationale explains the decision-tree path, not the item's content. The reader already has the description.
 - **Do not produce acceptance criteria or plan content** — that is the groomer's job. You classify only.
