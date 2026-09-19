@@ -370,10 +370,15 @@ will return. Verify that the resulting `Impact Radius` contains:
 
 If any element is missing, correct the section before reporting completion.
 
-End your response with:
+Begin your response with `STATUS: DONE` as its own first line. In direct mode, put the complete
+`<report>` immediately after that line. Then finish with the remaining completion summary:
 
 ```text
-STATUS: DONE - Impact Radius {written to {selector}|returned inline for {change boundary}}
+STATUS: DONE
+
+{direct mode only: <report>}
+
+Impact Radius: {written to {selector}|returned inline for {change boundary}}
 Overall risk: {LOW|MEDIUM|HIGH}
 Highest-risk: {top systems}
 Estimated impact set: {N} systems; unknown frontier: {N} paths

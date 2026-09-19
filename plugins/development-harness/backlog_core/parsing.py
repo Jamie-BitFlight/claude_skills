@@ -762,7 +762,7 @@ def extract_sections(text: str) -> dict[str, str]:
 
 
 class SectionSpan(BaseModel):
-    """One entry-block-aware ``## ``/``### `` section boundary in a markdown body.
+    """One entry-block-aware Markdown heading section boundary in a body.
 
     Produced by :func:`split_body_sections`, the single structural boundary
     detector shared by every ``operations.py`` consumer that used to
@@ -786,8 +786,8 @@ class SectionSpan(BaseModel):
     content: str
 
 
-def split_body_sections(body: str) -> list[SectionSpan]:
-    """Split *body* into ``## ``/``### ``-delimited sections, entry-block aware.
+def split_body_sections(body: str, *, levels: frozenset[int] = frozenset({2, 3})) -> list[SectionSpan]:
+    """Split *body* at selected Markdown heading levels, entry-block aware.
 
     The shared structural boundary detector for callers that need the same
     flat, mixed-level ``## ``/``### `` contract the deleted
@@ -804,11 +804,12 @@ def split_body_sections(body: str) -> list[SectionSpan]:
 
     Args:
         body: Full issue/item body text.
+        levels: Heading depths to treat as section boundaries. Defaults to H2 and H3.
 
     Returns:
         List of :class:`SectionSpan` in document order.
     """
-    return _section_spans(body, frozenset({_H2_LEVEL, _H3_LEVEL}))
+    return _section_spans(body, levels)
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:

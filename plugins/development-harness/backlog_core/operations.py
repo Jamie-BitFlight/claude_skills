@@ -6026,29 +6026,26 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         Set of system identifiers. Empty set when the body contains no
         inventory rows or legacy paths.
     """
-    lines = impact_radius.splitlines()
-    inventory_heading = next(
+    inventory_section = next(
         (
-            index
-            for index, raw_line in enumerate(lines)
-            if re.fullmatch(r"#{1,6}\s+Systems Inventory\s*", raw_line.strip(), re.IGNORECASE)
+            section
+            for section in split_body_sections(impact_radius, levels=frozenset(range(1, 7)))
+            if section.name.strip().casefold() == "systems inventory"
         ),
         None,
     )
 
-    if inventory_heading is not None:
+    if inventory_section is not None:
         systems: set[str] = set()
-        for raw_line in lines[inventory_heading + 1 :]:
+        for raw_line in inventory_section.content.splitlines():
             line = raw_line.strip()
-            if re.match(r"#{1,6}\s+", line):
-                break
             match = re.match(r"[-*]\s+`([^`]+)`", line)
             if match:
                 systems.add(match.group(1).partition("::")[0].strip())
         return systems
 
     paths: set[str] = set()
-    for raw_line in lines:
+    for raw_line in impact_radius.splitlines():
         # Strip bullet markers (-, *) and surrounding whitespace
         line = raw_line.strip().lstrip("-*").strip()
         # Discard empty lines and pure markdown headers

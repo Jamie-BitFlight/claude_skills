@@ -233,6 +233,31 @@ def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> 
     assert result[0].reason == f"Shared systems: {shared}"
 
 
+@pytest.mark.parametrize("level", range(1, 7))
+def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fences(level: int) -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+
+    def radius(example: str) -> str:
+        return f"""### Fact-Check
+```markdown
+### Systems Inventory
+- `{example}` | Role: example
+```
+{"#" * level} Systems Inventory
+- `{shared}` | Role: runtime system
+### Excluded Candidates and Unknown Frontier
+- None identified.
+"""
+
+    result = analyze_impact_radius_conflicts([
+        _item("A", 1, radius("plugins/example-a.py")),
+        _item("B", 2, radius("plugins/example-b.py")),
+    ])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
 def test_analyze_impact_radius_conflicts_ignores_unknown_frontier_paths() -> None:
     first = """### Systems Inventory
 - `plugins/a.py` | Role: producer

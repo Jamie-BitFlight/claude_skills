@@ -949,6 +949,14 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
     assert count_override.search(regression_mutation) is not None
 
 
+def test_impact_analyst_keeps_the_subagent_status_token_first_and_exact() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+
+    assert "Begin your response with `STATUS: DONE` as its own first line." in prompt
+    assert "STATUS: DONE -" not in prompt
+    assert "End your response with:" not in prompt
+
+
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
     """The CLI command reference and the MCP connection check live under ``dh-cli-usage``, and
     nowhere else still names either by its old name or old path, and dh-cli-usage links both.
