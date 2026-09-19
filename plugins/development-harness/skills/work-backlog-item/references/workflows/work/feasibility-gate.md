@@ -36,8 +36,8 @@ flowchart TD
     Compare -->|"No — annotations remain current"| C3Decision
     C3Decision{"estimated_impact_count?"}
     C3Decision -->|"0 to 10 systems"| C4
-    C3Decision -->|"11 to 20 systems"| RiskWarn["WARN: high blast radius — proceed with warning logged"]
-    C3Decision -->|"Over 20 systems"| FBlock3(["BLOCKED: blast radius exceeds safe threshold<br>Over 20 affected systems requires human confirmation"])
+    C3Decision -->|"11 to 20 systems"| RiskWarn["WARN: large impact set — proceed with warning logged"]
+    C3Decision -->|"Over 20 systems"| FBlock3(["BLOCKED: coordination threshold exceeded<br>Over 20 affected systems requires human confirmation"])
     RiskWarn --> C4
 
     C4{"Criterion 4 — Prior attempt check<br>Does item body contain 'tried', 'previous attempt', or 'failed'?<br>Does Systems Inventory (or Resources fallback) list exactly 1 affected file AND Effort lists 4 or more tasks?"}
@@ -56,6 +56,8 @@ flowchart TD
 - Do not count categorized views, evidence, excluded candidates, or unknown-frontier entries.
 - `pattern_count` is only the lexical-staleness baseline for its own row; it never replaces or
   increments `estimated_impact_count`.
+- The 10-system and 20-system thresholds are coordination-policy signals. They do not determine a
+  system's risk level; use the Impact Radius risk assessment for that judgment.
 
 **Criterion 4 — observable thresholds:**
 

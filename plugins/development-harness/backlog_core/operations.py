@@ -6042,7 +6042,7 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
             line = raw_line.strip()
             if re.match(r"#{1,6}\s+", line):
                 break
-            match = re.match(r"[-*]\s+`([^`]+)`(?:\s*\||\s*$)", line)
+            match = re.match(r"[-*]\s+`([^`]+)`", line)
             if match:
                 systems.add(match.group(1).partition("::")[0].strip())
         return systems
@@ -6102,12 +6102,23 @@ def _collect_items_with_paths(items: list[ImpactRadiusItem]) -> tuple[list[str],
     return titles, path_sets
 
 
+def _overlapping_systems(first: set[str], second: set[str]) -> set[str]:
+    overlap = first & second
+    overlap.update(
+        ancestor for ancestor in first if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in second)
+    )
+    overlap.update(
+        ancestor for ancestor in second if any(system.startswith(f"{ancestor.rstrip('/')}/") for system in first)
+    )
+    return overlap
+
+
 def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list[ConflictGroup]:
-    """Run union-find over path_sets and return ConflictGroup models.
+    """Run union-find over system identifier sets and return ConflictGroup models.
 
     Args:
         titles: Item title per index (parallel to path_sets).
-        path_sets: Parsed file-path sets per index.
+        path_sets: Parsed system identifier sets per index.
 
     Returns:
         List of ConflictGroup models for connected components with two or more
@@ -6116,10 +6127,10 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
     n = len(titles)
     uf = _UnionFind(n)
 
-    # Union pairs sharing at least one file path
+    # Union pairs with overlapping systems
     for i in range(n):
         for j in range(i + 1, n):
-            if path_sets[i] & path_sets[j]:
+            if _overlapping_systems(path_sets[i], path_sets[j]):
                 uf.union(i, j)
 
     # Collect connected components
@@ -6127,11 +6138,11 @@ def _build_conflict_groups(titles: list[str], path_sets: list[set[str]]) -> list
     for i in range(n):
         components[uf.find(i)].append(i)
 
-    # Gather shared paths per group root
+    # Gather overlapping systems per group root
     group_shared: dict[int, set[str]] = defaultdict(set)
     for i in range(n):
         for j in range(i + 1, n):
-            overlap = path_sets[i] & path_sets[j]
+            overlap = _overlapping_systems(path_sets[i], path_sets[j])
             if overlap and uf.find(i) == uf.find(j):
                 group_shared[uf.find(i)].update(overlap)
 

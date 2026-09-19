@@ -919,11 +919,14 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
         "Never use the count as evidence that a system is affected or unaffected",
         "Never calculate risk from the count",
         "In direct mode, return `<report>` inline and do not call `backlog_groom`",
+        "checked-out branch, HEAD, refs, index, and worktree",
+        "Run probes inline without creating temporary files",
         "Use a stable conflict identifier in the leading backticks",
     )
 
     missing = [contract for contract in required_contracts if contract not in prompt]
     assert not missing, f"impact-analyst lost semantic impact-analysis contracts: {missing}"
+    assert re.search(r"Unknown:.*\| Owner:.*\| Closure:", prompt)
 
     feasibility_gate = (
         SKILLS_DIR / "work-backlog-item" / "references" / "workflows" / "work" / "feasibility-gate.md"
