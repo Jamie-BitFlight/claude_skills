@@ -225,19 +225,30 @@ def normalize_import_to_package(import_name: str) -> str:
 
 
 def is_part_of_package(file_path: Path) -> bool:
-    """Check if file is part of an installed package.
+    """Check if the file is a module inside an importable package.
 
-    Searches parent directories for setup.py or pyproject.toml.
+    A file belongs to a package only when its own directory holds an
+    `__init__.py`. Searching parent directories for `setup.py` or
+    `pyproject.toml` alone is not enough: every file in a repository with a root
+    `pyproject.toml` satisfies that, which makes Rule 2 swallow every standalone
+    script in the tree.
 
     Args:
         file_path: Path to file to check
 
     Returns:
-        True if file is part of a package, False otherwise
+        True if file is a module of an importable package, False otherwise
     """
     current = file_path.resolve().parent
-    root = Path("/")
+    if not (current / "__init__.py").exists():
+        return False
 
+    # Walk out of the package to the directory that contains its top level.
+    while (current / "__init__.py").exists() and current != current.parent:
+        current = current.parent
+
+    # That top level belongs to a distribution when some ancestor declares one.
+    root = Path("/")
     while current != root:
         if (current / "setup.py").exists() or (current / "pyproject.toml").exists():
             return True
@@ -389,7 +400,7 @@ def determine_applicable_rule(file_path: Path, content: str) -> tuple[int, str, 
     # Gather file characteristics
     is_exec = is_executable(file_path)
     is_in_package = is_part_of_package(file_path)
-    _has_pep723, pep723_deps = extract_pep723_dependencies(content)
+    has_pep723, pep723_deps = extract_pep723_dependencies(content)
     imports = extract_imports(content)
     stdlib = get_stdlib_modules()
 
@@ -409,6 +420,12 @@ def determine_applicable_rule(file_path: Path, content: str) -> tuple[int, str, 
     rule4 = evaluate_rule_4(is_exec)
 
     evaluations = [rule1, rule2, rule3, rule4]
+
+    # A file carrying PEP 723 inline metadata is a standalone script by
+    # definition: uv resolves its dependencies from that block, not from the
+    # surrounding package. Rule 3 therefore outranks Rule 2 for such a file.
+    if has_pep723 and rule3.is_applicable:
+        return 3, rule3.reason, evaluations
 
     # Determine which rule applies (priority order: 2, 3, 1, 4)
     # Rule 2 takes precedence over Rule 1 and 3 if file is in package
