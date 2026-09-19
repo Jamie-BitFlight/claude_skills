@@ -133,6 +133,43 @@ def test_dispatch_conflicts_reads_canonical_systems_inventory(mocker: MockerFixt
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("body_shape", ["legacy_nested", "section_wrapped"])
+def test_dispatch_conflicts_reads_rendered_impact_radius_shapes(body_shape: str, mocker: MockerFixture) -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    if body_shape == "legacy_nested":
+        radius = f"## Groomed (2026-09-20)\n\n### Impact Radius\n\n- {shared}\n\n### Fact-Check\n\nVerified."
+    else:
+        radius = "\n".join([
+            "## Impact Radius",
+            "",
+            "<div><sub>2026-09-20</sub></div>",
+            "",
+            "## Impact Radius",
+            "",
+            "### Systems Inventory",
+            f"- `{shared}` | Role: producer",
+            "",
+            "## Fact-Check",
+            "Verified.",
+        ])
+    github_backend = mocker.Mock()
+    github_backend.get_github.return_value = mocker.Mock(full_name="owner/repo")
+    github_backend.sync_issues_graphql.return_value = [
+        {"id": f"issue-{number}", "title": title, "number": number, "body": "Human-owned body"}
+        for number, title in enumerate(("A", "B"), start=1)
+    ]
+    github_backend.resolve_issue_body.side_effect = [radius, radius]
+    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+
+    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+
+    assert result["count"] == 1
+    assert result["conflict_groups"][0]["items"] == ["A", "B"]
+    assert result["conflict_groups"][0]["reason"] == f"Shared systems: {shared}"
+
+
+@pytest.mark.unit
 def test_dispatch_conflicts_fails_closed_when_authoritative_body_is_unavailable(mocker: MockerFixture) -> None:
     github_backend = mocker.Mock()
     github_backend.get_github.return_value = mocker.Mock(full_name="owner/repo")

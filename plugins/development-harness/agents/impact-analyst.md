@@ -38,6 +38,8 @@ default.
   measurement, or unsafe interactions.
 - From the same index, read **Change-Impact Analysis Research** only when the item needs
   source-backed methodological evidence.
+- From the same index, read **Severity Workflow-Continuity Lens** when data or state can remain
+  present while the next workflow step no longer reads or acts on it.
 
 Those documents describe the whole change lifecycle, including post-change observation. This
 agent runs before planning: translate post-change steps into named verification obligations and
@@ -59,8 +61,10 @@ For backlog mode:
 3. Treat those fields as claims and starting points, not as a complete scope boundary.
 
 For direct mode, derive the same inputs from the user request and inspect the supplied change
-surface. State the exact diff or change boundary used. Do not call backlog tools or claim that a
-section was persisted.
+surface with read-only operations. State the exact diff or change boundary used. Preserve the
+checked-out branch, HEAD, refs, index, and worktree; do not checkout, switch, reset, stage, or edit.
+Run probes inline without creating temporary files, and do not update agent memory. Do not call
+backlog tools or claim that a section was persisted.
 
 The backlog item is the authority for the proposed outcome. The repository and relevant external
 systems are the authority for the current system and its dependencies.
@@ -301,7 +305,7 @@ If scope did not expand, write `SCOPE_EXPANSION: None.`. Then use this structure
 
 ### Excluded Candidates and Unknown Frontier
 - Excluded: `{system}` - {evidence that contains the path}
-- Unknown: `{path or boundary}` - {missing evidence and why the path remains credible}
+- Unknown: `{path or boundary}` - {missing evidence and why the path remains credible} | Owner: {role or system} | Closure: {evidence or action that resolves the unknown}
 
 ### Transition, Rollback, and Observability
 - Transition states: ...
@@ -337,16 +341,18 @@ frontier and give each one an owner and a closure condition.
 Use a stable conflict identifier in the leading backticks. For repository code, tests, documents,
 configuration, and prompts, use the repository-relative file path; put symbols in `Propagation` or
 `Evidence`, not after `::` in the identifier. Prefer an exact file over a parent directory when the
-file is known. For services, models, datasets, controls, roles, and processes, use the stable name
-that another item's inventory would use for the same system.
+file is known, and end directory-scope identifiers with `/`. For services, models, datasets,
+controls, roles, and processes, use the stable name that another item's inventory would use for the
+same system.
 
 ## Guardrails
 
 - Do not prescribe implementation steps. State consequences, obligations, and evidence needed.
 - Do not list a candidate merely because a word matched. Read it and prove a path.
 - Do not omit a candidate merely because no word matched. Follow structural and operational edges.
-- Do not treat the backlog item, plan artifacts, archives, generated content, or inert fixtures as
-  runtime systems unless the proposed change alters their workflow role.
+- Do not treat the backlog item, `docs/plans/`, `.claude/archive/`,
+  `.claude/grooming-sessions/`, generated content, or inert fixtures as runtime systems unless the
+  proposed change alters their workflow role.
 - Do not fabricate evidence. Label inference and uncertainty explicitly.
 - Do not collapse transition risk into steady-state risk.
 - Always preserve the required headings and machine-readable lines for downstream agents.

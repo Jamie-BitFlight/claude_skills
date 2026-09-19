@@ -365,7 +365,8 @@ The compact rule I would leave with the group is:
 
 > Trace from the proposed delta to outcomes through the real system, make uncertainty visible, demand evidence proportional to consequence, constrain exposure, and continue the analysis until operational results confirm or revise the prediction.
 
-The supporting primary-source research and evidence table are in [change-impact-analysis-research.md](/Users/jamienelson/change-impact-analysis-research.md).
+The supporting primary-source research and evidence table are in
+[change-impact-analysis-research.md](./change-impact-analysis-research.md).
 
 Research basis: official standards bodies, government engineering guidance, original research, and first-party engineering publications. Examples and the unified process are my synthesis. No direct quotations were used.
 

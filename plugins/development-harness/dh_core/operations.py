@@ -1569,6 +1569,19 @@ def dispatch_create_plan(
     }
 
 
+def _extract_impact_radius_section(body: str) -> str:
+    headings = list(
+        re.finditer(r"^(#{2,3})[ \t]+Impact[ \t]+Radius[ \t]*:?[ \t]*\r?$", body, re.IGNORECASE | re.MULTILINE)
+    )
+    if not headings:
+        return ""
+    heading = headings[-1]
+    level = len(heading.group(1))
+    remainder = body[heading.end() :]
+    boundary = re.search(rf"^#{{2,{level}}}[ \t]+", remainder, re.MULTILINE)
+    return remainder[: boundary.start() if boundary else None].strip()
+
+
 def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     """Analyze Impact Radius conflicts for items in a milestone.
 
@@ -1591,7 +1604,6 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     except (BacklogError, GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
-    ir_re = re.compile(r"^##(?!#)\s+Impact\s+Radius\b(.*?)(?=^##(?!#)\s+|\Z)", re.IGNORECASE | re.DOTALL | re.MULTILINE)
     items: list[ImpactRadiusItem] = []
     for issue in issue_nodes:
         try:
@@ -1601,8 +1613,7 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
                 "error": f"Could not resolve authoritative body for issue #{issue['number']}: {exc}",
                 "milestone_number": milestone_number,
             }
-        match = ir_re.search(body)
-        impact_radius = match.group(1).strip() if match else ""
+        impact_radius = _extract_impact_radius_section(body)
         items.append({"title": issue["title"], "issue": issue["number"], "impact_radius": impact_radius})
 
     conflict_groups = analyze_impact_radius_conflicts(items)

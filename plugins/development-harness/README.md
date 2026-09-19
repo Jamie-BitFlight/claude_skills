@@ -383,7 +383,7 @@ The harness ships specialist agents invoked automatically during pipeline stages
 - `ecosystem-researcher` — Researches external dependencies, libraries, and ecosystem context
 - `alignment-analyst` — Compares implementation against design intent during grooming
 - `fact-checker` — Verifies item claims against primary sources
-- `impact-analyst` — Assesses blast radius and affected systems for backlog items
+- `impact-analyst` — Traces causal, system-wide effects and verification obligations before planning
 - `classifier` — Classifies and routes items
 
 **Verification:**
