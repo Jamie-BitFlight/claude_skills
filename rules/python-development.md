@@ -6,24 +6,6 @@
 - **Plugins ship zipped, outside this repo** — no source-tree `uv.lock` is consulted at runtime.
 - **Root dev-dependencies mirror the script blocks**, solely so `ty`, `ruff`, and the IDE/LSP (which don't read PEP 723) can resolve imports while editing here — tooling convenience, not the runtime or distribution path. See `[dependency-groups] dev` in [`pyproject.toml`](pyproject.toml).
 
-### Root dependency declarations
-
-Every dependency declared in [`pyproject.toml`](pyproject.toml) is a development dependency.
-
-- **`[project].dependencies` is empty and stays empty.** This repository declares no
-  `[build-system]`, and nothing builds, installs or imports it as a package, so `uv` treats it as a
-  virtual project. There is no runtime here for a runtime dependency to serve.
-- **A development dependency is either imported or invoked**, and the two groups record which.
-  `dev` holds everything repository code imports, whether the importer is a package module or a PEP
-  723 script. `tools` holds executables and pytest plugins that nothing imports. `dev` pulls `tools`
-  in with `include-group`, so `uv sync` installs both. Put a new dependency in the group that
-  matches how it is consumed.
-- **A tool supplied by its own caller needs no declaration.** `uv run --with <tool>`, `uvx <tool>`,
-  and a prek hook pinning its own `repo:`/`rev:` each resolve the tool independently.
-- **Verify with the auditor.** `uv run scripts/audit_dependencies.py` classifies every declared
-  dependency by the evidence found for it and exits non-zero on one with no evidence. The
-  `audit-dependencies` prek hook runs it whenever `pyproject.toml` changes.
-
 ### Adding a new plugin MCP server
 
 1. Declare dependencies in the script's PEP 723 frontmatter (runtime source of truth).
