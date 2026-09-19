@@ -91,7 +91,7 @@ async def _fetch_all(urls: list[str], limit: int) -> list[str]:
 ## PEP 723 Shebang
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["typer>=0.21", "rich>=13.0"]

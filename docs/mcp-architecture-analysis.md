@@ -194,7 +194,7 @@ These plugins primarily provide knowledge (skills) rather than runtime tooling. 
 Based on `agentskill-kaizen/mcp/server.py`, the standard pattern:
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11,<3.14"
 # dependencies = [

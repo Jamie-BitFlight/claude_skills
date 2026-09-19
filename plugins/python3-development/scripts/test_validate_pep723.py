@@ -1,0 +1,108 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "typer>=0.27.0",
+#   "pytest>=9.1.1",
+# ]
+#
+# [tool.ty.environment]
+# extra-paths = ["."]
+# ///
+"""Tests for validate_pep723.py rule selection.
+
+Covers the two conditions that decide between Rule 2 (package module) and
+Rule 3 (standalone PEP 723 script).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from validate_pep723 import UV_SHEBANG, determine_applicable_rule, is_part_of_package
+
+RULE_PACKAGE_EXECUTABLE = 2
+RULE_UV_SCRIPT = 3
+
+SCRIPT_BODY = f"""{UV_SHEBANG}
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx>=0.28.1"]
+# ///
+import httpx
+"""
+
+
+@pytest.fixture
+def distribution(tmp_path: Path) -> Path:
+    """Create a project root that declares a distribution.
+
+    Args:
+        tmp_path: Per-test temporary directory.
+
+    Returns:
+        The project root path.
+    """
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n')
+    return tmp_path
+
+
+def write_script(path: Path) -> Path:
+    """Write an executable PEP 723 script with an external dependency.
+
+    Args:
+        path: Destination file path.
+
+    Returns:
+        The path written.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SCRIPT_BODY, encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def test_script_beside_pyproject_is_not_part_of_a_package(distribution: Path) -> None:
+    """A loose script is not a package module just because an ancestor declares a distribution."""
+    script = write_script(distribution / "scripts" / "tool.py")
+    assert is_part_of_package(script) is False
+
+
+def test_module_with_init_is_part_of_a_package(distribution: Path) -> None:
+    """A module inside an __init__.py directory of a distribution is a package module."""
+    package = distribution / "demo"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    module = write_script(package / "cli.py")
+    assert is_part_of_package(module) is True
+
+
+def test_standalone_script_selects_the_uv_rule(distribution: Path) -> None:
+    """A standalone PEP 723 script with external imports selects Rule 3, not Rule 2."""
+    script = write_script(distribution / "scripts" / "tool.py")
+    rule, _reason, _evaluations = determine_applicable_rule(script, script.read_text())
+    assert rule == RULE_UV_SCRIPT
+
+
+def test_pep723_metadata_outranks_package_membership(distribution: Path) -> None:
+    """PEP 723 metadata wins over package membership, because uv resolves from the block."""
+    package = distribution / "demo"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    script = write_script(package / "tool.py")
+    rule, _reason, _evaluations = determine_applicable_rule(script, script.read_text())
+    assert rule == RULE_UV_SCRIPT
+
+
+def test_package_module_without_pep723_selects_the_package_rule(distribution: Path) -> None:
+    """An executable package module carrying no PEP 723 block stays on Rule 2."""
+    package = distribution / "demo"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    module = package / "cli.py"
+    module.write_text("#!/usr/bin/env python3\nimport httpx\n")
+    module.chmod(0o755)
+    rule, _reason, _evaluations = determine_applicable_rule(module, module.read_text())
+    assert rule == RULE_PACKAGE_EXECUTABLE

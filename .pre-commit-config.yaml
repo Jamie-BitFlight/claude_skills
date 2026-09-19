@@ -184,6 +184,15 @@ repos:
         # not a symlink) and a token-count FYI (informational, not pass/fail). No real coverage.
         files: ^(plugins|\.claude)/.*(SKILL\.md|agents/.*\.md|commands/.*\.md|plugin\.json)$
 
+      - id: audit-dependencies
+        name: Audit declared dependencies for evidence of use
+        # Runs only when pyproject.toml changes: it greps every text surface and
+        # queries `uv tree`, which is too slow for every commit.
+        entry: uv run -q scripts/audit_dependencies.py
+        language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false
+
       - id: check-compat-annotations
         name: Check COMPAT annotation completeness
         entry: uv run -q scripts/check_compat_annotations.py
@@ -196,7 +205,9 @@ repos:
         language: system
         types: [python]
         pass_filenames: true
-        exclude: 'plugins/development-harness/skills/implementation-manager/.*|examples/solid-review-ab/corpus/.*'
+        # Asset templates import hatchling, which this repository does not depend on.
+        # Keep this list in step with [tool.ty.src] exclude in pyproject.toml.
+        exclude: 'plugins/development-harness/skills/implementation-manager/.*|examples/solid-review-ab/corpus/.*|plugins/.*/assets/(hatch_build|version)\.py'
 
       - id: fix-research-formatting
         name: Fix MD031 and trailing whitespace in research entries
