@@ -14,9 +14,12 @@ skill's Technique 1 and 2 forms; `rules/skill-substitution.md`.
 
 **Warrant**: canary-tested in this repo on 2026-08-06, run twice, once with the plugin fully
 reloaded, against a no-variable control line. Record:
-`.claude/agent-memory/python-engineering-python-cli-architect/project_claude_plugin_root_bang_exec_vs_later_bash.md`
-(repo-local; the same result is summarised in `rules/skill-substitution.md` and in
-`skills/shared-content-references/references/verification.md`). Vendor documentation, as read on
+`skills/shared-content-references/references/verification.md` step 1, summarised in
+`rules/skill-substitution.md`. Re-measured 2026-09-20: invoking
+`/plugin-creator:shared-content-references` rendered `${CLAUDE_PLUGIN_ROOT}` and
+`${CLAUDE_SKILL_DIR}` as absolute paths in its `SKILL.md` body, and a `Read` of
+`skills/hooks-guide/references/common-schema.md:128` in the same session returned
+`${CLAUDE_PLUGIN_ROOT}` literally. Vendor documentation, as read on
 2026-09-06 and recorded in `rules/skill-substitution.md`: `code.claude.com/docs/en/skills` lists the
 variables under "Available string substitutions" and scopes substitution to the skill's markdown
 content and `allowed-tools`; `code.claude.com/docs/en/plugins-reference` says "anywhere the

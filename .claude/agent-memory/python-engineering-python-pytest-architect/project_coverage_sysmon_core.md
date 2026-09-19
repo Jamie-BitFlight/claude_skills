@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Root `pyproject.toml` sets `[tool.coverage.run] core = "sysmon"` (Python 3.13). CI's `test-python` job runs plain `uv run -q --locked pytest`, with no `fail_under` and no upload.
+Root `pyproject.toml` sets `[tool.coverage.run] core = "sysmon"` (Python 3.13). Nothing gates on the coverage report: CI's `test-python` job runs plain `uv run -q --locked pytest`, with no `fail_under` and no upload.
 
 On Python 3.13 with coverage 7.15.2, sysmon cannot do branch coverage, plugin file tracers, or dynamic contexts. Branch coverage or dynamic contexts make coverage warn `no-sysmon` and fall back to ctrace; a plugin file tracer only gets a warning that sysmon does not support it.
 To add a plugin file tracer, remove `core = "sysmon"` in the same change.

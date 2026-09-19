@@ -13,7 +13,7 @@ NON_RETRYABLE (auth 401/404, 403 without `Retry-After`, `BackendUnavailableError
 `ValueError`, non-network `OSError`) → `SyncStatus.OFFLINE` at once. RETRYABLE (429, 403 with
 `Retry-After`, 5xx, network/timeout exceptions, generic `BacklogError`) → backoff, and after
 `MAX_RETRIES` → `SyncStatus.ERROR`. So network failures end in ERROR, after the retries run out.
-`backlog_core/ARCHITECTURE.md` leaves this state machine out; grep it before citing it.
+Cite `sync_engine.py` and `sync_state.py` for this state machine; `backlog_core/ARCHITECTURE.md` leaves it out.
 
 **Per-call cache fallback** — `_provider_online()` in `backends/github_content_migration.py`,
 which is what ARCHITECTURE.md's storage and `file_cache.py` sections describe.

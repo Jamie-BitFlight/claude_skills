@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Use timing as the liveness oracle:
+In a process-tree-kill regression test, use timing as the liveness oracle:
 
 - Launch the runner with `subprocess.run(..., capture_output=True)`. Every descendant inherits the
   pipe fds, so `communicate()` blocks until the last surviving descendant exits.

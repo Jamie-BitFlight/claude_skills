@@ -20,5 +20,3 @@ Example: `research/knowledge-explorer.py` `fetch_github_metadata`.
 `socket.getaddrinfo` resolves to a per-`AddressFamily`
 Literal-keyed union; the annotated wrapper `_guarded_getaddrinfo` in
 `plugins/development-harness/conftest.py` has the exact type to copy.
-`plugins/frustration-analyzer/tests/conftest.py`'s `_guarded_getaddrinfo` has no return
-annotation; reuse that type when you add one.
