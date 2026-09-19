@@ -248,8 +248,10 @@ that change depends on.
 **Impact analysis for a change to behavior, interfaces, data or state, models or prompts, controls,
 people, or processes:**
 
-- Load [Impact Analysis Principles](./docs/impact-analysis-principals.md) before estimating blast
-  radius, propagation, transition risk, or operational effects.
+- Load [Impact Analysis Principles](./docs/impact-analysis-principals.md) when explaining the
+  cross-domain method, designing an impact-analysis process, or selecting worked examples.
+- For backlog impact analysis, follow the executable contract in
+  [impact-analyst.md](./agents/impact-analyst.md); it contains the complete pre-change procedure.
 - When the change involves implicit behavior, an external delta, control removal, delayed feedback,
   or unsafe interaction, also load [Impact Analysis Gap
   Supplement](./docs/impact-analysis-gap-supplement.md#integrated-additions).

@@ -25,10 +25,18 @@ CLI's `backlog view` has no `summary` parameter — it always returns full secti
 
 Extract file paths using this priority order:
 
-1. Primary key: `response["sections"]["Impact Radius"]` (display-title key, as written by the impact-analyst swarm agent)
+1. Primary key: `response["sections"]["Impact Radius"]` (display-title key, as written by the
+   impact-analyst swarm agent). Within that section, read only rows under
+   `### Systems Inventory`; take the leading backticked `{system}` value when it is a repository
+   file or directory path.
 2. Fallback key: `response["sections"]["Resources"]` (used by older grooming templates that wrote file lists to a Resources section instead of Impact Radius)
 
-Use a regex to find all path-like tokens (e.g., `\S+\.\w+` patterns or lines beginning with a path segment) in whichever section is found.
+Do not scan the whole Impact Radius for path-like tokens. Paths in evidence, categorized views,
+excluded candidates, and unknown-frontier notes are not authoritative members of the estimated
+impact set. Deduplicate the inventory paths before passing them to git.
+
+For a legacy Impact Radius with no `### Systems Inventory`, extract leading paths only from the
+legacy categorized rows. Use a regex over the entire section only for the `Resources` fallback.
 
 If neither section is present or neither contains file paths:
 skip Phase 1 and Phase 2 — proceed directly to [rt-ica-gate.md](./rt-ica-gate.md) with cached groom content.
