@@ -269,7 +269,10 @@ add what you establish back to it.
   executables and pytest plugins that nothing imports. `dev` pulls the other two in with
   `include-group`, so `uv sync` still installs everything. Put a new dependency in the group that
   matches how it is consumed. `uv run --with <tool>`, `uvx <tool>`, and a prek hook pinning its own
-  `repo:`/`rev:` each supply a tool independently, so none of them justifies a declaration. Run
+  `repo:`/`rev:` each supply a tool independently, so none of them justifies a declaration. A
+  `--active` shebang is the exception: it runs the script against `.venv`, so its inline
+  dependencies must be declared. `rules/script-invocation.md` forbids `--active` for that reason.
+  Run
   `uv run scripts/audit_dependencies.py` to classify every declared dependency by the evidence
   found for it; the `audit-dependencies` prek hook runs it whenever `pyproject.toml` changes.
 - **Public by default**: name new functions and modules without a leading underscore. Early
