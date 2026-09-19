@@ -6,10 +6,10 @@
       "type_source": "groom/swarm.md:## Issue Classification",
       "specific_steps": [
         {
-          "step_label": "Root-Cause Analysis — invoke find-cause",
+          "step_label": "Root-Cause Analysis — invoke root-cause-tracing-process",
           "source_file": "groom/swarm.md:#### Root-Cause Analysis — only for `defect` or `recurring-pattern`",
           "applies": "only-this-type",
-          "evidence": "defect: invoke Skill(skill='find-cause', args='{description}'), write evidence chain to section=\"Root-Cause Analysis\"."
+          "evidence": "defect: invoke Skill(skill='dh:root-cause-tracing-process', args='{description}'), write evidence chain to section=\"Root-Cause Analysis\"."
         },
         {
           "step_label": "Analysis Method: 5-whys",
@@ -18,7 +18,7 @@
           "evidence": "**Analysis Method**: {method} — flowchart labels defect branch '5-whys'"
         }
       ],
-      "path_notes": "find-cause skill is invoked; evidence chain written to Root-Cause Analysis section. Analysis method recorded as 5-whys. All other groom swarm stages (impact-analyst, fact-checker, rtica-assessor, groomer, alignment-analyst) run identically to other types. No attested downstream differentiation in work/plan/implement-feature beyond the groomed Root-Cause Analysis section being present in the item."
+      "path_notes": "root-cause-tracing-process skill is invoked; evidence chain written to Root-Cause Analysis section. Analysis method recorded as 5-whys. All other groom swarm stages (impact-analyst, fact-checker, rtica-assessor, groomer, alignment-analyst) run identically to other types. No attested downstream differentiation in work/plan/implement-feature beyond the groomed Root-Cause Analysis section being present in the item."
     },
     {
       "task_type": "recurring-pattern",
@@ -38,7 +38,7 @@
           "evidence": "flowchart labels recurring-pattern branch '6-sigma'"
         }
       ],
-      "path_notes": "Root-cause analysis runs but uses resolved-backlog frequency search rather than find-cause. Analysis method is 6-sigma. No find-cause invocation. No attested downstream differentiation beyond Root-Cause Analysis section content."
+      "path_notes": "Root-cause analysis runs but uses resolved-backlog frequency search rather than root-cause-tracing-process. Analysis method is 6-sigma. No root-cause-tracing-process invocation. No attested downstream differentiation beyond Root-Cause Analysis section content."
     },
     {
       "task_type": "missing-guardrail",

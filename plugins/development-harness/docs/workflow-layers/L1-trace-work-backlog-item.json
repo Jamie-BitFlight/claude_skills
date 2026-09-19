@@ -753,12 +753,12 @@
       "path": [
         "Q3",
         "defect — 5-whys RCA",
-        "Invoke Skill(skill='find-cause')",
+        "Invoke Skill(skill='dh:root-cause-tracing-process')",
         "Groomer prompt -> finalize.md"
       ],
       "crosses_into_files": ["references/workflows/groom/finalize.md"],
       "terminal_type": "hands_off_to_skill",
-      "terminal_target": "find-cause",
+      "terminal_target": "root-cause-tracing-process",
       "source_file": "skills/work-backlog-item/references/workflows/groom/swarm.md"
     },
     {

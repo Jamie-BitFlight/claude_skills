@@ -56,7 +56,7 @@ Not allowed at creation time:
 
 If the user supplies a possible fix, preserve it as user-provided context or hypothesis, not as a requirement or implementation instruction.
 
-Cause verification is grooming's job (`find-cause`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
+Cause verification is grooming's job (`dh:root-cause-tracing-process`, `dh:fact-checker`), not creation's — an unlabeled causal claim at creation time reaches the groomed item, and eventually the live issue, indistinguishable from a verified fact.
 
 Solutions belong to later stages:
 - grooming may investigate causes, constraints, and candidate directions

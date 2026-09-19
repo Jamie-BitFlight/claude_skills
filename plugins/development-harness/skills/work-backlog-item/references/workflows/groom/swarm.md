@@ -253,7 +253,7 @@ backlog groom \
 
 #### Root-Cause Analysis — only for `defect` or `recurring-pattern`
 
-- `defect`: invoke `Skill(skill='find-cause', args='{description}')`, write evidence chain
+- `defect`: invoke `Skill(skill='dh:root-cause-tracing-process', args='{description}')`, write evidence chain
   to `section="Root-Cause Analysis"`.
 - `recurring-pattern`: search `backlog_list(status='resolved')` for keyword matches, count
   frequency, write measurement + analysis + improvement to `section="Root-Cause Analysis"`.
