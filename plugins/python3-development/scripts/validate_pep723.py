@@ -44,7 +44,7 @@ app = typer.Typer(help="Validate Python shebang compliance using 4-rule decision
 
 # Valid shebang patterns
 PYTHON_SHEBANG = "#!/usr/bin/env python3"
-UV_SHEBANG = "#!/usr/bin/env -S uv --quiet run --active --script"
+UV_SHEBANG = "#!/usr/bin/env -S uv run --quiet --script"
 
 # Regex patterns
 UV_SHEBANG_PATTERN = re.compile(r"^#!/usr/bin/env.* uv .*")
@@ -327,7 +327,7 @@ def evaluate_rule_2(is_exec: bool, is_in_package: bool) -> RuleEvaluation:
 def evaluate_rule_3(is_exec: bool, has_external_deps: bool) -> RuleEvaluation:
     """Evaluate Rule 3: UV shebang for scripts with external dependencies.
 
-    Pattern: #!/usr/bin/env -S uv --quiet run --active --script
+    Pattern: #!/usr/bin/env -S uv run --quiet --script
     Conditions:
         1. File is executable standalone script
         2. Requires external packages
@@ -460,33 +460,24 @@ def diagnose_uv_shebang(shebang: str) -> list[str]:
         return diagnostics
 
     # Check for missing flags
-    if "--quiet" not in shebang:
-        diagnostics.append("Missing --quiet global flag (should come before 'run')")
-    if "--active" not in shebang:
-        diagnostics.append("Missing --active subcommand flag (should come after 'run')")
+    if "--quiet" not in shebang and " -q" not in shebang:
+        diagnostics.append("Missing --quiet flag")
     if "--script" not in shebang:
-        diagnostics.append("Missing --script subcommand flag (should come after 'run')")
+        diagnostics.append("Missing --script subcommand flag (must come after 'run')")
 
-    # Check for incorrect flag positions
-    if "--quiet" in shebang and " run " in shebang:
-        quiet_pos = shebang.index("--quiet")
-        run_pos = shebang.index(" run ")
-        if quiet_pos > run_pos:
-            diagnostics.append("Flag ordering error: --quiet is a global flag and must come BEFORE 'run'")
-
-    if "--active" in shebang and " run " in shebang:
-        active_pos = shebang.index("--active")
-        run_pos = shebang.index(" run ")
-        if active_pos < run_pos:
-            diagnostics.append("Flag ordering error: --active is a subcommand flag and must come AFTER 'run'")
+    # --active runs the script against the project .venv instead of an isolated
+    # environment, which pollutes the shared environment with the script's own
+    # dependencies. See rules/script-invocation.md.
+    if "--active" in shebang:
+        diagnostics.append("Remove --active: it runs the script against the project .venv, not an isolated environment")
 
     # Explain the pattern
     if diagnostics:
         diagnostics.extend((
             "",
-            "Correct pattern: uv [GLOBAL_FLAGS] SUBCOMMAND [SUBCOMMAND_FLAGS]",
-            "Global flags (--quiet) modify uv itself and come before subcommand",
-            "Subcommand flags (--active, --script) modify 'run' and come after it",
+            f"Correct pattern: {UV_SHEBANG}",
+            "--quiet is a global flag and is order-independent",
+            "--script is a subcommand flag and comes after 'run'",
         ))
 
     return diagnostics

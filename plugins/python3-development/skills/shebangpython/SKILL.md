@@ -61,7 +61,7 @@ If no arguments provided:
 
 ### Rule 3: Standalone scripts with external dependencies
 
-**Pattern**: `#!/usr/bin/env -S uv --quiet run --active --script`
+**Pattern**: `#!/usr/bin/env -S uv run --quiet --script`
 
 **Conditions**:
 
@@ -86,18 +86,17 @@ If no arguments provided:
 
 ## UV Shebang Command Structure
 
-The shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
+The shebang: `#!/usr/bin/env -S uv run --quiet --script`
 
 ### Component Breakdown
 
-| Component           | Position                        | Purpose                                                       |
-| ------------------- | ------------------------------- | ------------------------------------------------------------- |
-| `#!/usr/bin/env -S` | Prefix                          | Shebang invoking env with -S flag for multiple arguments      |
-| `uv`                | Command                         | The uv binary on PATH                                         |
-| `--quiet`           | GLOBAL flag (before subcommand) | Suppresses progress output from uv                            |
-| `run`               | Subcommand                      | Executes Python scripts with automatic environment management |
-| `--active`          | run flag (after subcommand)     | Prefer active virtual environment over isolated environment   |
-| `--script`          | run flag (after subcommand)     | Indicates file contains PEP 723 inline script metadata        |
+| Component           | Position    | Purpose                                                       |
+| ------------------- | ----------- | ------------------------------------------------------------- |
+| `#!/usr/bin/env -S` | Prefix      | Shebang invoking env with -S flag for multiple arguments      |
+| `uv`                | Command     | The uv binary on PATH                                         |
+| `run`               | Subcommand  | Executes Python scripts with automatic environment management |
+| `--quiet`           | Global flag | Suppresses progress output from uv                            |
+| `--script`          | run flag    | Indicates file contains PEP 723 inline script metadata        |
 
 ### Command Syntax Pattern
 
@@ -105,22 +104,19 @@ The shebang: `#!/usr/bin/env -S uv --quiet run --active --script`
 uv [GLOBAL_FLAGS] SUBCOMMAND [SUBCOMMAND_FLAGS] [ARGS]
 ```
 
-### Flag Ordering Rule
+### Flag Ordering
 
-Global flags modify the uv binary behavior and MUST appear before the subcommand.
-Subcommand flags modify that specific subcommand's behavior and MUST appear after the subcommand.
-
-**Valid**: `uv --quiet run --active --script`
-**Invalid**: `uv run --quiet --active --script` (--quiet is global flag)
+`--quiet`/`-q` is a global option — `uv --help` and `uv run --help` list it identically, and
+`uv run --quiet --script` / `uv --quiet run --script` are confirmed equivalent at runtime (both
+exit 0, identical output). Either ordering works; use `uv run --quiet --script` as the canonical
+form for consistency.
 
 ### Invalid Variations
 
-The model MUST reject these malformed shebangs:
-
-- `#!/usr/bin/env -S uv run --quiet --active --script` (--quiet in wrong position)
-- `#!/usr/bin/env -S uv --quiet run --script` (missing --active)
-- `#!/usr/bin/env -S uv run --active --script` (missing --quiet)
-- `#!/usr/bin/env -S uv --quiet --active run --script` (--active in wrong position)
+The model MUST reject any shebang carrying `--active` in any position, and any PEP-723-metadata
+file missing `--script`. `--active` makes `uv run` prefer an ambient activated virtual environment
+over the isolated ephemeral one a PEP 723 script is supposed to get, so the script's dependencies
+land in the caller's shared `.venv` instead of a throwaway environment.
 
 ---
 
@@ -164,7 +160,7 @@ For each file, output in this exact order:
 **Before** (invalid - no external dependencies):
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
@@ -232,7 +228,7 @@ from rich.panel import Panel
 **After** (corrected):
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [

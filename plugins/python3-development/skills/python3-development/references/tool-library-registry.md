@@ -1827,7 +1827,7 @@ alternatives:
 **Basic Usage**:
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -3211,7 +3211,7 @@ alternatives:
 ${CLAUDE_PLUGIN_ROOT}/scripts/validate_pep723.py check script.py
 
 # Expected output
-✅ Shebang correct: #!/usr/bin/env -S uv --quiet run --active --script
+✅ Shebang correct: #!/usr/bin/env -S uv run --quiet --script
 ✅ Metadata block found
 ✅ requires-python present: >=3.11
 ✅ All imports have dependencies
@@ -3663,7 +3663,7 @@ graph TD
 ### 13.1 CLI Human-Facing Profile
 
 ```bash
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -3974,7 +3974,7 @@ uv publish                 # Publish to PyPI
 ### 16.1 PEP 723 Script Template
 
 ```python
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
