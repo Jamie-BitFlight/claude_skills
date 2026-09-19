@@ -27,7 +27,6 @@ import dataclasses
 import json
 import logging
 import os
-import re
 import sqlite3
 import sys
 import time
@@ -68,6 +67,7 @@ from backlog_core.models import (
     UnsupportedCapabilityError,
     get_repo_root,
 )
+from backlog_core.parsing import split_body_sections
 from dispatch_schema import Wave
 from github import GithubException
 from pydantic import AliasChoices, BaseModel
@@ -1570,16 +1570,24 @@ def dispatch_create_plan(
 
 
 def _extract_impact_radius_section(body: str) -> str:
-    headings = list(
-        re.finditer(r"^(#{2,3})[ \t]+Impact[ \t]+Radius[ \t]*:?[ \t]*\r?$", body, re.IGNORECASE | re.MULTILINE)
-    )
-    if not headings:
+    def heading_level(start: int) -> int:
+        suffix = body[start:]
+        return len(suffix) - len(suffix.lstrip("#"))
+
+    sections = split_body_sections(body)
+    matches = [
+        (index, section)
+        for index, section in enumerate(sections)
+        if section.name.strip().removesuffix(":").strip().casefold() == "impact radius"
+    ]
+    if not matches:
         return ""
-    heading = headings[-1]
-    level = len(heading.group(1))
-    remainder = body[heading.end() :]
-    boundary = re.search(rf"^#{{2,{level}}}[ \t]+", remainder, re.MULTILINE)
-    return remainder[: boundary.start() if boundary else None].strip()
+    index, section = matches[-1]
+    level = heading_level(section.start)
+    end = next((later.start for later in sections[index + 1 :] if heading_level(later.start) <= level), len(body))
+    heading_end = body.find("\n", section.start, end)
+    content_start = end if heading_end == -1 else heading_end + 1
+    return body[content_start:end].strip()
 
 
 def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
