@@ -266,12 +266,64 @@ def is_part_of_package(file_path: Path) -> bool:
         config = tomllib.loads(pyproject.read_text(encoding="utf-8")) if pyproject.exists() else {}
     except tomllib.TOMLDecodeError:
         config = {}
-    find_config = config.get("tool", {}).get("setuptools", {}).get("packages", {}).get("find", {})
-    if not find_config:
+    packages = config.get("tool", {}).get("setuptools", {}).get("packages", {})
+    if "find" not in packages:
         return False
-    includes = find_config.get("include", [])
-    package_name = ".".join(relative.parent.parts)
-    return not includes or any(fnmatch.fnmatchcase(package_name, pattern) for pattern in includes)
+    return matches_setuptools_find(packages["find"], relative)
+
+
+def string_list(value: object, default: list[str]) -> list[str]:
+    """Read a TOML value as a list of strings, falling back to a default.
+
+    Args:
+        value: The raw TOML value, of unknown shape.
+        default: The value to use when the key is absent or not a list.
+
+    Returns:
+        The list's items as strings, or the default.
+    """
+    return [str(item) for item in value] if isinstance(value, list) else default
+
+
+def matches_setuptools_find(find_config: dict[str, object], relative: Path) -> bool:
+    """Decide whether setuptools package discovery would claim this module.
+
+    Applies the documented defaults for `[tool.setuptools.packages.find]`:
+    `where` is `["."]`, `include` is `["*"]`, `exclude` is empty, and
+    `namespaces` is true — namespace discovery is on by default in
+    `pyproject.toml`, so the absence of `__init__.py` is not disqualifying on
+    its own. The caller has already ruled out a regular package, so
+    `namespaces = false` leaves nothing for discovery to claim.
+
+    Args:
+        find_config: The `[tool.setuptools.packages.find]` table.
+        relative: The module's path relative to the project root.
+
+    Returns:
+        True when discovery would claim the module's directory as a package.
+    """
+    if not find_config.get("namespaces", True):
+        return False
+
+    where = string_list(find_config.get("where"), ["."])
+    includes = string_list(find_config.get("include"), ["*"])
+    excludes = string_list(find_config.get("exclude"), [])
+    parts = relative.parent.parts
+    for root in where:
+        root_parts = () if root in {".", ""} else tuple(Path(root).parts)
+        if parts[: len(root_parts)] != root_parts:
+            continue
+        # Discovery claims packages, never a loose module sitting in the root
+        # it scans — that file has no package name to match against.
+        package_parts = parts[len(root_parts) :]
+        if not package_parts:
+            continue
+        package_name = ".".join(package_parts)
+        if any(fnmatch.fnmatchcase(package_name, pattern) for pattern in excludes):
+            continue
+        if any(fnmatch.fnmatchcase(package_name, pattern) for pattern in includes):
+            return True
+    return False
 
 
 def is_executable(file_path: Path) -> bool:
