@@ -34,7 +34,7 @@ been added yet.
 | `skill-documentation-verification.md` | skill docs are AI-facing, not user-facing |
 | `shared-process-extraction.md` | writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it |
 | `skill-substitution.md` | load-time string substitution gotcha |
-| `uv-run-fallback.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists |
+| `uv-run-required.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists |
 | `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
 | `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes |
 | `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` and the sub-agent contract |

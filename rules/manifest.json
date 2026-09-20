@@ -97,7 +97,7 @@
       "match": "SKILL.md"
     },
     {
-      "file": "uv-run-fallback.md",
+      "file": "uv-run-required.md",
       "match": "**/scripts/**,*.py,.claude/hooks/**"
     },
     {
