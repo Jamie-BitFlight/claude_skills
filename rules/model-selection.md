@@ -30,5 +30,3 @@ Orthogonal to `--model`: a haiku agent doing a boilerplate task should use `low`
 | `max` | Deep reasoning, planning under uncertainty, novel design problems |
 
 **Default (omit `--effort`)**: inherits model default.
-
-**How to pass**: `spawn.py ... spawn --effort {level}` or `dispatch_spawn(effort="{level}")`.

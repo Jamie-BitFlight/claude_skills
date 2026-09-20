@@ -18,7 +18,7 @@ Never write these as agent output instructions:
 
 ## Enforcement
 
-When writing or reviewing an agent file, and when launching one:
+When writing or reviewing an agent file:
 
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence

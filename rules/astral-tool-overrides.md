@@ -24,7 +24,6 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
   --upgrade-package pkg` moves only the lockfile, within the constraint `pyproject.toml` already
   carries, so the vulnerable floor survives and a later resolution can return to it. Confirm the
   result with `uv tree | grep pkg`.
-- **ty per-file relaxation**: see `python-development.md`'s "ty Type Checker Errors" section.
 - **Tool invocation**: always `uv run <tool>` — never bare `ruff`/`ty`/`pytest`, never `uvx <tool>`
   for a tool already in the dev dependency group. Both resolve a different version than the one CI
   gates against. `uvx` is correct only for tools this repo doesn't depend on (e.g.
@@ -35,9 +34,3 @@ Where this repo's policy and Astral's `uv`/`ty`/`ruff` guidance disagree, this r
   `[tool.basedpyright] typeCheckingMode = "off"`) that stops an IDE defaulting to it — see
   `pyproject.toml`. Never add config that *enables* checking with them. Astral's migration tables describe moving *to* ty from mypy/Pyright; this repo
   already made that move.
-- **CI lockfile flags**: every `uv run`/`uv sync` invocation in `.github/workflows/*.yml` passes
-  `--locked` (run) or `--frozen` (sync). Exempt: any `uv run` of a script carrying its own `# /// script` PEP 723 block (with or without an
-  explicit `--script` flag — `uv` auto-detects the block either way; e.g.
-  `.github/workflows/code-quality.yml`'s `uv run plugins/development-harness/scripts/close_test_issues.py`)
-  — it resolves from that block, not the root lockfile. Also exempt: any call that already passes
-  `--no-sync` (skips environment resolution entirely, so neither flag applies).

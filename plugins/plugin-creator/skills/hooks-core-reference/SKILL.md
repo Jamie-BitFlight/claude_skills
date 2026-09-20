@@ -302,6 +302,7 @@ Use in `command` and `args` fields to reference scripts at stable paths:
 | `CLAUDE_CODE_REMOTE` | `"true"` if remote web, absent if local CLI | All hooks |
 | `CLAUDE_ENV_FILE` | Path for persisting env vars into Bash commands | SessionStart, Setup, CwdChanged, FileChanged |
 | `CLAUDE_PLUGIN_ROOT` | Plugin directory (absolute) | Plugin hooks |
+| `CLAUDE_PLUGIN_DIR` | Does not exist — use `CLAUDE_PLUGIN_ROOT` | N/A |
 | `CLAUDE_PLUGIN_DATA` | Plugin persistent data directory | Plugin hooks |
 | `CLAUDE_EFFORT` | Active effort level (`low`/`medium`/`high`/`xhigh`/`max`) | Tool-use context events |
 

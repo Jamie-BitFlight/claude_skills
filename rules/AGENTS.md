@@ -30,14 +30,13 @@ been added yet.
 | `runtime-vs-design-time.md` | runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo | `manifest.json` |
 | `script-invocation.md` | shebang/execute-bit, run scripts directly | `manifest.json` |
 | `silent-failure-prevention.md` | write operations must report what changed | `manifest.json` |
-| `skill-content-optimization.md` | load skill-creator before editing skills | `manifest.json` |
 | `skill-documentation-verification.md` | skill docs are AI-facing, not user-facing | `manifest.json` |
 | `shared-process-extraction.md` | writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it | `manifest.json` |
 | `skill-substitution.md` | load-time string substitution gotcha | `manifest.json` |
 | `uv-run-required.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists | `manifest.json` |
 | `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` | `manifest.json` |
 | `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes | routing line |
-| `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` and the sub-agent contract | routing line + `context-rules-agent.mjs` |
+| `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` | routing line + `context-rules-agent.mjs` |
 | `evidence-action-proportionality.md` | files changed must match evidence gathered | routing line |
 | `fact-verification-first.md` | WebSearch before planning around a named product/version | routing line + `context-rules-prompt.mjs` |
 | `falsification-requirement.md` | every hypothesis test needs a falsification check | routing line |

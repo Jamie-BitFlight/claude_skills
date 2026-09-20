@@ -4,22 +4,6 @@
 
 `plugin.json` is always at `<plugin-root>/.claude-plugin/plugin.json` (or `.cursor-plugin/plugin.json` when developing a Cursor plugin, or both).
 
-## Required Fields
-
-- `name`: kebab-case, required
-
-## Component Path Fields
-
-| Field | Type | Example |
-|-------|------|---------|
-| `commands` | string or array | `"./custom/cmd.md"` or `["./cmd1.md"]` |
-| `agents` | array | `["./agents/agent.md"]` |
-| `skills` | string or array | `"./custom/skills/"` |
-| `hooks` | string or object | `"./hooks.json"` |
-| `mcpServers` | string or object | `"./mcp-config.json"` |
-| `outputStyles` | string or array | `"./styles/"` |
-| `lspServers` | string or object | `"./.lsp.json"` |
-
 ## Path Rules
 
 - All paths must start with `./`

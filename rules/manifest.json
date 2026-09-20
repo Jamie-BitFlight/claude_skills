@@ -85,10 +85,6 @@
       "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
     },
     {
-      "file": "skill-content-optimization.md",
-      "match": "SKILL.md,**/references/*.md"
-    },
-    {
       "file": "skill-documentation-verification.md",
       "match": "SKILL.md,**/references/*.md"
     },

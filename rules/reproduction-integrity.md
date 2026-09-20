@@ -4,9 +4,6 @@ A reproduction must demonstrate the failure in the ACTUAL conditions, not in con
 
 Before any `env -i`, `docker run`, mock, or simulated environment: run the equivalent check in the real environment first.
 
-Wrong order: hypothesize → build synthetic env → confirm → act
-Right order: hypothesize → check real env → if real env matches → reproduce → act
-
 Proof template:
 
 1. "The actual value is: [observed via tool]"

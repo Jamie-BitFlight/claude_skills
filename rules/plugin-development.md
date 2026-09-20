@@ -86,15 +86,6 @@ The stock `agent-marketplace-versioner` hook owns local synchronization. Its sha
 Not part of Claude Code's own plugin schema — see `plugin-creator:claude-plugins-reference-2026`
 for that. This section covers only what's specific to how this repo uses plugins.
 
-A plugin's directory name need not equal its install name: `plugins/development-harness` installs
-as `dh`, `plugins/the-rewrite-room` as `rwr`, `plugins/clang-format` as `clang-format-configuration`.
-
-The plugin-validator hook may silently strip unexpected frontmatter fields (e.g. `name` from skill
-frontmatter) — a field disappearing after commit is validator auto-fix, not a manual edit.
-
-**Skilllint hook**: The pre-commit hook runs `uvx skilllint@latest check --fix` on SKILL.md,
-plugin.json, agent, and command files.
-
 **Cross-plugin documentation convention:**
 
 Plugins commonly ship a `{plugin-name}-meta-docs` skill so other skills can reach the plugin's

@@ -58,17 +58,6 @@ Confirm before rebuilding, replacing a working component, or any architectural c
 
 **Quiesce agents before committing or running a mutating linter** (see `commit-cadence-and-worktrees.md`'s prek stash/restore race) — confirm agents are idle (token count stable across two readings) first.
 
-## Cross-references
-
-- **Mechanism leaks** — read
-  [instruction-hygiene §1–2](plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
-  before writing or reviewing any task prompt, skill, or agent file: what belongs in the prompt
-  versus the executor config, and when a skill narrates itself instead of the reader's task.
-- **Custom agents only; verify their claims** — never use general-purpose agents for workers (they
-  inherit ~100k tokens of tool/skill/MCP descriptions). Treat agent reports as claims, not facts:
-  an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
-  "not found" is often a wrong-directory confabulation — verify against primary source.
-
 ## What belongs in `AGENTS.md`
 
 Every agent reads `AGENTS.md` in full, for every task. It tells the agent where to find what a

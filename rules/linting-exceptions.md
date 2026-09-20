@@ -56,8 +56,6 @@ If none of the above apply:
 
 1. Fix linting smell using `/holistic-linting:holistic-linting` Skill (exact methodology for addressing linting issues)
 2. If unable to fix, document specific blocker
-3. See `astral-tool-overrides.md`'s Suppressions rule — `# noqa` is the only form eligible for a
-   user-approval exception.
 
 ## Rule Codes That MUST Always Be Fixed (never suppress)
 
@@ -80,9 +78,3 @@ Every entry there names specific rule codes for a specific path pattern and (wit
 treated as bugs to fix, not precedent) carries an inline comment stating why — matching one of the
 categories above. New entries must do the same: name the codes, not the whole rule family unless
 every code genuinely applies, and state the reason next to the code, not above the block.
-
-## `--ignore` and `--unsafe-fixes`
-
-The `--ignore` and `--unsafe-fixes` rules are stated once, in `astral-tool-overrides.md`.
-See [`astral-tool-overrides.md`](rules/astral-tool-overrides.md) for why this departs from Astral's own
-`ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.

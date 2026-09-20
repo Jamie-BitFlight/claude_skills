@@ -23,10 +23,6 @@ tracker or a project board, where an agent reading the code may have no access t
 is not merely stale-prone — it can be unresolvable by construction for whoever reads the code next.
 `ARCHITECTURE.md` lives with the code and is always readable by anyone who has the code.
 
-The consequence to watch for: a reader who must replay a chain of decisions and supersessions to
-work out what is currently true is reading the deliberation because nothing else states the outcome.
-That is the failure this rule prevents.
-
 A test that reads an ADR and enforces its criteria is the extreme case — executable code coupled to
 a deliberation document, which cannot then be dismissed without breaking the suite. If a criterion
 is worth enforcing, it belongs in the architecture document or an executable specification, and the

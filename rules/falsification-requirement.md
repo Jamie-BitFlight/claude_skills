@@ -9,12 +9,3 @@ Before acting on a confirmed hypothesis, state:
 - Falsification result: [what you observed]
 
 If you cannot state the falsification test, you have not tested the hypothesis — you have illustrated it.
-
-Example:
-
-```text
-Hypothesis: uv fails because PATH excludes /root/.local/bin
-Confirmation: env -i PATH=/usr/local/bin uv → "not found" ✓
-Falsification: check actual subprocess PATH for /root/.local/bin
-Falsification result: PATH DOES include it → hypothesis REJECTED
-```
