@@ -413,7 +413,7 @@ Rule files outside `rules/` that other harnesses read — not a full rule-file i
 | File | Purpose |
 |------|---------|
 | `.cursor/rules/backlog-before-work.mdc` | Always create backlog items for multi-step work |
-| `.cursor/rules/json-no-pretty-print.mdc` | Compact-JSON rule for agent-facing CLI output |
+| `.cursor/rules/json-no-pretty-print.mdc` | Symlink to `rules/json-no-pretty-print.mdc` — compact JSON on stdout/stderr an agent reads; configuration files are excluded |
 | `.agent/rules/git-commits.md` | Commit message rules (conventional commits, no --no-verify) |
 
 ## PR Review Protocol
