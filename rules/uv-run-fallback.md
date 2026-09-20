@@ -9,9 +9,9 @@ uv run scripts/some_script.py
 uvx skilllint@latest check <path>
 ```
 
-`uv` reads the script's own PEP 723 `# /// script` block (see `rules/python-development.md`) and
-resolves an isolated environment for it at launch — it does not consult `pyproject.toml` or the
-root `uv.lock`. No manual `pip install` or `venv activate` is required.
+`uv run` resolves whatever environment a script needs at launch — from its own PEP 723
+`# /// script` block when it has one (see `rules/python-development.md`), or from the project
+environment otherwise. No manual `pip install` or `venv activate` is required.
 
 ## If `uv run` fails with "uv not found" or "command not found"
 
