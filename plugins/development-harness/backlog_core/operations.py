@@ -6049,7 +6049,8 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         systems: set[str] = set()
         for inventory_section in inventory_sections:
             systems.update(
-                value.partition("::")[0].strip() for value in extract_leading_code_list_items(inventory_section.content)
+                _without_repository_symbol(value)
+                for value in extract_leading_code_list_items(inventory_section.content)
             )
         return systems
 
@@ -6062,8 +6063,8 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
             continue
         backticked = re.match(r"`([^`]+)`", line)
         candidate = backticked.group(1) if backticked else re.split(r"\s+(?:\||-|—)\s+", line, maxsplit=1)[0]
-        candidate = candidate.partition("::")[0].strip()
-        if backticked or (" " not in candidate and ("/" in candidate or re.search(r"\.[A-Za-z0-9_-]+$", candidate))):
+        candidate = _without_repository_symbol(candidate)
+        if backticked or _repository_path(candidate) is not None:
             paths.add(candidate)
     return paths
 
@@ -6118,6 +6119,14 @@ def _repository_path(system: str) -> str | None:
     if system in {"Dockerfile", "Makefile"}:
         return posixpath.normpath(system)
     return None
+
+
+def _without_repository_symbol(system: str) -> str:
+    candidate = system.strip()
+    prefix, separator, _ = candidate.partition("::")
+    if separator and _repository_path(prefix.strip()) is not None:
+        return prefix.strip()
+    return candidate
 
 
 def _path_contains(ancestor: str, descendant: str) -> bool:
