@@ -34,7 +34,4 @@ Then re-run the original command with `uv run`.
 
 **If uv installation is not an option:**
 
-Stop and tell the user. There is no fallback: `pip`, `poetry`, `pipx`, and bare `python` are all
-prohibited substitutes for `uv run` (`astral-tool-overrides.md`'s Package management rule,
-`script-invocation.md`). Report which command needed `uv` and wait for the user to make `uv`
-available; do not install dependencies or run the script by any other means.
+Stop and tell the user which command needed `uv`, then wait for them to make `uv` available.
