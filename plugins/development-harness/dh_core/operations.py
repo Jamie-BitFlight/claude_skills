@@ -27,7 +27,6 @@ import dataclasses
 import json
 import logging
 import os
-import re
 import sqlite3
 import sys
 import time
@@ -68,6 +67,7 @@ from backlog_core.models import (
     UnsupportedCapabilityError,
     get_repo_root,
 )
+from backlog_core.parsing import split_body_sections
 from dispatch_schema import Wave
 from github import GithubException
 from pydantic import AliasChoices, BaseModel
@@ -1569,6 +1569,27 @@ def dispatch_create_plan(
     }
 
 
+def _extract_impact_radius_section(body: str) -> str:
+    def heading_level(start: int) -> int:
+        suffix = body[start:]
+        return len(suffix) - len(suffix.lstrip("#"))
+
+    sections = split_body_sections(body)
+    matches = [
+        (index, section)
+        for index, section in enumerate(sections)
+        if section.plain_name.strip().removesuffix(":").strip().casefold() == "impact radius"
+    ]
+    if not matches:
+        return ""
+    index, section = matches[-1]
+    level = heading_level(section.start)
+    end = next((later.start for later in sections[index + 1 :] if heading_level(later.start) <= level), len(body))
+    heading_end = body.find("\n", section.start, end)
+    content_start = end if heading_end == -1 else heading_end + 1
+    return body[content_start:end].strip()
+
+
 def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     """Analyze Impact Radius conflicts for items in a milestone.
 
@@ -1591,12 +1612,16 @@ def dispatch_conflicts(milestone_number: int, repo: str = "") -> dict[str, Any]:
     except (BacklogError, GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
-    ir_re = re.compile(r"##\s+Impact\s+Radius\b(.*?)(?=\n##|\Z)", re.IGNORECASE | re.DOTALL)
     items: list[ImpactRadiusItem] = []
     for issue in issue_nodes:
-        body = issue["body"] or ""
-        match = ir_re.search(body)
-        impact_radius = match.group(1).strip() if match else ""
+        try:
+            body = github_backend.resolve_issue_body(gh_repo, owner, repo_name, issue)
+        except (BacklogError, ContentConflictError, ContentUnavailableError, GithubException) as exc:
+            return {
+                "error": f"Could not resolve authoritative body for issue #{issue['number']}: {exc}",
+                "milestone_number": milestone_number,
+            }
+        impact_radius = _extract_impact_radius_section(body)
         items.append({"title": issue["title"], "issue": issue["number"], "impact_radius": impact_radius})
 
     conflict_groups = analyze_impact_radius_conflicts(items)

@@ -4369,9 +4369,9 @@ async def dispatch_conflicts(
 ) -> Annotated[dict[str, object], _wire_schema(DispatchConflictsResponse)]:
     """Analyze Impact Radius conflicts for items in a milestone.
 
-    Fetches open issues for the milestone from GitHub, extracts the
-    Impact Radius section from each issue body, then runs conflict analysis
-    to find items that share file paths.
+    Fetches open issues for the milestone from GitHub, resolves each authoritative
+    agent-managed body, extracts its Impact Radius section, then finds items that
+    share canonical system identifiers or legacy paths.
 
     Delegates to ``dh_core.operations.dispatch_conflicts`` — the MCP tool and
     the CLI-facing function share one implementation.

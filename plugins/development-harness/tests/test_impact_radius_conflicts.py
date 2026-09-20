@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
+from backlog_core.entry_blocks import rewrite_section, wrap_entry_with_timestamp
 from backlog_core.operations import ImpactRadiusItem, analyze_impact_radius_conflicts
 from dispatch_schema.core.models import ConflictGroup
 
@@ -123,7 +124,7 @@ def test_analyze_impact_radius_conflicts_reason_contains_sorted_shared_files() -
     # Assert
     assert len(result) == 1
     # Reason must list shared files in sorted order
-    assert result[0].reason == "Shared files: a-file.py, z-file.py"
+    assert result[0].reason == "Shared systems: a-file.py, z-file.py"
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +178,28 @@ def test_analyze_impact_radius_conflicts_bullet_markers_stripped() -> None:
     assert "plugins/foo.py" in result[0].reason
 
 
+@pytest.mark.parametrize("root_file", ["Dockerfile", "Makefile"])
+def test_analyze_impact_radius_conflicts_preserves_backticked_extensionless_root_files(root_file: str) -> None:
+    first = f"- `{root_file}` — build input"
+    second = f"- `{root_file}` — build consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {root_file}"
+
+
+@pytest.mark.parametrize("root_file", ["Dockerfile", "Makefile"])
+def test_analyze_impact_radius_conflicts_preserves_bare_extensionless_root_files(root_file: str) -> None:
+    first = f"- {root_file} — build input"
+    second = f"- {root_file} — build consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {root_file}"
+
+
 def test_analyze_impact_radius_conflicts_markdown_headers_excluded_from_paths() -> None:
     # Arrange: body includes a section header line that must not become a path
     body = "## Impact Radius\n- plugins/baz.py"
@@ -190,6 +213,269 @@ def test_analyze_impact_radius_conflicts_markdown_headers_excluded_from_paths() 
     # Header must not appear in the reason
     assert "##" not in result[0].reason
     assert "plugins/baz.py" in result[0].reason
+
+
+def test_analyze_impact_radius_conflicts_uses_system_from_inventory_row() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    first = f"""### Systems Inventory
+- `{shared}` | Role: producer | Action: CODE_CHANGE | Risk: HIGH
+### Unknown Frontier
+- `plugins/unknown-a.py` | Owner: team-a
+"""
+    second = f"""### Systems Inventory
+- `{shared}` | Role: consumer | Action: VERIFY_COMPATIBLE | Risk: MEDIUM
+### Unknown Frontier
+- `plugins/unknown-b.py` | Owner: team-b
+"""
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_reads_inventory_inside_active_entry_blocks() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    inventory = f"### Systems Inventory\n- `{shared}` | Role: runtime system"
+    first = wrap_entry_with_timestamp(inventory, "2026-09-20T00:00:00Z")
+    second = wrap_entry_with_timestamp(inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_does_not_share_entry_wrapper_markup() -> None:
+    first_inventory = "### Systems Inventory\n- `plugins/a.py` | Role: runtime system"
+    second_inventory = "### Systems Inventory\n- `plugins/b.py` | Role: runtime system"
+    first = wrap_entry_with_timestamp(first_inventory, "2026-09-20T00:00:00Z")
+    second = wrap_entry_with_timestamp(second_inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_keeps_unwrapped_content_beside_entries() -> None:
+    legacy_system = "plugins/legacy.py"
+    legacy_inventory = f"### Systems Inventory\n- `{legacy_system}` | Role: legacy content"
+    current_inventory = "### Systems Inventory\n- `plugins/current.py` | Role: current entry"
+    mixed = f"{legacy_inventory}\n\n{wrap_entry_with_timestamp(current_inventory, '2026-09-20T00:00:00Z')}"
+    second = wrap_entry_with_timestamp(legacy_inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, mixed), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {legacy_system}"
+
+
+def test_analyze_impact_radius_conflicts_ignores_superseded_entry_inventory() -> None:
+    superseded = "### Systems Inventory\n- `plugins/shared.py` | Role: former system"
+    current = "### Systems Inventory\n- `plugins/current-a.py` | Role: runtime system"
+    first = rewrite_section(
+        wrap_entry_with_timestamp(superseded, "2026-09-20T00:00:00Z"),
+        new_content=current,
+        replace=True,
+        reason="impact analysis refreshed",
+    )
+    second = wrap_entry_with_timestamp(superseded, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    first = f"### Systems Inventory\n- `{shared}` — producer connected to dispatch"
+    second = f"### Systems Inventory\n- `{shared}` | Role: consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_ignores_inventory_examples() -> None:
+    def radius(real_system: str) -> str:
+        return f"""### Systems Inventory
+- `{real_system}` | Role: runtime system
+
+1. `plugins/ordered-example.py` | Role: ordered example only
+
+> - `plugins/quoted-example.py` | Role: quoted example only
+
+- Supporting example detail
+  - `plugins/nested-example.py` | Role: nested example only
+
+```markdown
+- `plugins/fenced-example.py` | Role: example only
+```
+
+<!--
+- `plugins/comment-example.py` | Role: example only
+-->
+"""
+
+    result = analyze_impact_radius_conflicts([
+        _item("A", 1, radius("plugins/a.py")),
+        _item("B", 2, radius("plugins/b.py")),
+    ])
+
+    assert result == []
+
+
+@pytest.mark.parametrize("level", range(1, 7))
+@pytest.mark.parametrize("closing", ["", " ##"])
+def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fences(level: int, closing: str) -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+
+    def radius(example: str) -> str:
+        return f"""### Fact-Check
+```markdown
+### Systems Inventory
+- `{example}` | Role: example
+```
+{"#" * level} Systems Inventory{closing}
+- `{shared}` | Role: runtime system
+### Excluded Candidates and Unknown Frontier
+- None identified.
+"""
+
+    result = analyze_impact_radius_conflicts([
+        _item("A", 1, radius("plugins/fenced-example.py")),
+        _item("B", 2, radius("plugins/fenced-example.py")),
+    ])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_ignores_unknown_frontier_paths() -> None:
+    first = """### Systems Inventory
+- `plugins/a.py` | Role: producer
+### Excluded Candidates and Unknown Frontier
+- Unknown: `plugins/shared-unknown.py` - owner must inspect
+"""
+    second = """### Systems Inventory
+- `plugins/b.py` | Role: consumer
+### Excluded Candidates and Unknown Frontier
+- Unknown: `plugins/shared-unknown.py` - owner must inspect
+"""
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_normalizes_symbols_to_owning_system() -> None:
+    first = "### Systems Inventory\n- `plugins/shared.py::first` | Role: producer"
+    second = "### Systems Inventory\n- `plugins/shared.py::second` | Role: consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result[0].reason == "Shared systems: plugins/shared.py"
+
+
+def test_analyze_impact_radius_conflicts_preserves_distinct_namespaced_systems() -> None:
+    first = "### Systems Inventory\n- `AWS::S3::Bucket` | Role: state owner"
+    second = "### Systems Inventory\n- `AWS::Lambda::Function` | Role: consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+@pytest.mark.parametrize("directory", ["./plugins", "plugins/", "plugins/example", "plugins/example/"])
+def test_analyze_impact_radius_conflicts_detects_directory_and_nested_file_overlap(directory: str) -> None:
+    first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
+    second = "### Systems Inventory\n- `plugins/example/nested.py` | Role: file scope"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {directory}"
+
+
+@pytest.mark.parametrize(
+    ("directory", "nested_file"),
+    [
+        ("./plugins/example/", "plugins/example/nested.py"),
+        ("plugins/other/../example/", "plugins/example/nested.py"),
+        ("./", "plugins/example/nested.py"),
+    ],
+)
+def test_analyze_impact_radius_conflicts_normalizes_repository_relative_paths(directory: str, nested_file: str) -> None:
+    first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
+    second = f"### Systems Inventory\n- `{nested_file}` | Role: file scope"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].items == ["A", "B"]
+
+
+@pytest.mark.parametrize(("first_system", "second_system"), [("./", "Dockerfile"), ("./Dockerfile", "Dockerfile")])
+def test_analyze_impact_radius_conflicts_normalizes_extensionless_root_files(
+    first_system: str, second_system: str
+) -> None:
+    first = f"### Systems Inventory\n- `{first_system}` | Role: repository scope"
+    second = f"### Systems Inventory\n- `{second_system}` | Role: root file"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].items == ["A", "B"]
+
+
+def test_analyze_impact_radius_conflicts_does_not_treat_multiword_system_as_root_file() -> None:
+    first = "### Systems Inventory\n- `./` | Role: repository scope"
+    second = "### Systems Inventory\n- `release approval control` | Role: process control"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+@pytest.mark.parametrize("system", ["Redis", "auth"])
+def test_analyze_impact_radius_conflicts_does_not_treat_single_word_system_as_root_file(system: str) -> None:
+    first = "### Systems Inventory\n- `./` | Role: repository scope"
+    second = f"### Systems Inventory\n- `{system}` | Role: logical system"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+@pytest.mark.parametrize(("system", "path"), [("Redis", "Redis/config.yml"), ("auth", "auth/policy.yaml")])
+def test_analyze_impact_radius_conflicts_does_not_infer_single_word_system_as_directory(system: str, path: str) -> None:
+    first = f"### Systems Inventory\n- `{system}` | Role: logical system"
+    second = f"### Systems Inventory\n- `{path}` | Role: repository path"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_detects_shared_non_file_system() -> None:
+    system = "release approval control"
+    first = f"### Systems Inventory\n- `{system}` | Role: process control"
+    second = f"### Systems Inventory\n- `{system}` | Role: human handoff"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {system}"
+
+
+def test_analyze_impact_radius_conflicts_legacy_ignores_shared_status_lines() -> None:
+    first = "SCOPE_EXPANSION: None.\n- plugins/a.py - changed producer"
+    second = "SCOPE_EXPANSION: None.\n- plugins/b.py - changed consumer"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +630,7 @@ def test_analyze_impact_radius_conflicts_reason_format_multiple_shared_files() -
 
     # Assert
     assert len(result) == 1
-    assert result[0].reason == "Shared files: aardvark.py, middle.py, zoo.py"
+    assert result[0].reason == "Shared systems: aardvark.py, middle.py, zoo.py"
 
 
 # ---------------------------------------------------------------------------

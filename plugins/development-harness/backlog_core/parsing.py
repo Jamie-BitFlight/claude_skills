@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 import marko
-from marko.block import Heading
+from marko.block import Heading, List as MarkdownList, ListItem, Paragraph
 from marko.helpers import MarkoExtension
+from marko.inline import CodeSpan
 from pydantic import BaseModel
 from ruamel.yaml import YAML, YAMLError
 
@@ -61,6 +62,7 @@ __all__ = [
     "dump_frontmatter",
     "extract_description_from_issue_body",
     "extract_groomed_section",
+    "extract_leading_code_list_items",
     "extract_normalize_metadata",
     "extract_sections",
     "find_item",
@@ -762,7 +764,7 @@ def extract_sections(text: str) -> dict[str, str]:
 
 
 class SectionSpan(BaseModel):
-    """One entry-block-aware ``## ``/``### `` section boundary in a markdown body.
+    """One entry-block-aware Markdown heading section boundary in a body.
 
     Produced by :func:`split_body_sections`, the single structural boundary
     detector shared by every ``operations.py`` consumer that used to
@@ -771,6 +773,7 @@ class SectionSpan(BaseModel):
 
     Attributes:
         name: Heading text with the ``#`` marker stripped and whitespace trimmed.
+        plain_name: Heading text normalized by the Markdown parser, without source markup.
         start: Char offset of the start of the heading's own source line in
             the original ``body`` string.
         end: Char offset of the next section's ``start`` (or ``len(body)`` for
@@ -781,13 +784,14 @@ class SectionSpan(BaseModel):
     """
 
     name: str
+    plain_name: str
     start: int
     end: int
     content: str
 
 
-def split_body_sections(body: str) -> list[SectionSpan]:
-    """Split *body* into ``## ``/``### ``-delimited sections, entry-block aware.
+def split_body_sections(body: str, *, levels: frozenset[int] = frozenset({2, 3})) -> list[SectionSpan]:
+    """Split *body* at selected Markdown heading levels, entry-block aware.
 
     The shared structural boundary detector for callers that need the same
     flat, mixed-level ``## ``/``### `` contract the deleted
@@ -804,11 +808,41 @@ def split_body_sections(body: str) -> list[SectionSpan]:
 
     Args:
         body: Full issue/item body text.
+        levels: Heading depths to treat as section boundaries. Defaults to H2 and H3.
 
     Returns:
         List of :class:`SectionSpan` in document order.
     """
-    return _section_spans(body, frozenset({_H2_LEVEL, _H3_LEVEL}))
+    return _section_spans(body, levels)
+
+
+def extract_leading_code_list_items(markdown: str) -> list[str]:
+    """Return code-span values that begin direct unordered Markdown list items.
+
+    Only top-level unordered rows form the canonical inventory. Fenced code,
+    HTML comments, ordered lists, blockquotes, and nested examples are excluded
+    by their AST structure without lexical masking.
+
+    Args:
+        markdown: Markdown source containing zero or more lists.
+
+    Returns:
+        Code-span values in document order.
+    """
+    document = marko.parse(markdown)
+    values: list[str] = []
+    for block in document.children:
+        if isinstance(block, MarkdownList) and not block.ordered:
+            for item in block.children:
+                if not isinstance(item, ListItem) or not item.children:
+                    continue
+                first_block = item.children[0]
+                inline_children = getattr(first_block, "children", None)
+                if isinstance(first_block, Paragraph) and isinstance(inline_children, list) and inline_children:
+                    first_inline = inline_children[0]
+                    if isinstance(first_inline, CodeSpan) and isinstance(first_inline.children, str):
+                        values.append(first_inline.children)
+    return values
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:
@@ -1035,8 +1069,8 @@ def _heading_line_start(normalized: str, pos: int) -> int:
     return pos
 
 
-def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str]]:
-    """Return ``(start_offset, heading_text)`` for every heading at *levels*.
+def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str, str]]:
+    """Return source positions, source names, and plain names for headings at *levels*.
 
     Offsets index *body* itself, so a caller may slice the original text with them.
 
@@ -1045,20 +1079,21 @@ def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str
         levels: Heading depths to treat as boundaries.
 
     Returns:
-        Ordered list of ``(start_offset, heading_text)`` tuples.
+        Ordered ``(start_offset, source_name, plain_name)`` tuples.
     """
     masked = _mask_entry_blocks(body)
     doc = _ENTRY_AWARE_MARKDOWN.parse(masked)
     normalized = masked.replace("\r\n", "\n")
     mapping = _original_offsets(masked)
 
-    spans: list[tuple[int, str]] = []
+    spans: list[tuple[int, str, str]] = []
     for child in doc.children:
         if not isinstance(child, Heading) or child.level not in levels:
             continue
         norm_start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
         start = mapping[norm_start] if mapping is not None else norm_start
-        spans.append((start, _heading_name_from_source(body, start) or _extract_heading_text(child)))
+        plain_name = _extract_heading_text(child)
+        spans.append((start, _heading_name_from_source(body, start) or plain_name, plain_name))
     return spans
 
 
@@ -1077,12 +1112,12 @@ def _section_spans(body: str, levels: frozenset[int]) -> list[SectionSpan]:
     """
     heads = _ast_heading_spans(body, levels)
     spans: list[SectionSpan] = []
-    for i, (start, name) in enumerate(heads):
+    for i, (start, name, plain_name) in enumerate(heads):
         end = heads[i + 1][0] if i + 1 < len(heads) else len(body)
         newline = body.find("\n", start)
         content_start = len(body) if newline == -1 else newline + 1
         content = _slice_content(body, min(content_start, end), end)
-        spans.append(SectionSpan(name=name, start=start, end=end, content=content))
+        spans.append(SectionSpan(name=name, plain_name=plain_name, start=start, end=end, content=content))
     return spans
 
 

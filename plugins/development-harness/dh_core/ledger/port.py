@@ -28,8 +28,9 @@ plan is one the content path can open, and a plan the content path holds is one 
 
 ``from-milestone`` takes the milestone's items as :class:`MilestoneItem` values.
 :func:`conflict_groups_for` is the seam that fetches ``dispatch_conflicts`` from GitHub; the
-transition says the conflict group comes from it "else null", so a caller that passes nothing gets
-tasks with no conflict group rather than an error.
+transition says the conflict group comes from it "else null", so an item absent from a successful
+response gets no conflict group. A failed conflict analysis raises instead of silently making every
+item safe to run concurrently.
 """
 
 from __future__ import annotations
@@ -1119,10 +1120,15 @@ def conflict_groups_for(milestone_number: int, items: Sequence[MilestoneItem], r
         repo: The repository, in ``owner/name`` form; the configured one when empty.
 
     Returns:
-        Issue number to conflict group name, empty when the backend could not answer — the
-        transition's "else null".
+        Issue number to conflict group name. An empty mapping means the analysis completed and
+        found no conflicts.
+
+    Raises:
+        ContentUnavailableError: When conflict analysis could not produce an authoritative result.
     """
     answer = dispatch_conflicts(milestone_number, repo)
+    if error := answer.get("error"):
+        raise ContentUnavailableError(str(error))
     issues_by_title: dict[str, list[int]] = {}
     for item in items:
         issues_by_title.setdefault(item.title, []).append(item.issue)

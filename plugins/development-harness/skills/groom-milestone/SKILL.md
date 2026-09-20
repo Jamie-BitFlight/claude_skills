@@ -60,11 +60,11 @@ flowchart TD
     GroomUserQ -->|"Skip items"| DepAnalysis
     GroomUserQ -->|"Abort"| Abort(["ABORT — user decision"])
 
-    DepAnalysis["Step 5: Dependency Analysis<br>Action: Read Impact Radius from each groomed item.<br>Compare file lists across all items to find overlaps.<br>Output: dependency graph — which items<br>touch overlapping files/modules"]
+    DepAnalysis["Step 5: Dependency Analysis<br>Action: Run dispatch_conflicts for the milestone.<br>It compares canonical Systems Inventory identifiers<br>with legacy flat-list fallback.<br>Output: dependency graph — which items<br>touch overlapping systems"]
 
-    DepAnalysis --> ConflictGroup["Step 6: Conflict Grouping<br>Action: Items with file overlap form a conflict group.<br>Items in the same conflict group MUST execute sequentially.<br>Items in different groups or with no overlap execute in parallel.<br>Output: conflict groups list"]
+    DepAnalysis --> ConflictGroup["Step 6: Conflict Grouping<br>Action: Items with system overlap form a conflict group.<br>Items in the same conflict group MUST execute sequentially.<br>Items in different groups or with no overlap execute in parallel.<br>Output: conflict groups list"]
 
-    ConflictGroup --> SplitCheck{"Step 7: Split Assessment<br>Any single item spanning multiple<br>independent plugins or repo areas?<br>Observable: item's Impact Radius<br>lists files in 2+ unrelated directories"}
+    ConflictGroup --> SplitCheck{"Step 7: Split Assessment<br>Any single item spanning multiple<br>independent plugins or repo areas?<br>Observable: file-valued Systems Inventory rows<br>span 2+ unrelated directories"}
 
     SplitCheck -->|"Splittable items found"| ProposeSplit["Step 7a: Propose Splits<br>Action: Present split recommendations<br>to user with rationale per item<br>Output: user decision per split"]
     SplitCheck -->|"No splits needed"| Prioritize
@@ -93,6 +93,8 @@ flowchart TD
 The backlog MCP server exposes these dispatch tools used at plan-write time:
 
 - `dispatch_create_plan(milestone_number, plan, overwrite, validate, issue)` — Step 9: validates and persists the dispatch plan atomically; `plan` is a typed DispatchPlan object; use overwrite=True when re-grooming a stale plan
+- `dispatch_conflicts(milestone_number)` — Steps 5-6: reads each Impact Radius and groups items
+  that share canonical Systems Inventory identifiers or legacy flat-list entries
 - `dispatch_wave_start(milestone, wave_num, items)` — Step 9: registers each wave in the dispatch state database; call after dispatch_create_plan to initialise wave state
 - `dispatch_wave_status(milestone, wave_num)` — available after `/work-milestone` launches; returns item-level progress with stale PID detection
 
@@ -105,6 +107,8 @@ The DispatchPlan schema is defined in [./references/dispatch-plan-schema.md](./r
 - No items in milestone: report, suggest running `/group-items-to-milestone` first
 - Grooming agent fails for an item: log the error, continue grooming remaining items, report all failures at the end
 - Impact Radius missing after grooming: re-trigger groom for that item once; if still missing, flag as BLOCKED in the report
+- `dispatch_conflicts` returns `error`: report `PROCESS ERROR` with the exact error and stop; never
+  interpret a failed authoritative-body read as zero conflicts
 - Wave ordering or dependency reference errors found during plan build: fix before calling `dispatch_create_plan` and `dispatch_wave_start`
 
 ## Backend Requirements

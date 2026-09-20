@@ -77,12 +77,15 @@ import re
 from pathlib import Path
 
 from agent_profile.parser import _load_frontmatter_from_path, _normalize_skills
+from backlog_core.models import BacklogItem, Entry, Section
+from backlog_core.operations import render_sections_as_body
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = PLUGIN_ROOT / "agents"
 SKILLS_DIR = PLUGIN_ROOT / "skills"
 
 ALIGNMENT_ANALYST = AGENTS_DIR / "alignment-analyst.md"
+IMPACT_ANALYST = AGENTS_DIR / "impact-analyst.md"
 
 # The section body field that ``groom/finalize.md``'s validation gate matches, and the three values
 # it accepts. This is the one part of the report a consumer does read.
@@ -904,8 +907,58 @@ def test_work_ledger_docs_describe_mcp_ledger_routing() -> None:
 
 def test_impact_analyst_description_fits_frontmatter_limit() -> None:
     """Agent discovery metadata must fit the portable 1024-character description limit."""
-    frontmatter, _ = _load_frontmatter_from_path(AGENTS_DIR / "impact-analyst.md")
+    frontmatter, _ = _load_frontmatter_from_path(IMPACT_ANALYST)
     assert len(str(frontmatter["description"])) <= 1024
+
+
+def test_impact_analyst_and_feasibility_gate_share_the_refresh_command() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+    feasibility_gate = (
+        SKILLS_DIR / "work-backlog-item" / "references" / "workflows" / "work" / "feasibility-gate.md"
+    ).read_text(encoding="utf-8")
+    refresh_command = "rg --hidden --glob '!**/.git' --glob '!**/.git/**' -F -l -- \"$pattern\""
+    assert refresh_command in prompt
+    assert refresh_command in feasibility_gate
+    assert "rg -l '<pattern>' | wc -l" not in feasibility_gate
+
+
+def test_impact_analyst_keeps_the_subagent_status_token_first_and_exact() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+    completion_template = re.search(r"```text\n(STATUS: DONE\n.*?\n)```", prompt, flags=re.DOTALL)
+
+    assert completion_template is not None
+    assert completion_template.group(1).splitlines()[0] == "STATUS: DONE"
+
+
+def test_impact_analyst_replaces_the_previous_impact_snapshot() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+
+    expected_write = """mcp__plugin_dh_backlog__backlog_groom(
+    selector=<value>,
+    section="Impact Radius",
+    content=<impact-radius-content>,
+    replace_section=True,
+    reason="impact analysis refreshed"
+)"""
+    assert expected_write in prompt
+
+
+def test_impact_analyst_keeps_backlog_content_heading_free() -> None:
+    content = """SCOPE_EXPANSION: None.
+IMPACT_RADIUS_COMPLETE: Written to item example. Overall risk: LOW. Highest-risk: None.
+
+### Change Frame
+- Baseline: unchanged
+"""
+    item = BacklogItem(
+        title="Impact analysis render contract",
+        sections={"impact_radius": Section(entries=[Entry(id="2026-09-20T00:00:00Z", content=content)])},
+    )
+
+    rendered = render_sections_as_body(item, section="Impact Radius")
+
+    assert len(re.findall(r"^## Impact Radius$", rendered, flags=re.MULTILINE)) == 1
+    assert "### Change Frame" in rendered
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:

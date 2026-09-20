@@ -89,7 +89,7 @@ Items that touch overlapping files must be serialized. They are assigned to the 
 | `reason` | string | Human-readable explanation of the overlap (e.g., shared directory) |
 | `items` | list of strings | Item titles belonging to this group |
 
-Items with `conflict_group: null` have no file overlap with any other item and may execute fully in parallel.
+Items with `conflict_group: null` have no canonical system overlap with any other item and may execute fully in parallel.
 
 ### `waves`
 

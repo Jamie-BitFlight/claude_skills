@@ -62,7 +62,7 @@ import pytest
 from backlog_core.backend_protocol import get_config, set_config
 from backlog_core.backend_types import BacklogConfig, ContentProvider
 from backlog_core.backends.memory_backend import InMemoryBackend
-from backlog_core.models import ContentKind, ContentRef, ContentWrite
+from backlog_core.models import ContentKind, ContentRef, ContentUnavailableError, ContentWrite
 from dh_core import ledger_spec, operations
 from dh_core.ledger import port, store, transitions
 from sam_schema import sam_plan
@@ -767,6 +767,17 @@ def test_conflict_groups_map_member_titles_back_to_issues(monkeypatch: pytest.Mo
     ]
 
     assert port.conflict_groups_for(MILESTONE, items) == {10: "conflict-1", 11: "conflict-1"}
+
+
+def test_conflict_groups_propagates_dispatch_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        port,
+        "dispatch_conflicts",
+        lambda *_: {"error": "Could not resolve authoritative body for issue #10", "milestone_number": MILESTONE},
+    )
+
+    with pytest.raises(ContentUnavailableError, match="Could not resolve authoritative body for issue #10"):
+        port.conflict_groups_for(MILESTONE, [port.MilestoneItem(issue=10, title="first")])
 
 
 # ---------------------------------------------------------------------------
