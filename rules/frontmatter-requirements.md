@@ -5,9 +5,7 @@
 - `name`: Required — lowercase, hyphens, must match directory name, satisfies `^[a-z][a-z0-9-]*$`
 - `description`: Optional (uses first paragraph if omitted)
 - `allowed-tools`: comma-separated for Claude Code — `Read, Grep, Glob`; space-delimited when the
-  skill targets multiple platforms — see
-  [agent-plugin-ecosystem.md](plugins/plugin-creator/skills/skill-creator/references/agent-plugin-ecosystem.md)
-  lines 36-41 for the delimiter split. Never a YAML array; that form conforms to neither delimiter
+  skill targets multiple platforms. Never a YAML array; that form conforms to neither delimiter
   convention. Grants permission for the listed tools while the skill is active; it does not
   restrict which tools are callable (see the `plugin-creator:claude-skills-overview-2026` skill for
   the full schema).

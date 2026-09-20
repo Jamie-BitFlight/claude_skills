@@ -1,6 +1,6 @@
 # Fact Verification First
 
-When a prompt names a specific product, technology, version, or release event, the FIRST action MUST be a `WebSearch` (or `mcp__Ref-local__ref_search_documentation`) call to confirm existence, release status, current version, and specs. No planning, design, or code generation may occur before this verification step completes.
+When a prompt names a specific product, technology, version, or release event, verification MUST be a `WebSearch` (or `mcp__Ref-local__ref_search_documentation`) call to confirm existence, release status, current version, and specs. No planning, design, or code generation may occur before this verification step completes.
 
 ## Trigger Patterns
 

@@ -4,7 +4,7 @@ Not all markdown is documentation. Any file whose prose describes or influences 
 
 ```mermaid
 flowchart TD
-    File([File being reviewed or modified]) --> Q1{"Is it a .md file?"}
+    File([File being reviewed or modified]) --> Q1{"Is it prose?<br>(markdown, text, config with prose fields)"}
     Q1 -->|"No — pure code"| Code["Standard code review<br>Language-specific quality gates"]
     Q1 -->|Yes| Q2{"Does any part describe or influence<br>a process or function?<br>(for AI or human readers)"}
     Q2 -->|"No — pure reference data,<br>changelogs, release notes"| Data["Documentation-only treatment<br>No system impact analysis required<br>SKIP is valid"]

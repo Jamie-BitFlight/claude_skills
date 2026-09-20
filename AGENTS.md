@@ -102,7 +102,7 @@ Before running `git commit`, running `git push`, or spawning a sub-agent that wr
 Before doing substantive work yourself, or dispatching it to a sub-agent, read
 `rules/delegation.md` for when delegation is required, and its fix and output-path pointers.
 
-Before applying the same fix to more than one file, read `rules/evidence-action-proportionality.md`
+Before editing more than one file, read `rules/evidence-action-proportionality.md`
 for the verification-before-scope requirement.
 
 When a prompt names a specific product, technology, version, or release event, read

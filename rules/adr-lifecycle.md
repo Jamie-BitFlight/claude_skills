@@ -13,8 +13,6 @@ rejected. It is planning material. Many repositories never commit one at all.
 
 ## Nothing links to an ADR
 
-Not a document, not a skill, not an agent, not a test, not code, and not `ARCHITECTURE.md` either.
-
 A link makes the ADR load-bearing, and the repository owner must be able to dismiss an ADR that
 turns out not to reflect the goal or the intent without the repository being stuck with it. The
 citation is precisely what removes that right. Where an ADR's substance is needed, write the

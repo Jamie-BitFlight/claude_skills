@@ -56,7 +56,7 @@ Confirm before rebuilding, replacing a working component, or any architectural c
 - **Wrong:** asked "is this where the runner lives?" → rewrote the working Python runner as bash.
 - **Right:** answer the question; if a change seems warranted, propose it and act on confirmation.
 
-**Quiesce agents before committing** (see `commit-cadence-and-worktrees.md`'s prek stash/restore race) — confirm agents are idle (token count stable across two readings) before committing.
+**Quiesce agents before committing or running a mutating linter** (see `commit-cadence-and-worktrees.md`'s prek stash/restore race) — confirm agents are idle (token count stable across two readings) first.
 
 ## Cross-references
 

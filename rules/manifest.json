@@ -18,7 +18,7 @@
     },
     {
       "file": "citation-requirements.md",
-      "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
+      "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
     },
     {
       "file": "data-format-selection.md",

@@ -401,8 +401,6 @@ Run the `init_skill.py` script. This script generates a complete template skill 
 ${CLAUDE_PLUGIN_ROOT}/skills/skill-creator/scripts/init_skill.py <skill-name> --path <output-directory>
 ```
 
-> Run scripts using `uv run` when a shebang invocation fails due to missing dependencies. If `uv` is not available, there is no fallback — stop and tell the user rather than installing dependencies or running the script another way.
-
 **Examples:**
 
 ```bash
@@ -497,7 +495,7 @@ Write the YAML frontmatter. All fields are optional, but `description` is strong
   - **CRITICAL:** Do NOT use YAML multiline indicators (`>-`, `|-`, `|`) - they are broken and will display as ">-" instead of your text. Use single-line quoted strings instead.
   - Example description for a `docx` skill: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 - `argument-hint`: Optional. Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`.
-- `allowed-tools`: Optional. Lists tools Claude can use without asking permission when this skill is active, and restricts Claude to only those tools. Also reduces context size by limiting included tool definitions. When omitted, the skill inherits all tool capabilities from the parent agent. (comma-separated). Example: `Read, Grep, Glob, Bash(npm run:*)`
+- `allowed-tools`: Optional. Lists tools Claude can use without asking permission when this skill is active. Also reduces context size by limiting included tool definitions. When omitted, the skill inherits all tool capabilities from the parent agent. (comma-separated). Example: `Read, Grep, Glob, Bash(npm run:*)`
 - `model`: Optional. Model to use when this skill is active. Options: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `opus`, `sonnet`, `haiku`
 - `context`: Optional. Set to `fork` to run in a forked subagent context for isolation. See advanced patterns below.
 - `agent`: Optional. Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent name.
