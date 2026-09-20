@@ -31,7 +31,7 @@ Run after writing or editing any frontmatter file:
 uvx skilllint@latest check --fix {path}
 ```
 
-The validator auto-adds `name:` derived from the directory name when absent, confirmed for both plugin-bundled and project-level (`.claude/skills/`) SKILL.md files.
+The validator auto-adds `name:` derived from the directory name when absent.
 
 ## `skills:` — Never List an Externally-Sourced Plugin's Skill
 
