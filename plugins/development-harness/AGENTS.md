@@ -243,7 +243,7 @@ that change depends on.
 **Designing new architecture for a feature (any module, before writing an architect spec):**
 
 - Nearest-first: check the touched module's own subtree for an `ARCHITECTURE.md` or `CONTEXT.md` before designing from scratch — extend what exists rather than re-deriving it.
-- ADRs are deliberation, not the design. Read the nearest `ARCHITECTURE.md` for what the system is expected to do, and see [rules/adr-lifecycle.md](../../rules/adr-lifecycle.md) for why nothing links to an ADR. Existing ADR filenames embed an issue number, which is the same staleness this rule removes elsewhere; that convention has not yet been reworked.
+- ADRs are deliberation, not the design. Read the nearest `ARCHITECTURE.md` for what the system is expected to do — the authoring repo's own ADR lifecycle convention is why nothing links to an ADR. Existing ADR filenames embed an issue number, which is the same staleness this rule removes elsewhere; that convention has not yet been reworked.
 
 **Impact analysis for a change to behavior, interfaces, data or state, models or prompts, controls,
 people, or processes:**

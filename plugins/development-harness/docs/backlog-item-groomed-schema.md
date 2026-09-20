@@ -8,7 +8,7 @@
 
 ## Frontmatter (Research-Style)
 
-Aligned with [research/README.md](../../../research/README.md) metadata format:
+Aligned with the authoring repo's `research/` metadata format:
 
 ```yaml
 ---

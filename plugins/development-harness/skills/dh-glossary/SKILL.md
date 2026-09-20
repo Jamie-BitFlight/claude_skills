@@ -29,8 +29,7 @@ ARL-derived — see the S1-S7 entry below. Canonical: load the `plugin-creator:a
 **SAM** (Stateless Agent Methodology) — the 7-stage development pipeline this harness implements
 (S1-S7, below). "Stateless" means each stage's state lives in a provider-owned artifact, never in
 conversation history — a stage reads its input from the prior stage's registered artifact, not
-from what an agent remembers saying earlier. Canonical: `plugins/development-harness/AGENTS.md`
-("SAM 7-Stage Pipeline").
+from what an agent remembers saying earlier. Canonical: load the `dh:dh-meta-docs` skill.
 
 **S1-S7** — the SAM pipeline stage names, in order: **S1 Discovery** (understand the feature,
 codebase, constraints) → **S2 Planning + RT-ICA** (generate a plan, gated by `dh:rt-ica`) → **S3
@@ -39,7 +38,7 @@ Decomposition** (break the plan into executable tasks) → **S5 Execution** (imp
 language-specific specialists) → **S6 Forensic Review** (verify each task against its acceptance
 criteria) → **S7 Final Verification** (certify the feature meets the original requirements). Not
 every stage requires human review — ARL-derived constraint analysis decides when to escalate, not
-a fixed checkpoint per stage. Canonical: `plugins/development-harness/AGENTS.md` ("How It Works").
+a fixed checkpoint per stage. Canonical: load the `dh:dh-meta-docs` skill.
 
 **Impact Radius** — the backlog-item section whose `Systems Inventory` records the estimated impact
 set across software, data, runtime, prompts, controls, people, and processes, with causal paths,
