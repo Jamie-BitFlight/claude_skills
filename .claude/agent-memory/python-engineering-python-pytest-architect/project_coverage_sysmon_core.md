@@ -7,7 +7,7 @@ metadata:
 
 Root `pyproject.toml` sets `[tool.coverage.run] core = "sysmon"`. The core that a run actually uses depends on its interpreter. Locally `.python-version` pins 3.13, so a local run gets sysmon. CI installs 3.11 (`.github/actions/setup-python/action.yml`), and its pytest header reads `platform linux -- Python 3.11.16`, so CI falls back to ctrace. Nothing gates on the coverage report: CI's `test-python` job runs plain `uv run -q --locked pytest`, with no `fail_under` and no upload.
 
-On Python 3.12+ with coverage 7.15.2, sysmon cannot do branch coverage, plugin file tracers, or dynamic contexts. Branch coverage or dynamic contexts make coverage warn `no-sysmon` and fall back to ctrace; a plugin file tracer only gets a warning that sysmon does not support it.
+On Python 3.12 or 3.13 with coverage 7.15.2, sysmon cannot do branch coverage; on any version with `sys.monitoring` it also cannot do plugin file tracers or dynamic contexts (measured: `coverage.env.PYBEHAVIOR.branch_right_left` is `False` on 3.12.13 and 3.13.14, `True` on 3.14.6 — Python 3.14 lifts the branch-coverage limit). Branch coverage or dynamic contexts make coverage warn `no-sysmon` and fall back to ctrace; a plugin file tracer only gets a warning that sysmon does not support it.
 To add a plugin file tracer, remove `core = "sysmon"` in the same change.
 
 Confirm the configured core with `uv run coverage debug config | grep -i core` → `core: sysmon`; the core a run actually uses is whatever survives the fallbacks above, and a `no-sysmon` warning on the run names it.
