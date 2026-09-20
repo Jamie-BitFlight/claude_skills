@@ -40,11 +40,9 @@ as **labels naming a key in that JSON** — not variables passed into the file. 
 **Agent `tools:` frontmatter** requires exact, correctly-cased tool names
 (`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). Separator format is free at parse
 time — comma, comma-without-space, space, and a YAML list all parse identically; write
-comma-and-space regardless. Only that comma-separated string form conforms:
-`frontmatter-requirements.md`'s Agents heading requires it for `tools:`, a separate heading from
-the Skills section's `allowed-tools`, whose space-delimited allowance for a multi-platform skill
-stops at that heading and never reaches `tools:` or a YAML list. Verify every MCP name against the
-running server, not against another agent file.
+comma-and-space regardless. Only that form conforms — see
+[frontmatter-requirements.md](rules/frontmatter-requirements.md) for the delimiter each frontmatter
+field requires. Verify every MCP name against the running server, not against another agent file.
 
 An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
 entry resolves to nothing the subagent refuses to launch, reporting that it "would be spawned with

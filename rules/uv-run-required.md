@@ -1,4 +1,4 @@
-# uv run Is Required — Stop and Ask, Never Substitute Another Interpreter
+# Run Scripts With uv run — Stop and Ask When uv Is Unavailable
 
 ## Standard invocation
 
