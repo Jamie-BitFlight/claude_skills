@@ -71,7 +71,21 @@ Confirm before rebuilding, replacing a working component, or any architectural c
 
 ## What belongs in `AGENTS.md`
 
-Every agent reads `AGENTS.md` in full, for every task, so it carries only what every task needs.
-A convention that applies to one kind of work belongs to a rule file with a `rules/manifest.json`
-glob — the hook then delivers it the moment an agent touches a matching file, and it costs nothing
-on every other task.
+Every agent reads `AGENTS.md` in full, for every task. It tells the agent where to find what a
+task needs, rather than handing over the data itself — a pointer costs its own line; inline data
+costs every task, whether or not the convention applies.
+
+Route a new convention by what selects it:
+
+- **A path-based condition** (a file extension, a directory) — give it a rule file with a
+  `rules/manifest.json` glob. The hook delivers the file the moment an agent touches a matching
+  path, and it costs nothing on every other task.
+- **A runtime-state condition a glob cannot express** (a TTY error, a confirmed hypothesis, a
+  prompt naming a product, a write above a size estimate) — give it a rule file and a trigger line
+  under `AGENTS.md`'s "Situational Rule Triggers" heading, naming the condition and the file to
+  read.
+
+Write it inline only when no branch selects it — the convention applies identically to every task,
+with nothing to route on. That is the same test that decides where any material sits on the
+information hierarchy: inline what every branch needs, push behind a pointer what only some
+branches reach.
