@@ -246,6 +246,19 @@ def test_analyze_impact_radius_conflicts_does_not_share_entry_wrapper_markup() -
     assert result == []
 
 
+def test_analyze_impact_radius_conflicts_keeps_unwrapped_content_beside_entries() -> None:
+    legacy_system = "plugins/legacy.py"
+    legacy_inventory = f"### Systems Inventory\n- `{legacy_system}` | Role: legacy content"
+    current_inventory = "### Systems Inventory\n- `plugins/current.py` | Role: current entry"
+    mixed = f"{legacy_inventory}\n\n{wrap_entry_with_timestamp(current_inventory, '2026-09-20T00:00:00Z')}"
+    second = wrap_entry_with_timestamp(legacy_inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, mixed), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {legacy_system}"
+
+
 def test_analyze_impact_radius_conflicts_ignores_superseded_entry_inventory() -> None:
     superseded = "### Systems Inventory\n- `plugins/shared.py` | Role: former system"
     current = "### Systems Inventory\n- `plugins/current-a.py` | Role: runtime system"

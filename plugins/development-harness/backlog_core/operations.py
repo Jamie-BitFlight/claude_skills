@@ -41,7 +41,14 @@ from .backend_types import (
     SnapshotCompletenessProvider,
     SyncProvider,
 )
-from .entry_blocks import _render_entry_raw, find_entry_spans, parse_entries, resolve_all_entry_ids, resolve_entry_id
+from .entry_blocks import (
+    _render_entry_raw,
+    find_entry_spans,
+    parse_entries,
+    resolve_all_entry_ids,
+    resolve_entry_id,
+    wrap_entry,
+)
 from .models import (
     ITEM_TYPE_ALIASES,
     VALID_CLOSE_REASONS,
@@ -6027,8 +6034,9 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         Set of system identifiers. Empty set when the body contains no
         inventory rows or legacy paths.
     """
+    active_entry_source = wrap_entry(impact_radius)
     active_content = "\n\n".join(
-        entry.content for entry in parse_entries(impact_radius, show="all") if not entry.struck
+        entry.content for entry in parse_entries(active_entry_source, show="all") if not entry.struck
     )
     inventory_sections = [
         section
