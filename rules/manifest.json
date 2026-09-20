@@ -21,10 +21,6 @@
       "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
     },
     {
-      "file": "commit-cadence-and-worktrees.md",
-      "match": "*"
-    },
-    {
       "file": "data-format-selection.md",
       "match": "*.py,*.json,*.md,*.sql"
     },
@@ -33,44 +29,16 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
-      "file": "delegation.md",
-      "match": "*"
-    },
-    {
-      "file": "evidence-action-proportionality.md",
-      "match": "*"
-    },
-    {
       "file": "exception-handling.md",
       "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
-    },
-    {
-      "file": "fact-verification-first.md",
-      "match": "*"
-    },
-    {
-      "file": "falsification-requirement.md",
-      "match": "*"
-    },
-    {
-      "file": "fix-delegation-discipline.md",
-      "match": "*"
     },
     {
       "file": "frontmatter-requirements.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
     },
     {
-      "file": "interactive-terminal-workarounds.md",
-      "match": "*"
-    },
-    {
       "file": "language-conventions.md",
       "match": "**/scripts/**,.claude/hooks/**,*.py"
-    },
-    {
-      "file": "large-file-write-strategy.md",
-      "match": "*"
     },
     {
       "file": "linting-exceptions.md",
@@ -81,20 +49,12 @@
       "match": "*.md"
     },
     {
-      "file": "model-selection.md",
-      "match": "*"
-    },
-    {
       "file": "plugin-development.md",
       "match": "plugins/**/*,.claude-plugin/**/*"
     },
     {
       "file": "plugin-json.md",
       "match": "plugin.json"
-    },
-    {
-      "file": "proactive-fix-gate.md",
-      "match": "*"
     },
     {
       "file": "prose-file-classification.md",
@@ -105,20 +65,12 @@
       "match": "*.py,pyproject.toml,uv.lock"
     },
     {
-      "file": "reproduction-integrity.md",
-      "match": "*"
-    },
-    {
       "file": "review-and-correction-discipline.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,rules/**/*.md,AGENTS.md,CLAUDE.md"
     },
     {
       "file": "runtime-vs-design-time.md",
       "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
-    },
-    {
-      "file": "scratch-directory.md",
-      "match": "*"
     },
     {
       "file": "script-invocation.md",
