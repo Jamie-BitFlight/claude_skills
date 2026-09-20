@@ -77,6 +77,8 @@ import re
 from pathlib import Path
 
 from agent_profile.parser import _load_frontmatter_from_path, _normalize_skills
+from backlog_core.models import BacklogItem, Entry, Section
+from backlog_core.operations import render_sections_as_body
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = PLUGIN_ROOT / "agents"
@@ -972,11 +974,34 @@ def test_impact_analyst_replaces_the_previous_impact_snapshot() -> None:
     expected_write = """mcp__plugin_dh_backlog__backlog_groom(
     selector=<value>,
     section="Impact Radius",
-    content=<report>,
+    content=<impact-radius-content>,
     replace_section=True,
     reason="impact analysis refreshed"
 )"""
     assert expected_write in prompt
+
+
+def test_impact_analyst_keeps_backlog_content_heading_free() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+
+    assert "Do not include `## Impact Radius` in `<impact-radius-content>`" in prompt
+    assert "Direct-mode `<report>` adds `## Impact Radius`" in prompt
+
+    content = """SCOPE_EXPANSION: None.
+IMPACT_RADIUS_COMPLETE: Written to item example. Overall risk: LOW. Highest-risk: None.
+
+### Change Frame
+- Baseline: unchanged
+"""
+    item = BacklogItem(
+        title="Impact analysis render contract",
+        sections={"impact_radius": Section(entries=[Entry(id="2026-09-20T00:00:00Z", content=content)])},
+    )
+
+    rendered = render_sections_as_body(item, section="Impact Radius")
+
+    assert len(re.findall(r"^## Impact Radius$", rendered, flags=re.MULTILINE)) == 1
+    assert "### Change Frame" in rendered
 
 
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:

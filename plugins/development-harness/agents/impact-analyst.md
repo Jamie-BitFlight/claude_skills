@@ -253,7 +253,7 @@ In backlog mode, replace the previous active snapshot with:
 mcp__plugin_dh_backlog__backlog_groom(
     selector=<value>,
     section="Impact Radius",
-    content=<report>,
+    content=<impact-radius-content>,
     replace_section=True,
     reason="impact analysis refreshed"
 )
@@ -262,7 +262,8 @@ mcp__plugin_dh_backlog__backlog_groom(
 Replacing the section strikes the previous snapshot while preserving it as history. Do not append
 a second active report: conflict detection reads every active `Systems Inventory` and would keep
 systems removed by the refreshed analysis in scope.
-In direct mode, return `<report>` inline and do not call `backlog_groom`.
+Do not include `## Impact Radius` in `<impact-radius-content>`: the named section supplies that
+heading when it renders. In direct mode, return `<report>` inline and do not call `backlog_groom`.
 
 Put these machine-readable lines first:
 
@@ -274,8 +275,6 @@ IMPACT_RADIUS_COMPLETE: {Written to item {selector}|Returned inline for {change 
 If scope did not expand, write `SCOPE_EXPANSION: None.`. Then use this structure:
 
 ```markdown
-## Impact Radius
-
 ### Change Frame
 - Baseline: ...
 - Delta: ...
@@ -344,6 +343,13 @@ If scope did not expand, write `SCOPE_EXPANSION: None.`. Then use this structure
 - [ ] Transition, rollback, delayed effects, and observability checked
 - [ ] Replacement or removal preserves the purpose of existing capabilities and controls
 ```
+
+The structure above is `<analysis-body>`. Compose the mode-specific values exactly once:
+
+- `<impact-radius-content>` is the two machine-readable lines, one blank line, then
+  `<analysis-body>`.
+- Direct-mode `<report>` adds `## Impact Radius` between the machine-readable lines and
+  `<analysis-body>`, with one blank line on each side of the heading.
 
 For an empty category, write `None identified.` followed by the evidence boundary, for example:
 `None identified. Checked workflow references and runtime configuration; no propagation path was

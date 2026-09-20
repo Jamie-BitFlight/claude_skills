@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 import marko
-from marko.block import Heading, ListItem, Paragraph
+from marko.block import Heading, List as MarkdownList, ListItem, Paragraph
 from marko.helpers import MarkoExtension
 from marko.inline import CodeSpan
 from pydantic import BaseModel
@@ -817,10 +817,11 @@ def split_body_sections(body: str, *, levels: frozenset[int] = frozenset({2, 3})
 
 
 def extract_leading_code_list_items(markdown: str) -> list[str]:
-    """Return code-span values that begin real Markdown list items.
+    """Return code-span values that begin direct unordered Markdown list items.
 
-    Fenced code and HTML comments contain no ``ListItem`` nodes, so example
-    rows in those blocks are excluded without lexical masking.
+    Only top-level unordered rows form the canonical inventory. Fenced code,
+    HTML comments, ordered lists, blockquotes, and nested examples are excluded
+    by their AST structure without lexical masking.
 
     Args:
         markdown: Markdown source containing zero or more lists.
@@ -830,19 +831,17 @@ def extract_leading_code_list_items(markdown: str) -> list[str]:
     """
     document = marko.parse(markdown)
     values: list[str] = []
-    pending = list(reversed(document.children))
-    while pending:
-        node = pending.pop()
-        children = getattr(node, "children", None)
-        if isinstance(node, ListItem) and isinstance(children, list) and children:
-            first_block = children[0]
-            inline_children = getattr(first_block, "children", None)
-            if isinstance(first_block, Paragraph) and isinstance(inline_children, list) and inline_children:
-                first_inline = inline_children[0]
-                if isinstance(first_inline, CodeSpan) and isinstance(first_inline.children, str):
-                    values.append(first_inline.children)
-        if isinstance(children, list):
-            pending.extend(reversed(children))
+    for block in document.children:
+        if isinstance(block, MarkdownList) and not block.ordered:
+            for item in block.children:
+                if not isinstance(item, ListItem) or not item.children:
+                    continue
+                first_block = item.children[0]
+                inline_children = getattr(first_block, "children", None)
+                if isinstance(first_block, Paragraph) and isinstance(inline_children, list) and inline_children:
+                    first_inline = inline_children[0]
+                    if isinstance(first_inline, CodeSpan) and isinstance(first_inline.children, str):
+                        values.append(first_inline.children)
     return values
 
 

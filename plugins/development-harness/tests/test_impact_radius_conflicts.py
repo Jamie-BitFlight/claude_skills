@@ -291,6 +291,13 @@ def test_analyze_impact_radius_conflicts_ignores_inventory_examples() -> None:
         return f"""### Systems Inventory
 - `{real_system}` | Role: runtime system
 
+1. `plugins/ordered-example.py` | Role: ordered example only
+
+> - `plugins/quoted-example.py` | Role: quoted example only
+
+- Supporting example detail
+  - `plugins/nested-example.py` | Role: nested example only
+
 ```markdown
 - `plugins/fenced-example.py` | Role: example only
 ```
