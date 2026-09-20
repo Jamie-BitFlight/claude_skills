@@ -36,17 +36,16 @@ been added yet.
 | `uv-run-required.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists | `manifest.json` |
 | `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` | `manifest.json` |
 | `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes | routing line |
-| `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` | routing line + `context-rules-agent.mjs` |
-| `fact-verification-first.md` | WebSearch before planning around a named product/version | routing line + `context-rules-prompt.mjs` |
-| `fix-delegation-discipline.md` | reproduction-first cycle for bug-fix delegation | routing line + `context-rules-agent.mjs` |
+| `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` | routing line + `.claude/hooks/context-rules-agent.mjs` |
+| `fact-verification-first.md` | WebSearch before planning around a named product/version | routing line + `.claude/hooks/context-rules-prompt.mjs` |
+| `fix-delegation-discipline.md` | reproduction-first cycle for bug-fix delegation | routing line + `.claude/hooks/context-rules-agent.mjs` |
 | `interactive-terminal-workarounds.md` | PTY providers when a tool needs a TTY | routing line |
 | `large-file-write-strategy.md` | skeleton+edit-fill above 25K chars | routing line |
-| `model-selection.md` | model/effort tier by cognitive requirement | routing line + `context-rules-agent.mjs` |
+| `model-selection.md` | model/effort tier by cognitive requirement | routing line + `.claude/hooks/context-rules-agent.mjs` |
 | `proactive-fix-gate.md` | gate before acting on a self-discovered problem | routing line |
-| `reproduction-integrity.md` | reproduce in the real environment before synthetic ones | routing line |
 | `scratch-directory.md` | `.tmp/scratch/` fallback output convention | routing line |
 
-A `manifest.json` entry means `context-rules.mjs` loads the file when a touched path matches its
+A `manifest.json` entry means `.claude/hooks/context-rules.mjs` loads the file when a touched path matches its
 glob — read the actual pattern in `manifest.json` itself, not restated here. "routing line" means
 the rule carries no `manifest.json` entry; instead, a line under root `AGENTS.md`'s "Situational
 Rule Triggers" section names the file and the condition for reading it. A routing-line rule marked

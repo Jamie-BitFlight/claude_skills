@@ -123,9 +123,6 @@ Before assigning a model or effort tier to a dispatched agent, read `rules/model
 Before fixing any problem discovered during a session that the user did not ask about, read
 `rules/proactive-fix-gate.md` for the required gate.
 
-Before building a synthetic, mocked, or containerized reproduction environment (`env -i`,
-`docker run`, a mock), read `rules/reproduction-integrity.md`.
-
 Before writing agent output with no explicit path given in the task, before creating any new file
 under `.claude/`, or before creating a new file under `docs/` with no existing convention to
 follow, read `rules/scratch-directory.md` for the `.tmp/scratch/` convention, the committed-file
