@@ -168,7 +168,7 @@ Research tool preference for PEP documentation:
 **What it validates**:
 
 - **Stdlib-only scripts**: `#!/usr/bin/env python3` (no PEP 723 needed - nothing to declare)
-- **Scripts with dependencies**: `#!/usr/bin/env -S uv --quiet run --active --script` + PEP 723 metadata declaring those dependencies
+- **Scripts with dependencies**: `#!/usr/bin/env -S uv run --quiet --script` + PEP 723 metadata declaring those dependencies
 - **Package executables**: `#!/usr/bin/env python3` (dependencies via package manager)
 - **Library modules**: No shebang (not directly executable)
 

@@ -17,9 +17,11 @@ It checks PEP 723 compliance, execute bits, and provides auto-fix capabilities.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import os
 import re
 import sys
+import tomllib
 from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
@@ -44,7 +46,7 @@ app = typer.Typer(help="Validate Python shebang compliance using 4-rule decision
 
 # Valid shebang patterns
 PYTHON_SHEBANG = "#!/usr/bin/env python3"
-UV_SHEBANG = "#!/usr/bin/env -S uv --quiet run --active --script"
+UV_SHEBANG = "#!/usr/bin/env -S uv run --quiet --script"
 
 # Regex patterns
 UV_SHEBANG_PATTERN = re.compile(r"^#!/usr/bin/env.* uv .*")
@@ -58,6 +60,7 @@ RULE_NO_SHEBANG = 4
 EXECUTABLE_RULES = {RULE_STDLIB_SCRIPT, RULE_PACKAGE_EXECUTABLE, RULE_UV_SCRIPT}
 
 MAX_SHEBANG_PREVIEW = 40
+MIN_SRC_PACKAGE_PARTS = 3
 
 
 @dataclass
@@ -225,24 +228,98 @@ def normalize_import_to_package(import_name: str) -> str:
 
 
 def is_part_of_package(file_path: Path) -> bool:
-    """Check if file is part of an installed package.
+    """Check if the file is a module inside an importable package.
 
-    Searches parent directories for setup.py or pyproject.toml.
+    Recognize regular packages by `__init__.py`, conventional `src/` layouts,
+    and namespace packages explicitly configured for setuptools discovery.
+    Do not treat every file below a project-level `pyproject.toml` as packaged:
+    that would make Rule 2 swallow standalone scripts in the same repository.
 
     Args:
         file_path: Path to file to check
 
     Returns:
-        True if file is part of a package, False otherwise
+        True if file is a module of an importable package, False otherwise
     """
-    current = file_path.resolve().parent
-    root = Path("/")
+    resolved = file_path.resolve()
+    project_root = next(
+        (
+            parent
+            for parent in resolved.parents
+            if (parent / "setup.py").exists() or (parent / "pyproject.toml").exists()
+        ),
+        None,
+    )
+    if project_root is None:
+        return False
 
-    while current != root:
-        if (current / "setup.py").exists() or (current / "pyproject.toml").exists():
+    package_parents = list(resolved.parents[: resolved.parents.index(project_root)])
+    if any((parent / "__init__.py").exists() for parent in package_parents):
+        return True
+
+    relative = resolved.relative_to(project_root)
+    pyproject = project_root / "pyproject.toml"
+    try:
+        config = tomllib.loads(pyproject.read_text(encoding="utf-8")) if pyproject.exists() else {}
+    except tomllib.TOMLDecodeError:
+        config = {}
+    packages = config.get("tool", {}).get("setuptools", {}).get("packages", {})
+    if "find" not in packages:
+        return len(relative.parts) >= MIN_SRC_PACKAGE_PARTS and relative.parts[0] == "src"
+    return matches_setuptools_find(packages["find"], relative)
+
+
+def string_list(value: object, default: list[str]) -> list[str]:
+    """Read a TOML value as a list of strings, falling back to a default.
+
+    Args:
+        value: The raw TOML value, of unknown shape.
+        default: The value to use when the key is absent or not a list.
+
+    Returns:
+        The list's items as strings, or the default.
+    """
+    return [str(item) for item in value] if isinstance(value, list) else default
+
+
+def matches_setuptools_find(find_config: dict[str, object], relative: Path) -> bool:
+    """Decide whether setuptools package discovery would claim this module.
+
+    Applies the documented defaults for `[tool.setuptools.packages.find]`:
+    `where` is `["."]`, `include` is `["*"]`, `exclude` is empty, and
+    `namespaces` is true — namespace discovery is on by default in
+    `pyproject.toml`, so the absence of `__init__.py` is not disqualifying on
+    its own. The caller has already ruled out a regular package, so
+    `namespaces = false` leaves nothing for discovery to claim.
+
+    Args:
+        find_config: The `[tool.setuptools.packages.find]` table.
+        relative: The module's path relative to the project root.
+
+    Returns:
+        True when discovery would claim the module's directory as a package.
+    """
+    if not find_config.get("namespaces", True):
+        return False
+
+    where = string_list(find_config.get("where"), ["."])
+    includes = string_list(find_config.get("include"), ["*"])
+    excludes = string_list(find_config.get("exclude"), [])
+    parts = relative.parent.parts
+    for root in where:
+        root_parts = () if root in {".", ""} else tuple(Path(root).parts)
+        if parts[: len(root_parts)] != root_parts:
+            continue
+        # Discovery claims packages, never a loose module sitting in the root
+        # it scans — that file has no package name to match against.
+        package_parts = parts[len(root_parts) :]
+        if not package_parts:
+            continue
+        package_name = ".".join(package_parts)
+        if any(fnmatch.fnmatchcase(package_name, pattern) for pattern in excludes):
+            continue
+        if any(fnmatch.fnmatchcase(package_name, pattern) for pattern in includes):
             return True
-        current = current.parent
-
     return False
 
 
@@ -327,7 +404,7 @@ def evaluate_rule_2(is_exec: bool, is_in_package: bool) -> RuleEvaluation:
 def evaluate_rule_3(is_exec: bool, has_external_deps: bool) -> RuleEvaluation:
     """Evaluate Rule 3: UV shebang for scripts with external dependencies.
 
-    Pattern: #!/usr/bin/env -S uv --quiet run --active --script
+    Pattern: #!/usr/bin/env -S uv run --quiet --script
     Conditions:
         1. File is executable standalone script
         2. Requires external packages
@@ -389,7 +466,7 @@ def determine_applicable_rule(file_path: Path, content: str) -> tuple[int, str, 
     # Gather file characteristics
     is_exec = is_executable(file_path)
     is_in_package = is_part_of_package(file_path)
-    _has_pep723, pep723_deps = extract_pep723_dependencies(content)
+    has_pep723, pep723_deps = extract_pep723_dependencies(content)
     imports = extract_imports(content)
     stdlib = get_stdlib_modules()
 
@@ -409,6 +486,12 @@ def determine_applicable_rule(file_path: Path, content: str) -> tuple[int, str, 
     rule4 = evaluate_rule_4(is_exec)
 
     evaluations = [rule1, rule2, rule3, rule4]
+
+    # A file carrying PEP 723 inline metadata is a standalone script by
+    # definition: uv resolves its dependencies from that block, not from the
+    # surrounding package. Rule 3 therefore outranks Rule 2 for such a file.
+    if has_pep723 and rule3.is_applicable:
+        return 3, rule3.reason, evaluations
 
     # Determine which rule applies (priority order: 2, 3, 1, 4)
     # Rule 2 takes precedence over Rule 1 and 3 if file is in package
@@ -460,33 +543,24 @@ def diagnose_uv_shebang(shebang: str) -> list[str]:
         return diagnostics
 
     # Check for missing flags
-    if "--quiet" not in shebang:
-        diagnostics.append("Missing --quiet global flag (should come before 'run')")
-    if "--active" not in shebang:
-        diagnostics.append("Missing --active subcommand flag (should come after 'run')")
+    if "--quiet" not in shebang and " -q" not in shebang:
+        diagnostics.append("Missing --quiet flag")
     if "--script" not in shebang:
-        diagnostics.append("Missing --script subcommand flag (should come after 'run')")
+        diagnostics.append("Missing --script subcommand flag (must come after 'run')")
 
-    # Check for incorrect flag positions
-    if "--quiet" in shebang and " run " in shebang:
-        quiet_pos = shebang.index("--quiet")
-        run_pos = shebang.index(" run ")
-        if quiet_pos > run_pos:
-            diagnostics.append("Flag ordering error: --quiet is a global flag and must come BEFORE 'run'")
-
-    if "--active" in shebang and " run " in shebang:
-        active_pos = shebang.index("--active")
-        run_pos = shebang.index(" run ")
-        if active_pos < run_pos:
-            diagnostics.append("Flag ordering error: --active is a subcommand flag and must come AFTER 'run'")
+    # --active runs the script against the project .venv instead of an isolated
+    # environment, which pollutes the shared environment with the script's own
+    # dependencies. See rules/script-invocation.md.
+    if "--active" in shebang:
+        diagnostics.append("Remove --active: it runs the script against the project .venv, not an isolated environment")
 
     # Explain the pattern
     if diagnostics:
         diagnostics.extend((
             "",
-            "Correct pattern: uv [GLOBAL_FLAGS] SUBCOMMAND [SUBCOMMAND_FLAGS]",
-            "Global flags (--quiet) modify uv itself and come before subcommand",
-            "Subcommand flags (--active, --script) modify 'run' and come after it",
+            f"Correct pattern: {UV_SHEBANG}",
+            "--quiet is a global flag and is order-independent",
+            "--script is a subcommand flag and comes after 'run'",
         ))
 
     return diagnostics

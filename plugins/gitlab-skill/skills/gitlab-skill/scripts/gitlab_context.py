@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv --quiet run --active --script
+#!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["python-gitlab>=4.0.0", "gitpython>=3.1.0"]

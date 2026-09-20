@@ -13,7 +13,8 @@ syntax, migration tables, and general usage (not duplicated here).
 
 - Follow `python-engineering:standards-for-python-development` for shared architecture, typing, testing, and CLI rules.
 - Use `uv add` / `uv sync` / `uv run` for all Python work — never `uv pip install`, `uv venv`, or `source .venv/bin/activate`. A `uv.lock`-managed project with PEP 723 scripts never needs the pip-compatible lane Astral documents.
-- PEP 723 script shebang: `#!/usr/bin/env -S uv run --quiet --script`. Never add `--active` — it breaks PEP 723 isolation by resolving into an ambient `VIRTUAL_ENV` instead of an isolated ephemeral one.
+- Portable PEP 723 script shebang: `#!/usr/bin/env -S uv run --quiet --script`. Omit `--active`
+  unless the script is intentionally coupled to the caller's activated virtual environment.
 - Use text mode (`'r'`/`'w'`) with `tomlkit`, never binary mode (`'rb'`/`'wb'`) — binary mode returns `bytes`, which `tomlkit` cannot parse or write.
 
 ## External Resources (if `astral:uv` isn't installed)

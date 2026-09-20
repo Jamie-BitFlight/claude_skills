@@ -14,7 +14,7 @@ from typing import Any
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
-class BinaryBuildHook(BuildHookInterface[Any]):
+class BinaryBuildHook(BuildHookInterface):
     """Build hook that runs binary compilation scripts before packaging.
 
     This hook checks for the following scripts in order:

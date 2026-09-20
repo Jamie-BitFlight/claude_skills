@@ -68,14 +68,13 @@ If no arguments provided:
 - File is executable standalone script
 - Requires external packages
 
-**Reasoning**: PEP 723 inline metadata declares dependencies, uv installs them automatically.
-Never add `--active`: it makes `uv run` prefer an ambient activated virtual environment over the
-isolated ephemeral one PEP 723 scripts are supposed to get, installing the script's dependencies
-into the caller's shared `.venv` instead of a throwaway environment — empirically verified: a
-probe script declaring a dependency absent from a project venv, run under `--active --script`
-with `VIRTUAL_ENV` set, measurably installed into that venv; with `--active` omitted, the same
-probe resolved into an isolated `uv` cache environment instead, leaving the project venv
-untouched.
+**Reasoning**: PEP 723 inline metadata declares dependencies, uv installs them automatically. For a
+portable standalone script, omit `--active`: it prefers an ambient activated virtual environment
+over the isolated ephemeral one PEP 723 scripts normally get. Use `--active` only when the script
+is intentionally coupled to that pre-activated environment. A probe script declaring a dependency
+absent from a project venv, run under `--active --script` with `VIRTUAL_ENV` set, installed into that
+venv; with `--active` omitted, the same probe resolved into an isolated `uv` cache environment and
+left the project venv untouched.
 
 ### Rule 4: Non-executable files
 

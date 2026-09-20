@@ -277,7 +277,7 @@
 - **Outputs**: Rendered HTML output (stdout) or validation errors from GitLab API
 - **Validated Inputs**: Requires GITLAB_TOKEN. Requires network access to GitLab API.
 - **Migration**: SCRIPT — invoked via Bash by agents that perform GLFM validation. Used by `gitlab-docs-expert`. Referenced in `plugins/the-rewrite-room/skills/the-rewrite-room/registry/validators.yaml` with `--file` flag (verified correct per audit Check 2).
-- **Notes**: Shebang: `#!/usr/bin/env -S uv --quiet run --active --script`. PEP 723 deps: `httpx>=0.28.1`. Source verified lines 1-40.
+- **Notes**: Shebang: `#!/usr/bin/env -S uv run --quiet --script`. PEP 723 deps: `httpx>=0.28.1`. Source verified lines 1-40.
 
 ---
 
