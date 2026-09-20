@@ -99,8 +99,8 @@ in `docs/cross-harness-smoke-tests.md`.
 Before running `git commit`, running `git push`, or spawning a sub-agent that writes files, read
 `rules/commit-cadence-and-worktrees.md` for commit scoping, push batching, and worktree isolation.
 
-Before dispatching a task to a sub-agent, read `rules/delegation.md` for the delegation, fix, and
-output-path pointers.
+Before doing substantive work yourself, or dispatching it to a sub-agent, read
+`rules/delegation.md` for when delegation is required, and its fix and output-path pointers.
 
 Before applying the same fix to more than one file, read `rules/evidence-action-proportionality.md`
 for the verification-before-scope requirement.
