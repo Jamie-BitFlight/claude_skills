@@ -134,10 +134,10 @@ Those tests are visible in the starting versions of
 | Default `pytest -q tests/research_backlinks` | Wall | User CPU | Max RSS | Selected tests |
 |---|---:|---:|---:|---:|
 | old code and routing | 101.45 s | 153.35 s | 315,736,064 B | 148 |
-| new fixture-only default | 7.68 s | 9.28 s | 92,815,360 B | 94 |
+| new fixture-only default | 7.15 s | 9.41 s | 91,979,776 B | 96 |
 
-This observation reduced wall time by approximately 92.4%, user CPU by approximately 93.9%, and
-maximum resident set size by approximately 70.6%. Test counts are intentionally not equal: 62
+This observation reduced wall time by approximately 93.0%, user CPU by approximately 93.9%, and
+maximum resident set size by approximately 70.9%. Test counts are intentionally not equal: 62
 synthetic subprocess tests moved to the required integration lane, and the sole production-vault
 test moved to the explicit advisory lane. The behavior was reallocated, not deleted.
 
@@ -146,24 +146,26 @@ The benchmark command was:
 ```bash
 uv run --script scripts/run_bounded.py --timeout-seconds 600 -- \
   /usr/bin/time -lp uv run --frozen pytest -q \
-  --basetemp=/tmp/research-backlink-final-default-restart tests/research_backlinks
+  --basetemp=/tmp/research-backlink-final-default-workflow tests/research_backlinks
 ```
 
-The original run completed `148 passed in 90.06s`; the final new run completed `94 passed in 5.62s`.
+The original run completed `148 passed in 90.06s`; the final new run completed `96 passed in 5.00s`.
 The difference between pytest's duration and `/usr/bin/time` includes interpreter, xdist, and
 coverage startup/teardown. The final run used a fresh explicit pytest base temporary directory and
 reported no test warning summary.
 
-Final collection evidence was `94/157 tests collected (63 deselected) in 0.99s`. The 63 are the 62
+Final collection evidence was `96/159 tests collected (63 deselected) in 1.15s`. The 63 are the 62
 synthetic integration tests plus the one `research_vault` test. Explicit
 `-m research_vault --collect-only` selected only
 `TestRealVaultScan::test_real_vault_scan_no_exception`. Therefore the default lane performs zero
 production-vault parses; its Marko activity is confined to temporary fixture documents.
 
-After rebasing onto `2776c8d654de81fcb89578919701b40966c4001c`, the bounded repository default
-suite completed with `6581 passed, 54 skipped, 10 xfailed` in 276.00 seconds. The required research
-integration lane completed 62 tests in 26.19 seconds, and the sole advisory corpus test completed
-once in 23.39 seconds.
+After rebasing onto `2776c8d654de81fcb89578919701b40966c4001c`, a bounded repository default suite
+completed with `6581 passed, 54 skipped, 10 xfailed` in 276.00 seconds. The later PR-review fix added
+two fixture-only regressions for retained warnings and advisory workflow routing, then reran every
+affected test rather than the whole repository.
+The final required research integration lane completed 62 tests in 27.34 seconds, and the sole
+advisory corpus test completed once in 25.58 seconds.
 
 ## Runtime Requirements and Invariants
 
@@ -213,9 +215,11 @@ once in 23.39 seconds.
 5. Corrupt, contract-invalid, incompatible, locked, or unwritable cache state warns once. A late
    read failure discards the partial pass and returns one complete uncached scan; an open failure
    starts uncached immediately. Cache failure cannot turn a red semantic result green.
-6. Concurrent readers are allowed. Concurrent cold writers use WAL and insert-if-absent semantics;
+6. Scan-skip diagnostics are emitted only after a pass is retained, so a discarded cached pass and
+   its uncached replacement cannot report the same skip twice.
+7. Concurrent readers are allowed. Concurrent cold writers use WAL and insert-if-absent semantics;
    lock timeout falls back uncached. Marko remains serial within each process.
-7. `--no-cache` is the semantic control. `--cache-path` provides deterministic tests and benchmarks.
+8. `--no-cache` is the semantic control. `--cache-path` provides deterministic tests and benchmarks.
    Supplying both is an argument error.
 
 ### Output and exit behavior
@@ -378,9 +382,10 @@ contract for a later correctness stage; **nightly** belongs only in a copied-cor
 | C06 | corrupt SQLite file | warn and complete uncached | unit | PR |
 | C07 | manifest row count disagrees | warn and complete uncached | unit | PR |
 | C08 | late stored row violates its Pydantic contract after earlier hits | discard partial graph; complete uncached with zero hits/skips | unit | PR |
-| C09 | schema/parser fingerprint changes | miss or disposable rebuild | unit | PR |
-| C10 | two cold processes share one cache | both semantic results correct; no partial rows | bounded integration | next |
-| C11 | database locked/unwritable | bounded wait then uncached equivalence | bounded integration | next |
+| C09 | retained skip precedes a late cache failure | final skip is returned and warned exactly once | unit | PR |
+| C10 | schema/parser fingerprint changes | miss or disposable rebuild | unit | PR |
+| C11 | two cold processes share one cache | both semantic results correct; no partial rows | bounded integration | next |
+| C12 | database locked/unwritable | bounded wait then uncached equivalence | bounded integration | next |
 | F01 | one missing reciprocal | one repair then clean verification | CLI integration | PR |
 | F02 | excluded target | no write, edge remains, non-zero | CLI integration | PR |
 | F03 | second unchanged fix | byte-idempotent, zero repairs | CLI integration | PR |
@@ -396,7 +401,8 @@ contract for a later correctness stage; **nightly** belongs only in a copied-cor
 | T01 | default collection | no direct production-vault reader selected | collect-only/default | PR |
 | T02 | integration collection | synthetic CLI contracts selected and bounded | required CI | PR |
 | T03 | corpus collection | exactly one read-only test selected | advisory CI | PR |
-| T04 | copied corpus fix twice | second run byte-identical | scheduled | nightly |
+| T04 | advisory corpus scan fails | subsequent entry validation still runs through `always()` | workflow fixture | PR |
+| T05 | copied corpus fix twice | second run byte-identical | scheduled | nightly |
 
 ### Performance gates
 
@@ -438,6 +444,8 @@ The lanes are intentionally different:
 - The existing `research-validation` job remains advisory and runs the sole `research_vault` test
   once. Promotion, if ever desired, requires splitting backlink scanning into its own required job;
   making the whole current advisory job required would also promote unrelated corpus-format debt.
+- Entry validation in that job uses `if: ${{ always() }}` so a corpus-scan failure does not suppress
+  the independent entry-format report.
 - Pre-commit remains changed-file entry validation. A whole-vault backlink scan does not belong in
   the commit hook.
 - A copied-corpus mutation/benchmark job is deferred to scheduled or manual CI. It must use one
@@ -455,7 +463,7 @@ The following stages are executable separately. This pull request completes Stag
 - Reuse one serial Marko parser and add exact-content SQLite extraction caching.
 - Emit compact JSON metrics and prove cache invalidation/fallback.
 
-**Complete when:** `C01`-`C09`, `T01`-`T03`, and existing graph/CLI contracts pass; then
+**Complete when:** `C01`-`C10`, `T01`-`T04`, and existing graph/CLI contracts pass; then
 `uv run --frozen pytest -q` passes with the repository's default marker expression, and the
 benchmark evidence above has been regenerated from a fresh temporary cache.
 
@@ -560,7 +568,7 @@ Rollback boundaries are small:
 | `tests/research_backlinks/` | fixtures, cache cases, bounded integration, one corpus test | scenario rows marked `next`/`nightly` |
 | `pyproject.toml` | register and deselect `research_vault` | none |
 | `docs/testing.md` | document all three test lanes | scheduled lane when added |
-| `.github/workflows/code-quality.yml` | required research integration; one advisory corpus scan | separate required backlink job only after promotion decision |
+| `.github/workflows/code-quality.yml` | required research integration; one advisory corpus scan; independent entry validation | separate required backlink job only after promotion decision |
 | `.pre-commit-config.yaml` | no change | no whole-vault hook planned |
 
 The implementation uses only standard-library SQLite and cache-path selection; it adds no package
@@ -588,7 +596,7 @@ Residual risks in the implemented slice:
 ## Delivery Checklist
 
 - [x] Cache unit tests cover hit, exact-byte invalidation, current target state, parse failures,
-  corrupt databases, incomplete row state, and Pydantic-invalid stored rows.
+  corrupt databases, incomplete row state, Pydantic-invalid stored rows, and retained warnings.
 - [x] Default research tests pass from a fresh `--basetemp` and select no `research_vault` test.
 - [x] Required research integration tests pass and every validator subprocess is bounded.
 - [x] `pytest -m research_vault --collect-only` selects exactly one test; the test passes once.

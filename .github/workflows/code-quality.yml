@@ -221,6 +221,7 @@ jobs:
         run: uv run -q --locked pytest -m research_vault -v tests/research_backlinks/test_graph_asymmetry.py --no-cov
 
       - name: Validate research entries
+        if: ${{ always() }}
         run: uv run -q --locked prek run validate-research-entries --all-files
 
   # =============================================================================

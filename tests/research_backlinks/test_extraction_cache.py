@@ -154,6 +154,46 @@ def test_build_graph_when_cached_row_fails_validation_reparses_vault(
     assert "cached extraction row failed validation" in capsys.readouterr().err
 
 
+def test_build_graph_when_late_cache_failure_emits_retained_skip_once(
+    tmp_vault: Path, make_entry: Callable[..., Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    broken = make_entry(
+        "00-broken.md",
+        custom_markdown=(
+            "# Broken\n\n"
+            "## Cross-References\n\n"
+            "| Entry | Category | Relationship |\n"
+            "|-------|----------|--------------|\n"
+            "| beta.md | tools | missing link |\n"
+        ),
+    )
+    early = make_entry("agent-frameworks/alpha.md")
+    target = make_entry("tools/beta.md")
+    source = make_entry("zz/omega.md", cross_refs=[("../tools/beta.md", "tools", "Beta", "uses beta")])
+    cache_path = tmp_path / "backlinks.sqlite3"
+    bl.build_cross_reference_graph(tmp_vault, cache_path=cache_path, quiet=True)
+    connection = sqlite3.connect(cache_path)
+    try:
+        connection.execute("UPDATE extraction_rows SET link_path = ?", (sqlite3.Binary(b"\xff"),))
+        connection.commit()
+    finally:
+        connection.close()
+
+    scan = bl.build_cross_reference_graph(tmp_vault, cache_path=cache_path)
+
+    assert scan.graph == {
+        broken.resolve(): [],
+        early.resolve(): [],
+        target.resolve(): [],
+        source.resolve(): [target.resolve()],
+    }
+    assert [(skip.path, skip.reason) for skip in scan.skips] == [("00-broken.md", "parse")]
+    assert scan.files_parsed == 4
+    assert scan.cache_hits == 0
+    stderr = capsys.readouterr().err
+    assert stderr.count("warning: scan-skipped") == 1
+
+
 def test_build_graph_when_entry_is_not_utf8_records_read_skip(tmp_vault: Path) -> None:
     entry = tmp_vault / "tools" / "invalid.md"
     entry.write_bytes(b"\xff\xfe")

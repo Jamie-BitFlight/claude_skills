@@ -330,30 +330,20 @@ class CachedExtractor:
         self._cache = None
 
 
-def record_scan_skip(
-    skips: list[ScanSkip], relative_file: pathlib.Path, reason: str, message: str, *, quiet: bool
-) -> None:
-    """Record one coverage hole and optionally mirror it to stderr.
+def record_scan_skip(skips: list[ScanSkip], relative_file: pathlib.Path, reason: str, message: str) -> None:
+    """Record one coverage hole for the scan result.
 
     Args:
         skips: Scan result list to append to.
         relative_file: Affected path relative to the vault.
         reason: Scan phase that failed.
         message: Human-readable failure detail.
-        quiet: Suppress stderr when true.
     """
     skips.append(ScanSkip(path=relative_file.as_posix(), reason=reason, detail=message))
-    if not quiet:
-        print(f"warning: scan-skipped, could not {message}", file=sys.stderr)
 
 
 def resolve_targets(
-    source: pathlib.Path,
-    relative_file: pathlib.Path,
-    cross_reference_rows: list[CrossRefRow],
-    skips: list[ScanSkip],
-    *,
-    quiet: bool,
+    source: pathlib.Path, relative_file: pathlib.Path, cross_reference_rows: list[CrossRefRow], skips: list[ScanSkip]
 ) -> list[pathlib.Path]:
     """Resolve currently existing targets for parsed rows.
 
@@ -362,7 +352,6 @@ def resolve_targets(
         relative_file: Source path relative to the vault.
         cross_reference_rows: Parsed Cross-References rows.
         skips: Scan result list for resolution failures.
-        quiet: Suppress stderr when true.
 
     Returns:
         Resolved targets that currently exist.
@@ -372,9 +361,7 @@ def resolve_targets(
         try:
             target = resolve_link_path(source, row.link_path)
         except (OSError, ValueError) as exc:
-            record_scan_skip(
-                skips, relative_file, "resolve", f"resolve {row.link_path!r} in {relative_file}: {exc}", quiet=quiet
-            )
+            record_scan_skip(skips, relative_file, "resolve", f"resolve {row.link_path!r} in {relative_file}: {exc}")
             continue
         if target.exists():
             targets.append(target)
@@ -769,7 +756,7 @@ def build_cross_reference_graph(
                 content = md_file.read_bytes()
                 text = content.decode("utf-8")
             except (OSError, UnicodeDecodeError) as exc:
-                record_scan_skip(skips, rel_file, "read", f"read {rel_file}: {exc}", quiet=quiet)
+                record_scan_skip(skips, rel_file, "read", f"read {rel_file}: {exc}")
                 continue
 
             try:
@@ -777,16 +764,20 @@ def build_cross_reference_graph(
             except ValueError as exc:
                 if extractor.requires_uncached_restart:
                     break
-                record_scan_skip(skips, rel_file, "parse", f"parse {rel_file}: {exc}", quiet=quiet)
+                record_scan_skip(skips, rel_file, "parse", f"parse {rel_file}: {exc}")
                 continue
             if extractor.requires_uncached_restart:
                 break
-            graph[abs_file].extend(resolve_targets(abs_file, rel_file, rows, skips, quiet=quiet))
+            graph[abs_file].extend(resolve_targets(abs_file, rel_file, rows, skips))
     finally:
         extractor.close()
 
     if extractor.requires_uncached_restart:
         return build_cross_reference_graph(vault_root, quiet=quiet, cache_path=None)
+
+    if not quiet:
+        for skip in skips:
+            print(f"warning: scan-skipped, could not {skip.detail}", file=sys.stderr)
 
     return CrossReferenceScan(
         graph=graph, skips=skips, files_parsed=extractor.files_parsed, cache_hits=extractor.cache_hits
