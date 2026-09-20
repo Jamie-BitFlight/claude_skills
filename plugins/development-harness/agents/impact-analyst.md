@@ -247,8 +247,21 @@ Format it at the end of an inventory row:
 
 ## Output contract
 
-In backlog mode, write the section with
-`mcp__plugin_dh_backlog__backlog_groom(selector=<value>, section="Impact Radius", content=<report>)`.
+In backlog mode, replace the previous active snapshot with:
+
+```text
+mcp__plugin_dh_backlog__backlog_groom(
+    selector=<value>,
+    section="Impact Radius",
+    content=<report>,
+    replace_section=True,
+    reason="impact analysis refreshed"
+)
+```
+
+Replacing the section strikes the previous snapshot while preserving it as history. Do not append
+a second active report: conflict detection reads every active `Systems Inventory` and would keep
+systems removed by the refreshed analysis in scope.
 In direct mode, return `<report>` inline and do not call `backlog_groom`.
 
 Put these machine-readable lines first:

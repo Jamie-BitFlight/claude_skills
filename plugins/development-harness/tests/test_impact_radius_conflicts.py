@@ -286,6 +286,28 @@ def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> 
     assert result[0].reason == f"Shared systems: {shared}"
 
 
+def test_analyze_impact_radius_conflicts_ignores_inventory_examples() -> None:
+    def radius(real_system: str) -> str:
+        return f"""### Systems Inventory
+- `{real_system}` | Role: runtime system
+
+```markdown
+- `plugins/fenced-example.py` | Role: example only
+```
+
+<!--
+- `plugins/comment-example.py` | Role: example only
+-->
+"""
+
+    result = analyze_impact_radius_conflicts([
+        _item("A", 1, radius("plugins/a.py")),
+        _item("B", 2, radius("plugins/b.py")),
+    ])
+
+    assert result == []
+
+
 @pytest.mark.parametrize("level", range(1, 7))
 @pytest.mark.parametrize("closing", ["", " ##"])
 def test_analyze_impact_radius_conflicts_ignores_inventory_headings_inside_fences(level: int, closing: str) -> None:

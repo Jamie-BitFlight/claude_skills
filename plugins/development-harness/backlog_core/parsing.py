@@ -21,8 +21,9 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 import marko
-from marko.block import Heading
+from marko.block import Heading, ListItem, Paragraph
 from marko.helpers import MarkoExtension
+from marko.inline import CodeSpan
 from pydantic import BaseModel
 from ruamel.yaml import YAML, YAMLError
 
@@ -61,6 +62,7 @@ __all__ = [
     "dump_frontmatter",
     "extract_description_from_issue_body",
     "extract_groomed_section",
+    "extract_leading_code_list_items",
     "extract_normalize_metadata",
     "extract_sections",
     "find_item",
@@ -812,6 +814,36 @@ def split_body_sections(body: str, *, levels: frozenset[int] = frozenset({2, 3})
         List of :class:`SectionSpan` in document order.
     """
     return _section_spans(body, levels)
+
+
+def extract_leading_code_list_items(markdown: str) -> list[str]:
+    """Return code-span values that begin real Markdown list items.
+
+    Fenced code and HTML comments contain no ``ListItem`` nodes, so example
+    rows in those blocks are excluded without lexical masking.
+
+    Args:
+        markdown: Markdown source containing zero or more lists.
+
+    Returns:
+        Code-span values in document order.
+    """
+    document = marko.parse(markdown)
+    values: list[str] = []
+    pending = list(reversed(document.children))
+    while pending:
+        node = pending.pop()
+        children = getattr(node, "children", None)
+        if isinstance(node, ListItem) and isinstance(children, list) and children:
+            first_block = children[0]
+            inline_children = getattr(first_block, "children", None)
+            if isinstance(first_block, Paragraph) and isinstance(inline_children, list) and inline_children:
+                first_inline = inline_children[0]
+                if isinstance(first_inline, CodeSpan) and isinstance(first_inline.children, str):
+                    values.append(first_inline.children)
+        if isinstance(children, list):
+            pending.extend(reversed(children))
+    return values
 
 
 def merge_sections(local_body: str, github_body: str) -> tuple[str, bool]:

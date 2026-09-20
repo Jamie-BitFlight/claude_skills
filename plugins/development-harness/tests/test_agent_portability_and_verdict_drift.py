@@ -966,6 +966,19 @@ def test_impact_analyst_keeps_the_subagent_status_token_first_and_exact() -> Non
     assert "End your response with:" not in prompt
 
 
+def test_impact_analyst_replaces_the_previous_impact_snapshot() -> None:
+    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+
+    expected_write = """mcp__plugin_dh_backlog__backlog_groom(
+    selector=<value>,
+    section="Impact Radius",
+    content=<report>,
+    replace_section=True,
+    reason="impact analysis refreshed"
+)"""
+    assert expected_write in prompt
+
+
 def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
     """The CLI command reference and the MCP connection check live under ``dh-cli-usage``, and
     nowhere else still names either by its old name or old path, and dh-cli-usage links both.

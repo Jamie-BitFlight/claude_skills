@@ -89,6 +89,7 @@ from .models import (
 )
 from .parsing import (
     SectionSpan,
+    extract_leading_code_list_items,
     find_item,
     items_needing_issues,
     items_with_issues,
@@ -6047,11 +6048,9 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
     if inventory_sections:
         systems: set[str] = set()
         for inventory_section in inventory_sections:
-            for raw_line in inventory_section.content.splitlines():
-                line = raw_line.strip()
-                match = re.match(r"[-*]\s+`([^`]+)`", line)
-                if match:
-                    systems.add(match.group(1).partition("::")[0].strip())
+            systems.update(
+                value.partition("::")[0].strip() for value in extract_leading_code_list_items(inventory_section.content)
+            )
         return systems
 
     paths: set[str] = set()
