@@ -233,6 +233,12 @@ def is_part_of_package(file_path: Path) -> bool:
     `pyproject.toml` satisfies that, which makes Rule 2 swallow every standalone
     script in the tree.
 
+    A PEP 420 namespace package carries no `__init__.py`, so a module inside one
+    reads as a standalone script here. That is the deliberate trade: the marker
+    is what separates a package from a content directory, and this repository
+    ships no namespace package. Loosen it only with a positive signal that the
+    directory is a package, never by dropping the marker check.
+
     Args:
         file_path: Path to file to check
 

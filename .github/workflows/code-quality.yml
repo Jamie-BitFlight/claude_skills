@@ -36,6 +36,13 @@ jobs:
       - name: Check formatting with Ruff
         run: uv run -q --locked prek run ruff-format --all-files
 
+      # The hook's own `files:` pattern limits it to pyproject.toml changes, and the
+      # file-hygiene job runs changed-files-only on pull_request. A change that removes
+      # the last import of a dependency without touching pyproject.toml would otherwise
+      # skip the audit entirely. Run it here against the whole tree on every event.
+      - name: Audit declared dependencies
+        run: uv run -q --locked prek run audit-dependencies --all-files
+
   # =============================================================================
   # Python: Type checking with ty (Astral)
   # Blocking as of 2026-02-19 — CI run 22188303914 passed cleanly.
@@ -188,7 +195,7 @@ jobs:
 
       - name: Run file hygiene hooks
         env:
-          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,agent-marketplace-versioner,skilllint,ty,enable-rerere,validate-research-entries
+          SKIP: sync-pre-commit-deps,conventional-pre-commit,repair-symlinks,biome-check,ruff,ruff-format,pypfmt,markdownlint-cli2,actionlint,shell-fmt-go,shellcheck,agent-marketplace-versioner,skilllint,ty,enable-rerere,validate-research-entries,audit-dependencies
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE=$(git merge-base "origin/${GITHUB_HEAD_REF}" "origin/${GITHUB_BASE_REF}")

@@ -164,8 +164,11 @@ def installed_metadata(search_path: list[str]) -> dict[str, dict[str, list[str]]
             parts = file.parts
             if not parts or parts[0].endswith(".dist-info"):
                 continue
-            if "bin" in parts:
-                binaries.add(file.name)
+            if "bin" in parts or "Scripts" in parts:
+                # Console-script launchers land in `bin/` on POSIX and `Scripts/` on
+                # Windows, where they also carry a `.exe` suffix. Record the bare
+                # name so the invocation grep matches `uv run ruff` on either OS.
+                binaries.add(file.name.removesuffix(".exe"))
             elif parts[0].endswith(".py"):
                 modules.add(parts[0][:-3])
             elif len(parts) > 1 and "." not in parts[0] and parts[0] not in GENERIC_DIRS:
