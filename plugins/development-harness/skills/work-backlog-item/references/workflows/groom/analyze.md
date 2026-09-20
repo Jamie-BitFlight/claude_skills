@@ -49,7 +49,7 @@ artifact register \
 ```
 
 Note: the CLI's `--artifact-id` corresponds to MCP's `path` parameter — both hold the artifact's
-logical identifier. For artifact conventions, activate the `dh:dh-meta-docs` skill.
+logical identifier (see [Artifact Manifest System](../../../../../AGENTS.md#artifact-manifest-system)).
 
 → Load the just-registered artifact via `artifact_read`, **CONTINUE** to RT-ICA snapshot.
 
