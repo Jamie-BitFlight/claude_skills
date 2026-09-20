@@ -2087,6 +2087,19 @@ def _build_compact_manifest(
         if num_match:
             issue_number = int(num_match.group(1))
     status: str = "closed" if result.state == "closed" else "open"
+    sections_index = _sections_index_from_result(result)
+    if sections_index:
+        # A section directory exists, so section='<name>' is a valid address —
+        # name it first (R7 prohibition 1).
+        hint = (
+            f"Load specific sections: backlog_view(selector='{selector}', summary=False, section='<index, title, or /regex/>')\n"
+            f"Load full content: backlog_view(selector='{selector}', summary=False)"
+        )
+    else:
+        # This item has no section directory (unstructured body): a section=
+        # address would produce a section_filter_miss, not content, so the only
+        # mechanism present in this response is the unfiltered full-content load.
+        hint = f"Load full content: backlog_view(selector='{selector}', summary=False)"
     compact: dict[str, object] = {
         "issue_number": issue_number,
         "title": result.title,
@@ -2098,12 +2111,8 @@ def _build_compact_manifest(
         "unavailable_capabilities": result.unavailable_capabilities,
         "_summary": True,
         "_full_chars": full_chars,
-        "_hint": (
-            f"Load specific sections: backlog_view(selector='{selector}', summary=False, section='<index, title, or /regex/>')\n"
-            f"Load full content: backlog_view(selector='{selector}', summary=False)"
-        ),
+        "_hint": hint,
     }
-    sections_index = _sections_index_from_result(result)
     if sections_index:
         compact["sections_index"] = sections_index
     return compact
@@ -2188,9 +2197,10 @@ def _build_over_budget_view(
             "Get this item's ordinal map, then page through the oversized section with "
             "navigate=/head=/skip_tokens=:\n"
             f"  backlog_view(selector='{selector}', map=True)\n"
-            "Note: on a large item, that map=True call can itself exceed this budget "
-            "(check its own over_budget field) — there is no smaller retrieval for this "
-            "section available yet."
+            "Note: map=True's own over_budget field reflects this item's total content "
+            "estimate, not the size of the map response itself — the map text is usually "
+            "small enough to return even when over_budget is true. There is no smaller "
+            "retrieval for this section available yet."
         )
     else:
         usage = (
