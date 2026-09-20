@@ -62,5 +62,4 @@ Flow experiments run in [sam-flow-experiments](https://github.com/Jamie-BitFligh
 ## References
 
 - [SAM definition](../../skills/work-backlog-item/references/sam-definition.md)
-- [Development harness](../../AGENTS.md)
 - [ARL PROVENANCE](https://github.com/bitflight-devops/stateless-agent-methodology/blob/main/research/arl/PROVENANCE.md) (external repo)
