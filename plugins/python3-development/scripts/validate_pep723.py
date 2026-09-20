@@ -17,9 +17,11 @@ It checks PEP 723 compliance, execute bits, and provides auto-fix capabilities.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import os
 import re
 import sys
+import tomllib
 from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
@@ -58,6 +60,7 @@ RULE_NO_SHEBANG = 4
 EXECUTABLE_RULES = {RULE_STDLIB_SCRIPT, RULE_PACKAGE_EXECUTABLE, RULE_UV_SCRIPT}
 
 MAX_SHEBANG_PREVIEW = 40
+MIN_SRC_PACKAGE_PARTS = 3
 
 
 @dataclass
@@ -227,17 +230,10 @@ def normalize_import_to_package(import_name: str) -> str:
 def is_part_of_package(file_path: Path) -> bool:
     """Check if the file is a module inside an importable package.
 
-    A file belongs to a package only when its own directory holds an
-    `__init__.py`. Searching parent directories for `setup.py` or
-    `pyproject.toml` alone is not enough: every file in a repository with a root
-    `pyproject.toml` satisfies that, which makes Rule 2 swallow every standalone
-    script in the tree.
-
-    A PEP 420 namespace package carries no `__init__.py`, so a module inside one
-    reads as a standalone script here. That is the deliberate trade: the marker
-    is what separates a package from a content directory, and this repository
-    ships no namespace package. Loosen it only with a positive signal that the
-    directory is a package, never by dropping the marker check.
+    Recognize regular packages by `__init__.py`, conventional `src/` layouts,
+    and namespace packages explicitly configured for setuptools discovery.
+    Do not treat every file below a project-level `pyproject.toml` as packaged:
+    that would make Rule 2 swallow standalone scripts in the same repository.
 
     Args:
         file_path: Path to file to check
@@ -245,22 +241,37 @@ def is_part_of_package(file_path: Path) -> bool:
     Returns:
         True if file is a module of an importable package, False otherwise
     """
-    current = file_path.resolve().parent
-    if not (current / "__init__.py").exists():
+    resolved = file_path.resolve()
+    project_root = next(
+        (
+            parent
+            for parent in resolved.parents
+            if (parent / "setup.py").exists() or (parent / "pyproject.toml").exists()
+        ),
+        None,
+    )
+    if project_root is None:
         return False
 
-    # Walk out of the package to the directory that contains its top level.
-    while (current / "__init__.py").exists() and current != current.parent:
-        current = current.parent
+    package_parents = list(resolved.parents[: resolved.parents.index(project_root)])
+    if any((parent / "__init__.py").exists() for parent in package_parents):
+        return True
 
-    # That top level belongs to a distribution when some ancestor declares one.
-    root = Path("/")
-    while current != root:
-        if (current / "setup.py").exists() or (current / "pyproject.toml").exists():
-            return True
-        current = current.parent
+    relative = resolved.relative_to(project_root)
+    if len(relative.parts) >= MIN_SRC_PACKAGE_PARTS and relative.parts[0] == "src":
+        return True
 
-    return False
+    pyproject = project_root / "pyproject.toml"
+    try:
+        config = tomllib.loads(pyproject.read_text(encoding="utf-8")) if pyproject.exists() else {}
+    except tomllib.TOMLDecodeError:
+        config = {}
+    find_config = config.get("tool", {}).get("setuptools", {}).get("packages", {}).get("find", {})
+    if not find_config:
+        return False
+    includes = find_config.get("include", [])
+    package_name = ".".join(relative.parent.parts)
+    return not includes or any(fnmatch.fnmatchcase(package_name, pattern) for pattern in includes)
 
 
 def is_executable(file_path: Path) -> bool:

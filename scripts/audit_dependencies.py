@@ -47,6 +47,8 @@ TEXT_GLOBS = ("*.md", "*.yml", "*.yaml", "*.toml", "*.json")
 NAME_RE = re.compile(r"^([A-Za-z0-9._-]+)")
 PEP723_RE = re.compile(r"^# /// script\s*$(.*?)^# ///\s*$", re.MULTILINE | re.DOTALL)
 GENERIC_DIRS = frozenset({"tests", "test", "bin", "share", "include", "lib", "etc", "licenses", "data"})
+SCRIPT_DIRS = frozenset({"bin", "scripts"})
+WINDOWS_LAUNCHER_SUFFIXES = ("-script.py", ".exe", ".cmd", ".bat")
 
 
 class Dependency(BaseModel):
@@ -159,24 +161,28 @@ def installed_metadata(search_path: list[str]) -> dict[str, dict[str, list[str]]
             continue
         entry = meta.setdefault(name, {"modules": [], "binaries": [], "plugin_groups": [], "requires": []})
         modules: set[str] = set()
-        binaries: set[str] = set()
+        entry_points = list(dist.entry_points)
+        binaries = {ep.name for ep in entry_points if ep.group in {"console_scripts", "gui_scripts"}}
         for file in dist.files or []:
             parts = file.parts
             if not parts or parts[0].endswith(".dist-info"):
                 continue
-            if "bin" in parts or "Scripts" in parts:
-                # Console-script launchers land in `bin/` on POSIX and `Scripts/` on
-                # Windows, where they also carry a `.exe` suffix. Record the bare
-                # name so the invocation grep matches `uv run ruff` on either OS.
-                binaries.add(file.name.removesuffix(".exe"))
-            elif parts[0].endswith(".py"):
+            if any(part.casefold() in SCRIPT_DIRS for part in parts):
+                launcher = file.name
+                for suffix in WINDOWS_LAUNCHER_SUFFIXES:
+                    if launcher.casefold().endswith(suffix):
+                        launcher = launcher[: -len(suffix)]
+                        break
+                binaries.add(launcher)
+                continue
+            if parts[0].endswith(".py"):
                 modules.add(parts[0][:-3])
             elif len(parts) > 1 and "." not in parts[0] and parts[0] not in GENERIC_DIRS:
                 modules.add(parts[0])
         entry["modules"] = sorted(modules)
         entry["binaries"] = sorted(binaries)
         entry["plugin_groups"] = sorted({
-            ep.group for ep in dist.entry_points if ep.group not in {"console_scripts", "gui_scripts"}
+            ep.group for ep in entry_points if ep.group not in {"console_scripts", "gui_scripts"}
         })
         entry["requires"] = sorted({name for req in dist.requires or [] if (name := requirement_name(req)) is not None})
     return resolve_meta_packages(meta)

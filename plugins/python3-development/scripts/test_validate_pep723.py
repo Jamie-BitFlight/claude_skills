@@ -79,6 +79,31 @@ def test_module_with_init_is_part_of_a_package(distribution: Path) -> None:
     assert is_part_of_package(module) is True
 
 
+def test_src_layout_namespace_module_is_part_of_a_package(distribution: Path) -> None:
+    """A namespace module below the conventional src root needs no __init__.py."""
+    module = write_script(distribution / "src" / "acme" / "tools" / "cli.py")
+    assert is_part_of_package(module) is True
+
+
+def test_configured_flat_namespace_module_is_part_of_a_package(distribution: Path) -> None:
+    """Explicit setuptools discovery identifies a flat namespace without __init__.py."""
+    (distribution / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n[tool.setuptools.packages.find]\ninclude = ["acme.*"]\n', encoding="utf-8"
+    )
+    module = write_script(distribution / "acme" / "tools" / "cli.py")
+    assert is_part_of_package(module) is True
+
+
+def test_src_namespace_module_without_pep723_selects_package_rule(distribution: Path) -> None:
+    """A src-layout namespace module receives package dependencies through Rule 2."""
+    module = distribution / "src" / "acme" / "tools" / "cli.py"
+    module.parent.mkdir(parents=True)
+    module.write_text("#!/usr/bin/env python3\nimport httpx\n", encoding="utf-8")
+    module.chmod(0o755)
+    rule, _reason, _evaluations = determine_applicable_rule(module, module.read_text())
+    assert rule == RULE_PACKAGE_EXECUTABLE
+
+
 def test_standalone_script_selects_the_uv_rule(distribution: Path) -> None:
     """A standalone PEP 723 script with external imports selects Rule 3, not Rule 2."""
     script = write_script(distribution / "scripts" / "tool.py")
