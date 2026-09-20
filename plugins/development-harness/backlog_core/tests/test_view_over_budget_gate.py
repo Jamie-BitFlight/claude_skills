@@ -319,6 +319,35 @@ class TestReviewRoundContract:
         assert "section='0" not in usage, f"_usage must not repeat section='0 narrowing, got: {usage!r}"
         assert "section='/" not in usage, f"_usage must not repeat section='/ narrowing, got: {usage!r}"
 
+    def test_over_budget_blank_section_not_treated_as_narrowed_request(self, mocker: MockerFixture) -> None:
+        """A blank/whitespace ``section=""`` must not count as an exhausted narrowing request.
+
+        ``operations.view_item()`` normalises a blank ``section`` to ``None``
+        internally and performs no narrowing (``section = (section or
+        "").strip() or None``).  The call-site predicate in ``backlog_view``
+        must match that normalisation: an item that happens to have exactly one
+        section total (so ``full_response["sections"]`` has length 1 even with
+        no narrowing) must not be reported as "already narrowed to a single
+        section" when the caller passed ``section=""`` and never actually asked
+        to narrow (codex review, PR #3649).
+        """
+        _patch_github_body(mocker, 2495, f"## Huge\n\n{_HUGE_SINGLE}\n\n")
+
+        resp = _call_view(selector="2495", summary=False, section="")
+
+        assert resp.get("_over_budget") is True, (
+            f"Single-section body must still trip the over-budget gate.  Got keys: {sorted(resp)!r}"
+        )
+        usage = str(resp.get("_usage"))
+        assert "map=True" not in usage, (
+            f"A blank section= must not be treated as an exhausted narrowing request "
+            f"(that would wrongly skip straight to the map=True advice), got: {usage!r}"
+        )
+        assert "sections_index below" in usage, (
+            f"_usage for an unnarrowed over-budget response must use the general "
+            f"sections_index guidance, got: {usage!r}"
+        )
+
     def test_substring_section_returns_all_matching_sections_in_order(self) -> None:
         """section='Section' returns BOTH '## Section 1' and '## Section 2' in order.
 

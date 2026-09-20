@@ -2554,8 +2554,16 @@ async def backlog_view(
                 # _filter_view_sections() narrows full_response["sections"] for the
                 # plural sections=[...] path but leaves result untouched.
                 narrowed_sections = full_response.get("sections")
+                # Normalise a blank/whitespace-only ``section`` the same way
+                # ``operations.view_item()`` does internally (``(section or
+                # "").strip() or None``) — a blank string performs no narrowing
+                # there, so it must not count as one here either, or an item
+                # that happens to have exactly one section total would be
+                # reported as an already-exhausted single-section request the
+                # caller never made.
+                section_requested = bool((section or "").strip())
                 narrowed_to_single_section = (
-                    (section is not None or sections_filter is not None)
+                    (section_requested or sections_filter is not None)
                     and isinstance(narrowed_sections, dict)
                     and len(narrowed_sections) == 1
                 )
