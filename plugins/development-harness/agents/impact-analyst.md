@@ -234,9 +234,9 @@ lexically enumerable scope such as an old import, route, flag, or type name.
 
 - Add it only when one literal grep pattern precisely enumerates that row's scope.
 - Record `pattern_count:` as the number of matching files returned by
-  `rg --hidden --glob '!**/.git/**' -F -l -- "$pattern"` when adding `pattern:`. Use this exact
-  fixed-string, hidden-path search and exclude `.git` so the later refresh compares the same unit
-  and scope.
+  `rg --hidden --glob '!**/.git' --glob '!**/.git/**' -F -l -- "$pattern"` when adding `pattern:`.
+  Use this exact fixed-string, hidden-path search and exclude `.git` files and directories so the
+  later refresh compares the same unit and scope.
 - Omit it for semantic dependencies, conceptual categories, dynamic dispatch, generated values,
   indirect consumers, and human or process effects.
 - Never use the count as evidence that a system is affected or unaffected.

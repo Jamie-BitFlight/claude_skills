@@ -945,7 +945,7 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
     assert count_override.search(combined_contract) is None
     assert "distinct `Systems Inventory` row count, or the legacy affected-system row count" in feasibility_gate
     assert 'Compare -->|"No — annotations remain current"| C3Decision' in feasibility_gate
-    refresh_command = "rg --hidden --glob '!**/.git/**' -F -l -- \"$pattern\""
+    refresh_command = "rg --hidden --glob '!**/.git' --glob '!**/.git/**' -F -l -- \"$pattern\""
     assert refresh_command in prompt
     assert refresh_command in feasibility_gate
     assert "number of matching files" in prompt
