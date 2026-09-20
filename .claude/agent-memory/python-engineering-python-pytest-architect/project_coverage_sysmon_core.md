@@ -1,47 +1,14 @@
 ---
 name: project-coverage-sysmon-core
-description: How this repo's pytest coverage core is configured and verified (sysmon vs ctrace)
+description: Before enabling a plugin file tracer, turn off sysmon — coverage otherwise asks for the sysmon (PEP 669) core, which only a local Python 3.12+ run gets; CI's 3.11 run falls back to ctrace regardless
 metadata:
   type: project
 ---
 
-Root `pyproject.toml` `[tool.coverage.run]` sets `core = "sysmon"` (added PR #2936, 2026-08-17),
-switching coverage.py from the default `ctrace` (`sys.settrace`) core to the PEP 669
-`sys.monitoring` core on Python 3.13. Measured 84% user-CPU reduction / 48% wall reduction on a
-`tests_sam` run with byte-identical coverage output — see
-`.tmp/scratch/reports/pytest-fix-options-coverage-overhead.md` for the full A/B/C measurement.
+Root `pyproject.toml` sets `[tool.coverage.run] core = "sysmon"`. The core that a run actually uses depends on its interpreter. Locally `.python-version` pins 3.13, so a local run gets sysmon. CI installs 3.11 (`.github/actions/setup-python/action.yml`), and its pytest header reads `platform linux -- Python 3.11.16`, so CI falls back to ctrace. Nothing gates on the coverage report: CI's `test-python` job runs plain `uv run -q --locked pytest`, with no `fail_under` and no upload.
 
-**Why sysmon was safe here**: nothing in this repo's own CI consumes the coverage report as a
-quality gate (`test-python` job just runs `uv run -q pytest`, no `--cov`/`fail_under`/upload) —
-verified before switching, not assumed. Also: branch coverage was already off, no coverage
-plugins configured, no dynamic contexts configured — the three documented sysmon limitations on
-pre-3.14 Python.
+On Python 3.12 or 3.13 with coverage 7.15.2, sysmon cannot do branch coverage; on any version with `sys.monitoring` it also cannot do plugin file tracers or dynamic contexts (measured: `coverage.env.PYBEHAVIOR.branch_right_left` is `False` on 3.12.13 and 3.13.14, `True` on 3.14.6 — Python 3.14 lifts the branch-coverage limit). Branch coverage or dynamic contexts make coverage warn `no-sysmon` and fall back to ctrace; a plugin file tracer only gets a warning that sysmon does not support it.
+To add a plugin file tracer, remove `core = "sysmon"` in the same change.
 
-**How to verify which core is actually active** (the config key silently no-ops if misspelled or
-below coverage 7.9.0):
-
-```bash
-uv run coverage debug config | grep -i core   # -> "core: sysmon"
-```
-
-or programmatically:
-
-```python
-import coverage
-
-c = coverage.Coverage()
-c.start()
-c.stop()
-type(c._collector.core.tracer_class)  # -> coverage.sysmon.SysMonitor when active
-```
-
-Note the attribute is `c._collector.core` (not `._collector._core` — that raises
-`AttributeError`, the underscore-prefixed name doesn't exist on `Collector`).
-
-`[tool.coverage.run] omit` also had to gain `tests_sam/*`, `*/tests_sam/*`, `tests_backlog/*`,
-`*/tests_backlog/*` in the same PR — the pre-existing `tests/*`/`*/tests/*` patterns don't match
-those directory names, so files under them (mainly non-`test_*.py` helpers/conftest) were being
-counted as measured "source" in the coverage report.
-
-If this repo ever needs branch coverage before moving to Python 3.14, `core = "sysmon"` must be
-turned back off first (sysmon lacks branch-coverage support on 3.12/3.13).
+Confirm the configured core with `uv run coverage debug config | grep -i core` → `core: sysmon`; the core a run actually uses is whatever survives the fallbacks above, and a `no-sysmon` warning on the run names it.
+A misspelled key prints `CoverageWarning: Unrecognized option` and leaves `core` unset, so coverage uses ctrace.

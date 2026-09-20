@@ -15,9 +15,11 @@ prevent it:
   scopes it to the skill's markdown content and `allowed-tools` Bash rules, while
   `code.claude.com/docs/en/plugins-reference` says skill content substitutes "anywhere the
   placeholder appears" — the two pages disagree, and the canary result below is what this repo
-  relies on. Verified live via `dh-meta-docs` and `implementation-manager`, and canary-tested against a
-  no-variable control line (2026-08-06) — see
-  `.claude/agent-memory/python-engineering-python-cli-architect/project_claude_plugin_root_bang_exec_vs_later_bash.md`.
+  relies on. Canary-tested against a no-variable control line (2026-08-06), recorded in
+[the verification record](plugins/plugin-creator/skills/shared-content-references/references/verification.md)
+step 1.
+  Re-measured 2026-09-20: invoking `/plugin-creator:shared-content-references` rendered both
+  variables as absolute paths in its plain prose, a markdown link target and a mermaid block.
 
 Literal `$N` is only safe to document inside `references/*.md` files, which are not substituted —
 a SKILL.md itself cannot explain this syntax without being corrupted by it. `${CLAUDE_PLUGIN_ROOT}`
