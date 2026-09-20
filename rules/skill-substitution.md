@@ -16,7 +16,8 @@ prevent it:
   `code.claude.com/docs/en/plugins-reference` says skill content substitutes "anywhere the
   placeholder appears" — the two pages disagree, and the canary result below is what this repo
   relies on. Canary-tested against a no-variable control line (2026-08-06), recorded in
-  `plugins/plugin-creator/skills/shared-content-references/references/verification.md` step 1.
+[the verification record](plugins/plugin-creator/skills/shared-content-references/references/verification.md)
+step 1.
   Re-measured 2026-09-20: invoking `/plugin-creator:shared-content-references` rendered both
   variables as absolute paths in its plain prose, a markdown link target and a mermaid block.
 
