@@ -225,6 +225,20 @@ def test_dispatch_conflicts_ignores_impact_radius_headings_inside_fences(mocker:
 
 
 @pytest.mark.unit
+def test_extract_impact_radius_prefers_outer_section_over_later_subsection() -> None:
+    body = "## Impact Radius\n- shared.py\n## Fact-Check\n### Impact Radius\nNo scope change."
+
+    assert _dh_ops._extract_impact_radius_section(body) == "- shared.py"
+
+
+@pytest.mark.unit
+def test_extract_impact_radius_uses_ast_level_for_indented_heading_boundary() -> None:
+    body = "  ## Impact Radius\n- shared.py\n## Systems Inventory\n- unrelated.py"
+
+    assert _dh_ops._extract_impact_radius_section(body) == "- shared.py"
+
+
+@pytest.mark.unit
 def test_dispatch_conflicts_fails_closed_when_authoritative_body_is_unavailable(mocker: MockerFixture) -> None:
     github_backend = mocker.Mock()
     github_backend.get_github.return_value = mocker.Mock(full_name="owner/repo")
