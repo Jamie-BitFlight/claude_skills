@@ -98,28 +98,39 @@ in `docs/cross-harness-smoke-tests.md`.
 
 Before running `git commit`, running `git push`, or spawning a sub-agent that writes files, read
 `rules/commit-cadence-and-worktrees.md` for commit scoping, push batching, and worktree isolation.
+
 Before dispatching a task to a sub-agent, read `rules/delegation.md` for the delegation, fix, and
 output-path pointers.
+
 Before applying the same fix to more than one file, read `rules/evidence-action-proportionality.md`
 for the verification-before-scope requirement.
+
 When a prompt names a specific product, technology, version, or release event, read
 `rules/fact-verification-first.md` before any planning, design, or code generation.
+
 Before acting on a confirmed hypothesis, read `rules/falsification-requirement.md` for the required
 falsification check.
+
 Before writing a bug-fix delegation prompt, read `rules/fix-delegation-discipline.md` for the
 reproduction-first cycle and prompt template.
+
 On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), garbled
 terminal-browser output (block characters instead of text), or before running any tool that
 requires a TTY (including `git rebase -i`/`git add -i`), read
 `rules/interactive-terminal-workarounds.md` for PTY providers, the DevTools Protocol workaround,
 and non-interactive equivalents.
+
 Before a single `Write` call whose content may exceed 25,000 characters, read
 `rules/large-file-write-strategy.md` for the split/skeleton-and-fill strategy.
+
 Before assigning a model or effort tier to a dispatched agent, read `rules/model-selection.md`.
+
 Before fixing any problem discovered during a session that the user did not ask about, read
 `rules/proactive-fix-gate.md` for the required gate.
+
 Before building a synthetic, mocked, or containerized reproduction environment (`env -i`,
 `docker run`, a mock), read `rules/reproduction-integrity.md`.
+
 Before writing agent output with no explicit path given in the task, or before creating a new file
 under `.claude/` or `docs/` with no existing convention to follow, read
 `rules/scratch-directory.md` for the `.tmp/scratch/` convention and the committed-file placement
@@ -186,7 +197,7 @@ flowchart TD
     T -->|"Known bug, CI failure, broken behavior"| Fix[Fix: reproduction first]
     T -->|"Unknown cause, unclear path: debug failure, diagnose perf, flaky test"| Inv[Investigation: hypothesis first]
     Exec --> V[Verify after completion]
-    Fix --> FD["fix-delegation-discipline.md: Reproduce, Fix, Validate against reproduction"]
+    Fix --> FD["fix-delegation-discipline.md"]
     FD --> V
     Inv --> H[Load /scientific-method:scientific-thinking] --> V
 ```
@@ -240,9 +251,7 @@ dismiss it — dismissing it normalizes technical debt. Respond with:
 > session? If not, I'll add them to the backlog.
 
 "Plan" means concrete steps (files, fixes, scope estimate) with the user choosing priority;
-"backlog" means a trackable record that prevents the finding from being lost. A trivial
-single-file fix with an unambiguous cause routes straight to `/dh:work-backlog-item --quick`
-without asking first — the gate decides the routing, not the user.
+"backlog" means a trackable record that prevents the finding from being lost.
 
 When you identify that work needs multiple steps, create backlog items for them rather than only
 describing them:

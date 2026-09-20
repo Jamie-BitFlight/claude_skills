@@ -31,11 +31,10 @@ The validator auto-adds `name:` derived from the directory name when absent, con
 
 ## `skills:` — Never List an Externally-Sourced Plugin's Skill
 
-An agent's `skills:` field preloads skill content at subagent startup. A listed skill absent from
-the host (an uninstalled plugin) is expected to be a **silent no-op** per the subagent-startup
-skill-preload mechanism — no incident on record, but treat as untested. Never name a skill from an
+An agent's `skills:` field preloads skill content at subagent startup. Never name a skill from an
 externally-sourced plugin (a marketplace entry whose `source`
-is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:`. Reference such skills
+is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:` — a listed skill absent
+from the host (an uninstalled plugin) has no confirmed behavior. Reference such skills
 only in prose (a routing table entry, an inline mention) — a name an agent tries to activate on
 demand fails visibly instead.
 

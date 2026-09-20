@@ -2,7 +2,7 @@
 
 ## Scope
 
-This policy applies to any agent that writes a document to the filesystem with a single `Write` call and may exceed **25,000 characters**. The 25K threshold is this repo's own safety margin for one `Write` call, not a measured or published reliability limit; treat it as a conservative trigger for the strategies below, not a proven failure point.
+This policy applies to any agent that writes a document to the filesystem with a single `Write` call and may exceed **25,000 characters**. Treat 25K as this repo's conservative trigger for the strategies below.
 
 It does not apply to output stored through an MCP operation. An agent that returns its result through a plan, task, or artifact operation writes no file, so no `Write` limit applies to it. Size limits on that path belong to the configured provider, are not 25K, and are not addressed here — check the provider before assuming one exists.
 

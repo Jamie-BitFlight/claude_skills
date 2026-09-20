@@ -401,7 +401,7 @@ Run the `init_skill.py` script. This script generates a complete template skill 
 ${CLAUDE_PLUGIN_ROOT}/skills/skill-creator/scripts/init_skill.py <skill-name> --path <output-directory>
 ```
 
-> Run scripts using `uv run` when a shebang invocation fails due to missing dependencies. If `uv` is not available, read `.claude/rules/uv-run-fallback.md` for install instructions and pip fallback procedure.
+> Run scripts using `uv run` when a shebang invocation fails due to missing dependencies. If `uv` is not available, read `rules/uv-run-fallback.md` — there is no fallback; stop and tell the user.
 
 **Examples:**
 

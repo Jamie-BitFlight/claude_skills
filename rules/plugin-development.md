@@ -61,8 +61,7 @@ Result: only 2 of 19 agents were registered. The other 17 were invisible to Clau
 
 **Validation: YES** — Validate skills to ensure quality:
 
-- YAML frontmatter properly formatted
-- Required fields present (name, description, allowed-tools, model)
+- YAML frontmatter properly formatted; required fields present per [frontmatter-requirements.md](rules/frontmatter-requirements.md)
 - File references correct and target files exist
 - Directory structure valid
 

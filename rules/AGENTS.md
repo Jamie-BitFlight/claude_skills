@@ -49,10 +49,13 @@ been added yet.
 | `reproduction-integrity.md` | reproduce in the real environment before synthetic ones |
 | `scratch-directory.md` | `.tmp/scratch/` fallback output convention |
 
-`match: "*"` in `manifest.json` means always-on: it fires on the first file touch of a session
-(and, for `delegation.md`, `fix-delegation-discipline.md`, and `model-selection.md`, also on the
-first `Agent` tool call, via `.claude/hooks/context-rules-agent.mjs`'s hardcoded list), same dedup
-rules as any other entry.
+The 12 rules below the `manifest.json` table — `commit-cadence-and-worktrees.md` through
+`scratch-directory.md` — carry no `manifest.json` entry. Each reaches an agent through its own
+routing line under root `AGENTS.md`'s "Situational Rule Triggers" section. Two hooks separately
+deliver four of these by name: `.claude/hooks/context-rules-agent.mjs` delivers `delegation.md`,
+`fix-delegation-discipline.md`, and `model-selection.md` on every `Agent` tool call;
+`.claude/hooks/context-rules-prompt.mjs` delivers `fact-verification-first.md` on
+`UserPromptSubmit` when its regex matches.
 
 ## Writing a Rule File
 
