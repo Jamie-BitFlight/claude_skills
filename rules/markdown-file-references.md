@@ -2,7 +2,7 @@
 
 ## Code Fence Standards
 
-Add a language specifier to every code fence, and surround every fenced code block with blank lines (MD031). Nested fences use 4 backticks on the outer fence and 3 on inner fences.
+Add a language specifier to every code fence, and surround every fenced code block with blank lines. This is house style, not an enforced lint rule — `.markdownlint-cli2.jsonc` disables MD031 in this repo. Nested fences use 4 backticks on the outer fence and 3 on inner fences.
 
 ````markdown
 # Section Title
@@ -38,7 +38,7 @@ Use a markdown link for any real relative path; a bare backticked path (`modern-
 `${CLAUDE_PLUGIN_ROOT}/docs/<doc>.md` — contains <what>; read before <when>.
 ```
 
-Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths in markdown links. See `skill-substitution.md`.
+Does not apply inside `references/*.md`, which are never substituted; those keep real `./`-relative paths in markdown links. See [skill-substitution.md](rules/skill-substitution.md).
 
 ## Skill Activation References
 

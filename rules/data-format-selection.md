@@ -15,7 +15,7 @@ Never author a data table as prose and then parse the prose to get the data back
 markdown or AST parser to read your own repository's data means the data is in the wrong format —
 move the data, do not improve the parser.
 
-This is separate from [Markdown AST Parsing](.claude/CLAUDE.md): `marko` is still the only way
+This is separate from `marko` guidance in [AGENTS.md](AGENTS.md): `marko` is still the only way
 to parse markdown you do not own. It is never the way to reach data you wrote yourself.
 
 ## A document describes data; it never copies it

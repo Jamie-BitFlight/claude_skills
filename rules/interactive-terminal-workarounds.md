@@ -22,7 +22,9 @@ Claude Code sessions do NOT have a TTY attached. When a tool requires a TTY (err
 2. **script** — simplest for commands that run and exit
 
    ```bash
-   # Run command with PTY, capture output
+   # macOS/BSD script (file first, command after):
+   timeout 15 script -q /tmp/output.txt sh -c "command here"
+   # Linux (util-linux) script:
    timeout 15 script -qc "command here" /tmp/output.txt
    ```
 
@@ -50,21 +52,6 @@ curl -s http://localhost:9222/json  # list tabs
 ```
 
 The CDP interface (`--remote-debugging-port`) is the primary value — not terminal rendering.
-
-## Decision Flowchart
-
-```text
-Tool needs TTY?
-├─ YES → Use tmux/script/pty to provide one
-│        ├─ Interactive program → tmux (capture-pane for output)
-│        ├─ Run-and-exit command → script -qc
-│        └─ Programmatic control → Python pty module
-└─ NO → Run normally
-
-Output is pixel blocks (▄)?
-├─ YES → Use DevTools Protocol / CDP for text extraction
-└─ NO → Parse terminal output directly
-```
 
 ## Prohibited Interactive Commands
 
