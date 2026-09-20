@@ -1,6 +1,6 @@
 # Skill Documentation Verification
 
-Skill documentation (SKILL.md, reference files) is AI-facing, NOT user-facing.
+Skill documentation (SKILL.md, reference files) is AI-facing, NOT user-facing. For an external or URL source, use `citation-requirements.md`'s citation methods instead of this file's line-number format.
 
 **Primary Audience:**
 
@@ -12,7 +12,7 @@ False/unverified/assumed information in skill documentation causes model self-mi
 
 ## Verification Protocol
 
-Before documenting behavior/capability/characteristic of commands (`~/.claude/commands/`), agents (`~/.claude/agents/`), tools, libraries, or system configuration — execute ALL steps:
+Before documenting behavior/capability/characteristic of commands (this repo's `.claude/commands/` or a plugin's `commands/`), agents (`.claude/agents/` or a plugin's `agents/`), tools, libraries, or system configuration — execute ALL steps:
 
 1. **Read Actual Source**
    - Commands: Read entire file, note line numbers
@@ -59,7 +59,7 @@ Before documenting behavior/capability/characteristic of commands (`~/.claude/co
 
 **Right**: "Corrects shebang to match script type, adds PEP 723 metadata if external dependencies detected, removes PEP 723 if stdlib-only, sets execute bit if needed"
 
-Source: Lines 137, 154 of `plugins/python3-development/skills/shebangpython/SKILL.md`
+Source: `## Instructions` (line 18) and `## Shebang Selection Rules` (line 37 onward) of `plugins/python3-development/skills/shebangpython/SKILL.md`
 
 </example>
 

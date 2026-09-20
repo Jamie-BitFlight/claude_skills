@@ -39,8 +39,10 @@ as **labels naming a key in that JSON** — not variables passed into the file. 
 
 **Agent `tools:` frontmatter** requires exact, correctly-cased tool names
 (`mcp__Ref__ref_search_documentation`, not `mcp__ref__...`). Separator format is free — comma,
-comma-without-space, space, and a YAML list all parse identically; write comma-and-space. Verify
-every MCP name against the running server, not against another agent file.
+comma-without-space, space, and a YAML list all parse identically; write comma-and-space. A YAML
+list parses but is non-conforming: `frontmatter-requirements.md` requires the comma-separated
+string form only — don't use a YAML list on the strength of it parsing here. Verify every MCP name
+against the running server, not against another agent file.
 
 An entry that matches no live tool is dropped and the rest of the grant still resolves. When every
 entry resolves to nothing the subagent refuses to launch, reporting that it "would be spawned with

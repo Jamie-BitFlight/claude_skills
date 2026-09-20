@@ -1,6 +1,6 @@
 # Citation Requirements
 
-Every factual claim in skill documentation requires a cited source. **Reason**: Without citations, guidance cannot be verified, updated, or trusted — and false claims persist across sessions.
+Every factual claim in skill documentation requires a cited source. **Reason**: Without citations, guidance cannot be verified, updated, or trusted — and false claims persist across sessions. For a claim about this repo's own commands, agents, or files, use `skill-documentation-verification.md`'s line-number citation format instead of the URL-based methods below.
 
 **Citation methods** (choose one per claim):
 

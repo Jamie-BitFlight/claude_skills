@@ -23,7 +23,7 @@
 ## Path Rules
 
 - All paths must start with `./`
-- Declaring the `agents` key replaces auto-discovery entirely — every agent not listed becomes invisible. Omit the key to use auto-discovery for all agents in `agents/`.
+- See `plugin-development.md`'s "plugin.json Auto-Discovery Rules" section — declaring `agents` overrides auto-discovery entirely. Omit the key to use auto-discovery for all agents in `agents/`.
 - `agents` field must be an array of individual file paths — `["./agents/file.md"]` — not a directory string `"./agents/"`
 - Plugins cannot reference files outside their directory (`../shared-utils` fails after installation)
 

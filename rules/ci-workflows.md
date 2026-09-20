@@ -94,7 +94,7 @@ Repository uses the `alls-green` quality gate pattern.
 - Jobs with known pre-existing failures listed in `allowed-failures`
 - Gate passes if all non-allowed jobs succeed and allowed jobs either succeed or fail
 
-**Implementation:** Uses `re-actors/alls-green` action — verify the current pinned version in `.github/workflows/`.
+**Implementation (generic pattern — this repo's `code-quality.yml` currently uses no `allowed-failures` exceptions):** Uses `re-actors/alls-green` action — verify the current pinned version in `.github/workflows/`.
 
 ```yaml
 quality-gate:

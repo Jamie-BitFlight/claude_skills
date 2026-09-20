@@ -4,7 +4,7 @@
 
 - `name`: Required — lowercase, hyphens, must match directory name, satisfies `^[a-z][a-z0-9-]*$`
 - `description`: Optional (uses first paragraph if omitted)
-- `tools`: Must be comma-separated string — `Read, Grep, Glob` — not a YAML array
+- `allowed-tools`: Must be comma-separated string — `Read, Grep, Glob` — not a YAML array. Grants permission for the listed tools while the skill is active; it does not restrict which tools are callable (see the `plugin-creator:claude-skills-overview-2026` skill for the full schema).
 
 ## Agents
 
@@ -27,13 +27,14 @@ Run after writing or editing any frontmatter file:
 uvx skilllint@latest check --fix {path}
 ```
 
-The validator auto-adds `name:` derived from the directory name when absent (plugin skills only).
+The validator auto-adds `name:` derived from the directory name when absent, confirmed for both plugin-bundled and project-level (`.claude/skills/`) SKILL.md files.
 
 ## `skills:` — Never List an Externally-Sourced Plugin's Skill
 
 An agent's `skills:` field preloads skill content at subagent startup. A listed skill absent from
-the host (an uninstalled plugin) is a **silent no-op** — no error, agent just starts without that
-content. Never name a skill from an externally-sourced plugin (a marketplace entry whose `source`
+the host (an uninstalled plugin) is expected to be a **silent no-op** per the subagent-startup
+skill-preload mechanism — no incident on record, but treat as untested. Never name a skill from an
+externally-sourced plugin (a marketplace entry whose `source`
 is `github`, `git-subdir`, `url`, or `npm`, not a local path) in `skills:`. Reference such skills
 only in prose (a routing table entry, an inline mention) — a name an agent tries to activate on
 demand fails visibly instead.
