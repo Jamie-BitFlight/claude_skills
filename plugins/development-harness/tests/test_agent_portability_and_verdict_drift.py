@@ -922,6 +922,7 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
         "checked-out branch, HEAD, refs, index, and worktree",
         "Run probes inline without creating temporary files",
         "Use a stable conflict identifier in the leading backticks",
+        "Prefix any other extensionless root file with `./`",
     )
 
     missing = [contract for contract in required_contracts if contract not in prompt]
@@ -944,7 +945,7 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
     assert count_override.search(combined_contract) is None
     assert "distinct `Systems Inventory` row count, or the legacy affected-system row count" in feasibility_gate
     assert 'Compare -->|"No — annotations remain current"| C3Decision' in feasibility_gate
-    refresh_command = "rg --hidden --glob '!.git/**' -F -l -- \"$pattern\""
+    refresh_command = "rg --hidden --glob '!**/.git/**' -F -l -- \"$pattern\""
     assert refresh_command in prompt
     assert refresh_command in feasibility_gate
     assert "number of matching files" in prompt

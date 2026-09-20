@@ -234,7 +234,7 @@ lexically enumerable scope such as an old import, route, flag, or type name.
 
 - Add it only when one literal grep pattern precisely enumerates that row's scope.
 - Record `pattern_count:` as the number of matching files returned by
-  `rg --hidden --glob '!.git/**' -F -l -- "$pattern"` when adding `pattern:`. Use this exact
+  `rg --hidden --glob '!**/.git/**' -F -l -- "$pattern"` when adding `pattern:`. Use this exact
   fixed-string, hidden-path search and exclude `.git` so the later refresh compares the same unit
   and scope.
 - Omit it for semantic dependencies, conceptual categories, dynamic dispatch, generated values,
@@ -338,6 +338,9 @@ demonstrated.`
 
 `Systems Inventory` is the canonical machine-readable scope. Include each affected system exactly
 once there. The categorized sections are human-readable views and do not define or count scope.
+Use repository-relative paths. Bare `Dockerfile` and `Makefile` are recognized as conventional
+extensionless root files. Prefix any other extensionless root file with `./` so it remains
+distinguishable from a one-word logical system such as `Redis` or `auth`.
 Do not place excluded candidates in the inventory. Put unresolved credible paths in the unknown
 frontier and give each one an owner and a closure condition.
 

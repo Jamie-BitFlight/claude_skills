@@ -58,11 +58,11 @@ flowchart TD
   increments `estimated_impact_count`. It uses the same matched-file unit and search semantics as
   `current_pattern_count`.
 - For every complete annotation, run
-  `rg --hidden --glob '!.git/**' -F -l -- "$pattern"` and capture its output and exit status before
-  counting lines. This includes tracked hidden paths while excluding Git internals. Exit status 0
-  means matches, Exit status 1 means zero matches, and an exit status greater than 1 is a scan
-  failure: report the exact error and stop instead of using a count. Do not pipe `rg` directly to
-  `wc`, because the pipeline can hide the scan failure.
+  `rg --hidden --glob '!**/.git/**' -F -l -- "$pattern"` and capture its output and exit status
+  before counting lines. This includes tracked hidden paths while excluding Git internals at any
+  depth. Exit status 0 means matches, and Exit status 1 means zero matches. An
+  exit status greater than 1 is a scan failure: report the exact error and stop instead of using a
+  count. Do not pipe `rg` directly to `wc`, because the pipeline can hide the scan failure.
 - The 10-system and 20-system thresholds are coordination-policy signals. They do not determine a
   system's risk level; use the Impact Radius risk assessment for that judgment.
 

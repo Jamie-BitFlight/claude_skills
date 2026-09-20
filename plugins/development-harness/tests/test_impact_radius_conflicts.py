@@ -336,6 +336,16 @@ def test_analyze_impact_radius_conflicts_does_not_treat_multiword_system_as_root
     assert result == []
 
 
+@pytest.mark.parametrize("system", ["Redis", "auth"])
+def test_analyze_impact_radius_conflicts_does_not_treat_single_word_system_as_root_file(system: str) -> None:
+    first = "### Systems Inventory\n- `./` | Role: repository scope"
+    second = f"### Systems Inventory\n- `{system}` | Role: logical system"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
 def test_analyze_impact_radius_conflicts_detects_shared_non_file_system() -> None:
     system = "release approval control"
     first = f"### Systems Inventory\n- `{system}` | Role: process control"
