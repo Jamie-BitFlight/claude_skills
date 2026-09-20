@@ -33,5 +33,4 @@ Orchestrators pass paths and outcomes; agents discover and verify. Do not pre-ga
 
 ## Source
 
-- [orchestrator-discipline rules](../../../../plugins/orchestrator-discipline/rules/CLAUDE.md)
-- [orchestrator-discipline SKILL.md](../../../../plugins/orchestrator-discipline/skills/orchestrator-discipline/SKILL.md)
+- `orchestrator-discipline:orchestrator-discipline` skill (separate plugin; load it when installed)

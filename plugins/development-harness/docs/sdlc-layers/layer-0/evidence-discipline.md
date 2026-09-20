@@ -38,4 +38,4 @@ Use for: bugs, architecture, refactor, strange behavior. Not for trivial tasks.
 - [fact-check SKILL.md](../../../skills/fact-check/SKILL.md)
 - [find-cause SKILL.md](../../../skills/find-cause/SKILL.md)
 - [root-cause-tracing-process SKILL.md](../../../skills/root-cause-tracing-process/SKILL.md)
-- [scientific-thinking SKILL.md](../../../../plugins/scientific-method/skills/scientific-thinking/SKILL.md)
+- `scientific-method:scientific-thinking` skill (separate plugin; load it when installed)

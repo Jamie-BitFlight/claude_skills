@@ -1,8 +1,7 @@
 # Development Harness Architecture
 
-How the harness achieves what [docs/PURPOSE.md](./docs/PURPOSE.md) states it is for. Repository-level
-design is in the [root ARCHITECTURE.md](../../ARCHITECTURE.md); storage internals are in
-[backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md).
+How the harness achieves what [docs/PURPOSE.md](./docs/PURPOSE.md) states it is for. Storage
+internals are in [backlog_core/ARCHITECTURE.md](./backlog_core/ARCHITECTURE.md).
 
 ## The workflow
 
@@ -410,9 +409,8 @@ node that did would be a node whose completion the loop is itself waiting on.
 return of something the Orchestrator launched is the whole of the push mechanism. Where it launched
 a command rather than an agent, that command completing is the same event. This is stated at the
 level of the mechanism on purpose. A harness's own function name for dispatching an agent or running
-a command belongs to that harness, and this plugin targets several (see the root
-[AGENTS.md](../../AGENTS.md)); writing one of those names here would bake a single harness into a
-model meant to hold across all of them.
+a command belongs to that harness, and this plugin targets several; writing one of those names here
+would bake a single harness into a model meant to hold across all of them.
 
 **Notification is individual, never batched.** Many nodes are in flight at once and each returns on
 its own. The loop turns on each return. An Orchestrator that waited for a set of dispatches to

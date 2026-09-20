@@ -41,4 +41,4 @@ Before claiming task complete:
 ## Sources
 
 - [verify-done SKILL.md](../../../skills/verify-done/SKILL.md)
-- [verification-gate SKILL.md](../../../../plugins/verification-gate/skills/verification-gate/SKILL.md)
+- `verification-gate:verification-gate` skill (separate plugin; load it when installed)
