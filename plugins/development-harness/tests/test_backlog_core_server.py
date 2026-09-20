@@ -3923,6 +3923,63 @@ def test_sections_index_from_result_empty_sections_returns_empty_string() -> Non
 
 
 # ---------------------------------------------------------------------------
+# _build_compact_manifest  (unit tests — pure function, no MCP transport)
+# ---------------------------------------------------------------------------
+
+
+def test_build_compact_manifest_hint_recommends_section_narrowing_first() -> None:
+    """_build_compact_manifest's _hint recommends section narrowing before full-content load.
+
+    Tests: R7 prohibition-1 compliance — the first line of _hint must not recommend
+           loading everything as the first suggestion.
+    Why: An agent reading a two-line hint acts on the first line.  If it recommends
+         full-content load first, the agent reloads the same over-budget content it
+         is trying to avoid.
+    """
+    from backlog_core.server import _build_compact_manifest
+
+    # Arrange
+    selector = "#3060"
+    result = _make_view_result({"title": "Big Item", "sections_index": "## Sections\n[0] Huge (1 entries)\n"})
+
+    # Act
+    compact = _build_compact_manifest(result, full_response={}, selector=selector)
+    first_line = str(compact["_hint"]).split("\n", 1)[0]
+
+    # Assert — first line narrows to a section, not full-content load
+    assert "section=" in first_line, f"First _hint line must mention 'section=', got: {first_line!r}"
+    assert first_line != f"Load full content: backlog_view(selector='{selector}', summary=False)", (
+        f"First _hint line must not be the full-content-load recommendation, got: {first_line!r}"
+    )
+
+
+def test_build_compact_manifest_hint_has_no_section_address_when_no_sections_index() -> None:
+    """_build_compact_manifest's _hint omits the section= suggestion for a sectionless item.
+
+    Tests: R7 prohibition-3 — a hint must never name a mechanism absent from the
+           response it accompanies. When an item has no ``sections_index`` (an
+           unstructured body), ``section=<name>`` is not a valid address in this
+           response — using it produces a ``section_filter_miss``, not content.
+    Why: Without this guard, a sectionless item's compact manifest would still
+         lead with a `section=` suggestion an agent cannot act on, sending it
+         into a miss loop before it reaches the one mechanism that does work.
+    """
+    from backlog_core.server import _build_compact_manifest
+
+    # Arrange — no sections_index and no sections dict, so the derived index is empty
+    selector = "#4242"
+    result = _make_view_result({"title": "Unstructured Item", "body": "Just prose, no headings."})
+
+    # Act
+    compact = _build_compact_manifest(result, full_response={}, selector=selector)
+
+    # Assert — the only mechanism named is the one this response actually supports
+    assert "sections_index" not in compact
+    assert compact["_hint"] == f"Load full content: backlog_view(selector='{selector}', summary=False)"
+    assert "section=" not in str(compact["_hint"])
+
+
+# ---------------------------------------------------------------------------
 # _build_over_budget_view  (unit tests — pure function, no MCP transport)
 # ---------------------------------------------------------------------------
 
@@ -3999,6 +4056,40 @@ def test_build_over_budget_view_usage_mentions_sections_param() -> None:
     usage = str(compact["_usage"])
     assert "sections=" in usage, f"_usage must mention 'sections=', got: {usage!r}"
     assert "#7" in usage, f"_usage must embed the selector '#7', got: {usage!r}"
+
+
+def test_build_over_budget_view_narrowed_usage_advises_ordinal_map_not_section_narrowing() -> None:
+    """_build_over_budget_view with narrowed_to_single_section=True advises map=True, not section narrowing.
+
+    Tests: R7 prohibition-2 compliance — when the caller already narrowed to a single
+           section that is itself over budget, _usage must not repeat exhausted
+           section-narrowing advice; it must point to the ordinal map instead.
+    Why: Recommending section= narrowing again when the caller already narrowed to one
+         section and is still over budget sends the caller in a loop.
+    """
+    from backlog_core.server import _build_over_budget_view
+
+    # Arrange
+    result = _make_view_result({
+        "number": 3060,
+        "title": "Huge Section Item",
+        "priority": "P1",
+        "status": "open",
+        "description": "An item with one oversized section.",
+        "sections_index": "## Sections\n[0] Huge (1 entries)\n",
+    })
+
+    # Act
+    compact = _build_over_budget_view(result, full_chars=99999, selector="#3060", narrowed_to_single_section=True)
+    usage = str(compact["_usage"])
+
+    # Assert — present: ordinal-map advice and the selector
+    assert "map=True" in usage, f"_usage must mention 'map=True', got: {usage!r}"
+    assert "#3060" in usage, f"_usage must embed the selector '#3060', got: {usage!r}"
+    # Assert — absent: the exhausted section-narrowing call-expression forms
+    assert "sections=['" not in usage, f"_usage must not repeat sections=[' narrowing, got: {usage!r}"
+    assert "section='0" not in usage, f"_usage must not repeat section='0 narrowing, got: {usage!r}"
+    assert "section='/" not in usage, f"_usage must not repeat section='/ narrowing, got: {usage!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -4149,4 +4240,105 @@ async def test_backlog_view_auto_compact_enforced_when_section_filter_provided(m
         f"Budget enforcement must apply even with section= filter, but _over_budget is absent. "
         f"Got keys: {list(response.keys())}"
     )
-    assert response["_over_budget"] is True
+
+
+# ---------------------------------------------------------------------------
+# AC3 — narrowed _usage names map=True's own budget limit
+# ---------------------------------------------------------------------------
+
+
+def test_build_over_budget_view_narrowed_usage_names_map_true_budget_limit() -> None:
+    """narrowed _usage tells the caller the map=True fallback can itself be over budget.
+
+    Tests: R7 prohibition-3 honesty — the ``map=True`` hint must not be presented as
+           a guaranteed fix; it must name its own ``over_budget`` field and state that
+           no smaller retrieval exists yet for the oversized section.
+    Why: Without this sentence, a caller that follows the ``map=True`` hint and hits
+         another over-budget response has no way to know that outcome was expected
+         and that no further narrowing is currently available.
+    """
+    from backlog_core.server import _build_over_budget_view
+
+    # Arrange
+    result = _make_view_result({
+        "number": 3060,
+        "title": "Huge Section Item",
+        "priority": "P1",
+        "status": "open",
+        "description": "An item with one oversized section.",
+        "sections_index": "## Sections\n[0] Huge (1 entries)\n",
+    })
+
+    # Act
+    compact = _build_over_budget_view(result, full_chars=99999, selector="#3060", narrowed_to_single_section=True)
+    usage = str(compact["_usage"])
+
+    # Assert
+    assert "map=True" in usage, f"_usage must mention 'map=True', got: {usage!r}"
+    assert "over_budget" in usage, f"_usage must name the 'over_budget' field, got: {usage!r}"
+    assert "no smaller retrieval" in usage, f"_usage must state 'no smaller retrieval', got: {usage!r}"
+
+
+def test_build_over_budget_view_narrowed_usage_does_not_misrepresent_map_over_budget_field() -> None:
+    """narrowed _usage does not claim over_budget signals the map response's own size.
+
+    Tests: honesty of the ``over_budget`` reference — ``MapResponse.over_budget``
+           (``disclosure_handler.py``'s ``_handle_map``) is derived from the
+           item's total level-1 content estimate, not from the serialised
+           ``map_text`` length, so it can be ``True`` while the map response
+           itself is small and fully usable.
+    Why: Telling a caller to "check its own over_budget field" to decide whether
+         the map=True response overflowed would send it away from a usable
+         fallback based on a field that does not measure what the hint implies.
+    """
+    from backlog_core.server import _build_over_budget_view
+
+    # Arrange
+    result = _make_view_result({
+        "number": 3060,
+        "title": "Huge Section Item",
+        "priority": "P1",
+        "status": "open",
+        "description": "An item with one oversized section.",
+        "sections_index": "## Sections\n[0] Huge (1 entries)\n",
+    })
+
+    # Act
+    compact = _build_over_budget_view(result, full_chars=99999, selector="#3060", narrowed_to_single_section=True)
+    usage = str(compact["_usage"])
+
+    # Assert — the field is named for what it actually measures, not as a map-size check
+    assert "check its own over_budget field" not in usage, (
+        f"_usage must not tell the caller to use over_budget as a map-response-size check, got: {usage!r}"
+    )
+    assert "total content estimate" in usage, (
+        f"_usage must explain over_budget reflects the item's total content estimate, got: {usage!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# AC5 — backlog_view summary Field description lists sections before content
+# ---------------------------------------------------------------------------
+
+
+async def test_backlog_view_summary_description_lists_sections_before_full_content() -> None:
+    """backlog_view's ``summary`` parameter description orders 'specific sections' before 'full content'.
+
+    Tests: hint ordering — the registered tool's input schema description for
+           ``summary`` must list section-scoped retrieval ahead of full-content
+           retrieval, matching R7's "never recommend retrieving everything as its
+           first suggestion" prohibition.
+    Why: Tool descriptions are the caller's first signal for how to retrieve data;
+         listing 'full content' first nudges callers toward the expensive option.
+    """
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+
+    tool = next(t for t in tools if t.name == "backlog_view")
+    description = str(tool.input_schema["properties"]["summary"]["description"])
+
+    sections_pos = description.index("specific sections")
+    full_content_pos = description.index("full content")
+    assert sections_pos < full_content_pos, (
+        f"'specific sections' must appear before 'full content' in the summary Field description, got: {description!r}"
+    )
