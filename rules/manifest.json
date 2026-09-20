@@ -1,6 +1,10 @@
 {
   "rules": [
     {
+      "file": "adr-lifecycle.md",
+      "match": "**/docs/adrs/*.md,**/decisions/*.md,ARCHITECTURE.md"
+    },
+    {
       "file": "agent-output-contracts.md",
       "match": "**/agents/*.md"
     },
@@ -14,7 +18,7 @@
     },
     {
       "file": "citation-requirements.md",
-      "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
+      "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
     },
     {
       "file": "commit-cadence-and-worktrees.md",
@@ -38,7 +42,7 @@
     },
     {
       "file": "exception-handling.md",
-      "match": "*.py,*.ts,*.js"
+      "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
     },
     {
       "file": "fact-verification-first.md",
@@ -86,7 +90,7 @@
     },
     {
       "file": "plugin-json.md",
-      "match": ".claude-plugin/plugin.json,plugin.json"
+      "match": "plugin.json"
     },
     {
       "file": "proactive-fix-gate.md",
@@ -126,7 +130,7 @@
     },
     {
       "file": "silent-failure-prevention.md",
-      "match": "*.py,*.ts,*.js"
+      "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
     },
     {
       "file": "skill-content-optimization.md",
