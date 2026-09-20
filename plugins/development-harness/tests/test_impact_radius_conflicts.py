@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
+from backlog_core.entry_blocks import rewrite_section, wrap_entry_with_timestamp
 from backlog_core.operations import ImpactRadiusItem, analyze_impact_radius_conflicts
 from dispatch_schema.core.models import ConflictGroup
 
@@ -220,6 +221,45 @@ def test_analyze_impact_radius_conflicts_uses_system_from_inventory_row() -> Non
 
     assert len(result) == 1
     assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_reads_inventory_inside_active_entry_blocks() -> None:
+    shared = "plugins/development-harness/backlog_core/operations.py"
+    inventory = f"### Systems Inventory\n- `{shared}` | Role: runtime system"
+    first = wrap_entry_with_timestamp(inventory, "2026-09-20T00:00:00Z")
+    second = wrap_entry_with_timestamp(inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert len(result) == 1
+    assert result[0].reason == f"Shared systems: {shared}"
+
+
+def test_analyze_impact_radius_conflicts_does_not_share_entry_wrapper_markup() -> None:
+    first_inventory = "### Systems Inventory\n- `plugins/a.py` | Role: runtime system"
+    second_inventory = "### Systems Inventory\n- `plugins/b.py` | Role: runtime system"
+    first = wrap_entry_with_timestamp(first_inventory, "2026-09-20T00:00:00Z")
+    second = wrap_entry_with_timestamp(second_inventory, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+def test_analyze_impact_radius_conflicts_ignores_superseded_entry_inventory() -> None:
+    superseded = "### Systems Inventory\n- `plugins/shared.py` | Role: former system"
+    current = "### Systems Inventory\n- `plugins/current-a.py` | Role: runtime system"
+    first = rewrite_section(
+        wrap_entry_with_timestamp(superseded, "2026-09-20T00:00:00Z"),
+        new_content=current,
+        replace=True,
+        reason="impact analysis refreshed",
+    )
+    second = wrap_entry_with_timestamp(superseded, "2026-09-20T00:01:00Z")
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
 
 
 def test_analyze_impact_radius_conflicts_reads_legacy_inventory_row_suffix() -> None:

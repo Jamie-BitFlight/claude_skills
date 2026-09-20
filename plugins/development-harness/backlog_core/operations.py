@@ -6027,26 +6027,27 @@ def _parse_impact_radius_paths(impact_radius: str) -> set[str]:
         Set of system identifiers. Empty set when the body contains no
         inventory rows or legacy paths.
     """
-    inventory_section = next(
-        (
-            section
-            for section in split_body_sections(impact_radius, levels=frozenset(range(1, 7)))
-            if section.plain_name.strip().casefold() == "systems inventory"
-        ),
-        None,
+    active_content = "\n\n".join(
+        entry.content for entry in parse_entries(impact_radius, show="all") if not entry.struck
     )
+    inventory_sections = [
+        section
+        for section in split_body_sections(active_content, levels=frozenset(range(1, 7)))
+        if section.plain_name.strip().casefold() == "systems inventory"
+    ]
 
-    if inventory_section is not None:
+    if inventory_sections:
         systems: set[str] = set()
-        for raw_line in inventory_section.content.splitlines():
-            line = raw_line.strip()
-            match = re.match(r"[-*]\s+`([^`]+)`", line)
-            if match:
-                systems.add(match.group(1).partition("::")[0].strip())
+        for inventory_section in inventory_sections:
+            for raw_line in inventory_section.content.splitlines():
+                line = raw_line.strip()
+                match = re.match(r"[-*]\s+`([^`]+)`", line)
+                if match:
+                    systems.add(match.group(1).partition("::")[0].strip())
         return systems
 
     paths: set[str] = set()
-    for raw_line in impact_radius.splitlines():
+    for raw_line in active_content.splitlines():
         # Strip bullet markers (-, *) and surrounding whitespace
         line = raw_line.strip().lstrip("-*").strip()
         # Discard empty lines and pure markdown headers
