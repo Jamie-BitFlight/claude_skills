@@ -37,9 +37,7 @@ been added yet.
 | `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` | `manifest.json` |
 | `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes | routing line |
 | `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` | routing line + `context-rules-agent.mjs` |
-| `evidence-action-proportionality.md` | files changed must match evidence gathered | routing line |
 | `fact-verification-first.md` | WebSearch before planning around a named product/version | routing line + `context-rules-prompt.mjs` |
-| `falsification-requirement.md` | every hypothesis test needs a falsification check | routing line |
 | `fix-delegation-discipline.md` | reproduction-first cycle for bug-fix delegation | routing line + `context-rules-agent.mjs` |
 | `interactive-terminal-workarounds.md` | PTY providers when a tool needs a TTY | routing line |
 | `large-file-write-strategy.md` | skeleton+edit-fill above 25K chars | routing line |

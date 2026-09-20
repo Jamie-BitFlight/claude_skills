@@ -102,23 +102,18 @@ Before running `git commit`, running `git push`, or spawning a sub-agent that wr
 Before doing substantive work yourself, or dispatching it to a sub-agent, read
 `rules/delegation.md` for when delegation is required, and its fix and output-path pointers.
 
-Before editing more than one file, read `rules/evidence-action-proportionality.md`
-for the verification-before-scope requirement.
-
 When a prompt names a specific product, technology, version, or release event, read
 `rules/fact-verification-first.md` before any planning, design, or code generation.
-
-Before acting on a confirmed hypothesis, read `rules/falsification-requirement.md` for the required
-falsification check.
 
 Before writing a bug-fix delegation prompt, read `rules/fix-delegation-discipline.md` for the
 reproduction-first cycle and prompt template.
 
-On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), garbled
-terminal-browser output (block characters instead of text), or before running any tool that
-requires a TTY (including `git rebase -i`/`git add -i`), read
-`rules/interactive-terminal-workarounds.md` for PTY providers, the DevTools Protocol workaround,
-and non-interactive equivalents.
+On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), or before running
+any tool that requires a TTY (including `git rebase -i`/`git add -i`), read
+`rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents.
+
+On garbled terminal-browser output (block characters instead of text — terminal browsers render
+pixels, not extractable text), use the /agent-browser skill instead of a terminal browser.
 
 Before a single `Write` call whose content may exceed 25,000 characters, read
 `rules/large-file-write-strategy.md` for the split/skeleton-and-fill strategy.
