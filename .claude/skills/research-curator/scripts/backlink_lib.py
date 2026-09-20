@@ -1,61 +1,30 @@
 #!/usr/bin/env -S uv run --quiet --script
+# noqa: SIZE_OK - Existing shared backlink API kept intact; this change adds only its extraction-cache seam.
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["marko>=2.0.0", "pydantic>=2.12.5"]
+#
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Shared library for backlink detection: cross-reference table parsing, relationship-description transforms, and idempotent backlink emission."""
 
 from __future__ import annotations
 
+import importlib.metadata
 import pathlib
 import re
+import sqlite3
 import sys
-from dataclasses import dataclass
+from contextlib import suppress
 
 import marko
 import marko.block
 import marko.ext.gfm.elements as gfm_elements
 import marko.inline
-from pydantic import BaseModel, Field
 
-# ---------------------------------------------------------------------------
-# Data types
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class CrossRefRow:
-    """A single row from a Cross-References markdown table."""
-
-    entry_name: str
-    link_path: str
-    category: str
-    relationship: str
-
-
-class ScanSkip(BaseModel):
-    """One file the vault scan could not fold into the graph, and why."""
-
-    path: str = Field(description="Path of the skipped file, relative to the vault root.")
-    reason: str = Field(description="Which phase dropped it: 'read', 'parse', or 'resolve'.")
-    detail: str = Field(description="The originating exception rendered as text.")
-
-
-class CrossReferenceScan(BaseModel):
-    """A vault scan: the edge graph, plus every file dropped while building it.
-
-    The skips travel with the graph so that a caller cannot read the graph without
-    also being handed the scan's coverage. A graph alone cannot distinguish
-    "this vault has no asymmetric edges" from "the files that had them were dropped".
-    """
-
-    graph: dict[pathlib.Path, list[pathlib.Path]] = Field(
-        default_factory=dict, description="Adjacency list mapping each entry to the entries it cites."
-    )
-    skips: list[ScanSkip] = Field(
-        default_factory=list, description="Every file dropped during the scan, in vault-walk order."
-    )
-
+from backlink_cache import CrossReferenceExtractionCache, content_sha256
+from backlink_models import CrossReferenceScan, CrossRefRow, ScanSkip
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -64,6 +33,9 @@ class CrossReferenceScan(BaseModel):
 _H2_LEVEL = 2
 _CROSS_REF_MIN_COLS = 3
 _TABLE_SEPARATOR_MIN_PIPES = 2
+_EXTRACTION_CACHE_VERSION = 1
+_PARSER_FINGERPRINT = f"marko={importlib.metadata.version('marko')};extractor={_EXTRACTION_CACHE_VERSION}"
+_NON_ENTRY_FILENAMES = {"README.md", "CLAUDE.md", "AGENTS.md"}
 
 
 # ---------------------------------------------------------------------------
@@ -252,24 +224,16 @@ def _find_freshness_insert_index(lines_stripped: list[str], anchor_idx: int) -> 
 # ---------------------------------------------------------------------------
 
 
-def parse_cross_references_table(entry_markdown: str) -> list[CrossRefRow]:
-    """Parse the Cross-References markdown table from an entry using marko AST.
-
-    Walks the marko AST looking for a Heading with text "Cross-References" followed
-    by a Table node. Extracts each non-header row as a CrossRefRow.
+def parse_cross_references_table_with_parser(entry_markdown: str, parser: marko.Markdown) -> list[CrossRefRow]:
+    """Parse Cross-References rows with a caller-owned serial Marko parser.
 
     Args:
-        entry_markdown: Full text of a research entry markdown file.
+        entry_markdown: Full text of a research entry.
+        parser: Marko GFM parser owned by the calling thread.
 
     Returns:
-        List of CrossRefRow instances, one per data row in the table.
-        Returns an empty list when no Cross-References section or table is found.
-
-    Raises:
-        ValueError: When a Cross-References section exists but contains a malformed
-            table (e.g., wrong column count, missing link in Entry cell).
+        Ordered table rows, or an empty list when no target table exists.
     """
-    parser = marko.Markdown(extensions=["gfm"])
     doc = parser.parse(entry_markdown)
 
     doc_children: list[object] = getattr(doc, "children", [])
@@ -292,6 +256,136 @@ def parse_cross_references_table(entry_markdown: str) -> list[CrossRefRow]:
             return _parse_table_rows(node)
 
     return []
+
+
+class CachedExtractor:
+    """Reuse one Marko parser and optional cache, requesting a clean restart after late cache failure."""
+
+    def __init__(self, cache_path: pathlib.Path | None, quiet: bool) -> None:
+        """Create a serial extractor for one graph scan.
+
+        Args:
+            cache_path: SQLite cache path, or None for uncached extraction.
+            quiet: Suppress cache-fallback warnings when true.
+        """
+        self._quiet = quiet
+        self._parser = marko.Markdown(extensions=["gfm"])
+        self._cache: CrossReferenceExtractionCache | None = None
+        self.files_parsed = 0
+        self.cache_hits = 0
+        self.requires_uncached_restart = False
+        if cache_path is not None:
+            try:
+                self._cache = CrossReferenceExtractionCache(cache_path)
+            except (OSError, sqlite3.Error) as exc:
+                self._disable_cache(exc)
+
+    def _disable_cache(self, exc: OSError | sqlite3.Error) -> None:
+        if self._cache is not None:
+            with suppress(OSError, sqlite3.Error):
+                self._cache.close()
+        self._cache = None
+        if not self._quiet:
+            print(f"warning: extraction-cache-disabled: {exc}", file=sys.stderr)
+
+    def extract(self, content: bytes, text: str) -> list[CrossRefRow]:
+        """Return cached or freshly parsed rows for one document.
+
+        Args:
+            content: Exact document bytes used as the cache identity.
+            text: UTF-8-decoded document passed to Marko on a miss.
+
+        Returns:
+            Ordered Cross-References rows.
+        """
+        content_identity = content_sha256(content)
+        if self._cache is not None:
+            try:
+                cached_rows = self._cache.get(content_identity, _PARSER_FINGERPRINT)
+            except (OSError, sqlite3.Error) as exc:
+                self.requires_uncached_restart = self.files_parsed > 0 or self.cache_hits > 0
+                self._disable_cache(exc)
+            else:
+                if cached_rows is not None:
+                    self.cache_hits += 1
+                    return cached_rows
+
+        self.files_parsed += 1
+        rows = parse_cross_references_table_with_parser(text, self._parser)
+        if self._cache is not None:
+            self._cache.put(content_identity, _PARSER_FINGERPRINT, rows)
+        return rows
+
+    def close(self) -> None:
+        """Commit complete extractions and close the optional cache."""
+        if self._cache is None:
+            return
+        try:
+            self._cache.commit()
+        except (OSError, sqlite3.Error) as exc:
+            self._disable_cache(exc)
+            return
+        with suppress(OSError, sqlite3.Error):
+            self._cache.close()
+        self._cache = None
+
+
+def record_scan_skip(skips: list[ScanSkip], relative_file: pathlib.Path, reason: str, message: str) -> None:
+    """Record one coverage hole for the scan result.
+
+    Args:
+        skips: Scan result list to append to.
+        relative_file: Affected path relative to the vault.
+        reason: Scan phase that failed.
+        message: Human-readable failure detail.
+    """
+    skips.append(ScanSkip(path=relative_file.as_posix(), reason=reason, detail=message))
+
+
+def resolve_targets(
+    source: pathlib.Path, relative_file: pathlib.Path, cross_reference_rows: list[CrossRefRow], skips: list[ScanSkip]
+) -> list[pathlib.Path]:
+    """Resolve currently existing targets for parsed rows.
+
+    Args:
+        source: Absolute source-entry path.
+        relative_file: Source path relative to the vault.
+        cross_reference_rows: Parsed Cross-References rows.
+        skips: Scan result list for resolution failures.
+
+    Returns:
+        Resolved targets that currently exist.
+    """
+    targets: list[pathlib.Path] = []
+    for row in cross_reference_rows:
+        try:
+            target = resolve_link_path(source, row.link_path)
+        except (OSError, ValueError) as exc:
+            record_scan_skip(skips, relative_file, "resolve", f"resolve {row.link_path!r} in {relative_file}: {exc}")
+            continue
+        if target.exists():
+            targets.append(target)
+    return targets
+
+
+def parse_cross_references_table(entry_markdown: str) -> list[CrossRefRow]:
+    """Parse the Cross-References markdown table from an entry using marko AST.
+
+    Walks the marko AST looking for a Heading with text "Cross-References" followed
+    by a Table node. Extracts each non-header row as a CrossRefRow.
+
+    Args:
+        entry_markdown: Full text of a research entry markdown file.
+
+    Returns:
+        List of CrossRefRow instances, one per data row in the table.
+        Returns an empty list when no Cross-References section or table is found.
+
+    Raises:
+        ValueError: When a Cross-References section exists but contains a malformed
+            table (e.g., wrong column count, missing link in Entry cell).
+    """
+    return parse_cross_references_table_with_parser(entry_markdown, marko.Markdown(extensions=["gfm"]))
 
 
 def extract_section_block(entry_markdown: str, heading: str) -> tuple[int, int] | None:
@@ -611,7 +705,9 @@ def append_backlink_row(
     return ("\n".join(new_lines) + ("\n" if ends_with_newline else ""), True)
 
 
-def build_cross_reference_graph(vault_root: pathlib.Path, *, quiet: bool = False) -> CrossReferenceScan:
+def build_cross_reference_graph(
+    vault_root: pathlib.Path, *, quiet: bool = False, cache_path: pathlib.Path | None = None
+) -> CrossReferenceScan:
     """Scan the vault and return its cross-reference edge graph plus every skipped file.
 
     Walks all .md files under vault_root (excluding README.md), parses each entry's
@@ -631,6 +727,11 @@ def build_cross_reference_graph(vault_root: pathlib.Path, *, quiet: bool = False
             afterward to verify none remain -- and a scan-skip is a pre-existing file
             defect the fix step never touches, so the second call would otherwise
             reprint every skip already reported by the first.
+        cache_path: Optional SQLite path for successful extraction results. Entries
+            are keyed by exact file bytes and parser version. Link resolution and
+            target existence are always recomputed from the current filesystem. A
+            cache read failure after earlier documents discards the partial pass and
+            restarts the complete scan without a cache.
 
     Returns:
         A CrossReferenceScan whose ``graph`` maps each entry's absolute Path to the
@@ -641,46 +742,46 @@ def build_cross_reference_graph(vault_root: pathlib.Path, *, quiet: bool = False
     vault_root = vault_root.resolve()
     graph: dict[pathlib.Path, list[pathlib.Path]] = {}
     skips: list[ScanSkip] = []
+    extractor = CachedExtractor(cache_path, quiet)
 
-    def record(rel_file: pathlib.Path, reason: str, message: str) -> None:
-        """Record one skip and, unless quiet, mirror it to stderr."""
-        skips.append(ScanSkip(path=rel_file.as_posix(), reason=reason, detail=message))
-        if not quiet:
-            print(f"warning: scan-skipped, could not {message}", file=sys.stderr)
-
-    for md_file in sorted(vault_root.rglob("*.md")):
-        if md_file.name == "README.md":
-            continue
-        abs_file = md_file.resolve()
-        # Relative to the *unresolved* rglob path, which is always literally under
-        # vault_root. Deriving it from abs_file instead would raise ValueError for
-        # any .md that symlinks outside the vault, aborting the whole scan on a
-        # display string -- the opposite of this function's skip-and-continue contract.
-        rel_file = md_file.relative_to(vault_root)
-        graph.setdefault(abs_file, [])
-
-        try:
-            text = md_file.read_text(encoding="utf-8")
-        except OSError as exc:
-            record(rel_file, "read", f"read {rel_file}: {exc}")
-            continue
-
-        try:
-            rows = parse_cross_references_table(text)
-        except ValueError as exc:
-            record(rel_file, "parse", f"parse {rel_file}: {exc}")
-            continue
-
-        for row_item in rows:
-            try:
-                target = resolve_link_path(abs_file, row_item.link_path)
-            except (OSError, ValueError) as exc:
-                record(rel_file, "resolve", f"resolve {row_item.link_path!r} in {rel_file}: {exc}")
+    try:
+        for md_file in sorted(vault_root.rglob("*.md")):
+            if md_file.name in _NON_ENTRY_FILENAMES:
                 continue
-            if target.exists():
-                graph[abs_file].append(target)
+            abs_file = md_file.resolve()
+            rel_file = md_file.relative_to(vault_root)
+            graph.setdefault(abs_file, [])
 
-    return CrossReferenceScan(graph=graph, skips=skips)
+            try:
+                content = md_file.read_bytes()
+                text = content.decode("utf-8")
+            except (OSError, UnicodeDecodeError) as exc:
+                record_scan_skip(skips, rel_file, "read", f"read {rel_file}: {exc}")
+                continue
+
+            try:
+                rows = extractor.extract(content, text)
+            except ValueError as exc:
+                if extractor.requires_uncached_restart:
+                    break
+                record_scan_skip(skips, rel_file, "parse", f"parse {rel_file}: {exc}")
+                continue
+            if extractor.requires_uncached_restart:
+                break
+            graph[abs_file].extend(resolve_targets(abs_file, rel_file, rows, skips))
+    finally:
+        extractor.close()
+
+    if extractor.requires_uncached_restart:
+        return build_cross_reference_graph(vault_root, quiet=quiet, cache_path=None)
+
+    if not quiet:
+        for skip in skips:
+            print(f"warning: scan-skipped, could not {skip.detail}", file=sys.stderr)
+
+    return CrossReferenceScan(
+        graph=graph, skips=skips, files_parsed=extractor.files_parsed, cache_hits=extractor.cache_hits
+    )
 
 
 def find_asymmetric_edges(graph: dict[pathlib.Path, list[pathlib.Path]]) -> list[tuple[pathlib.Path, pathlib.Path]]:

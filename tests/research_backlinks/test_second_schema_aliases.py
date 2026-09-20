@@ -18,9 +18,24 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Final
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
+import pytest
+
+pytestmark = pytest.mark.integration
+
+_REPO_ROOT = Path(__file__).parents[2]
+_SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+_RUN_BOUNDED: Final = (
+    "uv",
+    "run",
+    "--script",
+    str(_REPO_ROOT / "scripts" / "run_bounded.py"),
+    "--timeout-seconds",
+    "60",
+    "--",
+)
 
 _BODY = """\
 # Example
@@ -67,7 +82,7 @@ def _uv_path() -> str:
 
 def _run_json(path: Path) -> dict:
     """Run ``validate_research.py main --json`` on a single file and parse the result."""
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", "--json", str(path)]
+    cmd = [*_RUN_BOUNDED, _uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "main", "--json", str(path)]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     return json.loads(result.stdout)
 

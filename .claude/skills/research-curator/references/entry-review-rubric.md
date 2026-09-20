@@ -33,9 +33,9 @@ uv run --script .claude/skills/research-curator/scripts/validate_research.py che
 |---|---|---|
 | `fix_research_formatting.py --check` | Non-zero exit — the file needs formatting fixes | Every path the tool named, and the fix it wanted. `--check` does not write; drop `--check` only when this review is also applying fixes |
 | `validate_research.py main --json` | Any issue in the JSON `entries[].issues[]` array | `errors: N, warnings: N` from `summary`, then every issue's `check`, `severity`, `message`, and `line`, quoted |
-| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each asymmetric pair by both paths, and every `{path} ({reason})` line under `scan_skipped_files: N`. Run without `--fix` to review; `--fix` repairs but hides what was wrong |
+| `validate_research.py check-backlinks ./research` | Any asymmetric cross-reference involving this entry, or any file the scan could not read or parse | Each object in JSON `edges`, and every object in `skips` when `scan_skipped_files` is non-zero. `--fix` retains the original `edges` and adds repair outcome fields |
 
-A non-zero `scan_skipped_files: N` fails this command on its own, because a file dropped from
+A non-zero `scan_skipped_files` field fails this command on its own, because a file dropped from
 the scan was never compared -- exit 0 would claim coverage the scan did not have. Treat those
 paths as Gate 1 defects, not as noise.
 

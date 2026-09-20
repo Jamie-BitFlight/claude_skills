@@ -43,7 +43,7 @@ Relative paths are computed from the directory of the entry the row is being wri
 
 Within a category: `./other-entry.md`. Across categories: `../other-category/filename.md`. Use `pathlib.Path` to compute the relative path rather than assembling it by hand.
 
-Every path must resolve to a real file. `validate_research.py check-backlinks` reports rows pointing at paths that do not exist on disk, and `--fix` skips them rather than writing a reciprocal row into nothing.
+Every path must resolve to a real file. The current `validate_research.py check-backlinks` implementation omits missing targets from its graph and cannot repair them, so a clean backlink result is not proof that every target exists. Verify a target when authoring its row.
 
 The reciprocal row is written into the *cited* entry, so `--fix` modifies files the current task may not own. Pass `--exclude {path}` once per file the run must leave untouched -- an excluded file is still scanned and still reported, only the write is withheld.
 

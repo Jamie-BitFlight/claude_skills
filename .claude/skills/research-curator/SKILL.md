@@ -338,7 +338,7 @@ in [Mode Routing](#mode-routing).
    (see [Mode Routing](#mode-routing)). The repair writes its reciprocal row into the *cited*
    entry, so without this it can write into another contributor's uncommitted work. An excluded
    file is still scanned and its asymmetric pairs are still reported -- only the write is withheld,
-   counted on stdout as `backlinks_excluded: N`. Step 3 below still filters those paths out of the
+   counted in stdout JSON as `backlinks_excluded`. Step 3 below still filters those paths out of the
    commit; `--exclude` is what keeps them unmodified on disk in the first place.
 
    ```bash
@@ -350,26 +350,24 @@ in [Mode Routing](#mode-routing).
    Check the result in this order:
 
    1. **Exit code 124** (`run_bounded.py`'s timeout signal): halt Post-Actions and report a
-      timeout, unconditionally -- even if an `asymmetric_cross_references: N` line already printed
-      before the timeout fired, a terminated run's partial state is not trustworthy to commit.
-   2. **Stdout does not contain an `asymmetric_cross_references: N` line**: the command crashed
-      before completing its scan rather than reporting a structural result. Halt Post-Actions and
-      report the failure to the user.
+      timeout unconditionally. A terminated run's partial state is not trustworthy to commit.
+   2. **Stdout is not one compact JSON object containing integer
+      `asymmetric_cross_references`**: the command crashed before completing its scan rather than
+      reporting a structural result. Halt Post-Actions and report the failure to the user.
    3. **Stderr contains a `warning: io-error, could not repair ...` line**: a genuine I/O failure
       reading or writing a target. Halt Post-Actions and report the exact warning text.
-   4. **Otherwise**: continue to step 3 regardless of this exit code. This covers both a clean
-      structural non-zero exit (a dangling link to a missing target) and a
+   4. **Otherwise**: continue to step 3 regardless of this exit code. This covers a
       `warning: structural, could not repair ...` line (a malformed entry the script cannot parse,
-      e.g. a Cross-References row with no markdown link). A non-zero `scan_skipped_files: N`
-      line belongs here too: those files were dropped from the graph before they could be
-      compared, so the printed `asymmetric_cross_references: N` undercounts by whatever they hold,
-      and `N > 0` is on its own enough to make this command exit non-zero. Read the
-      `{path} ({reason})` lines printed under that count and report each verbatim -- the files are
-      repairable and nothing else in the repo will name them -- then continue. Pass
+      e.g. a Cross-References row with no markdown link). A non-zero `scan_skipped_files` field
+      belongs here too: those files were dropped from the graph before they could be compared, so
+      `asymmetric_cross_references` undercounts by whatever they hold, and a positive skip count is
+      on its own enough to make this command exit non-zero. Read each object in `skips` and report
+      its `path`, `reason`, and `detail` verbatim -- the files are repairable and nothing else in
+      the repo will name them -- then continue. Pass
       `--allow-partial-scan` only when a run must exit 0 despite that hole in its coverage; this
-      step never needs it, because it already continues past a non-zero exit. Do not parse the printed
-      `{source} -> {target}` lines to guess which files were modified -- they list every asymmetric
-      edge found *before* repair was attempted, not which repairs succeeded. Step 3's diff
+      step never needs it, because it already continues past a non-zero exit. Do not use the
+      `edges` array to guess which files were modified -- it lists every asymmetric edge found
+      *before* repair was attempted, not which repairs succeeded. Step 3's diff
       determines what this command actually changed.
 
 3. **Compute the filtered file list** -- diff the current working tree against the pre-mode

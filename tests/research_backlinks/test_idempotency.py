@@ -2,14 +2,32 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any, Final
+
+import pytest
 
 import backlink_lib as bl
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
+_REPO_ROOT = Path(__file__).parents[2]
+_SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+_RUN_BOUNDED: Final = (
+    "uv",
+    "run",
+    "--script",
+    str(_REPO_ROOT / "scripts" / "run_bounded.py"),
+    "--timeout-seconds",
+    "60",
+    "--",
+)
+
+
+def _report(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    return json.loads(result.stdout)
 
 
 def _uv_path() -> str:
@@ -149,6 +167,7 @@ class TestAppendBacklinkRowIdempotency:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
 class TestValidatorFixIdempotent:
     """Running --fix twice must leave vault in zero-asymmetry state after first run."""
 
@@ -280,7 +299,16 @@ Test.
 
     def _run_check_backlinks(self, vault: Path, fix: bool = False) -> subprocess.CompletedProcess[str]:
         """Run the check-backlinks command via uv run --script."""
-        cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), "check-backlinks", str(vault)]
+        cmd = [
+            *_RUN_BOUNDED,
+            _uv_path(),
+            "run",
+            "--script",
+            str(_VALIDATE_SCRIPT),
+            "check-backlinks",
+            str(vault),
+            "--no-cache",
+        ]
         if fix:
             cmd.append("--fix")
         return subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -291,22 +319,18 @@ Test.
 
         # First check: expect asymmetry
         result1 = self._run_check_backlinks(vault)
-        assert "asymmetric_cross_references: 1" in result1.stdout, (
-            f"Expected 1 asymmetry before fix, got:\n{result1.stdout}"
-        )
+        assert _report(result1)["asymmetric_cross_references"] == 1
 
         # First fix: repair the asymmetry
         result_fix1 = self._run_check_backlinks(vault, fix=True)
         assert result_fix1.returncode == 0, (
             f"First fix should exit 0, got {result_fix1.returncode}:\n{result_fix1.stdout}\n{result_fix1.stderr}"
         )
-        assert "backlinks_repaired: 1" in result_fix1.stdout
+        assert _report(result_fix1)["backlinks_repaired"] == 1
 
         # Re-check after fix: must report 0 asymmetries
         result2 = self._run_check_backlinks(vault)
-        assert "asymmetric_cross_references: 0" in result2.stdout, (
-            f"Expected 0 asymmetries after fix, got:\n{result2.stdout}"
-        )
+        assert _report(result2)["asymmetric_cross_references"] == 0
         assert result2.returncode == 0
 
         # Second fix: idempotent — no changes, still 0
@@ -314,7 +338,7 @@ Test.
         assert result_fix2.returncode == 0, (
             f"Second fix should exit 0, got {result_fix2.returncode}:\n{result_fix2.stdout}"
         )
-        assert "asymmetric_cross_references: 0" in result_fix2.stdout
+        assert _report(result_fix2)["remaining_asymmetric_cross_references"] == 0
 
     def test_fix_then_check_exits_zero(self, tmp_path: Path) -> None:
         """After --fix, plain check-backlinks exits 0."""

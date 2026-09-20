@@ -16,6 +16,10 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 _REPO_ROOT = Path(__file__).parents[2]
 _SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"

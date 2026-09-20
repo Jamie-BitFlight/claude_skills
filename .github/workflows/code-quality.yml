@@ -217,7 +217,11 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
+      - name: Scan research backlinks
+        run: uv run -q --locked pytest -m research_vault -v tests/research_backlinks/test_graph_asymmetry.py --no-cov
+
       - name: Validate research entries
+        if: ${{ always() }}
         run: uv run -q --locked prek run validate-research-entries --all-files
 
   # =============================================================================
@@ -267,7 +271,7 @@ jobs:
   # Deselected from the default `test-python` addopts filter because each test
   # spawns a real `uv run` or `pytest` subprocess (~2-30s each vs sub-second
   # in-process tests) — see -m "not e2e and not cross_backend and not
-  # integration" in pyproject.toml. No live external credentials required
+  # integration and not research_vault" in pyproject.toml. No live external credentials required
   # (network-guard probes are self-contained; CLI subprocess tests sanitize
   # BACKLOG_BACKEND/GITHUB_TOKEN), so unlike test-e2e this runs as a required
   # quality-gate job rather than advisory.
@@ -284,7 +288,7 @@ jobs:
       - uses: ./.github/actions/setup-python
 
       - name: Run integration tests
-        run: uv run -q --locked pytest -m integration -v plugins/development-harness/tests/
+        run: uv run -q --locked pytest -m "integration and not research_vault" -v plugins/development-harness/tests/ tests/research_backlinks/
 
   # =============================================================================
   # Python: End-to-end live validation tests

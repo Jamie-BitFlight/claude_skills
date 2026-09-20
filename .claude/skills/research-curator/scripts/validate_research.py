@@ -1,7 +1,11 @@
 #!/usr/bin/env -S uv run --quiet --script
+# noqa: SIZE_OK - Existing standalone validator CLI kept intact; this change adds typed backlink output and cache flags.
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["marko>=2.2.2", "pydantic>=2.12.5", "ruamel.yaml>=0.18.0", "typer>=0.21.0"]
+#
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Validate research entries against the research-curator quality standard.
 
@@ -26,6 +30,9 @@ from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 import typer
 from ruamel.yaml import YAML
+
+import backlink_cache
+from backlink_models import BacklinkEdge, CheckBacklinksReport
 
 if TYPE_CHECKING:
     import types
@@ -937,8 +944,7 @@ def _load_backlink_lib() -> types.ModuleType:
     """Load backlink_lib from the same directory as this script using importlib.util.
 
     Both scripts are PEP 723 siblings in the same directory; importlib is needed
-    because neither is an installed package. Module must be registered in sys.modules
-    before exec_module so that @dataclass can resolve its module namespace.
+    because neither is an installed package.
 
     Returns:
         The loaded backlink_lib module with all public functions accessible.
@@ -1129,25 +1135,44 @@ def check_backlinks(
             ),
         ),
     ] = False,
+    cache_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--cache-path", help="SQLite extraction-cache path. Defaults to a user cache scoped to this vault."
+        ),
+    ] = None,
+    no_cache: Annotated[
+        bool, typer.Option("--no-cache", help="Disable persistent extraction caching for this scan.")
+    ] = False,
 ) -> None:
     """Scan the vault for asymmetric cross-references and optionally repair them."""
     bl = _load_backlink_lib()
     vault_path = vault_path.resolve()
     excluded: set[Path] = {path.resolve() for path in (exclude or [])}
+    if no_cache and cache_path is not None:
+        raise typer.BadParameter("--cache-path cannot be combined with --no-cache")
+    selected_cache_path: Path | None = (
+        None if no_cache else cache_path or backlink_cache.default_cross_reference_cache_path(vault_path)
+    )
 
-    scan = bl.build_cross_reference_graph(vault_path)
+    scan = bl.build_cross_reference_graph(vault_path, cache_path=selected_cache_path)
     asymmetric: list[tuple[Path, Path]] = bl.find_asymmetric_edges(scan.graph)
     count = len(asymmetric)
-
-    print(f"asymmetric_cross_references: {count}")
-    for source, target in asymmetric:
-        source_rel = source.relative_to(vault_path)
-        target_rel = target.relative_to(vault_path)
-        print(f"  {source_rel} -> {target_rel}")
-
-    print(f"scan_skipped_files: {len(scan.skips)}")
-    for skip in scan.skips:
-        print(f"  {skip.path} ({skip.reason})")
+    report = CheckBacklinksReport(
+        schema_version=1,
+        asymmetric_cross_references=count,
+        edges=[
+            BacklinkEdge(
+                source=os.path.relpath(source, vault_path).replace("\\", "/"),
+                target=os.path.relpath(target, vault_path).replace("\\", "/"),
+            )
+            for source, target in asymmetric
+        ],
+        scan_skipped_files=len(scan.skips),
+        skips=scan.skips,
+        files_parsed=scan.files_parsed,
+        cache_hits=scan.cache_hits,
+    )
 
     # A skipped file is a hole in the scan's coverage, so it decides the exit code
     # independently of the edges found. Reported before any repair, because --fix
@@ -1179,17 +1204,36 @@ def check_backlinks(
                     err=True,
                 )
 
-        print(f"backlinks_repaired: {repaired}")
-        print(f"backlinks_excluded: {excluded_writes}")
         # quiet=True: this rebuild only checks for remaining asymmetric edges after
         # repair; the fix step never touches scan-skip defects, so re-scanning here
         # would reprint every skip the first build (above) already reported.
-        rescan = bl.build_cross_reference_graph(vault_path, quiet=True)
+        rescan = bl.build_cross_reference_graph(vault_path, quiet=True, cache_path=selected_cache_path)
         remaining: list[tuple[Path, Path]] = bl.find_asymmetric_edges(rescan.graph)
+        report = report.model_copy(
+            update={
+                "backlinks_repaired": repaired,
+                "backlinks_excluded": excluded_writes,
+                "verification_files_parsed": rescan.files_parsed,
+                "verification_cache_hits": rescan.cache_hits,
+                "remaining_asymmetric_cross_references": len(remaining),
+            }
+        )
+        print(json.dumps(report.model_dump(mode="json", exclude_unset=True), separators=(",", ":"), sort_keys=True))
         if remaining or scan_incomplete:
             sys.exit(1)
         sys.exit(0)
 
+    if fix:
+        report = report.model_copy(
+            update={
+                "backlinks_repaired": 0,
+                "backlinks_excluded": 0,
+                "verification_files_parsed": None,
+                "verification_cache_hits": None,
+                "remaining_asymmetric_cross_references": count,
+            }
+        )
+    print(json.dumps(report.model_dump(mode="json", exclude_unset=True), separators=(",", ":"), sort_keys=True))
     if count > 0 or scan_incomplete:
         sys.exit(1)
     sys.exit(0)

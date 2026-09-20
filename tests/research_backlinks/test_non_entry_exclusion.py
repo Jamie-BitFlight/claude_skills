@@ -15,6 +15,8 @@ from typing import Any, Final
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 _REPO_ROOT = Path(__file__).parents[2]
 _SCRIPTS_DIR = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts"
 _VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
@@ -96,13 +98,3 @@ class TestNonEntryFileExclusion:
         result = _run_json([str(vault_with_non_entry_files / "AGENTS.md")])
         assert result["entries"] == []
         assert result["summary"]["total"] == 0
-
-    def test_real_research_claude_md_excluded_from_directory_scan(self) -> None:
-        """Regression: the real research/CLAUDE.md is excluded from a real corpus scan."""
-        real_vault = Path(__file__).parents[2] / "research"
-        if not real_vault.exists():
-            pytest.skip("Real research vault not present")
-
-        result = _run_json([str(real_vault)])
-        files = {entry["file"] for entry in result["entries"]}
-        assert "CLAUDE.md" not in files

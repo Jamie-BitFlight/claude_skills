@@ -16,36 +16,20 @@ and how a scan survives a damaged vault:
 
 from __future__ import annotations
 
-import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 import backlink_lib
-
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
-_VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
-
-if str(_SCRIPTS_DIR) not in sys.path:  # pragma: no cover - conftest normally does this
-    sys.path.insert(0, str(_SCRIPTS_DIR))
-
 import validate_research
 
-
-def _uv_path() -> str:
-    """Locate the uv binary, raising RuntimeError if not found."""
-    found = shutil.which("uv")
-    if found is None:
-        raise RuntimeError("uv binary not found on PATH — cannot run CLI tests")
-    return found
+from .conftest import validator_command
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
     """Run validate_research.py via uv run --script."""
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), *args]
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+    return subprocess.run(validator_command(args), capture_output=True, text=True, check=False)
 
 
 _YAML_ENTRY_BODY = """\
@@ -197,6 +181,7 @@ class TestScanResilience:
 
         assert "scan-skipped" not in capsys.readouterr().err
 
+    @pytest.mark.integration
     def test_fix_run_reports_each_scan_skip_exactly_once(self, tmp_path: Path) -> None:
         """check-backlinks --fix builds the graph twice but warns once."""
         vault = tmp_path / "vault"

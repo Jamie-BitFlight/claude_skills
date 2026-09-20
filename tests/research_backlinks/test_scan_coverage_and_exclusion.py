@@ -14,16 +14,16 @@ Covers the two gaps issue #3516 records against the shared Post-Actions gate:
 
 from __future__ import annotations
 
-import shutil
+import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 import backlink_lib
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
-_VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+from .conftest import validator_command
 
 # A Cross-References table whose Entry cell holds no markdown link. parse_cross_references_table
 # raises ValueError on it, so the whole file is dropped during the scan's parse phase.
@@ -38,18 +38,13 @@ _UNPARSEABLE_ENTRY = """\
 """
 
 
-def _uv_path() -> str:
-    """Locate the uv binary, raising RuntimeError if not found."""
-    found = shutil.which("uv")
-    if found is None:
-        raise RuntimeError("uv binary not found on PATH — cannot run CLI tests")
-    return found
-
-
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
     """Run validate_research.py via uv run --script."""
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), *args]
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+    return subprocess.run(validator_command(args), capture_output=True, text=True, check=False)
+
+
+def _report(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    return json.loads(result.stdout)
 
 
 def _write_entry(path: Path, cross_refs: list[tuple[str, str, str]] | None = None) -> None:
@@ -145,6 +140,7 @@ class TestScanReportsItsOwnSkips:
         assert len(scan.skips) == 1
 
 
+@pytest.mark.integration
 class TestScanCoverageDecidesExitCode:
     """A hole in the scan's coverage fails the run on its own."""
 
@@ -152,7 +148,9 @@ class TestScanCoverageDecidesExitCode:
         """The count is machine-readable on stdout even when it is zero."""
         result = _run(["check-backlinks", str(clean_vault)])
 
-        assert "scan_skipped_files: 0" in result.stdout
+        report = _report(result)
+        assert report["schema_version"] == 1
+        assert report["scan_skipped_files"] == 0
         assert result.returncode == 0, f"Expected exit 0, got {result.returncode}:\n{result.stdout}"
 
     def test_skipped_file_is_counted_on_stdout(self, clean_vault: Path) -> None:
@@ -161,8 +159,12 @@ class TestScanCoverageDecidesExitCode:
 
         result = _run(["check-backlinks", str(clean_vault)])
 
-        assert "scan_skipped_files: 1" in result.stdout
-        assert "tools/broken.md (parse)" in result.stdout
+        report = _report(result)
+        assert report["scan_skipped_files"] == 1
+        assert len(report["skips"]) == 1
+        assert report["skips"][0]["path"] == "tools/broken.md"
+        assert report["skips"][0]["reason"] == "parse"
+        assert report["skips"][0]["detail"]
 
     def test_skipped_file_fails_an_otherwise_clean_vault(self, clean_vault: Path) -> None:
         """This is the defect: exit 0 used to claim coverage the scan did not have."""
@@ -179,14 +181,14 @@ class TestScanCoverageDecidesExitCode:
         result = _run(["check-backlinks", str(clean_vault), "--allow-partial-scan"])
 
         assert result.returncode == 0, f"Expected exit 0 with --allow-partial-scan:\n{result.stdout}\n{result.stderr}"
-        assert "scan_skipped_files: 1" in result.stdout
+        assert _report(result)["scan_skipped_files"] == 1
 
     def test_allow_partial_scan_does_not_excuse_an_asymmetric_edge(self, asymmetric_vault: Path) -> None:
         """The flag waives scan coverage only, never a real finding."""
         result = _run(["check-backlinks", str(asymmetric_vault), "--allow-partial-scan"])
 
         assert result.returncode == 1
-        assert "asymmetric_cross_references: 1" in result.stdout
+        assert _report(result)["asymmetric_cross_references"] == 1
 
     def test_fix_run_fails_when_the_scan_was_partial(self, asymmetric_vault: Path) -> None:
         """--fix cannot repair a scan-skip, so it must not report success over one."""
@@ -194,10 +196,11 @@ class TestScanCoverageDecidesExitCode:
 
         result = _run(["check-backlinks", str(asymmetric_vault), "--fix"])
 
-        assert "backlinks_repaired: 1" in result.stdout
+        assert _report(result)["backlinks_repaired"] == 1
         assert result.returncode == 1, f"Expected exit 1 for a partial scan, got {result.returncode}:\n{result.stdout}"
 
 
+@pytest.mark.integration
 class TestExcludeGatesTheWriteOnly:
     """--exclude keeps --fix out of a named file without hiding it from the scan."""
 
@@ -226,8 +229,9 @@ class TestExcludeGatesTheWriteOnly:
 
         result = _run(["check-backlinks", str(asymmetric_vault), "--fix", "--exclude", str(target)])
 
-        assert "asymmetric_cross_references: 1" in result.stdout
-        assert "agent-frameworks/alpha.md -> tools/beta.md" in result.stdout
+        report = _report(result)
+        assert report["asymmetric_cross_references"] == 1
+        assert report["edges"] == [{"source": "agent-frameworks/alpha.md", "target": "tools/beta.md"}]
 
     def test_excluded_write_is_counted(self, asymmetric_vault: Path) -> None:
         """The run says how many repairs it withheld."""
@@ -235,8 +239,9 @@ class TestExcludeGatesTheWriteOnly:
 
         result = _run(["check-backlinks", str(asymmetric_vault), "--fix", "--exclude", str(target)])
 
-        assert "backlinks_excluded: 1" in result.stdout
-        assert "backlinks_repaired: 0" in result.stdout
+        report = _report(result)
+        assert report["backlinks_excluded"] == 1
+        assert report["backlinks_repaired"] == 0
 
     def test_unrepaired_exclusion_leaves_the_run_failing(self, asymmetric_vault: Path) -> None:
         """A withheld repair is still an open asymmetric pair, so the gate stays red."""
@@ -270,7 +275,7 @@ class TestExcludeGatesTheWriteOnly:
             str(vault / "tools" / "gamma.md"),
         ])
 
-        assert "backlinks_excluded: 2" in result.stdout
+        assert _report(result)["backlinks_excluded"] == 2
         assert (vault / "tools" / "beta.md").read_text(encoding="utf-8") == beta_before
         assert (vault / "tools" / "gamma.md").read_text(encoding="utf-8") == gamma_before
 
@@ -289,6 +294,7 @@ class TestExcludeGatesTheWriteOnly:
 
         result = _run(["check-backlinks", str(vault), "--fix", "--exclude", str(vault / "tools" / "gamma.md")])
 
-        assert "backlinks_repaired: 1" in result.stdout
-        assert "backlinks_excluded: 1" in result.stdout
+        report = _report(result)
+        assert report["backlinks_repaired"] == 1
+        assert report["backlinks_excluded"] == 1
         assert (vault / "tools" / "gamma.md").read_text(encoding="utf-8") == gamma_before
