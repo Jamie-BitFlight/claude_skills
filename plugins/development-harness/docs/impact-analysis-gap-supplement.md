@@ -1,8 +1,7 @@
 # Change-impact analysis gap supplement
 
-This supplement extends [Impact Analysis Principles](./impact-analysis-principals.md) without
-altering that document's verbatim briefing. It records the material additions found by comparing
-the briefing with the supplied `impact-analysis-principles.md` scratchpad.
+This supplement extends [Impact Analysis Principles](./impact-analysis-principals.md) with checks
+for implicit behavior, external change, control removal, delayed effects, and unsafe interaction.
 
 Apply only the branches relevant to the change under analysis. A pre-change analysis is complete
 when every triggered branch has either current evidence or a named post-change verification owner
@@ -108,7 +107,7 @@ Handbook](https://psas.scripts.mit.edu/home/get_file1.php?name=STPA_Handbook.pdf
 
 ## Additions to the reusable process
 
-Insert these checks into the briefing's eight-step process:
+Insert these checks into the core eight-step process:
 
 1. During **Frame the change**, state whether the trigger is internal or environmental and record
    the change set. Complete this check when every authored and externally supplied delta is named.
@@ -140,24 +139,3 @@ Insert these checks into the briefing's eight-step process:
   duration hazards?
 - Are containment, detection, rollback triggers, and ownership decided before exposure?
 - After rollout, were estimated and actual impact sets compared and the analysis process updated?
-
-## Maintainer comparison ledger
-
-This ledger records why the supplement exists. It is provenance for maintainers, not an execution
-checklist.
-
-| Comparison claim | Briefing coverage | State | Integrated action |
-|---|---|---|---|
-| Distinguish impact analysis from testing, general risk assessment, and artifact review | The briefing distinguishes implementation location from propagated consequences, but does not name the three boundaries | MISSING | Add an explicit scope boundary below |
-| Record a starting, estimated, and actual impact set | The briefing maps affected elements and later observes outcomes, but does not compare the predicted and actual sets | MISSING | Add the impact-set calibration loop below |
-| Treat implicit contracts as a first-class dependency class | The briefing includes undocumented behavior and downstream consumers, but does not give implicit contracts their own review step | PARTIAL | Add an implicit-contract probe below |
-| Trigger analysis for external changes | The briefing includes environmental dependencies and drift scenarios, but frames the initiating delta mainly as a proposed internal change | PARTIAL | Add external trigger conditions below |
-| Learn why an element or control exists before removing it | The briefing assesses controls but does not require purpose and history discovery before removal | MISSING | Add a purpose-before-removal gate below |
-| Separate immediate, delayed, and self-reinforcing effects | The briefing covers transition, steady state, rollback, drift, and feedback loops without this explicit time classification | PARTIAL | Add the temporal classification below |
-| Compare old and new behavior on identical inputs | The briefing requires baselines, representative evidence, and candidate-versus-control comparison, but does not require a paired comparison | PARTIAL | Add paired comparison below |
-| Analyze unsafe control actions and interactions, not only component failures | The briefing traces control paths but does not provide a control-loop hazard method | MISSING | Add the control-action probe below |
-
-The comparison otherwise matched the briefing on the core method: define the delta and baseline,
-set outcome criteria, model the socio-technical boundary, trace propagation, assess multiple impact
-dimensions and uncertainty, scale rigor to consequence, stage exposure, preserve recovery paths,
-monitor production outcomes, and feed observations back into the analysis.

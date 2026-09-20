@@ -369,5 +369,3 @@ The supporting primary-source research and evidence table are in
 [change-impact-analysis-research.md](./change-impact-analysis-research.md).
 
 Research basis: official standards bodies, government engineering guidance, original research, and first-party engineering publications. Examples and the unified process are my synthesis. No direct quotations were used.
-
-STATUS: DONE
