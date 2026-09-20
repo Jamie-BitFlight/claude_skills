@@ -2163,9 +2163,18 @@ def _build_over_budget_view(
             request to one section (``section=`` or ``sections=[...]``) and that
             section alone is still over budget. ``_usage`` then names ``map=True``
             instead of repeating section-narrowing advice the caller has already
-            exhausted (R7 in docs/agent-markdown-consumption-contract.md). It names
-            no ``navigate=`` ordinal because ``sections_index`` numbering is not
-            guaranteed to match the ordinals ``navigate=`` resolves.
+            exhausted, satisfying R7 prohibition 2 (never recommend an action the
+            caller has already exhausted) in
+            docs/agent-markdown-consumption-contract.md. It names no ``navigate=``
+            ordinal because ``sections_index`` numbering is not guaranteed to
+            match the ordinals ``navigate=`` resolves.
+
+            This fixes address *validity* only. R7 prohibition 3 (never name a
+            mechanism absent from the response it accompanies) stays unmet: the
+            ``map=True`` call itself can exceed the budget, and there is no
+            smaller retrieval to fall back to for that section, so the hint can
+            still name a mechanism that cannot resolve the request. See
+            architect spec 5.4 / ADR 9.1 and #3059.
 
     Returns:
         Compact dict with number, title, priority, status, description,
@@ -2178,7 +2187,10 @@ def _build_over_budget_view(
             "further section= narrowing is not available for this request. "
             "Get this item's ordinal map, then page through the oversized section with "
             "navigate=/head=/skip_tokens=:\n"
-            f"  backlog_view(selector='{selector}', map=True)"
+            f"  backlog_view(selector='{selector}', map=True)\n"
+            "Note: on a large item, that map=True call can itself exceed this budget "
+            "(check its own over_budget field) — there is no smaller retrieval for this "
+            "section available yet."
         )
     else:
         usage = (
@@ -2287,7 +2299,7 @@ async def backlog_view(
             description=(
                 "When True (default), returns a compact routing manifest with issue_number, title, labels, "
                 "status, plan_address, sections_index (all available sections as [N] Title (count) lines), "
-                "_full_chars, and _hint showing how to load full content or specific sections. "
+                "_full_chars, and _hint showing how to load specific sections or full content. "
                 "When False, returns the full response unchanged."
             )
         ),

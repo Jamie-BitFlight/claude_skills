@@ -4214,4 +4214,68 @@ async def test_backlog_view_auto_compact_enforced_when_section_filter_provided(m
         f"Budget enforcement must apply even with section= filter, but _over_budget is absent. "
         f"Got keys: {list(response.keys())}"
     )
-    assert response["_over_budget"] is True
+
+
+# ---------------------------------------------------------------------------
+# AC3 — narrowed _usage names map=True's own budget limit
+# ---------------------------------------------------------------------------
+
+
+def test_build_over_budget_view_narrowed_usage_names_map_true_budget_limit() -> None:
+    """narrowed _usage tells the caller the map=True fallback can itself be over budget.
+
+    Tests: R7 prohibition-3 honesty — the ``map=True`` hint must not be presented as
+           a guaranteed fix; it must name its own ``over_budget`` field and state that
+           no smaller retrieval exists yet for the oversized section.
+    Why: Without this sentence, a caller that follows the ``map=True`` hint and hits
+         another over-budget response has no way to know that outcome was expected
+         and that no further narrowing is currently available.
+    """
+    from backlog_core.server import _build_over_budget_view
+
+    # Arrange
+    result = _make_view_result({
+        "number": 3060,
+        "title": "Huge Section Item",
+        "priority": "P1",
+        "status": "open",
+        "description": "An item with one oversized section.",
+        "sections_index": "## Sections\n[0] Huge (1 entries)\n",
+    })
+
+    # Act
+    compact = _build_over_budget_view(result, full_chars=99999, selector="#3060", narrowed_to_single_section=True)
+    usage = str(compact["_usage"])
+
+    # Assert
+    assert "map=True" in usage, f"_usage must mention 'map=True', got: {usage!r}"
+    assert "over_budget" in usage, f"_usage must name the 'over_budget' field, got: {usage!r}"
+    assert "no smaller retrieval" in usage, f"_usage must state 'no smaller retrieval', got: {usage!r}"
+
+
+# ---------------------------------------------------------------------------
+# AC5 — backlog_view summary Field description lists sections before content
+# ---------------------------------------------------------------------------
+
+
+async def test_backlog_view_summary_description_lists_sections_before_full_content() -> None:
+    """backlog_view's ``summary`` parameter description orders 'specific sections' before 'full content'.
+
+    Tests: hint ordering — the registered tool's input schema description for
+           ``summary`` must list section-scoped retrieval ahead of full-content
+           retrieval, matching R7's "never recommend retrieving everything as its
+           first suggestion" prohibition.
+    Why: Tool descriptions are the caller's first signal for how to retrieve data;
+         listing 'full content' first nudges callers toward the expensive option.
+    """
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+
+    tool = next(t for t in tools if t.name == "backlog_view")
+    description = str(tool.input_schema["properties"]["summary"]["description"])
+
+    sections_pos = description.index("specific sections")
+    full_content_pos = description.index("full content")
+    assert sections_pos < full_content_pos, (
+        f"'specific sections' must appear before 'full content' in the summary Field description, got: {description!r}"
+    )

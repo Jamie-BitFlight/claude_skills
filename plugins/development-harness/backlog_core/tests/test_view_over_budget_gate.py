@@ -313,6 +313,8 @@ class TestReviewRoundContract:
         assert "map=True" in usage, (
             f"_usage for a narrowed single over-budget section must advise 'map=True', got: {usage!r}"
         )
+        assert "over_budget" in usage, f"_usage must name the 'over_budget' field, got: {usage!r}"
+        assert "no smaller retrieval" in usage, f"_usage must state 'no smaller retrieval', got: {usage!r}"
         assert "sections=['" not in usage, f"_usage must not repeat sections=[' narrowing, got: {usage!r}"
         assert "section='0" not in usage, f"_usage must not repeat section='0 narrowing, got: {usage!r}"
         assert "section='/" not in usage, f"_usage must not repeat section='/ narrowing, got: {usage!r}"
