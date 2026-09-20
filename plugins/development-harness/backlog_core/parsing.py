@@ -774,6 +774,7 @@ class SectionSpan(BaseModel):
     Attributes:
         name: Heading text with the ``#`` marker stripped and whitespace trimmed.
         plain_name: Heading text normalized by the Markdown parser, without source markup.
+        level: Markdown heading depth from the parser.
         start: Char offset of the start of the heading's own source line in
             the original ``body`` string.
         end: Char offset of the next section's ``start`` (or ``len(body)`` for
@@ -785,6 +786,7 @@ class SectionSpan(BaseModel):
 
     name: str
     plain_name: str
+    level: int
     start: int
     end: int
     content: str
@@ -1069,8 +1071,8 @@ def _heading_line_start(normalized: str, pos: int) -> int:
     return pos
 
 
-def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str, str]]:
-    """Return source positions, source names, and plain names for headings at *levels*.
+def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str, str, int]]:
+    """Return source positions, names, and levels for headings at *levels*.
 
     Offsets index *body* itself, so a caller may slice the original text with them.
 
@@ -1079,21 +1081,21 @@ def _ast_heading_spans(body: str, levels: frozenset[int]) -> list[tuple[int, str
         levels: Heading depths to treat as boundaries.
 
     Returns:
-        Ordered ``(start_offset, source_name, plain_name)`` tuples.
+        Ordered ``(start_offset, source_name, plain_name, level)`` tuples.
     """
     masked = _mask_entry_blocks(body)
     doc = _ENTRY_AWARE_MARKDOWN.parse(masked)
     normalized = masked.replace("\r\n", "\n")
     mapping = _original_offsets(masked)
 
-    spans: list[tuple[int, str, str]] = []
+    spans: list[tuple[int, str, str, int]] = []
     for child in doc.children:
         if not isinstance(child, Heading) or child.level not in levels:
             continue
         norm_start = _heading_line_start(normalized, getattr(child, "raw_start", 0))
         start = mapping[norm_start] if mapping is not None else norm_start
         plain_name = _extract_heading_text(child)
-        spans.append((start, _heading_name_from_source(body, start) or plain_name, plain_name))
+        spans.append((start, _heading_name_from_source(body, start) or plain_name, plain_name, child.level))
     return spans
 
 
@@ -1112,12 +1114,12 @@ def _section_spans(body: str, levels: frozenset[int]) -> list[SectionSpan]:
     """
     heads = _ast_heading_spans(body, levels)
     spans: list[SectionSpan] = []
-    for i, (start, name, plain_name) in enumerate(heads):
+    for i, (start, name, plain_name, level) in enumerate(heads):
         end = heads[i + 1][0] if i + 1 < len(heads) else len(body)
         newline = body.find("\n", start)
         content_start = len(body) if newline == -1 else newline + 1
         content = _slice_content(body, min(content_start, end), end)
-        spans.append(SectionSpan(name=name, plain_name=plain_name, start=start, end=end, content=content))
+        spans.append(SectionSpan(name=name, plain_name=plain_name, level=level, start=start, end=end, content=content))
     return spans
 
 

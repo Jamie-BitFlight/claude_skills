@@ -1570,10 +1570,6 @@ def dispatch_create_plan(
 
 
 def _extract_impact_radius_section(body: str) -> str:
-    def heading_level(start: int) -> int:
-        suffix = body[start:]
-        return len(suffix) - len(suffix.lstrip("#"))
-
     sections = split_body_sections(body)
     matches = [
         (index, section)
@@ -1582,9 +1578,9 @@ def _extract_impact_radius_section(body: str) -> str:
     ]
     if not matches:
         return ""
-    index, section = matches[-1]
-    level = heading_level(section.start)
-    end = next((later.start for later in sections[index + 1 :] if heading_level(later.start) <= level), len(body))
+    shallowest_level = min(section.level for _, section in matches)
+    index, section = next(match for match in reversed(matches) if match[1].level == shallowest_level)
+    end = next((later.start for later in sections[index + 1 :] if later.level <= section.level), len(body))
     heading_end = body.find("\n", section.start, end)
     content_start = end if heading_end == -1 else heading_end + 1
     return body[content_start:end].strip()
