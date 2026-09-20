@@ -13,7 +13,10 @@ The first step reads the Concerns section of the just-resolved item before routi
 item. When the item carries no backend reference, skip that read and go to the slug search; a
 missing reference is not a backend failure.
 
-**Selector source (`{item_ref}`)**: `{item_ref}` is what the `complete-implementation` skill stored in **Step 3 -- Extract context for proportional gates**: the `backlog_view` response's opaque `reference`. That step runs on either backend. The value is a GitHub integer on a GitHub backend and a string such as `bd-a3f8` on beads; pass it unchanged as `{item_ref}` in the `backlog_view` call below.
+**Selector source (`{item_ref}`)**: use the value already resolved by `complete-implementation`:
+the work-item response's `issue`, the plan row's `issue`, or the slug-search result's `issue`.
+The value may be a GitHub reference such as `#42` or a backend identifier such as `bd-a3f8`;
+pass it unchanged to `backlog_view`.
 
 **Call signature**:
 
@@ -41,12 +44,14 @@ The Concerns block is displayed first, followed by a blank line separator, befor
 advisory — backend errors must not block Final Handoff. Emit no warning when the item carries no
 reference, because no call was attempted.
 
-**`section=` caveat**: The `section=` parameter has no effect on GitHub-only items with a raw body — the full body may be returned. When this occurs, scan the response body for a `## Concerns` heading and extract the list items beneath it. Apply active-entry detection to those items only.
+**`section=` caveat**: A provider may return a raw body instead of section-filtered content. When
+this occurs, scan the response body for a `## Concerns` heading and extract only the list items
+beneath it before applying active-entry detection.
 
 ```mermaid
 flowchart TD
     %% Step 1: Read Concerns from the just-resolved item — MUST run before slug-search routing
-    %% {item_ref} = the item reference stored by 'Extract context for proportional gates' Step 3
+    %% {item_ref} = response issue, plan issue, or slug-search result issue
     Start([Final handoff]) --> HasRef{"Item reference<br>available?"}
     HasRef -->|"No"| Fetch
     HasRef -->|Yes| ConcernsCheck["backlog_view(selector='{item_ref}', summary=False, section='Concerns')<br>Read Concerns from the just-resolved item"]

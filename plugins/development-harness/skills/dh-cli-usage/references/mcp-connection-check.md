@@ -4,19 +4,22 @@ Load `dh:dh-cli-usage` before resolving `<sam_cli/>` or `<dh_scripts/>` below.
 
 You are here because an `mcp__plugin_dh_backlog__*` or `mcp__plugin_dh_sam__*` call failed.
 
-1. Make the failed call once more. A server that was still starting answers on the second call.
+1. Restart the agent session once so the harness reloads its MCP configuration. In Claude Code
+   only, when stderr says startup exceeded the MCP timeout, increase `MCP_TIMEOUT` before restarting.
 
-2. When it fails again, start each server directly and read what it prints:
+2. If the server is still unavailable, run its diagnostic from the project repository root. Run
+   each command separately; do not start both servers in one shell invocation.
 
    ```bash
-   uv run --script "<dh_scripts/>/run_backlog_server.py"
-   uv run --script "<dh_scripts/>/run_sam_server.py"
+   uv run --script "<dh_scripts/>/run_bounded.py" --timeout-seconds 60 -- uvx --from "fastmcp-slim[server]>=4.0.0" fastmcp list --command 'uv run --script "<dh_scripts/>/run_backlog_server.py" --project-dir .' --timeout 45
    ```
 
-   Each runs as a long-running stdio server. A process that stays up and prints no error is a
-   working server; stop it before you start the next one. On `Error: missing dependencies`, run
-   `uv self update` and start it again — each script resolves its own dependencies from its PEP 723
-   metadata.
+   ```bash
+   uv run --script "<dh_scripts/>/run_bounded.py" --timeout-seconds 60 -- uvx --from "fastmcp-slim[server]>=4.0.0" fastmcp list --command 'uv run --script "<dh_scripts/>/run_sam_server.py" --project-dir .' --timeout 45
+   ```
+
+   Exit 0 with a tool list proves the client completed an MCP handshake. Exit 124, another non-zero
+   exit, a traceback, or a server error is the failure signal; preserve that stderr for step 4.
 
 3. Use the CLI for any operation that has one:
 

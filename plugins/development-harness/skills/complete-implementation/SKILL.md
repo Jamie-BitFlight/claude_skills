@@ -94,7 +94,7 @@ Proceeding with full quality gates.
 
 From the `backlog_view` response, extract and store:
 
-- `item_ref`: str (the response's opaque `reference`)
+- `item_ref`: str (the response's non-empty `issue`; otherwise keep the normalized input selector)
 - `title`: str
 - `body`: str (full issue body text)
 - `labels`: list[str]
@@ -593,12 +593,10 @@ Execute the full follow-up routing procedure defined in [./references/recursive-
 
 After all phases and follow-up routing complete, apply verified status to the parent work item.
 
-**Beads backend**: No `dh:state:verified` label — skip this section, continue to Final Step.
-
 ### Step 1: Locate the backlog item
 
 Use the resolved `{item_ref}`. If the plan did not expose an owner reference, search by its
-`{slug}` and store the matched item's `reference` as `{item_ref}`:
+`{slug}` and store the matched item's `issue` as `{item_ref}`:
 
 ```bash
 <sam_cli/> backlog list --title "{slug}"
@@ -607,6 +605,8 @@ Use the resolved `{item_ref}`. If the plan did not expose an owner reference, se
 If zero items match, skip this section — there is no issue to label.
 
 ### Step 2: Apply the label
+
+**Beads backend**: No `dh:state:verified` label — skip this step and continue to Final Step.
 
 Call:
 

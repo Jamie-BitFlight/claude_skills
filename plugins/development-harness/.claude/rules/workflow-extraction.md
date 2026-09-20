@@ -1,5 +1,6 @@
 ---
 paths:
+- docs/workflow-layers/**
 - skills/meta-workflow-graph-refresh/references/**
 ---
 

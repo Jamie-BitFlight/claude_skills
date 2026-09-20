@@ -127,7 +127,7 @@ workers AND a sonnet reducer self-check passes.
 
 The single-agent `dh:workflow-extractor` that used to run this pipeline has been
 retired; the replacement pipeline is pending redesign (see the PRD at
-`../plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
+`../../../docs/plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
 
 ```
 Phase 0 — Plan (deterministic)

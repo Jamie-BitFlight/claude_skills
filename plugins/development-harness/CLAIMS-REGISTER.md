@@ -88,9 +88,14 @@ Consequences the design draws, each a claim in its own right:
   worktree and starts a child process in it. Confidence: source, Cursor by snippet. Re-check:
   the worktree column. Cursor's write event carries no working directory, so there the path hook
   reads `file_path` alone.
-- **MCP is not in the shared layer**, since pi has no native MCP. The CLI over a shell is.
-  Every other harness measured, Kilo Code included, registers MCP servers from project config.
-  Confidence: source. Re-check: `earendil-works/pi` README.
+- **MCP is not required by the shared layer.** pi's official quickstart documents only its four
+  default tools (`read`, `write`, `edit`, `bash`), while MCP setup is harness-specific in products
+  that provide it (for example, Cursor's `.cursor/mcp.json` and OpenCode's `mcp.servers`). The
+  portable baseline is therefore the shell CLI; harness adapters may add MCP.
+  Sources (read 2026-09-20):
+  [pi quickstart](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/quickstart.md),
+  [Cursor MCP](https://cursor.com/docs/context/model-context-protocol), and
+  [OpenCode MCP](https://opencode.ai/v2/docs/mcp-servers). Confidence: source.
 - **`${CLAUDE_PLUGIN_ROOT}` is substituted in a skill body by Claude Code only.** Kimi and
   Hermes substitute their own skill-directory variables in a skill body; Codex substitutes
   nothing in a skill body, expanding `${CLAUDE_PLUGIN_ROOT}`/`${PLUGIN_ROOT}`/`${PLUGIN_DATA}`
@@ -126,12 +131,12 @@ Consequences the design draws, each a claim in its own right:
   it as a source but must still fail closed when neither way states a directory, which
   `dh-cli-usage` does. Confidence: source. Re-check: `read.rs` lines 49, 66 and 241 at `main`, and
   section 4 of the other three files.
-- **A dh MCP server that was still connecting answers the same call made a second time.**
-  `skills/dh-cli-usage/references/mcp-connection-check.md` step 1 rests on it. No harness
-  documentation establishing it was read: the citation that file used to carry covered Claude
-  Code's `MCP_TIMEOUT` and connection-waiting behaviour only, and the procedure now runs on any
-  harness. The step costs the one call it repeats. Confidence: unestablished. Re-check: fail an
-  `mcp__plugin_dh_*` call during session startup and repeat it.
+- **MCP recovery requires a fresh session after configuration or timeout changes.** The diagnostic
+  restarts once, then runs each stdio entry point independently under the plugin's bounded runner
+  with `--project-dir .`. Claude Code documents `MCP_TIMEOUT` as its server-startup timeout; the
+  instruction is explicitly Claude-only. Source (read 2026-09-20):
+  [Claude Code environment variables](https://code.claude.com/docs/en/env-vars). Confidence: source
+  plus repository behavior. Re-check: the MCP connection check and `scripts/run_bounded.py`.
 - **Cursor exposes no absolute skill root.** Its skills documentation says bundled-resource
   references resolve relative to the skill root, and states nothing about the model receiving that
   root as an absolute path. Searched: `cursor.com/docs/skills`, `/docs/plugins`,

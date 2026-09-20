@@ -175,17 +175,6 @@ ANY_VERDICT_RE = re.compile(r"MISSION_[A-Z_]+")
 
 # --- Plugin-root variable, skill-dir climb, and hard-coded CLI path (W2, dh-cli-usage) ----------
 #
-# ``dh:dh-cli-usage`` is the one place that derives the plugin root and the CLI's location. Every
-# other agent and skill file is meant to say ``<sam_cli/>`` or ``<dh_scripts/>`` and point at that
-# skill, never re-derive either value itself. These patterns are the three ways a file did that
-# derivation directly instead: a raw ``${...PLUGIN_ROOT}`` template variable, a
-# ``${...SKILL_DIR}/..`` parent-directory climb written out longhand, and the CLI's literal path.
-# Claude Code, Kimi and Hermes each substitute their own skill-directory variable into a skill
-# body; a harness that substitutes none leaves the line literal. A reference or doc file that
-# assumes any one of those harness-specific forms ships broken text to the others
-# (``CLAIMS-REGISTER.md``'s ``${CLAUDE_PLUGIN_ROOT}`` entry;
-# ``rules/runtime-vs-design-time.md``). ``dh-cli-usage`` carries one complete command line per
-# variable so the model picks the absolute one instead of assembling a path.
 PLUGIN_ROOT_VARIABLE_RE = re.compile(r"\$\{?[A-Z_]*PLUGIN_ROOT\b")
 SKILL_DIR_PARENT_RE = re.compile(r"\$\{?[A-Z_]*SKILL_DIR\}?/\.\.")
 CLI_PATH_RE = re.compile(r"sam_schema[/\\.]cli\b|run_sam_cli\.py")
@@ -242,18 +231,10 @@ DH_CLI_USAGE_DIR = SKILLS_DIR / "dh-cli-usage"
 DH_CLI_USAGE = DH_CLI_USAGE_DIR / "SKILL.md"
 DH_CLI_USAGE_SKILL_URI = "dh:dh-cli-usage"
 
-# The three forms a harness substitutes a skill's own directory into its body as.
-# ``dh-cli-usage`` derives the plugin root and the CLI's location from one of these -- never from a
-# plugin-root variable, which needs a hand-built path suffix that breaks when the skill is renamed.
 SKILL_DIR_VARIABLES = ("CLAUDE_SKILL_DIR", "KIMI_SKILL_DIR", "HERMES_SKILL_DIR")
 SAM_CLI_LINES = tuple(f'uv run "${{{v}}}/../../sam_schema/cli.py"' for v in SKILL_DIR_VARIABLES)
 DH_SCRIPTS_LINES = tuple(f"${{{v}}}/../../scripts" for v in SKILL_DIR_VARIABLES)
 
-# Every instruction ``dh-cli-usage``'s body carries, written as the whole sentence it spans rather
-# than a phrase inside it. ``test_dh_cli_usage_hands_over_a_runnable_command_or_fails_closed``
-# matches these against the body with its whitespace collapsed, so deleting any one line of a
-# paragraph breaks the sentence crossing that line, while rewrapping the paragraph does not. The
-# two blocks are checked separately, by content, in the same test.
 DH_CLI_USAGE_INSTRUCTIONS = (
     "# dh CLI usage",
     (
@@ -261,10 +242,10 @@ DH_CLI_USAGE_INSTRUCTIONS = (
         "harness does not fill in; pass over it."
     ),
     (
-        "When no line is absolute, take the directory your harness stated for this skill: a `Base "
-        "directory for this skill:` line above this body, or the `skill_root` value a `skills.read` "
-        'call returns. Then `<sam_cli/>` is `uv run "<that directory>/../../sam_schema/cli.py"`, and '
-        "`<dh_scripts/>` is `<that directory>/../../scripts`."
+        "When no line is absolute, use the absolute directory the harness supplied with this skill, "
+        "returned as `skill_root`, or used to read this `SKILL.md`. Then `<sam_cli/>` is "
+        '`uv run "<that directory>/../../sam_schema/cli.py"`, and `<dh_scripts/>` is '
+        "`<that directory>/../../scripts`."
     ),
     (
         "When no line is absolute and no such directory is stated, report `STATUS: BLOCKED` naming "
@@ -1040,11 +1021,21 @@ def test_context_refinement_splits_the_resolved_cli_command_for_subprocess() -> 
 
 
 def test_mcp_connection_check_names_both_server_commands() -> None:
-    """Manual recovery must provide runnable commands for both shipped MCP servers."""
+    """Recovery must diagnose each shipped server independently and terminate it predictably."""
     connection_check = (DH_CLI_USAGE_DIR / "references" / "mcp-connection-check.md").read_text(encoding="utf-8")
 
-    assert 'uv run --script "<dh_scripts/>/run_backlog_server.py"' in connection_check
-    assert 'uv run --script "<dh_scripts/>/run_sam_server.py"' in connection_check
+    bounded_prefix = (
+        'uv run --script "<dh_scripts/>/run_bounded.py" --timeout-seconds 60 -- '
+        'uvx --from "fastmcp-slim[server]>=4.0.0" fastmcp list --command '
+    )
+    assert (
+        f"{bounded_prefix}'uv run --script \"<dh_scripts/>/run_backlog_server.py\" --project-dir .'" in connection_check
+    )
+    assert f"{bounded_prefix}'uv run --script \"<dh_scripts/>/run_sam_server.py\" --project-dir .'" in connection_check
+    assert "Exit 0 with a tool list" in connection_check
+    assert "Restart the agent session once" in connection_check
+    assert "MCP_TIMEOUT" in connection_check
+    assert "Make the failed call once more" not in connection_check
     assert "<mcp_server_scripts" not in connection_check
 
 
@@ -1106,7 +1097,7 @@ def test_cli_guide_and_connection_check_live_in_dh_cli_usage() -> None:
 
 
 def test_workflow_refresh_references_follow_the_relocated_documents() -> None:
-    """Workflow-refresh entry points must resolve within the skill that now owns the documents."""
+    """Moved workflow-refresh documents must retain resolvable local links and rule coverage."""
     refresh_dir = SKILLS_DIR / "meta-workflow-graph-refresh"
     coverage = refresh_dir / "references" / "COVERAGE.md"
     methodology = refresh_dir / "references" / "workflow-trace-methodology.md"
@@ -1117,11 +1108,22 @@ def test_workflow_refresh_references_follow_the_relocated_documents() -> None:
     assert not (PLUGIN_ROOT / "docs" / "workflow-layers" / "COVERAGE.md").exists()
     assert not (PLUGIN_ROOT / "docs" / "workflow-trace-methodology.md").exists()
 
-    active_text = "\n".join(path.read_text(encoding="utf-8") for path in (refresh_dir / "SKILL.md", methodology, rule))
-    assert "docs/workflow-layers/COVERAGE.md" not in active_text
-    assert "docs/workflow-trace-methodology.md" not in active_text
-    assert "references/COVERAGE.md" in active_text
-    assert "references/workflow-trace-methodology.md" in active_text
+    governed = (refresh_dir / "SKILL.md", coverage, methodology, rule)
+    broken: list[str] = []
+    for source in governed:
+        for target in re.findall(
+            r"\[[^\]]+\]\(([^)]+)\)|`((?:\.{1,2}/)[^`# ]+\.md)`", source.read_text(encoding="utf-8")
+        ):
+            relative = next(part for part in target if part)
+            if relative.startswith(("http://", "https://", "#")):
+                continue
+            if not (source.parent / relative.split("#", 1)[0]).resolve().is_file():
+                broken.append(f"{source.relative_to(PLUGIN_ROOT)} -> {relative}")
+    assert not broken, "broken local workflow-refresh link(s):\n" + "\n".join(broken)
+
+    rule_text = rule.read_text(encoding="utf-8")
+    assert "- docs/workflow-layers/**" in rule_text
+    assert "- skills/meta-workflow-graph-refresh/references/**" in rule_text
 
 
 def test_final_handoff_skips_the_concerns_read_without_an_item_reference() -> None:
@@ -1135,13 +1137,7 @@ def test_final_handoff_skips_the_concerns_read_without_an_item_reference() -> No
 
 
 def test_final_handoff_takes_the_item_reference_from_a_backend_neutral_step() -> None:
-    """The handoff's ``{item_ref}`` source must be a step that runs on either backend.
-
-    ``Apply status:verified Label`` is skipped whole on beads, so a pointer into it leaves a beads
-    run with no stated source for the selector it is about to pass. ``Step 3 -- Extract context for
-    proportional gates`` stores the same value from the ``backlog_view`` response and precedes the
-    backend-gated section.
-    """
+    """Every entry path must source ``{item_ref}`` from the response field that exists."""
     complete_implementation = SKILLS_DIR / "complete-implementation"
     final_handoff = (complete_implementation / "references" / "final-handoff.md").read_text(encoding="utf-8")
     skill = (complete_implementation / "SKILL.md").read_text(encoding="utf-8")
@@ -1151,25 +1147,17 @@ def test_final_handoff_takes_the_item_reference_from_a_backend_neutral_step() ->
         "beads run to skip whole."
     )
 
-    source_step = "Step 3 -- Extract context for proportional gates"
-    assert source_step in final_handoff, f"final-handoff.md does not name `{source_step}` as the {{item_ref}} source."
+    assert "response's non-empty `issue`" in skill
+    assert "plan row's `feature` field as `{slug}`\nand its `issue` field as `{item_ref}`" in skill
+    assert "matched item's `issue` as `{item_ref}`" in skill
+    assert (
+        "the work-item response's `issue`, the plan row's `issue`, or the slug-search result's `issue`" in final_handoff
+    )
+    assert "response's opaque `reference`" not in skill
 
-    heading_at = skill.find(f"**{source_step}**")
-    assert heading_at != -1, (
-        f"complete-implementation/SKILL.md has no `{source_step}` step for final-handoff.md to cite."
-    )
-    assert "- `item_ref`: str (the response's opaque `reference`)" in skill, (
-        f"`{source_step}` no longer stores `item_ref` from the response's opaque `reference`."
-    )
-
-    beads_skip_at = skill.find("**Beads backend**: No `dh:state:verified` label — skip this section")
-    assert beads_skip_at != -1, (
-        "complete-implementation/SKILL.md no longer marks a section beads skips; re-check which "
-        "steps a beads run reaches before confirming this pointer."
-    )
-    assert beads_skip_at > heading_at, (
-        "The cited step no longer precedes the beads-skipped section, so a beads run may reach the handoff without it."
-    )
+    locate_at = skill.find("### Step 1: Locate the backlog item")
+    beads_skip_at = skill.find("**Beads backend**: No `dh:state:verified` label — skip this step")
+    assert -1 < locate_at < beads_skip_at
 
 
 def test_every_file_using_the_cli_token_names_dh_cli_usage() -> None:
