@@ -28,13 +28,13 @@ Argument vocabulary:
 
 Route → reference file: see [command-routes.json](./scripts/parser/command-routes.json) — one JSON object, `route` keyword to reference-file path, do not hand-copy it here.
 
-For every placeholder in the form <key/>, substitute the value of that key from `<input/>`.
-
-Load `dh:dh-cli-usage` before using `<sam_cli/>` or `<dh_scripts/>` below.
+Load `dh:dh-cli-usage` before resolving command tokens. For each placeholder in the form <key/>
+whose key exists in `<input/>`, substitute that input value. `<sam_cli/>` and `<dh_scripts/>` are
+command tokens, not input placeholders.
 
 The `references/workflows/*.md` files loaded by this skill are plain files, not substituted — they
 show bare SAM CLI subcommands and args only (e.g. `backlog view --selector "..."`), never the
-invocation prefix. Prepend `<sam_cli/>` to every one of them.
+invocation prefix. Prepend the resolved `<sam_cli/>` command to every one of them.
 
 > [!IMPORTANT]
 > When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.

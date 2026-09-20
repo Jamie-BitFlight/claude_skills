@@ -4,7 +4,7 @@ Defines how to systematically collect, store, and query the DH workflow executio
 Written after two failed collection passes (pass 1: 67 agents; pass 2: 120 agents) to
 record the root causes and the corrected approach.
 
-See `docs/workflow-layers/COVERAGE.md` for what has been collected and how to answer
+See [COVERAGE.md](./COVERAGE.md) for what has been collected and how to answer
 follow-up questions without restarting.
 
 ---
@@ -77,7 +77,7 @@ orchestrator-span
 This is distinct from the groom swarm's parallel dispatch, which names specialists directly. The
 join must distinguish these two shapes or every task-worker span resolves to the wrong actor.
 
-SOURCE: `plugins/development-harness/skills/dispatch-contract/SKILL.md`
+SOURCE: `dh:dispatch-contract`
 
 ### Conditional topology
 
@@ -127,7 +127,7 @@ workers AND a sonnet reducer self-check passes.
 
 The single-agent `dh:workflow-extractor` that used to run this pipeline has been
 retired; the replacement pipeline is pending redesign (see the PRD at
-`../plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
+`../../../docs/plans/prd-workflow-extractor.md`). The 4-phase ensemble it ran internally:
 
 ```
 Phase 0 — Plan (deterministic)

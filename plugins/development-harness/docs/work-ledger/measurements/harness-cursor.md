@@ -247,6 +247,11 @@ optional `scripts/`, `references/`, `assets/`. Frontmatter: `name`, `description
 your SKILL.md using relative paths from the skill root." Plugin skills: `<plugin>/skills/<name>/SKILL.md`
 `[repo + docs-snippet]`.
 
+For the `dh-cli-usage` CLI-path fallback, this establishes only skill-relative resource lookup. The docs and
+repositories searched here do not establish that Cursor gives the model an absolute skill-root value or an absolute
+path after reading a relative reference. This finding is about resolving runtime files, not Cursor's MCP
+configuration.
+
 ### Plugin manifest — **`.cursor-plugin/plugin.json`** (Cursor format) or root `plugin.json` (Agent Plugins standard)
 
 - `[docs-snippet]` `https://cursor.com/docs/reference/plugins` ("Plugins Reference | Cursor Docs"): "Every Cursor

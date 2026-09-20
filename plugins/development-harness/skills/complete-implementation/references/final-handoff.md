@@ -9,14 +9,19 @@ The following diagram is the authoritative procedure for Final Handoff Output. E
 
 ## Concerns Check — Implementation Notes
 
-The first step reads the Concerns section of the just-resolved issue before routing to the next work item.
+The first step reads the Concerns section of the just-resolved item before routing to the next work
+item. When the item carries no backend reference, skip that read and go to the slug search; a
+missing reference is not a backend failure.
 
-**Selector source (`#{N}`)**: The resolved issue number is available from the **"Apply status:verified Label" Step 2** of the `complete-implementation` skill — that step calls `backlog_list(title="{slug}")`, finds the matched item, and extracts `issue_number` from the item's `issue` field (e.g., `"#2437"` → `issue_number = 2437`). Use that integer as `#{N}` in the `backlog_view` call below.
+**Selector source (`{item_ref}`)**: use the value already resolved by `complete-implementation`:
+the work-item response's `issue`, the plan row's `issue`, or the slug-search result's `issue`.
+The value may be a GitHub reference such as `#42` or a backend identifier such as `bd-a3f8`;
+pass it unchanged to `backlog_view`.
 
 **Call signature**:
 
 ```text
-backlog_view(selector="#{N}", summary=False, section="Concerns")
+backlog_view(selector="{item_ref}", summary=False, section="Concerns")
 ```
 
 **Active-entry detection**: An entry is active if it is NOT struck-through (`` ~~entry~~ ``) and NOT a checked checkbox (`[x] entry`). Inactive entries were processed during the P6 Concerns verification phase — only active entries are actionable at handoff.
@@ -24,7 +29,7 @@ backlog_view(selector="#{N}", summary=False, section="Concerns")
 **Display format when active entries exist**:
 
 ```text
-## Unresolved Concerns from #{N}
+## Unresolved Concerns from {item_ref}
 
 - {entry text verbatim}
 ...
@@ -34,18 +39,26 @@ Review these concerns before proceeding. You may choose to create backlog items 
 
 The Concerns block is displayed first, followed by a blank line separator, before any slug-search output.
 
-**Error handling**: If `backlog_view` returns an `error` key, output `⚠ Could not read Concerns section: {error}` and continue to the slug search. The Concerns check is advisory — backend errors must not block Final Handoff.
+**Error handling**: When the call was made and `backlog_view` returns an `error` key, output
+`⚠ Could not read Concerns section: {error}` and continue to the slug search. The Concerns check is
+advisory — backend errors must not block Final Handoff. Emit no warning when the item carries no
+reference, because no call was attempted.
 
-**`section=` caveat**: The `section=` parameter has no effect on GitHub-only items with a raw body — the full body may be returned. When this occurs, scan the response body for a `## Concerns` heading and extract the list items beneath it. Apply active-entry detection to those items only.
+**`section=` caveat**: A provider may return a raw body instead of section-filtered content. When
+this occurs, scan the response body for a `## Concerns` heading and extract only the list items
+beneath it before applying active-entry detection.
 
 ```mermaid
 flowchart TD
-    %% Step 1: Read Concerns from just-resolved issue — MUST run before slug-search routing
-    %% #{N} = issue_number extracted in 'Apply status:verified Label' Step 2
-    ConcernsCheck["backlog_view(selector='#{N}', summary=False, section='Concerns')<br>Read Concerns from just-resolved issue"] --> ConcernsError{"Call returned<br>error key?"}
+    %% Step 1: Read Concerns from the just-resolved item — MUST run before slug-search routing
+    %% {item_ref} = response issue, plan issue, or slug-search result issue
+    Start([Final handoff]) --> HasRef{"Item reference<br>available?"}
+    HasRef -->|"No"| Fetch
+    HasRef -->|Yes| ConcernsCheck["backlog_view(selector='{item_ref}', summary=False, section='Concerns')<br>Read Concerns from the just-resolved item"]
+    ConcernsCheck --> ConcernsError{"Call returned<br>error key?"}
     ConcernsError -->|"Yes — backend error"| WarnContinue["⚠ 'Could not read Concerns section: {error}'<br>Non-blocking — continue to slug search"]
     ConcernsError -->|"No — call succeeded"| HasActiveConcerns{"Active entries in<br>Concerns section?<br>(not strikethrough, not checked)"}
-    HasActiveConcerns -->|"Yes — 1+ active entries"| DisplayConcerns["Display concerns block:<br>## Unresolved Concerns from #{N}<br>- {each active entry verbatim}<br>Review — you may create backlog items if needed"]
+    HasActiveConcerns -->|"Yes — 1+ active entries"| DisplayConcerns["Display concerns block:<br>## Unresolved Concerns from {item_ref}<br>- {each active entry verbatim}<br>Review — you may create backlog items if needed"]
     HasActiveConcerns -->|"No — absent or all processed"| Fetch
     DisplayConcerns --> Fetch
     WarnContinue --> Fetch

@@ -18,13 +18,17 @@ ${KIMI_SKILL_DIR}/../../scripts
 ${HERMES_SKILL_DIR}/../../scripts
 </dh_scripts>
 
-Your harness filled in one line of each block with an absolute path. Use the line whose path is
-absolute. A line still reading `${…}` names a variable this harness does not fill in; pass over it.
+Use the line whose path is absolute. A line still reading `${…}` names a variable this harness does
+not fill in; pass over it.
 
-Codex, OpenCode and Cursor fill in no line above. When no line holds an absolute path, take the
-directory your harness stated when it loaded this skill: a `Base directory for this skill:` line, a
-`References are relative to` line, or the directory of the `SKILL.md` you read. Then `<sam_cli/>` is
-`uv run "<that directory>/../../sam_schema/cli.py"` and `<dh_scripts/>` is `<that directory>/../../scripts`.
+When no line is absolute, use the absolute directory the harness supplied with this skill, returned
+as `skill_root`, or used to read this `SKILL.md`. Then `<sam_cli/>` is
+`uv run "<that directory>/../../sam_schema/cli.py"`, and `<dh_scripts/>` is
+`<that directory>/../../scripts`.
+
+When no line is absolute and no such directory is stated, report `STATUS: BLOCKED` naming this
+skill, and run no `<sam_cli/>` command. Use the `mcp__plugin_dh_*` tools for any operation that has
+one.
 
 Wherever a dh skill, agent or reference writes `<sam_cli/> plan read …`, run your `<sam_cli>` line
 followed by the words written after `<sam_cli/>`. The path in the line is complete; run it as

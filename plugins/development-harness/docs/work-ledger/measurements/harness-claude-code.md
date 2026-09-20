@@ -68,6 +68,14 @@ Plugins carry skills, agents, commands, hooks and MCP servers. `${CLAUDE_PLUGIN_
 substituted in "skill and agent content | anywhere the placeholder appears" (plugins:701) and in
 hook commands (hooks:468).
 
+**`${CLAUDE_SKILL_DIR}` in a skill body — measured 2026-09-18.** Ran: invoked `dh:dh-cli-usage`
+in a Claude Code session and read the body as it arrived. Came back: its `<sam_cli>` line rendered
+as an absolute path, so `${CLAUDE_SKILL_DIR}` is substituted; `${KIMI_SKILL_DIR}` and
+`${HERMES_SKILL_DIR}` on the neighbouring lines stayed literal; and the body was preceded by a
+`Base directory for this skill:` line naming the same directory. The cached pages above were read
+for a substitution table naming `${CLAUDE_SKILL_DIR}` or that preamble line and neither was found,
+so both rest on this invocation. `CLAIMS-REGISTER.md` carries the claim.
+
 ## 5. MCP
 
 A plugin registers MCP servers through its manifest, and a project through its own settings

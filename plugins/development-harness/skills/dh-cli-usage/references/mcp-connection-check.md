@@ -1,34 +1,37 @@
-# MCP Server Connection Check
+# MCP server connection check
 
-Both `mcp__plugin_dh_backlog__*` and `mcp__plugin_dh_sam__*` tools require their servers to be
-connected before use. Agent harnesses normally wait for connecting servers automatically. Apply
-this procedure only when the harness reports that a server failed or a tool call returns a
-connection error.
+Load `dh:dh-cli-usage` before resolving `<sam_cli/>` or `<dh_scripts/>` below.
 
-1. Inspect the harness's MCP server status. If the DH backlog and SAM servers are connected, rerun
-   the original tool call.
-2. Restart the agent session so plugin MCP servers restart.
-3. If the failure persists, load `dh:dh-cli-usage` and run both source commands below, substituting
-   `<dh_scripts/>` from that skill:
+You are here because an `mcp__plugin_dh_backlog__*` or `mcp__plugin_dh_sam__*` call failed.
 
-   ```text
-   uv run --script "<dh_scripts/>/run_sam_server.py"
-   uv run --script "<dh_scripts/>/run_backlog_server.py" --project-dir .
+1. Restart the agent session once so the harness reloads its MCP configuration. In Claude Code
+   only, when stderr says startup exceeded the MCP timeout, increase `MCP_TIMEOUT` before restarting.
+
+2. If the server is still unavailable, run its diagnostic from the project repository root. Run
+   each command separately; do not start both servers in one shell invocation.
+
+   ```bash
+   uv run --script "<dh_scripts/>/run_bounded.py" --timeout-seconds 60 -- uvx --from "fastmcp-slim[server]>=4.0.0" fastmcp list --command 'uv run --script "<dh_scripts/>/run_backlog_server.py" --project-dir .' --timeout 45
    ```
 
-4. If either command reports missing dependencies, run `uv self update` and retry. Each script
-   resolves its own PEP 723 dependencies.
-5. Check the harness's MCP startup timeout and restore its default when a local override aborts
-   startup before either source command initializes.
+   ```bash
+   uv run --script "<dh_scripts/>/run_bounded.py" --timeout-seconds 60 -- uvx --from "fastmcp-slim[server]>=4.0.0" fastmcp list --command 'uv run --script "<dh_scripts/>/run_sam_server.py" --project-dir .' --timeout 45
+   ```
 
-If a structured SAM operation is needed while the SAM server is unavailable, use the validated
-CLI transport. Load `dh:dh-cli-usage`, prefix each line with `<sam_cli/>`, and use named options:
+   Exit 0 with a tool list proves the client completed an MCP handshake. Exit 124, another non-zero
+   exit, a traceback, or a server error is the failure signal; preserve that stderr for step 4.
 
-```text
-plan list
-plan status --plan-address P{N}
-plan ready --plan-address P{N}
-```
+3. Use the CLI for any operation that has one:
 
-Do not use the retired standalone console script, flat commands, or selectable output-format
-flags. Call MCP composites only through connected `mcp__plugin_dh_*` tools.
+   ```bash
+   <sam_cli/> plan list
+   <sam_cli/> plan status --plan-address P{N}
+   <sam_cli/> plan ready --plan-address P{N}
+   ```
+
+   Pass addresses and task data as named options; read
+   [command reference](./command-reference.md) for the full set. The MCP composites have no CLI
+   form.
+
+4. When a server fails to start and the operation has no CLI form, report `STATUS: BLOCKED` with the
+   exact command and its stderr, and make no further `mcp__plugin_dh_*` call against that server.
