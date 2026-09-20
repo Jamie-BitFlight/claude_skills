@@ -1,8 +1,8 @@
 # Agent Output Contracts — Prohibited Instructions in Agent Definitions
 
-Scope: persistent agent-definition files (`plugins/*/agents/*.md`) that an agent reloads on
-every dispatch — not a one-off dispatch prompt. For prompt-level output requirements, see
-`agent-orchestration:delegate`'s `sub-agent-contract.md`.
+Scope: persistent agent-definition files (any `agents/*.md`, e.g. `plugins/*/agents/*.md` or `.claude/agents/*.md`) that an agent reloads on
+every dispatch — not a one-off dispatch prompt. For prompt-level output requirements, see the
+`/agent-orchestration:delegate` skill's `sub-agent-contract.md`.
 
 ## Prohibited Instructions in Agent Files
 

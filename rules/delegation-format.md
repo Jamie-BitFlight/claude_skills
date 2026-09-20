@@ -1,8 +1,8 @@
 # Delegation Format Standard — Wrong Formats
 
 Scope: documenting a delegation step in prose or workflow docs (SKILL.md, agent files, command
-files, reference files) — not constructing an actual dispatch prompt. For that, see
-`agent-orchestration:delegate`.
+files, reference files) — not constructing an actual dispatch prompt. For that, see the
+`/agent-orchestration:delegate` skill.
 
 ## Wrong Formats
 

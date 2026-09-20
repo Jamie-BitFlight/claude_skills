@@ -9,3 +9,5 @@ One hypothesis confirmed by one test → fix ONE file maximum. Edits across mult
 3. Fix validated on at least one file before applying to the rest
 
 "This same fix applies to all N files" is a CLAIM requiring verification, not a conclusion that follows from fixing one file.
+
+For a problem discovered during the current session rather than assigned by the user, `proactive-fix-gate.md`'s Step 3 routing governs whether to fix now at all; this rule governs scope once a fix is underway.

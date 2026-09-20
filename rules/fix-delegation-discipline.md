@@ -27,8 +27,8 @@ flowchart TD
     Val -->|"Pass — reproduction now succeeds"| Commit["[Agent] Commit the fix<br>Include root cause in commit message<br>Do NOT include Fixes #N trailer<br>(quality gates handle issue closure)"]
     Commit --> Done(["Fix complete — notify orchestrator"])
 
-    Val -->|"Fail (cycle 1) — reproduction still fails"| R
-    Val -->|"Fail (cycle 2+) — still failing after retry"| Stuck(["Escalate — report to orchestrator<br>State: root cause statement, reproduction command,<br>fix attempted, validation output<br>Orchestrator routes to /scientific-method:scientific-thinking"])
+    Val -->|"Fail (cycles 1-2) — reproduction still fails"| R
+    Val -->|"Fail (cycle 3+) — still failing after 3 cycles"| Stuck(["Escalate — report to orchestrator<br>State: root cause statement, reproduction command,<br>fix attempted, validation output<br>Orchestrator routes to /scientific-method:scientific-thinking"])
 ```
 
 ## Delegation Prompt Template
@@ -51,8 +51,9 @@ If it still fails, research the root cause and repeat. After 3 cycles without pr
 
 | State | Condition | Agent action |
 |---|---|---|
+| Root cause unclear | Root cause not known or strongly suspected before starting the fix cycle | Escalate; activate `/dh:root-cause-tracing-process` to establish root cause first |
 | Validated fix | Reproduction command passes | Commit, report STATUS: DONE with fix summary |
-| Cannot reproduce | Reproduction command does not fail | Report exact command run and exact output observed; do not guess a fix |
+| Cannot reproduce | No failing command, test, or assertion can be written to demonstrate the bug | Report what was attempted and why reproduction is not possible; orchestrator routes to `/dh:root-cause-tracing-process` |
 | Partially fixed | Some reproduction commands pass, others fail | Report which pass and which still fail; do not commit partial fixes |
 | Stuck after 3 cycles | Same failure persists after 3 research-fix iterations | Report last command, output, and working hypothesis; activate `/scientific-method:scientific-thinking` |
 

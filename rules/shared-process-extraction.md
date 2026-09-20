@@ -9,9 +9,11 @@ against.
 **Trigger**: writing into an agent file something another agent also needs, or noticing two agent
 files say the same thing.
 
-**Action**: create or extend the skill that owns the process, list it in the `skills:` frontmatter
-of every agent that needs it, and cut the process text out of each of those agents. Done when a
-grep for a distinctive phrase of the process returns the skill alone.
+**Action**: create or extend the skill that owns the process. If the copy sits in an agent file,
+list the owning skill in that agent's `skills:` frontmatter and cut the process text from the
+agent. If the copy sits in another skill's `SKILL.md`, replace the restated process with a
+cross-reference to the owning skill (e.g. "activate `/plugin:skill-name`") and cut the restated
+text. Done when a grep for a distinctive phrase of the process returns the skill alone.
 
 ## A copy is any second rendering
 
