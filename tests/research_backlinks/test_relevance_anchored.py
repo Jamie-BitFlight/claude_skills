@@ -20,6 +20,10 @@ import subprocess
 from pathlib import Path
 from typing import Final
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 _REPO_ROOT = Path(__file__).parents[2]
 _VALIDATE_SCRIPT = _REPO_ROOT / ".claude" / "skills" / "research-curator" / "scripts" / "validate_research.py"
 
@@ -192,7 +196,7 @@ class TestRelevanceUnanchored:
 
 def _init_checkout(root: Path) -> None:
     """Make ``root`` a git checkout so repo_root_for resolves anchor paths against it."""
-    subprocess.run(["git", "init", "--quiet", str(root)], check=True, capture_output=True)
+    subprocess.run([*_RUN_BOUNDED, "git", "init", "--quiet", str(root)], check=True, capture_output=True)
 
 
 class TestRelevanceAnchorPaths:

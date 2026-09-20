@@ -3,9 +3,10 @@
 ## Commands
 
 ```bash
-uv run pytest                              # Fast suite (parallel via xdist); e2e, cross_backend, and integration are deselected by addopts
-uv run pytest -m "not slow"                # Additionally skip slow tests
-uv run pytest -m integration plugins/development-harness/tests/   # Integration tests (deselected by default)
+uv run pytest                              # Fast suite (parallel via xdist); e2e, cross_backend, integration, and research_vault are deselected by addopts
+uv run pytest -m "not e2e and not cross_backend and not integration and not research_vault and not slow"  # Fast suite, also excluding slow tests
+uv run pytest -m "integration and not research_vault" plugins/development-harness/tests/ tests/research_backlinks/  # Integration tests (deselected by default)
+uv run pytest -m research_vault tests/research_backlinks/test_graph_asymmetry.py  # Advisory, read-only production-vault scan
 uv run pytest plugins/development-harness/tests/  # Specific test directory
 uv run pytest plugins/development-harness/tests/test_migrate_tasks_to_github.py  # Specific test file
 ```
@@ -31,11 +32,12 @@ null until the validation runner records an observed result. It is not a passing
 
 - **Framework**: pytest with `pytest-xdist` (parallel), `pytest-asyncio` (async), `pytest-mock`
 - **Markers**: `unit`, `integration`, `e2e`, `slow`, `demos`, `cross_backend`, `critical`,
-  `allow_startup_sync`
-- **Default deselection**: addopts include `-m "not e2e and not cross_backend and not integration"`,
+  `allow_startup_sync`, `research_vault`
+- **Default deselection**: addopts include `-m "not e2e and not cross_backend and not integration and not research_vault"`,
   so a bare `uv run pytest` runs the fast in-process suite only. Integration tests (real-subprocess
-  CLI/network-guard behavior, ~2-30s each) and cross-backend tests run as separate CI jobs; e2e
-  tests need a live `GITHUB_TOKEN` and run only on main.
+  CLI/network-guard behavior, ~2-30s each) and cross-backend tests run as separate CI jobs; the
+  one `research_vault` test reads the production corpus only in the advisory research-validation job;
+  e2e tests need a live `GITHUB_TOKEN` and run only on main.
 - **Async mode**: `asyncio_mode = "auto"` — tests auto-detect async
 - **Test discovery**: Multiple test directories configured in `pyproject.toml [tool.pytest.ini_options] testpaths`
   (plugin `tests/` dirs, `development-harness`'s `tests_sam`/`sam_schema/tests`/`backlog_core/tests`,

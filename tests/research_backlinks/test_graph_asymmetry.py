@@ -124,14 +124,15 @@ class TestSymmetricGraph:
         """Graph with no cross-references has no asymmetric edges."""
         vault = tmp_path / "vault"
         vault.mkdir()
-        (vault / "README.md").write_text("# Research\n", encoding="utf-8")
+        for non_entry_name in ("README.md", "CLAUDE.md", "AGENTS.md"):
+            (vault / non_entry_name).write_text("# Directory file\n", encoding="utf-8")
 
-        _make_vault_entry(vault, "tools/alpha.md")
-        _make_vault_entry(vault, "tools/beta.md")
+        entry = _make_vault_entry(vault, "tools/alpha.md")
 
         graph = bl.build_cross_reference_graph(vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
+        assert set(graph) == {entry}
         assert asymmetric == []
 
 
@@ -243,6 +244,7 @@ class TestThreeNodeCycle:
 class TestRealVaultScan:
     """Informational baseline: real vault scan runs without exception."""
 
+    @pytest.mark.research_vault
     def test_real_vault_scan_no_exception(self) -> None:
         """build_cross_reference_graph on real vault completes without exception."""
         real_vault = Path(__file__).parents[2] / "research"
@@ -252,20 +254,8 @@ class TestRealVaultScan:
         graph = bl.build_cross_reference_graph(real_vault).graph
         asymmetric = bl.find_asymmetric_edges(graph)
 
-        # Informational: log the baseline count (not an assertion)
         print(f"\nReal vault baseline: {len(graph)} entries, {len(asymmetric)} asymmetric edges")
-        # Smoke assertion: the graph was built (not empty)
         assert len(graph) > 0, "Expected non-empty graph from real vault"
-
-    def test_readme_excluded_from_graph(self) -> None:
-        """README.md is not included as a graph node."""
-        real_vault = Path(__file__).parents[2] / "research"
-        if not real_vault.exists():
-            pytest.skip("Real vault not present")
-
-        graph = bl.build_cross_reference_graph(real_vault).graph
-        for path in graph:
-            assert path.name != "README.md", f"README.md should not be in graph: {path}"
 
 
 class TestGraphHelpers:

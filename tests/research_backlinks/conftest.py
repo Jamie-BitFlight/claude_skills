@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import pytest
 
@@ -19,8 +20,43 @@ _SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-cura
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-# The real research vault root (read-only in tests)
-REAL_VAULT_ROOT = Path(__file__).parents[2] / "research"
+_REPO_ROOT = Path(__file__).parents[2]
+_VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+_RUN_BOUNDED: Final = (
+    "uv",
+    "run",
+    "--script",
+    str(_REPO_ROOT / "scripts" / "run_bounded.py"),
+    "--timeout-seconds",
+    "60",
+    "--",
+)
+
+
+def validator_command(args: list[str]) -> list[str]:
+    """Build one bounded validator command with isolated backlink-cache behavior.
+
+    Args:
+        args: Arguments passed to ``validate_research.py``.
+
+    Returns:
+        Complete subprocess argument vector.
+
+    Raises:
+        RuntimeError: If the uv executable is unavailable.
+    """
+    found_uv = shutil.which("uv")
+    if found_uv is None:
+        raise RuntimeError("uv binary not found on PATH — cannot run CLI tests")
+    prepared_args = list(args)
+    if (
+        prepared_args
+        and prepared_args[0] == "check-backlinks"
+        and not {"--cache-path", "--no-cache"}.intersection(prepared_args)
+    ):
+        prepared_args.append("--no-cache")
+    return [*_RUN_BOUNDED, found_uv, "run", "--script", str(_VALIDATE_SCRIPT), *prepared_args]
+
 
 # Canonical minimal entry markdown template
 _ENTRY_TEMPLATE = """\
@@ -151,34 +187,3 @@ def make_entry(tmp_vault: Path) -> Callable[..., Path]:
         return full_path
 
     return _make
-
-
-@pytest.fixture(scope="session")
-def real_entry_samples() -> list[Path]:
-    """Collect at least 5 diverse real research entry file paths.
-
-    Selection criteria for diversity:
-    1. Entry with a large multi-row Cross-References table (research-mode.md)
-    2. Entry with a Cross-References table (compression-monitor.md, same category refs)
-    3. Entry with a Cross-References table (task-management/xyops.md, cross-category)
-    4. Entry with a Freshness Tracking section but no Cross-References (beads.md)
-    5. Entry from coding-agents with Cross-References (soulforge.md)
-
-    Returns:
-        List of at least 5 absolute Paths to real vault entries (all guaranteed to exist).
-    """
-    # All candidates have been verified to parse cleanly via parse_cross_references_table.
-    # soulforge.md is intentionally excluded — its Cross-References table uses plain text
-    # cells (no markdown links) which is a data quality issue in that entry, not a bug.
-    candidates = [
-        REAL_VAULT_ROOT / "ai-observability" / "research-mode.md",  # 8 rows, cross-category links
-        REAL_VAULT_ROOT / "ai-observability" / "compression-monitor.md",  # 8 rows, same+cross category
-        REAL_VAULT_ROOT / "task-management" / "xyops.md",  # 7 rows, cross-category
-        REAL_VAULT_ROOT / "task-management" / "beads.md",  # 0 rows (no Cross-References)
-        REAL_VAULT_ROOT / "agent-frameworks" / "AutoResearchClaw.md",  # 10 rows, same+cross category
-        REAL_VAULT_ROOT / "ai-research-tools" / "OpenSpace.md",  # 8 rows, cross-category
-        REAL_VAULT_ROOT / "ai-research-tools" / "samuraizer.md",  # 5 rows, same-category
-    ]
-    existing = [p for p in candidates if p.exists()]
-    assert len(existing) >= 5, f"Need at least 5 real entry samples, found {len(existing)}: {existing}"
-    return existing[:7]  # return up to 7 for thoroughness

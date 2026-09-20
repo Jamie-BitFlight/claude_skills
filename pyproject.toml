@@ -64,7 +64,7 @@ addopts = [
     "--dist",
     "loadgroup",
     "-m",
-    "not e2e and not cross_backend and not integration",
+    "not e2e and not cross_backend and not integration and not research_vault",
 ]
 asyncio_mode = "auto"
 markers = [
@@ -74,7 +74,8 @@ markers = [
     "demos: marks tests as demonstration tests",
     "e2e: marks tests as end-to-end tests",
     "integration: marks tests as integration tests",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "research_vault: marks the single read-only production research-vault scan, run only in advisory validation",
+    "slow: marks tests as slow",
     "unit: marks tests as unit tests",
 ]
 pythonpath = [

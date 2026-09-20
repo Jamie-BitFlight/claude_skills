@@ -2,28 +2,25 @@
 
 from __future__ import annotations
 
-import shutil
+import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-_SCRIPTS_DIR = Path(__file__).parents[2] / ".claude" / "skills" / "research-curator" / "scripts"
-_VALIDATE_SCRIPT = _SCRIPTS_DIR / "validate_research.py"
+from .conftest import validator_command
 
-
-def _uv_path() -> str:
-    """Locate the uv binary, raising RuntimeError if not found."""
-    found = shutil.which("uv")
-    if found is None:
-        raise RuntimeError("uv binary not found on PATH — cannot run CLI tests")
-    return found
+pytestmark = pytest.mark.integration
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
     """Run validate_research.py via uv run --script."""
-    cmd = [_uv_path(), "run", "--script", str(_VALIDATE_SCRIPT), *args]
-    return subprocess.run(cmd, capture_output=True, text=True, check=False)
+    return subprocess.run(validator_command(args), capture_output=True, text=True, check=False)
+
+
+def _report(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    return json.loads(result.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +171,10 @@ class TestDefaultMode:
     def test_asymmetric_vault_prints_count(self, asymmetric_vault: Path) -> None:
         """Asymmetric vault prints asymmetric_cross_references: 1."""
         result = _run(["check-backlinks", str(asymmetric_vault)])
-        assert "asymmetric_cross_references: 1" in result.stdout, f"Expected count line in output:\n{result.stdout}"
+        report = _report(result)
+        assert report["schema_version"] == 1
+        assert report["asymmetric_cross_references"] == 1
+        assert result.stdout == json.dumps(report, separators=(",", ":")) + "\n"
 
     def test_symmetric_vault_exits_zero(self, symmetric_vault: Path) -> None:
         """Fully symmetric vault exits 0."""
@@ -184,14 +184,34 @@ class TestDefaultMode:
     def test_symmetric_vault_prints_zero_count(self, symmetric_vault: Path) -> None:
         """Symmetric vault prints asymmetric_cross_references: 0."""
         result = _run(["check-backlinks", str(symmetric_vault)])
-        assert "asymmetric_cross_references: 0" in result.stdout
+        assert _report(result)["asymmetric_cross_references"] == 0
 
     def test_asymmetric_vault_prints_edge_details(self, asymmetric_vault: Path) -> None:
         """Output includes the specific asymmetric pair paths."""
         result = _run(["check-backlinks", str(asymmetric_vault)])
-        # Should mention alpha.md -> beta.md or beta.md in the detailed lines
-        output = result.stdout
-        assert "alpha.md" in output or "beta.md" in output, f"Expected entry paths in output:\n{output}"
+        assert _report(result)["edges"] == [{"source": "agent-frameworks/alpha.md", "target": "tools/beta.md"}]
+
+    def test_cached_and_uncached_results_are_semantically_equal(self, symmetric_vault: Path, tmp_path: Path) -> None:
+        cache_path = tmp_path / "backlinks.sqlite3"
+        uncached = _run(["check-backlinks", str(symmetric_vault), "--no-cache"])
+        cold = _run(["check-backlinks", str(symmetric_vault), "--cache-path", str(cache_path)])
+        warm = _run(["check-backlinks", str(symmetric_vault), "--cache-path", str(cache_path)])
+
+        assert uncached.returncode == cold.returncode == warm.returncode == 0
+        uncached_report = _report(uncached)
+        cold_report = _report(cold)
+        warm_report = _report(warm)
+        operational_fields = {"files_parsed", "cache_hits"}
+        assert {key: value for key, value in uncached_report.items() if key not in operational_fields} == {
+            key: value for key, value in cold_report.items() if key not in operational_fields
+        }
+        assert {key: value for key, value in cold_report.items() if key not in operational_fields} == {
+            key: value for key, value in warm_report.items() if key not in operational_fields
+        }
+        assert cold_report["files_parsed"] == 2
+        assert cold_report["cache_hits"] == 0
+        assert warm_report["files_parsed"] == 0
+        assert warm_report["cache_hits"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -212,12 +232,12 @@ class TestFixMode:
     def test_fix_mode_reports_repaired_count(self, asymmetric_vault: Path) -> None:
         """--fix output contains backlinks_repaired: N."""
         result = _run(["check-backlinks", str(asymmetric_vault), "--fix"])
-        assert "backlinks_repaired:" in result.stdout, f"Expected backlinks_repaired in output:\n{result.stdout}"
+        assert _report(result)["backlinks_repaired"] == 1
 
     def test_fix_mode_repairs_one(self, asymmetric_vault: Path) -> None:
         """--fix repairs the single asymmetric edge."""
         result = _run(["check-backlinks", str(asymmetric_vault), "--fix"])
-        assert "backlinks_repaired: 1" in result.stdout
+        assert _report(result)["backlinks_repaired"] == 1
 
     def test_rerun_after_fix_exits_zero(self, asymmetric_vault: Path) -> None:
         """After --fix, plain check-backlinks exits 0."""
@@ -229,37 +249,4 @@ class TestFixMode:
         """After --fix, re-check reports asymmetric_cross_references: 0."""
         _run(["check-backlinks", str(asymmetric_vault), "--fix"])
         result = _run(["check-backlinks", str(asymmetric_vault)])
-        assert "asymmetric_cross_references: 0" in result.stdout
-
-
-# ---------------------------------------------------------------------------
-# Real vault informational baseline
-# ---------------------------------------------------------------------------
-
-
-class TestRealVaultBaseline:
-    """Informational: scan real vault and emit asymmetry count."""
-
-    def test_check_backlinks_against_real_vault(self) -> None:
-        """Run check-backlinks against real vault — captures informational baseline.
-
-        This test does NOT assert a specific count. It only verifies the command
-        runs to completion and emits the expected output line format.
-        """
-        real_vault = Path(__file__).parents[2] / "research"
-        if not real_vault.exists():
-            pytest.skip("Real research vault not present")
-
-        result = _run(["check-backlinks", str(real_vault)])
-
-        # Must emit the count line regardless of exit code
-        assert "asymmetric_cross_references:" in result.stdout, (
-            f"Expected count line in output:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
-
-        # Extract and print the count for informational purposes
-        for line in result.stdout.splitlines():
-            if line.startswith("asymmetric_cross_references:"):
-                count_str = line.split(":")[1].strip()
-                print(f"\nReal vault asymmetric_cross_references: {count_str}")
-                break
+        assert _report(result)["asymmetric_cross_references"] == 0
