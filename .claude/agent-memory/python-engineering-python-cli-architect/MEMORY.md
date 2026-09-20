@@ -1,6 +1,6 @@
 # Memory Index
 
-- [feedback_typer_echo_vs_logging_capture.md](./feedback_typer_echo_vs_logging_capture.md) — typer.echo() output reaches CliRunner's result.output; a logging.StreamHandler created before the test run writes elsewhere
+- [feedback_typer_echo_vs_logging_capture.md](./feedback_typer_echo_vs_logging_capture.md) — CliRunner tests: typer.echo() output reaches result.output; a logging.StreamHandler created before the test run writes elsewhere
 - [feedback_worktree_isolated_bash.md](./feedback_worktree_isolated_bash.md) — worktree sessions: worktree paths only, one plain command per call; the guard refuses any command it cannot prove git-free, including `git -C <sibling worktree>`; plain `git show <sha>` reads a sibling's commit
 - [feedback_sam_task_create_hits_live_github.md](./feedback_sam_task_create_hits_live_github.md) — sam-* leaf commands (sam-task-create etc.) hit live GitHub on invocation; monkeypatch sam_schema.sam_plan.operations first
 - [project_dh_content_store_live_plan_records_must_parse.md](./project_dh_content_store_live_plan_records_must_parse.md) — every live ContentKind.PLAN record is parsed on ContentTaskProvider load; a non-plan one breaks all content-store plan commands, so live-test with ARTIFACT_CONTENT

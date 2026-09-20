@@ -1,6 +1,6 @@
 ---
 name: project-coverage-sysmon-core
-description: coverage asks for the sysmon (PEP 669) core, which only a local Python 3.12+ run gets; CI runs 3.11 and uses ctrace — turn sysmon off before enabling a plugin file tracer
+description: Before enabling a plugin file tracer, turn off sysmon — coverage otherwise asks for the sysmon (PEP 669) core, which only a local Python 3.12+ run gets; CI's 3.11 run falls back to ctrace regardless
 metadata:
   type: project
 ---
@@ -10,5 +10,5 @@ Root `pyproject.toml` sets `[tool.coverage.run] core = "sysmon"`. The core that 
 On Python 3.12+ with coverage 7.15.2, sysmon cannot do branch coverage, plugin file tracers, or dynamic contexts. Branch coverage or dynamic contexts make coverage warn `no-sysmon` and fall back to ctrace; a plugin file tracer only gets a warning that sysmon does not support it.
 To add a plugin file tracer, remove `core = "sysmon"` in the same change.
 
-Confirm the active core with `uv run coverage debug config | grep -i core` → `core: sysmon`.
+Confirm the configured core with `uv run coverage debug config | grep -i core` → `core: sysmon`; the core a run actually uses is whatever survives the fallbacks above, and a `no-sysmon` warning on the run names it.
 A misspelled key prints `CoverageWarning: Unrecognized option` and leaves `core` unset, so coverage uses ctrace.

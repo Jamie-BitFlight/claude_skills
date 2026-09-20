@@ -1,6 +1,6 @@
 ---
 name: backlog-core-connection-failure-taxonomy
-description: backlog_core has two separate "provider unreachable" paths — background sync (OFFLINE vs ERROR) and the per-call cache fallback — identify which one a doc sentence describes before writing cause prose
+description: Before writing offline/unreachable/unavailable cause prose in a backlog_core doc, identify which "provider unreachable" path the sentence describes — background sync (OFFLINE vs ERROR) or the per-call cache fallback
 metadata:
   type: project
 ---

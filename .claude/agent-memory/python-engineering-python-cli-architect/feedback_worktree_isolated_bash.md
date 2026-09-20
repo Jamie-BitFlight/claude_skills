@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-Run every command from the session's worktree, using paths relative to it or literal absolute paths inside it. The isolation guard refuses any command it cannot prove git-free. A shell redirect after `cd` to a directory outside the worktree runs without a guard check.
+Run every command from the session's worktree, using paths relative to it or literal absolute paths inside it. The isolation guard refuses any command it cannot prove git-free. Point every redirect target at a path inside the worktree yourself: the guard checks git, not redirects, so a redirect after `cd` outside the worktree lands wherever you sent it.
 
 Keep each Bash call to one plain command. The guard refuses any call that has:
 - git inside a command substitution (`for f in $(git diff ...)`),
