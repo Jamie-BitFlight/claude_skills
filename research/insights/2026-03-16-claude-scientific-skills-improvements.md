@@ -43,5 +43,5 @@ Run: `Grep "Skill Composition" plugins/plugin-creator/skills/skill-creator/` -- 
 |---|---|
 | Comprehensive domain coverage through modular skills | Already covered — the local repo already uses self-contained skill directories with SKILL.md + references/ + scripts/ structure. Each skill is independently discoverable. |
 | Skill frontmatter-based metadata (name, description) | Already covered — `name` and `description` fields are documented in skill-creator SKILL.md lines 160-173, enforced by `skilllint`, and required per local conventions. |
-| Dependency isolation via uv | Already covered — the local repo uses `uv` as the primary package manager (documented in CLAUDE.md Session Start, `rules/uv-run-fallback.md`). All Python scripts run via `uv run`. |
+| Dependency isolation via uv | Already covered — the local repo uses `uv` as the primary package manager (documented in CLAUDE.md Session Start, `rules/uv-run-required.md`). All Python scripts run via `uv run`. |
 | Documentation-as-skill pattern | Already covered — the local skill-creator explicitly documents the "references/" directory pattern for embedding curated documentation in skill files (SKILL.md lines 187-196). Progressive disclosure is a core principle. |
