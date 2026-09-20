@@ -285,7 +285,7 @@ def test_analyze_impact_radius_conflicts_normalizes_symbols_to_owning_system() -
     assert result[0].reason == "Shared systems: plugins/shared.py"
 
 
-@pytest.mark.parametrize("directory", ["plugins", "plugins/example", "plugins/example/"])
+@pytest.mark.parametrize("directory", ["./plugins", "plugins/", "plugins/example", "plugins/example/"])
 def test_analyze_impact_radius_conflicts_detects_directory_and_nested_file_overlap(directory: str) -> None:
     first = f"### Systems Inventory\n- `{directory}` | Role: directory scope"
     second = "### Systems Inventory\n- `plugins/example/nested.py` | Role: file scope"
@@ -340,6 +340,16 @@ def test_analyze_impact_radius_conflicts_does_not_treat_multiword_system_as_root
 def test_analyze_impact_radius_conflicts_does_not_treat_single_word_system_as_root_file(system: str) -> None:
     first = "### Systems Inventory\n- `./` | Role: repository scope"
     second = f"### Systems Inventory\n- `{system}` | Role: logical system"
+
+    result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
+
+    assert result == []
+
+
+@pytest.mark.parametrize(("system", "path"), [("Redis", "Redis/config.yml"), ("auth", "auth/policy.yaml")])
+def test_analyze_impact_radius_conflicts_does_not_infer_single_word_system_as_directory(system: str, path: str) -> None:
+    first = f"### Systems Inventory\n- `{system}` | Role: logical system"
+    second = f"### Systems Inventory\n- `{path}` | Role: repository path"
 
     result = analyze_impact_radius_conflicts([_item("A", 1, first), _item("B", 2, second)])
 

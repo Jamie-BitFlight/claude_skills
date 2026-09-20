@@ -6115,13 +6115,7 @@ def _repository_path(system: str) -> str | None:
 def _path_contains(ancestor: str, descendant: str) -> bool:
     ancestor_path = _repository_path(ancestor)
     descendant_path = _repository_path(descendant)
-    if ancestor_path is None:
-        return bool(
-            descendant_path is not None
-            and re.fullmatch(r"[^/\s]+", ancestor)
-            and descendant_path.startswith(f"{ancestor}/")
-        )
-    if descendant_path is None or ancestor_path == descendant_path:
+    if ancestor_path is None or descendant_path is None or ancestor_path == descendant_path:
         return False
     if ancestor_path == ".":
         return True

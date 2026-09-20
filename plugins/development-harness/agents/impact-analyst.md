@@ -339,8 +339,9 @@ demonstrated.`
 `Systems Inventory` is the canonical machine-readable scope. Include each affected system exactly
 once there. The categorized sections are human-readable views and do not define or count scope.
 Use repository-relative paths. Bare `Dockerfile` and `Makefile` are recognized as conventional
-extensionless root files. Prefix any other extensionless root file with `./` so it remains
-distinguishable from a one-word logical system such as `Redis` or `auth`.
+extensionless root files. Prefix every other one-segment repository path, whether a directory or
+an extensionless file, with `./` so it remains distinguishable from a one-word logical system such
+as `Redis` or `auth`.
 Do not place excluded candidates in the inventory. Put unresolved credible paths in the unknown
 frontier and give each one an owner and a closure condition.
 

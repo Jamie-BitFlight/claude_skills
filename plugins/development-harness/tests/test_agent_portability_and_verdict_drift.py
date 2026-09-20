@@ -922,7 +922,7 @@ def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
         "checked-out branch, HEAD, refs, index, and worktree",
         "Run probes inline without creating temporary files",
         "Use a stable conflict identifier in the leading backticks",
-        "Prefix any other extensionless root file with `./`",
+        "Prefix every other one-segment repository path",
     )
 
     missing = [contract for contract in required_contracts if contract not in prompt]
