@@ -24,11 +24,11 @@ flowchart TD
     Impl["[Agent] Implement fix<br>Change only the code identified<br>in the root cause statement<br>No scope creep — one root cause per fix"]
 
     Impl --> Val{"[Agent] Validate<br>Re-run the exact reproduction command<br>from the WriteRepro step<br>Does it now pass?"}
-    Val -->|"Pass — reproduction now succeeds"| Commit["[Agent] Commit the fix<br>Include root cause in commit message<br>Do NOT include Fixes #N trailer<br>(quality gates handle issue closure)"]
+    Val -->|"Pass — reproduction now succeeds"| Commit["[Agent] Commit the fix<br>Include root cause in commit message"]
     Commit --> Done(["Fix complete — notify orchestrator"])
 
-    Val -->|"Fail (cycle 1) — reproduction still fails"| R
-    Val -->|"Fail (cycle 2+) — still failing after retry"| Stuck(["Escalate — report to orchestrator<br>State: root cause statement, reproduction command,<br>fix attempted, validation output<br>Orchestrator routes to /scientific-method:scientific-thinking"])
+    Val -->|"Fail (cycles 1-2) — reproduction still fails"| R
+    Val -->|"Fail (cycle 3+) — still failing after 3 cycles"| Stuck(["Escalate — report to orchestrator<br>State: root cause statement, reproduction command,<br>fix attempted, validation output<br>Orchestrator routes to /scientific-method:scientific-thinking"])
 ```
 
 ## Delegation Prompt Template
@@ -51,37 +51,13 @@ If it still fails, research the root cause and repeat. After 3 cycles without pr
 
 | State | Condition | Agent action |
 |---|---|---|
+| Root cause unclear | Root cause not known or strongly suspected before starting the fix cycle | Escalate; activate `/dh:root-cause-tracing-process` to establish root cause first |
 | Validated fix | Reproduction command passes | Commit, report STATUS: DONE with fix summary |
-| Cannot reproduce | Reproduction command does not fail | Report exact command run and exact output observed; do not guess a fix |
+| Cannot reproduce | No failing command, test, or assertion can be written to demonstrate the bug | Report what was attempted and why reproduction is not possible; orchestrator routes to `/dh:root-cause-tracing-process` |
 | Partially fixed | Some reproduction commands pass, others fail | Report which pass and which still fail; do not commit partial fixes |
 | Stuck after 3 cycles | Same failure persists after 3 research-fix iterations | Report last command, output, and working hypothesis; activate `/scientific-method:scientific-thinking` |
 
-## Wrong / Right Examples
-
-### Single failure (canonical)
-
-**Wrong** — no reproduction, no validation:
-
-```text
-Fix the ruff ANN401 errors in backlog_core. Run ruff check and fix what it finds.
-```
-
-**Right** — reproduction first, validated against same command:
-
-```text
-Problem: ruff ANN401 violations in backlog_core fail CI
-
-Reproduce: uv run ruff check --select ANN401 plugins/development-harness/backlog_core/
-Expected output before fix: 8 errors listed
-
-Success criteria: same command exits 0 with no output
-
-Cycle instruction: Run the reproduction command first and confirm the failure. Fix only what is needed.
-Re-run the exact same reproduction command. If it passes, commit and report DONE.
-If it still fails, research the root cause and repeat. After 3 cycles without progress, report BLOCKED.
-```
-
-### Multiple failures (kage-bunshin / batch)
+## Batch Prompts
 
 When a prompt covers several independent failures, list each reproduction command separately and apply the cycle to each independently:
 
@@ -98,10 +74,3 @@ Success criteria: all three commands exit 0 with no errors
 Cycle instruction: For each failure — confirm it, fix it, re-run the same command to validate.
 Commit only after all reproduction commands pass. After 3 cycles on any single failure without progress, report BLOCKED.
 ```
-
-## Cross-References
-
-- For CoVe methodology applied to self-checking prompts, activate `/cove-prompt-design`.
-- For unknown root cause requiring hypothesis testing before writing the reproduction, activate `/dh:root-cause-tracing-process`.
-- For post-fix validation protocol where the reproduction command IS the validation artifact, activate `/dh:validation-protocol`.
-- For unknown failures requiring structured hypothesis testing across multiple cycles, activate `/scientific-method:scientific-thinking`.

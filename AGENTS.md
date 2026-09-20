@@ -26,8 +26,6 @@ over maximizing information.
 
 - No planning in "weeks" or "sprints" — work scales with parallelism, not calendar time.
 - Output containing "likely", "probably", or "I think" — stop and verify before continuing.
-- A prompt naming a specific product, version, or release event — search the web or current docs
-  FIRST, before any planning, design, or code generation.
 - Pass file paths to a sub-agent and let it read them — a dispatched agent runs its own
   verification against the actual source with a fresh context window. Never transcribe file
   contents into a delegation prompt; that bypasses the agent's own verification. Symmetrically, do
@@ -96,6 +94,40 @@ state, and update its `verification` entries after compatibility work — object
 regenerated with `uv run --script scripts/generate_harness_compatibility.py`, smoke-test procedure
 in `docs/cross-harness-smoke-tests.md`.
 
+## Situational Rule Triggers
+
+Before running `git commit`, running `git push`, or spawning a sub-agent that writes files, read
+`rules/commit-cadence-and-worktrees.md` for commit scoping, push batching, and worktree isolation.
+
+Before doing substantive work yourself, or dispatching it to a sub-agent, read
+`rules/delegation.md` for when delegation is required, and its fix and output-path pointers.
+
+When a prompt names a specific product, technology, version, or release event, read
+`rules/fact-verification-first.md` before any planning, design, or code generation.
+
+Before writing a bug-fix delegation prompt, read `rules/fix-delegation-discipline.md` for the
+reproduction-first cycle and prompt template.
+
+On a TTY error (`Inappropriate ioctl for device`, `not a terminal`, `ENOTTY`), or before running
+any tool that requires a TTY (including `git rebase -i`/`git add -i`), read
+`rules/interactive-terminal-workarounds.md` for PTY providers and non-interactive equivalents.
+
+On garbled terminal-browser output (block characters instead of text — terminal browsers render
+pixels, not extractable text), use the /agent-browser skill instead of a terminal browser.
+
+Before a single `Write` call whose content may exceed 25,000 characters, read
+`rules/large-file-write-strategy.md` for the split/skeleton-and-fill strategy.
+
+Before assigning a model or effort tier to a dispatched agent, read `rules/model-selection.md`.
+
+Before fixing any problem discovered during a session that the user did not ask about, read
+`rules/proactive-fix-gate.md` for the required gate.
+
+Before writing agent output with no explicit path given in the task, before creating any new file
+under `.claude/`, or before creating a new file under `docs/` with no existing convention to
+follow, read `rules/scratch-directory.md` for the `.tmp/scratch/` convention, the committed-file
+placement check, and the hard rule against writing agent output under `.claude/`.
+
 ## Environment Setup (Required First)
 
 ```bash
@@ -157,7 +189,7 @@ flowchart TD
     T -->|"Known bug, CI failure, broken behavior"| Fix[Fix: reproduction first]
     T -->|"Unknown cause, unclear path: debug failure, diagnose perf, flaky test"| Inv[Investigation: hypothesis first]
     Exec --> V[Verify after completion]
-    Fix --> FD["fix-delegation-discipline.md: Reproduce, Fix, Validate against reproduction"]
+    Fix --> FD["fix-delegation-discipline.md"]
     FD --> V
     Inv --> H[Load /scientific-method:scientific-thinking] --> V
 ```
@@ -211,9 +243,7 @@ dismiss it — dismissing it normalizes technical debt. Respond with:
 > session? If not, I'll add them to the backlog.
 
 "Plan" means concrete steps (files, fixes, scope estimate) with the user choosing priority;
-"backlog" means a trackable record that prevents the finding from being lost. A trivial
-single-file fix with an unambiguous cause routes straight to `/dh:work-backlog-item --quick`
-without asking first — the gate decides the routing, not the user.
+"backlog" means a trackable record that prevents the finding from being lost.
 
 When you identify that work needs multiple steps, create backlog items for them rather than only
 describing them:
@@ -311,7 +341,6 @@ branch, and open a pull request for it. Do not wait for interactive approval bef
 pushing in this repository — this overrides Claude Code's own default "ask before committing"
 behavior here.
 
-- Commit small and file-scoped, naming each file explicitly on the `git commit` command.
 - One PR per discrete task or unit of work, not one PR per session. Push the branch and run
   `gh pr create` once a task's commit(s) land.
 - **Never leave a PR in draft state.** Open every PR ready for review, and mark any PR you did

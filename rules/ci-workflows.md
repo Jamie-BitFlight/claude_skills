@@ -23,9 +23,15 @@ The `quality-gate` summary job requires ALL of these to pass:
 Advisory jobs outside the gate: `research-validation` (research-corpus template gaps) and
 `test-e2e` (live GitHub sandbox issues; main push / manual dispatch only).
 
-Other workflows in `.github/workflows/`: `backlog-sync.yml`, `bump-marketplace.yml`,
-`auto-rebase.yml`, `claude.yml`, `claude-code-review.yml`, `copilot-setup-steps.yml`,
-`main-ci-health-check.yml`, `quality-gate-audit.yml`.
+## uv Invocation Lockfile Flags
+
+Every `uv run`/`uv sync` invocation in `.github/workflows/*.yml` passes `--locked` (run) or
+`--frozen` (sync). Exempt: any `uv run` of a script carrying its own `# /// script` PEP 723 block
+(with or without an explicit `--script` flag — `uv` auto-detects the block either way; e.g.
+`.github/workflows/code-quality.yml`'s
+`uv run plugins/development-harness/scripts/close_test_issues.py`) — it resolves from that block,
+not the root lockfile. Also exempt: any call that already passes `--no-sync` (skips environment
+resolution entirely, so neither flag applies).
 
 ## Phase 1: Research
 
@@ -94,20 +100,7 @@ Repository uses the `alls-green` quality gate pattern.
 - Jobs with known pre-existing failures listed in `allowed-failures`
 - Gate passes if all non-allowed jobs succeed and allowed jobs either succeed or fail
 
-**Implementation:** Uses `re-actors/alls-green` action — verify the current pinned version in `.github/workflows/`.
-
-```yaml
-quality-gate:
-  name: Quality Gate
-  if: always()
-  needs: [lint, test, type-check, validate-plugins]
-  runs-on: ubuntu-latest
-  steps:
-    - uses: re-actors/alls-green@<version>
-      with:
-        allowed-failures: validate-plugins
-        jobs: ${{ toJSON(needs) }}
-```
+**Implementation (generic pattern — this repo's `code-quality.yml` currently uses no `allowed-failures` exceptions):** Uses `re-actors/alls-green` action — verify the current pinned version in `.github/workflows/`.
 
 **Promoting advisory check to blocking**: Remove from `allowed-failures`. One-line change.
 

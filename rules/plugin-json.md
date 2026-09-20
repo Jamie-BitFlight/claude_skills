@@ -4,26 +4,10 @@
 
 `plugin.json` is always at `<plugin-root>/.claude-plugin/plugin.json` (or `.cursor-plugin/plugin.json` when developing a Cursor plugin, or both).
 
-## Required Fields
-
-- `name`: kebab-case, required
-
-## Component Path Fields
-
-| Field | Type | Example |
-|-------|------|---------|
-| `commands` | string or array | `"./custom/cmd.md"` or `["./cmd1.md"]` |
-| `agents` | array | `["./agents/agent.md"]` |
-| `skills` | string or array | `"./custom/skills/"` |
-| `hooks` | string or object | `"./hooks.json"` |
-| `mcpServers` | string or object | `"./mcp-config.json"` |
-| `outputStyles` | string or array | `"./styles/"` |
-| `lspServers` | string or object | `"./.lsp.json"` |
-
 ## Path Rules
 
 - All paths must start with `./`
-- Declaring the `agents` key replaces auto-discovery entirely — every agent not listed becomes invisible. Omit the key to use auto-discovery for all agents in `agents/`.
+- See `plugin-development.md`'s "plugin.json Auto-Discovery Rules" section — declaring `agents` overrides auto-discovery entirely. Omit the key to use auto-discovery for all agents in `agents/`.
 - `agents` field must be an array of individual file paths — `["./agents/file.md"]` — not a directory string `"./agents/"`
 - Plugins cannot reference files outside their directory (`../shared-utils` fails after installation)
 

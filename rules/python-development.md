@@ -23,9 +23,7 @@ package's) that silently diverge — a split-brain, not a cleanup.
 
 A PEP 723 script may import its own modules; the inline block governs its PyPI dependencies, not
 its file count. Split a script that passes ~500 lines, per the File Size Policy in
-[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md). Verified
-2026-09-06 by running a two-file PEP 723 script from an unrelated working directory, and by
-`sam_schema/cli.py`, which has shipped this way.
+[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md).
 
 Imports resolve two ways:
 
@@ -43,32 +41,12 @@ Imports resolve two ways:
 Only the entry script carries the shebang and the `# /// script` block; the modules it imports are
 plain `.py` files.
 
-`ty` will not resolve those imports yet: it treats a file with inline metadata as a standalone
-script, so `pyproject.toml` does not apply to it. Set `root` inside the script's own block, not
-`extra-paths` — `root` replaces ty's root detection rather than adding to it, so include `"."` or
-the script's declared dependencies stop resolving too. `tests_sam/scripted_runner.py` carries
-`root = [".", ".."]`. Load `python-engineering:ty` before changing this; it holds the full rule.
-
-### Invariant
-
-```bash
-git ls-files | grep uv.lock
-```
-
-Must return only the root `uv.lock`. A per-plugin `uv.lock` is never read — the runtime self-resolves via PEP 723 and the linters use the root dev group — so it would only drift from the real dependency set.
+`ty` needs `root` inside the script's own block to resolve those imports — `tests_sam/scripted_runner.py` carries
+`root = [".", ".."]`. Load `python-engineering:ty`; it holds the full rule.
 
 ---
 
 ## ty Type Checker Errors
-
-Fix the code to satisfy the type checker — inline `# ty: ignore` suppressions are prohibited.
-Config-level relaxation via `[[tool.ty.overrides]]` in `pyproject.toml` is allowed, but only for a
-case matching one of the acceptable-exception categories in
-[`linting-exceptions.md`](rules/linting-exceptions.md) — cite the matching category by name in a
-comment beside the override (the SOLID-corpus override in `pyproject.toml` shows the pattern).
-Load `python-engineering:ty` for suppression syntax, diagnostics, and unresolved-import/environment
-resolution. Load `python-engineering:python3-typing` for the boundary-validation pattern
-(`model_validate()` on raw input) instead of passing untyped values to typed constructors.
 
 ### `unresolved-import` errors
 

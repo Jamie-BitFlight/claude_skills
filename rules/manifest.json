@@ -1,6 +1,10 @@
 {
   "rules": [
     {
+      "file": "adr-lifecycle.md",
+      "match": "**/docs/adrs/*.md,**/decisions/*.md,ARCHITECTURE.md"
+    },
+    {
       "file": "agent-output-contracts.md",
       "match": "**/agents/*.md"
     },
@@ -17,10 +21,6 @@
       "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md"
     },
     {
-      "file": "commit-cadence-and-worktrees.md",
-      "match": "*"
-    },
-    {
       "file": "data-format-selection.md",
       "match": "*.py,*.json,*.md,*.sql"
     },
@@ -29,44 +29,16 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,**/references/*.md"
     },
     {
-      "file": "delegation.md",
-      "match": "*"
-    },
-    {
-      "file": "evidence-action-proportionality.md",
-      "match": "*"
-    },
-    {
       "file": "exception-handling.md",
-      "match": "*.py,*.ts,*.js"
-    },
-    {
-      "file": "fact-verification-first.md",
-      "match": "*"
-    },
-    {
-      "file": "falsification-requirement.md",
-      "match": "*"
-    },
-    {
-      "file": "fix-delegation-discipline.md",
-      "match": "*"
+      "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
     },
     {
       "file": "frontmatter-requirements.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
     },
     {
-      "file": "interactive-terminal-workarounds.md",
-      "match": "*"
-    },
-    {
       "file": "language-conventions.md",
       "match": "**/scripts/**,.claude/hooks/**,*.py"
-    },
-    {
-      "file": "large-file-write-strategy.md",
-      "match": "*"
     },
     {
       "file": "linting-exceptions.md",
@@ -77,20 +49,12 @@
       "match": "*.md"
     },
     {
-      "file": "model-selection.md",
-      "match": "*"
-    },
-    {
       "file": "plugin-development.md",
       "match": "plugins/**/*,.claude-plugin/**/*"
     },
     {
       "file": "plugin-json.md",
-      "match": ".claude-plugin/plugin.json,plugin.json"
-    },
-    {
-      "file": "proactive-fix-gate.md",
-      "match": "*"
+      "match": "plugin.json"
     },
     {
       "file": "prose-file-classification.md",
@@ -101,20 +65,12 @@
       "match": "*.py,pyproject.toml,uv.lock"
     },
     {
-      "file": "reproduction-integrity.md",
-      "match": "*"
-    },
-    {
       "file": "review-and-correction-discipline.md",
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md,rules/**/*.md,AGENTS.md,CLAUDE.md"
     },
     {
       "file": "runtime-vs-design-time.md",
       "match": "SKILL.md,**/references/*.md,**/agents/*.md,**/commands/**/*.md,CLAUDE.md,AGENTS.md"
-    },
-    {
-      "file": "scratch-directory.md",
-      "match": "*"
     },
     {
       "file": "script-invocation.md",
@@ -126,11 +82,7 @@
     },
     {
       "file": "silent-failure-prevention.md",
-      "match": "*.py,*.ts,*.js"
-    },
-    {
-      "file": "skill-content-optimization.md",
-      "match": "SKILL.md,**/references/*.md"
+      "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
     },
     {
       "file": "skill-documentation-verification.md",
@@ -141,7 +93,7 @@
       "match": "SKILL.md"
     },
     {
-      "file": "uv-run-fallback.md",
+      "file": "uv-run-required.md",
       "match": "**/scripts/**,*.py,.claude/hooks/**"
     },
     {

@@ -7,8 +7,7 @@ any file.
 **Step 1 — Domain skill loaded?**
 Identify the plugin or subsystem that owns the affected file. Load its domain skill (e.g.,
 `/holistic-linting:holistic-linting`, `/dh:work-backlog-item`) if not already active in this
-session. Without the skill loaded, plugin markdown files are static documentation. With the
-skill loaded, they are behavioral contracts. The quality judgment in Step 2 requires the skill.
+session.
 
 Observable pass criterion: The skill's SKILL.md has been Read in this session, or the skill was
 loaded via Skill() call. Name the skill you loaded.
@@ -17,7 +16,7 @@ Observable fail criterion: You cannot identify the owning skill, or the skill do
 Action on fail: Proceed to Step 3 and route to planning — do not fix without domain context.
 
 **Step 2 — Aligned with mission objective?**
-Read the mission statement or design intent section of the affected plugin's SKILL.md. State
+Read the affected skill's frontmatter `description` and any stated purpose/scope in its SKILL.md intro (or the plugin's `mission.json` if one exists). State
 in one sentence how the fix improves or maintains alignment with the stated mission. If you
 cannot produce this sentence, the fix is not ready — add it to the plan instead.
 
@@ -55,8 +54,3 @@ unnecessary grooming overhead for work already in flight.
 When routed to planning:
 Invoke `/dh:work-backlog-item create -- "{problem description}"` to register the item and defer
 the fix to a planned session. Do not attempt the fix in the current session.
-
-**Invocation mechanics**
-The `--quick` path is invoked as a mode flag (`flags.quick = true`), not a registry command.
-The parser translates `/dh:work-backlog-item --quick {title}` into `flags.quick = true` with
-`item_ref = [{title}]`. Do not construct the invocation any other way.

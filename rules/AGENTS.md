@@ -1,6 +1,6 @@
 # rules/ — Cross-Tool Path-Scoped Rules
 
-Plain-content mirror of `.claude/rules/*.md` for tools without a native path-glob mechanism
+`rules/` is the authoritative, plain-content rule source for tools without a native path-glob mechanism
 (Codex, Hermes). `manifest.json` is the authoritative source for which glob patterns load which
 file — read it directly rather than trusting a restated pattern here. `context-loader.mjs` is
 designed as the shared matcher/loader for every harness's own hook wrapper to call; as of this
@@ -8,49 +8,49 @@ writing only Claude Code's wrapper (`.claude/hooks/context-rules.mjs`) exists an
 (`.claude/settings.json`'s `PostToolUse`/`SessionStart` hooks) — a Codex or Hermes wrapper has not
 been added yet.
 
-| File | Loads when editing... |
-|---|---|
-| `agent-output-contracts.md` | agent-definition files — prohibited silent-output instructions and enforcement checklist |
-| `astral-tool-overrides.md` | Python files, `pyproject.toml`, `uv.lock` — this repo's uv/ty/ruff policy overrides |
-| `ci-workflows.md` | `.github/workflows/*.yml` — CI workflow modification protocol |
-| `citation-requirements.md` | SKILL.md/references/agents/commands/CLAUDE.md — factual claims need a cited source |
-| `data-format-selection.md` | Python/JSON/markdown/SQL — pick the format closest to the consumer; never parse prose for your own data |
-| `delegation-format.md` | SKILL.md/agents/commands/references — wrong delegation-instruction formats to avoid in prose |
-| `exception-handling.md` | Python/TS/JS — narrow exception catches only, no broad `except Exception` |
-| `frontmatter-requirements.md` | SKILL.md/agents/commands — required frontmatter fields |
-| `language-conventions.md` | scripts/, `.claude/hooks/`, Python files — language choice, `.cjs`/`.mjs` Node convention |
-| `linting-exceptions.md` | Python files, `pyproject.toml` — when a lint suppression is (rarely) acceptable |
-| `markdown-file-references.md` | any `.md` — code fence and markdown link conventions |
-| `plugin-development.md` | `plugins/**`, `.claude-plugin/**` — auto-discovery, versioning, local testing |
-| `plugin-json.md` | `plugin.json` — manifest schema requirements |
-| `prose-file-classification.md` | any `.md` — review-treatment decision tree for prose files |
-| `python-development.md` | Python files, `pyproject.toml`, `uv.lock` — PEP 723 scripts, no uv workspace, ty errors |
-| `review-and-correction-discipline.md` | SKILL.md/agents/commands/CLAUDE.md, `rules/**`, AGENTS.md — structural vs content review gates, and what belongs in `AGENTS.md` |
-| `runtime-vs-design-time.md` | SKILL.md/references/agents/commands/CLAUDE.md/AGENTS.md — runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo |
-| `script-invocation.md` | scripts/, `.claude/hooks/` — shebang/execute-bit, run scripts directly |
-| `silent-failure-prevention.md` | Python/TS/JS — write operations must report what changed |
-| `skill-content-optimization.md` | SKILL.md, references/*.md — load skill-creator before editing skills |
-| `skill-documentation-verification.md` | SKILL.md, references/*.md — skill docs are AI-facing, not user-facing |
-| `shared-process-extraction.md` | agent files/SKILL.md — writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it |
-| `skill-substitution.md` | SKILL.md — load-time string substitution gotcha |
-| `uv-run-fallback.md` | scripts/, Python files, `.claude/hooks/` — uv run fallback when uv unavailable |
-| `yaml-toml-libraries.md` | Python files — `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
-| `commit-cadence-and-worktrees.md` | any file (always-on) — small scoped commits, worktrees for concurrent writes |
-| `delegation.md` | any file (always-on) — substantive work is delegated; pointer to `agent-orchestration:delegate` and the sub-agent contract |
-| `evidence-action-proportionality.md` | any file (always-on) — files changed must match evidence gathered |
-| `fact-verification-first.md` | any file (always-on) — WebSearch before planning around a named product/version |
-| `falsification-requirement.md` | any file (always-on) — every hypothesis test needs a falsification check |
-| `fix-delegation-discipline.md` | any file (always-on) — reproduction-first cycle for bug-fix delegation |
-| `interactive-terminal-workarounds.md` | any file (always-on) — PTY providers when a tool needs a TTY |
-| `large-file-write-strategy.md` | any file (always-on) — skeleton+edit-fill above 25K chars |
-| `model-selection.md` | any file (always-on) — model/effort tier by cognitive requirement |
-| `proactive-fix-gate.md` | any file (always-on) — gate before acting on a self-discovered problem |
-| `reproduction-integrity.md` | any file (always-on) — reproduce in the real environment before synthetic ones |
-| `scratch-directory.md` | any file (always-on) — `.tmp/scratch/` fallback output convention |
+| File | Purpose | Reaches an agent via |
+|---|---|---|
+| `adr-lifecycle.md` | `ARCHITECTURE.md` states what's true now; an ADR records a dismissible deliberation nothing links to | `manifest.json` |
+| `agent-output-contracts.md` | prohibited silent-output instructions and enforcement checklist | `manifest.json` |
+| `astral-tool-overrides.md` | this repo's uv/ty/ruff policy overrides | `manifest.json` |
+| `ci-workflows.md` | CI workflow modification protocol | `manifest.json` |
+| `citation-requirements.md` | factual claims need a cited source | `manifest.json` |
+| `data-format-selection.md` | pick the format closest to the consumer; never parse prose for your own data | `manifest.json` |
+| `delegation-format.md` | wrong delegation-instruction formats to avoid in prose | `manifest.json` |
+| `exception-handling.md` | narrow exception catches only, no broad `except Exception` | `manifest.json` |
+| `frontmatter-requirements.md` | required frontmatter fields | `manifest.json` |
+| `language-conventions.md` | language choice, `.cjs`/`.mjs` Node convention | `manifest.json` |
+| `linting-exceptions.md` | when a lint suppression is (rarely) acceptable | `manifest.json` |
+| `markdown-file-references.md` | code fence and markdown link conventions | `manifest.json` |
+| `plugin-development.md` | auto-discovery, versioning, local testing | `manifest.json` |
+| `plugin-json.md` | manifest schema requirements | `manifest.json` |
+| `prose-file-classification.md` | review-treatment decision tree for prose files | `manifest.json` |
+| `python-development.md` | PEP 723 scripts, no uv workspace, ty errors | `manifest.json` |
+| `review-and-correction-discipline.md` | structural vs content review gates, and what belongs in `AGENTS.md` | `manifest.json` |
+| `runtime-vs-design-time.md` | runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo | `manifest.json` |
+| `script-invocation.md` | shebang/execute-bit, run scripts directly | `manifest.json` |
+| `silent-failure-prevention.md` | write operations must report what changed | `manifest.json` |
+| `skill-documentation-verification.md` | skill docs are AI-facing, not user-facing | `manifest.json` |
+| `shared-process-extraction.md` | writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it | `manifest.json` |
+| `skill-substitution.md` | load-time string substitution gotcha | `manifest.json` |
+| `uv-run-required.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists | `manifest.json` |
+| `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` | `manifest.json` |
+| `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes | routing line |
+| `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` | routing line + `.claude/hooks/context-rules-agent.mjs` |
+| `fact-verification-first.md` | WebSearch before planning around a named product/version | routing line + `.claude/hooks/context-rules-prompt.mjs` |
+| `fix-delegation-discipline.md` | reproduction-first cycle for bug-fix delegation | routing line + `.claude/hooks/context-rules-agent.mjs` |
+| `interactive-terminal-workarounds.md` | PTY providers when a tool needs a TTY | routing line |
+| `large-file-write-strategy.md` | skeleton+edit-fill above 25K chars | routing line |
+| `model-selection.md` | model/effort tier by cognitive requirement | routing line + `.claude/hooks/context-rules-agent.mjs` |
+| `proactive-fix-gate.md` | gate before acting on a self-discovered problem | routing line |
+| `scratch-directory.md` | `.tmp/scratch/` fallback output convention | routing line |
 
-`match: "*"` in `manifest.json` means always-on: it fires on the first file touch of a session,
-same dedup rules as any other entry. Every `.claude/rules/*.md` file is now migrated — a file with
-no `paths:` frontmatter there became an always-on entry here instead of being skipped.
+A `manifest.json` entry means `.claude/hooks/context-rules.mjs` loads the file when a touched path matches its
+glob — read the actual pattern in `manifest.json` itself, not restated here. "routing line" means
+the rule carries no `manifest.json` entry; instead, a line under root `AGENTS.md`'s "Situational
+Rule Triggers" section names the file and the condition for reading it. A routing-line rule marked
+with a hook filename also reaches an agent directly on that hook's event, independent of whether
+the routing line gets read.
 
 ## Writing a Rule File
 
@@ -59,4 +59,3 @@ the commit message or PR description; put a durable architecture decision in `do
 
 Rules are read only when small. Tightening an existing rule means rewriting it from scratch as
 flat directives, not `Edit`-trimming words from its existing structure.
-| `data-format-selection.md` | Python/JSON/markdown/SQL — pick the format closest to the consumer; never parse prose for your own data |

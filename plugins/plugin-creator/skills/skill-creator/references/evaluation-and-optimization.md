@@ -75,8 +75,6 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 Skills with objectively verifiable outputs (file transforms, data extraction, code generation, fixed workflow steps) benefit from test cases. Skills with subjective outputs (writing style, art) often don't need them. Suggest the appropriate default based on the skill type, but let the user decide.
 
-> Scripts in this section use `uv run` — if `uv` is not installed, read `.claude/rules/uv-run-fallback.md` for install instructions and pip fallback procedure.
-
 ## Step 8: Running and Evaluating Test Cases
 
 This section is one continuous sequence — don't stop partway through.

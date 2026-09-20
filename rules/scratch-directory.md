@@ -37,5 +37,5 @@ file in either, `ls` the likely parent — an existing directory convention deci
 
 ## Hard rule
 
-Never write agent output to `.claude/` — every write to that directory triggers a security
-prompt for the user.
+Never write agent output to `.claude/` — writes there are commonly gated by a confirmation
+prompt outside this repo's control; do not rely on `.claude/` for disposable output regardless.

@@ -66,7 +66,7 @@ All fields are optional. Only `description` is recommended.
 | `argument-hint`            | No          | Hint shown during autocomplete. Example: `[issue-number]` or `[filename] [format]`. |
 | `disable-model-invocation` | No          | `true` prevents Claude from automatically loading this skill. For manual-only workflows. Default: `false`. |
 | `user-invocable`           | No          | `false` hides from `/` menu. For background knowledge Claude loads automatically. Default: `true`. |
-| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active. Also restricts Claude to only those tools. |
+| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active. |
 | `model`                    | No          | Model to use when this skill is active. |
 | `context`                  | No          | `fork` runs in a forked subagent context. |
 | `agent`                    | No          | Subagent type when `context: fork`. Options: `Explore`, `Plan`, `general-purpose`, or custom agent from `.claude/agents/`. Default: `general-purpose`. |
@@ -74,10 +74,7 @@ All fields are optional. Only `description` is recommended.
 
 ### allowed-tools Behavior
 
-When `allowed-tools` is **not specified**, the skill inherits tool capabilities from the parent agent. When **specified**, it acts as both:
-
-- **Pre-approval**: Listed tools are granted without per-use permission prompts
-- **Capability scoping**: Claude is restricted to only those tools, reducing context size
+When `allowed-tools` is **not specified**, the skill inherits tool capabilities from the parent agent. When **specified**, listed tools are granted without per-use permission prompts.
 
 ### Frontmatter Validation Constraints
 

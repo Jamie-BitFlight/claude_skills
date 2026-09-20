@@ -56,24 +56,31 @@ Confirm before rebuilding, replacing a working component, or any architectural c
 - **Wrong:** asked "is this where the runner lives?" → rewrote the working Python runner as bash.
 - **Right:** answer the question; if a change seems warranted, propose it and act on confirmation.
 
-**Quiesce agents before committing.** Do not commit, lint, or stash while a background agent is
-editing the same files — `prek`'s stash/restore races the agent's writes and produces partial
-state. Confirm agents are idle — token count stable across two readings — then commit.
-
-## Cross-references
-
-- **Mechanism leaks** — read
-  [instruction-hygiene §1–2](plugins/plugin-creator/skills/ensemble-rule-review/references/instruction-hygiene.md)
-  before writing or reviewing any task prompt, skill, or agent file: what belongs in the prompt
-  versus the executor config, and when a skill narrates itself instead of the reader's task.
-- **Custom agents only; verify their claims** — never use general-purpose agents for workers (they
-  inherit ~100k tokens of tool/skill/MCP descriptions). Treat agent reports as claims, not facts:
-  an agent that lacks execution tools cannot run a gate (the orchestrator runs it), and an agent's
-  "not found" is often a wrong-directory confabulation — verify against primary source.
+**Quiesce agents before committing or running a mutating linter** (see `commit-cadence-and-worktrees.md`'s prek stash/restore race) — confirm agents are idle (token count stable across two readings) first.
 
 ## What belongs in `AGENTS.md`
 
-Every agent reads `AGENTS.md` in full, for every task, so it carries only what every task needs.
-A convention that applies to one kind of work belongs to a rule file with a `rules/manifest.json`
-glob — the hook then delivers it the moment an agent touches a matching file, and it costs nothing
-on every other task.
+Every agent reads `AGENTS.md` in full, for every task. It tells the agent where to find what a
+task needs, rather than handing over the data itself — a pointer costs its own line; inline data
+costs every task, whether or not the convention applies.
+
+Every rule file reaches an agent through a trigger; mechanisms differ only in what fires them and
+when, not in kind. Choose the one whose trigger fires at the moment the agent needs the rule. A
+rule writer chooses directly between two:
+
+- **A path-based condition** (a file extension, a directory) — give it a rule file with a
+  `rules/manifest.json` glob. The hook delivers the file the moment an agent touches a matching
+  path, and it costs nothing on every other task.
+- **A runtime-state condition a glob cannot express** (a TTY error, a confirmed hypothesis, a
+  prompt naming a product, a write above a size estimate) — give it a rule file and a trigger line
+  under `AGENTS.md`'s "Situational Rule Triggers" heading, naming the condition and the file to
+  read.
+
+Other event-based hooks already fire on conditions neither form expresses — an `Agent` tool call,
+a prompt submitted matching a regex — and the set is open, not fixed at two; `.claude/settings.json`
+shows what's currently wired.
+
+Write it inline only when no branch selects it — the convention applies identically to every task,
+with nothing to route on. That is the same test that decides where any material sits on the
+information hierarchy: inline what every branch needs, push behind a pointer what only some
+branches reach.

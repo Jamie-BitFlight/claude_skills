@@ -13,8 +13,6 @@ rejected. It is planning material. Many repositories never commit one at all.
 
 ## Nothing links to an ADR
 
-Not a document, not a skill, not an agent, not a test, not code, and not `ARCHITECTURE.md` either.
-
 A link makes the ADR load-bearing, and the repository owner must be able to dismiss an ADR that
 turns out not to reflect the goal or the intent without the repository being stuck with it. The
 citation is precisely what removes that right. Where an ADR's substance is needed, write the
@@ -24,10 +22,6 @@ An ADR need not live in the repository at all. A decision record belongs equally
 tracker or a project board, where an agent reading the code may have no access to it. So a citation
 is not merely stale-prone — it can be unresolvable by construction for whoever reads the code next.
 `ARCHITECTURE.md` lives with the code and is always readable by anyone who has the code.
-
-The consequence to watch for: a reader who must replay a chain of decisions and supersessions to
-work out what is currently true is reading the deliberation because nothing else states the outcome.
-That is the failure this rule prevents.
 
 A test that reads an ADR and enforces its criteria is the extreme case — executable code coupled to
 a deliberation document, which cannot then be dismissed without breaking the suite. If a criterion

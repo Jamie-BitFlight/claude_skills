@@ -1,8 +1,8 @@
 # Agent Output Contracts — Prohibited Instructions in Agent Definitions
 
-Scope: persistent agent-definition files (`plugins/*/agents/*.md`) that an agent reloads on
-every dispatch — not a one-off dispatch prompt. For prompt-level output requirements, see
-`agent-orchestration:delegate`'s `sub-agent-contract.md`.
+Scope: persistent agent-definition files (any `agents/*.md`, e.g. `plugins/*/agents/*.md` or `.claude/agents/*.md`) that an agent reloads on
+every dispatch — not a one-off dispatch prompt. For prompt-level output requirements, see the
+`/agent-orchestration:delegate` skill's `sub-agent-contract.md`.
 
 ## Prohibited Instructions in Agent Files
 
@@ -18,7 +18,7 @@ Never write these as agent output instructions:
 
 ## Enforcement
 
-When writing or reviewing an agent file, and when launching one:
+When writing or reviewing an agent file:
 
 1. Check that a STATUS: DONE format exists in the agent's output section
 2. Check that the "no findings" case produces explicit output — not silence
