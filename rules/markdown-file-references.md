@@ -19,14 +19,11 @@ This is another paragraph.
 
 ## Markdown Links
 
-Use markdown links with relative paths starting with `./`. **Reason**: Enables Claude Code click-through, works regardless of installation location, and supports on-demand file loading.
+Use markdown links with paths relative to the file holding the link — `./name.md` for a sibling or
+below it, `../name.md` for a parent. **Reason**: Enables Claude Code click-through, works regardless
+of installation location, and supports on-demand file loading.
 
 **Syntax**: `[descriptive text](./path/to/file.md)`
-
-**Directory Context:**
-- From SKILL.md → references: `[text](./references/filename.md)`
-- From references/file.md → same dir: `[text](./filename.md)`
-- From references/file.md → subdir: `[text](./subdir/filename.md)`
 
 Use a markdown link for any real relative path; a bare backticked path (`modern-modules/httpx.md`) and an absolute path (`/home/user/...`) both fail. External file: full URL with access date.
 
