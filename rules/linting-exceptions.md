@@ -56,15 +56,15 @@ If none of the above apply:
 
 1. Fix linting smell using `/holistic-linting:holistic-linting` Skill (exact methodology for addressing linting issues)
 2. If unable to fix, document specific blocker
-3. Adding `# type: ignore` or `# noqa` requires explicit user approval; `# ruff: ignore[<rule>]` and
-   `# ruff: file-ignore[<rules>]` are never eligible for that exception — see `astral-tool-overrides.md`
+3. See `astral-tool-overrides.md`'s Suppressions rule — `# noqa` is the only form eligible for a
+   user-approval exception.
 
 ## Rule Codes That MUST Always Be Fixed (never suppress)
 
 These are never eligible for any exception above:
 
 - BLE001 (blind-except): Replace `except Exception` with specific exception types
-- D103 (missing-docstring-in-public-function): Add docstrings to public functions
+- D103 (undocumented-public-function): Add docstrings to public functions
 - TRY300 (try-consider-else): Restructure try/except/else blocks properly
 
 **Touched Files Must Be Clean**: When files are modified/moved/renamed, all linting issues MUST be resolved before committing. Touching a file means taking responsibility for its quality.
@@ -83,8 +83,6 @@ every code genuinely applies, and state the reason next to the code, not above t
 
 ## `--ignore` and `--unsafe-fixes`
 
-Never pass `--ignore` to `ruff check` to make this repository's CI pass — that suppresses the same
-class of error this file already prohibits suppressing by comment. `ruff check --fix --unsafe-fixes`
-is permitted only after reviewing the change with `--diff` first; never apply unsafe fixes blind.
+The `--ignore` and `--unsafe-fixes` rules are stated once, in `astral-tool-overrides.md`.
 See [`astral-tool-overrides.md`](rules/astral-tool-overrides.md) for why this departs from Astral's own
 `ruff` skill, which teaches `--ignore` and `--unsafe-fixes` with no such gate.

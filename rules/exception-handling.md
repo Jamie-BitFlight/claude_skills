@@ -23,4 +23,4 @@ A suppression requires an inline comment stating which specific exception should
 
 ## `except Exception: pass` — Always Prohibited
 
-`BLE001` combined with `S112` (pass in except) has no recovery action and no justification in this codebase. Remove the try/except entirely and let the exception propagate.
+`BLE001` combined with `S110` (try-except-pass) has no recovery action and no justification in this codebase. Remove the try/except entirely and let the exception propagate.

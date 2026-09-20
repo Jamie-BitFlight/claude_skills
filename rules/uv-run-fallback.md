@@ -9,9 +9,9 @@ uv run scripts/some_script.py
 uvx skilllint@latest check <path>
 ```
 
-`uv` automatically creates or reuses the project virtual environment and installs all
-dependencies declared in `pyproject.toml` before running the script. No manual `pip install`
-or `venv activate` is required.
+`uv` reads the script's own PEP 723 `# /// script` block (see `rules/python-development.md`) and
+resolves an isolated environment for it at launch — it does not consult `pyproject.toml` or the
+root `uv.lock`. No manual `pip install` or `venv activate` is required.
 
 ## If `uv run` fails with "uv not found" or "command not found"
 
@@ -34,36 +34,7 @@ Then re-run the original command with `uv run`.
 
 **If uv installation is not an option:**
 
-1. Read the first 20 lines of the script to find PEP 723 inline script metadata:
-
-   ```python
-   # /// script
-   # requires-python = ">=3.11"
-   # dependencies = [
-   #   "ruamel.yaml",
-   #   "typer",
-   # ]
-   # ///
-   ```
-
-2. Install the listed `dependencies` using whatever package manager is available on the host:
-
-   ```bash
-   # pip (most common)
-   pip install ruamel.yaml typer
-
-   # poetry (if pyproject.toml present with poetry config)
-   poetry add ruamel.yaml typer
-
-   # pipx (for isolated CLI tools)
-   pipx install typer
-   ```
-
-   Match the tool to the project convention — check `pyproject.toml` `[build-system]` or
-   `[tool.poetry]` to determine which manager is in use.
-
-3. Run the script directly:
-
-   ```bash
-   python scripts/some_script.py
-   ```
+Stop and tell the user. There is no fallback: `pip`, `poetry`, `pipx`, and bare `python` are all
+prohibited substitutes for `uv run` (`astral-tool-overrides.md`'s Package management rule,
+`script-invocation.md`). Report which command needed `uv` and wait for the user to make `uv`
+available; do not install dependencies or run the script by any other means.

@@ -8,7 +8,7 @@ Run scripts directly, not as library modules and not via bare `python3`:
 2. If direct execution fails, `uv run plugins/plugin-creator/scripts/check_agent_auto_discovery.py`
 
 Never `python3 script.py` — it skips PEP 723 dependency resolution and may use the wrong
-interpreter. Never `node .claude/hooks/session-start-backlog.cjs` in place of its own invocation
+interpreter. Never `node .claude/hooks/run-commands-try-all.cjs` in place of its own invocation
 mechanism.
 
 ## Canonical PEP 723 Shebang
