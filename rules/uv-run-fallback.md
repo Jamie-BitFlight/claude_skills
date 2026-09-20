@@ -1,4 +1,4 @@
-# uv run — Fallback When uv Is Not Available
+# uv run Is Required — No Fallback When Unavailable
 
 ## Standard invocation
 

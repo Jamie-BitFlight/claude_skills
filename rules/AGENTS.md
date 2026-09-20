@@ -34,7 +34,7 @@ been added yet.
 | `skill-documentation-verification.md` | skill docs are AI-facing, not user-facing |
 | `shared-process-extraction.md` | writing into an agent what another also needs, or finding the same process in two agents: one skill holds it, both load it |
 | `skill-substitution.md` | load-time string substitution gotcha |
-| `uv-run-fallback.md` | uv run fallback when uv unavailable |
+| `uv-run-fallback.md` | stop and tell the user when uv is unavailable — no pip/poetry/pipx/python fallback exists |
 | `yaml-toml-libraries.md` | `ruamel.yaml`/`tomlkit` only, never `pyyaml` |
 | `commit-cadence-and-worktrees.md` | small scoped commits, worktrees for concurrent writes |
 | `delegation.md` | substantive work is delegated; pointer to `agent-orchestration:delegate` and the sub-agent contract |
@@ -49,8 +49,8 @@ been added yet.
 | `reproduction-integrity.md` | reproduce in the real environment before synthetic ones |
 | `scratch-directory.md` | `.tmp/scratch/` fallback output convention |
 
-The 12 rules below the `manifest.json` table — `commit-cadence-and-worktrees.md` through
-`scratch-directory.md` — carry no `manifest.json` entry. Each reaches an agent through its own
+Find these in the table's last 12 rows — `commit-cadence-and-worktrees.md` through
+`scratch-directory.md`; they carry no `manifest.json` entry. Each reaches an agent through its own
 routing line under root `AGENTS.md`'s "Situational Rule Triggers" section. Two hooks separately
 deliver four of these by name: `.claude/hooks/context-rules-agent.mjs` delivers `delegation.md`,
 `fix-delegation-discipline.md`, and `model-selection.md` on every `Agent` tool call;
