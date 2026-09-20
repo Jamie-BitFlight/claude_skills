@@ -75,7 +75,9 @@ Every agent reads `AGENTS.md` in full, for every task. It tells the agent where 
 task needs, rather than handing over the data itself — a pointer costs its own line; inline data
 costs every task, whether or not the convention applies.
 
-Route a new convention by what selects it:
+Every rule file reaches an agent through a trigger; mechanisms differ only in what fires them and
+when, not in kind. Choose the one whose trigger fires at the moment the agent needs the rule. A
+rule writer chooses directly between two:
 
 - **A path-based condition** (a file extension, a directory) — give it a rule file with a
   `rules/manifest.json` glob. The hook delivers the file the moment an agent touches a matching
@@ -84,6 +86,10 @@ Route a new convention by what selects it:
   prompt naming a product, a write above a size estimate) — give it a rule file and a trigger line
   under `AGENTS.md`'s "Situational Rule Triggers" heading, naming the condition and the file to
   read.
+
+Other event-based hooks already fire on conditions neither form expresses — an `Agent` tool call,
+a prompt submitted matching a regex — and the set is open, not fixed at two; `.claude/settings.json`
+shows what's currently wired.
 
 Write it inline only when no branch selects it — the convention applies identically to every task,
 with nothing to route on. That is the same test that decides where any material sits on the
