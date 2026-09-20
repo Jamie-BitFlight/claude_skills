@@ -21,10 +21,7 @@ Claude Code sessions do NOT have a TTY attached. When a tool requires a TTY (err
 
 2. **script** — simplest for commands that run and exit
 
-   `script` starts a child shell, so bound it with `scripts/run_bounded.py`
-   (see [AGENTS.md](AGENTS.md) "Bounded subprocess execution") rather than a bare `timeout` —
-   `timeout` alone sends TERM and leaves it to the command to exit; a command that ignores or
-   outlives TERM keeps running past the deadline, and `script`'s child shell is exactly that risk.
+   Bound it with `scripts/run_bounded.py` rather than a bare `timeout`.
 
    ```bash
    # macOS/BSD script (file first, command after):
