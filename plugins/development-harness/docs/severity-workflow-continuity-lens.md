@@ -14,8 +14,8 @@ The [S1-S7 pipeline](../AGENTS.md#sam-7-stage-pipeline) and the
 backend at every step — grooming writes a section, RT-ICA reads it, dispatch reads the plan,
 sync reconciles provider state, verification reads the acceptance criteria. A byte can survive
 that handoff on disk and still be lost to the workflow: written by one step, never consulted by
-the step that needed it. That is the failure this lens targets — see `impact-analyst.md`'s Core
-Principle for the directive itself.
+the step that needed it. That is the failure this lens targets — see `impact-analyst.md`'s
+"Assess each affected system" step for the executable check.
 
 ## Case 1 — `add_item()`'s missing `item_ref` (issue #2999)
 

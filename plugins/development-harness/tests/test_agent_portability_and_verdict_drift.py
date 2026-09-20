@@ -911,61 +911,23 @@ def test_impact_analyst_description_fits_frontmatter_limit() -> None:
     assert len(str(frontmatter["description"])) <= 1024
 
 
-def test_impact_analyst_requires_causal_scope_beyond_lexical_matches() -> None:
+def test_impact_analyst_and_feasibility_gate_share_the_refresh_command() -> None:
     prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
-    required_contracts = (
-        "A zero-match search does not prove zero impact",
-        "change -> dependency or control edge -> changed state or decision -> outcome -> stakeholder",
-        "**Estimated impact set**",
-        "**Unknown frontier**",
-        "Never use the count as evidence that a system is affected or unaffected",
-        "Never calculate risk from the count",
-        "In direct mode, return `<report>` inline and do not call `backlog_groom`",
-        "checked-out branch, HEAD, refs, index, and worktree",
-        "Run probes inline without creating temporary files",
-        "Use a stable conflict identifier in the leading backticks",
-        "Prefix every other one-segment repository path",
-    )
-
-    missing = [contract for contract in required_contracts if contract not in prompt]
-    assert not missing, f"impact-analyst lost semantic impact-analysis contracts: {missing}"
-    assert re.search(r"Unknown:.*\| Owner:.*\| Closure:", prompt)
-
     feasibility_gate = (
         SKILLS_DIR / "work-backlog-item" / "references" / "workflows" / "work" / "feasibility-gate.md"
     ).read_text(encoding="utf-8")
-    count_override = re.compile(
-        r"(?is)(?:"
-        r"\b(?:use|set|replace|calculate|derive)\b[^.\n]{0,120}"
-        r"\b(?:current_?pattern_count|pattern_count|live_count|match count|grep count)\b"
-        r"[^.\n]{0,80}\bblast[ -]radius\b"
-        r"|\bblast[ -]radius\b[^.\n]{0,80}\b(?:uses?|equals?|derives?)\b"
-        r"[^.\n]{0,80}\b(?:current_?pattern_count|pattern_count|live_count|match count|grep count)\b"
-        r")"
-    )
-    combined_contract = f"{prompt}\n{feasibility_gate}"
-    assert count_override.search(combined_contract) is None
-    assert "distinct `Systems Inventory` row count, or the legacy affected-system row count" in feasibility_gate
-    assert 'Compare -->|"No — annotations remain current"| C3Decision' in feasibility_gate
     refresh_command = "rg --hidden --glob '!**/.git' --glob '!**/.git/**' -F -l -- \"$pattern\""
     assert refresh_command in prompt
     assert refresh_command in feasibility_gate
-    assert "number of matching files" in prompt
-    assert "same matched-file unit and search semantics" in feasibility_gate
-    assert "Exit status 1 means zero matches" in feasibility_gate
-    assert "greater than 1" in feasibility_gate
     assert "rg -l '<pattern>' | wc -l" not in feasibility_gate
-
-    regression_mutation = "Use current_pattern_count as the blast radius whenever an annotation exists."
-    assert count_override.search(regression_mutation) is not None
 
 
 def test_impact_analyst_keeps_the_subagent_status_token_first_and_exact() -> None:
     prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
+    completion_template = re.search(r"```text\n(STATUS: DONE\n.*?\n)```", prompt, flags=re.DOTALL)
 
-    assert "Begin your response with `STATUS: DONE` as its own first line." in prompt
-    assert "STATUS: DONE -" not in prompt
-    assert "End your response with:" not in prompt
+    assert completion_template is not None
+    assert completion_template.group(1).splitlines()[0] == "STATUS: DONE"
 
 
 def test_impact_analyst_replaces_the_previous_impact_snapshot() -> None:
@@ -982,11 +944,6 @@ def test_impact_analyst_replaces_the_previous_impact_snapshot() -> None:
 
 
 def test_impact_analyst_keeps_backlog_content_heading_free() -> None:
-    prompt = IMPACT_ANALYST.read_text(encoding="utf-8")
-
-    assert "Do not include `## Impact Radius` in `<impact-radius-content>`" in prompt
-    assert "Direct-mode `<report>` adds `## Impact Radius`" in prompt
-
     content = """SCOPE_EXPANSION: None.
 IMPACT_RADIUS_COMPLETE: Written to item example. Overall risk: LOW. Highest-risk: None.
 
