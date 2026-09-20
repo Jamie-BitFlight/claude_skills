@@ -1,4 +1,4 @@
-# uv run Is Required — No Fallback When Unavailable
+# uv run Is Required — Stop and Ask, Never Substitute Another Interpreter
 
 ## Standard invocation
 
@@ -34,4 +34,4 @@ Then re-run the original command with `uv run`.
 
 **If uv installation is not an option:**
 
-Stop and tell the user which command needed `uv`, then wait for them to make `uv` available.
+Stop and tell the user which command needed `uv`.

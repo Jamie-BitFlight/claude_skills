@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// UserPromptSubmit hook — heuristic for fact-verification-first.md's trigger
-// (a named product/version in the prompt). A regex heuristic is imprecise by
-// nature; it complements, not replaces, the always-on manifest entry that
-// still guarantees delivery on the first file touch either way. Never
+// UserPromptSubmit hook — heuristic delivery for fact-verification-first.md's
+// trigger (a named product/version in the prompt). A regex heuristic is
+// imprecise by nature; this hook and the AGENTS.md routing line are this
+// rule's only two delivery paths — no manifest.json entry backs it. Never
 // blocks/crashes.
 
 import { readFileSync } from 'node:fs';

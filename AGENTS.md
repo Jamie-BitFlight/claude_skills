@@ -131,10 +131,10 @@ Before fixing any problem discovered during a session that the user did not ask 
 Before building a synthetic, mocked, or containerized reproduction environment (`env -i`,
 `docker run`, a mock), read `rules/reproduction-integrity.md`.
 
-Before writing agent output with no explicit path given in the task, or before creating a new file
-under `.claude/` or `docs/` with no existing convention to follow, read
-`rules/scratch-directory.md` for the `.tmp/scratch/` convention and the committed-file placement
-check.
+Before writing agent output with no explicit path given in the task, before creating any new file
+under `.claude/`, or before creating a new file under `docs/` with no existing convention to
+follow, read `rules/scratch-directory.md` for the `.tmp/scratch/` convention, the committed-file
+placement check, and the hard rule against writing agent output under `.claude/`.
 
 ## Environment Setup (Required First)
 
