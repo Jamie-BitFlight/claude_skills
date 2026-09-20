@@ -94,6 +94,36 @@ def test_configured_flat_namespace_module_is_part_of_a_package(distribution: Pat
     assert is_part_of_package(module) is True
 
 
+def test_empty_setuptools_find_does_not_swallow_loose_script(distribution: Path) -> None:
+    """Default-root discovery alone is not enough to classify scripts as packages."""
+    (distribution / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n[tool.setuptools.packages.find]\n', encoding="utf-8"
+    )
+    script = write_script(distribution / "tool.py")
+    assert is_part_of_package(script) is False
+
+
+def test_setuptools_find_respects_where(distribution: Path) -> None:
+    """A configured discovery root includes namespaces below it and excludes siblings."""
+    (distribution / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n[tool.setuptools.packages.find]\nwhere = ["lib"]\n', encoding="utf-8"
+    )
+    module = write_script(distribution / "lib" / "acme" / "tools" / "cli.py")
+    sibling = write_script(distribution / "acme" / "tools" / "cli.py")
+    assert is_part_of_package(module) is True
+    assert is_part_of_package(sibling) is False
+
+
+def test_setuptools_find_respects_exclude(distribution: Path) -> None:
+    """An excluded namespace does not receive project-environment Rule 2."""
+    (distribution / "pyproject.toml").write_text(
+        '[project]\nname = "demo"\n[tool.setuptools.packages.find]\nwhere = ["src"]\nexclude = ["acme.tools.*"]\n',
+        encoding="utf-8",
+    )
+    module = write_script(distribution / "src" / "acme" / "tools" / "internal" / "cli.py")
+    assert is_part_of_package(module) is False
+
+
 def test_src_namespace_module_without_pep723_selects_package_rule(distribution: Path) -> None:
     """A src-layout namespace module receives package dependencies through Rule 2."""
     module = distribution / "src" / "acme" / "tools" / "cli.py"

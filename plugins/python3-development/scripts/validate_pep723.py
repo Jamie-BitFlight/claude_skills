@@ -258,9 +258,6 @@ def is_part_of_package(file_path: Path) -> bool:
         return True
 
     relative = resolved.relative_to(project_root)
-    if len(relative.parts) >= MIN_SRC_PACKAGE_PARTS and relative.parts[0] == "src":
-        return True
-
     pyproject = project_root / "pyproject.toml"
     try:
         config = tomllib.loads(pyproject.read_text(encoding="utf-8")) if pyproject.exists() else {}
@@ -268,7 +265,7 @@ def is_part_of_package(file_path: Path) -> bool:
         config = {}
     packages = config.get("tool", {}).get("setuptools", {}).get("packages", {})
     if "find" not in packages:
-        return False
+        return len(relative.parts) >= MIN_SRC_PACKAGE_PARTS and relative.parts[0] == "src"
     return matches_setuptools_find(packages["find"], relative)
 
 
