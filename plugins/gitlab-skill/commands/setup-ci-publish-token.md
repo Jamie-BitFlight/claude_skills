@@ -47,7 +47,7 @@ Do not assign `CI_JOB_TOKEN` to `GITLAB_TOKEN`; `glab` sends these token types i
 | Token state | Variable state | Action |
 | --- | --- | --- |
 | Missing | Missing, hidden, or readable | Create a unique token and reconcile the variable; revoke the token if reconciliation fails |
-| Expired at or before today's UTC date | Missing, hidden, or readable | Create a unique replacement and reconcile the variable; revoke it if reconciliation fails |
+| Expired at or before today's UTC date | Missing, hidden, or readable | Store a unique replacement, then revoke the superseded ID; on write failure revoke only the new token |
 | Valid | Missing | Create and store a new token, then revoke the old token by ID |
 | Valid | Present, not hidden | Transactionally recreate it as hidden |
 | Valid | Present, hidden | Make no change |

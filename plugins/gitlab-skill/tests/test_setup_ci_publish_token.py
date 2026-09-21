@@ -336,13 +336,18 @@ def test_existing_hidden_variable_is_updated_without_delete() -> None:
     """Replacing an existing hidden value must retain variable identity and hidden state."""
     secret = "replacement-secret"
     runner = ScriptedRunner(
-        token_json(expires_at="2026-09-21"), variable_json(hidden=True), created_token_json(secret=secret), ""
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(secret=secret),
+        "",
+        "",
     )
 
     MODULE.reconcile(runner, "group/project", today=date(2026, 9, 21), now=datetime(2026, 9, 21, tzinfo=UTC))
 
-    assert runner.calls[-1].arguments[:3] == ("variable", "update", MODULE.VARIABLE_NAME)
-    assert runner.calls[-1].stdin.get_secret_value() == secret
+    assert runner.calls[-2].arguments[:3] == ("variable", "update", MODULE.VARIABLE_NAME)
+    assert runner.calls[-2].stdin.get_secret_value() == secret
+    assert runner.calls[-1] == MODULE.GlabCall(("token", "revoke", "42", "--repo", "group/project"))
     assert all(call.arguments[:2] != ("variable", "delete") for call in runner.calls)
 
 
@@ -473,10 +478,14 @@ def test_ambiguous_active_tokens_are_rejected_in_id_order() -> None:
 
 
 def test_expiry_boundary_creates_unique_replacement() -> None:
-    """A token expiring on today's UTC date is replaced with a uniquely named token."""
+    """An expiry-boundary token is revoked only after durable replacement storage."""
     secret = "new-secret"
     runner = ScriptedRunner(
-        token_json(expires_at="2026-09-21"), variable_json(hidden=True), created_token_json(secret=secret), ""
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(secret=secret),
+        "",
+        "",
     )
 
     result = MODULE.reconcile(
@@ -488,7 +497,81 @@ def test_expiry_boundary_creates_unique_replacement() -> None:
     assert create_call.arguments[:3] == ("token", "create", create_call.arguments[2])
     assert create_call.arguments[2].startswith("ci-publish-token-20260921131415-")
     assert create_call.arguments[2] != MODULE.RESOURCE_NAME
-    assert runner.calls[-1].stdin.get_secret_value() == secret
+    assert runner.calls[-2].stdin.get_secret_value() == secret
+    assert runner.calls[-1] == MODULE.GlabCall(("token", "revoke", "42", "--repo", "group/project"))
+
+
+def test_expiry_boundary_definitive_write_failure_preserves_old_token() -> None:
+    """Definitive replacement rejection cleans only the new token."""
+    runner = ScriptedRunner(
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(token_id=91),
+        MODULE.GlabError("variable update rejected", returncode=1),
+        "",
+    )
+
+    with pytest.raises(MODULE.TokenManagerError, match="new token was revoked"):
+        MODULE.reconcile(runner, "group/project", today=date(2026, 9, 21), now=datetime(2026, 9, 21, tzinfo=UTC))
+
+    revoke_calls = [call for call in runner.calls if call.arguments[:2] == ("token", "revoke")]
+    assert revoke_calls == [MODULE.GlabCall(("token", "revoke", "91", "--repo", "group/project"))]
+
+
+def test_expiry_boundary_indeterminate_write_performs_no_revoke() -> None:
+    """Unknown replacement outcome preserves both tokens for inspection."""
+    secret = "expiry-indeterminate-secret"
+    runner = ScriptedRunner(
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(token_id=91, secret=secret),
+        mutation_timeout("variable update"),
+    )
+
+    with pytest.raises(MODULE.IndeterminateMutationError, match=r"token.*91.*inspect") as caught:
+        MODULE.reconcile(runner, "group/project", today=date(2026, 9, 21), now=datetime(2026, 9, 21, tzinfo=UTC))
+
+    assert all(call.arguments[:2] != ("token", "revoke") for call in runner.calls)
+    assert runner.calls[-1].arguments[:2] == ("variable", "update")
+    assert secret not in str(caught.value)
+
+
+def test_expiry_boundary_old_revoke_failure_reports_durable_state() -> None:
+    """Definitive old-token revoke failure reports the durable replacement and old ID."""
+    secret = "expiry-durable-secret"
+    runner = ScriptedRunner(
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(token_id=91, secret=secret),
+        "",
+        MODULE.GlabError("old token revoke rejected", returncode=1),
+    )
+
+    with pytest.raises(MODULE.TokenManagerError, match=r"variable is durable.*revoke token ID 42") as caught:
+        MODULE.reconcile(runner, "group/project", today=date(2026, 9, 21), now=datetime(2026, 9, 21, tzinfo=UTC))
+
+    assert runner.calls[-2].arguments[:2] == ("variable", "update")
+    assert runner.calls[-1] == MODULE.GlabCall(("token", "revoke", "42", "--repo", "group/project"))
+    assert secret not in str(caught.value)
+
+
+def test_expiry_boundary_old_revoke_indeterminate_reports_unknown_status() -> None:
+    """Old-token revoke uncertainty reports durable state and the exact old ID."""
+    secret = "expiry-revoke-timeout-secret"
+    runner = ScriptedRunner(
+        token_json(token_id=42, expires_at="2026-09-21"),
+        variable_json(hidden=True),
+        created_token_json(token_id=91, secret=secret),
+        "",
+        mutation_timeout("old token revoke"),
+    )
+
+    with pytest.raises(MODULE.IndeterminateMutationError, match=r"old token ID 42.*status is unknown") as caught:
+        MODULE.reconcile(runner, "group/project", today=date(2026, 9, 21), now=datetime(2026, 9, 21, tzinfo=UTC))
+
+    assert runner.calls[-2].arguments[:2] == ("variable", "update")
+    assert runner.calls[-1] == MODULE.GlabCall(("token", "revoke", "42", "--repo", "group/project"))
+    assert secret not in str(caught.value)
 
 
 def test_valid_token_with_missing_variable_replaces_after_durable_write() -> None:

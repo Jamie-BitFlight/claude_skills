@@ -1,6 +1,6 @@
 {
   "name": "gitlab-skill",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
   "author": {
     "name": "Jamie Nelson",

@@ -618,12 +618,12 @@ def reconcile_created_token(
         raise TokenManagerError(f"variable reconciliation failed ({variable_error}); new token was revoked") from None
 
 
-def replace_active_token_with_missing_variable(
-    runner: GlabRunner, project: str, old_token_id: int, now: datetime
+def replace_active_token(
+    runner: GlabRunner, project: str, old_token_id: int, now: datetime, variable: VariableSnapshot | None
 ) -> None:
     """Create and durably store a replacement before revoking the old token."""
     created = create_token(runner, project, now)
-    reconcile_created_token(runner, project, created, None)
+    reconcile_created_token(runner, project, created, variable)
     try:
         runner.run(("token", "revoke", str(old_token_id), "--repo", project))
     except IndeterminateMutationError:
@@ -654,11 +654,10 @@ def reconcile(runner: GlabRunner, project: str, *, today: date, now: datetime) -
 
     token = tokens[0]
     if token.expires_at <= today:
-        created = create_token(runner, project, now)
-        reconcile_created_token(runner, project, created, variable)
+        replace_active_token(runner, project, token.id, now, variable)
         return {"status": "done", "action": "created_replacement_token_and_variable"}
     if variable is None:
-        replace_active_token_with_missing_variable(runner, project, token.id, now)
+        replace_active_token(runner, project, token.id, now, None)
         return {"status": "done", "action": "created_variable_then_revoked_old_token"}
     if variable.hidden is False:
         if variable.value is None or not variable.value.get_secret_value():
