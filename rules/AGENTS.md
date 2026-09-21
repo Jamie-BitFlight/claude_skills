@@ -25,7 +25,7 @@ been added yet.
 | `plugin-development.md` | auto-discovery, versioning, local testing | `manifest.json` |
 | `plugin-json.md` | manifest schema requirements | `manifest.json` |
 | `prose-file-classification.md` | review-treatment decision tree for prose files | `manifest.json` |
-| `python-development.md` | PEP 723 scripts, no uv workspace, ty errors | `manifest.json` |
+| `python-development.md` | PEP 723 scripts, no uv workspace, ty errors, repo overrides on the Python skills | `manifest.json` + routing line |
 | `review-and-correction-discipline.md` | structural vs content review gates, and what belongs in `AGENTS.md` | `manifest.json` |
 | `runtime-vs-design-time.md` | runtime vs. design-time audience, and a portable artifact's actual (installed) environment vs. its authoring repo | `manifest.json` |
 | `script-invocation.md` | shebang/execute-bit, run scripts directly | `manifest.json` |

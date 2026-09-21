@@ -129,7 +129,8 @@ How the resource works internally. Include diagrams if helpful.
 ### Integration Opportunities
 
 - **{API, package, or CLI this resource exposes}** -> nothing in `{scope searched}`
-  - Today: `git grep --full-name -il "{narrow term}" -- {root-anchored scope}` and `git grep --full-name -il "{broader term}" -- {root-anchored scope}` -> 0 matches each
+  - Today: `git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → {narrow term match count} matches
+  - Today: `git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → {broader term match count} matches
   - Change: {what would have to exist here first}
 
 ---
@@ -170,9 +171,15 @@ How the resource works internally. Include diagrams if helpful.
 >   argument inside a code fence — those carry the term without asserting anything. `Term:` is what
 >   makes the quote checkable by a reader who did not run the pass; without it Gate 4 Rule 5 of
 >   [Entry Review Rubric](./entry-review-rubric.md) has nothing to check against. Absence anchor:
->   `-> nothing in {scope searched}` with both the narrow and the broader search command at
->   `0 matches`. Zero matches is a finding, not a failure to find one — but it records that these
->   terms found nothing, never that the capability is absent from this repo.
+>   `-> nothing in {scope searched}` with the narrow and the broader search command each written
+>   out in full — every `:/` prefix included — and each followed by `→ {n} matches`, where `{n}` is
+>   the integer that command actually printed. Never type a count you did not observe: an absence
+>   anchor only has to be re-runnable, and `validate_research.py`'s
+>   `relevance_absence_anchor_refuted` check re-executes every one of these commands and fails the
+>   entry when the written count and the real output disagree. A command written in any other
+>   shape cannot be re-run and fails as `relevance_absence_anchor_unparsed`. Zero matches is a
+>   finding, not a failure to find one — but it records that these terms found nothing, never that
+>   the capability is absent from this repo.
 > - No two items anchor to the same path. Repeating one file across items multiplies a single
 >   observation instead of adding one.
 > - `Change:` has three passing outcomes — a specific edit, `none — {path} already covers it`, or

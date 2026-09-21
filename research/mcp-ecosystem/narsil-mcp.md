@@ -459,3 +459,4 @@ CLI flags > Environment vars > Project config (`.narsil.yaml`) > User config (`~
 | [codegraphcontext](./codegraphcontext.md) | mcp-ecosystem | referenced by codegraphcontext (mcp-ecosystem) |
 | [mcpskills-cli](./mcpskills-cli.md) | mcp-ecosystem | referenced by mcpskills-cli (mcp-ecosystem) |
 | [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
+| [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
