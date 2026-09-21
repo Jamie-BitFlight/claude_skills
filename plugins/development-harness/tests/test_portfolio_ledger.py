@@ -942,6 +942,18 @@ def test_inventory_validation_uses_frozen_git_revision_after_worktree_edit(tmp_p
     assert released.reservations[reservation.id].state is ReservationState.RELEASED
 
 
+def test_archived_inventory_verification_does_not_require_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    archived = b"immutable archived baseline\n"
+    (tmp_path / "archived.py").write_bytes(archived)
+    path = InventoryPath(path="archived.py", git_blob=SHA, sha256=hashlib.sha256(archived).hexdigest())
+    inventory = Inventory(id="inventory-a6-g0", revision=SHA, paths=[path], sha256=inventory_sha256([path]))
+    ledger = minimum_ledger().model_copy(update={"inventories": {inventory.id: inventory}})
+    store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock", evidence_root=tmp_path)
+    monkeypatch.setattr("dh_core.portfolio_ledger.shutil.which", lambda _name: None)
+
+    store.verify_inventory_path(inventory, path, PortfolioLedgerService(ledger, evidence_root=tmp_path))
+
+
 def test_compare_and_swap_rejects_a_transition_from_a_stale_process_read(tmp_path: Path) -> None:
     store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock")
     source = store.write(minimum_ledger())
@@ -1208,6 +1220,60 @@ def test_agent_cli_executes_reservation_transition_from_complete_json_request(tm
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["cars"]["A6-G0"]["state"] == "RESERVED"
     assert LedgerStore(ledger_path, lock_path).read().cars["A6-G0"].state is CarState.RESERVED
+
+
+def test_agent_cli_immediately_rejects_untyped_extra_request_fields(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    lock_path = tmp_path / "ledger.lock"
+    request_path = tmp_path / "request.json"
+    LedgerStore(ledger_path, lock_path).write(materialized_ledger(tmp_path))
+    receipt = b'{"reservation":"typed-boundary"}'
+    (tmp_path / "reservation.json").write_bytes(receipt)
+    reservation = Reservation(
+        id="reservation-a6-g0",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path=str(lock_path),
+        acquired_at=NOW,
+        receipt_path="reservation.json",
+        receipt_sha256=hashlib.sha256(receipt).hexdigest(),
+    )
+    request_path.write_text(
+        json.dumps({
+            "car_id": "A6-G0",
+            "actor_id": "maker",
+            "reservation": reservation.model_dump(mode="json"),
+            "unexpected": "must not cross the boundary",
+        }),
+        encoding="utf-8",
+    )
+    script = Path(__file__).parents[1] / "scripts" / "portfolio_ledger.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--ledger",
+            str(ledger_path),
+            "--lock",
+            str(lock_path),
+            "--evidence-root",
+            str(tmp_path),
+            "reservation-acquire",
+            "--request",
+            str(request_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 1
+    assert "extra_forbidden" in result.stderr
+    assert LedgerStore(ledger_path, lock_path).read().cars["A6-G0"].state is CarState.INVENTORIED
 
 
 def test_agent_cli_mirrored_transition_is_immediately_readable(tmp_path: Path) -> None:

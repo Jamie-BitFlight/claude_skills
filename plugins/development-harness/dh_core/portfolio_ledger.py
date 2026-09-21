@@ -1076,7 +1076,8 @@ class LedgerStore:
             return
         git_executable = shutil.which("git")
         if git_executable is None:
-            raise LedgerRefusal("Git executable is required to verify frozen inventory evidence")
+            service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} archived content")
+            return
         probe = subprocess.run(
             [git_executable, "-C", str(self.evidence_root), "rev-parse", "--is-inside-work-tree"],
             check=False,
