@@ -281,7 +281,7 @@ def test_reconstructed_car_enforces_transition_equivalent_evidence_and_independe
 def test_reconstructed_integrated_car_requires_legal_history_chain() -> None:
     payload = integrated_ledger().model_dump(mode="json")
     payload["cars"]["A6-G0"]["history"] = []
-    with pytest.raises(ValueError, match=r"history chain|inventory pointer"):
+    with pytest.raises(ValueError, match=r"history chain|inventory pointer|exactly one car history"):
         PortfolioLedger.model_validate(payload)
 
 
@@ -445,6 +445,177 @@ def test_reconstructed_reserved_car_requires_active_owned_exclusive_reservation(
 
     with pytest.raises(ValueError, match=r"active owned exclusive reservation|terminal timestamps|terminal receipt"):
         PortfolioLedger.model_validate(payload)
+
+
+def test_reconstruction_rejects_active_reservation_reused_by_two_car_histories() -> None:
+    admitted = admitted_ledger()
+    payload = admitted.model_dump(mode="json")
+    copied = dict(payload["cars"]["A6-G0"])
+    copied.update(id="COPIED", issue=9998, reservation_ids=[])
+    payload["cars"]["COPIED"] = copied
+
+    with pytest.raises(ValueError, match="exactly one car history"):
+        PortfolioLedger.model_validate(payload)
+
+
+@pytest.mark.parametrize("operation", ["initialize", "restore"])
+def test_operational_load_rejects_active_reservation_reused_by_two_car_histories(
+    tmp_path: Path, operation: str
+) -> None:
+    admitted = admitted_ledger()
+    payload = admitted.model_dump(mode="json")
+    copied = dict(payload["cars"]["A6-G0"])
+    copied.update(id="COPIED", issue=9998, reservation_ids=[])
+    payload["cars"]["COPIED"] = copied
+    hostile_path = tmp_path / "hostile.json"
+    hostile_path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    request_path = hostile_path
+    if operation == "restore":
+        request_path = tmp_path / "restore.json"
+        request_path.write_text(
+            json.dumps({"mirror_url": hostile_path.as_uri(), "expected_sha256": SHA}, separators=(",", ":")),
+            encoding="utf-8",
+        )
+    ledger_path = tmp_path / "ledger.json"
+    script = Path(__file__).parents[1] / "scripts" / "portfolio_ledger.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--ledger",
+            str(ledger_path),
+            "--lock",
+            str(tmp_path / "ledger.lock"),
+            "--evidence-root",
+            str(tmp_path),
+            operation,
+            "--request",
+            str(request_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 1
+    assert "exactly one car history" in result.stderr
+    assert not ledger_path.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("implementation_sha", SHA),
+        ("implementation_checker_id", "checker"),
+        ("implementation_report", "evidence/admission.json"),
+        (
+            "commands",
+            [{"argv": ["uv", "run", "pytest"], "exit_code": 1, "output_path": "failed.txt", "output_sha256": SHA}],
+        ),
+        (
+            "receipts",
+            [
+                {
+                    "path": "evidence/admission.json",
+                    "sha256": SHA,
+                    "author_id": "checker",
+                    "verdict": "PASS",
+                    "observed_revision": SHA,
+                }
+            ],
+        ),
+        ("integration_sha", "b" * 64),
+        ("integrator_id", "integrator"),
+        ("aspect_checker_id", "checker-2"),
+        ("aspect_report", "evidence/aspect.json"),
+    ],
+)
+@pytest.mark.parametrize("state", ["INVENTORIED", "RESERVED"])
+def test_reconstruction_rejects_future_stage_evidence_in_early_states(field: str, value: object, state: str) -> None:
+    source = (
+        minimum_ledger()
+        if state == "INVENTORIED"
+        else PortfolioLedgerService(minimum_ledger()).acquire_reservation(
+            "A6-G0",
+            Reservation(
+                id="reservation-a6-g0",
+                group="CG-PORTFOLIO-LEDGER",
+                paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
+                owner="maker",
+                state=ReservationState.ACTIVE,
+                lock_path="ledger.lock",
+                acquired_at=NOW,
+                receipt_path="evidence/reservation.json",
+                receipt_sha256=SHA,
+            ),
+            actor_id="maker",
+        )
+    )
+    payload = source.model_dump(mode="json")
+    payload["cars"]["A6-G0"][field] = value
+
+    with pytest.raises(ValueError, match="future-stage evidence"):
+        PortfolioLedger.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("implementation_report", "evidence/admission.json"),
+        (
+            "commands",
+            [{"argv": ["uv", "run", "pytest"], "exit_code": 1, "output_path": "failed.txt", "output_sha256": SHA}],
+        ),
+        (
+            "receipts",
+            [
+                {
+                    "path": "evidence/admission.json",
+                    "sha256": SHA,
+                    "author_id": "checker",
+                    "verdict": "PASS",
+                    "observed_revision": SHA,
+                }
+            ],
+        ),
+        ("aspect_checker_id", "checker-2"),
+    ],
+)
+def test_cli_initialization_rejects_each_future_stage_evidence_family(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    payload = minimum_ledger().model_dump(mode="json")
+    payload["cars"]["A6-G0"][field] = value
+    request_path = tmp_path / "initialize.json"
+    request_path.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+    ledger_path = tmp_path / "ledger.json"
+    script = Path(__file__).parents[1] / "scripts" / "portfolio_ledger.py"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--ledger",
+            str(ledger_path),
+            "--lock",
+            str(tmp_path / "ledger.lock"),
+            "--evidence-root",
+            str(tmp_path),
+            "initialize",
+            "--request",
+            str(request_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 1
+    assert "future-stage evidence" in result.stderr
+    assert not ledger_path.exists()
 
 
 def test_reservation_release_and_invalidate_return_to_inventory() -> None:
@@ -1296,6 +1467,40 @@ def test_mirror_publication_failure_keeps_previous_local_revision_readable(tmp_p
         store.write_transition(candidate, expected_ledger_sha256=current.ledger_sha256)
 
     assert ledger_path.read_bytes() == first_mirror.read_bytes()
+    assert store.verify_mirror() == current
+
+
+def test_mirror_publication_symlink_race_refuses_before_local_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    lock_path = tmp_path / "ledger.lock"
+    first_mirror = tmp_path / "mirror-v1.json"
+    raced_mirror = tmp_path / "mirror-v2.json"
+    store = LedgerStore(ledger_path, lock_path)
+    current = store.write(
+        minimum_ledger().model_copy(update={"mirror": Mirror(url=first_mirror.as_uri(), expected_sha256="0" * 64)})
+    )
+    prior_bytes = ledger_path.read_bytes()
+    candidate = current.model_copy(
+        update={
+            "portfolio_issue": 9999,
+            "mirror": Mirror(url=raced_mirror.as_uri(), expected_sha256="0" * 64),
+            "ledger_sha256": None,
+        }
+    )
+    real_link = os.link
+
+    def race_with_symlink(source: str, target: Path) -> None:
+        Path(target).symlink_to(source)
+        raise FileExistsError(target)
+
+    monkeypatch.setattr("dh_core.portfolio_ledger.os.link", race_with_symlink)
+    with pytest.raises(LedgerRefusal, match="regular non-symlink"):
+        store.write_transition(candidate, expected_ledger_sha256=current.ledger_sha256)
+    monkeypatch.setattr("dh_core.portfolio_ledger.os.link", real_link)
+
+    assert ledger_path.read_bytes() == prior_bytes
     assert store.verify_mirror() == current
 
 

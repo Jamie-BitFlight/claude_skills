@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -420,15 +421,28 @@ class Car(LedgerModel):
         """
         if self.state is CarState.RESERVED and not self.reservation_ids:
             raise ValueError("RESERVED car requires an active reservation reference")
-        if self.state in {CarState.INVENTORIED, CarState.RESERVED} and any((
+        early_stage_fields = (
             self.implementation_sha,
             self.implementation_checker_id,
+            self.implementation_report,
             self.integration_sha,
             self.integrator_id,
-        )):
+            self.aspect_checker_id,
+            self.aspect_report,
+        )
+        if self.state in {CarState.INVENTORIED, CarState.RESERVED} and (
+            any(value is not None for value in early_stage_fields) or self.commands or self.receipts
+        ):
             raise ValueError(f"{self.state} car carries future-stage evidence")
-        if self.state is CarState.IMPLEMENTATION_ADMITTED and any((self.integration_sha, self.integrator_id)):
-            raise ValueError("IMPLEMENTATION_ADMITTED car carries integration-stage evidence")
+        if self.state is CarState.IMPLEMENTATION_ADMITTED and any(
+            value is not None
+            for value in (self.integration_sha, self.integrator_id, self.aspect_checker_id, self.aspect_report)
+        ):
+            raise ValueError("IMPLEMENTATION_ADMITTED car carries future-stage evidence")
+        if self.state is CarState.INTEGRATED and any(
+            value is not None for value in (self.aspect_checker_id, self.aspect_report)
+        ):
+            raise ValueError("INTEGRATED car carries future-stage evidence")
         admitted_or_later = self.state in {
             CarState.IMPLEMENTATION_ADMITTED,
             CarState.INTEGRATED,
@@ -666,6 +680,7 @@ class PortfolioLedger(LedgerModel):
                 for car in self.cars.values()
                 if any(event.reservation_id == reservation.id for event in car.history)
             }
+            current_owners = {car.id for car in self.cars.values() if reservation.id in car.reservation_ids}
             expected_terminal = (
                 "reservation-release"
                 if reservation.state is ReservationState.RELEASED
@@ -676,8 +691,10 @@ class PortfolioLedger(LedgerModel):
                 expected_terminal,
             }.issubset(actions):
                 raise ValueError(f"concluded reservation {reservation.id!r} lacks matching car history")
-            if reservation.state is not ReservationState.ACTIVE and len(history_owners) != 1:
-                raise ValueError(f"concluded reservation {reservation.id!r} must belong to exactly one car history")
+            if len(history_owners) != 1:
+                raise ValueError(f"reservation {reservation.id!r} must belong to exactly one car history")
+            if reservation.state is ReservationState.ACTIVE and current_owners != history_owners:
+                raise ValueError(f"active reservation {reservation.id!r} history owner must equal its current owner")
         return self
 
     @model_validator(mode="after")
@@ -812,6 +829,17 @@ class PortfolioLedger(LedgerModel):
         history_error = self._car_history_error(car)
         if history_error:
             return history_error
+        expected_receipt_authors = {
+            CarState.INVENTORIED: [],
+            CarState.RESERVED: [],
+            CarState.IMPLEMENTATION_ADMITTED: [car.implementation_checker_id],
+            CarState.INTEGRATED: [car.implementation_checker_id, car.integrator_id],
+            CarState.ASPECT_CERTIFIED: [car.implementation_checker_id, car.integrator_id, car.aspect_checker_id],
+        }[car.state]
+        if sorted(receipt.author_id for receipt in car.receipts) != sorted(
+            author for author in expected_receipt_authors if author is not None
+        ):
+            return "state-inappropriate receipt set"
         if car.state in {CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}:
             error = self.implementation_evidence_error(car, maker)
             if error:
@@ -820,9 +848,7 @@ class PortfolioLedger(LedgerModel):
             error = self.integration_evidence_error(car, maker)
             if error:
                 return error
-        if car.state is CarState.ASPECT_CERTIFIED:
-            return self.aspect_evidence_error(car, maker)
-        return None
+        return self.aspect_evidence_error(car, maker) if car.state is CarState.ASPECT_CERTIFIED else None
 
     def _car_history_error(self, car: Car) -> str | None:
         """Return an error when persisted history cannot reconstruct current state."""
@@ -914,9 +940,9 @@ class PortfolioLedger(LedgerModel):
             Error text, or ``None`` when valid.
         """
         reservation = self.reservations[event.reservation_id or ""]
-        acquired.add(reservation.id)
-        if reservation.id in terminal or event.actor_id != reservation.owner:
+        if reservation.id in acquired or reservation.id in terminal or event.actor_id != reservation.owner:
             return "reservation acquisition is duplicated or has wrong authority"
+        acquired.add(reservation.id)
         if event.at != reservation.acquired_at:
             return "reservation acquisition timestamp does not match reservation"
         if event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256:
@@ -1644,11 +1670,10 @@ class _LedgerStore:
                     "mirror path must be physically distinct from ledger and lock", code="invalid_mirror"
                 )
             if target.exists():
-                if target.is_symlink() or not target.is_file():
-                    raise LedgerRefusal(
-                        "existing file mirror target must be a regular non-symlink file", code="invalid_mirror"
-                    )
-                if self._read_file_before_deadline(target, time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS) != expected:
+                observed = self._read_regular_file_before_deadline(
+                    target, time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
+                )
+                if observed != expected:
                     raise LedgerRefusal("mirror publication target already contains different immutable bytes")
                 return
             target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1664,7 +1689,10 @@ class _LedgerStore:
                 try:
                     os.link(temporary_path, target)
                 except FileExistsError as error:
-                    if target.read_bytes() != expected:
+                    observed = self._read_regular_file_before_deadline(
+                        target, time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
+                    )
+                    if observed != expected:
                         raise LedgerRefusal("mirror publication raced with different immutable bytes") from error
                 self.sync_directory(target.parent)
             finally:
@@ -1933,9 +1961,7 @@ class _LedgerStore:
         deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
         if parsed.scheme == "file":
             target = Path(file_uri_to_path(normalized))
-            if not target.is_file():
-                raise LedgerRefusal("file mirror target must be a regular file", code="invalid_mirror")
-            return self._read_file_before_deadline(target, deadline)
+            return self._read_regular_file_before_deadline(target, deadline)
         try:
             open_budget = deadline - time.monotonic()
             if open_budget <= 0:
@@ -1965,23 +1991,53 @@ class _LedgerStore:
         except OSError as error:
             raise LedgerRefusal(f"cannot read mirror {url!r}: {error}") from error
 
-    def _read_file_before_deadline(self, target: Path, deadline: float) -> bytes:
-        """Read one regular file while enforcing the mirror wall-clock deadline.
+    def _read_regular_file_before_deadline(self, target: Path, deadline: float) -> bytes:
+        """Read an opened regular non-symlink file without path validation/read races.
 
         Returns:
             Complete file bytes.
         """
-        chunks: list[bytes] = []
-        with target.open("rb") as stream:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            file_fd = os.open(target, flags)
+        except OSError as error:
+            raise LedgerRefusal(
+                "existing file mirror target must be a regular non-symlink file", code="invalid_mirror"
+            ) from error
+        try:
+            opened = os.fstat(file_fd)
+            linked = os.lstat(target)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or not stat.S_ISREG(linked.st_mode)
+                or stat.S_ISLNK(linked.st_mode)
+                or (opened.st_dev, opened.st_ino) != (linked.st_dev, linked.st_ino)
+            ):
+                raise LedgerRefusal(
+                    "existing file mirror target must be a regular non-symlink file", code="invalid_mirror"
+                )
+            chunks: list[bytes] = []
             while True:
                 if time.monotonic() >= deadline:
                     raise LedgerRefusal(
                         "file mirror read exceeded total deadline", code="process_timeout", category="external_io"
                     )
-                chunk = stream.read(65536)
+                chunk = os.read(file_fd, 65536)
                 if not chunk:
-                    return b"".join(chunks)
+                    break
                 chunks.append(chunk)
+            linked_after = os.lstat(target)
+            if (
+                not stat.S_ISREG(linked_after.st_mode)
+                or stat.S_ISLNK(linked_after.st_mode)
+                or (opened.st_dev, opened.st_ino) != (linked_after.st_dev, linked_after.st_ino)
+            ):
+                raise LedgerRefusal("file mirror target changed during verification", code="invalid_mirror")
+            return b"".join(chunks)
+        except OSError as error:
+            raise LedgerRefusal(f"cannot read mirror {target!s}: {error}") from error
+        finally:
+            os.close(file_fd)
 
 
 class PortfolioLedgerService:
