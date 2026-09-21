@@ -384,6 +384,8 @@ class Car(LedgerModel):
             self.integrator_id,
         )):
             raise ValueError(f"{self.state} car carries future-stage evidence")
+        if self.state is CarState.IMPLEMENTATION_ADMITTED and any((self.integration_sha, self.integrator_id)):
+            raise ValueError("IMPLEMENTATION_ADMITTED car carries integration-stage evidence")
         admitted_or_later = self.state in {
             CarState.IMPLEMENTATION_ADMITTED,
             CarState.INTEGRATED,
@@ -614,7 +616,11 @@ class PortfolioLedger(LedgerModel):
         Returns:
             Validated ledger.
         """
-        integrated_shas = {car.integration_sha for car in self.cars.values() if car.integration_sha is not None}
+        integrated_shas = {
+            car.integration_sha
+            for car in self.cars.values()
+            if car.state in {CarState.INTEGRATED, CarState.ASPECT_CERTIFIED} and car.integration_sha is not None
+        }
         if len(integrated_shas) != len([car for car in self.cars.values() if car.integration_sha is not None]):
             raise ValueError("integration SHAs must identify exactly one car")
         for car in self.cars.values():
@@ -659,7 +665,7 @@ class PortfolioLedger(LedgerModel):
                 raise ValueError(f"addendum {addendum.id!r} is invalid: {error}")
         if self.parent.state is ParentState.PARENT_CERTIFIED and self.parent.required_car_ids:
             for car in self.cars.values():
-                if car.history and car.history[-1].action not in {"integrate", "aspect-certify"}:
+                if car.history and car.history[-1].action not in {"integrate", "aspect-certify", "reservation-release"}:
                     raise ValueError("PARENT_CERTIFIED is terminal and forbids later car events")
             if any(reservation.state is ReservationState.ACTIVE for reservation in self.reservations.values()):
                 raise ValueError("PARENT_CERTIFIED forbids active reservations")
@@ -859,16 +865,41 @@ class PortfolioLedger(LedgerModel):
         ):
             return "terminal history receipt does not match reservation terminal receipt"
         if event.action == "reservation-recover":
-            recovery = reservation.recovery_evidence
-            if (
-                recovery is None
-                or recovery.judgement_path != event.receipt_path
-                or recovery.judgement_sha256 != event.receipt_sha256
-            ):
-                return "recovery event lacks matching liveness and independent judgement evidence"
-        elif reservation.recovery_evidence is not None:
+            return self._recovery_projection_error(event, reservation)
+        if reservation.recovery_evidence is not None:
             return "non-recovery terminal event carries recovery evidence"
         return None
+
+    def _recovery_projection_error(self, event: HistoryEvent, reservation: Reservation) -> str | None:
+        """Validate persisted recovery evidence and checker independence.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        recovery = reservation.recovery_evidence
+        if recovery is None:
+            return "recovery event lacks matching liveness and independent judgement evidence"
+        identity_matches = all((
+            recovery.judgement_path == event.receipt_path,
+            recovery.judgement_sha256 == event.receipt_sha256,
+            recovery.stale_owner_id == reservation.owner,
+            recovery.prior_receipt_sha256 == reservation.receipt_sha256,
+            recovery.checker_id == event.actor_id,
+        ))
+        if not identity_matches:
+            return "recovery event lacks matching liveness and independent judgement evidence"
+        checker = self.roles.get(recovery.checker_id)
+        owner = self.roles.get(reservation.owner)
+        authority_matches = all((
+            checker is not None,
+            checker is not None and checker.independence_class == "checker",
+            owner is not None,
+            checker is not None and owner is not None and checker.id != owner.id,
+            checker is not None and owner is not None and checker.session != owner.session,
+            bool(recovery.liveness_output_path),
+            bool(recovery.judgement_path),
+        ))
+        return None if authority_matches else "recovery event lacks independent checker or liveness authority"
 
     def _history_event_shape_error(
         self, car: Car, event: HistoryEvent, legal: dict[str, tuple[CarState, CarState, str | None]]
@@ -2124,7 +2155,11 @@ class PortfolioLedgerService:
             raise LedgerRefusal("stale base Git SHA")
         if expected_upstream_git_sha != car.upstream_git_sha:
             raise LedgerRefusal("stale upstream Git SHA")
-        integrated_shas = {item.integration_sha for item in self.ledger.cars.values() if item.integration_sha}
+        integrated_shas = {
+            item.integration_sha
+            for item in self.ledger.cars.values()
+            if item.state in {CarState.INTEGRATED, CarState.ASPECT_CERTIFIED} and item.integration_sha
+        }
         missing_predecessors = set(car.predecessor_shas) - integrated_shas
         if missing_predecessors:
             raise LedgerRefusal(f"missing predecessor SHAs: {sorted(missing_predecessors)}")
