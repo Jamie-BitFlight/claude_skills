@@ -836,8 +836,23 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     git = shutil.which("git")
     if git is None:
         return common
+    bounded_runner = Path(__file__).resolve().parents[4] / "scripts" / "run_bounded.py"
     result = subprocess.run(
-        [git, "-C", str(common), "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False
+        [
+            sys.executable,
+            str(bounded_runner),
+            "--timeout-seconds",
+            "10",
+            "--",
+            git,
+            "-C",
+            str(common),
+            "rev-parse",
+            "--show-toplevel",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
     if result.returncode == 0:
         return Path(result.stdout.strip()).resolve()
