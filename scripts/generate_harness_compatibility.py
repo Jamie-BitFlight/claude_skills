@@ -1,35 +1,57 @@
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["pydantic>=2.12.5"]
 # ///
-"""Generate harness_compatibility.json from the plugins/ tree.
+"""Generate the ignored harness_compatibility.json view from tracked inputs.
 
 Objective fields (manifests present, runtime-escape blockers) are re-derived from the
-filesystem on every run so the table cannot drift. Subjective fields (per-harness
-verification status, dates, notes) are preserved from the existing table when present.
+filesystem on every run. Verification evidence is merged from the sparse tracked
+harness_compatibility_verification.json source. The generated output is never an input.
 
 Usage:
     uv run --script scripts/generate_harness_compatibility.py [--check]
 
 Exit codes:
-    0: table written (or --check: table is current)
-    1: --check: table is stale, regenerate
+    0: table written (or --check: tracked inputs produce a valid table)
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import datetime as dt
 import json
 import sys
 from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = ROOT / "plugins"
 TABLE_PATH = ROOT / "harness_compatibility.json"
+VERIFICATION_PATH = ROOT / "harness_compatibility_verification.json"
 
 HARNESSES = ["claude-code", "codex", "hermes", "kimi"]
+
+
+class VerificationRecord(BaseModel):
+    """One durable, non-default smoke-test result."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["verified"]
+    date: dt.date
+    notes: str = Field(min_length=1)
+
+
+class VerificationSource(BaseModel):
+    """Sparse verification evidence keyed by plugin and harness."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    plugins: dict[str, dict[str, VerificationRecord]]
 
 
 def count_token_uses(plugin_dir: Path, token: str) -> int:
@@ -89,79 +111,102 @@ def scan_plugin(plugin_dir: Path) -> dict:
     }
 
 
-def preserve_verification(old: dict, name: str) -> dict:
-    """Carry hand-maintained verification entries over from the previous table.
+def load_verification_source(plugin_names: set[str]) -> VerificationSource:
+    """Load and validate the tracked sparse verification evidence.
+
+    Args:
+        plugin_names: Plugin directory names included in the generated view.
 
     Returns:
-        Per-harness verification mapping, defaulting to ``unverified``.
+        Validated sparse verification evidence.
+
+    Raises:
+        ValueError: The source names a plugin or harness absent from the generated matrix.
     """
-    prev = old.get("plugins", {}).get(name, {}).get("verification", {})
+    source = VerificationSource.model_validate_json(VERIFICATION_PATH.read_text(encoding="utf-8"))
+    unknown_plugins = set(source.plugins) - plugin_names
+    if unknown_plugins:
+        raise ValueError(f"verification source contains unknown plugins: {sorted(unknown_plugins)}")
+    for plugin_name, harnesses in source.plugins.items():
+        unknown_harnesses = set(harnesses) - set(HARNESSES)
+        if unknown_harnesses:
+            raise ValueError(
+                f"verification source for {plugin_name} contains unknown harnesses: {sorted(unknown_harnesses)}"
+            )
+    return source
+
+
+def merge_verification(source: VerificationSource, name: str) -> dict[str, dict[str, Any]]:
+    """Merge sparse evidence with defaults for every supported harness.
+
+    Args:
+        source: Validated tracked verification evidence.
+        name: Plugin name whose verification mapping is needed.
+
+    Returns:
+        Complete per-harness verification mapping.
+    """
+    evidence = source.plugins.get(name, {})
     default = {"status": "unverified", "date": None, "notes": None}
-    if not isinstance(prev, dict):
-        prev = {}
-    out = {}
-    for h in HARNESSES:
-        entry = prev.get(h)
-        out[h] = entry if isinstance(entry, dict) and "status" in entry else dict(default)
-    return out
+    return {
+        harness: evidence[harness].model_dump(mode="json") if harness in evidence else dict(default)
+        for harness in HARNESSES
+    }
 
 
-def build_table() -> dict:
-    """Scan every plugin and assemble the full table, preserving verification state.
+def build_table() -> dict[str, Any]:
+    """Scan every plugin and assemble the full table from tracked inputs.
 
     Returns:
         The complete table document as a JSON-serializable mapping.
     """
-    old = {}
-    if TABLE_PATH.exists():
-        old = json.loads(TABLE_PATH.read_text(encoding="utf-8"))
+    plugin_dirs = [
+        plugin_dir
+        for plugin_dir in sorted(
+            path for path in PLUGINS_DIR.iterdir() if path.is_dir() and not path.name.startswith((".", "_"))
+        )
+        if (plugin_dir / ".claude-plugin").is_dir() or (plugin_dir / "skills").is_dir()
+    ]
+    verification = load_verification_source({plugin_dir.name for plugin_dir in plugin_dirs})
     plugins = {}
-    for plugin_dir in sorted(p for p in PLUGINS_DIR.iterdir() if p.is_dir() and not p.name.startswith((".", "_"))):
-        if not (plugin_dir / ".claude-plugin").is_dir() and not (plugin_dir / "skills").is_dir():
-            continue  # not a plugin
+    for plugin_dir in plugin_dirs:
         entry = scan_plugin(plugin_dir)
-        entry["verification"] = preserve_verification(old, plugin_dir.name)
+        entry["verification"] = merge_verification(verification, plugin_dir.name)
         plugins[plugin_dir.name] = entry
     return {
         "_about": (
             "Cross-harness compatibility table. 'manifests'/'components'/'blockers' are generated by "
             "scripts/generate_harness_compatibility.py from the filesystem — do not hand-edit. "
-            "'verification' is hand-maintained: set status to 'verified' with the ISO date and the "
-            "issue/PR reference in notes after running the smoke tests named in that harness's issue."
+            "'verification' is merged from the tracked harness_compatibility_verification.json source; "
+            "edit that source after running the smoke tests, then regenerate this ignored view."
         ),
         "harnesses": HARNESSES,
         "plugins": plugins,
     }
 
 
-def main() -> int:
-    """Entry point: write the table, or check staleness with ``--check``.
+def main(argv: list[str] | None = None) -> int:
+    """Entry point: write the view, or validate tracked inputs with ``--check``.
+
+    Args:
+        argv: Optional command-line arguments. Defaults to ``sys.argv``.
 
     Returns:
-        Process exit code: 0 on success/current, 1 when ``--check`` finds a stale table.
+        Process exit code: 0 on success.
     """
     parser = argparse.ArgumentParser(description="Generate harness_compatibility.json from the plugins/ tree.")
-    parser.add_argument("--check", action="store_true", help="exit 1 if the committed table is stale")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="validate tracked inputs without reading or writing the ignored generated view",
+    )
+    args = parser.parse_args(argv)
 
     table = build_table()
-    rendered = json.dumps(table, indent=2, ensure_ascii=False) + "\n"
     if args.check:
-        # Compare parsed content, not bytes: the repo's JSON formatter hooks (biome) may
-        # reflow the committed file, and cosmetic reflow is not staleness.
-        current_text = TABLE_PATH.read_text(encoding="utf-8") if TABLE_PATH.exists() else ""
-        try:
-            current = json.loads(current_text) if current_text else None
-        except json.JSONDecodeError:
-            current = None
-        if current != table:
-            print(
-                "harness_compatibility.json is stale; run: uv run --script scripts/generate_harness_compatibility.py",
-                file=sys.stderr,
-            )
-            return 1
-        print("harness_compatibility.json is current")
+        print(f"validated harness compatibility inputs ({len(table['plugins'])} plugins)")
         return 0
+    rendered = json.dumps(table, indent=2, ensure_ascii=False) + "\n"
     TABLE_PATH.write_text(rendered, encoding="utf-8")
     n = len(table["plugins"])
     print(f"wrote {TABLE_PATH.relative_to(ROOT)} ({n} plugins)")

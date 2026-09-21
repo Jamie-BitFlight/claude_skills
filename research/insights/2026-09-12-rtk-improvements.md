@@ -158,7 +158,8 @@ Codex appear in neither table — there is no row, no attempted URL, and no "no 
 recorded for either.
 
 This contradicts the repo's stated targets: `AGENTS.md` says "Plugins are expected to be developed
-cross-harness compatible (claude-code, codex, hermes, kimi)" and points at `harness_compatibility.json`
+cross-harness compatible (claude-code, codex, hermes, kimi)" and points at the generated
+`harness_compatibility.json` view (created with `uv run --script scripts/generate_harness_compatibility.py`)
 and `docs/cross-harness-smoke-tests.md`. Codex is a first-class target whose interception model
 (directive files, not a hook runtime) is absent from the one registry that is supposed to record
 exactly that, so an agent asked to add a Codex-side hook has no recorded answer and re-derives it.
