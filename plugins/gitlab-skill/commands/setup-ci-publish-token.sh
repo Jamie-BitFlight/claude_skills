@@ -12,12 +12,12 @@ VAR_NAME="CI_PUBLISH_TOKEN"
 # shellcheck source=/dev/null
 [ -s .env ] && . ./.env
 
-# Set the token for the environment
-GITLAB_TOKEN="${GITLAB_TOKEN:-${GL_TOKEN:-${CI_JOB_TOKEN:-}}}"
+# Project access-token creation requires personal access-token authentication.
+GITLAB_TOKEN="${GITLAB_TOKEN:-${GL_TOKEN:-}}"
 export GITLAB_TOKEN
 
 if [ -z "${GITLAB_TOKEN:-}" ]; then
-    echo "ERROR: You need a GITLAB_TOKEN set in your environment to do this."
+    echo "ERROR: Set GITLAB_TOKEN or GL_TOKEN to a personal access token with the api scope."
     exit 1
 fi
 
@@ -101,37 +101,61 @@ has_maintainer_access
 
 # --- Check token and variable status ---
 
-token_json=$(glab token list --repo "${CI_PROJECT_PATH}" --output json)
-token_info=$(echo "${token_json}" | jq -r "if . == null then empty else .[] | select(.name == \"${TOKEN_NAME}\") end")
+token_json=$(glab token list --repo "${CI_PROJECT_PATH}" --active --output json)
+token_matches=$(printf '%s' "${token_json}" | jq -c --arg name "${TOKEN_NAME}" --arg prefix "${TOKEN_NAME}-" \
+    '[(. // [])[] | select(.name == $name or (.name | startswith($prefix)))] | sort_by(.id)')
+token_count=$(printf '%s' "${token_matches}" | jq -r 'length')
 
-# Filter out the "Listing variables..." line, default to empty array if no match
-var_json=$(glab variable list --repo "${CI_PROJECT_PATH}" --output json 2>/dev/null | grep '^\[' || echo '[]')
-if echo "${var_json}" | jq -e ".[] | select(.key == \"${VAR_NAME}\")" >/dev/null 2>&1; then
+if [ "${token_count}" -gt 1 ]; then
+    token_ids=$(printf '%s' "${token_matches}" | jq -r 'map(.id | tostring) | join(", ")')
+    echo "ERROR: Multiple active '${TOKEN_NAME}' tokens exist (IDs: ${token_ids}). Revoke all but one and retry."
+    exit 1
+fi
+
+token_info=$(printf '%s' "${token_matches}" | jq -c 'if length == 1 then .[0] else empty end')
+
+variable_json=""
+if variable_json=$(glab variable get "${VAR_NAME}" --repo "${CI_PROJECT_PATH}" --output json 2>/dev/null); then
     var_exists="true"
+    var_hidden=$(printf '%s' "${variable_json}" | jq -r \
+        'if (.hidden | type) == "boolean" then (.hidden | tostring) else "unknown" end')
 else
     var_exists="false"
+    var_hidden="absent"
 fi
+
+set_ci_variable() {
+    if [ "${var_exists}" = "true" ]; then
+        echo "INFO: Replacing CI variable '${VAR_NAME}' so its value is hidden..."
+        glab variable delete "${VAR_NAME}" --repo "${CI_PROJECT_PATH}"
+    else
+        echo "INFO: Setting CI variable '${VAR_NAME}'..."
+    fi
+
+    printf '%s' "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
+        --repo "${CI_PROJECT_PATH}" \
+        --hidden \
+        --masked \
+        --protected \
+        --description "Project access token for CI/CD release publishing and artifact uploads"
+}
 
 # --- Decision logic ---
 
 # Case 4: No token exists - CREATE NEW
 if [ -z "${token_info}" ]; then
     echo "INFO: Creating project access token '${TOKEN_NAME}'..."
-    NEW_TOKEN=$(glab token create "${TOKEN_NAME}" \
+    new_token_name="${TOKEN_NAME}-$(date -u +%Y%m%d%H%M%S)-$$"
+    NEW_TOKEN=$(glab token create "${new_token_name}" \
         --repo "${CI_PROJECT_PATH}" \
         --access-level maintainer \
         --scope api \
-        --scope write_repository \
         --duration 8760h \
         --description "CI/CD token for publishing releases and uploading artifacts" \
         --output text)
 
-    echo "INFO: Setting CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
-        --repo "${CI_PROJECT_PATH}" \
-        --masked \
-        --protected \
-        --description "Project access token for CI/CD release publishing and artifact uploads"
+    set_ci_variable
+    unset NEW_TOKEN
 
     echo "DONE: Token and variable created."
     exit 0
@@ -139,21 +163,29 @@ fi
 
 # Token exists - check expiry
 expires_at=$(echo "${token_info}" | jq -r '.expires_at')
-today=$(date +%Y-%m-%d)
+token_id=$(echo "${token_info}" | jq -r '.id')
+today=$(date -u +%Y-%m-%d)
 
 # Convert YYYY-MM-DD to integer for POSIX-compatible comparison
 expires_int=$(echo "${expires_at}" | tr -d '-')
 today_int=$(echo "${today}" | tr -d '-')
 
 # Case 2: Token expired - RENEW
-if [ "${expires_int}" -lt "${today_int}" ]; then
-    echo "INFO: Token expired (${expires_at}). Rotating..."
-    NEW_TOKEN=$(glab token rotate "${TOKEN_NAME}" --repo "${CI_PROJECT_PATH}" --output text)
+if [ "${expires_int}" -le "${today_int}" ]; then
+    echo "INFO: Token expired (${expires_at}). Creating a replacement..."
+    new_token_name="${TOKEN_NAME}-$(date -u +%Y%m%d%H%M%S)-$$"
+    NEW_TOKEN=$(glab token create "${new_token_name}" \
+        --repo "${CI_PROJECT_PATH}" \
+        --access-level maintainer \
+        --scope api \
+        --duration 8760h \
+        --description "CI/CD token for publishing releases and uploading artifacts" \
+        --output text)
 
-    echo "INFO: Updating CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable update "${VAR_NAME}" --repo "${CI_PROJECT_PATH}"
+    set_ci_variable
+    unset NEW_TOKEN
 
-    echo "DONE: Token rotated and variable updated."
+    echo "DONE: Replacement token and variable created."
     exit 0
 fi
 
@@ -161,19 +193,37 @@ fi
 if [ "${var_exists}" = "false" ]; then
     echo "INFO: Token '${TOKEN_NAME}' exists (expires ${expires_at}) but CI variable '${VAR_NAME}' is missing."
     echo "INFO: Rotating token to obtain a new value..."
-    NEW_TOKEN=$(glab token rotate "${TOKEN_NAME}" --repo "${CI_PROJECT_PATH}" --output text)
+    NEW_TOKEN=$(glab token rotate "${token_id}" --repo "${CI_PROJECT_PATH}" --duration 8760h --output text)
 
-    echo "INFO: Setting CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
-        --repo "${CI_PROJECT_PATH}" \
-        --masked \
-        --protected \
-        --description "Project access token for CI/CD release publishing and artifact uploads"
+    set_ci_variable
+    unset NEW_TOKEN
 
     echo "DONE: Token rotated and variable created."
     exit 0
 fi
 
-# Case 1: Token valid and variable exists - SKIP
-echo "OK: Already configured. Token '${TOKEN_NAME}' expires ${expires_at}."
+# Case 1: Token valid and legacy variable is not hidden - MIGRATE
+if [ "${var_hidden}" = "false" ]; then
+    if ! NEW_TOKEN=$(printf '%s' "${variable_json}" | jq -er '.value | strings | select(length > 0)'); then
+        echo "ERROR: CI variable '${VAR_NAME}' is not hidden, but its current value was not returned; no change was made."
+        exit 1
+    fi
+
+    echo "INFO: CI variable '${VAR_NAME}' is not hidden. Recreating it with hidden storage..."
+    set_ci_variable
+    unset NEW_TOKEN variable_json
+
+    echo "DONE: Existing variable recreated with hidden storage."
+    exit 0
+fi
+
+# Case 1: Token valid and variable exists, but hidden state is unavailable - SKIP
+if [ "${var_hidden}" = "unknown" ]; then
+    echo "OBSERVED: CI variable '${VAR_NAME}' exists, but current output did not report boolean hidden metadata."
+    echo "OBSERVED: No change was made; hidden storage was not verified. Token '${TOKEN_NAME}' expires ${expires_at}."
+    exit 0
+fi
+
+# Case 1: Token valid and hidden variable exists - SKIP
+echo "OK: Already configured with hidden variable storage. Token '${TOKEN_NAME}' expires ${expires_at}."
 exit 0

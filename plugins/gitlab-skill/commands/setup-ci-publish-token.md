@@ -1,30 +1,31 @@
 ---
-description: Create GitLab project access token for CI/CD publishing and add as masked CI variable
+description: Create a GitLab project access token for CI/CD operations that require elevated permissions
 ---
 
 # Setup CI Publishing Token
 
-Creates a GitLab project access token with permissions for publishing releases and uploading artifacts, then adds it as a protected, masked CI/CD variable.
+Creates a GitLab project access token for CI/CD operations that cannot use a job token, then adds it as a protected, masked, hidden CI/CD variable.
 
 ## Problem
 
-GitLab CI `CI_JOB_TOKEN` has limited permissions and cannot upload release assets, causing `401 Unauthorized` errors when using `glab release create` with file attachments.
+The preferred release-asset route uses the predefined `CI_JOB_TOKEN`, CI auto-login with `GLAB_ENABLE_CI_AUTOLOGIN=true`, and `glab release create --use-package-registry`. Use this command only when another CI/CD operation requires the broader permissions of a project access token.
 
 ## Solution
 
 Run the setup script which automatically:
 
-1. Verifies your GITLAB_TOKEN has required permissions (api scope + Maintainer access)
-2. Checks if `ci-publish-token` project access token exists
-3. Checks if `CI_PUBLISH_TOKEN` CI/CD variable exists
+1. Verifies your personal access token has required permissions (`api` scope and Maintainer access)
+2. Checks whether the active `ci-publish-token` project access token has reached its expiration date
+3. Checks whether the `CI_PUBLISH_TOKEN` CI/CD variable exists and reports hidden metadata
 4. Takes appropriate action based on current state
 
 ## Prerequisites
 
-- `GITLAB_TOKEN` environment variable set with `api` scope and Maintainer+ access to the project
+- `GITLAB_TOKEN` or `GL_TOKEN` set to a personal access token with `api` scope and Maintainer+ access to the project; project and job tokens cannot create project access tokens
 - `jq` installed
-- `glab` installed and authenticated
+- `glab` installed; the script authenticates from the token environment variable
 - Running from the git repository root
+- On GitLab.com, a Premium or Ultimate subscription; project access tokens are available with any license on GitLab Self-Managed and Dedicated
 
 ## Usage
 
@@ -42,14 +43,15 @@ TOKEN_NAME="ci-publish-token"
 VAR_NAME="CI_PUBLISH_TOKEN"
 
 # Load existing .env if present and non-empty
+# shellcheck source=/dev/null
 [ -s .env ] && . ./.env
 
-# Set the token for the environment
-GITLAB_TOKEN="${GITLAB_TOKEN:-${GL_TOKEN:-${CI_JOB_TOKEN:-}}}"
+# Project access-token creation requires personal access-token authentication.
+GITLAB_TOKEN="${GITLAB_TOKEN:-${GL_TOKEN:-}}"
 export GITLAB_TOKEN
 
 if [ -z "${GITLAB_TOKEN:-}" ]; then
-    echo "ERROR: You need a GITLAB_TOKEN set in your environment to do this."
+    echo "ERROR: Set GITLAB_TOKEN or GL_TOKEN to a personal access token with the api scope."
     exit 1
 fi
 
@@ -95,6 +97,7 @@ if [ -z "${GITLAB_CI:-}" ]; then
     [ ! -e .env ] && touch .env
     [ ! -e .gitignore ] && touch .gitignore
     grep -qE '^\s*/?\.env\s*$' .gitignore || printf "# Ignore localized environment variables\n.env\n" >>.gitignore
+    # shellcheck source=/dev/null
     [ -s .env ] && . ./.env
     in_dotenv GITLAB_HOST || echo "GITLAB_HOST=${GITLAB_HOST}" >>.env
     in_dotenv CI_PROJECT_PATH || echo "CI_PROJECT_PATH=${CI_PROJECT_PATH}" >>.env
@@ -132,37 +135,61 @@ has_maintainer_access
 
 # --- Check token and variable status ---
 
-token_json=$(glab token list --repo "${CI_PROJECT_PATH}" --output json)
-token_info=$(echo "${token_json}" | jq -r "if . == null then empty else .[] | select(.name == \"${TOKEN_NAME}\") end")
+token_json=$(glab token list --repo "${CI_PROJECT_PATH}" --active --output json)
+token_matches=$(printf '%s' "${token_json}" | jq -c --arg name "${TOKEN_NAME}" --arg prefix "${TOKEN_NAME}-" \
+    '[(. // [])[] | select(.name == $name or (.name | startswith($prefix)))] | sort_by(.id)')
+token_count=$(printf '%s' "${token_matches}" | jq -r 'length')
 
-# Filter out the "Listing variables..." line, default to empty array if no match
-var_json=$(glab variable list --repo "${CI_PROJECT_PATH}" --output json 2>/dev/null | grep '^\[' || echo '[]')
-if echo "${var_json}" | jq -e ".[] | select(.key == \"${VAR_NAME}\")" >/dev/null 2>&1; then
+if [ "${token_count}" -gt 1 ]; then
+    token_ids=$(printf '%s' "${token_matches}" | jq -r 'map(.id | tostring) | join(", ")')
+    echo "ERROR: Multiple active '${TOKEN_NAME}' tokens exist (IDs: ${token_ids}). Revoke all but one and retry."
+    exit 1
+fi
+
+token_info=$(printf '%s' "${token_matches}" | jq -c 'if length == 1 then .[0] else empty end')
+
+variable_json=""
+if variable_json=$(glab variable get "${VAR_NAME}" --repo "${CI_PROJECT_PATH}" --output json 2>/dev/null); then
     var_exists="true"
+    var_hidden=$(printf '%s' "${variable_json}" | jq -r \
+        'if (.hidden | type) == "boolean" then (.hidden | tostring) else "unknown" end')
 else
     var_exists="false"
+    var_hidden="absent"
 fi
+
+set_ci_variable() {
+    if [ "${var_exists}" = "true" ]; then
+        echo "INFO: Replacing CI variable '${VAR_NAME}' so its value is hidden..."
+        glab variable delete "${VAR_NAME}" --repo "${CI_PROJECT_PATH}"
+    else
+        echo "INFO: Setting CI variable '${VAR_NAME}'..."
+    fi
+
+    printf '%s' "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
+        --repo "${CI_PROJECT_PATH}" \
+        --hidden \
+        --masked \
+        --protected \
+        --description "Project access token for CI/CD release publishing and artifact uploads"
+}
 
 # --- Decision logic ---
 
 # Case 4: No token exists - CREATE NEW
 if [ -z "${token_info}" ]; then
     echo "INFO: Creating project access token '${TOKEN_NAME}'..."
-    NEW_TOKEN=$(glab token create "${TOKEN_NAME}" \
+    new_token_name="${TOKEN_NAME}-$(date -u +%Y%m%d%H%M%S)-$$"
+    NEW_TOKEN=$(glab token create "${new_token_name}" \
         --repo "${CI_PROJECT_PATH}" \
         --access-level maintainer \
         --scope api \
-        --scope write_repository \
         --duration 8760h \
         --description "CI/CD token for publishing releases and uploading artifacts" \
         --output text)
 
-    echo "INFO: Setting CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
-        --repo "${CI_PROJECT_PATH}" \
-        --masked \
-        --protected \
-        --description "Project access token for CI/CD release publishing and artifact uploads"
+    set_ci_variable
+    unset NEW_TOKEN
 
     echo "DONE: Token and variable created."
     exit 0
@@ -170,21 +197,29 @@ fi
 
 # Token exists - check expiry
 expires_at=$(echo "${token_info}" | jq -r '.expires_at')
-today=$(date +%Y-%m-%d)
+token_id=$(echo "${token_info}" | jq -r '.id')
+today=$(date -u +%Y-%m-%d)
 
 # Convert YYYY-MM-DD to integer for POSIX-compatible comparison
 expires_int=$(echo "${expires_at}" | tr -d '-')
 today_int=$(echo "${today}" | tr -d '-')
 
 # Case 2: Token expired - RENEW
-if [ "${expires_int}" -lt "${today_int}" ]; then
-    echo "INFO: Token expired (${expires_at}). Rotating..."
-    NEW_TOKEN=$(glab token rotate "${TOKEN_NAME}" --repo "${CI_PROJECT_PATH}" --output text)
+if [ "${expires_int}" -le "${today_int}" ]; then
+    echo "INFO: Token expired (${expires_at}). Creating a replacement..."
+    new_token_name="${TOKEN_NAME}-$(date -u +%Y%m%d%H%M%S)-$$"
+    NEW_TOKEN=$(glab token create "${new_token_name}" \
+        --repo "${CI_PROJECT_PATH}" \
+        --access-level maintainer \
+        --scope api \
+        --duration 8760h \
+        --description "CI/CD token for publishing releases and uploading artifacts" \
+        --output text)
 
-    echo "INFO: Updating CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable update "${VAR_NAME}" --repo "${CI_PROJECT_PATH}"
+    set_ci_variable
+    unset NEW_TOKEN
 
-    echo "DONE: Token rotated and variable updated."
+    echo "DONE: Replacement token and variable created."
     exit 0
 fi
 
@@ -192,21 +227,39 @@ fi
 if [ "${var_exists}" = "false" ]; then
     echo "INFO: Token '${TOKEN_NAME}' exists (expires ${expires_at}) but CI variable '${VAR_NAME}' is missing."
     echo "INFO: Rotating token to obtain a new value..."
-    NEW_TOKEN=$(glab token rotate "${TOKEN_NAME}" --repo "${CI_PROJECT_PATH}" --output text)
+    NEW_TOKEN=$(glab token rotate "${token_id}" --repo "${CI_PROJECT_PATH}" --duration 8760h --output text)
 
-    echo "INFO: Setting CI variable '${VAR_NAME}'..."
-    echo "${NEW_TOKEN}" | glab variable set "${VAR_NAME}" \
-        --repo "${CI_PROJECT_PATH}" \
-        --masked \
-        --protected \
-        --description "Project access token for CI/CD release publishing and artifact uploads"
+    set_ci_variable
+    unset NEW_TOKEN
 
     echo "DONE: Token rotated and variable created."
     exit 0
 fi
 
-# Case 1: Token valid and variable exists - SKIP
-echo "OK: Already configured. Token '${TOKEN_NAME}' expires ${expires_at}."
+# Case 1: Token valid and legacy variable is not hidden - MIGRATE
+if [ "${var_hidden}" = "false" ]; then
+    if ! NEW_TOKEN=$(printf '%s' "${variable_json}" | jq -er '.value | strings | select(length > 0)'); then
+        echo "ERROR: CI variable '${VAR_NAME}' is not hidden, but its current value was not returned; no change was made."
+        exit 1
+    fi
+
+    echo "INFO: CI variable '${VAR_NAME}' is not hidden. Recreating it with hidden storage..."
+    set_ci_variable
+    unset NEW_TOKEN variable_json
+
+    echo "DONE: Existing variable recreated with hidden storage."
+    exit 0
+fi
+
+# Case 1: Token valid and variable exists, but hidden state is unavailable - SKIP
+if [ "${var_hidden}" = "unknown" ]; then
+    echo "OBSERVED: CI variable '${VAR_NAME}' exists, but current output did not report boolean hidden metadata."
+    echo "OBSERVED: No change was made; hidden storage was not verified. Token '${TOKEN_NAME}' expires ${expires_at}."
+    exit 0
+fi
+
+# Case 1: Token valid and hidden variable exists - SKIP
+echo "OK: Already configured with hidden variable storage. Token '${TOKEN_NAME}' expires ${expires_at}."
 exit 0
 
 ```
@@ -219,12 +272,14 @@ chmod +x .claude/commands/setup-ci-publish-token.sh && .claude/commands/setup-ci
 
 ## Script Behavior
 
-| Token Exists? | Token Valid? | Variable Exists? | Script Action                                |
-| ------------- | ------------ | ---------------- | -------------------------------------------- |
-| No            | N/A          | Any              | Creates token and variable                   |
-| Yes           | Expired      | Yes              | Rotates token, updates variable              |
-| Yes           | Valid        | No               | Rotates token to get value, creates variable |
-| Yes           | Valid        | Yes              | No action needed (already configured)        |
+| Token Exists? | Token Valid? | Variable State          | Script Action                                      |
+| ------------- | ------------ | ----------------------- | -------------------------------------------------- |
+| No            | N/A          | Any                     | Creates token and hidden variable                  |
+| Yes           | Expired      | Any                     | Creates replacement token and hidden variable      |
+| Yes           | Valid        | Missing                 | Rotates token to get value, creates hidden variable |
+| Yes           | Valid        | Exists, not hidden      | Preserves value, deletes, and recreates as hidden  |
+| Yes           | Valid        | Exists, hidden          | No action needed                                   |
+| Yes           | Valid        | Hidden state unavailable | Reports observed state; makes no hidden claim       |
 
 ## Output Messages
 
@@ -234,44 +289,46 @@ The script uses consistent prefixes for parsing:
 - `INFO:` - Progress information
 - `DONE:` - Successful completion with changes made
 - `OK:` - Successful completion, no changes needed
+- `OBSERVED:` - Existing state could not be fully verified; no change made
 
-## Examples of how to use the new token
+## Preferred release-asset authentication
 
-In your `.gitlab-ci.yml` or CI scripts, prefer `CI_PUBLISH_TOKEN` for operations requiring elevated permissions. eg.:
+For release assets, use `CI_JOB_TOKEN`, enable CI auto-login with `GLAB_ENABLE_CI_AUTOLOGIN=true`, and upload through the generic package registry:
 
 ```bash
-PUBLISH_TOKEN="${CI_PUBLISH_TOKEN:-${GITLAB_TOKEN:-${GL_TOKEN:-}}}"
-if [ -n "${PUBLISH_TOKEN}" ]; then
-  glab auth login --hostname "${CI_SERVER_HOST}" --token "${PUBLISH_TOKEN}"
-else
-  glab auth login --hostname "${CI_SERVER_HOST}" --job-token "${CI_JOB_TOKEN}"
-fi
+GLAB_ENABLE_CI_AUTOLOGIN=true glab release create "${CI_COMMIT_TAG}" ./dist/* --use-package-registry
 ```
 
-In Python scripts you can now check for it:
+Do not assign `CI_JOB_TOKEN` to `GITLAB_TOKEN`; `glab` sends these token types in different headers.
 
-```python
-token = (
-    os.environ.get("CI_PUBLISH_TOKEN")
-    or os.environ.get("GITLAB_TOKEN")
-    or os.environ.get("GL_TOKEN")
-    or os.environ.get("CI_JOB_TOKEN")
-)
+## Using the project access token
+
+For an operation that needs the project access token, provide it directly through the documented environment variable without persisting a login:
+
+```bash
+GITLAB_TOKEN="${CI_PUBLISH_TOKEN}" glab api projects/:id
+```
+
+If a persistent login is required outside CI, pass the token on standard input instead of placing it in process arguments:
+
+```bash
+printf '%s' "${CI_PUBLISH_TOKEN}" | glab auth login --hostname "${GITLAB_HOST}" --stdin
 ```
 
 ## Token Details
 
 The script creates tokens with:
 
-- **Name:** `ci-publish-token`
+- **Name:** A unique name prefixed with `ci-publish-token-`
 - **Access level:** Maintainer
-- **Scopes:** `api`, `write_repository`
+- **Scope:** `api`
 - **Duration:** 1 year (8760h)
 
 The CI variable is created with:
 
-- **Protected:** Yes (only available on protected branches)
-- **Masked:** Yes (hidden in job logs)
+- **Protected:** Yes (available to pipelines on protected branches or protected tags, and optionally to eligible merge-request pipelines)
+- **Masked:** Yes (exact matching output is replaced with `[MASKED]`, subject to GitLab's masking limitations)
+- **Hidden:** Yes (the value cannot be revealed in the UI after creation)
 
 ## Troubleshooting
 
@@ -285,17 +342,18 @@ You need Maintainer or Owner role on the project to manage project access tokens
 
 **401 Unauthorized errors persist after setup:**
 
-- Verify the job runs on a protected branch (the variable is protected)
+- Verify the job runs on a protected branch or protected tag (the variable is protected)
 - Check token hasn't expired: `glab token list`
-- Verify your CI script is using `CI_PUBLISH_TOKEN`, not `CI_JOB_TOKEN`
+- For release assets, verify CI auto-login is enabled and `--use-package-registry` is present
 
 **Variable not available in job:**
 
-- Protected variables only work on protected branches
-- Verify the branch/tag is protected in Settings > Repository > Protected branches
+- Protected variables are available to pipelines on protected branches or protected tags, and optionally to eligible merge-request pipelines
+- For a branch, verify the ref under Settings > Repository > Branch rules
+- For a tag, verify the ref under Settings > Repository > Protected tags
 
 ## Related Documentation
 
 - [GitLab Project Access Tokens](https://docs.gitlab.com/user/project/settings/project_access_tokens/)
 - [GitLab CI/CD Variables](https://docs.gitlab.com/ci/variables/)
-- [glab token documentation](https://gitlab.com/gitlab-org/cli/-/blob/main/docs/source/token/index.md)
+- [glab token documentation](https://docs.gitlab.com/cli/token/)

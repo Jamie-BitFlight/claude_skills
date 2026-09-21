@@ -1,7 +1,7 @@
 {
   "name": "gitlab-skill",
-  "description": "The model must apply when tasks involve .gitlab-ci.yml configuration, GitLab Flavored Markdown (GLFM) syntax, gitlab-ci-local testing, CI/CD pipeline optimization, GitLab CI Steps composition, Docker-in-Docker workflows, or GitLab documentation creation. Triggers include modifying pipelines, writing GitLab README/Wiki content, debugging CI jobs locally, implementing caching strategies, or configuring release workflows.",
-  "version": "1.6.31",
+  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes an explicit fallback command for project access-token setup.",
+  "version": "1.7.0",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"

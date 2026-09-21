@@ -4,133 +4,42 @@
 
 # GitLab CI/CD and Documentation
 
-Makes Claude better at GitLab work: writing pipelines, creating GLFM documentation, and testing
-locally with `gitlab-ci-local` before pushing.
+This plugin provides current, source-backed guidance for documented GitLab CI/CD semantics, reusable components and inputs, experimental GitLab Functions, and GitLab Flavored Markdown (GLFM), plus behavior verified against the upstream `gitlab-ci-local` project. It includes an explicit fallback command for project access-token setup.
 
-## Problem
-
-When working with GitLab projects, Claude sometimes:
-
-- Writes pipelines that fail validation or miss caching and parallelization opportunities
-- Creates README files with Markdown syntax that doesn't render correctly in GitLab (wrong alert format, broken Mermaid)
-- Suggests pushing untested pipeline changes instead of running them locally first
-- Misses GitLab-specific features like CI Steps, collapsible sections, and coverage report integration
+The plugin ships curated references and directs uncovered topics to official GitLab documentation. It does not synchronize documentation or write fetched content into the installed plugin.
 
 ## Installation
 
-First, add the marketplace (one-time setup):
+Add the marketplace and install the plugin in Claude Code:
 
-```bash
+```text
 /plugin marketplace add Jamie-BitFlight/claude_skills
-```
-
-Then install the plugin:
-
-```bash
 /plugin install gitlab-skill@jamie-bitflight-skills
 ```
 
-## Quick Start
+## Supported Topics
 
-The skill activates automatically for GitLab tasks. Just describe what you need:
+- Apply documented `.gitlab-ci.yml` include, dependency, matrix, expression, and CI Lint semantics.
+- Create, test, publish, version, and consume CI/CD components with component or pipeline inputs.
+- Author experimental GitLab Functions with current syntax and documented loading or OCI publishing methods.
+- Use documented GLFM syntax and rendering constraints.
+- Run pipelines locally with shell or Docker execution using verified `gitlab-ci-local` behavior.
+- Use GitLab CI Lint for syntax and logic checks or pipeline simulation.
+- Set up a project access token as a protected CI/CD variable when `CI_JOB_TOKEN` cannot perform the required operation.
 
-```text
-"Add a test stage to the pipeline with proper caching"
-"Create a README for this GitLab project"
-"Test this pipeline locally before pushing"
-"Add a collapsible troubleshooting section to the docs"
-"Why is my Docker-in-Docker job failing?"
-```
+## Source-Backed Examples
 
-## What Changes
+Consume a component with `include:component`. Component references use `<fully-qualified-domain-name>/<project-path>/<component-name>@<specific-version>`.
 
-### CI/CD Pipelines
+Define typed inputs under `spec:inputs`, separate the header from jobs with `---`, and interpolate values with `$[[ inputs.<input-id> ]]`. Inputs validate at pipeline creation time.
 
-With this skill, Claude:
+Test the current component from a root `.gitlab-ci.yml` by referencing `$CI_SERVER_FQDN/$CI_PROJECT_PATH/<component>@$CI_COMMIT_SHA`. Catalog publication requires a Catalog project and a semantic-version tag pipeline whose successful `release` job publishes the version.
 
-- Validates `.gitlab-ci.yml` syntax before committing
-- Implements dependency-based cache keys to minimize build time
-- Uses masked variables for all sensitive data
-- Defines timeout limits on every job
-- Tests pipeline changes locally with `gitlab-ci-local` before suggesting a push
-- Uses the `.gitlab-ci.yml` `include` feature for modular configurations
-- Optimizes job dependency graphs to prevent unnecessary execution
+When migrating from the former CI/CD Steps name, use `func:`, `func.yml`, `${{ func_dir }}`, and `${{ vars.<variable_name> }}`. Existing shell scripts can run through a `script` step in a `run` list during incremental migration.
 
-### GitLab Flavored Markdown (GLFM)
+Use CI Lint to check configuration syntax and logic. Its pipeline simulation runs as a Git `push` event on the default branch.
 
-Claude uses correct GLFM syntax that renders in GitLab:
-
-```markdown
-> [!important]
-> This requires authentication tokens to be configured.
-```
-
-```markdown
-<details>
-<summary>Troubleshooting</summary>
-
-Full content here — renders as collapsible in GitLab.
-</details>
-```
-
-Mermaid diagrams, task lists, and footnotes use GitLab-specific rendering rules.
-
-### Local Pipeline Testing (Domain 3)
-
-Instead of push-and-wait, Claude guides local testing with `gitlab-ci-local`:
-
-```bash
-# Install
-npm install -g gitlab-ci-local
-
-# Test a specific job
-gitlab-ci-local <job-name>
-
-# Run all jobs
-gitlab-ci-local
-```
-
-Covers authentication token setup, project-specific variable files, and debugging job failures locally.
-
-## Example
-
-**Without this plugin:** You ask "add a security note to the README". Claude writes standard
-Markdown that displays as a plain blockquote in GitLab.
-
-**With this plugin:** Claude writes GLFM alert syntax that renders with a warning icon:
-
-```markdown
-> [!warning]
-> Running this in production requires the CI_DEPLOY_TOKEN variable to be set.
-```
-
-## Reference
-
-| Domain | Triggers |
-|--------|----------|
-| CI/CD Pipelines | `.gitlab-ci.yml` files, caching, DinD, CI Steps, job optimization |
-| GLFM Documentation | README files, wiki pages, MR descriptions, alert blocks, Mermaid |
-| Local Testing | `gitlab-ci-local`, job debugging, artifact validation, variable setup |
-
-## What's Included
-
-- CI/CD configuration patterns and optimization strategies with reference guides
-- Complete GLFM syntax documentation (alerts, collapsible sections, diagrams, task lists)
-- `gitlab-ci-local` testing setup and usage guide
-- GitLab CI Steps composition reference
-- Pipeline optimization guide (caching strategies, job parallelization, Docker optimization)
-
-## Requirements
-
-- Claude Code v2.0+
-- `gitlab-ci-local` for local testing (`npm install -g gitlab-ci-local`)
-
----
-
-> **The Ancient Woe**
->
-> *The chaotic shipyard where three different foremen are building the same galleon backwards, with no master ledger to unite their labor or test the timber.*
-
-> **The Bard's Decree**
->
-> *"Summon the Grand Overseer! We require a master scroll that maps the laying of every plank, testing the hull's strength with buckets of water before the vessel ever dares touch the unforgiving sea!"*
+SOURCE: <https://docs.gitlab.com/ci/components/> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/ci/inputs/> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/ci/functions/> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/ci/yaml/lint/> (accessed 2026-09-21)

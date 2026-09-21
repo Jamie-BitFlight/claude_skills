@@ -94,7 +94,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 | --- | --- | --- |
 | [conventional-commits](./plugins/conventional-commits) | `conventional-commits` | Write consistent commit messages (feat/fix/chore) for semantic versioning and changelog generation. |
 | [commitlint](./plugins/commitlint) | `commitlint` | Configure and validate commit messages against commitlint rules — CI rejects non-conforming commits before they merge. |
-| [gitlab-skill](./plugins/gitlab-skill) | `gitlab-skill` | Write GitLab CI pipelines and GLFM documentation with local testing via gitlab-ci-local before pushing. |
+| [gitlab-skill](./plugins/gitlab-skill) | `gitlab-skill` | Apply documented GitLab CI/CD semantics, components, inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes an explicit fallback command for project access-token setup. |
 
 #### Better Claude Behavior
 
