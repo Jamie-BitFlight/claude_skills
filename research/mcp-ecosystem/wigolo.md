@@ -11,7 +11,7 @@ freshness_tracking:
   last_verified: 2026-09-21
   version_at_verification: v0.2.0
   next_review: 2026-12-21
-  confidence_map: "Overview: high | Features: high | Architecture: high (code-read) | Installation: high | Relevance: high"
+  confidence_map: "Overview: high | Features: high | Architecture: high (code-read) | Installation: high | Limitations and Caveats: high | Relevance: high"
 ---
 
 # wigolo
@@ -269,17 +269,35 @@ docker run -p 3333:3333 -v wigolo-data:/data \
   - Today: "Model Context Protocol (MCP) enables Claude Code plugins to expose external service capabilities as tools. Use this skill when adding MCP server configuration to a plugin"
   - Change: Reference wigolo as a production MCP server example when documenting MCP configuration patterns, deployment methods (stdio, HTTP, Docker), and tool integration workflows.
 
+- **Browser Automation and Headless Testing** → `.claude/skills/agent-browser/SKILL.md`
+  - Term: `browser automation`
+  - Today: "Every browser automation follows this pattern:"
+  - Change: Consider wigolo's fetch escalation (HTTP → headless browser → explicit `blocked_by_challenge` failure)
+    for the page-retrieval half of research tasks, where the goal is getting readable content off a site that
+    resists plain HTTP. It does not replace `agent-browser` for interaction: wigolo's ten tools are
+    search/fetch/crawl/extract/cache/find_similar/research/agent/diff/watch, none of which snapshots or acts on
+    DOM elements, so anything that clicks, fills, or selects stays with `agent-browser`.
+
 ### Patterns Worth Adopting
 
-- **Local-First, Zero-Key Design** → No existing reference in scope searched
-  - Today: `git grep --full-name -il "local-first" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches; `git grep --full-name -il "zero-key\|keyless" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Change: Out of scope — this repo documents agent capabilities and skills, not architecture patterns for third-party tools.
+None in scope — Local-First, Zero-Key Design patterns are out of scope for this repo; the term "keyless" appears only in code-signing contexts (Sigstore), not in API authentication design documentation.
 
 ### Integration Opportunities
 
-- **Browser Automation and Headless Testing** → nothing in scope searched
-  - Today: `git grep --full-name -il "browser pool\|browser automation" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md` → 0 matches
-  - Change: None — this repo does not currently implement browser automation or pool management; wigolo's browser pool (Chromium/Firefox/WebKit, size configurable, tiered escalation) remains external and is called via MCP.
+- **Multi-page crawl and structured extraction for research gathering** → `.claude/agents/research-curator.md`
+  - Term: `research`
+  - Today: "Research and document a single tool, library, or resource into a structured research entry"
+  - Change: wigolo's `crawl` and `extract` tools cover a gap in that agent's `<research_tools>` block, which has no
+    route that follows links across a site within a page budget and no route that pulls structured records out of a
+    page. Tracked as issue #3790; integration sketches in
+    [2026-09-21-wigolo-utilization.md](../insights/2026-09-21-wigolo-utilization.md).
+
+- **Local-first web lookup for claim verification** → `.claude/skills/fact-check/SKILL.md`
+  - Term: `fact-check`
+  - Today: "Verifies claims in backlog items, skill documentation, or plugin content against primary sources using web lookups"
+  - Change: wigolo's `search`, `fetch` and `extract` are candidate replacements for that skill's WebFetch/WebSearch calls,
+    and its `diff` tool adds staleness detection the skill currently has no route for. Proposal in
+    [2026-09-21-wigolo-utilization.md](../insights/2026-09-21-wigolo-utilization.md).
 
 ---
 

@@ -318,6 +318,7 @@ MCP servers, tools, and integrations for extending AI assistant capabilities.
 | [gitnexus.md](./mcp-ecosystem/gitnexus.md)                   | GitNexus — graph-based code intelligence MCP server with 7 tools (query, context, impact, detect_changes, rename, cypher), 13-language support, precomputed clustering, Claude Code hooks integration (17.5K stars) | 2026-03-19   |
 | [codegraphcontext.md](./mcp-ecosystem/codegraphcontext.md)   | CodeGraphContext (CGC) — repository-to-graph tool with 20+ MCP tools, Tree-Sitter AST parsing, Cypher queries, KùzuDB default, 14-language support, CLI + MCP server dual mode, caller/callee analysis, dead code detection (v0.4.0 alpha) | 2026-04-08   |
 | [repowise.md](./mcp-ecosystem/repowise.md) | Repowise v0.20.0 — Python 3.11+ code intelligence MCP with 9 task-shaped tools; 25-biomarker code-health scoring (AUC 0.731 defect prediction), 5 intelligence layers (graph/git/docs/decisions/health), −96% tokens vs raw exploration; Claude Code marketplace plugin available (AGPL-3.0) | 2026-06-18 |
+| [wigolo.md](./mcp-ecosystem/wigolo.md) | wigolo v0.2.0 — self-hosted local-first web intelligence MCP server (10 tools: search/fetch/crawl/extract/cache/find_similar/research/agent/diff/watch); 18 search engines with reciprocal rank fusion, on-device embedding + reranker models, FTS5 + vector cache, tiered anti-bot escalation with per-domain learned routing; no API keys required (Node.js >= 20, ~1.5 GB, AGPL) | 2026-09-21 |
 
 **Key Topics**:
 
