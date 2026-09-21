@@ -1,7 +1,7 @@
 {
   "name": "gitlab-skill",
-  "version": "1.7.1",
-  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes an explicit fallback command for project access-token setup.",
+  "version": "1.7.2",
+  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "GitLab Skill",
-    "shortDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes an explicit fallback command for project access-token setup.",
-    "longDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes an explicit fallback command for project access-token setup.",
+    "shortDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
+    "longDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
     "capabilities": [

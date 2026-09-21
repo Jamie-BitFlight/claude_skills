@@ -4,7 +4,7 @@
 
 # GitLab CI/CD and Documentation
 
-This plugin provides current, source-backed guidance for documented GitLab CI/CD semantics, reusable components and inputs, experimental GitLab Functions, and GitLab Flavored Markdown (GLFM), plus behavior verified against the upstream `gitlab-ci-local` project. It includes an explicit fallback command for project access-token setup.
+This plugin provides current, source-backed guidance for documented GitLab CI/CD semantics, reusable components and inputs, experimental GitLab Functions, and GitLab Flavored Markdown (GLFM), plus behavior verified against the upstream `gitlab-ci-local` project. In Claude Code only, it includes an explicit fallback command for project access-token setup; the companion is portable Python, but the installed command launcher relies on Claude Code's `${CLAUDE_PLUGIN_ROOT}` substitution.
 
 The plugin ships curated references and directs uncovered topics to official GitLab documentation. It does not synchronize documentation or write fetched content into the installed plugin.
 
@@ -25,7 +25,7 @@ Add the marketplace and install the plugin in Claude Code:
 - Use documented GLFM syntax and rendering constraints.
 - Run pipelines locally with shell or Docker execution using verified `gitlab-ci-local` behavior.
 - Use GitLab CI Lint for syntax and logic checks or pipeline simulation.
-- Set up a project access token as a protected CI/CD variable when `CI_JOB_TOKEN` cannot perform the required operation.
+- In Claude Code only, set up a project access token as a protected CI/CD variable when `CI_JOB_TOKEN` cannot perform the required operation.
 
 ## Source-Backed Examples
 

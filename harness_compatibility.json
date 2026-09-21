@@ -496,7 +496,7 @@
         "hooks": false
       },
       "blockers": {
-        "claude_plugin_root_uses": 0,
+        "claude_plugin_root_uses": 2,
         "claude_skill_dir_uses": 0
       },
       "verification": {
