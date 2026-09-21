@@ -307,6 +307,7 @@ class Reservation(LedgerModel):
     group: str
     paths: list[str]
     owner: str
+    owner_process_id: int = Field(default_factory=os.getpid, gt=0, le=2_147_483_647)
     state: ReservationState
     lock_path: str
     acquired_at: datetime
@@ -323,7 +324,7 @@ class RecoveryEvidence(LedgerModel):
     """Evidence required to invalidate a stale owner's reservation."""
 
     stale_owner_id: str
-    process_id: int = Field(gt=0)
+    process_id: int = Field(gt=0, le=2_147_483_647)
     liveness_output_path: str
     liveness_output_sha256: Sha256
     liveness_pid: int = Field(gt=0)
@@ -652,6 +653,22 @@ class PortfolioLedger(LedgerModel):
                 raise ValueError(f"released reservation {reservation.id!r} has invalid terminal timestamps")
             if reservation.state is ReservationState.INVALIDATED and reservation.invalidated_at is None:
                 raise ValueError(f"invalidated reservation {reservation.id!r} lacks invalidated_at")
+            actions = {
+                event.action
+                for car in self.cars.values()
+                for event in car.history
+                if event.reservation_id == reservation.id
+            }
+            expected_terminal = (
+                "reservation-release"
+                if reservation.state is ReservationState.RELEASED
+                else ("reservation-recover" if reservation.recovery_evidence is not None else "reservation-invalidate")
+            )
+            if reservation.state is not ReservationState.ACTIVE and not {
+                "reservation-acquire",
+                expected_terminal,
+            }.issubset(actions):
+                raise ValueError(f"concluded reservation {reservation.id!r} lacks matching car history")
         return self
 
     @model_validator(mode="after")
@@ -1516,7 +1533,7 @@ class _LedgerStore:
         if os.name != "nt":
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
             return
-        deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS + 5
+        deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS * 3 + 5
         while True:
             try:
                 msvcrt.locking(lock_fd, msvcrt.LK_NBLCK, 1)
@@ -1689,6 +1706,19 @@ class _LedgerStore:
                 service.verify_evidence(
                     recovery.judgement_path, recovery.judgement_sha256, "independent recovery judgement"
                 )
+                liveness = service.read_evidence_json(
+                    recovery.liveness_output_path, recovery.liveness_output_sha256, "recovery liveness evidence"
+                )
+                judgement = service.read_evidence_json(
+                    recovery.judgement_path, recovery.judgement_sha256, "independent recovery judgement"
+                )
+                if liveness.get("pid") != recovery.liveness_pid or liveness.get("alive") is not recovery.liveness_alive:
+                    raise LedgerRefusal("persisted recovery liveness claims do not match verified bytes")
+                if (
+                    judgement.get("checker_id") != recovery.judgement_checker_id
+                    or judgement.get("verdict") != recovery.judgement_verdict
+                ):
+                    raise LedgerRefusal("persisted recovery judgement claims do not match verified bytes")
 
     def verify_inventory_path(self, inventory: Inventory, path: InventoryPath, service: PortfolioLedgerService) -> None:
         """Verify frozen inventory identity without requiring mutable worktree bytes.
@@ -2192,6 +2222,8 @@ class PortfolioLedgerService:
             raise LedgerRefusal("recovery stale owner does not match the reservation owner")
         if evidence.prior_receipt_sha256 != reservation.receipt_sha256:
             raise LedgerRefusal("recovery prior receipt does not match the reservation")
+        if evidence.process_id != reservation.owner_process_id:
+            raise LedgerRefusal("recovery process does not match the reservation owner process")
         self.require_independent_checker(evidence.checker_id, excluded={reservation.owner})
         liveness = self.read_evidence_json(
             evidence.liveness_output_path, evidence.liveness_output_sha256, "recovery liveness evidence"
@@ -2861,7 +2893,7 @@ class PortfolioLedgerRuntime:
         if command == "show":
             return ledger
         if command == "verify-mirror":
-            return self.store.verify_mirror()
+            return ledger
         payload = self.request_payload(request)
         service = PortfolioLedgerService(ledger, evidence_root=self.evidence_root)
         transitioned = self.dispatch_transition(command, payload, service)

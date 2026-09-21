@@ -542,7 +542,9 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
     ).encode()
     (tmp_path / "liveness.json").write_bytes(dead_liveness)
     (tmp_path / "judgement.json").write_bytes(passed_judgement)
-    recovered = PortfolioLedgerService(acquired, evidence_root=tmp_path).recover_reservation(
+    dead_reservation = acquired.reservations[reservation.id].model_copy(update={"owner_process_id": dead_pid})
+    acquired_dead = acquired.model_copy(update={"reservations": {reservation.id: dead_reservation}})
+    recovered = PortfolioLedgerService(acquired_dead, evidence_root=tmp_path).recover_reservation(
         "A6-G0",
         reservation.id,
         evidence.model_copy(
@@ -594,7 +596,7 @@ def test_invalidation_replay_rejects_stale_inventory_and_recover_without_evidenc
 
     missing_recovery = invalidated.model_dump(mode="json")
     missing_recovery["cars"]["A6-G0"]["history"][-1]["action"] = "reservation-recover"
-    with pytest.raises(ValueError, match="recovery event lacks"):
+    with pytest.raises(ValueError, match=r"recovery event lacks|lacks matching car history"):
         PortfolioLedger.model_validate(missing_recovery)
 
 
