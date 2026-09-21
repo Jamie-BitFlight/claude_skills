@@ -30,6 +30,7 @@ from dh_core.portfolio_ledger import (
     Parent,
     ParentState,
     PortfolioLedger,
+    PortfolioLedgerRuntime,
     PortfolioLedgerService,
     RecoveryEvidence,
     Reservation,
@@ -72,7 +73,7 @@ def minimum_ledger() -> PortfolioLedger:
         ),
         correction_rows={
             f"R{number:02d}": CorrectionRow(
-                owner=f"owner-{number}", artifact=f"receipt-{number}.json", sha256=SHA, reviewer=f"reviewer-{number}"
+                owner="maker", artifact=f"receipt-{number}.json", sha256=SHA, reviewer="checker"
             )
             for number in range(1, 22)
         },
@@ -98,6 +99,19 @@ def minimum_ledger() -> PortfolioLedger:
                 upstream_git_sha=SHA,
                 maker_id="maker",
                 inventory_ids=["inventory-a6-g0"],
+                history=[
+                    HistoryEvent(
+                        action="inventory",
+                        actor_id="maker",
+                        at=NOW,
+                        from_state="INVENTORIED",
+                        to_state="INVENTORIED",
+                        inventory_ids=["inventory-a6-g0"],
+                        reservation_id=None,
+                        receipt_path="plugins/development-harness/dh_core/portfolio_ledger.py",
+                        receipt_sha256=SHA,
+                    )
+                ],
             )
         },
         inventories={"inventory-a6-g0": inventory_record()},
@@ -124,6 +138,12 @@ def materialized_ledger(root: Path) -> PortfolioLedger:
     (root / source_path).write_bytes(source_bytes)
     path = InventoryPath(path=source_path, git_blob=SHA, sha256=hashlib.sha256(source_bytes).hexdigest())
     inventory = Inventory(id="inventory-a6-g0", revision=SHA, paths=[path], sha256=inventory_sha256([path]))
+    car = ledger.cars["A6-G0"]
+    history = [
+        car.history[0].model_copy(
+            update={"receipt_path": source_path, "receipt_sha256": path.sha256, "inventory_ids": [inventory.id]}
+        )
+    ]
     return ledger.model_copy(
         update={
             "tracker_manifest": ledger.tracker_manifest.model_copy(
@@ -131,6 +151,7 @@ def materialized_ledger(root: Path) -> PortfolioLedger:
             ),
             "correction_rows": corrections,
             "inventories": {inventory.id: inventory},
+            "cars": {car.id: car.model_copy(update={"history": history})},
         }
     )
 
@@ -259,7 +280,7 @@ def test_reconstructed_car_enforces_transition_equivalent_evidence_and_independe
 def test_reconstructed_integrated_car_requires_legal_history_chain() -> None:
     payload = integrated_ledger().model_dump(mode="json")
     payload["cars"]["A6-G0"]["history"] = []
-    with pytest.raises(ValueError, match="history chain"):
+    with pytest.raises(ValueError, match=r"history chain|inventory pointer"):
         PortfolioLedger.model_validate(payload)
 
 
@@ -420,7 +441,7 @@ def test_reconstructed_reserved_car_requires_active_owned_exclusive_reservation(
     payload = acquired.model_dump(mode="json")
     payload["reservations"][reservation.id]["state"] = "released"
 
-    with pytest.raises(ValueError, match="active owned exclusive reservation"):
+    with pytest.raises(ValueError, match=r"active owned exclusive reservation|terminal timestamps"):
         PortfolioLedger.model_validate(payload)
 
 
@@ -862,7 +883,7 @@ def test_parent_certification_requires_all_aggregates_addenda_and_parent_checker
     assert parent_certified.parent.state is ParentState.PARENT_CERTIFIED
     persisted = parent_certified.model_dump(mode="json")
     persisted["parent"]["addenda"][0]["receipt"]["verdict"] = "REFUSED"
-    with pytest.raises(ValueError, match="certified parent addendum"):
+    with pytest.raises(ValueError, match=r"certified parent addendum|addendum 'A6-final' is invalid"):
         PortfolioLedger.model_validate(persisted)
     with pytest.raises(LedgerRefusal, match="parent-checker authority"):
         PortfolioLedgerService(with_addendum).certify_parent(
@@ -1102,7 +1123,7 @@ def test_mirror_comparison_and_missing_local_restoration_are_fail_closed(tmp_pat
     lock_path = tmp_path / "ledger.lock"
     mirror_path = tmp_path / "mirror.json"
     store = LedgerStore(ledger_path, lock_path)
-    ledger = minimum_ledger().model_copy(update={"mirror": Mirror(url=mirror_path.as_uri())})
+    ledger = minimum_ledger().model_copy(update={"mirror": Mirror(url=mirror_path.as_uri(), expected_sha256="0" * 64)})
     written = store.write(ledger)
     mirror_path.write_bytes(ledger_path.read_bytes())
 
@@ -1127,7 +1148,9 @@ def test_mirrored_transition_publishes_exact_new_bytes_before_local_commit(tmp_p
     first_mirror = tmp_path / "mirror-v1.json"
     second_mirror = tmp_path / "mirror-v2.json"
     store = LedgerStore(ledger_path, lock_path)
-    current = store.write(minimum_ledger().model_copy(update={"mirror": Mirror(url=first_mirror.as_uri())}))
+    current = store.write(
+        minimum_ledger().model_copy(update={"mirror": Mirror(url=first_mirror.as_uri(), expected_sha256="0" * 64)})
+    )
     first_mirror.write_bytes(ledger_path.read_bytes())
     reservation = Reservation(
         id="reservation-a6-g0",
@@ -1141,7 +1164,9 @@ def test_mirrored_transition_publishes_exact_new_bytes_before_local_commit(tmp_p
         receipt_sha256=SHA,
     )
     transitioned = PortfolioLedgerService(current).acquire_reservation("A6-G0", reservation, actor_id="maker")
-    transitioned = transitioned.model_copy(update={"mirror": Mirror(url=second_mirror.as_uri())})
+    transitioned = transitioned.model_copy(
+        update={"mirror": Mirror(url=second_mirror.as_uri(), expected_sha256="0" * 64)}
+    )
 
     written = store.write_transition(transitioned, expected_ledger_sha256=current.ledger_sha256)
 
@@ -1155,11 +1180,17 @@ def test_mirror_publication_failure_keeps_previous_local_revision_readable(tmp_p
     first_mirror = tmp_path / "mirror-v1.json"
     occupied_mirror = tmp_path / "occupied-v2.json"
     store = LedgerStore(ledger_path, lock_path)
-    current = store.write(minimum_ledger().model_copy(update={"mirror": Mirror(url=first_mirror.as_uri())}))
+    current = store.write(
+        minimum_ledger().model_copy(update={"mirror": Mirror(url=first_mirror.as_uri(), expected_sha256="0" * 64)})
+    )
     first_mirror.write_bytes(ledger_path.read_bytes())
     occupied_mirror.write_text("immutable unrelated bytes", encoding="utf-8")
     candidate = current.model_copy(
-        update={"portfolio_issue": 9999, "mirror": Mirror(url=occupied_mirror.as_uri()), "ledger_sha256": None}
+        update={
+            "portfolio_issue": 9999,
+            "mirror": Mirror(url=occupied_mirror.as_uri(), expected_sha256="0" * 64),
+            "ledger_sha256": None,
+        }
     )
 
     with pytest.raises(LedgerRefusal, match="mirror publication"):
@@ -1176,7 +1207,9 @@ def test_restore_refuses_a_local_revision_created_during_mirror_read(
     lock_path = tmp_path / "ledger.lock"
     mirror_path = tmp_path / "mirror.json"
     store = LedgerStore(ledger_path, lock_path)
-    mirrored = store.write(minimum_ledger().model_copy(update={"mirror": Mirror(url=mirror_path.as_uri())}))
+    mirrored = store.write(
+        minimum_ledger().model_copy(update={"mirror": Mirror(url=mirror_path.as_uri(), expected_sha256="0" * 64)})
+    )
     mirror_bytes = ledger_path.read_bytes()
     mirror_path.write_bytes(mirror_bytes)
     competing_path = tmp_path / "competing.json"
@@ -1399,7 +1432,9 @@ def test_agent_cli_mirrored_transition_is_immediately_readable(tmp_path: Path) -
     first_mirror = tmp_path / "mirror-v1.json"
     second_mirror = tmp_path / "mirror-v2.json"
     request_path = tmp_path / "request.json"
-    ledger = materialized_ledger(tmp_path).model_copy(update={"mirror": Mirror(url=first_mirror.as_uri())})
+    ledger = materialized_ledger(tmp_path).model_copy(
+        update={"mirror": Mirror(url=first_mirror.as_uri(), expected_sha256="0" * 64)}
+    )
     LedgerStore(ledger_path, lock_path).write(ledger)
     receipt_bytes = b'{"reservation":"A6-G0"}'
     (tmp_path / "reservation.json").write_bytes(receipt_bytes)
@@ -1529,3 +1564,28 @@ def test_agent_cli_exposes_the_complete_transition_and_recovery_interface() -> N
         "show",
     ):
         assert command in result.stdout
+
+
+def test_checker_hostile_authority_reconstruction_and_mirror_outcomes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(LedgerRefusal) as missing_root:
+        PortfolioLedgerRuntime(evidence_root=None)
+    assert (missing_root.value.category, missing_root.value.code) == ("unavailable", "missing_evidence")
+
+    payload = minimum_ledger().model_dump(mode="json")
+    payload["correction_rows"]["R01"]["owner"] = "undeclared"
+    with pytest.raises(ValueError, match="undeclared"):
+        PortfolioLedger.model_validate(payload)
+
+    with pytest.raises(ValueError, match="present together"):
+        Mirror(expected_sha256=SHA)
+    with pytest.raises(LedgerRefusal, match="drive cannot appear in authority"):
+        file_uri_to_path("file://C:/path/mirror.json", platform="nt")
+
+    store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock")
+    called: list[str] = []
+    monkeypatch.setattr(store, "read_url", lambda url: called.append(url) or b"")
+    with pytest.raises(LedgerRefusal, match="unsupported scheme"):
+        store.restore_from_mirror(mirror_url="ftp://user@example.invalid:21/mirror?x=1", expected_sha256=SHA)
+    assert called == []

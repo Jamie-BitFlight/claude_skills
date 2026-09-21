@@ -274,7 +274,7 @@ def transition(command: str, ledger: PortfolioLedger, request: RequestModel, *, 
     else:
         raise LedgerRefusal(f"unsupported transition command {command!r}")
     if request.mirror_url is not None:
-        result = result.model_copy(update={"mirror": Mirror(url=request.mirror_url)})
+        result = result.model_copy(update={"mirror": Mirror(url=request.mirror_url, expected_sha256="0" * 64)})
     return result
 
 

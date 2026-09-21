@@ -81,6 +81,8 @@ def file_uri_to_path(url: str, *, platform: str = os.name) -> str:
     decoded = unquote(parsed.path)
     if platform == "nt":
         if parsed.netloc and parsed.netloc.lower() != "localhost":
+            if parsed.netloc.endswith(":"):
+                raise LedgerRefusal("Windows file URI drive cannot appear in authority", code="invalid_mirror")
             native = str(PureWindowsPath(f"//{parsed.netloc}{decoded}"))
         else:
             if (
@@ -441,6 +443,17 @@ class Mirror(LedgerModel):
     url: str | None = None
     expected_sha256: Sha256 | None = None
 
+    @model_validator(mode="after")
+    def validate_pair(self) -> Mirror:
+        """Require raw mirror authority to contain neither or both fields.
+
+        Returns:
+            Validated mirror pair.
+        """
+        if (self.url is None) != (self.expected_sha256 is None):
+            raise ValueError("mirror URL and expected digest must be present together")
+        return self
+
 
 class PortfolioLedger(LedgerModel):
     """Complete reconstructable state of the runtime-integrity merge train."""
@@ -475,6 +488,13 @@ class PortfolioLedger(LedgerModel):
         ]
         if invalid_rows:
             raise ValueError(f"correction rows require passed independent review: {sorted(invalid_rows)}")
+        for row_id, row in self.correction_rows.items():
+            owner = self.roles.get(row.owner)
+            reviewer = self.roles.get(row.reviewer)
+            if owner is None or reviewer is None or reviewer.independence_class != "checker":
+                raise ValueError(f"correction row {row_id} references undeclared or invalid authorities")
+            if owner.id == reviewer.id or owner.session == reviewer.session:
+                raise ValueError(f"correction row {row_id} owner and reviewer are not independent")
         for key, role in self.roles.items():
             if key != role.id:
                 raise ValueError(f"role key {key!r} does not match role id {role.id!r}")
@@ -539,6 +559,10 @@ class PortfolioLedger(LedgerModel):
             missing_inventories = set(car.inventory_ids) - set(self.inventories)
             if missing_inventories:
                 raise ValueError(f"car {car.id!r} references undefined inventories: {sorted(missing_inventories)}")
+            if len(car.inventory_ids) != len(set(car.inventory_ids)) or len(car.reservation_ids) != len(
+                set(car.reservation_ids)
+            ):
+                raise ValueError(f"car {car.id!r} contains duplicate current pointers")
         undefined = set(self.parent.required_car_ids) - set(self.cars)
         if undefined:
             raise ValueError(f"parent references undefined required cars: {sorted(undefined)}")
@@ -549,6 +573,22 @@ class PortfolioLedger(LedgerModel):
         reservation_keys = {key for key, value in self.reservations.items() if key != value.id}
         if reservation_keys:
             raise ValueError(f"reservation keys must equal record IDs: {sorted(reservation_keys)}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_reservation_terminal_records(self) -> PortfolioLedger:
+        """Validate concluded reservation timestamps.
+
+        Returns:
+            Validated ledger.
+        """
+        for reservation in self.reservations.values():
+            if reservation.state is ReservationState.RELEASED and (
+                reservation.released_at is None or reservation.invalidated_at is not None
+            ):
+                raise ValueError(f"released reservation {reservation.id!r} has invalid terminal timestamps")
+            if reservation.state is ReservationState.INVALIDATED and reservation.invalidated_at is None:
+                raise ValueError(f"invalidated reservation {reservation.id!r} lacks invalidated_at")
         return self
 
     @model_validator(mode="after")
@@ -570,6 +610,43 @@ class PortfolioLedger(LedgerModel):
             error = self.car_transition_error(car)
             if error:
                 raise ValueError(f"car {car.id!r} lacks transition-equivalent invariants: {error}")
+        edges = {
+            car.integration_sha: set(car.predecessor_shas)
+            for car in self.cars.values()
+            if car.integration_sha is not None
+        }
+        for start, predecessors in edges.items():
+            frontier = list(predecessors)
+            seen: set[str] = set()
+            while frontier:
+                node = frontier.pop()
+                if node == start:
+                    raise ValueError("integration predecessor graph contains a cycle")
+                if node not in seen:
+                    seen.add(node)
+                    frontier.extend(edges.get(node, set()))
+        return self
+
+    @model_validator(mode="after")
+    def validate_all_addenda_and_terminal_parent(self) -> PortfolioLedger:
+        """Validate optional addenda and terminal parent projections.
+
+        Returns:
+            Validated ledger.
+        """
+        ids = [addendum.id for addendum in self.parent.addenda]
+        if len(ids) != len(set(ids)):
+            raise ValueError("addendum IDs must be unique")
+        for addendum in self.parent.addenda:
+            error = self.certified_addendum_error(addendum)
+            if error:
+                raise ValueError(f"addendum {addendum.id!r} is invalid: {error}")
+        if self.parent.state is ParentState.PARENT_CERTIFIED and self.parent.required_car_ids:
+            for car in self.cars.values():
+                if car.history and car.history[-1].action not in {"integrate", "aspect-certify"}:
+                    raise ValueError("PARENT_CERTIFIED is terminal and forbids later car events")
+            if any(reservation.state is ReservationState.ACTIVE for reservation in self.reservations.values()):
+                raise ValueError("PARENT_CERTIFIED forbids active reservations")
         return self
 
     @model_validator(mode="after")
@@ -639,7 +716,7 @@ class PortfolioLedger(LedgerModel):
         maker = self.roles.get(car.maker_id)
         if maker is None or maker.independence_class != "maker":
             return "maker lacks maker authority"
-        history_error = self.car_history_error(car)
+        history_error = self._car_history_error(car)
         if history_error:
             return history_error
         if car.state in {CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}:
@@ -654,7 +731,7 @@ class PortfolioLedger(LedgerModel):
             return self.aspect_evidence_error(car, maker)
         return None
 
-    def car_history_error(self, car: Car) -> str | None:
+    def _car_history_error(self, car: Car) -> str | None:
         """Return an error when persisted history cannot reconstruct current state."""
         required_by_state = {
             CarState.INVENTORIED: [],
@@ -665,6 +742,9 @@ class PortfolioLedger(LedgerModel):
         }
         required = required_by_state[car.state]
         actions = [event.action for event in car.history]
+        inventory_events = [event for event in car.history if event.action == "inventory"]
+        if car.inventory_ids and (not inventory_events or inventory_events[-1].inventory_ids != car.inventory_ids):
+            return "current inventory pointer lacks matching maker inventory event"
         core_actions = {"implementation-admit", "integrate", "aspect-certify"}
         if any(actions.count(action) > 1 for action in core_actions):
             return "history chain duplicates a core transition"
@@ -674,14 +754,16 @@ class PortfolioLedger(LedgerModel):
         for previous, current in zip(car.history, car.history[1:], strict=False):
             if previous.to_state != current.from_state:
                 return "history chain contains a state jump"
-        event_error = self.history_event_error(car)
+        event_error = self._history_event_error(car)
         if event_error:
             return event_error
-        if car.history and car.history[-1].to_state != car.state:
-            return "history chain does not reach the persisted state"
-        return None
+        return (
+            "history chain does not reach the persisted state"
+            if car.history and car.history[-1].to_state != car.state
+            else None
+        )
 
-    def history_event_error(self, car: Car) -> str | None:
+    def _history_event_error(self, car: Car) -> str | None:
         """Return an error for an event no public transition could emit."""
         legal = {
             "reservation-acquire": (CarState.INVENTORIED, CarState.RESERVED, car.maker_id),
@@ -694,37 +776,69 @@ class PortfolioLedger(LedgerModel):
             "aspect-certify": (CarState.INTEGRATED, CarState.ASPECT_CERTIFIED, car.aspect_checker_id),
         }
         error: str | None = None
+        acquired: set[str] = set()
+        terminal: set[str] = set()
+        previous_at: datetime | None = None
         for event in car.history:
-            if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
-                error = f"history chain has illegal {event.action} state or actor"
-            elif event.action not in legal and event.action not in {
+            if previous_at is not None and event.at < previous_at:
+                return "history timestamps decrease"
+            previous_at = event.at
+            error = self._history_event_shape_error(car, event, legal)
+            if error is None and event.action == "reservation-acquire":
+                reservation = self.reservations[event.reservation_id or ""]
+                if reservation.id in acquired or event.actor_id != reservation.owner:
+                    error = "reservation acquisition is duplicated or has wrong authority"
+                elif (
+                    event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256
+                ):
+                    error = "reservation acquisition receipt does not match reservation"
+                acquired.add(reservation.id)
+            if error is None and event.action in {
                 "reservation-release",
                 "reservation-invalidate",
                 "reservation-recover",
-                "inventory",
             }:
-                error = f"history chain contains unknown action {event.action!r}"
-            elif event.action in {"inventory", "reservation-acquire"} and not event.inventory_ids:
-                error = f"history chain {event.action} lacks inventory subject"
-            elif event.action not in {"inventory", "reservation-acquire"} and event.inventory_ids:
-                error = f"history chain {event.action} carries forbidden inventory subjects"
-            reservation_actions = {
-                "reservation-acquire",
-                "reservation-release",
-                "reservation-invalidate",
-                "reservation-recover",
-                "implementation-admit",
-            }
-            if error is None and event.action in reservation_actions and event.reservation_id is None:
-                error = f"history chain {event.action} lacks reservation subject"
-            elif error is None and event.action not in reservation_actions and event.reservation_id is not None:
-                error = f"history chain {event.action} carries forbidden reservation subject"
-            elif error is None and event.reservation_id is not None and event.reservation_id not in self.reservations:
-                error = f"history chain references unknown reservation {event.reservation_id!r}"
-            elif error is None and any(inventory_id not in self.inventories for inventory_id in event.inventory_ids):
-                error = "history chain references unknown inventory"
+                if event.reservation_id not in acquired or event.reservation_id in terminal:
+                    error = "reservation cycle has no acquisition or multiple terminal edges"
+                terminal.add(event.reservation_id or "")
             if error:
                 break
+        return error
+
+    def _history_event_shape_error(
+        self, car: Car, event: HistoryEvent, legal: dict[str, tuple[CarState, CarState, str | None]]
+    ) -> str | None:
+        """Validate one event's legal state, authority, and subjects.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        reservation_actions = {
+            "reservation-acquire",
+            "reservation-release",
+            "reservation-invalidate",
+            "reservation-recover",
+            "implementation-admit",
+        }
+        error: str | None = None
+        if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
+            error = f"history chain has illegal {event.action} state or actor"
+        elif event.action not in legal and event.action not in {*reservation_actions, "inventory"}:
+            error = f"history chain contains unknown action {event.action!r}"
+        elif event.action in {"inventory", "reservation-acquire"} and not event.inventory_ids:
+            error = f"history chain {event.action} lacks inventory subject"
+        elif event.action not in {"inventory", "reservation-acquire"} and event.inventory_ids:
+            error = f"history chain {event.action} carries forbidden inventory subjects"
+        elif event.action in reservation_actions and event.reservation_id is None:
+            error = f"history chain {event.action} lacks reservation subject"
+        elif event.action not in reservation_actions and event.reservation_id is not None:
+            error = f"history chain {event.action} carries forbidden reservation subject"
+        elif event.reservation_id is not None and event.reservation_id not in self.reservations:
+            error = f"history chain references unknown reservation {event.reservation_id!r}"
+        elif any(inventory_id not in self.inventories for inventory_id in event.inventory_ids):
+            error = "history chain references unknown inventory"
+        elif event.action == "inventory" and (event.actor_id != car.maker_id or len(event.inventory_ids) != 1):
+            error = "inventory event authority or subject is invalid"
         return error
 
     def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
@@ -1355,9 +1469,10 @@ class LedgerStore:
         with self.lock():
             if self.ledger_path.exists():
                 raise LedgerRefusal("local ledger exists; neither local nor mirror may win automatically")
+            normalized_external_url = validate_mirror_url(mirror_url)
             mirror_bytes = self.read_url(mirror_url)
             mirror = self.validate_mirror_bytes(mirror_bytes)
-            if validate_mirror_url(mirror_url) != validate_mirror_url(mirror.mirror.url or ""):
+            if normalized_external_url != validate_mirror_url(mirror.mirror.url or ""):
                 raise LedgerRefusal("external and embedded mirror URLs do not match", code="invalid_mirror")
             if expected_sha256 is None or mirror.ledger_sha256 != expected_sha256:
                 raise LedgerRefusal("mirror identity does not match the externally recorded digest")
@@ -2163,7 +2278,7 @@ class PortfolioLedgerService:
         except ValueError as error:
             raise LedgerRefusal(f"{label} path escapes the evidence root: {path!r}") from error
         if not candidate.is_file():
-            raise LedgerRefusal(f"{label} does not exist: {path!r}")
+            raise LedgerRefusal(f"{label} does not exist: {path!r}", code="missing_evidence", category="unavailable")
         observed = hashlib.sha256(candidate.read_bytes()).hexdigest()
         if observed != expected_sha256:
             raise LedgerRefusal(
@@ -2279,6 +2394,8 @@ class PortfolioLedgerService:
         Raises:
             LedgerRefusal: When the car is undefined.
         """
+        if self.ledger.parent.state is ParentState.PARENT_CERTIFIED:
+            raise LedgerRefusal("PARENT_CERTIFIED is terminal", code="invalid_transition")
         car = self.ledger.cars.get(car_id)
         if car is None:
             raise LedgerRefusal(f"undefined car {car_id!r}")
@@ -2289,9 +2406,19 @@ class PortfolioLedgerRuntime:
     """Single application facade owning every accepted ledger command cycle."""
 
     def __init__(
-        self, *, evidence_root: Path, ledger_path: Path = CANONICAL_LEDGER_PATH, lock_path: Path = CANONICAL_LOCK_PATH
+        self,
+        *,
+        evidence_root: Path | None,
+        ledger_path: Path = CANONICAL_LEDGER_PATH,
+        lock_path: Path = CANONICAL_LOCK_PATH,
     ) -> None:
         """Configure authoritative evidence and canonical storage."""
+        if evidence_root is None:
+            raise LedgerRefusal(
+                "operational ledger runtime requires an authoritative evidence root",
+                code="missing_evidence",
+                category="unavailable",
+            )
         self.evidence_root = evidence_root
         self.store = LedgerStore(ledger_path, lock_path, evidence_root=evidence_root)
 
@@ -2322,7 +2449,9 @@ class PortfolioLedgerRuntime:
         transitioned = self.dispatch_transition(command, payload, service)
         mirror_url = payload.get("mirror_url")
         if mirror_url is not None:
-            transitioned = transitioned.model_copy(update={"mirror": Mirror(url=str(mirror_url))})
+            transitioned = transitioned.model_copy(
+                update={"mirror": Mirror(url=str(mirror_url), expected_sha256="0" * 64)}
+            )
         try:
             return self.store.write_transition(transitioned, expected_ledger_sha256=ledger.ledger_sha256)
         except LedgerRefusal as error:
