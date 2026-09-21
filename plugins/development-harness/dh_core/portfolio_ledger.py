@@ -1742,7 +1742,23 @@ class _LedgerStore:
             with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] - URL is explicit persisted authority
                 url, timeout=EXTERNAL_IO_TIMEOUT_SECONDS
             ) as response:
-                return response.read()
+                deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
+                chunks: list[bytes] = []
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise LedgerRefusal(
+                            f"mirror download exceeded {EXTERNAL_IO_TIMEOUT_SECONDS}s total deadline",
+                            code="process_timeout",
+                            category="external_io",
+                        )
+                    socket = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+                    if socket is not None:
+                        socket.settimeout(remaining)
+                    chunk = response.read(65536)
+                    if not chunk:
+                        return b"".join(chunks)
+                    chunks.append(chunk)
         except OSError as error:
             raise LedgerRefusal(f"cannot read mirror {url!r}: {error}") from error
 
