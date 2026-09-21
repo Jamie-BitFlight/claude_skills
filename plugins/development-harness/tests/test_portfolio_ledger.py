@@ -481,6 +481,10 @@ def test_parent_certification_requires_all_aggregates_addenda_and_parent_checker
     )
 
     assert parent_certified.parent.state is ParentState.PARENT_CERTIFIED
+    persisted = parent_certified.model_dump(mode="json")
+    persisted["parent"]["addenda"][0]["receipt"]["verdict"] = "REFUSED"
+    with pytest.raises(ValueError, match="certified parent addendum"):
+        PortfolioLedger.model_validate(persisted)
     with pytest.raises(LedgerRefusal, match="parent-checker authority"):
         PortfolioLedgerService(with_addendum).certify_parent(
             checker_id="checker",

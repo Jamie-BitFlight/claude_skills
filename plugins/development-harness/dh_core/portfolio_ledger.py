@@ -450,6 +450,13 @@ class PortfolioLedger(LedgerModel):
         addendum_ids = {addendum.id for addendum in self.parent.addenda}
         if set(self.parent.required_addendum_ids) - addendum_ids:
             raise ValueError("certified parent requires every declared addendum")
+        required_addenda = [
+            addendum for addendum in self.parent.addenda if addendum.id in self.parent.required_addendum_ids
+        ]
+        for addendum in required_addenda:
+            error = self.certified_addendum_error(addendum)
+            if error:
+                raise ValueError(f"certified parent addendum {addendum.id!r} is invalid: {error}")
         role = self.roles.get(self.parent.checker_id or "")
         receipt = self.parent.receipt
         if role is None or role.independence_class != "parent-checker":
@@ -463,6 +470,34 @@ class PortfolioLedger(LedgerModel):
         ):
             raise ValueError("certified parent requires a matching immutable verdict receipt")
         return self
+
+    def certified_addendum_error(self, addendum: Addendum) -> str | None:
+        """Return the persisted-contract error for one required addendum.
+
+        Args:
+            addendum: Required parent addendum.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        car = self.cars.get(addendum.car_id)
+        if car is None or car.state is not CarState.ASPECT_CERTIFIED:
+            return "car is not an ASPECT_CERTIFIED aggregate"
+        if addendum.revision != car.integration_sha:
+            return "revision does not match the integrated car SHA"
+        role = self.roles.get(addendum.checker_id)
+        excluded = {car.maker_id, car.implementation_checker_id, car.integrator_id, car.aspect_checker_id}
+        if role is None or role.independence_class != "checker" or addendum.checker_id in excluded:
+            return "checker lacks independent checker authority"
+        receipt = addendum.receipt
+        if (
+            addendum.report != receipt.path
+            or receipt.author_id != addendum.checker_id
+            or receipt.verdict is not Verdict.PASSED
+            or receipt.observed_revision != addendum.revision
+        ):
+            return "immutable receipt identity, verdict, revision, or report does not match"
+        return None
 
     def canonical_json(self, *, include_digest: bool = True) -> str:
         """Return compact, sorted, UTF-8-safe canonical JSON.
