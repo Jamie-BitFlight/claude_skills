@@ -25,7 +25,6 @@ from dh_core.portfolio_ledger import (
     Inventory,
     InventoryPath,
     LedgerRefusal,
-    LedgerStore,
     Mirror,
     Parent,
     ParentState,
@@ -37,6 +36,7 @@ from dh_core.portfolio_ledger import (
     ReservationState,
     Role,
     TrackerManifest,
+    _LedgerStore as LedgerStore,
     file_path_to_uri,
     file_uri_to_path,
     inventory_sha256,
@@ -441,7 +441,7 @@ def test_reconstructed_reserved_car_requires_active_owned_exclusive_reservation(
     payload = acquired.model_dump(mode="json")
     payload["reservations"][reservation.id]["state"] = "released"
 
-    with pytest.raises(ValueError, match=r"active owned exclusive reservation|terminal timestamps"):
+    with pytest.raises(ValueError, match=r"active owned exclusive reservation|terminal timestamps|terminal receipt"):
         PortfolioLedger.model_validate(payload)
 
 

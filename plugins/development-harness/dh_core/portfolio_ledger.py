@@ -289,6 +289,8 @@ class Reservation(LedgerModel):
     invalidated_at: datetime | None = None
     receipt_path: str = ""
     receipt_sha256: Sha256
+    terminal_receipt_path: str | None = None
+    terminal_receipt_sha256: Sha256 | None = None
     recovery_evidence: RecoveryEvidence | None = None
 
 
@@ -460,6 +462,8 @@ class Mirror(LedgerModel):
         """
         if (self.url is None) != (self.expected_sha256 is None):
             raise ValueError("mirror URL and expected digest must be present together")
+        if self.url is not None:
+            validate_mirror_url(self.url)
         return self
 
 
@@ -591,6 +595,10 @@ class PortfolioLedger(LedgerModel):
             Validated ledger.
         """
         for reservation in self.reservations.values():
+            if reservation.state is not ReservationState.ACTIVE and (
+                reservation.terminal_receipt_path is None or reservation.terminal_receipt_sha256 is None
+            ):
+                raise ValueError(f"concluded reservation {reservation.id!r} lacks terminal receipt identity")
             if reservation.state is ReservationState.RELEASED and (
                 reservation.released_at is None or reservation.invalidated_at is not None
             ):
@@ -646,7 +654,7 @@ class PortfolioLedger(LedgerModel):
         if len(ids) != len(set(ids)):
             raise ValueError("addendum IDs must be unique")
         for addendum in self.parent.addenda:
-            error = self.certified_addendum_error(addendum)
+            error = self._certified_addendum_error(addendum)
             if error:
                 raise ValueError(f"addendum {addendum.id!r} is invalid: {error}")
         if self.parent.state is ParentState.PARENT_CERTIFIED and self.parent.required_car_ids:
@@ -786,32 +794,66 @@ class PortfolioLedger(LedgerModel):
         error: str | None = None
         acquired: set[str] = set()
         terminal: set[str] = set()
-        previous_at: datetime | None = None
+        current_inventory: list[str] = []
+        timestamps = [event.at for event in car.history]
+        if timestamps != sorted(timestamps):
+            return "history timestamps decrease"
         for event in car.history:
-            if previous_at is not None and event.at < previous_at:
-                return "history timestamps decrease"
-            previous_at = event.at
             error = self._history_event_shape_error(car, event, legal)
-            if error is None and event.action == "reservation-acquire":
-                reservation = self.reservations[event.reservation_id or ""]
-                if reservation.id in acquired or event.actor_id != reservation.owner:
-                    error = "reservation acquisition is duplicated or has wrong authority"
-                elif (
-                    event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256
-                ):
-                    error = "reservation acquisition receipt does not match reservation"
-                acquired.add(reservation.id)
-            if error is None and event.action in {
-                "reservation-release",
-                "reservation-invalidate",
-                "reservation-recover",
-            }:
-                if event.reservation_id not in acquired or event.reservation_id in terminal:
-                    error = "reservation cycle has no acquisition or multiple terminal edges"
-                terminal.add(event.reservation_id or "")
+            if error is None:
+                error = self._cycle_projection_error(event, acquired, terminal, current_inventory)
             if error:
                 break
         return error
+
+    def _cycle_projection_error(
+        self, event: HistoryEvent, acquired: set[str], terminal: set[str], current_inventory: list[str]
+    ) -> str | None:
+        """Replay one event into cycle subjects and terminal projections.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        if event.action == "inventory":
+            current_inventory[:] = event.inventory_ids
+            return None
+        if event.action == "reservation-acquire":
+            reservation = self.reservations[event.reservation_id or ""]
+            acquired.add(reservation.id)
+            if reservation.id in terminal or event.actor_id != reservation.owner:
+                return "reservation acquisition is duplicated or has wrong authority"
+            if event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256:
+                return "reservation acquisition receipt does not match reservation"
+            if event.inventory_ids != current_inventory:
+                return "reservation acquisition inventory subject does not match current snapshot"
+        if event.action in {"reservation-release", "reservation-invalidate", "reservation-recover"}:
+            return self._terminal_projection_error(event, acquired, terminal)
+        return None
+
+    def _terminal_projection_error(self, event: HistoryEvent, acquired: set[str], terminal: set[str]) -> str | None:
+        """Compare a terminal event with its immutable reservation record.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        reservation = self.reservations[event.reservation_id or ""]
+        if reservation.id not in acquired or reservation.id in terminal:
+            return "reservation cycle has no acquisition or multiple terminal edges"
+        terminal.add(reservation.id)
+        expected_state = (
+            ReservationState.RELEASED if event.action == "reservation-release" else ReservationState.INVALIDATED
+        )
+        expected_at = (
+            reservation.released_at if expected_state is ReservationState.RELEASED else reservation.invalidated_at
+        )
+        if reservation.state is not expected_state or event.at != expected_at:
+            return "terminal history action does not match reservation terminal projection"
+        if (
+            event.receipt_path != reservation.terminal_receipt_path
+            or event.receipt_sha256 != reservation.terminal_receipt_sha256
+        ):
+            return "terminal history receipt does not match reservation terminal receipt"
+        return None
 
     def _history_event_shape_error(
         self, car: Car, event: HistoryEvent, legal: dict[str, tuple[CarState, CarState, str | None]]
@@ -993,7 +1035,7 @@ class PortfolioLedger(LedgerModel):
             addendum for addendum in self.parent.addenda if addendum.id in self.parent.required_addendum_ids
         ]
         for addendum in required_addenda:
-            error = self.certified_addendum_error(addendum)
+            error = self._certified_addendum_error(addendum)
             if error:
                 raise ValueError(f"certified parent addendum {addendum.id!r} is invalid: {error}")
         role = self.roles.get(self.parent.checker_id or "")
@@ -1019,7 +1061,7 @@ class PortfolioLedger(LedgerModel):
             raise ValueError("certified parent requires a matching immutable verdict receipt")
         return self
 
-    def certified_addendum_error(self, addendum: Addendum) -> str | None:
+    def _certified_addendum_error(self, addendum: Addendum) -> str | None:
         """Return the persisted-contract error for one required addendum.
 
         Args:
@@ -1094,6 +1136,118 @@ CANONICAL_LEDGER_PATH = Path(".tmp/reports/runtime-integrity-merge-train-ledger.
 CANONICAL_LOCK_PATH = Path(".tmp/reports/runtime-integrity-merge-train-ledger.lock")
 
 
+class RuntimeRequest(LedgerModel):
+    """Strict base for module-owned typed command requests."""
+
+    mirror_url: str | None = None
+
+
+class InventoryRequest(RuntimeRequest):
+    """Record or reactivate one immutable inventory."""
+
+    car_id: str
+    actor_id: str
+    inventory: Inventory
+
+
+class ReservationAcquireRequest(RuntimeRequest):
+    """Acquire one exact reservation."""
+
+    car_id: str
+    actor_id: str
+    reservation: Reservation
+
+
+class ReservationConclusionRequest(RuntimeRequest):
+    """Release or invalidate one reservation."""
+
+    car_id: str
+    reservation_id: str
+    actor_id: str
+    at: datetime
+    receipt_sha256: Sha256
+    receipt_path: str
+
+
+class ReservationRecoverRequest(RuntimeRequest):
+    """Recover one stale reservation."""
+
+    car_id: str
+    reservation_id: str
+    evidence: RecoveryEvidence
+
+
+class ImplementationAdmitRequest(RuntimeRequest):
+    """Admit one implementation revision."""
+
+    car_id: str
+    checker_id: str
+    implementation_sha: GitSha
+    expected_base_git_sha: GitSha
+    expected_upstream_git_sha: GitSha
+    report: str
+    receipt: EvidenceReceipt
+    commands: list[CommandEvidence]
+    at: datetime
+
+
+class IntegrateRequest(RuntimeRequest):
+    """Record one integration revision."""
+
+    car_id: str
+    integrator_id: str
+    integration_sha: GitSha
+    expected_implementation_sha: GitSha
+    receipt: EvidenceReceipt
+    at: datetime
+
+
+class AspectCertifyRequest(RuntimeRequest):
+    """Certify one integrated aspect aggregate."""
+
+    car_id: str
+    checker_id: str
+    report: str
+    receipt: EvidenceReceipt
+    at: datetime
+
+
+class AddendumRecordRequest(RuntimeRequest):
+    """Record one checked addendum."""
+
+    addendum: Addendum
+
+
+class ParentCertifyRequest(RuntimeRequest):
+    """Certify the parent portfolio revision."""
+
+    checker_id: str
+    revision: GitSha
+    report: str
+    receipt: EvidenceReceipt
+
+
+class RestoreRequest(RuntimeRequest):
+    """Restore a missing local ledger from one mirror pair."""
+
+    mirror_url: str
+    expected_sha256: Sha256
+
+
+RUNTIME_REQUEST_MODELS: dict[str, type[RuntimeRequest]] = {
+    "inventory": InventoryRequest,
+    "reservation-acquire": ReservationAcquireRequest,
+    "reservation-release": ReservationConclusionRequest,
+    "reservation-invalidate": ReservationConclusionRequest,
+    "reservation-recover": ReservationRecoverRequest,
+    "implementation-admit": ImplementationAdmitRequest,
+    "integrate": IntegrateRequest,
+    "aspect-certify": AspectCertifyRequest,
+    "addendum-record": AddendumRecordRequest,
+    "parent-certify": ParentCertifyRequest,
+}
+
+
 class LedgerRefusal(ValueError):
     """A requested mutation violated the fail-closed portfolio contract."""
 
@@ -1104,7 +1258,7 @@ class LedgerRefusal(ValueError):
         self.category = category
 
 
-class LedgerStore:
+class _LedgerStore:
     """Lock-backed atomic persistence for canonical portfolio revisions."""
 
     def __init__(self, ledger_path: Path, lock_path: Path, *, evidence_root: Path | None = None) -> None:
@@ -2264,6 +2418,8 @@ class PortfolioLedgerService:
                 "state": state,
                 "released_at": at if state is ReservationState.RELEASED else None,
                 "invalidated_at": at if state is ReservationState.INVALIDATED else None,
+                "terminal_receipt_path": receipt_path,
+                "terminal_receipt_sha256": receipt_sha256,
                 "recovery_evidence": recovery_evidence,
             }
         )
@@ -2495,9 +2651,9 @@ class PortfolioLedgerRuntime:
                 category="unavailable",
             )
         self.evidence_root = evidence_root
-        self.store = LedgerStore(ledger_path, lock_path, evidence_root=evidence_root)
+        self.store = _LedgerStore(ledger_path, lock_path, evidence_root=evidence_root)
 
-    def execute(self, command: str, request: BaseModel | None = None) -> PortfolioLedger:
+    def execute(self, command: str, request: RuntimeRequest | PortfolioLedger | None = None) -> PortfolioLedger:
         """Execute one complete locked, verified, CAS-bound command cycle.
 
         Returns:
@@ -2534,9 +2690,9 @@ class PortfolioLedgerRuntime:
                 raise LedgerRefusal(str(error), code="stale_revision", category="conflict") from error
             raise
 
-    def request_payload(self, request: BaseModel | None) -> dict[str, object]:
+    def request_payload(self, request: RuntimeRequest | PortfolioLedger | None) -> dict[str, object]:
         """Return validated model data for internal command dispatch."""
-        if request is None:
+        if not isinstance(request, RuntimeRequest):
             raise LedgerRefusal("command requires a typed request", code="invalid_request")
         return request.model_dump(mode="python")
 
