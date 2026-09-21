@@ -307,7 +307,7 @@ class Reservation(LedgerModel):
     group: str
     paths: list[str]
     owner: str
-    owner_process_id: int = Field(default_factory=os.getpid, gt=0, le=2_147_483_647)
+    owner_process_id: int = Field(default_factory=os.getppid, gt=0, le=2_147_483_647)
     state: ReservationState
     lock_path: str
     acquired_at: datetime

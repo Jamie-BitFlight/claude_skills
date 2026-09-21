@@ -512,16 +512,17 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
         receipt_sha256=SHA,
     )
     acquired = PortfolioLedgerService(minimum_ledger()).acquire_reservation("A6-G0", reservation, actor_id="maker")
-    liveness = json.dumps({"pid": os.getpid(), "alive": True}, separators=(",", ":")).encode()
+    owner_pid = os.getppid()
+    liveness = json.dumps({"pid": owner_pid, "alive": True}, separators=(",", ":")).encode()
     judgement = b'{"verdict":"PASS","reason":"owner confirmed stale"}'
     (tmp_path / "liveness.json").write_bytes(liveness)
     (tmp_path / "judgement.json").write_bytes(judgement)
     evidence = RecoveryEvidence(
         stale_owner_id="maker",
-        process_id=os.getpid(),
+        process_id=owner_pid,
         liveness_output_path="liveness.json",
         liveness_output_sha256=hashlib.sha256(liveness).hexdigest(),
-        liveness_pid=os.getpid(),
+        liveness_pid=owner_pid,
         liveness_alive=False,
         prior_receipt_sha256=SHA,
         checker_id="checker",
