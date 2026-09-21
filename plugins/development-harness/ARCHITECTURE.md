@@ -515,6 +515,11 @@ Cross-aspect merge trains use a separate portfolio ledger from the task-executio
 its permanent advisory lock are `.tmp/reports/runtime-integrity-merge-train-ledger.json` and
 `.tmp/reports/runtime-integrity-merge-train-ledger.lock`.
 
+`PortfolioLedgerRuntime.execute` is the application boundary for every command. It owns canonical
+path defaults, locking, reconstruction, evidence and mirror verification, typed transition dispatch,
+mirror rotation/publication, compare-and-swap, and accepted-state return. The CLI parses one typed
+request, calls this boundary once, and renders one compact result or stable category/code refusal.
+
 The ledger binds each car to exact base, upstream, predecessor, inventory, reservation, command
 output, receipt, and integrated revision identities. The conflict-group names are a closed
 vocabulary, and every primary writable path belongs to one group. Unknown names, aliases, duplicate
@@ -529,6 +534,12 @@ maker-independent checkers admit them, integrators record merge facts without a 
 checker certifies an aggregate, and a parent checker independent from all of those actors records the
 parent verdict. The ledger writer validates and records those immutable receipts but does not author
 their facts or judgements.
+
+Inventory and reservation registries are immutable history; car pointers identify only the current
+cycle. History events carry inventory and reservation subjects. Release preserves the reusable
+inventory, while invalidation and recovery clear it and require a newly recorded inventory before
+reacquisition. Reacquisition after a terminal edge is legal, and replay validates each cycle rather
+than treating action names as globally unique.
 
 Persistence holds the lock across compare-and-swap validation, canonical serialization, temporary
 file flush and `fsync`, atomic replacement, and directory `fsync`. A crashed writer therefore leaves
