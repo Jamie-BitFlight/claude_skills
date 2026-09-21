@@ -12,7 +12,7 @@ If the user's intent does not match the purpose of this skill, load `plugin-life
 
 # Add Documentation Updater
 
-Orchestrate adding automated documentation updater to target Claude skills. Follow the proven pattern from gitlab-skill's sync_gitlab_docs.py.
+Orchestrate adding automated documentation updater to target Claude skills from the bundled template.
 
 **Purpose**: Create a self-maintaining documentation pipeline that downloads upstream docs, processes markdown for AI consumption, transforms links for local navigation, and enforces cooldown periods between updates.
 
