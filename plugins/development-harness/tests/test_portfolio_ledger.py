@@ -367,6 +367,7 @@ def test_reservation_requires_inventory_coverage_of_every_reserved_path() -> Non
         group="CG-PORTFOLIO-LEDGER",
         paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
         owner="maker",
+        owner_process_id=os.getpid(),
         state=ReservationState.ACTIVE,
         lock_path="ledger.lock",
         acquired_at=NOW,
@@ -512,7 +513,8 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
         receipt_sha256=SHA,
     )
     acquired = PortfolioLedgerService(minimum_ledger()).acquire_reservation("A6-G0", reservation, actor_id="maker")
-    owner_pid = os.getppid()
+    owner_pid = acquired.reservations[reservation.id].owner_process_id
+    assert owner_pid is not None
     liveness = json.dumps({"pid": owner_pid, "alive": True}, separators=(",", ":")).encode()
     judgement = b'{"verdict":"PASS","reason":"owner confirmed stale"}'
     (tmp_path / "liveness.json").write_bytes(liveness)
@@ -1082,6 +1084,7 @@ def test_inventory_validation_uses_frozen_git_revision_after_worktree_edit(tmp_p
         group="CG-PORTFOLIO-LEDGER",
         paths=["product.py"],
         owner="maker",
+        owner_process_id=os.getpid(),
         state=ReservationState.ACTIVE,
         lock_path="ledger.lock",
         acquired_at=NOW,
@@ -1431,6 +1434,7 @@ def test_agent_cli_executes_reservation_transition_from_complete_json_request(tm
         group="CG-PORTFOLIO-LEDGER",
         paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
         owner="maker",
+        owner_process_id=os.getpid(),
         state=ReservationState.ACTIVE,
         lock_path=str(lock_path),
         acquired_at=NOW,
@@ -1480,6 +1484,7 @@ def test_agent_cli_immediately_rejects_untyped_extra_request_fields(tmp_path: Pa
         group="CG-PORTFOLIO-LEDGER",
         paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
         owner="maker",
+        owner_process_id=os.getpid(),
         state=ReservationState.ACTIVE,
         lock_path=str(lock_path),
         acquired_at=NOW,
@@ -1539,6 +1544,7 @@ def test_agent_cli_mirrored_transition_is_immediately_readable(tmp_path: Path) -
         group="CG-PORTFOLIO-LEDGER",
         paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
         owner="maker",
+        owner_process_id=os.getpid(),
         state=ReservationState.ACTIVE,
         lock_path=str(lock_path),
         acquired_at=NOW,
@@ -1597,6 +1603,7 @@ def test_concurrent_cli_processes_admit_only_one_incompatible_reservation(tmp_pa
             group="CG-PORTFOLIO-LEDGER",
             paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
             owner="maker",
+            owner_process_id=os.getpid(),
             state=ReservationState.ACTIVE,
             lock_path=str(lock_path),
             acquired_at=NOW,

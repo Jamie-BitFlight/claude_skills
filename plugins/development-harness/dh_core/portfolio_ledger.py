@@ -307,7 +307,7 @@ class Reservation(LedgerModel):
     group: str
     paths: list[str]
     owner: str
-    owner_process_id: int = Field(default_factory=os.getppid, gt=0, le=2_147_483_647)
+    owner_process_id: int | None = Field(default=None, gt=0, le=2_147_483_647)
     state: ReservationState
     lock_path: str
     acquired_at: datetime
@@ -643,6 +643,8 @@ class PortfolioLedger(LedgerModel):
             Validated ledger.
         """
         for reservation in self.reservations.values():
+            if reservation.owner_process_id is None:
+                raise ValueError(f"reservation {reservation.id!r} lacks explicit owner process identity")
             if reservation.state is not ReservationState.ACTIVE and (
                 reservation.terminal_receipt_path is None or reservation.terminal_receipt_sha256 is None
             ):
@@ -659,6 +661,11 @@ class PortfolioLedger(LedgerModel):
                 for event in car.history
                 if event.reservation_id == reservation.id
             }
+            history_owners = {
+                car.id
+                for car in self.cars.values()
+                if any(event.reservation_id == reservation.id for event in car.history)
+            }
             expected_terminal = (
                 "reservation-release"
                 if reservation.state is ReservationState.RELEASED
@@ -669,6 +676,8 @@ class PortfolioLedger(LedgerModel):
                 expected_terminal,
             }.issubset(actions):
                 raise ValueError(f"concluded reservation {reservation.id!r} lacks matching car history")
+            if reservation.state is not ReservationState.ACTIVE and len(history_owners) != 1:
+                raise ValueError(f"concluded reservation {reservation.id!r} must belong to exactly one car history")
         return self
 
     @model_validator(mode="after")
@@ -888,19 +897,32 @@ class PortfolioLedger(LedgerModel):
             current_inventory[:] = event.inventory_ids
             return None
         if event.action == "reservation-acquire":
-            reservation = self.reservations[event.reservation_id or ""]
-            acquired.add(reservation.id)
-            if reservation.id in terminal or event.actor_id != reservation.owner:
-                return "reservation acquisition is duplicated or has wrong authority"
-            if event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256:
-                return "reservation acquisition receipt does not match reservation"
-            if event.inventory_ids != current_inventory:
-                return "reservation acquisition inventory subject does not match current snapshot"
+            return self._acquisition_projection_error(event, acquired, terminal, current_inventory)
         if event.action in {"reservation-release", "reservation-invalidate", "reservation-recover"}:
             error = self._terminal_projection_error(event, acquired, terminal)
             if error is None and event.action in {"reservation-invalidate", "reservation-recover"}:
                 current_inventory.clear()
             return error
+        return None
+
+    def _acquisition_projection_error(
+        self, event: HistoryEvent, acquired: set[str], terminal: set[str], current_inventory: list[str]
+    ) -> str | None:
+        """Compare one acquisition event with its reservation and inventory snapshot.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        reservation = self.reservations[event.reservation_id or ""]
+        acquired.add(reservation.id)
+        if reservation.id in terminal or event.actor_id != reservation.owner:
+            return "reservation acquisition is duplicated or has wrong authority"
+        if event.at != reservation.acquired_at:
+            return "reservation acquisition timestamp does not match reservation"
+        if event.receipt_path != reservation.receipt_path or event.receipt_sha256 != reservation.receipt_sha256:
+            return "reservation acquisition receipt does not match reservation"
+        if event.inventory_ids != current_inventory:
+            return "reservation acquisition inventory subject does not match current snapshot"
         return None
 
     def _terminal_projection_error(self, event: HistoryEvent, acquired: set[str], terminal: set[str]) -> str | None:
@@ -1622,7 +1644,11 @@ class _LedgerStore:
                     "mirror path must be physically distinct from ledger and lock", code="invalid_mirror"
                 )
             if target.exists():
-                if target.read_bytes() != expected:
+                if target.is_symlink() or not target.is_file():
+                    raise LedgerRefusal(
+                        "existing file mirror target must be a regular non-symlink file", code="invalid_mirror"
+                    )
+                if self._read_file_before_deadline(target, time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS) != expected:
                     raise LedgerRefusal("mirror publication target already contains different immutable bytes")
                 return
             target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1986,6 +2012,10 @@ class PortfolioLedgerService:
             LedgerRefusal: When state, authority, group, paths, or exclusivity is invalid.
         """
         car = self.require_car(car_id)
+        if reservation.owner_process_id is None:
+            if self.evidence_root is not None:
+                raise LedgerRefusal("reservation acquisition requires explicit durable owner_process_id")
+            reservation = reservation.model_copy(update={"owner_process_id": os.getpid()})
         error = self._reservation_acquisition_error(car, reservation, actor_id)
         if error:
             raise LedgerRefusal(error)
