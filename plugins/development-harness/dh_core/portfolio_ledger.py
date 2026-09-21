@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -374,6 +375,13 @@ class Car(LedgerModel):
         """
         if self.state is CarState.RESERVED and not self.reservation_ids:
             raise ValueError("RESERVED car requires an active reservation reference")
+        if self.state in {CarState.INVENTORIED, CarState.RESERVED} and any((
+            self.implementation_sha,
+            self.implementation_checker_id,
+            self.integration_sha,
+            self.integrator_id,
+        )):
+            raise ValueError(f"{self.state} car carries future-stage evidence")
         admitted_or_later = self.state in {
             CarState.IMPLEMENTATION_ADMITTED,
             CarState.INTEGRATED,
@@ -820,6 +828,9 @@ class PortfolioLedger(LedgerModel):
             "reservation-recover",
             "implementation-admit",
         }
+        terminal_error = self._terminal_event_error(car, event)
+        if terminal_error:
+            return terminal_error
         error: str | None = None
         if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
             error = f"history chain has illegal {event.action} state or actor"
@@ -840,6 +851,35 @@ class PortfolioLedger(LedgerModel):
         elif event.action == "inventory" and (event.actor_id != car.maker_id or len(event.inventory_ids) != 1):
             error = "inventory event authority or subject is invalid"
         return error
+
+    def _terminal_event_error(self, car: Car, event: HistoryEvent) -> str | None:
+        """Validate inventory and reservation terminal event authority/state.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        if event.action == "inventory" and (event.from_state, event.to_state, event.actor_id) != (
+            CarState.INVENTORIED,
+            CarState.INVENTORIED,
+            car.maker_id,
+        ):
+            return "history chain has illegal inventory state or actor"
+        if event.action == "reservation-release":
+            valid_edge = (event.from_state, event.to_state) == (CarState.RESERVED, CarState.INVENTORIED) or (
+                event.from_state in {CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}
+                and event.to_state == event.from_state
+            )
+            if not valid_edge or event.actor_id != car.maker_id:
+                return "history chain has illegal reservation-release state or actor"
+        if event.action in {"reservation-invalidate", "reservation-recover"}:
+            role = self.roles.get(event.actor_id)
+            if (
+                (event.from_state, event.to_state) != (CarState.RESERVED, CarState.INVENTORIED)
+                or role is None
+                or role.independence_class != "checker"
+            ):
+                return f"history chain has illegal {event.action} state or actor"
+        return None
 
     def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
         """Validate reconstructed implementation-admission evidence.
@@ -1150,7 +1190,7 @@ class LedgerStore:
             if current.ledger_sha256 != expected_ledger_sha256:
                 raise LedgerRefusal("stale ledger revision; reload before retrying the transition")
             if current.mirror.url is not None:
-                self.verify_mirror()
+                self._verify_mirror_locked()
                 if ledger.mirror.url is None or ledger.mirror.url == current.mirror.url:
                     raise LedgerRefusal("mirrored transition requires a new immutable mirror URL")
             stamped = self.stamp_ledger(ledger)
@@ -1172,10 +1212,7 @@ class LedgerStore:
                     os.write(lock_fd, b"\0")
                     os.fsync(lock_fd)
                 os.lseek(lock_fd, 0, os.SEEK_SET)
-                if os.name == "nt":
-                    msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
-                else:
-                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                self._acquire_file_lock(lock_fd)
                 try:
                     yield
                 finally:
@@ -1186,6 +1223,26 @@ class LedgerStore:
                         fcntl.flock(lock_fd, fcntl.LOCK_UN)
             finally:
                 os.close(lock_fd)
+
+    def _acquire_file_lock(self, lock_fd: int) -> None:
+        """Acquire the native lock for the full valid mirror hold interval."""
+        if os.name != "nt":
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            return
+        deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS + 5
+        while True:
+            try:
+                msvcrt.locking(lock_fd, msvcrt.LK_NBLCK, 1)
+            except OSError as error:
+                if time.monotonic() >= deadline:
+                    raise LedgerRefusal(
+                        "Windows ledger lock contention exceeded valid hold interval",
+                        code="reservation_conflict",
+                        category="conflict",
+                    ) from error
+                time.sleep(0.1)
+            else:
+                return
 
     def write_locked(self, ledger: PortfolioLedger) -> PortfolioLedger:
         """Durably replace the ledger while the caller holds the advisory lock.
@@ -1429,7 +1486,8 @@ class LedgerStore:
             for receipt in car.receipts:
                 service.verify_evidence(receipt.path, receipt.sha256, "car evidence receipt")
             for event in car.history:
-                service.verify_evidence(event.receipt_path, event.receipt_sha256, "transition history receipt")
+                if event.action != "inventory":
+                    service.verify_evidence(event.receipt_path, event.receipt_sha256, "transition history receipt")
         for addendum in ledger.parent.addenda:
             service.verify_evidence(addendum.receipt.path, addendum.receipt.sha256, "addendum receipt")
         if ledger.parent.receipt is not None:
@@ -1443,6 +1501,15 @@ class LedgerStore:
 
         Raises:
             LedgerRefusal: When URL, bytes, parsing, or recorded digest disagree.
+        """
+        with self.lock():
+            return self._verify_mirror_locked()
+
+    def _verify_mirror_locked(self) -> PortfolioLedger:
+        """Verify one local/mirror snapshot while the caller holds the ledger lock.
+
+        Returns:
+            Verified local revision.
         """
         local = self.read()
         mirror_bytes = self.read_mirror_bytes(local.mirror)
@@ -2301,8 +2368,16 @@ class PortfolioLedgerService:
         """
         if self.evidence_root is None:
             raise LedgerRefusal(f"{label} requires an authoritative evidence root")
-        self.verify_evidence(path, expected_sha256, label)
-        payload = json.loads((self.evidence_root / path).read_text(encoding="utf-8"))
+        candidate = (self.evidence_root / path).resolve()
+        try:
+            candidate.relative_to(self.evidence_root.resolve())
+        except ValueError as error:
+            raise LedgerRefusal(f"{label} path escapes the evidence root: {path!r}") from error
+        content = candidate.read_bytes()
+        observed = hashlib.sha256(content).hexdigest()
+        if observed != expected_sha256:
+            raise LedgerRefusal(f"{label} digest mismatch for {path!r}")
+        payload = json.loads(content)
         if not isinstance(payload, dict):
             raise LedgerRefusal(f"{label} must be a JSON object")
         return payload
