@@ -453,6 +453,30 @@ def test_reservation_release_and_invalidate_return_to_inventory() -> None:
     assert invalidated.cars["A6-G0"].state is CarState.INVENTORIED
 
 
+def test_release_allows_second_reservation_cycle_with_history_reconstruction() -> None:
+    first = Reservation(
+        id="cycle-one",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path="ledger.lock",
+        acquired_at=NOW,
+        receipt_path="evidence/cycle-one.json",
+        receipt_sha256=SHA,
+    )
+    reserved = PortfolioLedgerService(minimum_ledger()).acquire_reservation("A6-G0", first, actor_id="maker")
+    released = PortfolioLedgerService(reserved).release_reservation(
+        "A6-G0", first.id, actor_id="maker", at=NOW, receipt_path="evidence/release.json", receipt_sha256=SHA
+    )
+    second = first.model_copy(update={"id": "cycle-two"})
+    reserved_again = PortfolioLedgerService(released).acquire_reservation("A6-G0", second, actor_id="maker")
+    reconstructed = PortfolioLedger.model_validate(reserved_again.model_dump(mode="python"))
+    assert reconstructed.cars["A6-G0"].state is CarState.RESERVED
+    assert reconstructed.cars["A6-G0"].reservation_ids == [second.id]
+    assert set(reconstructed.reservations) == {first.id, second.id}
+
+
 def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(tmp_path: Path) -> None:
     reservation = Reservation(
         id="reservation-a6-g0",
@@ -901,7 +925,7 @@ def test_atomic_store_round_trip_and_failed_replace_preserves_previous_revision(
     monkeypatch.setattr("dh_core.portfolio_ledger.os.replace", fail_replace)
     changed = written.model_copy(update={"portfolio_issue": 9999})
     with pytest.raises(OSError, match="simulated crash"):
-        store.write(changed)
+        store.write_transition(changed, expected_ledger_sha256=written.ledger_sha256)
 
     assert store.read() == written
     assert list(tmp_path.glob("*.tmp")) == []
@@ -919,6 +943,8 @@ def test_initialization_is_create_only_and_preserves_existing_history(tmp_path: 
                     at=NOW,
                     from_state="INVENTORIED",
                     to_state="INVENTORIED",
+                    inventory_ids=["inventory-a6-g0"],
+                    reservation_id=None,
                     receipt_sha256=SHA,
                 )
             ]

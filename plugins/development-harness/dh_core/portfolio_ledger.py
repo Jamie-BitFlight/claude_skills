@@ -12,12 +12,12 @@ import sys
 import tempfile
 import urllib.request
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from threading import Lock
 from typing import Annotated, Literal, overload
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -32,6 +32,7 @@ THREAD_LOCKS_GUARD = Lock()
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 GitSha = Annotated[str, Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")]
 WINDOWS_DRIVE_URI_PREFIX_LENGTH = 3
+MINIMUM_UNC_PARTS = 2
 EXTERNAL_IO_TIMEOUT_SECONDS = 30
 
 
@@ -45,8 +46,20 @@ def file_path_to_uri(path: str, *, platform: str = os.name) -> str:
     Returns:
         Canonical file URI.
     """
-    pure_path = PureWindowsPath(path) if platform == "nt" else PurePosixPath(path)
-    return pure_path.as_uri()
+    if platform == "nt":
+        pure_path = PureWindowsPath(path)
+        if not pure_path.is_absolute():
+            raise LedgerRefusal("Windows mirror path must be absolute", code="invalid_mirror")
+        if pure_path.drive.startswith("\\"):
+            authority = pure_path.drive.lstrip("\\").replace("\\", "/")
+            suffix = "/".join(pure_path.parts[1:])
+            return f"file://{authority}/{quote(suffix, safe='/')}"
+        normalized = str(pure_path).replace("\\", "/")
+        return f"file:///{quote(normalized, safe='/:')}"
+    pure_path = PurePosixPath(path)
+    if not pure_path.is_absolute():
+        raise LedgerRefusal("POSIX mirror path must be absolute", code="invalid_mirror")
+    return f"file://{quote(str(pure_path), safe='/')}"
 
 
 def file_uri_to_path(url: str, *, platform: str = os.name) -> str:
@@ -80,11 +93,34 @@ def file_uri_to_path(url: str, *, platform: str = os.name) -> str:
             native = str(PureWindowsPath(decoded))
         if not PureWindowsPath(native).is_absolute():
             raise LedgerRefusal(f"Windows mirror URI is not drive-qualified or UNC-absolute: {url!r}")
+        if native.startswith("\\") and len(PureWindowsPath(native).parts) < MINIMUM_UNC_PARTS:
+            raise LedgerRefusal("Windows UNC mirror URI requires a share", code="invalid_mirror")
         return native
-    native = f"//{parsed.netloc}{decoded}" if parsed.netloc else decoded
+    if parsed.netloc and parsed.netloc.lower() != "localhost":
+        raise LedgerRefusal("POSIX file mirror authority must be empty or localhost", code="invalid_mirror")
+    native = decoded
     if not PurePosixPath(native).is_absolute():
         raise LedgerRefusal(f"POSIX mirror URI is not absolute: {url!r}")
     return native
+
+
+def validate_mirror_url(url: str) -> str:
+    """Return a normalized supported mirror URL or refuse ambiguity."""
+    if "\x00" in url or "%2f" in url.lower() or (os.name == "nt" and "%5c" in url.lower()):
+        raise LedgerRefusal("mirror URL contains forbidden encoded separators or NUL", code="invalid_mirror")
+    parsed = urlparse(url)
+    if parsed.scheme not in {"file", "https"} or parsed.query or parsed.fragment or parsed.username or parsed.password:
+        raise LedgerRefusal("mirror URL has unsupported scheme or components", code="invalid_mirror")
+    try:
+        if parsed.port is not None:
+            raise LedgerRefusal("mirror URL ports are not supported", code="invalid_mirror")
+    except ValueError as error:
+        raise LedgerRefusal("mirror URL has an invalid port", code="invalid_mirror") from error
+    if parsed.scheme == "file":
+        file_uri_to_path(url)
+    elif not parsed.hostname:
+        raise LedgerRefusal("HTTPS mirror URL requires a hostname", code="invalid_mirror")
+    return url
 
 
 CANONICAL_CONFLICT_GROUP_IDS = frozenset({
@@ -294,6 +330,8 @@ class HistoryEvent(LedgerModel):
     at: datetime
     from_state: str
     to_state: str
+    inventory_ids: list[str]
+    reservation_id: str | None
     receipt_path: str = ""
     receipt_sha256: Sha256
 
@@ -477,6 +515,11 @@ class PortfolioLedger(LedgerModel):
         for key, inventory in self.inventories.items():
             if key != inventory.id:
                 raise ValueError(f"inventory key {key!r} does not match inventory id {inventory.id!r}")
+            names = [path.path for path in inventory.paths]
+            if not names or names != sorted(names) or len(names) != len(set(names)):
+                raise ValueError(f"inventory {inventory.id!r} paths must be non-empty, sorted, and unique")
+            if any(Path(name).is_absolute() or ".." in Path(name).parts for name in names):
+                raise ValueError(f"inventory {inventory.id!r} contains an unsafe path")
             if inventory.sha256 != inventory_sha256(inventory.paths):
                 raise ValueError(f"inventory {inventory.id!r} digest mismatch")
         return self
@@ -499,6 +542,13 @@ class PortfolioLedger(LedgerModel):
         undefined = set(self.parent.required_car_ids) - set(self.cars)
         if undefined:
             raise ValueError(f"parent references undefined required cars: {sorted(undefined)}")
+        if len(self.parent.required_car_ids) != len(set(self.parent.required_car_ids)):
+            raise ValueError("parent required car IDs must be unique")
+        if len(self.parent.required_addendum_ids) != len(set(self.parent.required_addendum_ids)):
+            raise ValueError("parent required addendum IDs must be unique")
+        reservation_keys = {key for key, value in self.reservations.items() if key != value.id}
+        if reservation_keys:
+            raise ValueError(f"reservation keys must equal record IDs: {sorted(reservation_keys)}")
         return self
 
     @model_validator(mode="after")
@@ -509,7 +559,11 @@ class PortfolioLedger(LedgerModel):
             Validated ledger.
         """
         integrated_shas = {car.integration_sha for car in self.cars.values() if car.integration_sha is not None}
+        if len(integrated_shas) != len([car for car in self.cars.values() if car.integration_sha is not None]):
+            raise ValueError("integration SHAs must identify exactly one car")
         for car in self.cars.values():
+            if car.integration_sha is not None and car.integration_sha in car.predecessor_shas:
+                raise ValueError(f"car {car.id!r} has a predecessor self-edge")
             missing_predecessors = set(car.predecessor_shas) - integrated_shas
             if missing_predecessors:
                 raise ValueError(f"car {car.id!r} references absent predecessor SHAs: {sorted(missing_predecessors)}")
@@ -611,7 +665,7 @@ class PortfolioLedger(LedgerModel):
         }
         required = required_by_state[car.state]
         actions = [event.action for event in car.history]
-        core_actions = {"reservation-acquire", "implementation-admit", "integrate", "aspect-certify"}
+        core_actions = {"implementation-admit", "integrate", "aspect-certify"}
         if any(actions.count(action) > 1 for action in core_actions):
             return "history chain duplicates a core transition"
         positions = [actions.index(action) for action in required if action in actions]
@@ -639,17 +693,39 @@ class PortfolioLedger(LedgerModel):
             "integrate": (CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, car.integrator_id),
             "aspect-certify": (CarState.INTEGRATED, CarState.ASPECT_CERTIFIED, car.aspect_checker_id),
         }
+        error: str | None = None
         for event in car.history:
             if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
-                return f"history chain has illegal {event.action} state or actor"
-            if event.action not in legal and event.action not in {
+                error = f"history chain has illegal {event.action} state or actor"
+            elif event.action not in legal and event.action not in {
                 "reservation-release",
                 "reservation-invalidate",
                 "reservation-recover",
                 "inventory",
             }:
-                return f"history chain contains unknown action {event.action!r}"
-        return None
+                error = f"history chain contains unknown action {event.action!r}"
+            elif event.action in {"inventory", "reservation-acquire"} and not event.inventory_ids:
+                error = f"history chain {event.action} lacks inventory subject"
+            elif event.action not in {"inventory", "reservation-acquire"} and event.inventory_ids:
+                error = f"history chain {event.action} carries forbidden inventory subjects"
+            reservation_actions = {
+                "reservation-acquire",
+                "reservation-release",
+                "reservation-invalidate",
+                "reservation-recover",
+                "implementation-admit",
+            }
+            if error is None and event.action in reservation_actions and event.reservation_id is None:
+                error = f"history chain {event.action} lacks reservation subject"
+            elif error is None and event.action not in reservation_actions and event.reservation_id is not None:
+                error = f"history chain {event.action} carries forbidden reservation subject"
+            elif error is None and event.reservation_id is not None and event.reservation_id not in self.reservations:
+                error = f"history chain references unknown reservation {event.reservation_id!r}"
+            elif error is None and any(inventory_id not in self.inventories for inventory_id in event.inventory_ids):
+                error = "history chain references unknown inventory"
+            if error:
+                break
+        return error
 
     def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
         """Validate reconstructed implementation-admission evidence.
@@ -867,6 +943,12 @@ CANONICAL_LOCK_PATH = Path(".tmp/reports/runtime-integrity-merge-train-ledger.lo
 class LedgerRefusal(ValueError):
     """A requested mutation violated the fail-closed portfolio contract."""
 
+    def __init__(self, message: str, *, code: str = "invalid_transition", category: str = "contract") -> None:
+        """Create a stable caller-action refusal."""
+        super().__init__(message)
+        self.code = code
+        self.category = category
+
 
 class LedgerStore:
     """Lock-backed atomic persistence for canonical portfolio revisions."""
@@ -900,6 +982,8 @@ class LedgerStore:
             raise LedgerRefusal("local ledger digest mismatch")
         if ledger.mirror.expected_sha256 is not None and ledger.mirror.expected_sha256 != ledger.ledger_sha256:
             raise LedgerRefusal("recorded mirror digest does not match local ledger identity")
+        if (ledger.mirror.url is None) != (ledger.mirror.expected_sha256 is None):
+            raise LedgerRefusal("persisted mirror URL and digest must be present together", code="invalid_mirror")
         self.validate_external_evidence(ledger)
         return ledger
 
@@ -921,7 +1005,7 @@ class LedgerStore:
             return self.write_locked(ledger)
 
     def write(self, ledger: PortfolioLedger) -> PortfolioLedger:
-        """Stamp and atomically replace one canonical ledger revision.
+        """Create the first revision; accepted state is never unconditionally replaced.
 
         Args:
             ledger: Validated transition result.
@@ -932,8 +1016,7 @@ class LedgerStore:
         Raises:
             OSError: When durable write or atomic replacement fails.
         """
-        with self.lock():
-            return self.write_locked(ledger)
+        return self.initialize(ledger)
 
     def write_transition(self, ledger: PortfolioLedger, *, expected_ledger_sha256: str | None) -> PortfolioLedger:
         """Atomically compare and replace a transition result.
@@ -1006,7 +1089,15 @@ class LedgerStore:
         Returns:
             Stamped ledger ready for mirror publication and local commit.
         """
+        if ledger.mirror.url is not None and ledger.mirror.expected_sha256 is None:
+            ledger = ledger.model_copy(
+                update={"mirror": ledger.mirror.model_copy(update={"expected_sha256": "0" * 64})}
+            )
         ledger = PortfolioLedger.model_validate(ledger.model_dump(mode="python"))
+        if ledger.mirror.expected_sha256 is not None and ledger.mirror.url is None:
+            raise LedgerRefusal("mirror digest without URL is invalid", code="invalid_mirror")
+        if ledger.mirror.url is not None:
+            validate_mirror_url(ledger.mirror.url)
         self.validate_external_evidence(ledger)
         digest = ledger.identity_sha256()
         mirror = ledger.mirror
@@ -1050,6 +1141,10 @@ class LedgerStore:
         parsed = urlparse(stamped.mirror.url)
         if parsed.scheme == "file":
             target = Path(file_uri_to_path(stamped.mirror.url))
+            if target.resolve() in {self.ledger_path.resolve(), self.lock_path.resolve()}:
+                raise LedgerRefusal(
+                    "mirror path must be physically distinct from ledger and lock", code="invalid_mirror"
+                )
             if target.exists():
                 if target.read_bytes() != expected:
                     raise LedgerRefusal("mirror publication target already contains different immutable bytes")
@@ -1262,6 +1357,8 @@ class LedgerStore:
                 raise LedgerRefusal("local ledger exists; neither local nor mirror may win automatically")
             mirror_bytes = self.read_url(mirror_url)
             mirror = self.validate_mirror_bytes(mirror_bytes)
+            if validate_mirror_url(mirror_url) != validate_mirror_url(mirror.mirror.url or ""):
+                raise LedgerRefusal("external and embedded mirror URLs do not match", code="invalid_mirror")
             if expected_sha256 is None or mirror.ledger_sha256 != expected_sha256:
                 raise LedgerRefusal("mirror identity does not match the externally recorded digest")
             if self.ledger_path.exists():
@@ -1359,6 +1456,8 @@ class PortfolioLedgerService:
             at=reservation.acquired_at,
             from_state=car.state,
             to_state=CarState.RESERVED,
+            inventory_ids=list(car.inventory_ids),
+            reservation_id=reservation.id,
             receipt_path=reservation.receipt_path,
             receipt_sha256=reservation.receipt_sha256,
         )
@@ -1436,10 +1535,8 @@ class PortfolioLedgerService:
             raise LedgerRefusal("inventory can only be recorded in INVENTORIED state")
         if actor_id != car.maker_id:
             raise LedgerRefusal("only the declared maker may record its inventory")
-        if inventory.id in self.ledger.inventories:
-            raise LedgerRefusal(f"inventory {inventory.id!r} already exists")
-        if inventory.revision != car.upstream_git_sha:
-            raise LedgerRefusal("inventory revision is stale relative to the car upstream SHA")
+        if inventory.id in self.ledger.inventories and self.ledger.inventories[inventory.id] != inventory:
+            raise LedgerRefusal(f"inventory {inventory.id!r} already exists with different immutable content")
         path_names = [item.path for item in inventory.paths]
         if path_names != sorted(path_names) or len(path_names) != len(set(path_names)):
             raise LedgerRefusal("inventory paths must be sorted and unique")
@@ -1449,7 +1546,24 @@ class PortfolioLedgerService:
             raise LedgerRefusal("inventory digest does not match its exact paths")
         for path in inventory.paths:
             self.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} content")
-        updated_car = car.model_copy(update={"inventory_ids": [*car.inventory_ids, inventory.id]})
+        event = HistoryEvent(
+            action="inventory",
+            actor_id=actor_id,
+            at=datetime.now(UTC),
+            from_state=CarState.INVENTORIED,
+            to_state=CarState.INVENTORIED,
+            inventory_ids=[inventory.id],
+            reservation_id=None,
+            receipt_path=inventory.paths[0].path,
+            receipt_sha256=inventory.paths[0].sha256,
+        )
+        updated_car = car.model_copy(
+            update={
+                "inventory_ids": [inventory.id],
+                "upstream_git_sha": inventory.revision,
+                "history": [*car.history, event],
+            }
+        )
         return self.ledger.model_copy(
             update={
                 "inventories": {**self.ledger.inventories, inventory.id: inventory},
@@ -1659,6 +1773,8 @@ class PortfolioLedgerService:
             at=at,
             from_state=car.state,
             to_state=CarState.IMPLEMENTATION_ADMITTED,
+            inventory_ids=[],
+            reservation_id=active_reservations[0].id,
             receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
@@ -1731,6 +1847,8 @@ class PortfolioLedgerService:
             at=at,
             from_state=car.state,
             to_state=CarState.INTEGRATED,
+            inventory_ids=[],
+            reservation_id=None,
             receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
@@ -1804,6 +1922,8 @@ class PortfolioLedgerService:
             at=at,
             from_state=car.state,
             to_state=CarState.ASPECT_CERTIFIED,
+            inventory_ids=[],
+            reservation_id=None,
             receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
@@ -1971,13 +2091,22 @@ class PortfolioLedgerService:
             at=at,
             from_state=car.state,
             to_state=target_state,
+            inventory_ids=[],
+            reservation_id=reservation.id,
             receipt_path=receipt_path,
             receipt_sha256=receipt_sha256,
         )
         updated_car = car.model_copy(
             update={
                 "state": target_state,
-                "reservation_ids": [item for item in car.reservation_ids if item != reservation.id],
+                "reservation_ids": (
+                    car.reservation_ids
+                    if car.state is not CarState.RESERVED
+                    else [item for item in car.reservation_ids if item != reservation.id]
+                ),
+                "inventory_ids": []
+                if action in {"reservation-invalidate", "reservation-recover"}
+                else car.inventory_ids,
                 "history": [*car.history, event],
             }
         )
@@ -2154,3 +2283,160 @@ class PortfolioLedgerService:
         if car is None:
             raise LedgerRefusal(f"undefined car {car_id!r}")
         return car
+
+
+class PortfolioLedgerRuntime:
+    """Single application facade owning every accepted ledger command cycle."""
+
+    def __init__(
+        self, *, evidence_root: Path, ledger_path: Path = CANONICAL_LEDGER_PATH, lock_path: Path = CANONICAL_LOCK_PATH
+    ) -> None:
+        """Configure authoritative evidence and canonical storage."""
+        self.evidence_root = evidence_root
+        self.store = LedgerStore(ledger_path, lock_path, evidence_root=evidence_root)
+
+    def execute(self, command: str, request: BaseModel | None = None) -> PortfolioLedger:
+        """Execute one complete locked, verified, CAS-bound command cycle.
+
+        Returns:
+            Accepted reconstructed ledger revision.
+        """
+        if command == "initialize":
+            if not isinstance(request, PortfolioLedger):
+                raise LedgerRefusal("initialize requires a PortfolioLedger request", code="invalid_request")
+            return self.store.initialize(request)
+        if command == "restore":
+            payload = self.request_payload(request)
+            return self.store.restore_from_mirror(
+                mirror_url=str(payload["mirror_url"]), expected_sha256=str(payload["expected_sha256"])
+            )
+        ledger = self.store.read()
+        if ledger.mirror.url is not None:
+            ledger = self.store.verify_mirror()
+        if command == "show":
+            return ledger
+        if command == "verify-mirror":
+            return self.store.verify_mirror()
+        payload = self.request_payload(request)
+        service = PortfolioLedgerService(ledger, evidence_root=self.evidence_root)
+        transitioned = self.dispatch_transition(command, payload, service)
+        mirror_url = payload.get("mirror_url")
+        if mirror_url is not None:
+            transitioned = transitioned.model_copy(update={"mirror": Mirror(url=str(mirror_url))})
+        try:
+            return self.store.write_transition(transitioned, expected_ledger_sha256=ledger.ledger_sha256)
+        except LedgerRefusal as error:
+            if "stale ledger revision" in str(error):
+                raise LedgerRefusal(str(error), code="stale_revision", category="conflict") from error
+            raise
+
+    def request_payload(self, request: BaseModel | None) -> dict[str, object]:
+        """Return validated model data for internal command dispatch."""
+        if request is None:
+            raise LedgerRefusal("command requires a typed request", code="invalid_request")
+        return request.model_dump(mode="python")
+
+    def dispatch_transition(
+        self, command: str, payload: dict[str, object], service: PortfolioLedgerService
+    ) -> PortfolioLedger:
+        """Dispatch validated request data to one domain transition.
+
+        Returns:
+            Transitioned in-memory ledger.
+        """
+        if command in {
+            "inventory",
+            "reservation-acquire",
+            "reservation-release",
+            "reservation-invalidate",
+            "reservation-recover",
+        }:
+            return self._dispatch_work_cycle(command, payload, service)
+        return self._dispatch_delivery(command, payload, service)
+
+    def _dispatch_work_cycle(
+        self, command: str, payload: dict[str, object], service: PortfolioLedgerService
+    ) -> PortfolioLedger:
+        """Dispatch inventory and reservation-cycle commands.
+
+        Returns:
+            Transitioned ledger.
+        """
+        if command == "inventory":
+            return service.record_inventory(
+                str(payload["car_id"]),
+                Inventory.model_validate(payload["inventory"]),
+                actor_id=str(payload["actor_id"]),
+            )
+        if command == "reservation-acquire":
+            return service.acquire_reservation(
+                str(payload["car_id"]),
+                Reservation.model_validate(payload["reservation"]),
+                actor_id=str(payload["actor_id"]),
+            )
+        if command in {"reservation-release", "reservation-invalidate"}:
+            operation = (
+                service.release_reservation if command == "reservation-release" else service.invalidate_reservation
+            )
+            return operation(
+                str(payload["car_id"]),
+                str(payload["reservation_id"]),
+                actor_id=str(payload["actor_id"]),
+                at=datetime.fromisoformat(str(payload["at"])),
+                receipt_sha256=str(payload["receipt_sha256"]),
+                receipt_path=str(payload["receipt_path"]),
+            )
+        return service.recover_reservation(
+            str(payload["car_id"]), str(payload["reservation_id"]), RecoveryEvidence.model_validate(payload["evidence"])
+        )
+
+    def _dispatch_delivery(
+        self, command: str, payload: dict[str, object], service: PortfolioLedgerService
+    ) -> PortfolioLedger:
+        """Dispatch admission, integration, and certification commands.
+
+        Returns:
+            Transitioned ledger.
+        """
+        if command == "implementation-admit":
+            command_rows = payload["commands"]
+            if not isinstance(command_rows, list):
+                raise LedgerRefusal("commands must be a list", code="invalid_request")
+            return service.admit_implementation(
+                str(payload["car_id"]),
+                checker_id=str(payload["checker_id"]),
+                implementation_sha=str(payload["implementation_sha"]),
+                expected_base_git_sha=str(payload["expected_base_git_sha"]),
+                expected_upstream_git_sha=str(payload["expected_upstream_git_sha"]),
+                report=str(payload["report"]),
+                receipt=EvidenceReceipt.model_validate(payload["receipt"]),
+                commands=[CommandEvidence.model_validate(item) for item in command_rows],
+                at=datetime.fromisoformat(str(payload["at"])),
+            )
+        if command == "integrate":
+            return service.integrate(
+                str(payload["car_id"]),
+                integrator_id=str(payload["integrator_id"]),
+                integration_sha=str(payload["integration_sha"]),
+                expected_implementation_sha=str(payload["expected_implementation_sha"]),
+                receipt=EvidenceReceipt.model_validate(payload["receipt"]),
+                at=datetime.fromisoformat(str(payload["at"])),
+            )
+        if command == "aspect-certify":
+            return service.certify_aspect(
+                str(payload["car_id"]),
+                checker_id=str(payload["checker_id"]),
+                report=str(payload["report"]),
+                receipt=EvidenceReceipt.model_validate(payload["receipt"]),
+                at=datetime.fromisoformat(str(payload["at"])),
+            )
+        if command == "addendum-record":
+            return service.record_addendum(Addendum.model_validate(payload["addendum"]))
+        if command == "parent-certify":
+            return service.certify_parent(
+                checker_id=str(payload["checker_id"]),
+                revision=str(payload["revision"]),
+                report=str(payload["report"]),
+                receipt=EvidenceReceipt.model_validate(payload["receipt"]),
+            )
+        raise LedgerRefusal(f"unsupported runtime transition {command!r}", code="invalid_request")

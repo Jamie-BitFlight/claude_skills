@@ -25,14 +25,16 @@ PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PLUGIN_ROOT))
 
 from dh_core.portfolio_ledger import (
+    CANONICAL_LEDGER_PATH,
+    CANONICAL_LOCK_PATH,
     Addendum,
     CommandEvidence,
     EvidenceReceipt,
     Inventory,
     LedgerRefusal,
-    LedgerStore,
     Mirror,
     PortfolioLedger,
+    PortfolioLedgerRuntime,
     PortfolioLedgerService,
     RecoveryEvidence,
     Reservation,
@@ -178,8 +180,8 @@ def parser() -> argparse.ArgumentParser:
         Configured parser.
     """
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("--ledger", type=Path, required=True)
-    result.add_argument("--lock", type=Path, required=True)
+    result.add_argument("--ledger", type=Path, default=CANONICAL_LEDGER_PATH)
+    result.add_argument("--lock", type=Path, default=CANONICAL_LOCK_PATH)
     result.add_argument("--evidence-root", type=Path, default=Path.cwd())
     result.add_argument("command", choices=COMMANDS)
     result.add_argument("--request", type=Path)
@@ -286,32 +288,28 @@ def main(argv: list[str] | None = None) -> int:
         Process exit code.
     """
     args = parser().parse_args(argv)
-    store = LedgerStore(args.ledger, args.lock, evidence_root=args.evidence_root)
     try:
+        runtime = PortfolioLedgerRuntime(evidence_root=args.evidence_root, ledger_path=args.ledger, lock_path=args.lock)
         if args.command == "initialize":
-            ledger = store.initialize(request_json(args.request, args.command, PortfolioLedger))
+            request: BaseModel | None = request_json(args.request, args.command, PortfolioLedger)
         elif args.command == "restore":
             request = request_json(args.request, args.command, RestoreRequest)
-            ledger = store.restore_from_mirror(mirror_url=request.mirror_url, expected_sha256=request.expected_sha256)
+        elif args.command in {"show", "verify-mirror"}:
+            request = None
         else:
-            ledger = store.read()
-            if ledger.mirror.url is not None:
-                ledger = store.verify_mirror()
-            if args.command == "verify-mirror":
-                ledger = store.verify_mirror()
-            elif args.command != "show":
-                expected_digest = ledger.ledger_sha256
-                request_model = TRANSITION_REQUEST_MODELS[args.command]
-                ledger = transition(
-                    args.command,
-                    ledger,
-                    request_json(args.request, args.command, request_model),
-                    evidence_root=args.evidence_root,
-                )
-                ledger = store.write_transition(ledger, expected_ledger_sha256=expected_digest)
+            request_model = TRANSITION_REQUEST_MODELS[args.command]
+            request = request_json(args.request, args.command, request_model)
+        ledger = runtime.execute(args.command, request)
         output_json(ledger.model_dump(mode="json"))
-    except (KeyError, LedgerRefusal, OSError, TypeError, ValueError) as error:
-        output_json({"error": str(error), "error_type": type(error).__name__}, stream=sys.stderr)
+    except LedgerRefusal as error:
+        output_json(
+            {"error": {"category": error.category, "code": error.code, "message": str(error)}}, stream=sys.stderr
+        )
+        return 1
+    except (KeyError, OSError, TypeError, ValueError) as error:
+        output_json(
+            {"error": {"category": "contract", "code": "invalid_request", "message": str(error)}}, stream=sys.stderr
+        )
         return 1
     return 0
 
