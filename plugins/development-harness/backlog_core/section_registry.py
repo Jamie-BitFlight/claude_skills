@@ -23,17 +23,16 @@ without risking a cycle.
 
 What a section is
 ------------------
-A section is a **named channel**: a producer writes a report into it, and a named consumer
-reads that report back by name.
+A section is a **named channel**. A producer writes a report into it, and a consumer reads
+that report back by name.
 
-The name is the address, and it exists for economy. A groomed item is far larger than any
-one agent can read affordably, so no consumer reads the whole item — each fetches only the
-channels its own stage needs. A name no consumer addresses carries content nobody receives,
-which is why registration follows a reader rather than preceding one.
+The intention is economy. A groomed item grows larger than one agent can read affordably,
+so the name lets a consumer fetch the channels its own stage needs and leave the rest
+unread. A name that no consumer addresses holds content that reaches no reader.
 
-Dynamic channels need no entry here. A producer may open one this registry does not list;
-its name then travels to the consumer inside an instruction that names it — "read the
-``diffusion_images`` section when planning the image work".
+Dynamic channels are available and need no entry here. A producer may open one this
+registry does not list, and its name then travels to the consumer inside an instruction
+that names it — "read the ``diffusion_images`` section when planning the image work".
 
 How to add a new canonical section
 -----------------------------------
