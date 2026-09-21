@@ -343,3 +343,4 @@ This fills a gap in the research directory's MCP ecosystem coverage:
 | [tolaria](../ai-design-tools/tolaria.md) | ai-design-tools | referenced by tolaria (ai-design-tools) |
 | [repowise](./repowise.md) | mcp-ecosystem | referenced by repowise (mcp-ecosystem) |
 | [claude-scientific-skills](../skill-generation-tools/claude-scientific-skills.md) | skill-generation-tools | referenced by claude-scientific-skills (skill-generation-tools) |
+| [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
