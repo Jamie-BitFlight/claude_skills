@@ -272,7 +272,11 @@ docker run -p 3333:3333 -v wigolo-data:/data \
 - **Browser Automation and Headless Testing** → `.claude/skills/agent-browser/SKILL.md`
   - Term: `browser automation`
   - Today: "Every browser automation follows this pattern:"
-  - Change: Integrate wigolo's browser pool and fetch escalation as an alternative backend for agent-browser tasks; use when local headless browser management with intelligent tiering (HTTP → browser escalation → failure reporting) is needed for more complex research or site interaction workflows.
+  - Change: Consider wigolo's fetch escalation (HTTP → headless browser → explicit `blocked_by_challenge` failure)
+    for the page-retrieval half of research tasks, where the goal is getting readable content off a site that
+    resists plain HTTP. It does not replace `agent-browser` for interaction: wigolo's ten tools are
+    search/fetch/crawl/extract/cache/find_similar/research/agent/diff/watch, none of which snapshots or acts on
+    DOM elements, so anything that clicks, fills, or selects stays with `agent-browser`.
 
 ### Patterns Worth Adopting
 
