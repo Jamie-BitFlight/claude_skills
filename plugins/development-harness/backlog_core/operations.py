@@ -1157,9 +1157,12 @@ def _warn_unregistered_section(name: str, key: str, output: Output | None) -> No
     """
     message = (
         f"Unregistered section name {name!r} stored under fallback key {key!r}. "
-        "Register it in backlog_core/section_registry.py (SectionKey + SECTION_HEADING) "
-        "if this is a legitimate recurring section — see ARCHITECTURE.md 'Module: "
-        "section_registry.py' for the template."
+        "No consumer can address this content by name, so whatever was written here is "
+        "unreachable. Name the consumer that reads this section and register the name in "
+        "backlog_core/section_registry.py (SectionKey + SECTION_HEADING), or stop writing "
+        "the section. Registering a name that nothing reads silences this warning and "
+        "leaves the content just as unreachable — see that module's docstring, 'What a "
+        "section is, and when to register one'."
     )
     print(message, file=sys.stderr)
     if output is not None:
