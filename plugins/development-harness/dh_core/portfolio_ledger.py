@@ -14,6 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 from threading import Lock
 from typing import Annotated, Literal
+from urllib.parse import unquote, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -189,7 +190,9 @@ class Reservation(LedgerModel):
     acquired_at: datetime
     released_at: datetime | None = None
     invalidated_at: datetime | None = None
+    receipt_path: str = ""
     receipt_sha256: Sha256
+    recovery_evidence: RecoveryEvidence | None = None
 
 
 class RecoveryEvidence(LedgerModel):
@@ -233,6 +236,7 @@ class HistoryEvent(LedgerModel):
     at: datetime
     from_state: str
     to_state: str
+    receipt_path: str = ""
     receipt_sha256: Sha256
 
 
@@ -368,6 +372,13 @@ class PortfolioLedger(LedgerModel):
         expected_rows = {f"R{number:02d}" for number in range(1, 22)}
         if set(self.correction_rows) != expected_rows:
             raise ValueError("correction_rows must contain exactly R01 through R21")
+        invalid_rows = [
+            row_id
+            for row_id, row in self.correction_rows.items()
+            if row.verdict is not Verdict.PASSED or row.owner == row.reviewer or not row.artifact
+        ]
+        if invalid_rows:
+            raise ValueError(f"correction rows require passed independent review: {sorted(invalid_rows)}")
         for key, role in self.roles.items():
             if key != role.id:
                 raise ValueError(f"role key {key!r} does not match role id {role.id!r}")
@@ -384,6 +395,9 @@ class PortfolioLedger(LedgerModel):
         unknown_groups = set(self.conflict_groups) - CANONICAL_CONFLICT_GROUP_IDS
         if unknown_groups:
             raise ValueError(f"unknown conflict groups or aliases: {sorted(unknown_groups)}")
+        if set(self.conflict_groups) != CANONICAL_CONFLICT_GROUP_IDS:
+            missing = CANONICAL_CONFLICT_GROUP_IDS - set(self.conflict_groups)
+            raise ValueError(f"complete canonical conflict-group registry is required; missing {sorted(missing)}")
         for key, group in self.conflict_groups.items():
             if key != group.id:
                 raise ValueError(f"conflict-group key {key!r} does not match group id {group.id!r}")
@@ -430,6 +444,171 @@ class PortfolioLedger(LedgerModel):
         return self
 
     @model_validator(mode="after")
+    def validate_car_transition_evidence(self) -> PortfolioLedger:
+        """Reject reconstructed cars that bypass transition authority or evidence.
+
+        Returns:
+            Validated ledger.
+        """
+        for car in self.cars.values():
+            error = self.car_transition_error(car)
+            if error:
+                raise ValueError(f"car {car.id!r} lacks transition-equivalent invariants: {error}")
+        return self
+
+    @model_validator(mode="after")
+    def validate_reservation_attachments(self) -> PortfolioLedger:
+        """Reject reconstructed reservations that bypass ownership and exclusion.
+
+        Returns:
+            Validated ledger.
+        """
+        active_paths: dict[str, str] = {}
+        for car in self.cars.values():
+            undefined = set(car.reservation_ids) - set(self.reservations)
+            if undefined:
+                raise ValueError(f"car {car.id!r} references undefined reservations: {sorted(undefined)}")
+            if car.state is CarState.RESERVED:
+                attached = [self.reservations[item] for item in car.reservation_ids]
+                if not attached or any(reservation.state is not ReservationState.ACTIVE for reservation in attached):
+                    raise ValueError(f"car {car.id!r} lacks an active owned exclusive reservation")
+        for reservation in self.reservations.values():
+            if reservation.state is not ReservationState.ACTIVE:
+                continue
+            owners = [car for car in self.cars.values() if reservation.id in car.reservation_ids]
+            if len(owners) != 1 or self.active_reservation_error(reservation, owners[0]):
+                raise ValueError(f"reservation {reservation.id!r} is not an active owned exclusive reservation")
+            for path in reservation.paths:
+                if path in active_paths:
+                    raise ValueError(
+                        f"active reservation path {path!r} is shared by {active_paths[path]!r} and {reservation.id!r}"
+                    )
+                active_paths[path] = reservation.id
+        return self
+
+    def active_reservation_error(self, reservation: Reservation, car: Car) -> str | None:
+        """Return the reconstructed-contract error for one active reservation."""
+        group = self.conflict_groups.get(reservation.group)
+        if not reservation.receipt_path:
+            return "reservation receipt path is missing"
+        if reservation.owner != car.maker_id or car.state is CarState.INVENTORIED:
+            return "owner or car state mismatch"
+        if group is None or sorted(group.paths) != sorted(reservation.paths):
+            return "group or exact path mismatch"
+        inventories = [self.inventories[item] for item in car.inventory_ids]
+        if not inventories or any(inventory.revision != car.upstream_git_sha for inventory in inventories):
+            return "missing or stale inventory"
+        inventoried_paths = {path.path for inventory in inventories for path in inventory.paths}
+        if set(reservation.paths) != inventoried_paths:
+            return "bidirectional inventory path coverage mismatch"
+        return None
+
+    def car_transition_error(self, car: Car) -> str | None:
+        """Return an authority/evidence error for one reconstructed car.
+
+        Args:
+            car: Reconstructed car.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        maker = self.roles.get(car.maker_id)
+        if maker is None or maker.independence_class != "maker":
+            return "maker lacks maker authority"
+        if car.state in {CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}:
+            error = self.implementation_evidence_error(car, maker)
+            if error:
+                return error
+        if car.state in {CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}:
+            error = self.integration_evidence_error(car, maker)
+            if error:
+                return error
+        if car.state is CarState.ASPECT_CERTIFIED:
+            return self.aspect_evidence_error(car, maker)
+        return None
+
+    def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
+        """Validate reconstructed implementation-admission evidence.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        checker = self.roles.get(car.implementation_checker_id or "")
+        if checker is None or checker.independence_class != "checker" or checker.session == maker.session:
+            return "implementation checker is not independent from maker identity and session"
+        if not car.commands or any(command.exit_code != 0 for command in car.commands):
+            return "implementation commands are missing or not green"
+        matching = [
+            receipt
+            for receipt in car.receipts
+            if receipt.author_id == checker.id
+            and receipt.verdict is Verdict.PASSED
+            and receipt.observed_revision == car.implementation_sha
+            and receipt.path == car.implementation_report
+        ]
+        if not matching:
+            return "implementation admission receipt does not match checker, report, verdict, and revision"
+        return None
+
+    def integration_evidence_error(self, car: Car, maker: Role) -> str | None:
+        """Validate reconstructed integration evidence.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        checker = self.roles.get(car.implementation_checker_id or "")
+        integrator = self.roles.get(car.integrator_id or "")
+        excluded_sessions = {maker.session, checker.session if checker else ""}
+        if (
+            integrator is None
+            or integrator.independence_class != "integrator"
+            or integrator.session in excluded_sessions
+        ):
+            return "integrator is not independent from maker and implementation checker"
+        matching = [
+            receipt
+            for receipt in car.receipts
+            if receipt.author_id == integrator.id
+            and receipt.verdict is Verdict.RECORDED
+            and receipt.observed_revision == car.integration_sha
+        ]
+        if not matching:
+            return "integration factual receipt does not match integrator and revision"
+        return None
+
+    def aspect_evidence_error(self, car: Car, maker: Role) -> str | None:
+        """Validate reconstructed aspect-certification evidence.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        checker = self.roles.get(car.implementation_checker_id or "")
+        integrator = self.roles.get(car.integrator_id or "")
+        aspect_checker = self.roles.get(car.aspect_checker_id or "")
+        excluded_sessions = {
+            maker.session,
+            checker.session if checker else "",
+            integrator.session if integrator else "",
+        }
+        if (
+            aspect_checker is None
+            or aspect_checker.independence_class != "checker"
+            or aspect_checker.session in excluded_sessions
+        ):
+            return "aspect checker is not independent from earlier authorities"
+        matching = [
+            receipt
+            for receipt in car.receipts
+            if receipt.author_id == aspect_checker.id
+            and receipt.verdict is Verdict.PASSED
+            and receipt.observed_revision == car.integration_sha
+            and receipt.path == car.aspect_report
+        ]
+        if not matching:
+            return "aspect receipt does not match checker, report, verdict, and revision"
+        return None
+
+    @model_validator(mode="after")
     def validate_certified_parent(self) -> PortfolioLedger:
         """Reject persisted parent verdicts that bypass portfolio prerequisites.
 
@@ -461,6 +640,15 @@ class PortfolioLedger(LedgerModel):
         receipt = self.parent.receipt
         if role is None or role.independence_class != "parent-checker":
             raise ValueError("certified parent requires parent-checker authority")
+        prior_authorities = {
+            actor
+            for car in self.cars.values()
+            for actor in (car.maker_id, car.implementation_checker_id, car.integrator_id, car.aspect_checker_id)
+            if actor
+        } | {addendum.checker_id for addendum in self.parent.addenda}
+        prior_sessions = {self.roles[actor].session for actor in prior_authorities if actor in self.roles}
+        if role.session in prior_sessions:
+            raise ValueError("certified parent requires a session-independent parent checker")
         if (
             receipt is None
             or receipt.author_id != self.parent.checker_id
@@ -487,7 +675,13 @@ class PortfolioLedger(LedgerModel):
             return "revision does not match the integrated car SHA"
         role = self.roles.get(addendum.checker_id)
         excluded = {car.maker_id, car.implementation_checker_id, car.integrator_id, car.aspect_checker_id}
-        if role is None or role.independence_class != "checker" or addendum.checker_id in excluded:
+        excluded_sessions = {self.roles[actor].session for actor in excluded if actor in self.roles}
+        if (
+            role is None
+            or role.independence_class != "checker"
+            or addendum.checker_id in excluded
+            or role.session in excluded_sessions
+        ):
             return "checker lacks independent checker authority"
         receipt = addendum.receipt
         if (
@@ -547,15 +741,17 @@ class LedgerRefusal(ValueError):
 class LedgerStore:
     """Lock-backed atomic persistence for canonical portfolio revisions."""
 
-    def __init__(self, ledger_path: Path, lock_path: Path) -> None:
+    def __init__(self, ledger_path: Path, lock_path: Path, *, evidence_root: Path | None = None) -> None:
         """Configure exact local data and persistent lock paths.
 
         Args:
             ledger_path: Canonical JSON execution copy.
             lock_path: Advisory lock file, retained permanently.
+            evidence_root: Root used to verify complete referenced evidence bytes.
         """
         self.ledger_path = ledger_path
         self.lock_path = lock_path
+        self.evidence_root = evidence_root
 
     def read(self) -> PortfolioLedger:
         """Read and verify the canonical local revision.
@@ -574,7 +770,25 @@ class LedgerStore:
             raise LedgerRefusal("local ledger digest mismatch")
         if ledger.mirror.expected_sha256 is not None and ledger.mirror.expected_sha256 != ledger.ledger_sha256:
             raise LedgerRefusal("recorded mirror digest does not match local ledger identity")
+        self.validate_external_evidence(ledger)
         return ledger
+
+    def initialize(self, ledger: PortfolioLedger) -> PortfolioLedger:
+        """Create the first revision while atomically refusing existing state.
+
+        Args:
+            ledger: Initial validated portfolio.
+
+        Returns:
+            Persisted first revision.
+
+        Raises:
+            LedgerRefusal: When the canonical ledger already exists.
+        """
+        with self.lock():
+            if self.ledger_path.exists():
+                raise LedgerRefusal("canonical ledger already exists; initialization is create-only")
+            return self.write_locked(ledger)
 
     def write(self, ledger: PortfolioLedger) -> PortfolioLedger:
         """Stamp and atomically replace one canonical ledger revision.
@@ -608,7 +822,13 @@ class LedgerStore:
             current = self.read()
             if current.ledger_sha256 != expected_ledger_sha256:
                 raise LedgerRefusal("stale ledger revision; reload before retrying the transition")
-            return self.write_locked(ledger)
+            if current.mirror.url is not None:
+                self.verify_mirror()
+                if ledger.mirror.url is None or ledger.mirror.url == current.mirror.url:
+                    raise LedgerRefusal("mirrored transition requires a new immutable mirror URL")
+            stamped = self.stamp_ledger(ledger)
+            self.publish_or_verify_mirror(stamped)
+            return self.write_stamped_locked(stamped)
 
     @contextlib.contextmanager
     def lock(self) -> Iterator[None]:
@@ -646,12 +866,30 @@ class LedgerStore:
         Returns:
             Persisted ledger with its identity digest.
         """
+        stamped = self.stamp_ledger(ledger)
+        self.publish_or_verify_mirror(stamped)
+        return self.write_stamped_locked(stamped)
+
+    def stamp_ledger(self, ledger: PortfolioLedger) -> PortfolioLedger:
+        """Validate and stamp canonical identity fields without writing.
+
+        Returns:
+            Stamped ledger ready for mirror publication and local commit.
+        """
         ledger = PortfolioLedger.model_validate(ledger.model_dump(mode="python"))
+        self.validate_external_evidence(ledger)
         digest = ledger.identity_sha256()
         mirror = ledger.mirror
         if mirror.url is not None:
             mirror = mirror.model_copy(update={"expected_sha256": digest})
-        stamped = ledger.model_copy(update={"ledger_sha256": digest, "mirror": mirror})
+        return ledger.model_copy(update={"ledger_sha256": digest, "mirror": mirror})
+
+    def write_stamped_locked(self, stamped: PortfolioLedger) -> PortfolioLedger:
+        """Atomically replace local bytes after successful mirror publication.
+
+        Returns:
+            Persisted stamped ledger.
+        """
         temporary_path: str | None = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -663,16 +901,115 @@ class LedgerStore:
                 os.fsync(stream.fileno())
             Path(temporary_path).replace(self.ledger_path)
             temporary_path = None
-            directory_fd = os.open(self.ledger_path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory_fd)
-            finally:
-                os.close(directory_fd)
+            self.sync_directory(self.ledger_path.parent)
         finally:
             if temporary_path is not None:
                 with contextlib.suppress(OSError):
                     Path(temporary_path).unlink()
         return stamped
+
+    def publish_or_verify_mirror(self, stamped: PortfolioLedger) -> None:
+        """Publish exact immutable file bytes or verify externally published bytes.
+
+        Raises:
+            LedgerRefusal: When a mirror URL is mutable, occupied, unreachable, or mismatched.
+        """
+        if stamped.mirror.url is None:
+            return
+        expected = stamped.canonical_bytes()
+        parsed = urlparse(stamped.mirror.url)
+        if parsed.scheme == "file":
+            target = Path(unquote(parsed.path))
+            if target.exists():
+                if target.read_bytes() != expected:
+                    raise LedgerRefusal("mirror publication target already contains different immutable bytes")
+                return
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            temporary_path: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", dir=target.parent, prefix=f".{target.name}.", suffix=".tmp", delete=False
+                ) as stream:
+                    temporary_path = stream.name
+                    stream.write(expected)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                try:
+                    os.link(temporary_path, target)
+                except FileExistsError as error:
+                    if target.read_bytes() != expected:
+                        raise LedgerRefusal("mirror publication raced with different immutable bytes") from error
+                self.sync_directory(target.parent)
+            finally:
+                if temporary_path is not None:
+                    with contextlib.suppress(OSError):
+                        Path(temporary_path).unlink()
+            return
+        try:
+            observed = self.read_url(stamped.mirror.url)
+        except LedgerRefusal as error:
+            raise LedgerRefusal("mirror publication must exist before local commit") from error
+        if observed != expected:
+            raise LedgerRefusal("mirror publication bytes do not match the candidate revision")
+
+    def sync_directory(self, directory: Path) -> None:
+        """Durably sync a directory on POSIX; Windows has no supported directory fsync."""
+        if os.name == "nt":
+            return
+        directory_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
+    def validate_external_evidence(self, ledger: PortfolioLedger) -> None:
+        """Verify every complete-byte reference used by persisted authority.
+
+        Args:
+            ledger: Reconstructed ledger to verify.
+        """
+        if self.evidence_root is None:
+            return
+        service = PortfolioLedgerService(ledger, evidence_root=self.evidence_root)
+        service.verify_evidence(
+            ledger.tracker_manifest.path, ledger.tracker_manifest.sha256, "tracker manifest evidence"
+        )
+        for row_id, row in ledger.correction_rows.items():
+            service.verify_evidence(row.artifact, row.sha256, f"correction row {row_id} artifact")
+        self.validate_inventory_and_reservation_evidence(ledger, service)
+        self.validate_transition_evidence(ledger, service)
+
+    def validate_inventory_and_reservation_evidence(
+        self, ledger: PortfolioLedger, service: PortfolioLedgerService
+    ) -> None:
+        """Verify inventory, reservation, and recovery byte references."""
+        for inventory in ledger.inventories.values():
+            for path in inventory.paths:
+                service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} content")
+        for reservation in ledger.reservations.values():
+            service.verify_evidence(reservation.receipt_path, reservation.receipt_sha256, "reservation receipt")
+            if reservation.recovery_evidence is not None:
+                recovery = reservation.recovery_evidence
+                service.verify_evidence(
+                    recovery.liveness_output_path, recovery.liveness_output_sha256, "recovery liveness evidence"
+                )
+                service.verify_evidence(
+                    recovery.judgement_path, recovery.judgement_sha256, "independent recovery judgement"
+                )
+
+    def validate_transition_evidence(self, ledger: PortfolioLedger, service: PortfolioLedgerService) -> None:
+        """Verify command, history, car, addendum, and parent byte references."""
+        for car in ledger.cars.values():
+            for command in car.commands:
+                service.verify_evidence(command.output_path, command.output_sha256, "complete command output")
+            for receipt in car.receipts:
+                service.verify_evidence(receipt.path, receipt.sha256, "car evidence receipt")
+            for event in car.history:
+                service.verify_evidence(event.receipt_path, event.receipt_sha256, "transition history receipt")
+        for addendum in ledger.parent.addenda:
+            service.verify_evidence(addendum.receipt.path, addendum.receipt.sha256, "addendum receipt")
+        if ledger.parent.receipt is not None:
+            service.verify_evidence(ledger.parent.receipt.path, ledger.parent.receipt.sha256, "parent receipt")
 
     def verify_mirror(self) -> PortfolioLedger:
         """Require local and immutable mirror bytes to agree exactly.
@@ -763,13 +1100,15 @@ class LedgerStore:
 class PortfolioLedgerService:
     """Pure transition service for one validated ledger revision."""
 
-    def __init__(self, ledger: PortfolioLedger) -> None:
+    def __init__(self, ledger: PortfolioLedger, *, evidence_root: Path | None = None) -> None:
         """Bind the service to one immutable input revision.
 
         Args:
             ledger: Validated source revision.
+            evidence_root: Root used to verify complete referenced evidence bytes.
         """
         self.ledger = ledger
+        self.evidence_root = evidence_root
 
     def acquire_reservation(self, car_id: str, reservation: Reservation, *, actor_id: str) -> PortfolioLedger:
         """Acquire exact canonical resources and advance one inventoried car.
@@ -786,38 +1125,16 @@ class PortfolioLedgerService:
             LedgerRefusal: When state, authority, group, paths, or exclusivity is invalid.
         """
         car = self.require_car(car_id)
-        if car.state is not CarState.INVENTORIED:
-            raise LedgerRefusal(f"car {car_id!r} is already reserved or past reservation")
-        if actor_id != car.maker_id or reservation.owner != actor_id:
-            raise LedgerRefusal("only the declared maker may acquire its reservation")
-        if not car.inventory_ids:
-            raise LedgerRefusal("reservation requires a frozen inventory")
-        stale_inventories = [
-            inventory_id
-            for inventory_id in car.inventory_ids
-            if self.ledger.inventories[inventory_id].revision != car.upstream_git_sha
-        ]
-        if stale_inventories:
-            raise LedgerRefusal(f"reservation inventories are stale: {sorted(stale_inventories)}")
-        inventoried_paths = {
-            path.path for inventory_id in car.inventory_ids for path in self.ledger.inventories[inventory_id].paths
-        }
-        missing_paths = set(reservation.paths) - inventoried_paths
-        if missing_paths:
-            raise LedgerRefusal(f"inventory does not cover reserved paths: {sorted(missing_paths)}")
-        group = self.ledger.conflict_groups.get(reservation.group)
-        if group is None:
-            raise LedgerRefusal(f"unknown conflict group {reservation.group!r}; aliases are not accepted")
-        if reservation.state is not ReservationState.ACTIVE:
-            raise LedgerRefusal("new reservation must be active")
-        if sorted(reservation.paths) != sorted(group.paths):
-            raise LedgerRefusal("reservation paths must exactly match the canonical conflict group")
+        error = self.reservation_acquisition_error(car, reservation, actor_id)
+        if error:
+            raise LedgerRefusal(error)
         if reservation.id in self.ledger.reservations:
             raise LedgerRefusal(f"reservation {reservation.id!r} already exists")
         requested = set(reservation.paths)
         for existing in self.ledger.reservations.values():
             if existing.state is ReservationState.ACTIVE and requested.intersection(existing.paths):
                 raise LedgerRefusal(f"resources are already reserved by {existing.id!r}")
+        self.verify_evidence(reservation.receipt_path, reservation.receipt_sha256, "reservation receipt")
 
         event = HistoryEvent(
             action="reservation-acquire",
@@ -825,6 +1142,7 @@ class PortfolioLedgerService:
             at=reservation.acquired_at,
             from_state=car.state,
             to_state=CarState.RESERVED,
+            receipt_path=reservation.receipt_path,
             receipt_sha256=reservation.receipt_sha256,
         )
         updated_car = car.model_copy(
@@ -841,6 +1159,44 @@ class PortfolioLedgerService:
                 "ledger_sha256": None,
             }
         )
+
+    def reservation_acquisition_error(self, car: Car, reservation: Reservation, actor_id: str) -> str | None:
+        """Return the first acquisition contract violation.
+
+        Args:
+            car: Inventoried car requesting resources.
+            reservation: Exact proposed resource reservation.
+            actor_id: Actor requesting acquisition.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        inventories = [self.ledger.inventories[item] for item in car.inventory_ids]
+        inventoried_paths = {path.path for inventory in inventories for path in inventory.paths}
+        classified_paths = {path for group in self.ledger.conflict_groups.values() for path in group.paths}
+        group = self.ledger.conflict_groups.get(reservation.group)
+        error: str | None = None
+        if car.state is not CarState.INVENTORIED:
+            error = f"car {car.id!r} is already reserved or past reservation"
+        elif actor_id != car.maker_id or reservation.owner != actor_id:
+            error = "only the declared maker may acquire its reservation"
+        elif not car.inventory_ids:
+            error = "reservation requires a frozen inventory"
+        elif any(inventory.revision != car.upstream_git_sha for inventory in inventories):
+            error = "reservation inventories are stale"
+        elif set(reservation.paths) - inventoried_paths:
+            error = "inventory does not cover reserved paths"
+        elif inventoried_paths - classified_paths:
+            error = "inventory contains unclassified writable paths"
+        elif inventoried_paths != set(reservation.paths):
+            error = "inventoried writable paths must exactly match the acquired reservation paths"
+        elif group is None:
+            error = f"unknown conflict group {reservation.group!r}; aliases are not accepted"
+        elif reservation.state is not ReservationState.ACTIVE:
+            error = "new reservation must be active"
+        elif sorted(reservation.paths) != sorted(group.paths):
+            error = "reservation paths must exactly match the canonical conflict group"
+        return error
 
     def record_inventory(self, car_id: str, inventory: Inventory, *, actor_id: str) -> PortfolioLedger:
         """Attach one exact current-revision inventory to an inventoried car.
@@ -872,6 +1228,8 @@ class PortfolioLedgerService:
             raise LedgerRefusal("inventory paths must be tracked repository-relative paths")
         if inventory.sha256 != inventory_sha256(inventory.paths):
             raise LedgerRefusal("inventory digest does not match its exact paths")
+        for path in inventory.paths:
+            self.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} content")
         updated_car = car.model_copy(update={"inventory_ids": [*car.inventory_ids, inventory.id]})
         return self.ledger.model_copy(
             update={
@@ -882,7 +1240,14 @@ class PortfolioLedgerService:
         )
 
     def release_reservation(
-        self, car_id: str, reservation_id: str, *, actor_id: str, at: datetime, receipt_sha256: Sha256
+        self,
+        car_id: str,
+        reservation_id: str,
+        *,
+        actor_id: str,
+        at: datetime,
+        receipt_sha256: Sha256,
+        receipt_path: str = "",
     ) -> PortfolioLedger:
         """Release an active pre-admission reservation owned by the caller.
 
@@ -892,6 +1257,7 @@ class PortfolioLedgerService:
             actor_id: Reservation owner.
             at: Release instant.
             receipt_sha256: Immutable release receipt digest.
+            receipt_path: Immutable release receipt path.
 
         Returns:
             A new inventoried ledger revision.
@@ -902,18 +1268,27 @@ class PortfolioLedgerService:
         reservation = self.require_active_reservation(car_id, reservation_id)
         if reservation.owner != actor_id:
             raise LedgerRefusal("only the reservation owner may release it")
+        self.verify_evidence(receipt_path, receipt_sha256, "reservation release receipt")
         return self.finish_reservation(
             car_id,
             reservation,
             actor_id=actor_id,
             at=at,
             receipt_sha256=receipt_sha256,
+            receipt_path=receipt_path,
             state=ReservationState.RELEASED,
             action="reservation-release",
         )
 
     def invalidate_reservation(
-        self, car_id: str, reservation_id: str, *, actor_id: str, at: datetime, receipt_sha256: Sha256
+        self,
+        car_id: str,
+        reservation_id: str,
+        *,
+        actor_id: str,
+        at: datetime,
+        receipt_sha256: Sha256,
+        receipt_path: str = "",
     ) -> PortfolioLedger:
         """Invalidate an active reservation under independent checker authority.
 
@@ -923,6 +1298,7 @@ class PortfolioLedgerService:
             actor_id: Independent checker.
             at: Invalidation instant.
             receipt_sha256: Immutable judgement digest.
+            receipt_path: Immutable judgement path.
 
         Returns:
             A new inventoried ledger revision.
@@ -934,12 +1310,14 @@ class PortfolioLedgerService:
             raise LedgerRefusal("reservation invalidation requires RESERVED state")
         reservation = self.require_active_reservation(car_id, reservation_id)
         self.require_independent_checker(actor_id, excluded={reservation.owner})
+        self.verify_evidence(receipt_path, receipt_sha256, "reservation invalidation receipt")
         return self.finish_reservation(
             car_id,
             reservation,
             actor_id=actor_id,
             at=at,
             receipt_sha256=receipt_sha256,
+            receipt_path=receipt_path,
             state=ReservationState.INVALIDATED,
             action="reservation-invalidate",
         )
@@ -966,14 +1344,28 @@ class PortfolioLedgerService:
         if evidence.prior_receipt_sha256 != reservation.receipt_sha256:
             raise LedgerRefusal("recovery prior receipt does not match the reservation")
         self.require_independent_checker(evidence.checker_id, excluded={reservation.owner})
+        liveness = self.read_evidence_json(
+            evidence.liveness_output_path, evidence.liveness_output_sha256, "recovery liveness evidence"
+        )
+        if self.process_is_alive(evidence.process_id):
+            raise LedgerRefusal(f"stale reservation owner process {evidence.process_id} is still live")
+        if liveness.get("pid") != evidence.process_id or liveness.get("alive") is not False:
+            raise LedgerRefusal("recovery liveness evidence does not identify a confirmed-dead owner process")
+        judgement = self.read_evidence_json(
+            evidence.judgement_path, evidence.judgement_sha256, "independent recovery judgement"
+        )
+        if judgement.get("verdict") != "PASS" or judgement.get("checker_id") != evidence.checker_id:
+            raise LedgerRefusal("independent recovery judgement does not carry the checker PASS verdict")
         return self.finish_reservation(
             car_id,
             reservation,
             actor_id=evidence.checker_id,
             at=evidence.observed_at,
             receipt_sha256=evidence.judgement_sha256,
+            receipt_path=evidence.judgement_path,
             state=ReservationState.INVALIDATED,
             action="reservation-recover",
+            recovery_evidence=evidence,
         )
 
     def admit_implementation(
@@ -1011,6 +1403,15 @@ class PortfolioLedgerService:
         car = self.require_car(car_id)
         if car.state is not CarState.RESERVED:
             raise LedgerRefusal("implementation admission requires RESERVED state")
+        active_reservations = [
+            self.ledger.reservations[item]
+            for item in car.reservation_ids
+            if item in self.ledger.reservations and self.ledger.reservations[item].state is ReservationState.ACTIVE
+        ]
+        if not active_reservations or any(
+            self.ledger.active_reservation_error(reservation, car) for reservation in active_reservations
+        ):
+            raise LedgerRefusal("implementation admission requires valid active reservation coverage")
         self.require_independent_checker(checker_id, excluded={car.maker_id})
         if expected_base_git_sha != car.base_git_sha:
             raise LedgerRefusal("stale base Git SHA")
@@ -1030,12 +1431,16 @@ class PortfolioLedgerService:
             or receipt.observed_revision != implementation_sha
         ):
             raise LedgerRefusal("checker receipt identity, verdict, or revision does not match admission")
+        self.verify_evidence(receipt.path, receipt.sha256, "implementation checker receipt")
+        for command in commands:
+            self.verify_evidence(command.output_path, command.output_sha256, "complete command output")
         event = HistoryEvent(
             action="implementation-admit",
             actor_id=checker_id,
             at=at,
             from_state=car.state,
             to_state=CarState.IMPLEMENTATION_ADMITTED,
+            receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
         updated_car = car.model_copy(
@@ -1085,6 +1490,13 @@ class PortfolioLedgerService:
             raise LedgerRefusal(f"actor {integrator_id!r} lacks integrator authority")
         if integrator_id in {car.maker_id, car.implementation_checker_id}:
             raise LedgerRefusal("integrator must be distinct from maker and implementation checker")
+        excluded_sessions = {
+            self.ledger.roles[actor].session
+            for actor in (car.maker_id, car.implementation_checker_id)
+            if actor in self.ledger.roles
+        }
+        if role.session in excluded_sessions:
+            raise LedgerRefusal("integrator session must be distinct from maker and implementation checker")
         if expected_implementation_sha != car.implementation_sha:
             raise LedgerRefusal("stale implementation Git SHA")
         if (
@@ -1093,12 +1505,14 @@ class PortfolioLedgerService:
             or receipt.observed_revision != integration_sha
         ):
             raise LedgerRefusal("integration receipt must record matching facts without a checker verdict")
+        self.verify_evidence(receipt.path, receipt.sha256, "integration factual receipt")
         event = HistoryEvent(
             action="integrate",
             actor_id=integrator_id,
             at=at,
             from_state=car.state,
             to_state=CarState.INTEGRATED,
+            receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
         updated_car = car.model_copy(
@@ -1154,12 +1568,14 @@ class PortfolioLedgerService:
             or receipt.observed_revision != car.integration_sha
         ):
             raise LedgerRefusal("aspect checker receipt identity, verdict, or revision does not match")
+        self.verify_evidence(receipt.path, receipt.sha256, "aspect checker receipt")
         event = HistoryEvent(
             action="aspect-certify",
             actor_id=checker_id,
             at=at,
             from_state=car.state,
             to_state=CarState.ASPECT_CERTIFIED,
+            receipt_path=receipt.path,
             receipt_sha256=receipt.sha256,
         )
         updated_car = car.model_copy(
@@ -1202,6 +1618,7 @@ class PortfolioLedgerService:
             or addendum.receipt.observed_revision != addendum.revision
         ):
             raise LedgerRefusal("addendum receipt identity, verdict, or revision does not match")
+        self.verify_evidence(addendum.receipt.path, addendum.receipt.sha256, "addendum checker receipt")
         parent = self.ledger.parent.model_copy(update={"addenda": [*self.ledger.parent.addenda, addendum]})
         return self.ledger.model_copy(update={"parent": parent, "ledger_sha256": None})
 
@@ -1237,6 +1654,13 @@ class PortfolioLedgerService:
         addendum_checkers = {addendum.checker_id for addendum in parent.addenda}
         if checker_id in car_authorities | addendum_checkers:
             raise LedgerRefusal("parent checker must be independent from all portfolio authorities")
+        authority_sessions = {
+            self.ledger.roles[actor].session
+            for actor in car_authorities | addendum_checkers
+            if actor in self.ledger.roles
+        }
+        if role.session in authority_sessions:
+            raise LedgerRefusal("parent checker session must be independent from all portfolio authorities")
         declared_required = {car.id for car in self.ledger.cars.values() if car.required_for_parent}
         listed_required = set(parent.required_car_ids)
         if listed_required != declared_required or len(parent.required_car_ids) != len(listed_required):
@@ -1263,6 +1687,7 @@ class PortfolioLedgerService:
             or receipt.observed_revision != revision
         ):
             raise LedgerRefusal("parent receipt identity, verdict, or revision does not match")
+        self.verify_evidence(receipt.path, receipt.sha256, "parent checker receipt")
         certified = parent.model_copy(
             update={
                 "state": ParentState.PARENT_CERTIFIED,
@@ -1282,8 +1707,10 @@ class PortfolioLedgerService:
         actor_id: str,
         at: datetime,
         receipt_sha256: Sha256,
+        receipt_path: str,
         state: ReservationState,
         action: str,
+        recovery_evidence: RecoveryEvidence | None = None,
     ) -> PortfolioLedger:
         """Apply a validated pre-admission reservation conclusion.
 
@@ -1301,6 +1728,7 @@ class PortfolioLedgerService:
                 "state": state,
                 "released_at": at if state is ReservationState.RELEASED else None,
                 "invalidated_at": at if state is ReservationState.INVALIDATED else None,
+                "recovery_evidence": recovery_evidence,
             }
         )
         event = HistoryEvent(
@@ -1309,6 +1737,7 @@ class PortfolioLedgerService:
             at=at,
             from_state=car.state,
             to_state=target_state,
+            receipt_path=receipt_path,
             receipt_sha256=receipt_sha256,
         )
         updated_car = car.model_copy(
@@ -1347,7 +1776,68 @@ class PortfolioLedgerService:
             raise LedgerRefusal(f"actor {actor_id!r} is not an independent checker")
         if actor_id in excluded:
             raise LedgerRefusal(f"checker {actor_id!r} collides with an excluded authority")
+        excluded_sessions = {self.ledger.roles[item].session for item in excluded if item in self.ledger.roles}
+        if role.session in excluded_sessions:
+            raise LedgerRefusal(f"checker {actor_id!r} collides with an excluded authority session")
         return role
+
+    def verify_evidence(self, path: str, expected_sha256: str, label: str) -> None:
+        """Verify complete evidence bytes when an authoritative root is configured.
+
+        Args:
+            path: Repository-relative evidence path.
+            expected_sha256: Declared complete-byte digest.
+            label: Caller-visible evidence description.
+
+        Raises:
+            LedgerRefusal: When path safety, existence, or digest validation fails.
+        """
+        if self.evidence_root is None:
+            return
+        candidate = (self.evidence_root / path).resolve()
+        try:
+            candidate.relative_to(self.evidence_root.resolve())
+        except ValueError as error:
+            raise LedgerRefusal(f"{label} path escapes the evidence root: {path!r}") from error
+        if not candidate.is_file():
+            raise LedgerRefusal(f"{label} does not exist: {path!r}")
+        observed = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        if observed != expected_sha256:
+            raise LedgerRefusal(
+                f"{label} digest mismatch for {path!r}: expected {expected_sha256}, observed {observed}"
+            )
+
+    def read_evidence_json(self, path: str, expected_sha256: str, label: str) -> dict[str, object]:
+        """Read a verified evidence object.
+
+        Args:
+            path: Repository-relative evidence path.
+            expected_sha256: Declared complete-byte digest.
+            label: Caller-visible evidence description.
+
+        Returns:
+            Parsed JSON object.
+
+        Raises:
+            LedgerRefusal: When no root is configured or JSON is not an object.
+        """
+        if self.evidence_root is None:
+            raise LedgerRefusal(f"{label} requires an authoritative evidence root")
+        self.verify_evidence(path, expected_sha256, label)
+        payload = json.loads((self.evidence_root / path).read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise LedgerRefusal(f"{label} must be a JSON object")
+        return payload
+
+    def process_is_alive(self, process_id: int) -> bool:
+        """Return whether the operating system still recognizes a process id."""
+        try:
+            os.kill(process_id, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
 
     def require_car(self, car_id: str) -> Car:
         """Return a declared car or refuse an undefined id.

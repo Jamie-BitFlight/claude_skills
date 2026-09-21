@@ -29,6 +29,7 @@ from dh_core.portfolio_ledger import (
     Inventory,
     LedgerRefusal,
     LedgerStore,
+    Mirror,
     PortfolioLedger,
     PortfolioLedgerService,
     RecoveryEvidence,
@@ -62,6 +63,7 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--ledger", type=Path, required=True)
     result.add_argument("--lock", type=Path, required=True)
+    result.add_argument("--evidence-root", type=Path, default=Path.cwd())
     result.add_argument("command", choices=COMMANDS)
     result.add_argument("--request", type=Path)
     return result
@@ -109,13 +111,15 @@ def instant(value: object) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def transition(command: str, ledger: PortfolioLedger, request: dict[str, object]) -> PortfolioLedger:
+def transition(
+    command: str, ledger: PortfolioLedger, request: dict[str, object], *, evidence_root: Path
+) -> PortfolioLedger:
     """Dispatch one complete request through the public transition service.
 
     Returns:
         Transitioned ledger.
     """
-    service = PortfolioLedgerService(ledger)
+    service = PortfolioLedgerService(ledger, evidence_root=evidence_root)
     if command == "inventory":
         result = service.record_inventory(
             str(request["car_id"]), Inventory.model_validate(request["inventory"]), actor_id=str(request["actor_id"])
@@ -134,6 +138,7 @@ def transition(command: str, ledger: PortfolioLedger, request: dict[str, object]
             actor_id=str(request["actor_id"]),
             at=instant(request["at"]),
             receipt_sha256=str(request["receipt_sha256"]),
+            receipt_path=str(request["receipt_path"]),
         )
     elif command == "reservation-recover":
         result = service.recover_reservation(
@@ -182,6 +187,9 @@ def transition(command: str, ledger: PortfolioLedger, request: dict[str, object]
         )
     else:
         raise LedgerRefusal(f"unsupported transition command {command!r}")
+    mirror_url = request.get("mirror_url")
+    if mirror_url is not None:
+        result = result.model_copy(update={"mirror": Mirror(url=str(mirror_url))})
     return result
 
 
@@ -195,10 +203,10 @@ def main(argv: list[str] | None = None) -> int:
         Process exit code.
     """
     args = parser().parse_args(argv)
-    store = LedgerStore(args.ledger, args.lock)
+    store = LedgerStore(args.ledger, args.lock, evidence_root=args.evidence_root)
     try:
         if args.command == "initialize":
-            ledger = store.write(PortfolioLedger.model_validate(request_json(args.request, args.command)))
+            ledger = store.initialize(PortfolioLedger.model_validate(request_json(args.request, args.command)))
         elif args.command == "restore":
             request = request_json(args.request, args.command)
             ledger = store.restore_from_mirror(
@@ -212,7 +220,9 @@ def main(argv: list[str] | None = None) -> int:
                 ledger = store.verify_mirror()
             elif args.command != "show":
                 expected_digest = ledger.ledger_sha256
-                ledger = transition(args.command, ledger, request_json(args.request, args.command))
+                ledger = transition(
+                    args.command, ledger, request_json(args.request, args.command), evidence_root=args.evidence_root
+                )
                 ledger = store.write_transition(ledger, expected_ledger_sha256=expected_digest)
         output_json(ledger.model_dump(mode="json"))
     except (KeyError, LedgerRefusal, OSError, TypeError, ValueError) as error:

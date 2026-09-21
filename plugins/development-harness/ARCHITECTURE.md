@@ -532,10 +532,26 @@ their facts or judgements.
 Persistence holds the lock across compare-and-swap validation, canonical serialization, temporary
 file flush and `fsync`, atomic replacement, and directory `fsync`. A crashed writer therefore leaves
 the prior revision or the complete next revision, never a partial file. Every accepted local revision
-has a canonical content identity. When an immutable mirror is declared, local bytes, mirror bytes,
-the ledger identity, and the independently supplied restore digest must agree; disagreement blocks
-transitions, and neither copy wins automatically. A missing local copy can be restored only from a
-canonical mirror that matches that external digest.
+has a canonical content identity. Initialization is create-only under that same lock; retrying or
+racing initialization cannot replace existing history. Directory `fsync` is the POSIX durability
+step and is skipped on Windows, where directory handles do not support it; file flush, file `fsync`,
+and atomic replacement still precede a successful return.
+
+When an immutable mirror is declared, each transition names a new immutable URL. The writer stamps
+the candidate, publishes or verifies those exact bytes at that URL, and only then performs the local
+compare-and-swap. File mirrors are published create-only; other URLs must already expose the exact
+candidate bytes. Publication failure leaves the previous local/mirror pair in authority, and a
+successful local transition is immediately readable against its new mirror. Local bytes, mirror
+bytes, the ledger identity, and the independently supplied restore digest must agree; disagreement
+blocks transitions, and neither copy wins automatically. A missing local copy can be restored only
+from a canonical mirror that matches that external digest.
+
+Operational CLI reads and mutations take an evidence root. Tracker and correction authorities,
+inventory contents, reservation and recovery evidence, complete command outputs, and checker,
+integration, addendum, and parent receipts are read in full and SHA-256 verified before a local
+commit. Persisted reconstruction separately replays state-equivalent role, session-independence,
+receipt, command-success, reservation-exclusivity, and inventory/group/path invariants, so loading
+JSON cannot bypass a transition gate.
 
 ## Automation Boundary
 
