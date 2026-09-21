@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import urllib.request
 from collections.abc import Iterator
@@ -15,7 +16,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from threading import Lock
-from typing import Annotated, Literal
+from typing import Annotated, Literal, overload
 from urllib.parse import unquote, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -31,6 +32,7 @@ THREAD_LOCKS_GUARD = Lock()
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 GitSha = Annotated[str, Field(pattern=r"^[0-9a-f]{40,64}$")]
 WINDOWS_DRIVE_URI_PREFIX_LENGTH = 3
+EXTERNAL_IO_TIMEOUT_SECONDS = 30
 
 
 def file_path_to_uri(path: str, *, platform: str = os.name) -> str:
@@ -579,6 +581,9 @@ class PortfolioLedger(LedgerModel):
         maker = self.roles.get(car.maker_id)
         if maker is None or maker.independence_class != "maker":
             return "maker lacks maker authority"
+        history_error = self.car_history_error(car)
+        if history_error:
+            return history_error
         if car.state in {CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, CarState.ASPECT_CERTIFIED}:
             error = self.implementation_evidence_error(car, maker)
             if error:
@@ -589,6 +594,27 @@ class PortfolioLedger(LedgerModel):
                 return error
         if car.state is CarState.ASPECT_CERTIFIED:
             return self.aspect_evidence_error(car, maker)
+        return None
+
+    def car_history_error(self, car: Car) -> str | None:
+        """Return an error when persisted history cannot reconstruct current state."""
+        required_by_state = {
+            CarState.INVENTORIED: [],
+            CarState.RESERVED: ["reservation-acquire"],
+            CarState.IMPLEMENTATION_ADMITTED: ["reservation-acquire", "implementation-admit"],
+            CarState.INTEGRATED: ["reservation-acquire", "implementation-admit", "integrate"],
+            CarState.ASPECT_CERTIFIED: ["reservation-acquire", "implementation-admit", "integrate", "aspect-certify"],
+        }
+        required = required_by_state[car.state]
+        actions = [event.action for event in car.history]
+        positions = [actions.index(action) for action in required if action in actions]
+        if len(positions) != len(required) or positions != sorted(positions):
+            return "history chain omits or reorders required transitions"
+        for previous, current in zip(car.history, car.history[1:], strict=False):
+            if previous.to_state != current.from_state:
+                return "history chain contains a state jump"
+        if car.history and car.history[-1].to_state != car.state:
+            return "history chain does not reach the persisted state"
         return None
 
     def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
@@ -1078,23 +1104,11 @@ class LedgerStore:
         if git_executable is None:
             service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} archived content")
             return
-        probe = subprocess.run(
-            [git_executable, "-C", str(self.evidence_root), "rev-parse", "--is-inside-work-tree"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        probe = self._run_git(git_executable, "rev-parse", "--is-inside-work-tree", text=True)
         if probe.returncode != 0:
             service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} archived content")
             return
-        blob_result = subprocess.run(
-            [git_executable, "-C", str(self.evidence_root), "rev-parse", f"{inventory.revision}:{path.path}"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        blob_result = self._run_git(git_executable, "rev-parse", f"{inventory.revision}:{path.path}", text=True)
         if blob_result.returncode != 0:
             raise LedgerRefusal(
                 f"inventory {inventory.id} cannot resolve frozen path {path.path!r} at {inventory.revision}"
@@ -1105,12 +1119,7 @@ class LedgerStore:
                 f"inventory {inventory.id} Git blob mismatch for {path.path!r}: "
                 f"expected {path.git_blob}, observed {observed_blob}"
             )
-        content_result = subprocess.run(
-            [git_executable, "-C", str(self.evidence_root), "cat-file", "blob", observed_blob],
-            check=False,
-            capture_output=True,
-            timeout=30,
-        )
+        content_result = self._run_git(git_executable, "cat-file", "blob", observed_blob, text=False)
         if content_result.returncode != 0:
             raise LedgerRefusal(f"inventory {inventory.id} cannot read frozen blob {observed_blob}")
         observed_sha256 = hashlib.sha256(content_result.stdout).hexdigest()
@@ -1119,6 +1128,39 @@ class LedgerStore:
                 f"inventory {inventory.id} frozen content mismatch for {path.path!r}: "
                 f"expected {path.sha256}, observed {observed_sha256}"
             )
+
+    @overload
+    def _run_git(self, git_executable: str, *args: str, text: Literal[True]) -> subprocess.CompletedProcess[str]: ...
+
+    @overload
+    def _run_git(self, git_executable: str, *args: str, text: Literal[False]) -> subprocess.CompletedProcess[bytes]: ...
+
+    def _run_git(
+        self, git_executable: str, *args: str, text: bool
+    ) -> subprocess.CompletedProcess[str] | subprocess.CompletedProcess[bytes]:
+        """Run a Git probe through the repository's process-group bounded runner.
+
+        Returns:
+            Completed bounded process result.
+        """
+        runner = Path(__file__).parents[3] / "scripts" / "run_bounded.py"
+        command = [
+            sys.executable,
+            str(runner),
+            "--timeout-seconds",
+            str(EXTERNAL_IO_TIMEOUT_SECONDS),
+            "--",
+            git_executable,
+            "-C",
+            str(self.evidence_root),
+            *args,
+        ]
+        try:
+            return subprocess.run(
+                command, check=False, capture_output=True, text=text, timeout=EXTERNAL_IO_TIMEOUT_SECONDS + 5
+            )
+        except subprocess.TimeoutExpired as error:
+            raise LedgerRefusal("bounded Git inventory probe timed out") from error
 
     def validate_transition_evidence(self, ledger: PortfolioLedger, service: PortfolioLedgerService) -> None:
         """Verify command, history, car, addendum, and parent byte references."""
@@ -1214,7 +1256,9 @@ class LedgerStore:
             Complete response bytes.
         """
         try:
-            with urllib.request.urlopen(url) as response:  # ruff: ignore[suspicious-url-open-usage] - URL is explicit persisted authority
+            with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] - URL is explicit persisted authority
+                url, timeout=EXTERNAL_IO_TIMEOUT_SECONDS
+            ) as response:
                 return response.read()
         except OSError as error:
             raise LedgerRefusal(f"cannot read mirror {url!r}: {error}") from error
@@ -1685,6 +1729,16 @@ class PortfolioLedgerService:
         ]
         if incomplete_consumers:
             raise LedgerRefusal(f"declared aspect consumers are not integrated: {sorted(incomplete_consumers)}")
+        consumer_revisions = {
+            item.integration_sha
+            for item in self.ledger.cars.values()
+            if item.id != car.id and car.aspect in item.aspect_membership and item.integration_sha is not None
+        }
+        missing_consumer_revisions = consumer_revisions - set(car.predecessor_shas)
+        if missing_consumer_revisions:
+            raise LedgerRefusal(
+                f"aggregate predecessor SHAs omit consumer integration revisions: {sorted(missing_consumer_revisions)}"
+            )
         if not report or report != receipt.path:
             raise LedgerRefusal("aspect report must reference the immutable checker receipt")
         if (
@@ -1956,6 +2010,8 @@ class PortfolioLedgerService:
 
     def process_is_alive(self, process_id: int) -> bool:
         """Return whether the operating system still recognizes a process id."""
+        if os.name == "nt":
+            return self.windows_process_is_alive(process_id)
         try:
             os.kill(process_id, 0)
         except ProcessLookupError:
@@ -1963,6 +2019,27 @@ class PortfolioLedgerService:
         except PermissionError:
             return True
         return True
+
+    def windows_process_is_alive(self, process_id: int) -> bool:
+        """Query Windows process existence without delivering a signal.
+
+        Returns:
+            Whether Tasklist reports the process id.
+        """
+        tasklist = shutil.which("tasklist")
+        if tasklist is None:
+            raise LedgerRefusal("tasklist is required for non-destructive Windows liveness checks")
+        try:
+            result = subprocess.run(
+                [tasklist, "/FI", f"PID eq {process_id}", "/FO", "CSV", "/NH"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=EXTERNAL_IO_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise LedgerRefusal("Windows process liveness check timed out") from error
+        return result.returncode == 0 and f'"{process_id}"' in result.stdout
 
     def require_car(self, car_id: str) -> Car:
         """Return a declared car or refuse an undefined id.

@@ -256,6 +256,13 @@ def test_reconstructed_car_enforces_transition_equivalent_evidence_and_independe
         PortfolioLedger.model_validate(payload)
 
 
+def test_reconstructed_integrated_car_requires_legal_history_chain() -> None:
+    payload = integrated_ledger().model_dump(mode="json")
+    payload["cars"]["A6-G0"]["history"] = []
+    with pytest.raises(ValueError, match="history chain"):
+        PortfolioLedger.model_validate(payload)
+
+
 def test_inventory_records_only_sorted_exact_content_at_the_current_revision() -> None:
     ledger = minimum_ledger()
     car = ledger.cars["A6-G0"].model_copy(update={"inventory_ids": []})
@@ -474,6 +481,16 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
     )
     assert recovered.reservations[reservation.id].state is ReservationState.INVALIDATED
     assert recovered.cars["A6-G0"].state is CarState.INVENTORIED
+
+
+def test_windows_liveness_probe_never_calls_destructive_os_kill(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = PortfolioLedgerService(minimum_ledger())
+    monkeypatch.setattr("dh_core.portfolio_ledger.os.name", "nt")
+    monkeypatch.setattr(
+        "dh_core.portfolio_ledger.os.kill", lambda *_args: pytest.fail("os.kill is destructive on Windows")
+    )
+    monkeypatch.setattr(service, "windows_process_is_alive", lambda _pid: True, raising=False)
+    assert service.process_is_alive(1234)
 
 
 def test_release_after_integration_preserves_the_integrated_car_state() -> None:
@@ -740,6 +757,22 @@ def test_only_aspect_aggregates_can_be_certified_by_a_distinct_checker() -> None
         )
 
 
+def test_aspect_certification_requires_every_consumer_integration_sha_as_predecessor() -> None:
+    aggregate = integrated_ledger(car_kind=CarKind.ASPECT_AGGREGATE)
+    consumer = aggregate.cars["A6-G0"].model_copy(
+        update={"id": "A6-CONSUMER", "issue": 9997, "car_kind": CarKind.IMPLEMENTATION}
+    )
+    aggregate_car = aggregate.cars["A6-G0"].model_copy(update={"predecessor_shas": []})
+    aggregate = aggregate.model_copy(update={"cars": {aggregate_car.id: aggregate_car, consumer.id: consumer}})
+    receipt = EvidenceReceipt(
+        path="evidence/aspect.json", sha256=SHA, author_id="checker-2", verdict="PASS", observed_revision="b" * 64
+    )
+    with pytest.raises(LedgerRefusal, match="consumer integration revisions"):
+        PortfolioLedgerService(aggregate).certify_aspect(
+            "A6-G0", checker_id="checker-2", report=receipt.path, receipt=receipt, at=NOW
+        )
+
+
 def test_parent_certification_requires_all_aggregates_addenda_and_parent_checker() -> None:
     aggregate = integrated_ledger(car_kind=CarKind.ASPECT_AGGREGATE)
     aspect_receipt = EvidenceReceipt(
@@ -952,6 +985,33 @@ def test_archived_inventory_verification_does_not_require_git(tmp_path: Path, mo
     monkeypatch.setattr("dh_core.portfolio_ledger.shutil.which", lambda _name: None)
 
     store.verify_inventory_path(inventory, path, PortfolioLedgerService(ledger, evidence_root=tmp_path))
+
+
+def test_inventory_git_timeout_becomes_structured_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = inventory_record().paths[0]
+    inventory = inventory_record()
+    ledger = minimum_ledger()
+    store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock", evidence_root=tmp_path)
+    monkeypatch.setattr("dh_core.portfolio_ledger.shutil.which", lambda _name: "/usr/bin/git")
+    monkeypatch.setattr(
+        "dh_core.portfolio_ledger.subprocess.run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("git", 30)),
+    )
+    with pytest.raises(LedgerRefusal, match="timed out"):
+        store.verify_inventory_path(inventory, path, PortfolioLedgerService(ledger, evidence_root=tmp_path))
+
+
+def test_remote_mirror_read_has_explicit_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    observed: dict[str, float] = {}
+
+    def stalled(_url: str, *, timeout: float) -> None:
+        observed["timeout"] = timeout
+        raise OSError("stalled mirror")
+
+    monkeypatch.setattr("dh_core.portfolio_ledger.urllib.request.urlopen", stalled)
+    with pytest.raises(LedgerRefusal, match="cannot read mirror"):
+        LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock").read_url("https://example.invalid/mirror")
+    assert observed["timeout"] == 30
 
 
 def test_compare_and_swap_rejects_a_transition_from_a_stale_process_read(tmp_path: Path) -> None:
