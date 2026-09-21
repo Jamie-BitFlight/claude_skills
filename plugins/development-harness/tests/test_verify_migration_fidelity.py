@@ -34,6 +34,7 @@ runner = CliRunner()
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPT_PATH = Path("plugins/development-harness/scripts/verify_migration_fidelity.py")
+_BOUNDED_RUNNER = Path("scripts/run_bounded.py")
 
 _ITEM_MD = """\
 ---
@@ -146,13 +147,24 @@ def test_standalone_pep723_invocation_reaches_help() -> None:
     env.pop("VIRTUAL_ENV", None)
 
     result = subprocess.run(
-        ["uv", "run", str(_SCRIPT_PATH), "--help"],
+        [
+            "uv",
+            "run",
+            "--script",
+            str(_BOUNDED_RUNNER),
+            "--timeout-seconds",
+            "180",
+            "--",
+            "uv",
+            "run",
+            str(_SCRIPT_PATH),
+            "--help",
+        ],
         cwd=_REPO_ROOT,
         env=env,
         check=False,
         capture_output=True,
         text=True,
-        timeout=180,
     )
 
     assert result.returncode == 0, result.stderr

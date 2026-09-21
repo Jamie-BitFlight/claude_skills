@@ -22,6 +22,8 @@ import importlib.util
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date
 from io import StringIO
@@ -831,10 +833,14 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     if any(p.is_dir() for p in absolute_paths):
         return common
 
-    for candidate in (common, *common.parents):
-        # A worktree's .git is a file, not a directory -- exists() covers both.
-        if (candidate / ".git").exists():
-            return candidate
+    git = shutil.which("git")
+    if git is None:
+        return common
+    result = subprocess.run(
+        [git, "-C", str(common), "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False
+    )
+    if result.returncode == 0:
+        return Path(result.stdout.strip()).resolve()
     return common
 
 
