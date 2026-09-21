@@ -1157,12 +1157,12 @@ def _warn_unregistered_section(name: str, key: str, output: Output | None) -> No
     """
     message = (
         f"Unregistered section name {name!r} stored under fallback key {key!r}. "
-        "No consumer can address this content by name, so whatever was written here is "
-        "unreachable. Name the consumer that reads this section and register the name in "
-        "backlog_core/section_registry.py (SectionKey + SECTION_HEADING), or stop writing "
-        "the section. Registering a name that nothing reads silences this warning and "
-        "leaves the content just as unreachable — see that module's docstring, 'What a "
-        "section is, and when to register one'."
+        "Nothing addresses this content by name, so what was written here is unreachable. "
+        f"Find the reader first: grep the agent and skill sources for {name!r} and for "
+        f"sections[{name!r}] reads of it. With a reader found, add a SectionKey member and "
+        "a _SECTION_DISPLAY entry in backlog_core/section_registry.py. With none found, "
+        "stop writing the section at its producer — a registry entry only reaches a "
+        "consumer that already addresses the name."
     )
     print(message, file=sys.stderr)
     if output is not None:
