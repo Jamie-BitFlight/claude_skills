@@ -9,6 +9,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path, PureWindowsPath
+from typing import Self
 
 import pytest
 from dh_core.portfolio_ledger import (
@@ -552,6 +553,33 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
     assert recovered.cars["A6-G0"].state is CarState.INVENTORIED
 
 
+def test_invalidation_replay_rejects_stale_inventory_and_recover_without_evidence() -> None:
+    reservation = Reservation(
+        id="r1",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path="ledger.lock",
+        acquired_at=NOW,
+        receipt_path="evidence/r1.json",
+        receipt_sha256=SHA,
+    )
+    reserved = PortfolioLedgerService(minimum_ledger()).acquire_reservation("A6-G0", reservation, actor_id="maker")
+    invalidated = PortfolioLedgerService(reserved).invalidate_reservation(
+        "A6-G0", reservation.id, actor_id="checker", at=NOW, receipt_path="evidence/end.json", receipt_sha256=SHA
+    )
+    stale = invalidated.model_dump(mode="json")
+    stale["cars"]["A6-G0"]["inventory_ids"] = ["inventory-a6-g0"]
+    with pytest.raises(ValueError, match="inventory projection"):
+        PortfolioLedger.model_validate(stale)
+
+    missing_recovery = invalidated.model_dump(mode="json")
+    missing_recovery["cars"]["A6-G0"]["history"][-1]["action"] = "reservation-recover"
+    with pytest.raises(ValueError, match="recovery event lacks"):
+        PortfolioLedger.model_validate(missing_recovery)
+
+
 def test_windows_liveness_probe_never_calls_destructive_os_kill(monkeypatch: pytest.MonkeyPatch) -> None:
     service = PortfolioLedgerService(minimum_ledger())
     monkeypatch.setattr("dh_core.portfolio_ledger.os.name", "nt")
@@ -1089,7 +1117,40 @@ def test_remote_mirror_read_has_explicit_timeout(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("dh_core.portfolio_ledger.urllib.request.urlopen", stalled)
     with pytest.raises(LedgerRefusal, match="cannot read mirror"):
         LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock").read_url("https://example.invalid/mirror")
-    assert observed["timeout"] == 30
+    assert observed["timeout"] == pytest.approx(30, abs=0.01)
+
+
+def test_total_mirror_deadline_includes_open_and_all_reads(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    class Response:
+        fp = None
+
+        def __init__(self, chunks: list[bytes]) -> None:
+            self.chunks = iter(chunks)
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self, _size: int) -> bytes:
+            return next(self.chunks)
+
+    observed: list[float] = []
+    monkeypatch.setattr(
+        "dh_core.portfolio_ledger.urllib.request.urlopen",
+        lambda _url, *, timeout: observed.append(timeout) or Response([b"x", b""]),
+    )
+    clock = iter([0.0, 0.0, 29.0, 33.0])
+    monkeypatch.setattr("dh_core.portfolio_ledger.time.monotonic", lambda: next(clock))
+    store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock")
+    with pytest.raises(LedgerRefusal, match="total deadline"):
+        store.read_url("https://example.invalid/mirror")
+    assert observed == [30.0]
+
+    clock = iter([0.0, 0.0, 10.0, 20.0])
+    monkeypatch.setattr("dh_core.portfolio_ledger.time.monotonic", lambda: next(clock))
+    assert store.read_url("https://example.invalid/mirror") == b"x"
 
 
 def test_compare_and_swap_rejects_a_transition_from_a_stale_process_read(tmp_path: Path) -> None:

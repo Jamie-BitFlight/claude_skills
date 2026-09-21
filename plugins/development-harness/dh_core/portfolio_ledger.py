@@ -804,6 +804,8 @@ class PortfolioLedger(LedgerModel):
                 error = self._cycle_projection_error(event, acquired, terminal, current_inventory)
             if error:
                 break
+        if error is None and current_inventory != car.inventory_ids:
+            error = "replayed inventory projection does not match current pointers"
         return error
 
     def _cycle_projection_error(
@@ -827,7 +829,10 @@ class PortfolioLedger(LedgerModel):
             if event.inventory_ids != current_inventory:
                 return "reservation acquisition inventory subject does not match current snapshot"
         if event.action in {"reservation-release", "reservation-invalidate", "reservation-recover"}:
-            return self._terminal_projection_error(event, acquired, terminal)
+            error = self._terminal_projection_error(event, acquired, terminal)
+            if error is None and event.action in {"reservation-invalidate", "reservation-recover"}:
+                current_inventory.clear()
+            return error
         return None
 
     def _terminal_projection_error(self, event: HistoryEvent, acquired: set[str], terminal: set[str]) -> str | None:
@@ -853,6 +858,16 @@ class PortfolioLedger(LedgerModel):
             or event.receipt_sha256 != reservation.terminal_receipt_sha256
         ):
             return "terminal history receipt does not match reservation terminal receipt"
+        if event.action == "reservation-recover":
+            recovery = reservation.recovery_evidence
+            if (
+                recovery is None
+                or recovery.judgement_path != event.receipt_path
+                or recovery.judgement_sha256 != event.receipt_sha256
+            ):
+                return "recovery event lacks matching liveness and independent judgement evidence"
+        elif reservation.recovery_evidence is not None:
+            return "non-recovery terminal event carries recovery evidence"
         return None
 
     def _history_event_shape_error(
@@ -1738,11 +1753,18 @@ class _LedgerStore:
         Returns:
             Complete response bytes.
         """
+        deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
         try:
+            open_budget = deadline - time.monotonic()
+            if open_budget <= 0:
+                raise LedgerRefusal(
+                    f"mirror download exceeded {EXTERNAL_IO_TIMEOUT_SECONDS}s total deadline",
+                    code="process_timeout",
+                    category="external_io",
+                )
             with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] - URL is explicit persisted authority
-                url, timeout=EXTERNAL_IO_TIMEOUT_SECONDS
+                url, timeout=open_budget
             ) as response:
-                deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
                 chunks: list[bytes] = []
                 while True:
                     remaining = deadline - time.monotonic()

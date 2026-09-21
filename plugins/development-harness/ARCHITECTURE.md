@@ -539,7 +539,8 @@ Inventory and reservation registries are immutable history; car pointers identif
 cycle. History events carry inventory and reservation subjects. Release preserves the reusable
 inventory, while invalidation and recovery clear it and require a newly recorded inventory before
 reacquisition. Reacquisition after a terminal edge is legal, and replay validates each cycle rather
-than treating action names as globally unique.
+than treating action names as globally unique. Recovery replay requires matching recorded liveness
+and independent judgement evidence on the concluded reservation.
 
 Persistence holds the lock across compare-and-swap validation, canonical serialization, temporary
 file flush and `fsync`, atomic replacement, and directory `fsync`. A crashed writer therefore leaves
@@ -558,7 +559,8 @@ bytes, the ledger identity, and the independently supplied restore digest must a
 blocks transitions, and neither copy wins automatically. A missing local copy can be restored only
 from a canonical mirror that matches that external digest. File-URI conversion uses explicit POSIX
 or Windows semantics; Windows drive-qualified and UNC paths round-trip without passing through a
-POSIX `Path` interpretation.
+POSIX `Path` interpretation. Remote reads share one monotonic deadline across connection setup and
+all response reads; each blocking operation receives only the remaining budget.
 
 Operational CLI reads and mutations take an evidence root. Tracker and correction authorities,
 reservation and recovery evidence, complete command outputs, and checker, integration, addendum, and
