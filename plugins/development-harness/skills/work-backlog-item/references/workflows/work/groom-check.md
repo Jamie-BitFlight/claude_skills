@@ -77,7 +77,7 @@ flowchart TD
     AnyCommits -->|"Zero commits"| CachedOK(["Use cached groom content<br>→ rt-ica-gate.md"])
     AnyCommits -->|"1+ commits"| Phase2["Phase 2: Spawn drift-assessment agent<br>Input: item description + ACs +<br>git diff {groom_date_sha}..HEAD -- {files}"]
     Phase2 --> Classification{"Agent returns?"}
-    Classification -->|"FUNCTIONAL_DRIFT"| FD["Write 'staleness context' section to item<br>via backlog_groom (diff summary as content)<br>Invoke: groom/start.md"]
+    Classification -->|"FUNCTIONAL_DRIFT"| FD["Write 'Staleness Context' section to item<br>via backlog_groom (diff summary as content)<br>Invoke: groom/start.md"]
     Classification -->|"SUPERSEDED"| SUP["backlog_close(reason='superseded',<br>comment='{commit refs}')"]
     Classification -->|"COSMETIC_ONLY"| CO(["Use cached groom content<br>→ rt-ica-gate.md"])
     Classification -->|"Ambiguous output"| FD
@@ -120,12 +120,12 @@ without AskUserQuestion. Log: `[AUTO] STALENESS Phase 2: {TOKEN} — {one-line r
 
 **FUNCTIONAL_DRIFT:**
 
-1. Write the diff summary as the `staleness context` section via the CLI:
+1. Write the diff summary as the `Staleness Context` section via the CLI:
 
    ```bash
    backlog groom \
      --selector "{title}" \
-     --section "staleness context" \
+     --section "Staleness Context" \
      --content "Staleness detected {today}: functional commits since {groomed_date}.\n\n{diff summary — key changed interfaces, renamed functions, added/removed files}\n\nCommits:\n{list of qualifying commit one-liners}"
    ```
 

@@ -21,7 +21,7 @@ from backlog_core.rendering import SECTION_HEADING, heading_to_unknown_key, norm
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
-_WRITE_RE = re.compile(r"""section=["']([^"']+)["']""")
+_WRITE_RE = re.compile(r"""(?:--)?section[= ]["']([^"']+)["']""")
 _READ_RE = re.compile(r"""["']?sections["']?(?:\]\[|\[|\.get\()["']([^"']+)["']""")
 
 
@@ -59,6 +59,34 @@ def test_doc_section_names_round_trip_through_section_heading() -> None:
         "Each entry is (file, referenced_name, actual_display_title) — fix the doc to use "
         "actual_display_title, or register referenced_name in SECTION_HEADING if it needs "
         "different display text: " + repr(mismatches)
+    )
+
+
+def test_doc_section_names_are_registered_not_merely_round_tripping() -> None:
+    """Every section name a doc writes must resolve to a registered SectionKey.
+
+    The round-trip test above cannot catch an unregistered name: "Blockers" stores as
+    ``unknown__blockers`` and renders back as "Blockers", so it round-trips perfectly
+    while still landing under the fallback key. That fallback is exactly what the
+    registry exists to prevent — ``backlog_groom`` emits a warning on every such write,
+    and #2974 records that agents reading a named section may treat mis-keyed content
+    as absent. Six names (Blockers, Human Input, Questions for Human, Grooming Drift,
+    Plan Drift, staleness context) reached production this way before this test existed.
+    """
+    unregistered: list[tuple[str, str, str]] = []
+    for path in _iter_doc_files():
+        text = path.read_text(encoding="utf-8")
+        for name in _referenced_section_names(text):
+            key = ops._normalize_section_key(name)
+            if key.startswith("unknown__"):
+                unregistered.append((str(path.relative_to(_PLUGIN_ROOT)), name, key))
+
+    assert not unregistered, (
+        "Section name(s) written by agent/skill docs are not registered and fall through "
+        "to the unknown__ fallback key, where a reader looking up the canonical key finds "
+        "nothing. Each entry is (file, referenced_name, fallback_key). Register each name "
+        "in backlog_core/section_registry.py — add a SectionKey member and a _SECTION_DISPLAY "
+        "entry — following that module's 'How to add a new canonical section' steps: " + repr(unregistered)
     )
 
 

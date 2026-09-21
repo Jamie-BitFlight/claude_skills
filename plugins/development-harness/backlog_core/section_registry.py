@@ -97,6 +97,17 @@ class SectionKey(StrEnum):
     SCOPE = "scope"
     DESIRED_STRUCTURE = "desired_structure"
     OUTPUT_EVIDENCE = "output_evidence"
+    BLOCKERS = "blockers"
+    HUMAN_INPUT = "human_input"
+    QUESTIONS_FOR_HUMAN = "questions_for_human"
+    GROOMING_DRIFT = "grooming_drift"
+    PLAN_DRIFT = "plan_drift"
+    STALENESS_CONTEXT = "staleness_context"
+    COMPLETION_REPORT = "completion_report"
+    VERIFICATION_RESULTS = "verification_results"
+    REVIEW_RESULTS = "review_results"
+    FINAL_VERIFICATION = "final_verification"
+    DISCOVERED_DURING_IMPLEMENTATION = "discovered_during_implementation"
 
 
 # Ordered (key, display heading) pairs — order is the canonical render order
@@ -130,6 +141,17 @@ _SECTION_DISPLAY: tuple[tuple[SectionKey, str], ...] = (
     (SectionKey.SCOPE, "Scope"),
     (SectionKey.DESIRED_STRUCTURE, "Desired Structure"),
     (SectionKey.OUTPUT_EVIDENCE, "Output / Evidence"),
+    (SectionKey.BLOCKERS, "Blockers"),
+    (SectionKey.HUMAN_INPUT, "Human Input"),
+    (SectionKey.QUESTIONS_FOR_HUMAN, "Questions for Human"),
+    (SectionKey.GROOMING_DRIFT, "Grooming Drift"),
+    (SectionKey.PLAN_DRIFT, "Plan Drift"),
+    (SectionKey.STALENESS_CONTEXT, "Staleness Context"),
+    (SectionKey.COMPLETION_REPORT, "Completion Report"),
+    (SectionKey.VERIFICATION_RESULTS, "Verification Results"),
+    (SectionKey.REVIEW_RESULTS, "Review Results"),
+    (SectionKey.FINAL_VERIFICATION, "Final Verification"),
+    (SectionKey.DISCOVERED_DURING_IMPLEMENTATION, "Discovered During Implementation"),
 )
 
 # Section key (plain str, never the enum instance — this dict is iterated to
