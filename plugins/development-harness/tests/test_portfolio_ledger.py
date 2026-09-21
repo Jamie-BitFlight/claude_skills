@@ -1132,7 +1132,10 @@ def test_remote_mirror_read_has_explicit_timeout(monkeypatch: pytest.MonkeyPatch
         observed["timeout"] = timeout
         raise OSError("stalled mirror")
 
-    monkeypatch.setattr("dh_core.portfolio_ledger.urllib.request.urlopen", stalled)
+    class Opener:
+        open = staticmethod(stalled)
+
+    monkeypatch.setattr("dh_core.portfolio_ledger.urllib.request.build_opener", lambda *_args: Opener())
     with pytest.raises(LedgerRefusal, match="cannot read mirror"):
         LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock").read_url("https://example.invalid/mirror")
     assert observed["timeout"] == pytest.approx(30, abs=0.01)
@@ -1155,10 +1158,14 @@ def test_total_mirror_deadline_includes_open_and_all_reads(monkeypatch: pytest.M
             return next(self.chunks)
 
     observed: list[float] = []
-    monkeypatch.setattr(
-        "dh_core.portfolio_ledger.urllib.request.urlopen",
-        lambda _url, *, timeout: observed.append(timeout) or Response([b"x", b""]),
-    )
+
+    class Opener:
+        @staticmethod
+        def open(_url: str, *, timeout: float) -> Response:
+            observed.append(timeout)
+            return Response([b"x", b""])
+
+    monkeypatch.setattr("dh_core.portfolio_ledger.urllib.request.build_opener", lambda *_args: Opener())
     clock = iter([0.0, 0.0, 29.0, 33.0])
     monkeypatch.setattr("dh_core.portfolio_ledger.time.monotonic", lambda: next(clock))
     store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock")

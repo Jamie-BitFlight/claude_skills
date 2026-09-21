@@ -15,9 +15,10 @@ import urllib.request
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from enum import StrEnum
+from http.client import HTTPMessage
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from threading import Lock
-from typing import Annotated, Literal, overload
+from typing import IO, Annotated, Literal, overload
 from urllib.parse import quote, unquote, urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -35,6 +36,15 @@ GitSha = Annotated[str, Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")]
 WINDOWS_DRIVE_URI_PREFIX_LENGTH = 3
 MINIMUM_UNC_PARTS = 2
 EXTERNAL_IO_TIMEOUT_SECONDS = 30
+
+
+def canonical_repository_path(path: str) -> str:
+    """Return a canonical repository-relative POSIX path or refuse aliases."""
+    candidate = PurePosixPath(path)
+    normalized = candidate.as_posix()
+    if not path or path != normalized or path.startswith("/") or ".." in candidate.parts or "\\" in path:
+        raise ValueError(f"repository path is not canonical: {path!r}")
+    return normalized
 
 
 def file_path_to_uri(path: str, *, platform: str = os.name) -> str:
@@ -124,6 +134,21 @@ def validate_mirror_url(url: str) -> str:
     elif not parsed.hostname:
         raise LedgerRefusal("HTTPS mirror URL requires a hostname", code="invalid_mirror")
     return url
+
+
+class StrictMirrorRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Validate every redirect target before transport follows it."""
+
+    def redirect_request(
+        self, req: urllib.request.Request, fp: IO[bytes], code: int, msg: str, headers: HTTPMessage, newurl: str
+    ) -> urllib.request.Request | None:
+        """Allow only redirect targets accepted by the mirror URI codec.
+
+        Returns:
+            Validated redirect request.
+        """
+        validate_mirror_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 CANONICAL_CONFLICT_GROUP_IDS = frozenset({
@@ -551,6 +576,7 @@ class PortfolioLedger(LedgerModel):
             if len(group.paths) != len(set(group.paths)):
                 raise ValueError(f"conflict group {group.id!r} contains duplicate paths")
             for path in group.paths:
+                canonical_repository_path(path)
                 if path in primary_paths:
                     raise ValueError(f"primary path {path!r} belongs to both {primary_paths[path]!r} and {group.id!r}")
                 primary_paths[path] = group.id
@@ -567,6 +593,8 @@ class PortfolioLedger(LedgerModel):
             if key != inventory.id:
                 raise ValueError(f"inventory key {key!r} does not match inventory id {inventory.id!r}")
             names = [path.path for path in inventory.paths]
+            for name in names:
+                canonical_repository_path(name)
             if not names or names != sorted(names) or len(names) != len(set(names)):
                 raise ValueError(f"inventory {inventory.id!r} paths must be non-empty, sorted, and unique")
             if any(Path(name).is_absolute() or ".." in Path(name).parts for name in names):
@@ -937,6 +965,9 @@ class PortfolioLedger(LedgerModel):
         terminal_error = self._terminal_event_error(car, event)
         if terminal_error:
             return terminal_error
+        receipt_error = self._core_event_receipt_error(car, event)
+        if receipt_error:
+            return receipt_error
         error: str | None = None
         if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
             error = f"history chain has illegal {event.action} state or actor"
@@ -957,6 +988,44 @@ class PortfolioLedger(LedgerModel):
         elif event.action == "inventory" and (event.actor_id != car.maker_id or len(event.inventory_ids) != 1):
             error = "inventory event authority or subject is invalid"
         return error
+
+    def _core_event_receipt_error(self, car: Car, event: HistoryEvent) -> str | None:
+        """Bind core transition events to their authorizing receipts.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
+        expected: EvidenceReceipt | None = None
+        if event.action == "implementation-admit":
+            expected = next(
+                (
+                    receipt
+                    for receipt in car.receipts
+                    if receipt.author_id == car.implementation_checker_id and receipt.path == car.implementation_report
+                ),
+                None,
+            )
+        elif event.action == "integrate":
+            expected = next(
+                (
+                    receipt
+                    for receipt in car.receipts
+                    if receipt.author_id == car.integrator_id and receipt.verdict is Verdict.RECORDED
+                ),
+                None,
+            )
+        elif event.action == "aspect-certify":
+            expected = next(
+                (
+                    receipt
+                    for receipt in car.receipts
+                    if receipt.author_id == car.aspect_checker_id and receipt.path == car.aspect_report
+                ),
+                None,
+            )
+        if expected is not None and (event.receipt_path, event.receipt_sha256) != (expected.path, expected.sha256):
+            return f"history chain {event.action} receipt does not match authorizing evidence"
+        return None
 
     def _terminal_event_error(self, car: Car, event: HistoryEvent) -> str | None:
         """Validate inventory and reservation terminal event authority/state.
@@ -1802,7 +1871,14 @@ class _LedgerStore:
         Returns:
             Complete response bytes.
         """
+        normalized = validate_mirror_url(url)
+        parsed = urlparse(normalized)
         deadline = time.monotonic() + EXTERNAL_IO_TIMEOUT_SECONDS
+        if parsed.scheme == "file":
+            target = Path(file_uri_to_path(normalized))
+            if not target.is_file():
+                raise LedgerRefusal("file mirror target must be a regular file", code="invalid_mirror")
+            return self._read_file_before_deadline(target, deadline)
         try:
             open_budget = deadline - time.monotonic()
             if open_budget <= 0:
@@ -1811,9 +1887,8 @@ class _LedgerStore:
                     code="process_timeout",
                     category="external_io",
                 )
-            with urllib.request.urlopen(  # ruff: ignore[suspicious-url-open-usage] - URL is explicit persisted authority
-                url, timeout=open_budget
-            ) as response:
+            opener = urllib.request.build_opener(StrictMirrorRedirectHandler())
+            with opener.open(normalized, timeout=open_budget) as response:
                 chunks: list[bytes] = []
                 while True:
                     remaining = deadline - time.monotonic()
@@ -1832,6 +1907,24 @@ class _LedgerStore:
                     chunks.append(chunk)
         except OSError as error:
             raise LedgerRefusal(f"cannot read mirror {url!r}: {error}") from error
+
+    def _read_file_before_deadline(self, target: Path, deadline: float) -> bytes:
+        """Read one regular file while enforcing the mirror wall-clock deadline.
+
+        Returns:
+            Complete file bytes.
+        """
+        chunks: list[bytes] = []
+        with target.open("rb") as stream:
+            while True:
+                if time.monotonic() >= deadline:
+                    raise LedgerRefusal(
+                        "file mirror read exceeded total deadline", code="process_timeout", category="external_io"
+                    )
+                chunk = stream.read(65536)
+                if not chunk:
+                    return b"".join(chunks)
+                chunks.append(chunk)
 
 
 class PortfolioLedgerService:

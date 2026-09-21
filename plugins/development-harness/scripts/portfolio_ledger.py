@@ -16,7 +16,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TextIO, TypeVar
+from typing import Never, TextIO, TypeVar
 
 from pydantic import BaseModel
 
@@ -54,13 +54,21 @@ COMMANDS = (
 RequestT = TypeVar("RequestT", bound=BaseModel)
 
 
+class JsonArgumentParser(argparse.ArgumentParser):
+    """Route argument failures through the compact refusal envelope."""
+
+    def error(self, message: str) -> Never:
+        """Raise a typed refusal instead of printing usage text."""
+        raise LedgerRefusal(message, code="invalid_request", category="contract")
+
+
 def parser() -> argparse.ArgumentParser:
     """Build the command parser.
 
     Returns:
         Configured parser.
     """
-    result = argparse.ArgumentParser(description=__doc__)
+    result = JsonArgumentParser(description=__doc__)
     result.add_argument("--ledger", type=Path, default=CANONICAL_LEDGER_PATH)
     result.add_argument("--lock", type=Path, default=CANONICAL_LOCK_PATH)
     result.add_argument("--evidence-root", type=Path, default=Path.cwd())
@@ -107,8 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         Process exit code.
     """
-    args = parser().parse_args(argv)
     try:
+        args = parser().parse_args(argv)
         runtime = PortfolioLedgerRuntime(evidence_root=args.evidence_root, ledger_path=args.ledger, lock_path=args.lock)
         if args.command == "initialize":
             request: BaseModel | None = request_json(args.request, args.command, PortfolioLedger)
