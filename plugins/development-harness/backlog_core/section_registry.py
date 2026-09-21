@@ -27,12 +27,12 @@ A section is a **named channel**. A producer writes a report into it, and a cons
 that report back by name.
 
 The intention is economy. A groomed item grows larger than one agent can read affordably,
-so the name lets a consumer fetch the channels its own stage needs and leave the rest
-unread. A name that no consumer addresses holds content that reaches no reader.
+so the name lets a consumer fetch only the channels its own stage needs. A name that no
+consumer addresses holds content that reaches no reader.
 
-Dynamic channels are available and need no entry here. A producer may open one this
-registry does not list, and its name then travels to the consumer inside an instruction
-that names it — "read the ``diffusion_images`` section when planning the image work".
+A channel this registry does not list reaches its consumer when the name travels in an
+instruction that names it — "read the ``diffusion_images`` section when planning the image
+work".
 
 How to add a new canonical section
 -----------------------------------
