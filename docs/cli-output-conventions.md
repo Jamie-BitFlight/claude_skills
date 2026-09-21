@@ -10,7 +10,7 @@ guess:
   value to its meaning via column *position* (nth value = nth header); JSON binds via an explicit
   *repeated key* at each value — a more direct, unambiguous token-level association for an LLM
   parsing the output, with no risk of misparsing when a cell value contains whitespace. Emit
-  compact JSON for this. [`rules/json-no-pretty-print.mdc`](../rules/json-no-pretty-print.mdc)
+  compact JSON for this. [`rules/json-no-pretty-print.md`](../rules/json-no-pretty-print.md)
   holds that rule and its exclusions.
 - **`logging` is for debug/trace/forensic output only** — never for primary output a calling agent
   needs to read or parse. Status messages, results, and errors meant to be consumed by the caller

@@ -1,8 +1,3 @@
----
-description: Do not pretty-print or indent JSON an agent reads on stdout or stderr
-alwaysApply: true
----
-
 # JSON output (no pretty-print by default)
 
 Applies to JSON an agent reads on stdout or stderr: script output, CLI results, MCP tool payloads.

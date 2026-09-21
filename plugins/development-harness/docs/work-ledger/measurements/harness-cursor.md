@@ -19,8 +19,8 @@ Repo prior notes checked: `plugins/development-harness/dh_paths.py` lines 25-70 
 about hooks, plugins, or env vars. `dh_paths.py` asserts that Cursor uses `.cursor-plugin/plugin.json` with
 `${CLAUDE_PLUGIN_ROOT}` in script paths and that "Cursor sets `DH_PROJECT_ROOT` to `${workspaceFolder}`" — the
 second is this repo's own convention (the repo's `mcp.json` would have to set it), not a Cursor behaviour; see §4
-and §6 for what was and was not found. `.cursor/rules/` in this repo holds two `.mdc` rule files only
-(`backlog-before-work.mdc`, and `json-no-pretty-print.mdc` as a symlink to `rules/`); there is no `.cursor-plugin/`, `.cursor/hooks.json`,
+and §6 for what was and was not found. `.cursor/rules/` in this repo holds one `.mdc` rule file only
+(`backlog-before-work.mdc`); there is no `.cursor-plugin/`, `.cursor/hooks.json`,
 `.cursor/mcp.json`, or `.cursor/skills/` in the checkout.
 
 ---
