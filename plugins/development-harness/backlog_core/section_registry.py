@@ -21,6 +21,29 @@ This module imports nothing from the rest of ``backlog_core`` — it is a leaf,
 even more foundational than ``models.py`` — so any module may import from it
 without risking a cycle.
 
+What a section is, and when to register one
+--------------------------------------------
+A section is a **named channel**: one producer writes a report into it, and a named
+consumer reads that report back by name. The name is the address.
+
+Sections exist for economy. A fully groomed item is far larger than any single agent
+can read affordably, so no consumer reads the whole item — each fetches only the
+sections its stage needs, by name. That is what makes the name load-bearing: a consumer
+that cannot address a section never receives what was written into it.
+
+**Register a name when a consumer reads it by name.** Registration is not the repair for
+an ``Unregistered section name 'X' ... 'unknown__x'`` warning. Registering a name nothing
+reads removes the warning and leaves the content exactly as unreachable — quieter, not
+fixed. That warning is the useful signal: it reports a producer writing to a channel with
+no receiver. The repair is to name the consumer and have it read the section, or to stop
+generating the section. See #1161 for the live instance — six grooming sections written
+today with no consumer reading any of them.
+
+Dynamic sections are supported and need no entry here. A producer may create a section
+this registry does not list; its name then reaches its consumer another way, carried by an
+instruction that names it — e.g. "read the ``diffusion_images`` section when planning the
+image work". An unlisted name with no such instruction is written and never received.
+
 How to add a new canonical section
 -----------------------------------
 1. Append a member to :class:`SectionKey` — the value is the ``snake_case``
