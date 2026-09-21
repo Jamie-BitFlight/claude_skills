@@ -5,18 +5,14 @@ alwaysApply: true
 
 # JSON output (no pretty-print by default)
 
-Scope: JSON an agent reads on stdout or stderr — script output, CLI results, MCP tool payloads.
+Applies to JSON an agent reads on stdout or stderr: script output, CLI results, MCP tool payloads.
+Excludes every JSON configuration file, whatever its name or location.
 
-**This rule excludes JSON configuration files of any kind.**
+- Emit compact JSON: `JSON.stringify(value)`, `json.dumps(data)`, `model_dump_json()`.
+- Never pass an indent argument: no `JSON.stringify(value, null, 2)`, no `indent=`.
+- Keep a configuration file's existing formatting.
+- Reformat a configuration file only when reformatting it is the requested task.
 
-- Emit compact JSON: `JSON.stringify(value)`, `json.dumps(data)`, `model_dump_json()`. Never
-  `JSON.stringify(value, null, 2)`, never `indent=`.
-- Indentation and newlines are token cost for a model and add no parsing benefit.
-
-Out of scope — every JSON configuration file, whatever its name or location: `package.json`,
-`tsconfig.json`, `biome.json`, every harness plugin manifest (`.claude-plugin/plugin.json`,
-`.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`), `marketplace.json`, test fixtures,
-snapshots, and any JSON a program writes to disk rather than to stdout or stderr. Humans read and
-edit these, git diffs them line by line, and non-AI tooling consumes them. Keep their existing
-formatting. Never reformat one as part of an unrelated change, and never cite this rule to justify
-compacting one.
+Configuration files include `package.json`, `tsconfig.json`, `biome.json`, every harness plugin
+manifest (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`),
+`marketplace.json`, test fixtures, snapshots, and any JSON a program writes to disk.
