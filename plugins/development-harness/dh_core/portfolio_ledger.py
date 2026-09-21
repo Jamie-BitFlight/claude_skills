@@ -1108,6 +1108,16 @@ class LedgerStore:
             service.verify_evidence(row.artifact, row.sha256, f"correction row {row_id} artifact")
         self.validate_inventory_and_reservation_evidence(ledger, service)
         self.validate_transition_evidence(ledger, service)
+        if ledger.parent.state is ParentState.PARENT_CERTIFIED:
+            for car_id in ledger.parent.required_car_ids:
+                car = ledger.cars[car_id]
+                if car.integration_sha != ledger.parent.revision and not service.git_revision_contains(
+                    ledger.parent.revision or "", car.integration_sha or ""
+                ):
+                    raise LedgerRefusal(
+                        f"persisted parent revision {ledger.parent.revision} does not incorporate "
+                        f"required aggregate {car.id} at {car.integration_sha}"
+                    )
 
     def validate_inventory_and_reservation_evidence(
         self, ledger: PortfolioLedger, service: PortfolioLedgerService
@@ -1332,7 +1342,7 @@ class PortfolioLedgerService:
             LedgerRefusal: When state, authority, group, paths, or exclusivity is invalid.
         """
         car = self.require_car(car_id)
-        error = self.reservation_acquisition_error(car, reservation, actor_id)
+        error = self._reservation_acquisition_error(car, reservation, actor_id)
         if error:
             raise LedgerRefusal(error)
         if reservation.id in self.ledger.reservations:
@@ -1367,7 +1377,7 @@ class PortfolioLedgerService:
             }
         )
 
-    def reservation_acquisition_error(self, car: Car, reservation: Reservation, actor_id: str) -> str | None:
+    def _reservation_acquisition_error(self, car: Car, reservation: Reservation, actor_id: str) -> str | None:
         """Return the first acquisition contract violation.
 
         Args:
@@ -1895,7 +1905,7 @@ class PortfolioLedgerService:
         if invalid:
             raise LedgerRefusal(f"required parent cars are not certified aggregates: {sorted(invalid)}")
         for car in required:
-            if car.integration_sha != revision and not self._git_revision_contains(revision, car.integration_sha or ""):
+            if car.integration_sha != revision and not self.git_revision_contains(revision, car.integration_sha or ""):
                 raise LedgerRefusal(
                     f"parent revision {revision} does not incorporate required aggregate {car.id} at {car.integration_sha}"
                 )
@@ -2065,7 +2075,7 @@ class PortfolioLedgerService:
             return True
         return True
 
-    def _git_revision_contains(self, revision: str, ancestor: str) -> bool:
+    def git_revision_contains(self, revision: str, ancestor: str) -> bool:
         """Return whether a parent revision contains one aggregate revision."""
         if self.evidence_root is None:
             return False
