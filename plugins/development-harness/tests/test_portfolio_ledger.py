@@ -263,6 +263,30 @@ def test_reconstructed_integrated_car_requires_legal_history_chain() -> None:
         PortfolioLedger.model_validate(payload)
 
 
+def test_reconstruction_rejects_malformed_sha_missing_predecessor_and_unintegrated_consumer() -> None:
+    malformed_sha = minimum_ledger().model_dump(mode="json")
+    malformed_sha["cars"]["A6-G0"]["base_git_sha"] = "a" * 41
+    with pytest.raises(ValueError, match="String should match pattern"):
+        PortfolioLedger.model_validate(malformed_sha)
+
+    missing_predecessor = admitted_ledger().model_dump(mode="json")
+    missing_predecessor["cars"]["A6-G0"]["predecessor_shas"] = ["c" * 64]
+    with pytest.raises(ValueError, match="absent predecessor"):
+        PortfolioLedger.model_validate(missing_predecessor)
+
+    aggregate = integrated_ledger(car_kind=CarKind.ASPECT_AGGREGATE)
+    aspect_receipt = EvidenceReceipt(
+        path="evidence/aspect.json", sha256=SHA, author_id="checker-2", verdict="PASS", observed_revision="b" * 64
+    )
+    certified = PortfolioLedgerService(aggregate).certify_aspect(
+        "A6-G0", checker_id="checker-2", report=aspect_receipt.path, receipt=aspect_receipt, at=NOW
+    )
+    consumer = minimum_ledger().cars["A6-G0"].model_copy(update={"id": "UNINTEGRATED", "issue": 9996})
+    payload = certified.model_copy(update={"cars": {**certified.cars, consumer.id: consumer}}).model_dump(mode="json")
+    with pytest.raises(ValueError, match="consumer is not integrated"):
+        PortfolioLedger.model_validate(payload)
+
+
 def test_inventory_records_only_sorted_exact_content_at_the_current_revision() -> None:
     ledger = minimum_ledger()
     car = ledger.cars["A6-G0"].model_copy(update={"inventory_ids": []})
@@ -489,7 +513,7 @@ def test_windows_liveness_probe_never_calls_destructive_os_kill(monkeypatch: pyt
     monkeypatch.setattr(
         "dh_core.portfolio_ledger.os.kill", lambda *_args: pytest.fail("os.kill is destructive on Windows")
     )
-    monkeypatch.setattr(service, "windows_process_is_alive", lambda _pid: True, raising=False)
+    monkeypatch.setattr(service, "_windows_process_is_alive", lambda _pid: True)
     assert service.process_is_alive(1234)
 
 
@@ -822,6 +846,13 @@ def test_parent_certification_requires_all_aggregates_addenda_and_parent_checker
             revision="b" * 64,
             report=parent_receipt.path,
             receipt=parent_receipt.model_copy(update={"author_id": "checker"}),
+        )
+    with pytest.raises(LedgerRefusal, match="does not incorporate"):
+        PortfolioLedgerService(with_addendum).certify_parent(
+            checker_id="parent-checker",
+            revision="c" * 64,
+            report=parent_receipt.path,
+            receipt=parent_receipt.model_copy(update={"observed_revision": "c" * 64}),
         )
 
 

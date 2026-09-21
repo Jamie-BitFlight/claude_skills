@@ -30,7 +30,7 @@ THREAD_LOCKS: dict[Path, Lock] = {}
 THREAD_LOCKS_GUARD = Lock()
 
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-GitSha = Annotated[str, Field(pattern=r"^[0-9a-f]{40,64}$")]
+GitSha = Annotated[str, Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")]
 WINDOWS_DRIVE_URI_PREFIX_LENGTH = 3
 EXTERNAL_IO_TIMEOUT_SECONDS = 30
 
@@ -508,7 +508,11 @@ class PortfolioLedger(LedgerModel):
         Returns:
             Validated ledger.
         """
+        integrated_shas = {car.integration_sha for car in self.cars.values() if car.integration_sha is not None}
         for car in self.cars.values():
+            missing_predecessors = set(car.predecessor_shas) - integrated_shas
+            if missing_predecessors:
+                raise ValueError(f"car {car.id!r} references absent predecessor SHAs: {sorted(missing_predecessors)}")
             error = self.car_transition_error(car)
             if error:
                 raise ValueError(f"car {car.id!r} lacks transition-equivalent invariants: {error}")
@@ -696,6 +700,12 @@ class PortfolioLedger(LedgerModel):
         ]
         if not matching:
             return "aspect receipt does not match checker, report, verdict, and revision"
+        consumers = [item for item in self.cars.values() if item.id != car.id and car.aspect in item.aspect_membership]
+        if any(item.state not in {CarState.INTEGRATED, CarState.ASPECT_CERTIFIED} for item in consumers):
+            return "declared aspect consumer is not integrated"
+        consumer_shas = {item.integration_sha for item in consumers if item.integration_sha is not None}
+        if consumer_shas - set(car.predecessor_shas):
+            return "aggregate predecessors omit declared consumer revisions"
         return None
 
     @model_validator(mode="after")
@@ -1854,6 +1864,11 @@ class PortfolioLedgerService:
         ]
         if invalid:
             raise LedgerRefusal(f"required parent cars are not certified aggregates: {sorted(invalid)}")
+        for car in required:
+            if car.integration_sha != revision and not self._git_revision_contains(revision, car.integration_sha or ""):
+                raise LedgerRefusal(
+                    f"parent revision {revision} does not incorporate required aggregate {car.id} at {car.integration_sha}"
+                )
         present_addenda = {addendum.id for addendum in parent.addenda}
         missing_addenda = set(parent.required_addendum_ids) - present_addenda
         if missing_addenda:
@@ -2011,7 +2026,7 @@ class PortfolioLedgerService:
     def process_is_alive(self, process_id: int) -> bool:
         """Return whether the operating system still recognizes a process id."""
         if os.name == "nt":
-            return self.windows_process_is_alive(process_id)
+            return self._windows_process_is_alive(process_id)
         try:
             os.kill(process_id, 0)
         except ProcessLookupError:
@@ -2020,7 +2035,36 @@ class PortfolioLedgerService:
             return True
         return True
 
-    def windows_process_is_alive(self, process_id: int) -> bool:
+    def _git_revision_contains(self, revision: str, ancestor: str) -> bool:
+        """Return whether a parent revision contains one aggregate revision."""
+        if self.evidence_root is None:
+            return False
+        git_executable = shutil.which("git")
+        if git_executable is None:
+            raise LedgerRefusal("Git is required to establish parent revision ancestry")
+        runner = Path(__file__).parents[3] / "scripts" / "run_bounded.py"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(runner),
+                "--timeout-seconds",
+                str(EXTERNAL_IO_TIMEOUT_SECONDS),
+                "--",
+                git_executable,
+                "-C",
+                str(self.evidence_root),
+                "merge-base",
+                "--is-ancestor",
+                ancestor,
+                revision,
+            ],
+            check=False,
+            capture_output=True,
+            timeout=EXTERNAL_IO_TIMEOUT_SECONDS + 5,
+        )
+        return result.returncode == 0
+
+    def _windows_process_is_alive(self, process_id: int) -> bool:
         """Query Windows process existence without delivering a signal.
 
         Returns:
