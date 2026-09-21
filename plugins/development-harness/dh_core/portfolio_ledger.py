@@ -611,14 +611,44 @@ class PortfolioLedger(LedgerModel):
         }
         required = required_by_state[car.state]
         actions = [event.action for event in car.history]
+        core_actions = {"reservation-acquire", "implementation-admit", "integrate", "aspect-certify"}
+        if any(actions.count(action) > 1 for action in core_actions):
+            return "history chain duplicates a core transition"
         positions = [actions.index(action) for action in required if action in actions]
         if len(positions) != len(required) or positions != sorted(positions):
             return "history chain omits or reorders required transitions"
         for previous, current in zip(car.history, car.history[1:], strict=False):
             if previous.to_state != current.from_state:
                 return "history chain contains a state jump"
+        event_error = self.history_event_error(car)
+        if event_error:
+            return event_error
         if car.history and car.history[-1].to_state != car.state:
             return "history chain does not reach the persisted state"
+        return None
+
+    def history_event_error(self, car: Car) -> str | None:
+        """Return an error for an event no public transition could emit."""
+        legal = {
+            "reservation-acquire": (CarState.INVENTORIED, CarState.RESERVED, car.maker_id),
+            "implementation-admit": (
+                CarState.RESERVED,
+                CarState.IMPLEMENTATION_ADMITTED,
+                car.implementation_checker_id,
+            ),
+            "integrate": (CarState.IMPLEMENTATION_ADMITTED, CarState.INTEGRATED, car.integrator_id),
+            "aspect-certify": (CarState.INTEGRATED, CarState.ASPECT_CERTIFIED, car.aspect_checker_id),
+        }
+        for event in car.history:
+            if event.action in legal and (event.from_state, event.to_state, event.actor_id) != legal[event.action]:
+                return f"history chain has illegal {event.action} state or actor"
+            if event.action not in legal and event.action not in {
+                "reservation-release",
+                "reservation-invalidate",
+                "reservation-recover",
+                "inventory",
+            }:
+                return f"history chain contains unknown action {event.action!r}"
         return None
 
     def implementation_evidence_error(self, car: Car, maker: Role) -> str | None:
@@ -1153,7 +1183,7 @@ class LedgerStore:
         Returns:
             Completed bounded process result.
         """
-        runner = Path(__file__).parents[3] / "scripts" / "run_bounded.py"
+        runner = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
         command = [
             sys.executable,
             str(runner),
@@ -2042,7 +2072,7 @@ class PortfolioLedgerService:
         git_executable = shutil.which("git")
         if git_executable is None:
             raise LedgerRefusal("Git is required to establish parent revision ancestry")
-        runner = Path(__file__).parents[3] / "scripts" / "run_bounded.py"
+        runner = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
         result = subprocess.run(
             [
                 sys.executable,
@@ -2073,16 +2103,29 @@ class PortfolioLedgerService:
         tasklist = shutil.which("tasklist")
         if tasklist is None:
             raise LedgerRefusal("tasklist is required for non-destructive Windows liveness checks")
+        runner = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
         try:
             result = subprocess.run(
-                [tasklist, "/FI", f"PID eq {process_id}", "/FO", "CSV", "/NH"],
+                [
+                    sys.executable,
+                    str(runner),
+                    "--timeout-seconds",
+                    str(EXTERNAL_IO_TIMEOUT_SECONDS),
+                    "--",
+                    tasklist,
+                    "/FI",
+                    f"PID eq {process_id}",
+                    "/FO",
+                    "CSV",
+                    "/NH",
+                ],
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=EXTERNAL_IO_TIMEOUT_SECONDS,
+                timeout=EXTERNAL_IO_TIMEOUT_SECONDS + 5,
             )
         except subprocess.TimeoutExpired as error:
-            raise LedgerRefusal("Windows process liveness check timed out") from error
+            raise LedgerRefusal("bounded Windows process liveness check timed out") from error
         return result.returncode == 0 and f'"{process_id}"' in result.stdout
 
     def require_car(self, car_id: str) -> Car:
