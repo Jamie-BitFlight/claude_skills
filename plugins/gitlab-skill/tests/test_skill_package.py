@@ -138,18 +138,10 @@ def test_component_and_function_evals_assert_documented_behavior() -> None:
         assert required in function_expectations
 
 
-def test_setup_command_embeds_checked_in_script_exactly() -> None:
-    """The command's embedded shell script must match the executable script."""
-    command = (PLUGIN_ROOT / "commands" / "setup-ci-publish-token.md").read_text(encoding="utf-8")
-    embedded = command.split("```sh\n", maxsplit=1)[1].split("\n```", maxsplit=1)[0]
-    script = (PLUGIN_ROOT / "commands" / "setup-ci-publish-token.sh").read_text(encoding="utf-8")
-    assert embedded == script
-
-
 def test_setup_command_uses_current_glab_security_contract() -> None:
     """The setup command must preserve current authentication and token invariants."""
-    script = (PLUGIN_ROOT / "commands" / "setup-ci-publish-token.sh").read_text(encoding="utf-8")
     command = (PLUGIN_ROOT / "commands" / "setup-ci-publish-token.md").read_text(encoding="utf-8")
+    script = command.split("```sh\n", maxsplit=1)[1].split("\n```", maxsplit=1)[0]
 
     assert "${CI_JOB_TOKEN" not in script
     assert "glab variable get" in script
