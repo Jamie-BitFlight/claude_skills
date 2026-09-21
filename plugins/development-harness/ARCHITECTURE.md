@@ -507,6 +507,36 @@ relaying, not to the loop. The outer loop is specified to turn on each session's
 inner one turns on each dispatch's; where a procedure waits for the whole set instead, that is an
 unfilled gap against this model, not a second model.
 
+## Portfolio merge ledger
+
+Cross-aspect merge trains use a separate portfolio ledger from the task-execution ledger above.
+`dh_core/portfolio_ledger.py` is the executable specification and transition service;
+`scripts/portfolio_ledger.py` is its agent-facing compact-JSON CLI. The persisted execution copy and
+its permanent advisory lock are `.tmp/reports/runtime-integrity-merge-train-ledger.json` and
+`.tmp/reports/runtime-integrity-merge-train-ledger.lock`.
+
+The ledger binds each car to exact base, upstream, predecessor, inventory, reservation, command
+output, receipt, and integrated revision identities. The conflict-group names are a closed
+vocabulary, and every primary writable path belongs to one group. Unknown names, aliases, duplicate
+primary membership, stale revisions, incomplete inventories, incompatible active reservations, and
+missing evidence fail before a transition is persisted.
+
+Car state is linear. Foundation, producer, and implementation cars stop at `INTEGRATED`; only an
+aspect aggregate may continue to `ASPECT_CERTIFIED`. `PARENT_CERTIFIED` exists only on the parent
+record after every required aggregate and addendum is present. Makers submit implementation facts,
+maker-independent checkers admit them, integrators record merge facts without a verdict, a different
+checker certifies an aggregate, and a parent checker independent from all of those actors records the
+parent verdict. The ledger writer validates and records those immutable receipts but does not author
+their facts or judgements.
+
+Persistence holds the lock across compare-and-swap validation, canonical serialization, temporary
+file flush and `fsync`, atomic replacement, and directory `fsync`. A crashed writer therefore leaves
+the prior revision or the complete next revision, never a partial file. Every accepted local revision
+has a canonical content identity. When an immutable mirror is declared, local bytes, mirror bytes,
+the ledger identity, and the independently supplied restore digest must agree; disagreement blocks
+transitions, and neither copy wins automatically. A missing local copy can be restored only from a
+canonical mirror that matches that external digest.
+
 ## Automation Boundary
 
 The harness exists to turn repeatable agent instructions into reliable workflow
