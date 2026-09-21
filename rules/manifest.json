@@ -37,6 +37,10 @@
       "match": "SKILL.md,**/agents/*.md,**/commands/**/*.md"
     },
     {
+      "file": "json-no-pretty-print.mdc",
+      "match": "*.py,*.ts,*.js,*.mjs,*.cjs"
+    },
+    {
       "file": "language-conventions.md",
       "match": "**/scripts/**,.claude/hooks/**,*.py"
     },
