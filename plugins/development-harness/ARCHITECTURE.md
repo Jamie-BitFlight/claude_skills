@@ -519,7 +519,8 @@ The ledger binds each car to exact base, upstream, predecessor, inventory, reser
 output, receipt, and integrated revision identities. The conflict-group names are a closed
 vocabulary, and every primary writable path belongs to one group. Unknown names, aliases, duplicate
 primary membership, stale revisions, incomplete inventories, incompatible active reservations, and
-missing evidence fail before a transition is persisted.
+missing evidence fail before a transition is persisted. A car cannot reserve an empty resource set:
+its non-empty inventory, canonical group, and reservation paths must agree exactly.
 
 Car state is linear. Foundation, producer, and implementation cars stop at `INTEGRATED`; only an
 aspect aggregate may continue to `ASPECT_CERTIFIED`. `PARENT_CERTIFIED` exists only on the parent
@@ -544,13 +545,18 @@ candidate bytes. Publication failure leaves the previous local/mirror pair in au
 successful local transition is immediately readable against its new mirror. Local bytes, mirror
 bytes, the ledger identity, and the independently supplied restore digest must agree; disagreement
 blocks transitions, and neither copy wins automatically. A missing local copy can be restored only
-from a canonical mirror that matches that external digest.
+from a canonical mirror that matches that external digest. File-URI conversion uses explicit POSIX
+or Windows semantics; Windows drive-qualified and UNC paths round-trip without passing through a
+POSIX `Path` interpretation.
 
 Operational CLI reads and mutations take an evidence root. Tracker and correction authorities,
-inventory contents, reservation and recovery evidence, complete command outputs, and checker,
-integration, addendum, and parent receipts are read in full and SHA-256 verified before a local
-commit. Persisted reconstruction separately replays state-equivalent role, session-independence,
-receipt, command-success, reservation-exclusivity, and inventory/group/path invariants, so loading
+reservation and recovery evidence, complete command outputs, and checker, integration, addendum, and
+parent receipts are read in full and SHA-256 verified before a local commit. Inventory paths are
+different: their baseline bytes are resolved from the recorded Git revision and blob and then hashed,
+so editing the candidate worktree cannot invalidate the frozen baseline or strand its reservation.
+Outside a Git worktree, an immutable archived inventory copy supplies those bytes. Persisted
+reconstruction separately replays state-equivalent role, session-independence, receipt,
+command-success, non-empty reservation-exclusivity, and inventory/group/path invariants, so loading
 JSON cannot bypass a transition gate.
 
 ## Automation Boundary

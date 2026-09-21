@@ -6,12 +6,14 @@ import contextlib
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import urllib.request
 from collections.abc import Iterator
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from threading import Lock
 from typing import Annotated, Literal
 from urllib.parse import unquote, urlparse
@@ -28,6 +30,60 @@ THREAD_LOCKS_GUARD = Lock()
 
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 GitSha = Annotated[str, Field(pattern=r"^[0-9a-f]{40,64}$")]
+WINDOWS_DRIVE_URI_PREFIX_LENGTH = 3
+
+
+def file_path_to_uri(path: str, *, platform: str = os.name) -> str:
+    """Encode an absolute native file path without host-platform coercion.
+
+    Args:
+        path: Native absolute path text.
+        platform: ``"nt"`` for Windows semantics; POSIX semantics otherwise.
+
+    Returns:
+        Canonical file URI.
+    """
+    pure_path = PureWindowsPath(path) if platform == "nt" else PurePosixPath(path)
+    return pure_path.as_uri()
+
+
+def file_uri_to_path(url: str, *, platform: str = os.name) -> str:
+    """Decode a file URI using explicit native drive and UNC semantics.
+
+    Args:
+        url: File URI.
+        platform: ``"nt"`` for Windows semantics; POSIX semantics otherwise.
+
+    Returns:
+        Native absolute path text.
+
+    Raises:
+        LedgerRefusal: When the URL is not a valid absolute file URI.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme != "file":
+        raise LedgerRefusal(f"mirror URL is not a file URI: {url!r}")
+    decoded = unquote(parsed.path)
+    if platform == "nt":
+        if parsed.netloc and parsed.netloc.lower() != "localhost":
+            native = str(PureWindowsPath(f"//{parsed.netloc}{decoded}"))
+        else:
+            if (
+                len(decoded) >= WINDOWS_DRIVE_URI_PREFIX_LENGTH
+                and decoded[0] == "/"
+                and decoded[1].isalpha()
+                and decoded[2] == ":"
+            ):
+                decoded = decoded[1:]
+            native = str(PureWindowsPath(decoded))
+        if not PureWindowsPath(native).is_absolute():
+            raise LedgerRefusal(f"Windows mirror URI is not drive-qualified or UNC-absolute: {url!r}")
+        return native
+    native = f"//{parsed.netloc}{decoded}" if parsed.netloc else decoded
+    if not PurePosixPath(native).is_absolute():
+        raise LedgerRefusal(f"POSIX mirror URI is not absolute: {url!r}")
+    return native
+
 
 CANONICAL_CONFLICT_GROUP_IDS = frozenset({
     "CG-PORTFOLIO-LEDGER",
@@ -487,21 +543,29 @@ class PortfolioLedger(LedgerModel):
         return self
 
     def active_reservation_error(self, reservation: Reservation, car: Car) -> str | None:
-        """Return the reconstructed-contract error for one active reservation."""
+        """Return the reconstructed-contract error for one active reservation.
+
+        Returns:
+            Error text, or ``None`` when valid.
+        """
         group = self.conflict_groups.get(reservation.group)
+        error: str | None = None
         if not reservation.receipt_path:
-            return "reservation receipt path is missing"
-        if reservation.owner != car.maker_id or car.state is CarState.INVENTORIED:
-            return "owner or car state mismatch"
-        if group is None or sorted(group.paths) != sorted(reservation.paths):
-            return "group or exact path mismatch"
-        inventories = [self.inventories[item] for item in car.inventory_ids]
-        if not inventories or any(inventory.revision != car.upstream_git_sha for inventory in inventories):
-            return "missing or stale inventory"
-        inventoried_paths = {path.path for inventory in inventories for path in inventory.paths}
-        if set(reservation.paths) != inventoried_paths:
-            return "bidirectional inventory path coverage mismatch"
-        return None
+            error = "reservation receipt path is missing"
+        elif not reservation.paths or group is None or not group.paths:
+            error = "non-empty reservation and canonical group paths are required"
+        elif reservation.owner != car.maker_id or car.state is CarState.INVENTORIED:
+            error = "owner or car state mismatch"
+        elif sorted(group.paths) != sorted(reservation.paths):
+            error = "group or exact path mismatch"
+        else:
+            inventories = [self.inventories[item] for item in car.inventory_ids]
+            inventoried_paths = {path.path for inventory in inventories for path in inventory.paths}
+            if not inventories or any(inventory.revision != car.upstream_git_sha for inventory in inventories):
+                error = "missing or stale inventory"
+            elif set(reservation.paths) != inventoried_paths:
+                error = "bidirectional inventory path coverage mismatch"
+        return error
 
     def car_transition_error(self, car: Car) -> str | None:
         """Return an authority/evidence error for one reconstructed car.
@@ -919,7 +983,7 @@ class LedgerStore:
         expected = stamped.canonical_bytes()
         parsed = urlparse(stamped.mirror.url)
         if parsed.scheme == "file":
-            target = Path(unquote(parsed.path))
+            target = Path(file_uri_to_path(stamped.mirror.url))
             if target.exists():
                 if target.read_bytes() != expected:
                     raise LedgerRefusal("mirror publication target already contains different immutable bytes")
@@ -985,7 +1049,7 @@ class LedgerStore:
         """Verify inventory, reservation, and recovery byte references."""
         for inventory in ledger.inventories.values():
             for path in inventory.paths:
-                service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} content")
+                self.verify_inventory_path(inventory, path, service)
         for reservation in ledger.reservations.values():
             service.verify_evidence(reservation.receipt_path, reservation.receipt_sha256, "reservation receipt")
             if reservation.recovery_evidence is not None:
@@ -996,6 +1060,64 @@ class LedgerStore:
                 service.verify_evidence(
                     recovery.judgement_path, recovery.judgement_sha256, "independent recovery judgement"
                 )
+
+    def verify_inventory_path(self, inventory: Inventory, path: InventoryPath, service: PortfolioLedgerService) -> None:
+        """Verify frozen inventory identity without requiring mutable worktree bytes.
+
+        Args:
+            inventory: Frozen inventory carrying the revision.
+            path: Path, Git blob, and complete-byte digest at that revision.
+            service: Evidence verifier used outside a Git worktree.
+
+        Raises:
+            LedgerRefusal: When revision, blob identity, or complete bytes disagree.
+        """
+        if self.evidence_root is None:
+            return
+        git_executable = shutil.which("git")
+        if git_executable is None:
+            raise LedgerRefusal("Git executable is required to verify frozen inventory evidence")
+        probe = subprocess.run(
+            [git_executable, "-C", str(self.evidence_root), "rev-parse", "--is-inside-work-tree"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if probe.returncode != 0:
+            service.verify_evidence(path.path, path.sha256, f"inventory {inventory.id} archived content")
+            return
+        blob_result = subprocess.run(
+            [git_executable, "-C", str(self.evidence_root), "rev-parse", f"{inventory.revision}:{path.path}"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if blob_result.returncode != 0:
+            raise LedgerRefusal(
+                f"inventory {inventory.id} cannot resolve frozen path {path.path!r} at {inventory.revision}"
+            )
+        observed_blob = blob_result.stdout.strip()
+        if observed_blob != path.git_blob:
+            raise LedgerRefusal(
+                f"inventory {inventory.id} Git blob mismatch for {path.path!r}: "
+                f"expected {path.git_blob}, observed {observed_blob}"
+            )
+        content_result = subprocess.run(
+            [git_executable, "-C", str(self.evidence_root), "cat-file", "blob", observed_blob],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+        if content_result.returncode != 0:
+            raise LedgerRefusal(f"inventory {inventory.id} cannot read frozen blob {observed_blob}")
+        observed_sha256 = hashlib.sha256(content_result.stdout).hexdigest()
+        if observed_sha256 != path.sha256:
+            raise LedgerRefusal(
+                f"inventory {inventory.id} frozen content mismatch for {path.path!r}: "
+                f"expected {path.sha256}, observed {observed_sha256}"
+            )
 
     def validate_transition_evidence(self, ledger: PortfolioLedger, service: PortfolioLedgerService) -> None:
         """Verify command, history, car, addendum, and parent byte references."""
@@ -1182,6 +1304,8 @@ class PortfolioLedgerService:
             error = "only the declared maker may acquire its reservation"
         elif not car.inventory_ids:
             error = "reservation requires a frozen inventory"
+        elif not inventories or not inventoried_paths or not reservation.paths:
+            error = "reservation requires non-empty inventory and reservation paths"
         elif any(inventory.revision != car.upstream_git_sha for inventory in inventories):
             error = "reservation inventories are stale"
         elif set(reservation.paths) - inventoried_paths:

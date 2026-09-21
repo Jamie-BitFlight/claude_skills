@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 from dh_core.portfolio_ledger import (
@@ -36,6 +36,8 @@ from dh_core.portfolio_ledger import (
     ReservationState,
     Role,
     TrackerManifest,
+    file_path_to_uri,
+    file_uri_to_path,
     inventory_sha256,
 )
 
@@ -347,6 +349,28 @@ def test_reservation_rejects_an_inventoried_writable_path_left_unreserved() -> N
     )
 
     with pytest.raises(LedgerRefusal, match="inventoried writable paths must exactly match"):
+        PortfolioLedgerService(ledger).acquire_reservation("A6-G0", reservation, actor_id="maker")
+
+
+def test_empty_inventory_group_and_reservation_cannot_reach_reserved() -> None:
+    ledger = minimum_ledger()
+    empty_inventory = Inventory(id="inventory-a6-g0", revision=SHA, paths=[], sha256=inventory_sha256([]))
+    groups = dict(ledger.conflict_groups)
+    groups["CG-PORTFOLIO-LEDGER"] = ConflictGroup(id="CG-PORTFOLIO-LEDGER", paths=[])
+    ledger = ledger.model_copy(update={"inventories": {empty_inventory.id: empty_inventory}, "conflict_groups": groups})
+    reservation = Reservation(
+        id="empty-reservation",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=[],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path="ledger.lock",
+        acquired_at=NOW,
+        receipt_path="evidence/empty-reservation.json",
+        receipt_sha256=SHA,
+    )
+
+    with pytest.raises(LedgerRefusal, match="non-empty"):
         PortfolioLedgerService(ledger).acquire_reservation("A6-G0", reservation, actor_id="maker")
 
 
@@ -854,6 +878,70 @@ def test_initialization_refuses_missing_tracker_correction_and_inventory_bytes(t
     assert not (tmp_path / "ledger.json").exists()
 
 
+def test_inventory_validation_uses_frozen_git_revision_after_worktree_edit(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, timeout=10)
+    subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Ledger Test"], check=True, timeout=10)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "ledger@example.invalid"], check=True, timeout=10
+    )
+    source = tmp_path / "product.py"
+    baseline = b"value = 'baseline'\n"
+    source.write_bytes(baseline)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "product.py"], check=True, timeout=10)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-qm", "baseline"], check=True, timeout=10)
+    revision = subprocess.run(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"], check=True, capture_output=True, text=True, timeout=10
+    ).stdout.strip()
+    blob = subprocess.run(
+        ["git", "-C", str(tmp_path), "rev-parse", f"{revision}:product.py"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    ).stdout.strip()
+    path = InventoryPath(path="product.py", git_blob=blob, sha256=hashlib.sha256(baseline).hexdigest())
+    inventory = Inventory(id="inventory-a6-g0", revision=revision, paths=[path], sha256=inventory_sha256([path]))
+    ledger = minimum_ledger()
+    car = ledger.cars["A6-G0"].model_copy(update={"base_git_sha": revision, "upstream_git_sha": revision})
+    groups = dict(ledger.conflict_groups)
+    groups["CG-PORTFOLIO-LEDGER"] = ConflictGroup(id="CG-PORTFOLIO-LEDGER", paths=["product.py"])
+    ledger = ledger.model_copy(
+        update={"cars": {car.id: car}, "inventories": {inventory.id: inventory}, "conflict_groups": groups}
+    )
+    reservation_receipt = b'{"reservation":"product.py"}'
+    (tmp_path / "reservation.json").write_bytes(reservation_receipt)
+    reservation = Reservation(
+        id="reservation-a6-g0",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=["product.py"],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path="ledger.lock",
+        acquired_at=NOW,
+        receipt_path="reservation.json",
+        receipt_sha256=hashlib.sha256(reservation_receipt).hexdigest(),
+    )
+    reserved = PortfolioLedgerService(ledger, evidence_root=tmp_path).acquire_reservation(
+        "A6-G0", reservation, actor_id="maker"
+    )
+    source.write_text("value = 'candidate edit'\n", encoding="utf-8")
+
+    LedgerStore(
+        tmp_path / "ledger.json", tmp_path / "ledger.lock", evidence_root=tmp_path
+    ).validate_inventory_and_reservation_evidence(reserved, PortfolioLedgerService(reserved, evidence_root=tmp_path))
+    release_receipt = b'{"release":"after candidate edit"}'
+    (tmp_path / "release.json").write_bytes(release_receipt)
+    released = PortfolioLedgerService(reserved, evidence_root=tmp_path).release_reservation(
+        "A6-G0",
+        reservation.id,
+        actor_id="maker",
+        at=NOW,
+        receipt_path="release.json",
+        receipt_sha256=hashlib.sha256(release_receipt).hexdigest(),
+    )
+    assert released.reservations[reservation.id].state is ReservationState.RELEASED
+
+
 def test_compare_and_swap_rejects_a_transition_from_a_stale_process_read(tmp_path: Path) -> None:
     store = LedgerStore(tmp_path / "ledger.json", tmp_path / "ledger.lock")
     source = store.write(minimum_ledger())
@@ -995,6 +1083,24 @@ def test_directory_durability_uses_posix_fsync_and_skips_unsupported_windows_bra
     monkeypatch.setattr("dh_core.portfolio_ledger.os.close", lambda fd: calls.append(("close", fd)))
     store.sync_directory(tmp_path)
     assert calls == [("open", tmp_path), ("fsync", 41), ("close", 41)]
+
+
+def test_windows_file_uri_round_trips_drive_and_unc_paths_without_posix_coercion() -> None:
+    drive_path = PureWindowsPath(r"C:\tmp\mirror.json")
+    drive_uri = file_path_to_uri(str(drive_path), platform="nt")
+    decoded_drive = PureWindowsPath(file_uri_to_path(drive_uri, platform="nt"))
+    assert drive_uri == "file:///C:/tmp/mirror.json"
+    assert decoded_drive == drive_path
+    assert decoded_drive.drive == "C:"
+    assert decoded_drive.is_absolute()
+
+    unc_path = PureWindowsPath(r"\\server\share\evidence\mirror.json")
+    unc_uri = file_path_to_uri(str(unc_path), platform="nt")
+    decoded_unc = PureWindowsPath(file_uri_to_path(unc_uri, platform="nt"))
+    assert unc_uri == "file://server/share/evidence/mirror.json"
+    assert decoded_unc == unc_path
+    assert decoded_unc.drive == r"\\server\share"
+    assert decoded_unc.is_absolute()
 
 
 def test_agent_cli_show_emits_one_compact_complete_json_object(tmp_path: Path) -> None:
