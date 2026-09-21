@@ -301,11 +301,28 @@ class RecoveryEvidence(LedgerModel):
     process_id: int = Field(gt=0)
     liveness_output_path: str
     liveness_output_sha256: Sha256
+    liveness_pid: int = Field(gt=0)
+    liveness_alive: Literal[False]
     prior_receipt_sha256: Sha256
     checker_id: str
     judgement_path: str
     judgement_sha256: Sha256
+    judgement_checker_id: str
+    judgement_verdict: Literal["PASS"]
     observed_at: datetime
+
+    @model_validator(mode="after")
+    def validate_verified_claims(self) -> RecoveryEvidence:
+        """Bind persisted recovery claims to process and checker identities.
+
+        Returns:
+            Validated recovery evidence.
+        """
+        if self.liveness_pid != self.process_id or self.liveness_alive is not False:
+            raise ValueError("recovery liveness claims do not match the recovered process")
+        if self.judgement_checker_id != self.checker_id or self.judgement_verdict != "PASS":
+            raise ValueError("recovery judgement claims do not match the independent checker PASS verdict")
+        return self
 
 
 class CommandEvidence(LedgerModel):
@@ -885,6 +902,7 @@ class PortfolioLedger(LedgerModel):
             recovery.stale_owner_id == reservation.owner,
             recovery.prior_receipt_sha256 == reservation.receipt_sha256,
             recovery.checker_id == event.actor_id,
+            recovery.observed_at == event.at,
         ))
         if not identity_matches:
             return "recovery event lacks matching liveness and independent judgement evidence"
@@ -2087,12 +2105,15 @@ class PortfolioLedgerService:
         )
         if self.process_is_alive(evidence.process_id):
             raise LedgerRefusal(f"stale reservation owner process {evidence.process_id} is still live")
-        if liveness.get("pid") != evidence.process_id or liveness.get("alive") is not False:
+        if liveness.get("pid") != evidence.liveness_pid or liveness.get("alive") is not evidence.liveness_alive:
             raise LedgerRefusal("recovery liveness evidence does not identify a confirmed-dead owner process")
         judgement = self.read_evidence_json(
             evidence.judgement_path, evidence.judgement_sha256, "independent recovery judgement"
         )
-        if judgement.get("verdict") != "PASS" or judgement.get("checker_id") != evidence.checker_id:
+        if (
+            judgement.get("verdict") != evidence.judgement_verdict
+            or judgement.get("checker_id") != evidence.judgement_checker_id
+        ):
             raise LedgerRefusal("independent recovery judgement does not carry the checker PASS verdict")
         return self.finish_reservation(
             car_id,

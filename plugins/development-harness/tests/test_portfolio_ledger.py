@@ -521,10 +521,14 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
         process_id=os.getpid(),
         liveness_output_path="liveness.json",
         liveness_output_sha256=hashlib.sha256(liveness).hexdigest(),
+        liveness_pid=os.getpid(),
+        liveness_alive=False,
         prior_receipt_sha256=SHA,
         checker_id="checker",
         judgement_path="judgement.json",
         judgement_sha256=hashlib.sha256(judgement).hexdigest(),
+        judgement_checker_id="checker",
+        judgement_verdict="PASS",
         observed_at=NOW,
     )
 
@@ -544,6 +548,7 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
         evidence.model_copy(
             update={
                 "process_id": dead_pid,
+                "liveness_pid": dead_pid,
                 "liveness_output_sha256": hashlib.sha256(dead_liveness).hexdigest(),
                 "judgement_sha256": hashlib.sha256(passed_judgement).hexdigest(),
             }
@@ -551,6 +556,19 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
     )
     assert recovered.reservations[reservation.id].state is ReservationState.INVALIDATED
     assert recovered.cars["A6-G0"].state is CarState.INVENTORIED
+
+    hostile = recovered.model_dump(mode="json")
+    hostile_recovery = hostile["reservations"][reservation.id]["recovery_evidence"]
+    hostile_recovery["process_id"] = dead_pid - 1
+    hostile_recovery["observed_at"] = "2026-09-21T00:00:01Z"
+    with pytest.raises(ValueError, match=r"liveness claims|observed_at"):
+        PortfolioLedger.model_validate(hostile)
+
+    for field, value in (("liveness_alive", True), ("judgement_checker_id", "maker"), ("judgement_verdict", "REFUSED")):
+        hostile = recovered.model_dump(mode="json")
+        hostile["reservations"][reservation.id]["recovery_evidence"][field] = value
+        with pytest.raises(ValueError, match=r"recovery|Input should be"):
+            PortfolioLedger.model_validate(hostile)
 
 
 def test_invalidation_replay_rejects_stale_inventory_and_recover_without_evidence() -> None:
