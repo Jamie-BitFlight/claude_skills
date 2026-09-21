@@ -3,18 +3,27 @@
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
 import tempfile
 import urllib.request
+from collections.abc import Iterator
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from threading import Lock
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
+THREAD_LOCKS: dict[Path, Lock] = {}
+THREAD_LOCKS_GUARD = Lock()
 
 Sha256 = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 GitSha = Annotated[str, Field(pattern=r"^[0-9a-f]{40,64}$")]
@@ -309,6 +318,22 @@ class Parent(LedgerModel):
     addenda: list[Addendum] = Field(default_factory=list)
     receipt: EvidenceReceipt | None = None
 
+    @model_validator(mode="after")
+    def validate_certification_evidence(self) -> Parent:
+        """Reject a persisted certification claim without its complete verdict.
+
+        Returns:
+            Validated parent record.
+        """
+        if self.state is ParentState.PARENT_CERTIFIED and not all((
+            self.checker_id,
+            self.revision,
+            self.report,
+            self.receipt,
+        )):
+            raise ValueError("PARENT_CERTIFIED requires complete parent certification evidence")
+        return self
+
 
 class Mirror(LedgerModel):
     """Immutable mirror binding for the latest accepted ledger bytes."""
@@ -404,6 +429,41 @@ class PortfolioLedger(LedgerModel):
             raise ValueError(f"parent references undefined required cars: {sorted(undefined)}")
         return self
 
+    @model_validator(mode="after")
+    def validate_certified_parent(self) -> PortfolioLedger:
+        """Reject persisted parent verdicts that bypass portfolio prerequisites.
+
+        Returns:
+            Validated ledger.
+        """
+        if self.parent.state is not ParentState.PARENT_CERTIFIED:
+            return self
+        required_ids = {car.id for car in self.cars.values() if car.required_for_parent}
+        if not required_ids or set(self.parent.required_car_ids) != required_ids:
+            raise ValueError("certified parent requires the exact non-empty required car set")
+        required_cars = [self.cars[car_id] for car_id in self.parent.required_car_ids]
+        if any(
+            car.car_kind is not CarKind.ASPECT_AGGREGATE or car.state is not CarState.ASPECT_CERTIFIED
+            for car in required_cars
+        ):
+            raise ValueError("certified parent requires every required car to be an ASPECT_CERTIFIED aggregate")
+        addendum_ids = {addendum.id for addendum in self.parent.addenda}
+        if set(self.parent.required_addendum_ids) - addendum_ids:
+            raise ValueError("certified parent requires every declared addendum")
+        role = self.roles.get(self.parent.checker_id or "")
+        receipt = self.parent.receipt
+        if role is None or role.independence_class != "parent-checker":
+            raise ValueError("certified parent requires parent-checker authority")
+        if (
+            receipt is None
+            or receipt.author_id != self.parent.checker_id
+            or receipt.verdict is not Verdict.PASSED
+            or receipt.observed_revision != self.parent.revision
+            or receipt.path != self.parent.report
+        ):
+            raise ValueError("certified parent requires a matching immutable verdict receipt")
+        return self
+
     def canonical_json(self, *, include_digest: bool = True) -> str:
         """Return compact, sorted, UTF-8-safe canonical JSON.
 
@@ -493,15 +553,8 @@ class LedgerStore:
         Raises:
             OSError: When durable write or atomic replacement fails.
         """
-        self.ledger_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        lock_fd = os.open(self.lock_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        with self.lock():
             return self.write_locked(ledger)
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            os.close(lock_fd)
 
     def write_transition(self, ledger: PortfolioLedger, *, expected_ledger_sha256: str | None) -> PortfolioLedger:
         """Atomically compare and replace a transition result.
@@ -516,18 +569,41 @@ class LedgerStore:
         Raises:
             LedgerRefusal: When another process has already advanced the ledger.
         """
-        self.ledger_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        lock_fd = os.open(self.lock_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        with self.lock():
             current = self.read()
             if current.ledger_sha256 != expected_ledger_sha256:
                 raise LedgerRefusal("stale ledger revision; reload before retrying the transition")
             return self.write_locked(ledger)
-        finally:
-            fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            os.close(lock_fd)
+
+    @contextlib.contextmanager
+    def lock(self) -> Iterator[None]:
+        """Hold the per-path thread and cross-process ledger lock."""
+        self.ledger_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self.lock_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        resolved_lock = self.lock_path.resolve()
+        with THREAD_LOCKS_GUARD:
+            thread_lock = THREAD_LOCKS.setdefault(resolved_lock, Lock())
+        with thread_lock:
+            lock_fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                if os.fstat(lock_fd).st_size == 0:
+                    os.write(lock_fd, b"\0")
+                    os.fsync(lock_fd)
+                os.lseek(lock_fd, 0, os.SEEK_SET)
+                if os.name == "nt":
+                    msvcrt.locking(lock_fd, msvcrt.LK_LOCK, 1)
+                else:
+                    fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    os.lseek(lock_fd, 0, os.SEEK_SET)
+                    if os.name == "nt":
+                        msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
+                    else:
+                        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            finally:
+                os.close(lock_fd)
 
     def write_locked(self, ledger: PortfolioLedger) -> PortfolioLedger:
         """Durably replace the ledger while the caller holds the advisory lock.
@@ -594,16 +670,19 @@ class LedgerStore:
         Raises:
             LedgerRefusal: When local exists or mirror verification fails.
         """
-        if self.ledger_path.exists():
-            raise LedgerRefusal("local ledger exists; neither local nor mirror may win automatically")
-        mirror_bytes = self.read_url(mirror_url)
-        mirror = self.validate_mirror_bytes(mirror_bytes)
-        if expected_sha256 is None or mirror.ledger_sha256 != expected_sha256:
-            raise LedgerRefusal("mirror identity does not match the externally recorded digest")
-        restored = self.write(mirror)
-        if restored.canonical_bytes() != mirror_bytes:
-            raise LedgerRefusal("restored canonical bytes do not match the immutable mirror")
-        return restored
+        with self.lock():
+            if self.ledger_path.exists():
+                raise LedgerRefusal("local ledger exists; neither local nor mirror may win automatically")
+            mirror_bytes = self.read_url(mirror_url)
+            mirror = self.validate_mirror_bytes(mirror_bytes)
+            if expected_sha256 is None or mirror.ledger_sha256 != expected_sha256:
+                raise LedgerRefusal("mirror identity does not match the externally recorded digest")
+            if self.ledger_path.exists():
+                raise LedgerRefusal("local ledger appeared during mirror restoration")
+            restored = self.write_locked(mirror)
+            if restored.canonical_bytes() != mirror_bytes:
+                raise LedgerRefusal("restored canonical bytes do not match the immutable mirror")
+            return restored
 
     def read_mirror_bytes(self, mirror: Mirror) -> bytes:
         """Read bytes from a declared mirror.
@@ -685,6 +764,12 @@ class PortfolioLedgerService:
         ]
         if stale_inventories:
             raise LedgerRefusal(f"reservation inventories are stale: {sorted(stale_inventories)}")
+        inventoried_paths = {
+            path.path for inventory_id in car.inventory_ids for path in self.ledger.inventories[inventory_id].paths
+        }
+        missing_paths = set(reservation.paths) - inventoried_paths
+        if missing_paths:
+            raise LedgerRefusal(f"inventory does not cover reserved paths: {sorted(missing_paths)}")
         group = self.ledger.conflict_groups.get(reservation.group)
         if group is None:
             raise LedgerRefusal(f"unknown conflict group {reservation.group!r}; aliases are not accepted")
@@ -810,6 +895,8 @@ class PortfolioLedgerService:
         Raises:
             LedgerRefusal: When authority or current state is invalid.
         """
+        if self.require_car(car_id).state is not CarState.RESERVED:
+            raise LedgerRefusal("reservation invalidation requires RESERVED state")
         reservation = self.require_active_reservation(car_id, reservation_id)
         self.require_independent_checker(actor_id, excluded={reservation.owner})
         return self.finish_reservation(
@@ -836,6 +923,8 @@ class PortfolioLedgerService:
         Raises:
             LedgerRefusal: When stale-owner, receipt, evidence, or independence checks fail.
         """
+        if self.require_car(car_id).state is not CarState.RESERVED:
+            raise LedgerRefusal("reservation recovery requires RESERVED state")
         reservation = self.require_active_reservation(car_id, reservation_id)
         if evidence.stale_owner_id != reservation.owner:
             raise LedgerRefusal("recovery stale owner does not match the reservation owner")
@@ -1113,6 +1202,10 @@ class PortfolioLedgerService:
         addendum_checkers = {addendum.checker_id for addendum in parent.addenda}
         if checker_id in car_authorities | addendum_checkers:
             raise LedgerRefusal("parent checker must be independent from all portfolio authorities")
+        declared_required = {car.id for car in self.ledger.cars.values() if car.required_for_parent}
+        listed_required = set(parent.required_car_ids)
+        if listed_required != declared_required or len(parent.required_car_ids) != len(listed_required):
+            raise LedgerRefusal("parent required car set does not exactly match cars marked required")
         required = [self.require_car(car_id) for car_id in parent.required_car_ids]
         invalid = [
             car.id

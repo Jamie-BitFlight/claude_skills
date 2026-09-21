@@ -33,6 +33,7 @@ from dh_core.portfolio_ledger import (
     ReservationState,
     Role,
     TrackerManifest,
+    inventory_sha256,
 )
 
 SHA = "a" * 64
@@ -170,6 +171,23 @@ def test_persisted_reconstruction_rejects_skipped_states_and_car_level_parent_ce
         PortfolioLedger.model_validate(payload)
 
 
+def test_persisted_parent_certification_requires_complete_verdict_evidence() -> None:
+    payload = minimum_ledger().model_dump(mode="json")
+    payload["parent"]["state"] = "PARENT_CERTIFIED"
+
+    with pytest.raises(ValueError, match="parent certification evidence"):
+        PortfolioLedger.model_validate(payload)
+
+    receipt = EvidenceReceipt(
+        path="evidence/parent.json", sha256=SHA, author_id="parent-checker", verdict="PASS", observed_revision=SHA
+    )
+    payload["parent"].update(
+        checker_id="parent-checker", revision=SHA, report=receipt.path, receipt=receipt.model_dump(mode="json")
+    )
+    with pytest.raises(ValueError, match="certified parent requires"):
+        PortfolioLedger.model_validate(payload)
+
+
 def test_inventory_records_only_sorted_exact_content_at_the_current_revision() -> None:
     ledger = minimum_ledger()
     car = ledger.cars["A6-G0"].model_copy(update={"inventory_ids": []})
@@ -213,6 +231,26 @@ def test_reservation_acquire_is_exclusive_and_advances_the_car() -> None:
     assert updated.cars["A6-G0"].reservation_ids == [reservation.id]
     with pytest.raises(LedgerRefusal, match="already reserved"):
         PortfolioLedgerService(updated).acquire_reservation("A6-G0", reservation, actor_id="maker")
+
+
+def test_reservation_requires_inventory_coverage_of_every_reserved_path() -> None:
+    ledger = minimum_ledger()
+    unrelated = InventoryPath(path="unrelated.py", git_blob=SHA, sha256=SHA)
+    inventory = Inventory(id="inventory-a6-g0", revision=SHA, paths=[unrelated], sha256=inventory_sha256([unrelated]))
+    ledger = ledger.model_copy(update={"inventories": {inventory.id: inventory}})
+    reservation = Reservation(
+        id="reservation-a6-g0",
+        group="CG-PORTFOLIO-LEDGER",
+        paths=["plugins/development-harness/dh_core/portfolio_ledger.py"],
+        owner="maker",
+        state=ReservationState.ACTIVE,
+        lock_path="ledger.lock",
+        acquired_at=NOW,
+        receipt_sha256=SHA,
+    )
+
+    with pytest.raises(LedgerRefusal, match="inventory does not cover"):
+        PortfolioLedgerService(ledger).acquire_reservation("A6-G0", reservation, actor_id="maker")
 
 
 def test_reservation_release_invalidate_and_stale_recovery_return_to_inventory() -> None:
@@ -272,6 +310,15 @@ def test_release_after_integration_preserves_the_integrated_car_state() -> None:
 
     assert released.reservations["reservation-a6-g0"].state is ReservationState.RELEASED
     assert released.cars["A6-G0"].state is CarState.INTEGRATED
+
+
+def test_invalidation_cannot_rewind_a_post_admission_car() -> None:
+    integrated = integrated_ledger()
+
+    with pytest.raises(LedgerRefusal, match="RESERVED"):
+        PortfolioLedgerService(integrated).invalidate_reservation(
+            "A6-G0", "reservation-a6-g0", actor_id="checker-2", at=NOW, receipt_sha256=SHA
+        )
 
 
 def test_implementation_admission_requires_green_evidence_fresh_shas_and_independent_checker() -> None:
@@ -443,6 +490,32 @@ def test_parent_certification_requires_all_aggregates_addenda_and_parent_checker
         )
 
 
+def test_parent_certification_cannot_omit_a_car_marked_required() -> None:
+    aggregate = integrated_ledger(car_kind=CarKind.ASPECT_AGGREGATE)
+    aspect_receipt = EvidenceReceipt(
+        path="evidence/aspect.json", sha256=SHA, author_id="checker-2", verdict="PASS", observed_revision="b" * 64
+    )
+    certified = PortfolioLedgerService(aggregate).certify_aspect(
+        "A6-G0", checker_id="checker-2", report=aspect_receipt.path, receipt=aspect_receipt, at=NOW
+    )
+    first = certified.cars["A6-G0"].model_copy(update={"required_for_parent": True})
+    omitted = first.model_copy(update={"id": "A6-OMITTED", "issue": 9998})
+    certified = certified.model_copy(
+        update={
+            "cars": {first.id: first, omitted.id: omitted},
+            "parent": Parent(state=ParentState.INVENTORIED, required_car_ids=[first.id]),
+        }
+    )
+    receipt = EvidenceReceipt(
+        path="evidence/parent.json", sha256=SHA, author_id="parent-checker", verdict="PASS", observed_revision="b" * 64
+    )
+
+    with pytest.raises(LedgerRefusal, match="required car set"):
+        PortfolioLedgerService(certified).certify_parent(
+            checker_id="parent-checker", revision="b" * 64, report=receipt.path, receipt=receipt
+        )
+
+
 def test_atomic_store_round_trip_and_failed_replace_preserves_previous_revision(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -515,6 +588,33 @@ def test_mirror_comparison_and_missing_local_restoration_are_fail_closed(tmp_pat
     mirror_path.write_text("{}", encoding="utf-8")
     with pytest.raises(LedgerRefusal, match="mirror"):
         store.verify_mirror()
+
+
+def test_restore_refuses_a_local_revision_created_during_mirror_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ledger_path = tmp_path / "ledger.json"
+    lock_path = tmp_path / "ledger.lock"
+    mirror_path = tmp_path / "mirror.json"
+    store = LedgerStore(ledger_path, lock_path)
+    mirrored = store.write(minimum_ledger().model_copy(update={"mirror": Mirror(url=mirror_path.as_uri())}))
+    mirror_bytes = ledger_path.read_bytes()
+    mirror_path.write_bytes(mirror_bytes)
+    competing_path = tmp_path / "competing.json"
+    competing = LedgerStore(competing_path, tmp_path / "competing.lock").write(
+        minimum_ledger().model_copy(update={"portfolio_issue": 9999})
+    )
+    ledger_path.unlink()
+
+    def racing_read(_url: str) -> bytes:
+        ledger_path.write_bytes(competing.canonical_bytes())
+        return mirror_bytes
+
+    monkeypatch.setattr(store, "read_url", racing_read)
+    with pytest.raises(LedgerRefusal, match="appeared during mirror restoration"):
+        store.restore_from_mirror(mirror_url=mirror_path.as_uri(), expected_sha256=mirrored.ledger_sha256)
+
+    assert PortfolioLedger.model_validate_json(ledger_path.read_bytes()).portfolio_issue == 9999
 
 
 def test_agent_cli_show_emits_one_compact_complete_json_object(tmp_path: Path) -> None:
