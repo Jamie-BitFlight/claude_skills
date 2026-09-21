@@ -945,12 +945,13 @@ class PortfolioLedger(LedgerModel):
             recovery.judgement_path == event.receipt_path,
             recovery.judgement_sha256 == event.receipt_sha256,
             recovery.stale_owner_id == reservation.owner,
+            recovery.process_id == reservation.owner_process_id,
             recovery.prior_receipt_sha256 == reservation.receipt_sha256,
             recovery.checker_id == event.actor_id,
             recovery.observed_at == event.at,
         ))
         if not identity_matches:
-            return "recovery event lacks matching liveness and independent judgement evidence"
+            return "recovery event lacks matching owner process, liveness, or independent judgement evidence"
         checker = self.roles.get(recovery.checker_id)
         owner = self.roles.get(reservation.owner)
         authority_matches = all((

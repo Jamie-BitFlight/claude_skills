@@ -572,6 +572,13 @@ def test_recovery_verifies_liveness_and_judgement_bytes_and_rejects_live_owner(t
         with pytest.raises(ValueError, match=r"recovery|Input should be"):
             PortfolioLedger.model_validate(hostile)
 
+    wrong_owner_process = recovered.model_dump(mode="json")
+    recovery_payload = wrong_owner_process["reservations"][reservation.id]["recovery_evidence"]
+    recovery_payload["process_id"] = dead_pid - 1
+    recovery_payload["liveness_pid"] = dead_pid - 1
+    with pytest.raises(ValueError, match="owner process"):
+        PortfolioLedger.model_validate(wrong_owner_process)
+
 
 def test_invalidation_replay_rejects_stale_inventory_and_recover_without_evidence() -> None:
     reservation = Reservation(
