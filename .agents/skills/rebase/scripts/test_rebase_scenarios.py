@@ -19,8 +19,8 @@ import pytest
 from pydantic import BaseModel, Field
 
 from rebase_plan import RebasePlan
+from rebase_test_support import capture_repository_state, commit_file, initialize_repository, run_git
 from test_rebase_plan import valid_plan_data
-from test_rebase_skill import commit_file, initialize_repository, run_git
 
 
 class WorkflowEvent(StrEnum):
@@ -97,7 +97,7 @@ def scenario_plan_data(
     publication["evidence_commands"] = [
         {
             "source": "local-git",
-            "argv": ["git", "for-each-ref", "--contains", old_tip, "refs/remotes"],
+            "argv": ["git", "for-each-ref", "--format=%(refname)", "--contains", old_tip, "refs/remotes"],
             "exit_code": 0,
             "stdout": "",
             "stderr": "",
@@ -200,6 +200,16 @@ def validate_plan_event(repository: Path, data: dict[str, object], evidence: Sce
     target_oid = target["oid"]
     assert isinstance(old_tip, str)
     assert isinstance(target_oid, str)
+    branch_ref = branch["ref"]
+    target_ref = target["ref"]
+    assert isinstance(branch_ref, str)
+    assert isinstance(target_ref, str)
+    repository_state, publication = capture_repository_state(
+        repository, branch_ref=branch_ref, target_ref=target_ref, transcript=evidence.commands
+    )
+    data["repository_state"] = repository_state
+    data["publication"] = publication
+    data["execution_worktree"] = str(repository.resolve())
     help_evidence, empty_option = capture_rebase_help(repository, evidence.commands)
     data["rebase_help"] = help_evidence
     data["becomes_empty_option"] = empty_option

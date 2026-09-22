@@ -52,7 +52,9 @@ Record the old branch OID, target OID, merge-base OID, current branch, complete 
 operation-marker existence, owning worktree, configured upstream, and every remote ref containing
 the old tip.[6] Report these observable local publication signals without claiming knowledge of
 downstream consumers. Record every repository instruction source examined and every required
-preflight as complete argv, exit code, stdout, and stderr.
+preflight as complete argv, exit code, stdout, and stderr. Store the universal command records and
+marker observations in the plan's required `repository_state` object; its maintained fields and
+binding checks are defined at lines 30–101 of [the evidence model](./scripts/rebase_evidence.py).
 
 Enter `BLOCKED_GIT_STATE` when tracked or untracked changes exist or another Git operation is active.
 Do not create a stash. Enter `NO_CHANGE` when distinct branch and target refs resolve to the same OID
@@ -136,10 +138,11 @@ command output; the validator imposes no display truncation. Validate before any
 uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" validate <plan.json>
 ```
 
-According to lines 243–410 of [the validator source](./scripts/rebase_plan.py), the model requires
-the complete plan inputs, captured `rev-list` graph, verified recovery ref, and rejects failed
-evidence, unresolved decisions, incomplete path coverage, unsupported drops, and unbound merge
-policy. Lines 437–466 define the validator's structured result and plan SHA-256.
+According to lines 105–308 of [the validator source](./scripts/rebase_plan.py), the model requires
+the typed repository-state bundle, complete plan inputs, captured `rev-list` graph, verified
+recovery ref, and rejects failed or contradictory evidence, unresolved decisions, incomplete path
+coverage, unsupported drops, and unbound merge policy. Lines 335–364 define the validator's
+structured result and plan SHA-256.
 
 Only exit code zero with compact JSON `status=VALID`, `state=READY_TO_REBASE`, and a plan SHA-256
 passes the gate. `PLAN_INVALID` is terminal for the current attempt: retain its complete structured

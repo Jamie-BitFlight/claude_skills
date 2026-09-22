@@ -16,10 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from rebase_plan import RebasePlan, WorkflowState
+from rebase_plan import RebasePlan
+from rebase_states import WorkflowState
+from rebase_test_support import commit_file, initialize_repository, run_git
 from test_rebase_scenarios import (
     CandidateFixture,
     WorkflowEvent,
+    assert_gate_precedes_rebase,
     begin_scenario,
     capture_rebase_help,
     finish_scenario,
@@ -27,7 +30,6 @@ from test_rebase_scenarios import (
     start_rebase,
     validate_plan_event,
 )
-from test_rebase_skill import commit_file, initialize_repository, run_git
 
 
 def test_existing_rebase_metadata_blocks_a_second_rebase(tmp_path: Path) -> None:
@@ -174,6 +176,43 @@ def test_becomes_empty_stops_after_complete_gate(tmp_path: Path) -> None:
     assert run_git(repository, "rev-parse", "REBASE_HEAD").stdout.strip() == candidate
     finish_scenario(repository, evidence)
     run_git(repository, "rebase", "--abort")
+
+
+def test_start_empty_commit_is_planned_and_preserved_without_invented_paths(tmp_path: Path) -> None:
+    """Gate and replay an intentional start-empty commit as PRESERVE_EMPTY."""
+    repository = tmp_path / "start-empty"
+    merge_base = initialize_repository(repository)
+    run_git(repository, "switch", "-c", "feature")
+    run_git(repository, "commit", "--allow-empty", "-m", "record release boundary")
+    empty_candidate = run_git(repository, "rev-parse", "HEAD").stdout.strip()
+    run_git(repository, "switch", "main")
+    commit_file(repository, "target.txt", "target\n", "target change")
+    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
+    run_git(repository, "switch", "feature")
+
+    evidence = begin_scenario(repository)
+    plan = validate_plan_event(
+        repository,
+        scenario_plan_data(
+            old_tip=empty_candidate,
+            target_oid=target_oid,
+            merge_base_oid=merge_base,
+            candidates=[
+                CandidateFixture(oid=empty_candidate, parents=[merge_base], paths=[], disposition="PRESERVE_EMPTY")
+            ],
+        ),
+        evidence,
+    )
+    assert plan.affected_paths == []
+    assert start_rebase(repository, plan, evidence) == 0
+
+    rewritten_candidates = run_git(repository, "rev-list", f"{target_oid}..feature").stdout.splitlines()
+    assert len(rewritten_candidates) == 1
+    assert run_git(repository, "show", "-s", "--format=%s", rewritten_candidates[0]).stdout.strip() == (
+        "record release boundary"
+    )
+    assert_gate_precedes_rebase(evidence)
+    finish_scenario(repository, evidence)
 
 
 def test_foreign_worktree_owner_blocks_without_mutating_owner(tmp_path: Path) -> None:

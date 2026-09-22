@@ -43,8 +43,9 @@ not permission to omit it. Record the equivalent target evidence, use `--reapply
 let the plan's installed-help-validated `becomes_empty_option` surface the candidate during replay.
 A `REDUNDANT_DROP` disposition requires that evidence or explicit approval.
 
-Record commits that start empty separately from commits that become empty. Preserve an intentionally
-empty commit when the plan assigns `PRESERVE_EMPTY`. When a nonempty candidate becomes empty, enter
+Record commits that start empty separately from commits that become empty. A start-empty candidate
+uses `paths: []` and `PRESERVE_EMPTY`; when the inventory contains no path-changing candidate, its
+path-impact inventory is `affected_paths: []`. When a nonempty candidate becomes empty, enter
 `EMPTY_COMMIT_DECISION` and:
 
 1. Identify the exact candidate from rebase metadata and `git rebase --show-current-patch`.
@@ -115,7 +116,7 @@ both rewritten and recovery refs intact for an explicit recovery decision.
 Read the canonical state names, transition/terminal classification, and required evidence from the
 bundled typed source instead of maintaining a second prose roster:
 
-According to lines 33–156 of [the typed state source](../scripts/rebase_plan.py), that source defines
+According to lines 9–137 of [the typed state source](../scripts/rebase_states.py), that source defines
 every state name, classification, and evidence contract in one typed collection.
 
 ```bash

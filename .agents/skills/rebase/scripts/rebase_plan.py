@@ -4,6 +4,8 @@
 # dependencies = [
 #   "pydantic>=2.0",
 # ]
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Validate an accounted local-rebase plan before history mutation."""
 
@@ -19,141 +21,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
+from rebase_evidence import CommandEvidence, RepositoryStateEvidence
+from rebase_states import WORKFLOW_STATE_DEFINITIONS, WorkflowState
+
 ObjectId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")]
 ArgumentVector = Annotated[list[str], Field(min_length=1)]
-
-
-class StateKind(StrEnum):
-    """Whether a workflow state continues or ends the current invocation."""
-
-    TRANSITION = "transition"
-    TERMINAL = "terminal"
-
-
-class WorkflowState(StrEnum):
-    """Canonical state vocabulary for the rebase workflow."""
-
-    READY_TO_ANALYZE = "READY_TO_ANALYZE"
-    PLAN_INVALID = "PLAN_INVALID"
-    READY_TO_REBASE = "READY_TO_REBASE"
-    BLOCKED_INVALID_REF = "BLOCKED_INVALID_REF"
-    BLOCKED_GIT_STATE = "BLOCKED_GIT_STATE"
-    BLOCKED_WORKTREE_IN_USE = "BLOCKED_WORKTREE_IN_USE"
-    NO_CHANGE = "NO_CHANGE"
-    NEEDS_USER_DECISION = "NEEDS_USER_DECISION"
-    REPLAN_REF_DRIFT = "REPLAN_REF_DRIFT"
-    CONFLICT = "CONFLICT"
-    UNEXPECTED_CONFLICT = "UNEXPECTED_CONFLICT"
-    EMPTY_COMMIT_DECISION = "EMPTY_COMMIT_DECISION"
-    REBASE_ABORTED_RESTORED = "REBASE_ABORTED_RESTORED"
-    BLOCKED_ABORT_FAILED = "BLOCKED_ABORT_FAILED"
-    BLOCKED_COMMAND_FAILED = "BLOCKED_COMMAND_FAILED"
-    REBASE_COMPLETE_VALIDATION_FAILED = "REBASE_COMPLETE_VALIDATION_FAILED"
-    REBASE_COMPLETE_VERIFIED = "REBASE_COMPLETE_VERIFIED"
-
-
-class WorkflowStateDefinition(BaseModel):
-    """One canonical workflow state and its observable evidence."""
-
-    name: WorkflowState
-    kind: StateKind
-    evidence: Annotated[list[str], Field(min_length=1)]
-
-
-WORKFLOW_STATE_DEFINITIONS = (
-    WorkflowStateDefinition(
-        name=WorkflowState.READY_TO_ANALYZE,
-        kind=StateKind.TRANSITION,
-        evidence=["immutable refs", "authorized clean worktree", "no active Git operation"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.PLAN_INVALID, kind=StateKind.TERMINAL, evidence=["validator errors", "no rebase command"]
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.READY_TO_REBASE,
-        kind=StateKind.TRANSITION,
-        evidence=["validator status VALID", "plan SHA-256", "recovery ref resolves to old tip"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.BLOCKED_INVALID_REF,
-        kind=StateKind.TERMINAL,
-        evidence=["exact failing ref lookup or identical ref names", "unchanged refs"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.BLOCKED_GIT_STATE,
-        kind=StateKind.TERMINAL,
-        evidence=["dirty status, active operation, or recovery-ref failure", "no new rebase"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.BLOCKED_WORKTREE_IN_USE,
-        kind=StateKind.TERMINAL,
-        evidence=["foreign owning worktree path", "unchanged foreign worktree"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.NO_CHANGE,
-        kind=StateKind.TERMINAL,
-        evidence=["distinct refs resolve to one OID", "zero candidates", "no recovery ref"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.NEEDS_USER_DECISION,
-        kind=StateKind.TERMINAL,
-        evidence=["concrete unresolved decisions", "no new rebase"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.REPLAN_REF_DRIFT,
-        kind=StateKind.TRANSITION,
-        evidence=["fresh branch or target OID differs from plan", "no stale-plan rebase"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.CONFLICT,
-        kind=StateKind.TRANSITION,
-        evidence=["current candidate", "unmerged entries", "active resolution loop"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.UNEXPECTED_CONFLICT,
-        kind=StateKind.TRANSITION,
-        evidence=["recorded plan deviation", "revalidated disposition before continuation"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.EMPTY_COMMIT_DECISION,
-        kind=StateKind.TRANSITION,
-        evidence=["exact stopped candidate", "approved skip or preserve evidence"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.REBASE_ABORTED_RESTORED,
-        kind=StateKind.TERMINAL,
-        evidence=["old tip restored", "clean recorded state", "recovery ref verified"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.BLOCKED_ABORT_FAILED,
-        kind=StateKind.TERMINAL,
-        evidence=["abort error or restoration mismatch", "recovery evidence preserved"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.BLOCKED_COMMAND_FAILED,
-        kind=StateKind.TERMINAL,
-        evidence=["failing command and output", "refs, status, and recovery evidence preserved"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.REBASE_COMPLETE_VALIDATION_FAILED,
-        kind=StateKind.TERMINAL,
-        evidence=["named failed verification oracle", "no publication claim"],
-    ),
-    WorkflowStateDefinition(
-        name=WorkflowState.REBASE_COMPLETE_VERIFIED,
-        kind=StateKind.TERMINAL,
-        evidence=["all verification oracles passed", "old, new, target, and recovery OIDs reported"],
-    ),
-)
-
-
-def workflow_state_definitions() -> dict[WorkflowState, WorkflowStateDefinition]:
-    """Return the canonical workflow-state map.
-
-    Returns:
-        Definitions keyed by workflow-state name.
-    """
-    return {definition.name: definition for definition in WORKFLOW_STATE_DEFINITIONS}
 
 
 class RefBinding(BaseModel):
@@ -161,16 +33,6 @@ class RefBinding(BaseModel):
 
     ref: Annotated[str, Field(min_length=1)]
     oid: ObjectId
-
-
-class CommandEvidence(BaseModel):
-    """Complete output from one repository-required preflight command."""
-
-    source: Annotated[str, Field(min_length=1)]
-    argv: ArgumentVector
-    exit_code: int
-    stdout: str
-    stderr: str
 
 
 class PublicationEvidence(BaseModel):
@@ -196,7 +58,7 @@ class Candidate(BaseModel):
 
     oid: ObjectId
     parents: list[ObjectId]
-    paths: Annotated[list[str], Field(min_length=1)]
+    paths: list[str]
     intent: Annotated[str, Field(min_length=1)]
     evidence: Annotated[list[str], Field(min_length=1)]
     disposition: Disposition
@@ -252,12 +114,13 @@ class RebasePlan(BaseModel):
     worktree_authorized: bool
     status_porcelain: str
     active_operations: list[str]
+    repository_state: RepositoryStateEvidence
     repository_instruction_sources: Annotated[list[str], Field(min_length=1)]
     repository_preflights: list[CommandEvidence]
     publication: PublicationEvidence
     replay_inventory: CommandEvidence
     candidates: Annotated[list[Candidate], Field(min_length=1)]
-    affected_paths: Annotated[list[PathImpact], Field(min_length=1)]
+    affected_paths: list[PathImpact]
     merge_policy: MergePolicy
     clean_cherry_pick_policy: Literal["SURFACE"]
     becomes_empty_policy: Literal["STOP"]
@@ -312,6 +175,17 @@ class RebasePlan(BaseModel):
             raise ValueError("another Git operation is active")
         if self.unknowns:
             raise ValueError("plan has unresolved unknowns")
+        self.repository_state.validate_bindings(
+            branch_ref=self.branch.ref,
+            branch_oid=self.branch.oid,
+            target_ref=self.target.ref,
+            target_oid=self.target.oid,
+            merge_base_oid=self.merge_base_oid,
+            execution_worktree=self.execution_worktree,
+            status_porcelain=self.status_porcelain,
+            active_operations=self.active_operations,
+            configured_upstream=self.publication.configured_upstream,
+        )
 
     def validate_decisions_and_preflights(self) -> set[str]:
         """Require successful evidence and collect approved decision IDs.
@@ -326,6 +200,22 @@ class RebasePlan(BaseModel):
         ]
         if failed_commands:
             raise ValueError(f"preflight evidence contains failed commands: {failed_commands}")
+        expected_remote_argv = [
+            "git",
+            "for-each-ref",
+            "--format=%(refname)",
+            "--contains",
+            self.branch.oid,
+            "refs/remotes",
+        ]
+        remote_evidence = [
+            evidence for evidence in self.publication.evidence_commands if evidence.argv == expected_remote_argv
+        ]
+        if len(remote_evidence) != 1:
+            raise ValueError("publication evidence must contain one remote-containment command")
+        observed_remote_refs = [line for line in remote_evidence[0].stdout.splitlines() if line]
+        if observed_remote_refs != self.publication.remote_refs_containing_old_tip:
+            raise ValueError("remote-containment evidence does not match recorded remote refs")
         if any(not decision.approved for decision in self.user_decisions):
             raise ValueError("plan contains an unapproved user decision")
         return {decision.decision_id for decision in self.user_decisions if decision.approved}
@@ -381,6 +271,14 @@ class RebasePlan(BaseModel):
         impact_by_path = {impact.path: impact for impact in self.affected_paths}
         if len(impact_by_path) != len(self.affected_paths):
             raise ValueError("affected paths must be unique")
+
+        for candidate in self.candidates:
+            starts_empty = not candidate.paths
+            preserves_empty = candidate.disposition is Disposition.PRESERVE_EMPTY
+            if starts_empty != preserves_empty:
+                raise ValueError(
+                    f"zero-path candidates require PRESERVE_EMPTY and PRESERVE_EMPTY requires zero paths: {candidate.oid}"
+                )
 
         candidate_paths = {path for candidate in self.candidates for path in candidate.paths}
         if candidate_paths != set(impact_by_path):

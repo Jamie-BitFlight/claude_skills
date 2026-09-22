@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import re
-import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -23,19 +22,21 @@ from marko.block import FencedCode
 from marko.inline import Link
 from pydantic import BaseModel
 
-from rebase_plan import Disposition, MergePolicy, workflow_state_definitions
+from rebase_plan import Disposition, MergePolicy
+from rebase_states import workflow_state_definitions
+from rebase_test_support import (
+    REPOSITORY_ROOT,
+    SKILL_ROOT,
+    commit_file,
+    initialize_repository,
+    run_git,
+    supported_empty_option,
+)
 
-SKILL_ROOT = Path(__file__).resolve().parents[1]
-REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 SKILL_PATH = SKILL_ROOT / "SKILL.md"
 REFERENCE_PATH = SKILL_ROOT / "references" / "rebase-edge-cases.md"
 EVALS_PATH = SKILL_ROOT / "evals" / "evals.json"
 ACTIVATION_RESULTS_PATH = SKILL_ROOT / "evals" / "activation-results.json"
-BOUNDED_RUNNER = REPOSITORY_ROOT / "scripts" / "run_bounded.py"
-
-# Local Git fixture commands complete in milliseconds. Twenty seconds permits slow CI filesystems
-# while still proving that a hung hook or descendant process is terminated by the bounded runner.
-TEST_COMMAND_TIMEOUT_SECONDS = 20
 
 
 class EvalCase(BaseModel):
@@ -132,86 +133,6 @@ def parse_markdown(path: Path) -> object:
         Parsed Marko document.
     """
     return marko.parse(path.read_text(encoding="utf-8"))
-
-
-def run_git(
-    repository: Path, *arguments: str, check: bool = True, transcript: list[tuple[str, ...]] | None = None
-) -> subprocess.CompletedProcess[str]:
-    """Run one bounded-by-pytest Git command in a temporary repository.
-
-    Args:
-        repository: Temporary Git repository.
-        *arguments: Arguments after the `git` executable.
-        check: Raise when Git exits nonzero.
-        transcript: Optional command transcript to append to.
-
-    Returns:
-        Completed Git process.
-    """
-    command = ("git", *arguments)
-    if transcript is not None:
-        transcript.append(command)
-    result = subprocess.run(
-        [str(BOUNDED_RUNNER), "--timeout-seconds", str(TEST_COMMAND_TIMEOUT_SECONDS), "--", *command],
-        cwd=repository,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if check:
-        result.check_returncode()
-    return result
-
-
-def supported_empty_option(repository: Path, transcript: list[tuple[str, ...]] | None = None) -> str:
-    """Return the installed Git spelling that stops for a commit that becomes empty."""
-    result = run_git(repository, "rebase", "-h", check=False, transcript=transcript)
-    empty_line = next(line for line in f"{result.stdout}\n{result.stderr}".splitlines() if "--empty" in line)
-    if "stop" in empty_line:
-        return "stop"
-    if "ask" in empty_line:
-        return "ask"
-    raise AssertionError("installed Git help has no stop-on-empty spelling")
-
-
-def initialize_repository(repository: Path) -> str:
-    """Create a deterministic temporary repository with one base commit.
-
-    Args:
-        repository: Directory to initialize.
-
-    Returns:
-        Full OID of the base commit.
-    """
-    repository.mkdir(parents=True)
-    run_git(repository, "init", "--initial-branch=main")
-    run_git(repository, "config", "user.name", "Rebase Skill Test")
-    run_git(repository, "config", "user.email", "rebase-skill@example.invalid")
-    run_git(repository, "config", "commit.gpgsign", "false")
-    (repository / "base.txt").write_text("base\n", encoding="utf-8")
-    run_git(repository, "add", "base.txt")
-    run_git(repository, "commit", "-m", "base")
-    return run_git(repository, "rev-parse", "HEAD").stdout.strip()
-
-
-def commit_file(repository: Path, relative_path: str, content: str, message: str) -> str:
-    """Write and commit one file in a temporary repository.
-
-    Args:
-        repository: Temporary Git repository.
-        relative_path: Repository-relative path to write.
-        content: Complete file content.
-        message: Commit message.
-
-    Returns:
-        Full OID of the created commit.
-    """
-    path = repository / relative_path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    run_git(repository, "add", relative_path)
-    run_git(repository, "commit", "-m", message)
-    return run_git(repository, "rev-parse", "HEAD").stdout.strip()
 
 
 def test_canonical_package_has_relative_claude_alias() -> None:

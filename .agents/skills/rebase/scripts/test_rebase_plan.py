@@ -19,7 +19,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from rebase_plan import RebasePlan, StateKind, WorkflowState, workflow_state_definitions
+from rebase_plan import RebasePlan
+from rebase_states import StateKind, WorkflowState, workflow_state_definitions
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -30,6 +31,53 @@ EXAMPLE_PLAN_PATH = SKILL_ROOT / "references" / "example-plan.json"
 # Validator fixtures complete in milliseconds. Twenty seconds permits slow CI filesystems while
 # still proving that a hung dependency resolver or descendant is terminated by the bounded runner.
 TEST_COMMAND_TIMEOUT_SECONDS = 20
+
+
+def valid_repository_state_data(
+    *, old_tip: str, target_oid: str, merge_base_oid: str, configured_upstream: str | None
+) -> dict[str, object]:
+    """Return complete universal preflight evidence bound to a valid fixture."""
+
+    def command(argv: list[str], stdout: str = "", exit_code: int = 0) -> dict[str, object]:
+        return {"source": "local-git", "argv": argv, "exit_code": exit_code, "stdout": stdout, "stderr": ""}
+
+    return {
+        "repository_root": command(["git", "rev-parse", "--show-toplevel"], "/work/project\n"),
+        "branch_ref": command(
+            ["git", "show-ref", "--verify", "refs/heads/feature/parser"], f"{old_tip} refs/heads/feature/parser\n"
+        ),
+        "branch_oid": command(["git", "rev-parse", "--verify", "refs/heads/feature/parser^{commit}"], f"{old_tip}\n"),
+        "target_oid": command(["git", "rev-parse", "--verify", "refs/heads/main^{commit}"], f"{target_oid}\n"),
+        "merge_base": command(
+            ["git", "merge-base", "refs/heads/feature/parser", "refs/heads/main"], f"{merge_base_oid}\n"
+        ),
+        "worktrees": command(
+            ["git", "worktree", "list", "--porcelain"],
+            "worktree /work/project\nHEAD " + old_tip + "\nbranch refs/heads/feature/parser\n",
+        ),
+        "status": command(["git", "status", "--porcelain=v1", "--untracked-files=all"]),
+        "current_branch": command(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], "feature/parser\n"),
+        "rebase_merge": {
+            "command": command(["git", "rev-parse", "--git-path", "rebase-merge"], ".git/rebase-merge\n"),
+            "present": False,
+        },
+        "rebase_apply": {
+            "command": command(["git", "rev-parse", "--git-path", "rebase-apply"], ".git/rebase-apply\n"),
+            "present": False,
+        },
+        "merge_head": {
+            "command": command(["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"], exit_code=1),
+            "present": False,
+        },
+        "cherry_pick_head": {
+            "command": command(["git", "rev-parse", "--verify", "--quiet", "CHERRY_PICK_HEAD"], exit_code=1),
+            "present": False,
+        },
+        "upstream": command(
+            ["git", "for-each-ref", "--format=%(upstream)", "refs/heads/feature/parser"],
+            f"{configured_upstream or ''}\n",
+        ),
+    }
 
 
 def valid_plan_data() -> dict[str, object]:
@@ -51,6 +99,12 @@ def valid_plan_data() -> dict[str, object]:
         "worktree_authorized": True,
         "status_porcelain": "",
         "active_operations": [],
+        "repository_state": valid_repository_state_data(
+            old_tip=old_tip,
+            target_oid=target_oid,
+            merge_base_oid="4" * 40,
+            configured_upstream="refs/remotes/origin/feature/parser",
+        ),
         "repository_instruction_sources": ["AGENTS.md"],
         "repository_preflights": [
             {
@@ -62,12 +116,12 @@ def valid_plan_data() -> dict[str, object]:
             }
         ],
         "publication": {
-            "configured_upstream": "origin/feature/parser",
+            "configured_upstream": "refs/remotes/origin/feature/parser",
             "remote_refs_containing_old_tip": ["refs/remotes/origin/feature/parser"],
             "evidence_commands": [
                 {
                     "source": "local-git",
-                    "argv": ["git", "for-each-ref", "--contains", old_tip, "refs/remotes"],
+                    "argv": ["git", "for-each-ref", "--format=%(refname)", "--contains", old_tip, "refs/remotes"],
                     "exit_code": 0,
                     "stdout": "refs/remotes/origin/feature/parser\n",
                     "stderr": "",
@@ -179,6 +233,68 @@ def test_bundled_example_is_a_valid_ready_to_rebase_plan() -> None:
 
 
 @pytest.mark.parametrize(
+    "missing_field",
+    [
+        "repository_root",
+        "branch_ref",
+        "branch_oid",
+        "target_oid",
+        "merge_base",
+        "worktrees",
+        "status",
+        "current_branch",
+        "rebase_merge",
+        "rebase_apply",
+        "merge_head",
+        "cherry_pick_head",
+        "upstream",
+    ],
+)
+def test_universal_preflight_evidence_is_required_without_repository_specific_checks(missing_field: str) -> None:
+    """Reject a plan missing any universal Step 1 observation."""
+    data = valid_plan_data()
+    data["repository_preflights"] = []
+    repository_state = data["repository_state"]
+    assert isinstance(repository_state, dict)
+    repository_state.pop(missing_field)
+
+    with pytest.raises(ValidationError):
+        RebasePlan.model_validate(data)
+
+
+def test_start_empty_commit_passes_as_preserve_empty_without_path_impacts() -> None:
+    """Represent an intentionally empty commit without inventing an affected path."""
+    data = valid_plan_data()
+    candidates = data["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    candidate["paths"] = []
+    candidate["disposition"] = "PRESERVE_EMPTY"
+    data["affected_paths"] = []
+
+    plan = RebasePlan.model_validate(data)
+
+    assert plan.candidates[0].paths == []
+    assert plan.candidates[0].disposition.value == "PRESERVE_EMPTY"
+    assert plan.affected_paths == []
+
+
+def test_zero_path_candidate_without_preserve_empty_is_rejected() -> None:
+    """Keep zero-path candidates exclusive to the intentional-empty disposition."""
+    data = valid_plan_data()
+    candidates = data["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    candidate["paths"] = []
+    data["affected_paths"] = []
+
+    with pytest.raises(ValidationError, match="zero-path candidates require PRESERVE_EMPTY"):
+        RebasePlan.model_validate(data)
+
+
+@pytest.mark.parametrize(
     "mutation",
     [
         "unknown",
@@ -230,6 +346,32 @@ def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
         help_evidence = data["rebase_help"]
         assert isinstance(help_evidence, dict)
         help_evidence["stderr"] = "--reapply-cherry-picks --rebase-merges --empty (drop|keep|ask)\n"
+
+    with pytest.raises(ValidationError):
+        RebasePlan.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "replacement"),
+    [
+        (("repository_state", "branch_oid", "stdout"), f"{'9' * 40}\n"),
+        (
+            ("repository_state", "worktrees", "stdout"),
+            f"worktree /work/foreign\nHEAD {'1' * 40}\nbranch refs/heads/feature/parser\n",
+        ),
+        (("repository_state", "merge_head", "present"), True),
+        (("publication", "remote_refs_containing_old_tip"), []),
+    ],
+)
+def test_contradictory_universal_evidence_cannot_reach_ready(field_path: tuple[str, ...], replacement: object) -> None:
+    """Reject universal evidence that contradicts another bound plan field."""
+    data = valid_plan_data()
+    target: dict[str, object] = data
+    for field in field_path[:-1]:
+        nested = target[field]
+        assert isinstance(nested, dict)
+        target = nested
+    target[field_path[-1]] = replacement
 
     with pytest.raises(ValidationError):
         RebasePlan.model_validate(data)

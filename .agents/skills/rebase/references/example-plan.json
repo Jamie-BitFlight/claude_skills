@@ -14,6 +14,111 @@
   "worktree_authorized": true,
   "status_porcelain": "",
   "active_operations": [],
+  "repository_state": {
+    "repository_root": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--show-toplevel"],
+      "exit_code": 0,
+      "stdout": "/work/project\n",
+      "stderr": ""
+    },
+    "branch_ref": {
+      "source": "local-git",
+      "argv": ["git", "show-ref", "--verify", "refs/heads/feature/parser"],
+      "exit_code": 0,
+      "stdout": "1111111111111111111111111111111111111111 refs/heads/feature/parser\n",
+      "stderr": ""
+    },
+    "branch_oid": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--verify", "refs/heads/feature/parser^{commit}"],
+      "exit_code": 0,
+      "stdout": "1111111111111111111111111111111111111111\n",
+      "stderr": ""
+    },
+    "target_oid": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--verify", "refs/heads/main^{commit}"],
+      "exit_code": 0,
+      "stdout": "2222222222222222222222222222222222222222\n",
+      "stderr": ""
+    },
+    "merge_base": {
+      "source": "local-git",
+      "argv": ["git", "merge-base", "refs/heads/feature/parser", "refs/heads/main"],
+      "exit_code": 0,
+      "stdout": "4444444444444444444444444444444444444444\n",
+      "stderr": ""
+    },
+    "worktrees": {
+      "source": "local-git",
+      "argv": ["git", "worktree", "list", "--porcelain"],
+      "exit_code": 0,
+      "stdout": "worktree /work/project\nHEAD 1111111111111111111111111111111111111111\nbranch refs/heads/feature/parser\n",
+      "stderr": ""
+    },
+    "status": {
+      "source": "local-git",
+      "argv": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "current_branch": {
+      "source": "local-git",
+      "argv": ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      "exit_code": 0,
+      "stdout": "feature/parser\n",
+      "stderr": ""
+    },
+    "rebase_merge": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--git-path", "rebase-merge"],
+        "exit_code": 0,
+        "stdout": ".git/rebase-merge\n",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "rebase_apply": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--git-path", "rebase-apply"],
+        "exit_code": 0,
+        "stdout": ".git/rebase-apply\n",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "merge_head": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "cherry_pick_head": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--verify", "--quiet", "CHERRY_PICK_HEAD"],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "upstream": {
+      "source": "local-git",
+      "argv": ["git", "for-each-ref", "--format=%(upstream)", "refs/heads/feature/parser"],
+      "exit_code": 0,
+      "stdout": "refs/remotes/origin/feature/parser\n",
+      "stderr": ""
+    }
+  },
   "repository_instruction_sources": ["AGENTS.md"],
   "repository_preflights": [
     {
@@ -25,7 +130,7 @@
     }
   ],
   "publication": {
-    "configured_upstream": "origin/feature/parser",
+    "configured_upstream": "refs/remotes/origin/feature/parser",
     "remote_refs_containing_old_tip": ["refs/remotes/origin/feature/parser"],
     "evidence_commands": [
       {
@@ -33,6 +138,7 @@
         "argv": [
           "git",
           "for-each-ref",
+          "--format=%(refname)",
           "--contains",
           "1111111111111111111111111111111111111111",
           "refs/remotes"
