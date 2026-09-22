@@ -3,21 +3,14 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Annotated, Protocol
 
 import typer
 
 from pr_review_cli_actions import authorize_reply_and_resolve, authorized_action, load_current_snapshot
-from pr_review_cli_target import (
-    DEFAULT_PROVIDER_TIMEOUT_SECONDS,
-    GithubOption,
-    HostOption,
-    ProviderOption,
-    ProviderTimeoutOption,
-    RepoOption,
-)
+from pr_review_cli_provider_errors import provider_operation_or_exit
+from pr_review_cli_target import GithubOption, HostOption, ProviderOption, ProviderTimeoutOption, RepoOption
 from pr_review_contracts import (
     BatchReviewActions,
     ChangeRequestTarget,
@@ -42,6 +35,17 @@ from pr_review_state_models import AuthorizedReviewAction
 
 SnapshotFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 StateFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
+
+
+def emit_batch_provider_error(input_id: str, replied: bool, message: str) -> None:
+    """Emit one structured batch failure after a provider process error.
+
+    Args:
+        input_id: Canonical input whose action failed.
+        replied: Whether its communication persisted before the failure.
+        message: Complete provider error text prepared by the shared boundary.
+    """
+    typer.echo(json.dumps({"input_id": input_id, "replied": replied, "resolved": False, "error": message}))
 
 
 def require_provider_confirmation(result: ReviewActionResult, operation: str) -> None:
@@ -143,7 +147,7 @@ def register_cycle_commands(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Evaluate and persist the REVIEW_COMPLETE terminal.
 
@@ -159,8 +163,11 @@ def register_cycle_commands(
         """
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        snapshot = load_current_snapshot(
-            target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+        snapshot = provider_operation_or_exit(
+            "complete-cycle",
+            lambda: load_current_snapshot(
+                target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+            ),
         )
         completed = evaluate_review_complete(snapshot, load_cycle(state_file))
         save_cycle(state_file, completed)
@@ -189,7 +196,7 @@ def register_response_commands(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Post one authorized inline reply.
 
@@ -207,16 +214,21 @@ def register_response_commands(
         """
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        action, cycle = authorized_action(
-            target,
-            snapshot_file,
-            state_file,
-            input_id,
-            ReplyAction(body=body),
-            provider=selected_provider,
-            command_timeout=provider_timeout_seconds,
+        action, cycle = provider_operation_or_exit(
+            "reply",
+            lambda: authorized_action(
+                target,
+                snapshot_file,
+                state_file,
+                input_id,
+                ReplyAction(body=body),
+                provider=selected_provider,
+                command_timeout=provider_timeout_seconds,
+            ),
         )
-        result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        result = provider_operation_or_exit(
+            "reply", lambda: selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        )
         require_provider_confirmation(result, "reply")
         save_cycle(state_file, record_completed_communication(cycle, input_id))
         typer.echo(json.dumps({"input_id": input_id, "replied": result.success}))
@@ -231,7 +243,7 @@ def register_response_commands(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Resolve one authorized input.
 
@@ -248,16 +260,21 @@ def register_response_commands(
         """
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        action, cycle = authorized_action(
-            target,
-            snapshot_file,
-            state_file,
-            input_id,
-            ResolveAction(),
-            provider=selected_provider,
-            command_timeout=provider_timeout_seconds,
+        action, cycle = provider_operation_or_exit(
+            "resolve",
+            lambda: authorized_action(
+                target,
+                snapshot_file,
+                state_file,
+                input_id,
+                ResolveAction(),
+                provider=selected_provider,
+                command_timeout=provider_timeout_seconds,
+            ),
         )
-        result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        result = provider_operation_or_exit(
+            "resolve", lambda: selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        )
         require_provider_confirmation(result, "resolution")
         save_cycle(state_file, record_completed_resolution(cycle, input_id))
         typer.echo(json.dumps({"input_id": input_id, "resolved": result.success}))
@@ -274,7 +291,7 @@ def register_response_commands(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Post one authorized top-level response.
 
@@ -293,16 +310,21 @@ def register_response_commands(
         """
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        action, cycle = authorized_action(
-            target,
-            snapshot_file,
-            state_file,
-            input_id,
-            TopLevelCommentAction(body=body, references=reference or []),
-            provider=selected_provider,
-            command_timeout=provider_timeout_seconds,
+        action, cycle = provider_operation_or_exit(
+            "comment",
+            lambda: authorized_action(
+                target,
+                snapshot_file,
+                state_file,
+                input_id,
+                TopLevelCommentAction(body=body, references=reference or []),
+                provider=selected_provider,
+                command_timeout=provider_timeout_seconds,
+            ),
         )
-        result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        result = provider_operation_or_exit(
+            "comment", lambda: selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        )
         require_provider_confirmation(result, "comment")
         save_cycle(state_file, record_completed_communication(cycle, input_id))
         typer.echo(json.dumps({"input_id": input_id, "commented": result.success}))
@@ -318,7 +340,7 @@ def register_response_commands(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Reply successfully before resolving the same authorized input.
 
@@ -336,17 +358,26 @@ def register_response_commands(
         """
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        snapshot = load_current_snapshot(
-            target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+        snapshot = provider_operation_or_exit(
+            "reply-and-resolve",
+            lambda: load_current_snapshot(
+                target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+            ),
         )
         cycle = load_cycle(state_file)
         reply_action, resolve_action, _simulated = authorize_reply_and_resolve(snapshot, cycle, input_id, body)
-        reply_result = selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds)
+        reply_result = provider_operation_or_exit(
+            "reply-and-resolve",
+            lambda: selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds),
+        )
         require_provider_confirmation(reply_result, "reply")
         cycle = record_completed_communication(cycle, input_id)
         save_cycle(state_file, cycle)
         typer.echo(json.dumps({"input_id": input_id, "replied": reply_result.success, "resolved": False}))
-        resolve_result = selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
+        resolve_result = provider_operation_or_exit(
+            "reply-and-resolve",
+            lambda: selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds),
+        )
         require_provider_confirmation(resolve_result, "resolution")
         save_cycle(state_file, record_completed_resolution(cycle, input_id))
         typer.echo(
@@ -375,7 +406,7 @@ def register_batch_command(
         provider: ProviderOption = None,
         repo: RepoOption = None,
         host: HostOption = None,
-        provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+        provider_timeout_seconds: ProviderTimeoutOption = None,
     ) -> None:
         """Validate the whole batch, then stop on its first failed action.
 
@@ -393,8 +424,11 @@ def register_batch_command(
         entries = BatchReviewActions.model_validate(json.loads(input_file.read_text())).root
         target = target_resolver(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
         selected_provider = provider_resolver(target)
-        snapshot = load_current_snapshot(
-            target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+        snapshot = provider_operation_or_exit(
+            "reply-and-resolve-batch",
+            lambda: load_current_snapshot(
+                target, snapshot_file, provider=selected_provider, command_timeout=provider_timeout_seconds
+            ),
         )
         cycle = load_cycle(state_file)
         planned: list[tuple[str, AuthorizedReviewAction, AuthorizedReviewAction]] = []
@@ -407,16 +441,32 @@ def register_batch_command(
         for input_id, reply_action, resolve_action in planned:
             replied = False
             try:
-                reply_result = selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds)
+                reply_result = provider_operation_or_exit(
+                    "reply-and-resolve-batch",
+                    lambda current_action=reply_action: selected_provider.act(
+                        target, current_action, command_timeout=provider_timeout_seconds
+                    ),
+                    emit_error=lambda message, current_input_id=input_id: emit_batch_provider_error(
+                        current_input_id, False, message
+                    ),
+                )
                 require_provider_confirmation(reply_result, "reply")
                 replied = True
                 cycle = record_completed_communication(cycle, input_id)
                 save_cycle(state_file, cycle)
-                resolve_result = selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
+                resolve_result = provider_operation_or_exit(
+                    "reply-and-resolve-batch",
+                    lambda current_action=resolve_action: selected_provider.act(
+                        target, current_action, command_timeout=provider_timeout_seconds
+                    ),
+                    emit_error=lambda message, current_input_id=input_id: emit_batch_provider_error(
+                        current_input_id, True, message
+                    ),
+                )
                 require_provider_confirmation(resolve_result, "resolution")
                 cycle = record_completed_resolution(cycle, input_id)
                 save_cycle(state_file, cycle)
-            except (ProviderResponseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            except ProviderResponseError as exc:
                 typer.echo(json.dumps({"input_id": input_id, "replied": replied, "resolved": False, "error": str(exc)}))
                 raise typer.Exit(code=1) from exc
             typer.echo(json.dumps({"input_id": input_id, "replied": True, "resolved": True}))

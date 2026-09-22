@@ -176,9 +176,10 @@ def summarize(result: ReviewSnapshot, *, pr: int, new_input: bool | None = None)
         checks_state=result.provider_metadata.checks_state,
         new_input=(
             bool(outstanding_inputs)
-            or result.unresolved_count > 0
-            or bool(result.unresponded_reviews)
-            or result.codex_approved is True
+            or (
+                not result.review_inputs
+                and (result.unresolved_count > 0 or bool(result.unresponded_reviews) or result.codex_approved is True)
+            )
         )
         if new_input is None
         else new_input,

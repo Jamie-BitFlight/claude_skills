@@ -353,14 +353,17 @@ def communicated_inputs(inputs: list[ReviewInput]) -> set[str]:
         Canonical input IDs with provider-observed communication evidence.
     """
     outbound = [item for item in inputs if item.direction == "outbound"]
+
+    def response_follows_input(response: ReviewInput, item: ReviewInput) -> bool:
+        observed_at = item.updated_at or item.created_at
+        return response.created_at is not None and (observed_at is None or response.created_at >= observed_at)
+
     return {
         item.input_id
         for item in inputs
         if item.direction == "inbound"
         and any(
-            response.created_at is not None
-            and item.created_at is not None
-            and response.created_at > item.created_at
+            response_follows_input(response, item)
             and (
                 (item.thread_id is not None and response.thread_id == item.thread_id)
                 or reference_present(response.body, item.stable_reference)
