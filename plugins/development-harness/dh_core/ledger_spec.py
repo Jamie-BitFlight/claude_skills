@@ -547,7 +547,11 @@ REASONS: list[Reason] = [
         code="leased",
         kind=ReasonKind.REFUSAL,
         condition="attempt_open is 1 and the command's exception (returned, stale, --force) does not hold",
-        message="Another attempt on this task is already open. Wait for it to close, or pass --force to take it over.",
+        message=(
+            "Another attempt on this task is already open. It has to close before this command "
+            "can run. Report this and stop; taking over an open attempt is the orchestrator's "
+            "decision, not the caller's."
+        ),
     ),
     Reason(
         code="not-ready",
@@ -563,7 +567,9 @@ REASONS: list[Reason] = [
         kind=ReasonKind.REFUSAL,
         condition="--attempt differs from tasks.attempts",
         message=(
-            "The --attempt you passed is not the attempt this task is on. Read the task again for the current number."
+            "The --attempt you passed is not the attempt this task is on. Report this and stop. "
+            "Running the command again at the current number takes over work that was given "
+            "to someone else."
         ),
     ),
     Reason(
@@ -630,7 +636,10 @@ REASONS: list[Reason] = [
         code="exists",
         kind=ReasonKind.REFUSAL,
         condition="a plan with this id, or an unarchived plan with this milestone, exists and --replace is absent",
-        message="A plan with this id, or an unarchived plan for this milestone, already exists. Pass --replace to overwrite it.",
+        message=(
+            "A plan with this id, or an unarchived plan for this milestone, already exists. "
+            "Work with that plan instead of creating a second one."
+        ),
     ),
     Reason(
         code="already-settled",
