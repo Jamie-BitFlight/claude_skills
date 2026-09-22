@@ -1157,12 +1157,12 @@ def _warn_unregistered_section(name: str, key: str, output: Output | None) -> No
     """
     message = (
         f"Unregistered section name {name!r} stored under fallback key {key!r}. "
-        "A section name is the address a consumer reads by, and this one is not registered, "
-        f"so a consumer asking for {name!r} finds nothing. Which consumer is meant to read "
-        f"it? Grepping the agent and skill sources for {name!r} shows whether one exists. "
-        "A consumer that reads it by name needs the name registered in "
-        "backlog_core/section_registry.py — a SectionKey member and a _SECTION_DISPLAY "
-        "entry. Registering the name does not by itself give the report a reader."
+        f"A consumer instructed to read {name!r} still retrieves it by that display title, "
+        "so this reports what the registry cannot confirm: that a consumer is expecting it. "
+        f"Grepping the agent and skill sources for {name!r} shows whether one is. A channel "
+        "meant to be canonical belongs in backlog_core/section_registry.py — a SectionKey "
+        "member and a _SECTION_DISPLAY entry. A channel meant to be dynamic carries its name "
+        "to the consumer in the instruction that names it."
     )
     print(message, file=sys.stderr)
     if output is not None:
