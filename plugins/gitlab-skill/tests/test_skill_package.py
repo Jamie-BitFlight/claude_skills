@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
+import re
 import subprocess
 import tomllib
+from datetime import date
 from pathlib import Path
-from types import ModuleType
 
 import marko
 import pytest
@@ -65,7 +65,7 @@ def test_reference_links_resolve() -> None:
     references = SKILL_ROOT / "references"
     for reference in references.glob("*.md"):
         for destination in markdown_links(reference):
-            if not destination.startswith("./"):
+            if destination.startswith(("http://", "https://", "#")):
                 continue
             target = (reference.parent / destination.split("#", maxsplit=1)[0]).resolve()
             assert target.is_file(), f"{reference.name}: missing reference {destination}"
@@ -100,8 +100,9 @@ def test_eval_file_uses_supported_schema() -> None:
     """Every eval has the complete package schema and a unique ID."""
     evaluations = load_evals()
     required = {"id", "should_activate", "reference", "prompt", "expected_output", "expectations"}
+    optional = {"loads"}
     assert evaluations
-    assert all(evaluation.keys() == required for evaluation in evaluations)
+    assert all(required <= evaluation.keys() <= required | optional for evaluation in evaluations)
 
     ids = [evaluation["id"] for evaluation in evaluations]
     assert all(isinstance(eval_id, int) for eval_id in ids)
@@ -117,6 +118,10 @@ def test_eval_file_uses_supported_schema() -> None:
         and all(isinstance(expectation, str) and expectation for expectation in evaluation["expectations"])
         for evaluation in evaluations
     )
+    for evaluation in evaluations:
+        loads = evaluation.get("loads", [])
+        assert isinstance(loads, list)
+        assert all(isinstance(reference, str) and SKILL_ROOT.joinpath(reference).is_file() for reference in loads)
 
 
 def test_eval_references_cover_router_behavior() -> None:
@@ -147,44 +152,12 @@ def test_negative_evals_exclude_supported_inspection_and_drafting() -> None:
     assert all(term not in prompt for prompt in negative_prompts for term in supported_terms)
 
 
-def test_release_credential_branch_encodes_default_branch_path() -> None:
-    """Protected-branch inspection requires numeric project ID and an encoded branch segment."""
-    reference = (SKILL_ROOT / "references" / "glab-release-credentials.md").read_text(encoding="utf-8")
-    encoded = subprocess.run(
-        ["jq", "-sRr", "@uri"], input="release/1.x", text=True, capture_output=True, check=True
-    ).stdout.strip()
-
-    assert encoded == "release%2F1.x"
-    assert 'PROJECT_JSON="$(glab api --hostname "$HOST" "projects/$PROJECT_SELECTOR")"' in reference
-    assert all(field in reference for field in (".id", ".path_with_namespace", ".default_branch", ".ssh_url_to_repo"))
-    assert 'VARIABLE_KEY="${VARIABLE_KEY:-RELEASE_PUSH_TOKEN}"' in reference
-    assert 'case "$PROJECT_ID"' in reference
-    assert 'DEFAULT_BRANCH_PATH="$(printf \'%s\' "$DEFAULT_BRANCH" | jq -sRr @uri)"' in reference
-    assert "projects/$PROJECT_ID/protected_branches/$DEFAULT_BRANCH_PATH" in reference
-    assert 'protected_branches/$DEFAULT_BRANCH"' not in reference
-
-
-def test_ci_context_references_separate_candidate_and_existing_ref_tools() -> None:
-    """CI context links expose distinct pre-merge and existing-ref command surfaces."""
+def test_ci_inspection_routes_only_to_existing_refs() -> None:
+    """The CI inspection index exposes the supported remote inspection surface."""
     references = SKILL_ROOT / "references"
     index = references.joinpath("glab-ci-inspection.md")
-    candidate = references.joinpath("glab-ci-candidate-validation.md").read_text(encoding="utf-8")
-    existing = references.joinpath("glab-ci-existing-ref-inspection.md").read_text(encoding="utf-8")
 
-    assert set(markdown_links(index)) == {"./glab-ci-candidate-validation.md", "./glab-ci-existing-ref-inspection.md"}
-    assert "validate_release_candidate.py" in candidate
-    assert "glab ci " not in candidate
-    assert "validate_release_candidate.py" not in existing
-    assert all(command in existing for command in ("glab ci list", "glab ci get", "glab ci trace", "glab ci lint"))
-
-
-def test_release_gate_links_both_ci_contexts() -> None:
-    """The lifecycle discloses pre-merge and existing-ref references from its gate."""
-    lifecycle = SKILL_ROOT / "references" / "automatic-tag-and-release.md"
-    destinations = set(markdown_links(lifecycle))
-
-    assert "./glab-ci-candidate-validation.md" in destinations
-    assert "./glab-ci-existing-ref-inspection.md" in destinations
+    assert set(markdown_links(index)) == {"./glab-ci-existing-ref-inspection.md"}
 
 
 @pytest.mark.parametrize(
@@ -310,255 +283,451 @@ poll_pipeline 5749
 
 
 def test_release_evals_select_one_adapter_without_loading_siblings() -> None:
-    """Adapter-selection evals name one branch; ordinary lifecycle evals load no evidence."""
+    """Structured eval routes select one adapter and keep evidence conditional."""
     evaluations = load_evals()
     selections: dict[object, list[str]] = {}
     for evaluation in evaluations:
-        expectations = evaluation["expectations"]
-        assert isinstance(expectations, list)
-        selections[evaluation["id"]] = [
-            expectation
-            for expectation in expectations
-            if isinstance(expectation, str) and expectation.startswith("Loads references/release-")
-        ]
+        loads = evaluation.get("loads", [])
+        assert isinstance(loads, list)
+        assert all(isinstance(reference, str) for reference in loads)
+        selections[evaluation["id"]] = [str(reference) for reference in loads]
 
-    assert all(len(selections[eval_id]) == 1 for eval_id in (23, 24, 25))
-    assert all(len(links) == 0 for eval_id, links in selections.items() if eval_id not in (23, 24, 25))
+    assert selections[13] == [
+        "references/release-version-adapters.md",
+        "references/release-notes-adapters.md",
+        "references/release-publication-adapters.md",
+    ]
+    assert selections[23] == ["references/release-version-semantic-release.md"]
+    assert selections[24] == ["references/release-version-python-semantic-release.md"]
+    assert selections[25] == ["references/release-publication-generic.md"]
+    assert all(len(links) == 0 for eval_id, links in selections.items() if eval_id not in (13, 23, 24, 25))
     ordinary = [evaluation for evaluation in evaluations if evaluation["id"] in (13, 15, 16, 17, 19)]
     assert all(evaluation["reference"] != "references/release-live-evidence.md" for evaluation in ordinary)
-    for evaluation in ordinary:
-        expectations = evaluation["expectations"]
-        assert isinstance(expectations, list)
-        assert "release-live-evidence" not in " ".join(str(expectation) for expectation in expectations)
 
 
-def test_package_has_no_runtime_or_credential_mutation_surface() -> None:
-    """Activation exposes no command or credential-mutation automation."""
-    assert not list(PLUGIN_ROOT.joinpath("commands").glob("*.md"))
-    assert not list(PLUGIN_ROOT.joinpath("scripts").glob("*.py"))
-    helper = SKILL_ROOT / "scripts" / "verify_release_playbook.py"
-    assert helper.is_file()
-    helper_text = helper.read_text(encoding="utf-8")
-    assert all(verb not in helper_text for verb in ('"POST"', '"PUT"', '"PATCH"', '"DELETE"'))
-    assert "variable get" not in helper_text
+def release_component_documents(path: Path) -> tuple[dict[str, object], dict[str, object]]:
+    """Load a component header and its executable document."""
+    documents = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
+    assert len(documents) == 2
+    assert all(isinstance(document, dict) for document in documents)
+    return documents[0], documents[1]
 
 
-def test_release_playbook_assets_exist() -> None:
-    """Universal, derived adapter, and exact live-evidence assets ship together."""
-    assets = SKILL_ROOT / "assets" / "release-playbook"
-    expected_root = {
-        "base.gitlab-ci.yml",
-        "semantic-release.gitlab-ci.yml",
-        "python-semantic-release.gitlab-ci.yml",
-        "generic-package.gitlab-ci.yml",
-        "release-notes.gitlab-ci.yml",
-        "release-build.gitlab-ci.yml",
-        "gitlab-release.gitlab-ci.yml",
-        ".releaserc.cjs",
-        "materialize_psr_config.py",
-        "live-verified",
+def component_inputs(path: Path) -> dict[str, object]:
+    """Return one component's typed input map."""
+    header, _ = release_component_documents(path)
+    specification = header["spec"]
+    assert isinstance(specification, dict)
+    inputs = specification["inputs"]
+    assert isinstance(inputs, dict)
+    return inputs
+
+
+def component_job(path: Path) -> dict[str, object]:
+    """Return one component's executable job contract."""
+    _, executable = release_component_documents(path)
+    job = executable["$[[ inputs.job-name ]]"]
+    assert isinstance(job, dict)
+    return job
+
+
+def object_map(value: object) -> dict[str, object]:
+    """Narrow a parsed YAML mapping."""
+    assert isinstance(value, dict)
+    assert all(isinstance(key, str) for key in value)
+    return {str(key): item for key, item in value.items()}
+
+
+def string_list(value: object) -> list[str]:
+    """Narrow a parsed YAML string sequence."""
+    assert isinstance(value, list)
+    assert all(isinstance(item, str) for item in value)
+    return [str(item) for item in value]
+
+
+def component_manifest(root: Path) -> set[str]:
+    """Return the authoritative component template inventory."""
+    manifest = json.loads(root.joinpath("component-manifest.json").read_text(encoding="utf-8"))
+    assert set(manifest) == {"templates"}
+    templates = manifest["templates"]
+    assert isinstance(templates, list)
+    assert all(isinstance(name, str) for name in templates)
+    return {str(name) for name in templates}
+
+
+def test_release_component_project_matches_authoritative_manifest() -> None:
+    """The publishable project shape exposes exactly its declared contracts."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    templates = root / "templates"
+    expected = component_manifest(root)
+
+    assert {path.name for path in templates.glob("*.yml")} == expected
+    assert root.joinpath("README.md").is_file()
+    assert root.joinpath(".gitlab-ci.yml").is_file()
+    assert root.joinpath("examples", "consumer.gitlab-ci.yml").is_file()
+
+    for path in templates.glob("*.yml"):
+        header, executable = release_component_documents(path)
+        assert set(header) == {"spec"}
+        specification = header["spec"]
+        assert isinstance(specification, dict)
+        assert isinstance(specification.get("inputs"), dict)
+        assert len(executable) == 1
+        assert next(iter(executable)) == "$[[ inputs.job-name ]]"
+
+
+def test_release_components_are_self_contained_and_pipeline_safe() -> None:
+    """Components expose jobs without mutating the consumer's global configuration."""
+    templates = SKILL_ROOT / "assets" / "release-components" / "templates"
+    forbidden = {"workflow", "stages", "default", "variables", "include"}
+
+    for path in templates.glob("*.yml"):
+        header, executable = release_component_documents(path)
+        content = path.read_text(encoding="utf-8")
+        assert forbidden.isdisjoint(executable)
+        assert "spec:component" not in content
+        assert "extends:" not in content
+        assert "include:" not in content
+        assert not any(str(name).startswith(".") for name in executable)
+        specification = header["spec"]
+        assert isinstance(specification, dict)
+        inputs = specification["inputs"]
+        assert isinstance(inputs, dict)
+        assert {"job-name", "stage", "rules", "image"} <= set(inputs)
+        rules = inputs["rules"]
+        assert isinstance(rules, dict)
+        assert rules["type"] == "array"
+
+
+def test_consumer_owns_release_orchestration_and_one_version_adapter() -> None:
+    """The composition selects one adapter while retaining all project policy and build work."""
+    path = SKILL_ROOT / "assets" / "release-components" / "examples" / "consumer.gitlab-ci.yml"
+    consumer = yaml.safe_load(path.read_text(encoding="utf-8"))
+    includes = consumer["include"]
+    component_refs = [entry["component"] for entry in includes]
+    version_refs = [reference for reference in component_refs if "semantic-release-version@" in reference]
+    pins = [reference.rsplit("@", maxsplit=1)[1] for reference in component_refs]
+
+    assert len(version_refs) == 1
+    assert all(re.fullmatch(r"[0-9a-f]{40}", pin) for pin in pins)
+    assert "workflow" in consumer
+    assert consumer["stages"] == [
+        "verify",
+        "release-version",
+        "release-notes",
+        "release-build",
+        "release-publish",
+        "release-create",
+    ]
+    assert "RELEASE_TAG_REGEX" in consumer["variables"]
+    assert "project-verify" in consumer
+    assert "build-release-artifact" in consumer
+    assert all("rules" in entry["inputs"] and "stage" in entry["inputs"] for entry in includes)
+
+
+def test_release_components_use_runtime_identity_and_secret_boundaries() -> None:
+    """Parsed jobs use predefined identity and restrict the release credential to version jobs."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    templates = root / "templates"
+    version_names = {"semantic-release-version.yml", "python-semantic-release-version.yml"}
+
+    for name in component_manifest(root):
+        job = component_job(templates / name)
+        serialized_job = json.dumps(job)
+        if name in version_names:
+            assert "RELEASE_PUSH_TOKEN" in serialized_job
+        else:
+            assert "RELEASE_PUSH_TOKEN" not in serialized_job
+
+    generic_job = json.dumps(component_job(templates / "generic-package.yml"))
+    release_job = json.dumps(component_job(templates / "gitlab-release.yml"))
+    assert all(
+        variable in generic_job for variable in ("CI_JOB_TOKEN", "CI_API_V4_URL", "CI_PROJECT_ID", "CI_COMMIT_TAG")
+    )
+    assert all(
+        variable in release_job for variable in ("CI_API_V4_URL", "CI_PROJECT_ID", "CI_PROJECT_PATH", "CI_COMMIT_TAG")
+    )
+
+
+def test_component_project_tests_every_template_at_its_commit_sha() -> None:
+    """The project resolves each template at its SHA with every mandatory input."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    includes = pipeline["include"]
+    component_refs = [entry["component"] for entry in includes]
+    included_names = {
+        reference.rsplit("/", maxsplit=1)[1].split("@", maxsplit=1)[0] + ".yml" for reference in component_refs
     }
-    expected_live = {
+
+    assert included_names == component_manifest(root)
+    assert all(reference.startswith("$CI_SERVER_FQDN/$CI_PROJECT_PATH/") for reference in component_refs)
+    assert all(reference.endswith("@$CI_COMMIT_SHA") for reference in component_refs)
+    for entry in includes:
+        name = entry["component"].rsplit("/", maxsplit=1)[1].split("@", maxsplit=1)[0]
+        inputs = component_inputs(root / "templates" / f"{name}.yml")
+        mandatory = {key for key, definition in inputs.items() if "default" not in object_map(definition)}
+        assert mandatory <= entry["inputs"].keys()
+
+
+def test_component_project_publishes_catalog_only_from_semantic_version_tags() -> None:
+    """Catalog publication is release-keyword based and follows component validation."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    publication = pipeline["publish-component-catalog"]
+
+    assert publication["stage"] == "release"
+    assert set(publication["needs"]) == {
+        "validate-component-tree",
+        "test-release-git-credential",
+        "test-release-tag-selection",
+    }
+    assert publication["release"]["tag_name"] == "$CI_COMMIT_TAG"
+    assert publication["rules"][0]["if"].startswith("$CI_COMMIT_TAG =~ /")
+
+
+def test_component_project_tag_selection_fixture_executes_without_side_effects(tmp_path: Path) -> None:
+    """The component project proves patterned previous-tag selection in a local repository."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    commands = string_list(pipeline["test-release-tag-selection"]["script"])
+    result = subprocess.run(
+        ["bash", "-c", "set -eu\n" + "\n".join(commands)], cwd=tmp_path, text=True, capture_output=True, check=False
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "version", ["0.0.0", "1.2.3", "1.2.3-alpha", "1.2.3-alpha.1", "1.2.3+build.5", "1.2.3-rc.1+build-7"]
+)
+def test_catalog_tag_expression_accepts_semver_2_versions(version: str) -> None:
+    """Catalog publication accepts SemVer 2.0 core, prerelease, and build forms."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    expression = pipeline["publish-component-catalog"]["rules"][0]["if"]
+    pattern = expression.removeprefix("$CI_COMMIT_TAG =~ /").removesuffix("/")
+
+    assert all(unsupported not in pattern for unsupported in ("(?:", "(?=", "(?<", "\\d"))
+    assert re.fullmatch(pattern, version)
+
+
+@pytest.mark.parametrize(
+    "version", ["", "v1.2.3", "01.2.3", "1.02.3", "1.2.03", "1.2.3-01", "1.2.3-alpha..1", "1.2.3+"]
+)
+def test_catalog_tag_expression_rejects_non_semver_versions(version: str) -> None:
+    """Catalog publication rejects prefixes, leading zeroes, and empty identifiers."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    expression = pipeline["publish-component-catalog"]["rules"][0]["if"]
+    pattern = expression.removeprefix("$CI_COMMIT_TAG =~ /").removesuffix("/")
+
+    assert re.fullmatch(pattern, version) is None
+
+
+def test_consumer_verification_gates_both_lifecycle_pipeline_types() -> None:
+    """Project verification runs before default-branch versioning and tag publication."""
+    path = SKILL_ROOT / "assets" / "release-components" / "examples" / "consumer.gitlab-ci.yml"
+    consumer = yaml.safe_load(path.read_text(encoding="utf-8"))
+    conditions = {rule["if"] for rule in consumer["project-verify"]["rules"]}
+
+    assert conditions == {
+        '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH',
+        '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX',
+    }
+
+
+def test_consumer_builds_once_and_feeds_each_publication_destination() -> None:
+    """Every publication consumes the one consumer-owned immutable build artifact."""
+    path = SKILL_ROOT / "assets" / "release-components" / "examples" / "consumer.gitlab-ci.yml"
+    consumer = yaml.safe_load(path.read_text(encoding="utf-8"))
+    build_jobs = [
+        name for name, value in consumer.items() if isinstance(value, dict) and value.get("stage") == "release-build"
+    ]
+    publication_includes = [entry for entry in consumer["include"] if entry["inputs"]["stage"] == "release-publish"]
+
+    assert build_jobs == ["build-release-artifact"]
+    assert publication_includes
+    for entry in publication_includes:
+        assert entry["inputs"]["needs"] == [{"job": "build-release-artifact", "artifacts": True}]
+
+
+def test_version_components_require_explicit_remote_selection() -> None:
+    """Both adapters require a remote and semantic-release receives the selected URL."""
+    templates = SKILL_ROOT / "assets" / "release-components" / "templates"
+    semantic_path = templates / "semantic-release-version.yml"
+    python_path = templates / "python-semantic-release-version.yml"
+    semantic_inputs = component_inputs(semantic_path)
+    python_inputs = component_inputs(python_path)
+    semantic_job = component_job(semantic_path)
+
+    assert "default" not in object_map(semantic_inputs["git-remote-name"])
+    assert "default" not in object_map(semantic_inputs["repository-url"])
+    assert "default" not in object_map(python_inputs["git-remote-name"])
+    assert "default" not in object_map(python_inputs["repository-url"])
+    variables = object_map(semantic_job["variables"])
+    assert variables["RELEASE_REPOSITORY_URL"] == "$[[ inputs.repository-url ]]"
+    commands = [*string_list(semantic_job["before_script"]), *string_list(semantic_job["script"])]
+    script = "\n".join(commands)
+    assert "git remote set-url" in script
+    assert "repositoryUrl" in script
+
+
+def test_python_semantic_release_runtime_config_leaves_git_auth_to_askpass(tmp_path: Path) -> None:
+    """The executed PSR config generator disables token-derived Git push authentication."""
+    path = SKILL_ROOT / "assets" / "release-components" / "templates" / "python-semantic-release-version.yml"
+    job = component_job(path)
+    generator = next(command for command in string_list(job["script"]) if command.startswith("python - <<'PY'"))
+    result = subprocess.run(
+        ["bash", "-c", generator],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "CI_DEFAULT_BRANCH": "release/1.x",
+            "RELEASE_TAG_PREFIX": "v",
+            "RELEASE_GIT_REMOTE_NAME": "upstream",
+            "RELEASE_VERSION_TOML": "pyproject.toml:project.version",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    config = tomllib.loads(tmp_path.joinpath(".release-component.toml").read_text(encoding="utf-8"))
+    assert config["semantic_release"]["remote"]["ignore_token_for_push"] is True
+
+
+@pytest.mark.parametrize("template_name", ["semantic-release-version.yml", "python-semantic-release-version.yml"])
+def test_version_credential_helper_forces_runtime_token_without_persisting_it(
+    template_name: str, tmp_path: Path
+) -> None:
+    """The actual askpass setup resolves a fixture token without writing its value."""
+    path = SKILL_ROOT / "assets" / "release-components" / "templates" / template_name
+    job = component_job(path)
+    before_script = string_list(job["before_script"])
+    setup = next(command for command in before_script if "cat >.release-git-askpass" in command)
+    fixture_token = "fixture-release-token"
+    result = subprocess.run(
+        ["bash", "-c", setup],
+        cwd=tmp_path,
+        env={**os.environ, "CI_PROJECT_DIR": str(tmp_path), "RELEASE_PUSH_TOKEN": fixture_token},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    helper = tmp_path / ".release-git-askpass"
+    assert helper.stat().st_mode & 0o777 == 0o700
+    assert fixture_token not in helper.read_text(encoding="utf-8")
+    assert "GIT_CONFIG_KEY_0=credential.helper" in setup
+    assert "GIT_CONFIG_VALUE_0=" in setup
+
+
+def test_release_token_environment_scope_exists_only_on_version_jobs() -> None:
+    """Parsed jobs expose the scoped token boundary only to version adapters."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    templates = root / "templates"
+    version_names = {"semantic-release-version.yml", "python-semantic-release-version.yml"}
+
+    for name in component_manifest(root):
+        job = component_job(templates / name)
+        if name in version_names:
+            assert job["environment"] == {"name": "$[[ inputs.environment ]]", "action": "verify"}
+            assert "environment" in component_inputs(templates / name)
+        else:
+            assert "environment" not in job
+
+    consumer = yaml.safe_load(root.joinpath("examples", "consumer.gitlab-ci.yml").read_text(encoding="utf-8"))
+    version_includes = [entry for entry in consumer["include"] if "-version@" in entry["component"]]
+    publication_includes = [entry for entry in consumer["include"] if "-version@" not in entry["component"]]
+    assert [entry["inputs"]["environment"] for entry in version_includes] == ["release-version"]
+    assert all("environment" not in entry["inputs"] for entry in publication_includes)
+
+    project_pipeline = yaml.safe_load(root.joinpath(".gitlab-ci.yml").read_text(encoding="utf-8"))
+    project_versions = [entry for entry in project_pipeline["include"] if "-version@" in entry["component"]]
+    project_publications = [entry for entry in project_pipeline["include"] if "-version@" not in entry["component"]]
+    assert all(entry["inputs"]["environment"] == "release-version" for entry in project_versions)
+    assert all("environment" not in entry["inputs"] for entry in project_publications)
+
+
+def test_release_notes_limit_history_to_the_selected_tag_pattern() -> None:
+    """Release-note history and current-tag validation share one mandatory pattern."""
+    path = SKILL_ROOT / "assets" / "release-components" / "templates" / "release-notes.yml"
+    inputs = component_inputs(path)
+    job = component_job(path)
+    script = "\n".join(string_list(job["script"]))
+
+    assert "default" not in object_map(inputs["release-tag-pattern"])
+    variables = object_map(job["variables"])
+    assert variables["RELEASE_TAG_PATTERN"] == "$[[ inputs.release-tag-pattern ]]"
+    assert 'git describe --tags --match "$RELEASE_TAG_PATTERN"' in script
+
+
+def test_components_assert_expected_protected_push_contexts_at_runtime() -> None:
+    """Version and publication jobs fail closed outside their required push contexts."""
+    templates = SKILL_ROOT / "assets" / "release-components" / "templates"
+    version_names = {"semantic-release-version.yml", "python-semantic-release-version.yml"}
+
+    for path in templates.glob("*.yml"):
+        job = component_job(path)
+        commands = [*string_list(job.get("before_script", [])), *string_list(job["script"])]
+        script = "\n".join(commands)
+        assert "CI_PIPELINE_SOURCE" in script
+        assert "CI_COMMIT_REF_PROTECTED" in script
+        if path.name in version_names:
+            assert "CI_COMMIT_BRANCH" in script
+            assert "CI_DEFAULT_BRANCH" in script
+        else:
+            assert "CI_COMMIT_TAG" in script
+
+
+def test_live_evidence_remains_separate_from_reusable_components() -> None:
+    """Observed sandbox configurations retain their evidence boundary."""
+    root = SKILL_ROOT / "assets" / "release-components"
+    live = root / "live-verified"
+    expected = {
         "semantic-release.gitlab-ci.yml",
         "python-semantic-release.gitlab-ci.yml",
         ".releaserc.json",
         "pyproject.toml",
     }
-    assert {path.name for path in assets.iterdir() if path.name != "__pycache__"} == expected_root
-    assert {path.name for path in assets.joinpath("live-verified").iterdir()} == expected_live
+    reusable = "\n".join(path.read_text(encoding="utf-8") for path in root.joinpath("templates").glob("*.yml"))
 
-
-def test_release_playbook_routes_conditional_adapter_references() -> None:
-    """The universal playbook discloses implementation and evidence only by branch."""
-    playbook = (SKILL_ROOT / "references" / "automatic-tag-and-release.md").read_text(encoding="utf-8")
-    destinations = set(markdown_links(SKILL_ROOT / "references" / "automatic-tag-and-release.md"))
-
-    assert "## Invariant State Machine" in playbook
-    assert "No release:" in playbook
-    assert "Release:" in playbook
-    assert "## Project Intake" in playbook
-    assert "## Adapter Interfaces" in playbook
-    assert "## Composition Contract" in playbook
-    assert "## Validation Gates" in playbook
-    assert "./release-version-adapters.md" in destinations
-    assert "./release-publication-adapters.md" in destinations
-    assert "./glab-release-credentials.md" in destinations
-    assert "./release-live-evidence.md" not in destinations
-
-
-def test_release_playbook_base_contains_only_shared_contracts() -> None:
-    """The base defines routing and hidden contracts without selecting project tools."""
-    base = (SKILL_ROOT / "assets" / "release-playbook" / "base.gitlab-ci.yml").read_text(encoding="utf-8")
-
-    assert "workflow:" in base
-    assert "stages:" in base
-    assert all(
-        contract in base
-        for contract in (
-            ".release_version:",
-            ".release_notes:",
-            ".release_build:",
-            ".release_publish:",
-            ".release_create:",
-        )
-    )
-    assert "RELEASE_TAG_REGEX" in base
-    assert all(
-        stage in base
-        for stage in ("release-version", "release-notes", "release-build", "release-publish", "release-create")
-    )
-    assert "script:" not in base
-    assert "image:" not in base
-    assert "semantic-release" not in base
-
-
-def test_derived_adapters_include_and_extend_one_base() -> None:
-    """Derived adapters contain implementation only and consume shared contracts."""
-    assets = SKILL_ROOT / "assets" / "release-playbook"
-    adapters = {
-        "semantic-release.gitlab-ci.yml": ".release_version",
-        "python-semantic-release.gitlab-ci.yml": ".release_version",
-        "release-notes.gitlab-ci.yml": ".release_notes",
-        "release-build.gitlab-ci.yml": ".release_build",
-        "generic-package.gitlab-ci.yml": ".release_publish",
-        "gitlab-release.gitlab-ci.yml": ".release_create",
-    }
-    for name, contract in adapters.items():
-        content = assets.joinpath(name).read_text(encoding="utf-8")
-        assert "base.gitlab-ci.yml" in content
-        assert f"extends: {contract}" in content
-        assert "workflow:" not in content
-        assert "stages:" not in content
-        assert "DERIVED + CI-LINT-VERIFIED" in content
-
-
-def test_version_configs_derive_branch_and_neutral_tag_policy() -> None:
-    """All consumers use base tag environment and fail when it is absent."""
-    assets = SKILL_ROOT / "assets" / "release-playbook"
-    base = yaml.safe_load((assets / "base.gitlab-ci.yml").read_text(encoding="utf-8"))
-    base_prefix = base["variables"]["RELEASE_TAG_PREFIX"]
-    node = assets.joinpath(".releaserc.cjs").read_text(encoding="utf-8")
-    psr_path = assets / "materialize_psr_config.py"
-    spec = importlib.util.spec_from_file_location("materialize_psr_config", psr_path)
-    assert spec
-    assert spec.loader
-    module: ModuleType = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    rendered = module.render_config("release/1.x", base_prefix, "upstream")
-    psr = tomllib.loads(rendered)["semantic_release"]
-
-    assert "process.env.CI_DEFAULT_BRANCH" in node
-    assert "const tagPrefix = process.env.RELEASE_TAG_PREFIX;" in node
-    assert "main" not in node
-    node_result = subprocess.run(
-        [
-            "node",
-            "-e",
-            f"const c=require({json.dumps(str(assets / '.releaserc.cjs'))}); console.log(JSON.stringify(c))",
-        ],
-        env={**os.environ, "CI_DEFAULT_BRANCH": "release/1.x", "RELEASE_TAG_PREFIX": base_prefix},
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    node_config = json.loads(node_result.stdout)
-    assert node_config["branches"] == ["release/1.x"]
-    assert node_config["tagFormat"] == f"{base_prefix}${{version}}"
-    assert psr["tag_format"] == f"{base_prefix}{{version}}"
-    assert psr["branches"]["release"]["match"] == r"^release/1\.x$"
-    assert psr["remote"]["name"] == "upstream"
-    psr_job = assets.joinpath("python-semantic-release.gitlab-ci.yml").read_text(encoding="utf-8")
-    assert 'semantic-release --config "$PSR_RUNTIME_CONFIG" version' in psr_job
-    assert 'git checkout -B "$CI_DEFAULT_BRANCH" "$CI_COMMIT_SHA"' in psr_job
-    assert 'git branch --set-upstream-to="$RELEASE_GIT_REMOTE_NAME/$CI_DEFAULT_BRANCH"' in psr_job
-    assert "RELEASE_GIT_REMOTE_NAME: '__RELEASE_GIT_REMOTE_NAME__'" in psr_job
-
-    missing_prefix_env = {key: value for key, value in os.environ.items() if key != "RELEASE_TAG_PREFIX"}
-    missing_prefix_env["CI_DEFAULT_BRANCH"] = "release/1.x"
-    node_missing = subprocess.run(
-        ["node", "-e", f"require({json.dumps(str(assets / '.releaserc.cjs'))})"],
-        env=missing_prefix_env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert node_missing.returncode != 0
-    assert "RELEASE_TAG_PREFIX is required" in node_missing.stderr
-    with pytest.raises(ValueError, match="RELEASE_TAG_PREFIX"):
-        module.render_config("release/1.x", "", "upstream")
-    with pytest.raises(ValueError, match="RELEASE_GIT_REMOTE_NAME"):
-        module.render_config("release/1.x", base_prefix, "")
-
-    credential = (SKILL_ROOT / "references" / "glab-release-credentials.md").read_text(encoding="utf-8")
-    assert 'TAG_PATTERN="${RELEASE_TAG_PREFIX}*"' in credential
-    assert 'TAG_PATTERN="${TAG_PATTERN:-' not in credential
-
-
-def test_generalized_assets_use_predefined_identity_and_no_sandbox_literals() -> None:
-    """Generalized assets derive identity while evidence-only files retain observed literals."""
-    assets = SKILL_ROOT / "assets" / "release-playbook"
-    source_suffixes = {".cjs", ".json", ".py", ".toml", ".yaml", ".yml"}
-    generalized = [
-        path
-        for path in assets.rglob("*")
-        if path.is_file() and "live-verified" not in path.parts and path.suffix in source_suffixes
-    ]
-    content = "\n".join(path.read_text(encoding="utf-8") for path in generalized)
-
-    for variable in (
-        "CI_PROJECT_ID",
-        "CI_PROJECT_NAME",
-        "CI_PROJECT_PATH",
-        "CI_DEFAULT_BRANCH",
-        "CI_COMMIT_SHA",
-        "CI_COMMIT_TAG",
-        "CI_API_V4_URL",
-    ):
-        assert variable in content
-    assert "RELEASE_TAG_PREFIX: 'v'" in content
-    assert "RELEASE_TAG_WILDCARD: 'v*'" in content
-    assert "GENERIC_PACKAGE_NAME: '$CI_PROJECT_NAME'" in content
-    assert all(
-        literal not in content
-        for literal in ("jira-ai-evaluation", "jamie.nelson", "projects/529", "release-playbook-v")
-    )
-    assert '"main"' not in content
-    assert "^main$" not in content
-
-    references = SKILL_ROOT / "references"
-    generalized_docs = [path for path in references.glob("*.md") if path.name != "release-live-evidence.md"]
-    docs_and_runtime = "\n".join(path.read_text(encoding="utf-8") for path in generalized_docs)
-    docs_and_runtime += (SKILL_ROOT / "evals" / "evals.json").read_text(encoding="utf-8")
-    docs_and_runtime += (SKILL_ROOT / "scripts" / "validate_release_candidate.py").read_text(encoding="utf-8")
-    assert all(
-        literal not in docs_and_runtime
-        for literal in ("jira-ai-evaluation", "jamie.nelson", "projects/529", "release-playbook-v1")
-    )
-
-
-def test_tag_contracts_require_the_release_regex() -> None:
-    """No generic tag condition can select lifecycle tag jobs."""
-    base = (SKILL_ROOT / "assets" / "release-playbook" / "base.gitlab-ci.yml").read_text(encoding="utf-8")
-    tag_rule = '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
-
-    assert base.count(tag_rule) == 5
-    assert '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG\'' not in base
+    assert {path.name for path in live.iterdir()} == expected
+    assert all(literal not in reusable for literal in ("jira-ai-evaluation", "projects/529", "release-playbook-v"))
 
 
 def test_disclosed_release_references_resolve_and_carry_evidence_dates() -> None:
-    """Every conditional release branch resolves and identifies dated sources."""
+    """Lifecycle routes and every indexed adapter branch carry valid dated sources."""
     reference_root = SKILL_ROOT / "references"
     playbook = reference_root / "automatic-tag-and-release.md"
-    disclosed = [destination for destination in markdown_links(playbook) if destination.startswith("./")]
+    targets = {
+        (reference_root / destination).resolve()
+        for destination in markdown_links(playbook)
+        if destination.startswith("./")
+    }
+    adapter_indexes = sorted(reference_root.glob("release-*-adapters.md"))
+    assert adapter_indexes
+    for index in adapter_indexes:
+        branch_targets = {
+            (index.parent / destination).resolve()
+            for destination in markdown_links(index)
+            if destination.startswith("./")
+        }
+        assert branch_targets, index
+        targets.update(branch_targets)
 
-    for destination in disclosed:
-        target = (reference_root / destination).resolve()
-        assert target.is_file(), destination
+    for target in targets:
+        assert target.is_file(), target
         source_lines = [
             line for line in target.read_text(encoding="utf-8").splitlines() if line.startswith("SOURCE: <")
         ]
-        assert source_lines, destination
-        assert all("2026-09-22" in line for line in source_lines)
+        assert source_lines, target
+        for line in source_lines:
+            match = re.search(r"\b(?:accessed|reviewed) (\d{4}-\d{2}-\d{2})\b", line)
+            assert match, line
+            date.fromisoformat(match.group(1))
 
 
 def test_adapter_indexes_create_real_branch_boundaries() -> None:
@@ -574,10 +743,16 @@ def test_adapter_indexes_create_real_branch_boundaries() -> None:
         for destination in markdown_links(references / "release-publication-adapters.md")
         if destination.startswith("./release-publication-")
     ]
+    notes_links = [
+        destination
+        for destination in markdown_links(references / "release-notes-adapters.md")
+        if destination.startswith("./release-notes-")
+    ]
 
     assert len(version_links) == 2
     assert len(publication_links) == 5
-    for destination in [*version_links, *publication_links]:
+    assert len(notes_links) == 2
+    for destination in [*version_links, *publication_links, *notes_links]:
         assert references.joinpath(destination).is_file(), destination
 
 

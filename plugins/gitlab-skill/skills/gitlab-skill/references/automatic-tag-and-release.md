@@ -1,157 +1,117 @@
 # Automatic Tag and Release Lifecycle
 
-Compose this lifecycle from replaceable adapters. This file defines universal behavior and routes
-selected implementations; the numbered validation gates are the sole completion authority.
+Compose the lifecycle from self-contained components and consumer-owned orchestration. The consumer
+configuration is the authority for workflow admission, complete stage order, release policy,
+project build, dependencies, and one selected version adapter.
 
 ## Invariant State Machine
 
-Every default-branch push runs one version adapter.
+Every default-branch push runs exactly one version component.
 
-1. The version adapter evaluates the push.
-2. **No release:** evaluation succeeds, creates no version tag, and terminates the lifecycle.
-3. **Release:** evaluation pushes one protected version tag with an authorized non-job-token Git
+1. The selected version component evaluates the push.
+2. No release: evaluation succeeds, creates no version tag, and terminates the lifecycle.
+3. Release: evaluation pushes one protected version tag with an authorized non-job-token Git
    credential. The ordinary tag push starts a separate tag pipeline.
-4. The tag pipeline preserves a release-description artifact, builds immutable artifacts, completes
-   one publication adapter for every selected destination, then runs one GitLab Release adapter.
+4. The tag pipeline generates one release-description artifact, runs the consumer-owned build once,
+   publishes the immutable build output to each selected destination, then creates one GitLab
+   Release.
 5. The GitLab Release targets the existing tag and starts only after every publication succeeds.
 
-SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; this is the user's composed lifecycle)
+SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; lifecycle composition)
 
-## Required vs Replaceable
+## Intake
 
-| Required lifecycle contract | Replaceable adapter choice |
-|---|---|
-| Every default-branch push reaches version evaluation | Version tool and release policy |
-| No-release terminates successfully without a tag | Tool-specific no-release output |
-| Release pushes one protected tag and triggers a tag pipeline | Tag format and credential type |
-| Tag jobs match only the resolved release-tag regex | Regex derived from the tag format |
-| One release-description artifact precedes Release creation | Generator, format, command, and path |
-| One build produces immutable artifacts | Runtime, image, and build command |
-| One publication adapter runs per selected destination | Destinations, authentication, and names |
-| One GitLab Release adapter runs after all publications | Release implementation and durable links |
+Read the current project before composing the consumer pipeline: GitLab target and remote, actual
+default branch, existing workflow admission and jobs, complete stage list, one version adapter,
+release policy and tag format, release-commit behavior, protected credential interface, notes
+artifact, project build command and outputs, publication destinations, Release links, immutable
+runtime images, and validation evidence.
 
-## Project Intake
+For a migration, account for all current workflow sources and jobs. Consult deleted configuration
+only when the owner requests migration or one named uncertainty cannot be resolved from current
+authority.
 
-New setup branch: use shipped assets and the current project state as the implementation authority.
-Migration branch: when the owner explicitly requests migration, include deleted historical
-configuration as migration input.
-Uncertainty branch: when a current authority leaves one named unresolved uncertainty that deleted
-configuration can answer, consult only the history needed to answer that uncertainty.
+## Component Project
 
-Resolve the GitLab target and Git remote; actual default branch; approved merge path; existing
-workflow sources/jobs; one version adapter and release policy; one resolved tag contract whose
-neutral default is owned by `base.gitlab-ci.yml` (or one explicit project override changing all
-derived values together); release-commit behavior; credential
-interface; one notes adapter; one build adapter; selected
-destinations and one publication adapter per destination; one Release adapter; immutable images;
-commands, paths, duplicate policies, durable URLs; and expected validation metadata.
+Use `assets/release-components/` as the dedicated component-project shape. Its
+`component-manifest.json` is the authoritative template inventory used by the root same-project SHA
+test pipeline and repository tests.
 
-Apply **Gate G1: Intake** before composition.
+Each template defines typed `spec:inputs` and one input-named job. It contains no workflow, stage
+list, global default, global variables, copied base, nested local include, or shared hidden job. It
+uses no `spec:component` context and therefore does not require GitLab 18.7.
 
-## Adapter Interfaces
+Test a component-project change by including every component from
+`$CI_SERVER_FQDN/$CI_PROJECT_PATH/<component>@$CI_COMMIT_SHA` in that project's root pipeline. Pin a
+production consumer to a reviewed commit SHA or trusted immutable release tag.
 
-### Version
+SOURCE: <https://docs.gitlab.com/ci/components/#directory-structure> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/components/#test-the-component> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/components/#cicd-component-security-best-practices> (accessed 2026-09-22)
 
-Exactly one adapter evaluates each default-branch push and returns no-release or release. Release
-pushes one matching protected tag; an adapter may also push its declared release commit. The main
-pipeline performs version evaluation and Git transport only. `CI_JOB_TOKEN` cannot provide the
-required ordinary tag-push handoff.
+## Adapter Selection
 
-Select an implementation from [Version Adapter Index](./release-version-adapters.md). Validate with
-**Gates G2, G3, and G5**.
+Select exactly one implementation from [Version Adapter Index](./release-version-adapters.md).
+Apply the component invocation and credential contract through the component-project README pointer
+below rather than redefining it here.
 
-### Release Notes
+Select one implementation from [Release Notes Adapter Index](./release-notes-adapters.md). Preserve
+the description artifact interface when substituting a project-owned notes component.
 
-Exactly one adapter turns the existing release tag and selected history into one preserved Release
-description artifact. Generator, format, command, and path are project choices. Every executable
-used by setup and generation commands must be installed and proven available before the history
-command runs. Validate with **Gates G2 and G6**.
+Select one publication implementation per destination from
+[Publication Adapter Index](./release-publication-adapters.md). Generic Package publication and
+GitLab Release creation use predefined project coordinates and `CI_JOB_TOKEN`.
 
-### Build
+For the LIVE-VERIFIED credential implementation, load
+[Release Credential Operations](./glab-release-credentials.md).
 
-Exactly one adapter builds immutable outputs once and preserves them for every publication. Validate
-with **Gates G2 and G6**.
+## Consumer Composition
 
-### Publication
-
-Select exactly one adapter per destination. Each consumes preserved build outputs and returns exact
-destination metadata, a read-back command, and a durable URL. Publication does not calculate or push
-version refs. Select implementations from
-[Publication Adapter Index](./release-publication-adapters.md). Validate with **Gates G2, G6, and
-G7**.
-
-### GitLab Release
-
-Exactly one adapter consumes the preserved description and durable links after every publication
-job succeeds. Validate with **Gates G6 and G7**.
-
-### Credential
-
-The interface is one protected non-job-token Git credential authorized for the release tag and any
-selected release commit. Credential type is replaceable; role, scope, state, expiry, variable
-metadata, and protected-ref authorization remain observable without reading the secret.
-
-For the LIVE-VERIFIED project-access-token implementation, load
-[Release Credential Operations](./glab-release-credentials.md). Validate with **Gate G4**.
-
-## Composition Contract
-
-The final project contains exactly:
-
-- one authoritative `base.gitlab-ci.yml`;
-- one version adapter;
-- one release-notes adapter;
-- one build adapter;
-- one publication adapter per selected destination; and
-- one GitLab Release adapter after all publication jobs.
-
-Each generalized adapter includes the base and extends one hidden contract. Merge existing project
-workflow sources/jobs into the final root configuration. Replace every marker and mutable image
-reference. Generalized assets are **DERIVED + CI-LINT-VERIFIED**; exact sandbox files are example
-compositions, not reusable adapters.
-
-GitLab identity comes from predefined variables. Keep explicit only project policy: alternate tag
-contract, destinations, artifact path/name, protected-tag role, and duplicate/retry behavior.
-Override shared defaults once in root CI rather than duplicating them in adapters.
-
-Apply **Gates G2 and G3** after composition.
+Apply the ownership, remote-selection, credential, and pinning contract in the
+[component-project README](../assets/release-components/README.md). Start from its consumer example
+and resolve every marker against the target project before validation.
 
 ## Validation Gates
 
-1. **G1 Intake:** every Project Intake value is read from the project or supplied by its owner;
-   existing workflow behavior is accounted for.
-2. **G2 Substitution:** no unresolved marker or mutable image reference remains; version tag output,
-   CI regex, and protected wildcard agree.
-3. **G3 CI Lint:** before merge, load [Pre-Merge Candidate Validation](./glab-ci-candidate-validation.md)
-   and validate the complete worktree-resolved candidate. After files and context refs exist
-   remotely, load [Post-Merge and Existing-Ref Inspection](./glab-ci-existing-ref-inspection.md) and
-   simulate the default branch, matching tag, nonmatching tag, and preserved existing sources.
-4. **G4 Credential:** protected refs, credential role/scope/state/expiry, and variable
-   flags/type/scope equal the resolved interface.
-5. **G5 Main:** the version job succeeds. No-release creates no matching tag or lifecycle tag
-   pipeline. Release creates exactly one intended protected tag. No main-pipeline job uses any
-   declared lifecycle-only tag stage; unrelated jobs in other stages remain allowed.
-6. **G6 Tag:** for release, tag-pipeline SHA equals the dereferenced tag commit; notes, build, every
-   publication, and Release succeed in stage order with Release last.
-7. **G7 Destination:** every selected read-back finds the exact package/version/files; the Release
-   targets the existing tag, contains the preserved description, and links resolve as intended.
-8. **G8 Generic Verifier:** for the LIVE-VERIFIED Generic branch, run
-   `verify_release_playbook.py --help` and follow that authoritative CLI contract. External
-   destinations remain outside its scope. The helper returns `"ok":true`; separate read-backs pass
-   for every additional destination.
+1. Intake: every intake value comes from the project or its owner, and existing workflow behavior
+   remains accounted for.
+2. Structure: the dedicated project has exactly the declared templates; every component is
+   self-contained and its inputs compile at pipeline creation.
+3. Composition: the consumer owns admission, all stages, policy, project build, dependencies, and
+   exactly one version adapter; no substitution marker or mutable production pin remains.
+4. Credential: protected refs, credential role/scope/state/expiry, and protected variable metadata
+   match the resolved interface.
+5. Main: the version job succeeds and records whether it selected no-release or release.
+6. Tag: the tag-pipeline SHA equals the dereferenced tag commit; notes, consumer build, every
+   publication, and Release succeed in dependency order with Release last.
+7. Destination: every selected read-back finds the exact package version and files; the Release
+   targets the existing tag, contains the preserved description, and exposes the intended links.
 
-The lifecycle is complete only when every applicable named gate passes.
+### Branch Completion
 
-## Evidence-Minimizing Golden Sequence
+- Default-branch no-release is complete when project verification and exactly one version job pass,
+  no matching tag is created, and no lifecycle tag pipeline exists.
+- Default-branch release is complete when project verification and exactly one version job pass,
+  one protected matching tag points to the intended commit, and its ordinary push creates one tag
+  pipeline.
+- Matching-tag publication is complete when runtime assertions confirm a protected tag push, notes
+  use the configured release-tag pattern, exactly one consumer build job produces the immutable
+  artifact set, and each selected destination has exactly one publication job consuming that same
+  set. Every destination's independent read-back must find the expected version and files before the
+  GitLab Release runs last against that tag.
+- Nonmatching-tag validation is complete when existing-ref CI Lint reports the documented
+  workflow-excluded result; authentication, syntax, or server failures remain failures.
+- Component Catalog publication is complete when all same-SHA components compile, component
+  validation passes, and a semantic-version tag pipeline creates the release in a project meeting
+  the Catalog prerequisites.
 
-1. Resolve intake, substitutions, notes executables, latest matching tag, and complete forecast range.
-2. Follow the pre-merge candidate reference once; defer the post-merge reference until its refs exist.
-3. Reuse or establish credential/protected-ref state, then merge one release-worthy change.
-4. Observe main and matching-tag pipelines and run the Generic verifier once. Its named checks replace
-   separate final reads for protected refs, token/variable metadata, pipelines/jobs, tag binding,
-   package/file, Release description/link, and asset resolution.
-5. Collect only evidence outside verifier scope: the no-release version-job trace, absence of a
-   pipeline for the fetched nonmatching tag, and a secret scan of worktree/traces/report.
+After refs exist remotely, load
+[Post-Merge and Existing-Ref Inspection](./glab-ci-existing-ref-inspection.md) to inspect the default
+branch, matching tag, nonmatching tag, pipelines, jobs, and traces. Apply only the completion branch
+that matches the observed version outcome, then apply matching-tag and destination completion when
+a release tag exists.
 
-Verifier-established state completes those final metadata reads and polling; only the named evidence
-outside verifier scope remains.
+SOURCE: <https://docs.gitlab.com/ci/inputs/> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/variables/predefined_variables/> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/variables/#protect-a-cicd-variable> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/components/#publish-a-new-release> (accessed 2026-09-22)

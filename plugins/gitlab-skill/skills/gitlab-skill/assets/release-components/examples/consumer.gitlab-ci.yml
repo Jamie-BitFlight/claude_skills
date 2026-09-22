@@ -1,0 +1,85 @@
+variables:
+  RELEASE_TAG_REGEX: '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$/'
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+stages:
+  - verify
+  - release-version
+  - release-notes
+  - release-build
+  - release-publish
+  - release-create
+
+include:
+  # Replace the example SHA with one reviewed commit from the dedicated component project.
+  - component: $CI_SERVER_FQDN/platform/release-components/semantic-release-version@1111111111111111111111111111111111111111
+    inputs:
+      job-name: release-version-semantic
+      stage: release-version
+      image: node:__NODE_VERSION__-alpine@sha256:__NODE_IMAGE_DIGEST__
+      semantic-release-version: __SEMANTIC_RELEASE_VERSION__
+      git-remote-name: origin
+      repository-url: $CI_PROJECT_URL.git
+      environment: release-version
+      tag-prefix: v
+      rules:
+        - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  - component: $CI_SERVER_FQDN/platform/release-components/release-notes@1111111111111111111111111111111111111111
+    inputs:
+      job-name: generate-release-notes
+      stage: release-notes
+      image: alpine:__ALPINE_VERSION__@sha256:__ALPINE_IMAGE_DIGEST__
+      output-file: release-notes.md
+      release-tag-pattern: v*
+      rules:
+        - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+  - component: $CI_SERVER_FQDN/platform/release-components/generic-package@1111111111111111111111111111111111111111
+    inputs:
+      job-name: publish-generic-package
+      stage: release-publish
+      image: curlimages/curl:__CURL_VERSION__@sha256:__CURL_IMAGE_DIGEST__
+      artifact-path: dist/release.tar.gz
+      asset-name: release.tar.gz
+      needs:
+        - job: build-release-artifact
+          artifacts: true
+      rules:
+        - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+  - component: $CI_SERVER_FQDN/platform/release-components/gitlab-release@1111111111111111111111111111111111111111
+    inputs:
+      job-name: create-gitlab-release
+      stage: release-create
+      image: registry.gitlab.com/gitlab-org/cli:__GLAB_VERSION__@sha256:__GLAB_IMAGE_DIGEST__
+      description-file: release-notes.md
+      asset-name: release.tar.gz
+      needs:
+        - job: generate-release-notes
+          artifacts: true
+        - job: publish-generic-package
+      rules:
+        - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+project-verify:
+  stage: verify
+  image: __PROJECT_VERIFY_IMAGE__@sha256:__PROJECT_VERIFY_IMAGE_DIGEST__
+  script:
+    - __PROJECT_VERIFY_COMMAND__
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+build-release-artifact:
+  stage: release-build
+  image: __PROJECT_BUILD_IMAGE__@sha256:__PROJECT_BUILD_IMAGE_DIGEST__
+  script:
+    - __PROJECT_BUILD_COMMAND__
+    - test -f dist/release.tar.gz
+  artifacts:
+    paths:
+      - dist/release.tar.gz
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'

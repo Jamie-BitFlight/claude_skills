@@ -4,6 +4,11 @@
 
 A component project must have a root `README.md` documenting every component and a top-level `templates/` directory. Store each component in `templates/<name>.yml` or `templates/<name>/template.yml`.
 
+Use `assets/release-components/` for a complete release-component project shape. Keep orchestration
+in the consumer: workflow admission, the full stage list, policy rules, one version-adapter
+selection, project builds, dependencies, and immutable component pins. Component templates remain
+self-contained and expose configuration through typed inputs.
+
 ```yaml
 spec:
   inputs:
@@ -19,6 +24,7 @@ All components in a project are versioned together. A project can contain up to 
 
 SOURCE: <https://docs.gitlab.com/ci/components/#create-a-component-project> (accessed 2026-09-21)
 SOURCE: <https://docs.gitlab.com/ci/components/#directory-structure> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/ci/components/#avoid-using-global-keywords> (accessed 2026-09-22)
 
 ## Test a Component
 

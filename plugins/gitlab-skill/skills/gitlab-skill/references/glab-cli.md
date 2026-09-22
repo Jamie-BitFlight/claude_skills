@@ -22,8 +22,8 @@ Select one branch:
 
 - [API and Repository Selection](./glab-api-and-repository.md) - Load for raw REST/GraphQL calls,
   pagination, typed fields, explicit repository selectors, or Git transport.
-- [CI Context Index](./glab-ci-inspection.md) - Load to choose unmerged local candidate validation or
-  post-merge/existing-ref inspection.
+- [CI Inspection](./glab-ci-inspection.md) - Load for post-merge or existing-ref pipeline and job
+  inspection.
 - [Merge Request Commands](./glab-merge-requests.md) - Load for non-interactive MR create/merge
   command composition or command-local scratch-clone identity.
 - [Release Credential Operations](./glab-release-credentials.md) - Load for protected branch/tag

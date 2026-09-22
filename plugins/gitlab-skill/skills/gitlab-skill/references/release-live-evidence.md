@@ -7,12 +7,12 @@ live-executed.
 ## Exact Fixtures
 
 The redacted files fetched from the successful commits are preserved under
-`assets/release-playbook/live-verified/`:
+`assets/release-components/live-verified/`:
 
 - `semantic-release.gitlab-ci.yml` and `.releaserc.json` from commit `c6de8fb`.
 - `python-semantic-release.gitlab-ci.yml` and `pyproject.toml` from release commit `95f5b4c`.
 
-Their `LIVE-VERIFIED` directory is the evidence label. They retain the sandbox's `main` branch,
+Their `live-verified` directory is the evidence label. They retain the sandbox's `main` branch,
 `release-playbook-v*` naming, exact commands, and mutable images as observed evidence; they are not
 general project templates.
 
@@ -47,7 +47,8 @@ general project templates.
 ## Evidence Boundary
 
 LIVE-VERIFIED: the two named version-tool behaviors, ordinary tag-push handoff, Generic publication,
-release-last ordering, release descriptions, package links, and current read-only metadata.
+release-last ordering, release descriptions, and package links. These copied pipeline files predate
+the component refactor and remain evidence, not reusable component templates.
 
 DOCUMENTATION-VERIFIED, NOT LIVE-TESTED: GitLab PyPI, GitLab npm, PyPI.org, and npmjs.com adapters.
 

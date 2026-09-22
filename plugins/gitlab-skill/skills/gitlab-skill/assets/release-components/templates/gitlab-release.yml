@@ -1,0 +1,42 @@
+spec:
+  inputs:
+    job-name:
+      description: Unique GitLab Release creation job name.
+    stage:
+      description: Consumer-owned final release stage.
+    rules:
+      description: Consumer-owned admission policy for Release creation.
+      type: array
+    needs:
+      description: Consumer-owned notes and publication prerequisites.
+      type: array
+    image:
+      description: Digest-pinned GitLab CLI image required by the release keyword.
+    description-file:
+      description: Preserved Markdown release-description artifact.
+    asset-name:
+      description: Generic Package file linked from the Release.
+    package-name:
+      description: Generic Package name; predefined project identity expands at runtime.
+      default: $CI_PROJECT_NAME
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  rules: $[[ inputs.rules ]]
+  needs: $[[ inputs.needs ]]
+  script:
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test -n "$CI_COMMIT_TAG"
+    - test -z "${CI_COMMIT_BRANCH:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+    - test -s "$[[ inputs.description-file ]]"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: Release $CI_COMMIT_TAG for $CI_PROJECT_PATH
+    description: $[[ inputs.description-file ]]
+    assets:
+      links:
+        - name: $[[ inputs.asset-name ]]
+          url: $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$[[ inputs.package-name ]]/$CI_COMMIT_TAG/$[[ inputs.asset-name ]]
+          link_type: package

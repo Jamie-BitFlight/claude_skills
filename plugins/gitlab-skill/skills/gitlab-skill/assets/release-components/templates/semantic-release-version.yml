@@ -1,0 +1,83 @@
+spec:
+  inputs:
+    job-name:
+      description: Unique version-evaluation job name.
+    stage:
+      description: Consumer-owned stage for version evaluation.
+    rules:
+      description: Consumer-owned admission policy for the version job.
+      type: array
+    image:
+      description: Digest-pinned Node image containing npm.
+    semantic-release-version:
+      description: Exact semantic-release package version.
+    git-remote-name:
+      description: Existing Git remote selected for release transport.
+    repository-url:
+      description: Explicit Git repository URL passed to semantic-release.
+    environment:
+      description: Environment name whose exact scope exposes RELEASE_PUSH_TOKEN to this job.
+    tag-prefix:
+      description: Prefix added before the semantic version.
+      default: v
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  rules: $[[ inputs.rules ]]
+  environment:
+    name: $[[ inputs.environment ]]
+    action: verify
+  variables:
+    GIT_DEPTH: "0"
+    GL_TOKEN: "$RELEASE_PUSH_TOKEN"
+    RELEASE_TAG_PREFIX: "$[[ inputs.tag-prefix ]]"
+    RELEASE_GIT_REMOTE_NAME: "$[[ inputs.git-remote-name ]]"
+    RELEASE_REPOSITORY_URL: "$[[ inputs.repository-url ]]"
+  before_script:
+    - apk add --no-cache git
+    - test -n "$CI_DEFAULT_BRANCH"
+    - test -n "$RELEASE_PUSH_TOKEN"
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+    - test -z "${CI_COMMIT_TAG:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+    - git remote get-url "$RELEASE_GIT_REMOTE_NAME" >/dev/null
+    - 'case "$RELEASE_REPOSITORY_URL" in http://*|https://*) ;; *) printf ''repository URL must use HTTP(S)\n'' >&2; exit 1 ;; esac'
+    - 'case "${RELEASE_REPOSITORY_URL#*://}" in *@*) printf ''repository URL must not contain credentials\n'' >&2; exit 1 ;; esac'
+    - git remote set-url "$RELEASE_GIT_REMOTE_NAME" "$RELEASE_REPOSITORY_URL"
+    - test "$(git remote get-url "$RELEASE_GIT_REMOTE_NAME")" = "$RELEASE_REPOSITORY_URL"
+    - |
+      cat >.release-git-askpass <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) printf '%s\n' oauth2 ;;
+        *Password*) printf '%s\n' "$RELEASE_PUSH_TOKEN" ;;
+        *) exit 1 ;;
+      esac
+      EOF
+      chmod 700 .release-git-askpass
+      export GIT_ASKPASS="$CI_PROJECT_DIR/.release-git-askpass"
+      export GIT_ASKPASS_REQUIRE=force
+      export GIT_TERMINAL_PROMPT=0
+      export GIT_CONFIG_COUNT=1
+      export GIT_CONFIG_KEY_0=credential.helper
+      export GIT_CONFIG_VALUE_0=
+      fixture_credential="$(printf 'protocol=https\nhost=fixture.invalid\n\n' | RELEASE_PUSH_TOKEN=fixture-token git credential fill)"
+      printf '%s\n' "$fixture_credential" | grep -Fxq 'username=oauth2'
+      printf '%s\n' "$fixture_credential" | grep -Fxq 'password=fixture-token'
+  script:
+    - |
+      cat >.releaserc.cjs <<'EOF'
+      const branch = process.env.CI_DEFAULT_BRANCH;
+      const prefix = process.env.RELEASE_TAG_PREFIX;
+      const repositoryUrl = process.env.RELEASE_REPOSITORY_URL;
+      if (!branch || !prefix || !repositoryUrl) throw new Error('release configuration is incomplete');
+      module.exports = {
+        branches: [branch],
+        repositoryUrl,
+        tagFormat: `${prefix}\${version}`,
+        plugins: ['@semantic-release/commit-analyzer'],
+      };
+      EOF
+    - npx --yes semantic-release@$[[ inputs.semantic-release-version ]]
