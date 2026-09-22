@@ -23,6 +23,8 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
+from typer.core import TyperOption
+from typer.main import get_group
 from typer.testing import CliRunner
 
 import pr_review_threads
@@ -341,7 +343,7 @@ def test_transport_rejects_mixed_time_collections(mocker: MockerFixture) -> None
         )
 
 
-def test_cli_routes_explicit_gitlab_target_and_exposes_provider_help(mocker: MockerFixture) -> None:
+def test_cli_routes_explicit_gitlab_target(mocker: MockerFixture) -> None:
     provider = mocker.Mock()
     provider.snapshot.return_value = normalize_state(state(), target())
     mocker.patch.object(pr_review_threads, "review_provider_for_target", return_value=provider)
@@ -362,13 +364,21 @@ def test_cli_routes_explicit_gitlab_target_and_exposes_provider_help(mocker: Moc
             "6",
         ],
     )
-    help_result = RUNNER.invoke(app, ["fetch", "--help"])
-
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["provider"] == "gitlab"
     provider.snapshot.assert_called_once_with(target(), deadline=None, command_timeout=6.0)
-    assert "--provider" in help_result.output
-    assert "--provider-timeout" in help_result.output
+
+
+def test_cli_exposes_provider_option_metadata() -> None:
+    fetch_command = get_group(app).commands["fetch"]
+    options = {
+        option: parameter.help
+        for parameter in fetch_command.params
+        if isinstance(parameter, TyperOption)
+        for option in parameter.opts
+    }
+    assert options["--provider"] == "Provider: github, gitlab, or auto remote detection."
+    assert options["--provider-timeout-seconds"] == "Positive bound for every provider subprocess."
 
 
 def test_cli_rejects_mixed_github_and_gitlab_options_before_provider_call(mocker: MockerFixture) -> None:
