@@ -119,10 +119,10 @@ WORKFLOW_STATE_DEFINITIONS = (
     WorkflowStateDefinition(
         name=WorkflowState.NO_ACTIVE_REBASE,
         kind=StateKind.TERMINAL,
-        condition="A continue or abort request finds no active rebase metadata or REBASE_HEAD.",
+        condition="A continue or abort request finds no active rebase metadata; REBASE_HEAD is evidence only.",
         next_action="End without running rebase --continue, rebase --abort, or a new rebase.",
         artifact_policy="Retain the operation-marker and REBASE_HEAD observations.",
-        evidence=["no rebase metadata", "absent REBASE_HEAD", "no rebase mutation"],
+        evidence=["no rebase metadata", "REBASE_HEAD observation, present or absent", "no rebase mutation"],
     ),
     WorkflowStateDefinition(
         name=WorkflowState.NO_CHANGE,

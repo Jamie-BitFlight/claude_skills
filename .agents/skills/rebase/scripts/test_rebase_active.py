@@ -15,7 +15,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from rebase_test_support import BOUNDED_RUNNER, SKILL_ROOT, commit_file, initialize_repository, run_git
+from rebase_test_support import BOUNDED_RUNNER, SKILL_ROOT, VALIDATOR_PATH, commit_file, initialize_repository, run_git
 
 ACTIVE_ROUTE = SKILL_ROOT / "scripts" / "rebase_active.py"
 
@@ -105,6 +105,21 @@ def test_completed_rebase_with_stale_rebase_head_routes_to_no_active_terminal(tm
     assert observation["rebase_apply_present"] is False
     assert observation["rebase_head_present"] is True
     assert observation["status"] == "## feature\n"
+
+    states_result = subprocess.run(
+        [str(BOUNDED_RUNNER), "--timeout-seconds", "20", "--", str(VALIDATOR_PATH), "states"],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    states = json.loads(states_result.stdout)
+    no_active = next(state for state in states if state["name"] == observation["route"])
+
+    assert states_result.returncode == 0
+    assert "no rebase metadata" in no_active["evidence"]
+    assert "REBASE_HEAD observation, present or absent" in no_active["evidence"]
+    assert "absent REBASE_HEAD" not in no_active["evidence"]
 
 
 def test_repository_without_rebase_routes_to_no_active_terminal(tmp_path: Path) -> None:
