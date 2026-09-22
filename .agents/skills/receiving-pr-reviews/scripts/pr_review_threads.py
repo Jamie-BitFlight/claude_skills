@@ -137,10 +137,10 @@ def review_provider_for_target(target: ChangeRequestTarget) -> ReviewProvider:
 
 
 def parse_pr_list(value: str) -> list[int]:
-    """Parse positive comma-separated pull-request numbers.
+    """Parse positive comma-separated change-request numbers.
 
     Args:
-        value: Comma-separated pull-request numbers.
+        value: Comma-separated PR or MR numbers.
 
     Returns:
         Validated numbers in input order.
@@ -150,15 +150,15 @@ def parse_pr_list(value: str) -> list[int]:
     """
     parts = [part.strip() for part in value.split(",")]
     if not all(parts):
-        raise typer.BadParameter("must be one or more PR numbers, comma-separated (e.g. '41,42,44')")
+        raise typer.BadParameter("must be one or more PR/MR numbers, comma-separated (e.g. '41,42,44')")
     numbers = []
     for part in parts:
         try:
             number = int(part)
         except ValueError as exc:
-            raise typer.BadParameter(f"not a valid PR number: {exc}") from exc
+            raise typer.BadParameter(f"not a valid PR/MR number: {exc}") from exc
         if number <= 0:
-            raise typer.BadParameter(f"PR number must be positive, got {number}")
+            raise typer.BadParameter(f"PR/MR number must be positive, got {number}")
         numbers.append(number)
     return numbers
 
@@ -181,7 +181,7 @@ BaselineSnapshotOption = Annotated[
 
 @app.command()
 def fetch(
-    pr: Annotated[str, typer.Option(help="Pull request number(s), comma-separated.")],
+    pr: Annotated[str, typer.Option(help="PR or MR number(s), comma-separated.")],
     github: GithubOption = None,
     provider: ProviderOption = None,
     repo: RepoOption = None,
@@ -193,7 +193,7 @@ def fetch(
     """Fetch complete canonical review snapshots.
 
     Args:
-        pr: One or more comma-separated pull-request numbers.
+        pr: One or more comma-separated PR or MR numbers.
         github: Legacy explicit GitHub repository.
         provider: Explicit provider selection.
         repo: Provider repository path.
@@ -223,7 +223,7 @@ def fetch(
 
 @app.command()
 def watch(
-    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    pr: Annotated[int, typer.Option(help="PR or MR number.")],
     github: GithubOption = None,
     provider: ProviderOption = None,
     repo: RepoOption = None,
@@ -239,7 +239,7 @@ def watch(
     """Sample complete snapshots within one deadline and attempt budget.
 
     Args:
-        pr: Pull-request number.
+        pr: PR or MR number.
         github: Legacy explicit GitHub repository.
         provider: Explicit provider selection.
         repo: Provider repository path.

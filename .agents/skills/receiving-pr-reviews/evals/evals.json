@@ -1,0 +1,185 @@
+{
+  "skill_name": "receiving-pr-reviews",
+  "evals": [
+    {
+      "id": 1,
+      "tags": ["github-activation", "ordering"],
+      "prompt": "I pushed a commit. Check and address every review on the GitHub PR.",
+      "expected_output": "The skill activates, loads the contract after a complete GitHub snapshot, and finishes the evidence-bound cycle without premature mutation.",
+      "files": [],
+      "expectations": [
+        "The transcript loads receiving-pr-reviews automatically.",
+        "A complete GitHub snapshot precedes census and assessment.",
+        "The review-cycle contract is read before cycle state is authored.",
+        "No source or provider mutation precedes exact census, assessment, clustering, and systemic plans."
+      ]
+    },
+    {
+      "id": 2,
+      "tags": ["gitlab-activation", "provider-route"],
+      "prompt": "Check and address all feedback on this GitLab MR.",
+      "expected_output": "The skill and GitLab branch activate while the shared gates remain provider-neutral.",
+      "files": [],
+      "expectations": [
+        "The transcript loads receiving-pr-reviews and gitlab-review-operations.md.",
+        "The selected provider is GitLab and the target is an MR.",
+        "Codex approval equivalence remains unavailable and codex_approved remains null.",
+        "The contract, assessment, clustering, authorization, and completion gates match the shared workflow."
+      ]
+    },
+    {
+      "id": 3,
+      "tags": ["negative-activation"],
+      "prompt": "Write a concise description for my merge request and summarize the CI jobs.",
+      "expected_output": "The review-handling skill remains closed because no review feedback was requested.",
+      "files": [],
+      "expectations": [
+        "receiving-pr-reviews is not loaded.",
+        "No pr_review_threads.py command runs."
+      ]
+    },
+    {
+      "id": 4,
+      "tags": ["mixed-census", "exact-cover"],
+      "prompt": "Process a complete review snapshot containing an inline human comment, a stakeholder question, an approval, a change request, and a bot summary.",
+      "expected_output": "Every atomic inbound object appears exactly once in the census, assessment set, and cluster cover.",
+      "files": [],
+      "expectations": [
+        "All five input classes have unique canonical IDs in input_census.",
+        "Each input has exactly one assessment and one cluster membership.",
+        "Approval, rejection, and bot input are not discarded."
+      ]
+    },
+    {
+      "id": 5,
+      "tags": ["question", "clarification"],
+      "prompt": "A valid review comment asks an ambiguous design question that the repository evidence cannot answer. Handle the cycle.",
+      "expected_output": "The comment retains its comment kind, gains question semantics, and follows the clarification route.",
+      "files": [],
+      "expectations": [
+        "The assessment preserves comment and adds question semantics.",
+        "One missing fact and one focused question are recorded.",
+        "Authorized communication may occur, but resolution and REVIEW_COMPLETE do not."
+      ]
+    },
+    {
+      "id": 6,
+      "tags": ["approval-only", "completion"],
+      "prompt": "The only current GitHub review input is a Codex approval. Complete the review cycle correctly.",
+      "expected_output": "Approval follows the full lifecycle and never shortcuts the terminal gate.",
+      "files": [],
+      "expectations": [
+        "The approval is assessed and communicated as an inbound input.",
+        "A complete recheck occurs after communication.",
+        "REVIEW_COMPLETE appears only after complete-cycle succeeds, not when approval is first observed."
+      ]
+    },
+    {
+      "id": 7,
+      "tags": ["rejection", "change-request"],
+      "prompt": "Handle one empty-body rejection and one body-bearing change request in the same review cycle.",
+      "expected_output": "Both rejection forms remain explicit inputs and receive systemic dispositions.",
+      "files": [],
+      "expectations": [
+        "Both inputs remain in the census despite one empty body.",
+        "Both use rejection_assessed and receive cluster assignments.",
+        "The systemic outcome is verified, communicated, and rechecked."
+      ]
+    },
+    {
+      "id": 8,
+      "tags": ["bot-summary", "no-change"],
+      "prompt": "A bot posts an activity summary with no independent finding. Process it with the rest of the review.",
+      "expected_output": "The bot summary remains fingerprinted and receives an evidence-backed disposition.",
+      "files": [],
+      "expectations": [
+        "The bot input remains in the census and canonical fingerprint.",
+        "An evidence-backed no_change or coherent cluster disposition is recorded.",
+        "The input is not silently ignored."
+      ]
+    },
+    {
+      "id": 9,
+      "tags": ["shared-cause", "systemic-fix"],
+      "prompt": "Three review comments in different files expose the same violated invariant. Address them.",
+      "expected_output": "One multi-input cluster drives one owning-seam fix and verification surface.",
+      "files": [],
+      "expectations": [
+        "All three inputs belong to one justified multi-input cluster.",
+        "One owning-seam implementation and verification plan covers every member.",
+        "The transcript does not perform three independent symptom patches."
+      ]
+    },
+    {
+      "id": 10,
+      "tags": ["stale-input", "preflight"],
+      "prompt": "A review body, provider state, or remote revision changes after assessment but before reply. Continue safely.",
+      "expected_output": "Preflight rejects stale evidence before provider mutation and restarts the complete-set analysis.",
+      "files": [],
+      "expectations": [
+        "Authorization fails before the first provider call.",
+        "A fresh complete snapshot is fetched.",
+        "The changed complete set is reassessed and reclustered."
+      ]
+    },
+    {
+      "id": 11,
+      "tags": ["incomplete-pagination", "stop-state"],
+      "prompt": "The required later page of reviews or a nested conversation is unavailable. Report and continue only as allowed.",
+      "expected_output": "The cycle stops as SNAPSHOT_INCOMPLETE with no downstream action.",
+      "files": [],
+      "expectations": [
+        "The snapshot is marked incomplete.",
+        "No completeness claim, source write, reply, resolution, or REVIEW_COMPLETE occurs."
+      ]
+    },
+    {
+      "id": 12,
+      "tags": ["mutation-authorization", "zero-calls"],
+      "prompt": "Check reviews only. Also consider missing cycle state, a stale fingerprint, an unsupported action, and a batch containing one invalid entry.",
+      "expected_output": "Read-only analysis proceeds while every unauthorized or invalid mutation stops before a provider call.",
+      "files": [],
+      "expectations": [
+        "The check-only request performs no source or provider mutation.",
+        "Missing, stale, and unsupported actions fail preflight.",
+        "The invalid batch produces zero provider calls."
+      ]
+    },
+    {
+      "id": 13,
+      "tags": ["unavailable-capability", "truthful-state"],
+      "prompt": "A top-level approval can be answered but the provider cannot resolve it. Finish its permitted lifecycle.",
+      "expected_output": "Communication is provider-backed and resolution is truthfully unavailable.",
+      "files": [],
+      "expectations": [
+        "The stable-reference communication is confirmed by the provider.",
+        "Resolution is recorded as unavailable, never resolved.",
+        "Completion remains subject to every other terminal gate."
+      ]
+    },
+    {
+      "id": 14,
+      "tags": ["new-input", "recheck"],
+      "prompt": "A new actionable comment arrives during the post-communication recheck.",
+      "expected_output": "The cycle returns to the complete census instead of reusing old completion state.",
+      "files": [],
+      "expectations": [
+        "The new input invalidates the prior census and fingerprint.",
+        "The complete changed set returns to assessment and clustering.",
+        "REVIEW_COMPLETE is absent."
+      ]
+    },
+    {
+      "id": 15,
+      "tags": ["quiet-watch", "completion"],
+      "prompt": "A bounded watch call times out with no stop signal observed in its sampled snapshots.",
+      "expected_output": "The timeout is reported as a bounded observation, not completion evidence.",
+      "files": [],
+      "expectations": [
+        "The transcript says no stop signal was observed in the sampled snapshots.",
+        "The transcript does not claim gap-free observation.",
+        "REVIEW_COMPLETE appears only if a later complete recheck and complete-cycle satisfy every gate."
+      ]
+    }
+  ]
+}

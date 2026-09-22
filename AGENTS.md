@@ -416,9 +416,9 @@ Rule files outside `rules/` that other harnesses read — not a full rule-file i
 | `.cursor/rules/json-no-pretty-print.mdc` | Compact-JSON rule for agent-facing CLI output |
 | `.agent/rules/git-commits.md` | Commit message rules (conventional commits, no --no-verify) |
 
-## PR Review Protocol
+## PR and MR Review Protocol
 
-After pushing a commit to a PR, or when asked to check or address PR reviews, load the
+After pushing a commit to a PR or MR, or when asked to check or address review feedback, load the
 `receiving-pr-reviews` skill.
 
 ## GitHub CLI Conventions

@@ -1,49 +1,42 @@
 # GitHub MCP fallback
 
-Use this path only when the bundled helper cannot use `gh` and GitHub MCP tools are available. Preserve the main workflow's decisions and stopping conditions; this is a transport fallback, not a different review policy.
+Use this branch only when the bundled CLI cannot use `gh` and a GitHub MCP connector is available.
+The shared review-cycle contract remains authoritative. Use the connector for the entire snapshot;
+fresh and stale partial results never form one snapshot.
 
-## Fetch one snapshot
+## Complete equivalent snapshot
 
-Batch the independent read calls concurrently when the host permits it. Use the available tools whose names end with:
+Collect PR identity and exact head revision, every page of review threads and nested comments, every
+submitted review, PR-level comments, reactions, force-push timeline events, and authenticated actor
+identity. Preserve resolved history. Missing fields, pagination gaps, permission failures, rate limits,
+or partial concurrent results produce `SNAPSHOT_INCOMPLETE` or `ERROR`, never an empty or clean state.
 
-- `github_get_pr_info` for state, draft status, mergeability, base, and exact head;
-- `github_list_pull_request_review_threads` for every thread and its resolved state;
-- `github_list_pull_request_reviews` for every submitted review and body;
-- `github_fetch_issue_comments` for PR-level responses;
-- `github_get_pr_reactions` for Codex's `+1` approval reaction;
-- `github_list_pr_timeline_events` for force-push events, needed only for the Codex approval check below;
-- `github_get_user_login` only when the authenticated comment author cannot otherwise be identified.
+Normalize the collected objects into the same models used by `fetch`. Required counts and blocker
+state derive from the complete normalized snapshot, not from a single endpoint. A response to a
+top-level review counts only when the authenticated actor's later PR comment quotes that review's
+exact stable permalink; unavailable permalinks or effective timestamps are errors.
 
-Derive the same summary as `fetch --summary`:
+## GitHub Codex input
 
-- `reviews_count`: all submitted reviews;
-- `threads_count`: all inline threads;
-- `unresolved`: every thread where `is_resolved` is false, and `unresolved_count` is its length;
-- `blockers`: exactly two conditions produce one — draft PR state, and merge conflicts (mergeable state is exactly "conflicting"). No other `mergeStateStatus` value is a blocker; treat unknown/pending mergeability as non-blocking;
-- `reviews_with_body`: submitted reviews with non-empty top-level bodies;
-- `unresponded_reviews`: each `reviews_with_body` entry not covered by the response rule below;
-- `codex_approved`: a current-revision Codex `+1` as defined below.
+Retain the bundled GitHub adapter's exact bot-identity, no-findings-wrapper, and current-revision
+rules. A Codex `+1` is current only when its observed timestamp is not older than the later of the
+head commit timestamp and latest force-push event. The reaction is an approval input in the census;
+it requires assessment and communication like every other input. Its presence neither completes nor
+blocks an otherwise fully processed cycle.
 
-Do not treat counts from only one endpoint as the complete snapshot.
+## Authorized actions
 
-### Unresponded reviews
+After the shared validation and authority gates pass:
 
-Exclude Codex's exact fixed no-findings review wrapper; real Codex findings arrive as inline threads. Every other non-empty submitted review remains unresponded until a later PR-level comment by the authenticated user quotes that review's exact permalink. If the normalized review result lacks its permalink or timestamps, call `github_fetch_issue_comments` only for those missing fields. A response must postdate the later of the review's submission and edit timestamps.
+- reply to an inline thread through its opening comment target;
+- resolve it through its thread target only after communication succeeds;
+- answer a top-level review through a PR comment containing its exact permalink.
 
-### Codex approval
+Use the connector operation with equivalent semantics if its prefix differs. Scope every operation to
+the bound repository and PR. Re-fetch through MCP before the first mutation and reject changed target,
+revision, fingerprint, or input state. Apply the shared reply-before-resolve, clarification, recovery,
+and partial-failure rules.
 
-A `+1` counts only when its author is the exact Codex bot account and its timestamp is not older than the current head revision. The current head revision is the later of the head commit's own timestamp (from `github_get_pr_info`) and the latest force-push event's timestamp (from `github_list_pr_timeline_events`) — a force-push that resets the branch onto a pre-existing commit does not change that commit's own timestamp, so the timeline event is the only signal for it. When a Codex `+1` exists, require its timestamp to postdate this current head revision. Do not carry approval forward from an older revision.
-
-## Reply and resolve
-
-Keep the main workflow's validate-before-fix and push-before-reply rules.
-
-- Reply to an inline thread with `github_reply_to_review_comment`, targeting the first comment's numeric database ID.
-- Resolve it with `github_resolve_review_thread`, using the thread node ID.
-- Respond to a top-level review with `github_add_comment_to_issue` on the PR. Include the review's exact permalink so the next snapshot clears it from `unresponded_reviews`.
-
-Use the connector's equivalent tool when its exposed prefix differs; do not broaden beyond the current repository and PR.
-
-## Watch
-
-Re-run the same lightweight snapshot on a bounded short polling schedule. Stop and restart the main workflow when an unresolved thread or unresponded review appears. With neither present, `codex_approved: true` is completion. If no work and no approval appear during one window, begin another window only when the intended watch period has not yet been covered. Re-check blockers on every snapshot.
+For rechecks and bounded watch samples, repeat the same complete MCP collection. Any canonical change
+returns to the full census. Completion still comes only from the shared terminal contract, never from
+an approval or elapsed sample alone.

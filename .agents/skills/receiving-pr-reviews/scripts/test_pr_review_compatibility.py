@@ -18,8 +18,10 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,8 +40,114 @@ from review_test_gh_fixtures import (
     runner,
 )
 
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+REQUIRED_EVAL_TAGS = {
+    "github-activation",
+    "gitlab-activation",
+    "negative-activation",
+    "mixed-census",
+    "question",
+    "approval-only",
+    "rejection",
+    "bot-summary",
+    "shared-cause",
+    "stale-input",
+    "incomplete-pagination",
+    "mutation-authorization",
+    "unavailable-capability",
+    "new-input",
+    "quiet-watch",
+}
+
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+
+# --- instruction package ------------------------------------------------------------------------
+
+
+def test_model_invoked_description_covers_both_providers_and_trigger_branches() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    description = next(
+        line.removeprefix("description: ") for line in skill.splitlines() if line.startswith("description:")
+    )
+
+    assert len(description.split()) <= 35
+    assert "GitHub PR" in description
+    assert "GitLab MR" in description
+    assert "after pushing" in description
+    assert "asked to check or address review feedback" in description
+    assert "disable-model-invocation" not in skill
+
+
+def test_instruction_links_are_one_hop_and_resolve_through_both_skill_paths() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    links = re.findall(r"\[[^]]+\]\(([^)]+\.md)\)", skill)
+
+    assert links == [
+        "./references/gitlab-review-operations.md",
+        "./references/github-mcp-fallback.md",
+        "./references/review-cycle-contract.md",
+    ]
+    for link in links:
+        relative = link.removeprefix("./")
+        assert (SKILL_ROOT / relative).is_file()
+        assert (SKILL_ROOT.parents[2] / ".claude/skills/receiving-pr-reviews" / relative).is_file()
+    for reference in (SKILL_ROOT / "references").glob("*.md"):
+        assert "references/" not in reference.read_text(encoding="utf-8")
+
+
+def test_instructions_have_no_volatile_source_citations_or_cli_option_cache() -> None:
+    instruction_files = [SKILL_ROOT / "SKILL.md", *(SKILL_ROOT / "references").glob("*.md")]
+    volatile_citation = re.compile(r"(?:According to )?lines? \d+|\.py:\d+|\.py#L\d+")
+
+    for path in instruction_files:
+        text = path.read_text(encoding="utf-8")
+        assert volatile_citation.search(text) is None, path
+        assert "--provider-timeout-seconds" not in text, path
+
+
+def test_review_contract_names_every_terminal_gate_and_input_class() -> None:
+    contract = (SKILL_ROOT / "references/review-cycle-contract.md").read_text(encoding="utf-8")
+
+    for term in (
+        "comment",
+        "question",
+        "approval",
+        "rejection/change request",
+        "bot summary",
+        "stakeholder input",
+        "Clusters",
+        "systemic",
+        "no_change",
+        "Verification",
+        "Communication",
+        "resolution",
+        "Recheck",
+        "REVIEW_COMPLETE",
+    ):
+        assert term in contract
+
+
+def test_instruction_evals_have_unique_ids_and_required_scenarios() -> None:
+    payload = json.loads((SKILL_ROOT / "evals/evals.json").read_text(encoding="utf-8"))
+    evals = payload["evals"]
+    ids = [case["id"] for case in evals]
+    tags = {tag for case in evals for tag in case["tags"]}
+
+    assert payload["skill_name"] == "receiving-pr-reviews"
+    assert len(ids) == len(set(ids))
+    assert tags >= REQUIRED_EVAL_TAGS
+    assert all(case["expectations"] for case in evals)
+
+
+@pytest.mark.parametrize("command", ["fetch", "watch"])
+def test_instruction_facing_help_uses_pr_and_mr_terminology(command: str) -> None:
+    result = runner.invoke(app, [command, "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "PR or MR number" in result.output
+
 
 # --- strict ingress ------------------------------------------------------------------------------
 
