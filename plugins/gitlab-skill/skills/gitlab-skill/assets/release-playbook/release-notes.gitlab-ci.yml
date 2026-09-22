@@ -3,11 +3,15 @@ include:
   - local: '/.gitlab/release/base.gitlab-ci.yml'
 
 variables:
-  RELEASE_DESCRIPTION_PATH: '__RELEASE_DESCRIPTION_PATH__'
+  NOTES_REQUIRED_EXECUTABLES: '__NOTES_REQUIRED_EXECUTABLES__'
 
 generate_release_notes:
   extends: .release_notes
-  image: '__NOTES_IMAGE__@sha256:__NOTES_IMAGE_DIGEST__'
+  image: 'alpine:__NOTES_ALPINE_VERSION__@sha256:__NOTES_IMAGE_DIGEST__'
+  before_script:
+    - apk add --no-cache git
+    - command -v git >/dev/null
+    - for executable in $NOTES_REQUIRED_EXECUTABLES; do command -v "$executable" >/dev/null; done
   script:
     - '__RELEASE_NOTES_COMMAND__'
     - test -s "$RELEASE_DESCRIPTION_PATH"

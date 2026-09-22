@@ -1,0 +1,7 @@
+variables:
+  SECOND: included
+  SHARED: second
+
+ordered_job:
+  stage: second
+  script: ["second"]

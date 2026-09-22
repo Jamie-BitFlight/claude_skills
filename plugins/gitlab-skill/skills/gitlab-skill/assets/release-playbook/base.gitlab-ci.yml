@@ -1,7 +1,13 @@
 # DERIVED + CI-LINT-VERIFIED universal contract.
-# Replace the regex marker and merge all existing project workflow sources before use.
+# Neutral defaults use v<semver>. Override the resolved prefix/regex/wildcard together.
 variables:
-  RELEASE_TAG_REGEX: '/^__RELEASE_TAG_REGEX__$/'
+  RELEASE_TAG_PREFIX: 'v'
+  RELEASE_TAG_REGEX: '/^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/'
+  RELEASE_TAG_WILDCARD: 'v*'
+  GENERIC_PACKAGE_NAME: '$CI_PROJECT_NAME'
+  RELEASE_ASSET_PATH: '__RELEASE_ASSET_PATH__'
+  RELEASE_ASSET_NAME: '__RELEASE_ASSET_NAME__'
+  RELEASE_DESCRIPTION_PATH: '__RELEASE_DESCRIPTION_PATH__'
 
 workflow:
   rules:

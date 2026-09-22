@@ -2,9 +2,6 @@
 include:
   - local: '/.gitlab/release/base.gitlab-ci.yml'
 
-variables:
-  RELEASE_ASSET_PATH: '__RELEASE_ASSET_PATH__'
-
 build_release:
   extends: .release_build
   image: '__BUILD_IMAGE__@sha256:__BUILD_IMAGE_DIGEST__'

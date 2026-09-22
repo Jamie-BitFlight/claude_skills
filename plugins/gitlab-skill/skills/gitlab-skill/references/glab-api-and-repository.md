@@ -18,6 +18,16 @@ values. Fields select POST by default; pass `-X GET` for read requests with quer
 `--input` for complete JSON and `--form` for multipart uploads. Repository-aware commands receive
 the explicit SSH Git URL rather than current-directory inference.
 
+Before a manual SHA refspec or tag push, fetch the target ref and prove the object is a local commit:
+
+```bash
+git fetch origin "$TARGET_REF"
+git cat-file -e "$SHA^{commit}"
+git push "$SSH_REPO" "$SHA:refs/tags/$TAG"
+```
+
+Proceed to push only after `git cat-file` exits zero.
+
 Safety boundary: this branch supplies general API mechanics; mutation requires the task-specific
 branch that defines its inputs and criterion.
 

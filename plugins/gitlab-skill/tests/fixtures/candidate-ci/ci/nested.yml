@@ -1,0 +1,6 @@
+variables:
+  NESTED: included
+
+ordered_job:
+  stage: nested
+  script: ["nested"]

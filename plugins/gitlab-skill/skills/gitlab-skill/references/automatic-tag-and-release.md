@@ -33,8 +33,10 @@ SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; this is the user's c
 ## Project Intake
 
 Resolve the GitLab target and Git remote; actual default branch; approved merge path; existing
-workflow sources/jobs; one version adapter; exact tag format, CI regex, and protected wildcard;
-release-commit behavior; credential interface; one notes adapter; one build adapter; selected
+workflow sources/jobs; one version adapter and release policy; one resolved tag contract whose
+neutral default is owned by `base.gitlab-ci.yml` (or one explicit project override changing all
+derived values together); release-commit behavior; credential
+interface; one notes adapter; one build adapter; selected
 destinations and one publication adapter per destination; one Release adapter; immutable images;
 commands, paths, duplicate policies, durable URLs; and expected validation metadata.
 
@@ -55,8 +57,9 @@ Select an implementation from [Version Adapter Index](./release-version-adapters
 ### Release Notes
 
 Exactly one adapter turns the existing release tag and selected history into one preserved Release
-description artifact. Generator, format, command, and path are project choices. Validate with
-**Gates G2 and G6**.
+description artifact. Generator, format, command, and path are project choices. Every executable
+used by setup and generation commands must be installed and proven available before the history
+command runs. Validate with **Gates G2 and G6**.
 
 ### Build
 
@@ -101,6 +104,10 @@ workflow sources/jobs into the final root configuration. Replace every marker an
 reference. Generalized assets are **DERIVED + CI-LINT-VERIFIED**; exact sandbox files are example
 compositions, not reusable adapters.
 
+GitLab identity comes from predefined variables. Keep explicit only project policy: alternate tag
+contract, destinations, artifact path/name, protected-tag role, and duplicate/retry behavior.
+Override shared defaults once in root CI rather than duplicating them in adapters.
+
 Apply **Gates G2 and G3** after composition.
 
 ## Validation Gates
@@ -109,9 +116,11 @@ Apply **Gates G2 and G3** after composition.
    existing workflow behavior is accounted for.
 2. **G2 Substitution:** no unresolved marker or mutable image reference remains; version tag output,
    CI regex, and protected wildcard agree.
-3. **G3 CI Lint:** base plus each selected adapter and final CI are valid; simulations select only
-   version evaluation on the default branch, all tag jobs on a matching tag, no lifecycle jobs on a
-   non-release tag, and preserved jobs for existing sources.
+3. **G3 CI Lint:** before merge, the bundled candidate helper resolves all worktree-local includes
+   and statically validates one complete include-free configuration. After files and context refs
+   exist remotely, one default-branch simulation selects version evaluation, one matching-tag
+   simulation selects all tag jobs, one nonmatching-tag simulation selects no lifecycle, and
+   preserved existing sources select their jobs. Pre-merge static lint is not event simulation.
 4. **G4 Credential:** protected refs, credential role/scope/state/expiry, and variable
    flags/type/scope equal the resolved interface.
 5. **G5 Main:** the version job succeeds. No-release creates no matching tag or lifecycle tag
@@ -127,3 +136,16 @@ Apply **Gates G2 and G3** after composition.
    for every additional destination.
 
 The lifecycle is complete only when every applicable named gate passes.
+
+## Evidence-Minimizing Golden Sequence
+
+1. Resolve intake, substitutions, notes executables, latest matching tag, and complete forecast range.
+2. Run the pre-merge candidate helper once; defer context simulations until their refs exist.
+3. Reuse or establish credential/protected-ref state, then merge one release-worthy change.
+4. Observe main and matching-tag pipelines and run the Generic verifier once. Its named checks replace
+   separate final reads for protected refs, token/variable metadata, pipelines/jobs, tag binding,
+   package/file, Release description/link, and asset resolution.
+5. Collect only evidence outside verifier scope: the no-release version-job trace, absence of a
+   pipeline for the fetched nonmatching tag, and a secret scan of worktree/traces/report.
+
+Do not repeat final metadata reads or polling after the verifier establishes the same state.
