@@ -257,7 +257,7 @@ def test_f03_f22_dynamic_dispatch_adapter_and_direct_writer_inventory() -> None:
             if not isinstance(node, ast.Call):
                 continue
             writers.extend(
-                (str(path.relative_to(plugin)), getattr(node.func, "id", getattr(node.func, "attr", "")))
+                (path.relative_to(plugin).as_posix(), getattr(node.func, "id", getattr(node.func, "attr", "")))
                 for keyword in node.keywords
                 if keyword.arg == "kind"
                 and isinstance(keyword.value, ast.Constant)

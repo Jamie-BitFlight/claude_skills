@@ -58,6 +58,17 @@ def request() -> RegisterTrain:
     return RegisterTrain(plan_ref="dispatch-7", milestone=7, plan="P3798")
 
 
+def windows_fcntl_bootstrap() -> str:
+    """Return child-process setup for imports that only inspect non-locking surfaces."""
+    return (
+        "import sys, types; "
+        "fcntl = types.ModuleType('fcntl'); "
+        "fcntl.LOCK_EX = 2; fcntl.LOCK_NB = 4; "
+        "fcntl.flock = lambda *_args: (_ for _ in ()).throw(OSError('fcntl unavailable on Windows')); "
+        "sys.modules.setdefault('fcntl', fcntl); "
+    )
+
+
 def service(tmp_path: Path, *, host: str = "host-a") -> tuple[MergeTrain, sqlite3.Connection]:
     connection = store.open_ledger(tmp_path / "dh.db")
     transitions.create(
@@ -459,19 +470,24 @@ def test_f03_raw_cli_dispatch_refuses_registered_member_without_mutation() -> No
     )
     root = Path(__file__).parents[3]
     plugin = root / "plugins" / "development-harness"
-    command = [
-        sys.executable,
-        str(root / "scripts" / "run_bounded.py"),
-        "--timeout-seconds",
-        "20",
-        "--",
-        sys.executable,
-        str(plugin / "sam_schema" / "cli.py"),
-        "plan",
-        "dispatch",
-        "--address",
-        "Pcli/T1",
-    ]
+    cli = plugin / "sam_schema" / "cli.py"
+    arguments = ["plan", "dispatch", "--address", "Pcli/T1"]
+    if sys.platform == "win32":
+        script = windows_fcntl_bootstrap() + (
+            f"import runpy; sys.argv = {[str(cli), *arguments]!r}; runpy.run_path({str(cli)!r}, run_name='__main__')"
+        )
+        command = [sys.executable, "-c", script]
+    else:
+        command = [
+            sys.executable,
+            str(root / "scripts" / "run_bounded.py"),
+            "--timeout-seconds",
+            "20",
+            "--",
+            sys.executable,
+            str(cli),
+            *arguments,
+        ]
 
     completed = subprocess.run(
         command, cwd=root, env={**os.environ, "PYTHONPATH": str(plugin)}, capture_output=True, text=True, check=False
@@ -486,7 +502,7 @@ def test_f04_installed_plugin_request_schemas_expose_no_storage_identity(tmp_pat
     root = Path(__file__).parents[3]
     installed = tmp_path / "installed-dh"
     shutil.copytree(root / "plugins" / "development-harness", installed)
-    script = (
+    script = (windows_fcntl_bootstrap() if sys.platform == "win32" else "") + (
         "import json; from dh_core.merge_train import RegisterTrain, DispatchReserved; "
         "print(json.dumps(sorted(set(RegisterTrain.model_fields) | set(DispatchReserved.model_fields))))"
     )
