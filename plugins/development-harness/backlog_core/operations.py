@@ -1136,33 +1136,32 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
     # ":EFFORT" -> "effort") -- that is not a fallback, so warning about an
     # "unregistered section" here would be false: the section IS registered.
     if key.startswith("unknown__"):
-        _warn_unregistered_section(name, key, output)
+        _warn_unregistered_section(name, output)
     return key
 
 
-def _warn_unregistered_section(name: str, key: str, output: Output | None) -> None:
-    """Report a section name that fell back to an ``unknown__`` storage key.
+def _warn_unregistered_section(name: str, output: Output | None) -> None:
+    """Tell the calling agent its section name is non-standard.
 
-    Emits a stderr diagnostic unconditionally — this is forensic/debug output,
-    not primary CLI/MCP output (see AGENTS.md "CLI and script output"), so it
-    surfaces in a session's raw stderr stream even when no caller reads
-    ``output.warnings``. When *output* is provided, the same fact is also
-    recorded as a structured warning so an MCP caller sees it in the tool
-    response without needing stderr access.
+    The only reader is the agent that called the write, on both channels —
+    stderr and ``Output.warnings``. It is in another repository, on a project
+    of its own, with no access to this plugin's source and no reason to change
+    it. So the message answers only what bears on that agent's task: the write
+    succeeded, and a later read must use the same name verbatim.
+
+    Everything else about this condition is a design-time concern for this
+    plugin — the registry, the ``unknown__`` key, which names are canonical,
+    who should register one. None of it reaches that agent as anything but
+    noise, and an instruction to act on it takes the agent out of its task.
+    Those belong in this repository's own authoring-time checks.
 
     Args:
         name: The caller-supplied section name that did not resolve.
-        key: The ``unknown__``-prefixed storage key it was normalised to.
         output: Optional ``Output`` aggregator to also receive the warning.
     """
     message = (
-        f"Unregistered section name {name!r} stored under fallback key {key!r}. "
-        f"A consumer instructed to read {name!r} still retrieves it by that display title, "
-        "so this reports what the registry cannot confirm: that a consumer is expecting it. "
-        f"Grepping the agent and skill sources for {name!r} shows whether one is. A channel "
-        "meant to be canonical belongs in backlog_core/section_registry.py — a SectionKey "
-        "member and a _SECTION_DISPLAY entry. A channel meant to be dynamic carries its name "
-        "to the consumer in the instruction that names it."
+        f"Section {name!r} saved. It is not one of this tool's standard section names, so "
+        f"anything reading it back must ask for {name!r} exactly."
     )
     print(message, file=sys.stderr)
     if output is not None:

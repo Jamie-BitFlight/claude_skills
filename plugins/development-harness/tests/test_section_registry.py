@@ -117,6 +117,13 @@ def test_unregistered_section_name_emits_stderr_diagnostic(capsys: pytest.Captur
          the registry nor the alias map (never seen anywhere in this repo).
     Why: The direct root cause #2970 exists to close — unregistered names must
          be visible immediately, not silently accumulate under unknown__.
+
+    The reader is an agent in another repository, on a project of its own,
+    with no access to this plugin's source. The message therefore carries the
+    section name and the one constraint that bears on that agent's task — a
+    later read must use the same name verbatim — and none of this plugin's
+    design-time concerns: not the registry, not the unknown__ key, and no
+    instruction to change anything here.
     """
     novel_name = "Never Before Seen Diagnostic Probe"
     key = ops._normalize_section_key(novel_name)
@@ -124,7 +131,9 @@ def test_unregistered_section_name_emits_stderr_diagnostic(capsys: pytest.Captur
     assert key.startswith("unknown__")
     captured = capsys.readouterr()
     assert novel_name in captured.err
-    assert "section_registry.py" in captured.err
+    assert "exactly" in captured.err
+    for leak in ("section_registry", "SectionKey", "_SECTION_DISPLAY", "register", key):
+        assert leak not in captured.err, f"message leaks a design-time concern: {leak!r}"
 
 
 def test_unregistered_section_name_records_output_warning() -> None:
