@@ -15,8 +15,7 @@ Wraps the `gh` command pipelines the skill documents: fetching every unresolved 
 unresponded review (auto-paginated, filtered before it reaches an agent's context), replying to a
 review comment, and resolving a review thread. Every operation shells out to `gh` (GitHub CLI)
 rather than talking to the GitHub API directly, relying on `gh`'s own authentication. A fourth
-command, `watch`, blocks this process on an internal polling loop so a caller never needs a
-separate resumption mechanism to re-check a PR later.
+command, `watch`, samples fresh snapshots within one deadline and attempt budget.
 
 `fetch`'s I/O and `FetchResult`/`WatchResult` assembly live in `pr_review_gh.py`; the data
 contracts live in `pr_review_models.py`. This module is the CLI presentation layer: it parses
@@ -40,33 +39,36 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
-from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
+from pr_review_gh import GitHubProvider, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_models import (
+    BatchReviewActions,
     BoardEntry,
+    ChangeRequestTarget,
     CommentSummary,
     FetchResult,
     FetchSummary,
+    ReplyAction,
+    RepositoryTarget,
+    ResolveAction,
     ReviewNode,
     ReviewSummary,
+    ThreadRef,
     ThreadSummary,
+    TopLevelCommentAction,
     UnresolvedThread,
     WatchResult,
     WatchSummary,
 )
+from pr_review_provider import ProviderResponseError, ReviewProvider
 
 app = typer.Typer(help="GitHub PR review-thread operations (fetch/watch/reply/resolve) via gh.")
 
-# Anthropic's raw prompt-cache API defaults to a 5-minute TTL in every billing mode; a 1-hour TTL
-# is opt-in only (https://platform.claude.com/docs/en/build-with-claude/prompt-caching, accessed
-# 2026-08-24). Claude Code additionally opts a Claude-subscription session into that 1-hour cache
-# on its own, dropping back to 5 minutes only during usage overage — API-key/Bedrock/Vertex
-# sessions stay on the 5-minute default throughout. Sizing `watch`'s defaults to the 5-minute
-# floor keeps one call's turn cached under every billing mode. Cover a longer watching window by
-# looping `watch` calls (receiving-pr-reviews SKILL.md step 7), not by raising `--timeout-seconds`.
+# Preserve the established polling cadence while bounding both elapsed time and complete snapshot
+# attempts. The defaults permit the mandatory first snapshot plus every interval that can fit in
+# the default window; neither bound silently expands when a provider call fails.
 _DEFAULT_WATCH_INTERVAL_SECONDS = 90
-# 270 is deliberately under the 5-minute prompt-cache TTL (every Claude billing mode) — a
-# watch call blocking this long still returns before the caller's context falls out of cache.
 _DEFAULT_WATCH_TIMEOUT_SECONDS = 270
+_DEFAULT_WATCH_MAX_ATTEMPTS = 4
 
 
 def _validate_github_option(value: str | None) -> str | None:
@@ -136,6 +138,41 @@ def _owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, s
             err=True,
         )
         raise typer.Exit(code=1) from exc
+
+
+def _target(github: str | None, pr: int, *, gh_timeout: float | None) -> ChangeRequestTarget:
+    """Resolve one explicit GitHub target before crossing the provider seam.
+
+    Returns:
+        The validated GitHub pull-request target.
+    """
+    owner, repo = _owner_repo(github, gh_timeout=gh_timeout)
+    return ChangeRequestTarget(
+        repository=RepositoryTarget(provider="github", hostname="github.com", full_name=f"{owner}/{repo}"), number=pr
+    )
+
+
+def _provider() -> ReviewProvider:
+    """Construct the GitHub adapter behind the shared provider interface.
+
+    The transport functions are injected at call time so existing GitHub regression tests can
+    replace them without bypassing the provider seam.
+
+    Returns:
+        A GitHub adapter satisfying the provider interface.
+    """
+    return GitHubProvider(snapshot_loader=build_fetch_result, command_runner=run_gh)
+
+
+def _legacy_global_thread_target() -> ChangeRequestTarget:
+    """Supply context for GitHub's globally unique resolve-thread compatibility command.
+
+    Returns:
+        A valid target whose repository fields are unused by GitHub resolution.
+    """
+    return ChangeRequestTarget(
+        repository=RepositoryTarget(provider="github", hostname="github.com", full_name="github/thread"), number=1
+    )
 
 
 def _parse_pr_list(value: str) -> list[int]:
@@ -368,9 +405,9 @@ def fetch(
 
     Prints compact JSON with `reviews_count`, `threads_count`, `unresolved`, `unresolved_count`,
     `reviews_with_body`, `unresponded_reviews`, `codex_approved`, and `reviewability`. A `threads_count` of 0 means
-    no reviews have landed yet — different from a nonzero `threads_count` with `unresolved_count:
-    0`, which means every thread found was already resolved. Never treat an empty `unresolved`
-    array as "nothing to do" without checking these counts first. Each unresolved thread carries
+    no inline review thread has landed — different from a nonzero `threads_count` with
+    `unresolved_count: 0`, which means every thread found was already resolved. Never treat an
+    empty `unresolved` array as "nothing to do" without checking these counts first. Each unresolved thread carries
     its own `id` (for resolving) and each comment's `databaseId` (for replying) — no separate
     lookup needed. A thread's `comments_truncated: true` means that single thread has passed 100
     comments in its own back-and-forth (rare, but real content is missing) — page that thread's
@@ -381,8 +418,8 @@ def fetch(
     thread at all and would otherwise be invisible even when `unresolved_count` is 0.
     `unresponded_reviews` narrows that to the ones nothing has been posted on the PR about since —
     see `pr_review_gh.build_fetch_result` for exactly how that is derived; treat each as
-    actionable input. `codex_approved` is `True` when Codex's thumbs-up reaction is currently
-    present on the PR.
+    actionable input. `codex_approved` is `True` when Codex's thumbs-up reaction is present for the
+    current revision.
 
     `reviewability.blockers` is non-empty when the PR itself is why nothing is outstanding: a draft
     gets no reviewers requested and a conflicting branch gets no review runs, so an empty
@@ -400,13 +437,15 @@ def fetch(
     # before any `gh` call is attempted (including autodetection's `gh repo view`), the same
     # reject-before-any-`gh`-call rule `_validate_github_option`'s callback already follows.
     pr_numbers = _parse_pr_list(pr)
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
+    first_target = _target(github, pr_numbers[0], gh_timeout=gh_timeout_seconds)
+    provider = _provider()
     if len(pr_numbers) == 1 and not summary:
-        result = build_fetch_result(owner, repo, pr_numbers[0], gh_timeout=gh_timeout_seconds)
+        result = provider.snapshot(first_target, deadline=None, command_timeout=gh_timeout_seconds)
         typer.echo(result.model_dump_json())
         return
     for number in pr_numbers:
-        result = build_fetch_result(owner, repo, number, gh_timeout=gh_timeout_seconds)
+        target = first_target.model_copy(update={"number": number})
+        result = provider.snapshot(target, deadline=None, command_timeout=gh_timeout_seconds)
         if summary:
             typer.echo(_summarize(result, pr=number, max_body=max_body).model_dump_json())
         else:
@@ -432,6 +471,9 @@ def watch(
             ),
         ),
     ] = _DEFAULT_WATCH_TIMEOUT_SECONDS,
+    max_attempts: Annotated[
+        int, typer.Option(min=1, help="Maximum complete snapshots, including the mandatory first snapshot.")
+    ] = _DEFAULT_WATCH_MAX_ATTEMPTS,
     gh_timeout_seconds: Annotated[
         float | None,
         typer.Option(
@@ -450,11 +492,9 @@ def watch(
     fresh `gh` snapshot, not a diff against an earlier call, so there is nothing to wait for that
     the first fetch would have missed.
 
-    Each call covers only its own `timeout_seconds` window. To watch for longer than one call's
-    default window, issue `watch` again immediately after a `timed_out: true` result — its own
-    first fetch picks up exactly where the previous call's last poll left off, so consecutive calls
-    never miss activity in between (nothing here depends on what an earlier call saw). The
-    receiving-pr-reviews SKILL.md documents this loop pattern.
+    Each call covers only its own `timeout_seconds` window and `max_attempts` budget. A later call
+    takes another fresh snapshot; neither call claims to observe activity that appeared and
+    disappeared between samples.
 
     Prints the same compact JSON `fetch` prints, nested under `state`, plus `timed_out`. Check
     `state.reviewability.blockers` on a `timed_out: true` result before issuing another call:
@@ -465,13 +505,10 @@ def watch(
     `timed_out` and every summary field flattened at the top level rather than nested under `state`
     — `fetch`'s and `watch`'s summaries are the same shape, so one parser handles either.
 
-    `deadline` is the only cutoff. The loop polls while a full `interval_seconds` still fits before
-    it and stops once less than that remains — the point past which `gh_timeout_budget` would
-    starve the call to nothing anyway. No fixed safety margin is reserved: this repository has no
-    source for how long seven sequential `gh api` round trips take, and inventing one would be a
-    guess. The final sub-interval stretch of a window is therefore left unpolled by design — the
-    next `watch` call's own first fetch covers it, which is exactly why the loop pattern above is
-    documented as back-to-back calls.
+    The total deadline and attempt budget are independent cutoffs. The loop polls while an attempt
+    remains and a full `interval_seconds` still fits before the deadline. No fixed safety margin is
+    reserved. The result reports `attempts` and `attempt_budget_exhausted`, so callers can
+    distinguish which bound ended the sampled window.
 
     Exits non-zero, with nothing printed to stdout, if the *last* re-poll attempted this window
     failed (a transient `gh` failure — see the exception handling inside the loop). An earlier
@@ -484,18 +521,21 @@ def watch(
     ending rather than a failure; a non-zero `gh` exit never is — see the two handlers below.
     """
     deadline = time.monotonic() + timeout_seconds
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
-    # The first fetch is mandatory and is *not* deadline-bounded: with `--timeout-seconds 0` the
-    # deadline is already spent, and starving this call would turn the documented immediate
-    # snapshot into a `TimeoutExpired`. Only the polls below race the deadline.
-    current = build_fetch_result(owner, repo, pr, gh_timeout=gh_timeout_seconds)
+    target = _target(github, pr, gh_timeout=gh_timeout_seconds)
+    provider = _provider()
+    # The first fetch is mandatory. A positive total window bounds it with the same deadline as
+    # every later snapshot. Zero is the documented immediate-snapshot mode, so that one explicit
+    # case uses only the caller's per-command bound rather than a pre-spent deadline.
+    first_deadline = deadline if timeout_seconds > 0 else None
+    current = provider.snapshot(target, deadline=first_deadline, command_timeout=gh_timeout_seconds)
+    attempts = 1
     poll_attempts = 0
     # Tracks the outcome of the most recent poll attempt, not a success count — a success earlier
     # in the window does not confirm the tail after a later failure. Starts True: the first fetch
     # above already succeeded (its own errors propagate uncaught, before the loop), so "no poll
     # attempted since" is itself a confirmed state, not an unknown one.
     last_poll_ok = True
-    while not current.has_outstanding_work():
+    while not current.has_outstanding_work() and attempts < max_attempts:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
@@ -509,12 +549,13 @@ def watch(
         # `deadline` (see `gh_timeout_budget`), re-measured between them rather than split from a
         # fixed reservation.
         poll_attempts += 1
+        attempts += 1
         # `watch` is meant to run unattended, often backgrounded (see the receiving-pr-reviews
         # skill's own gotchas on polling a backgrounded call for its own result); crashing on a
         # single bad poll loses the whole call's result. Both handlers below record the outcome and
         # let the loop continue toward `deadline` on its own schedule.
         try:
-            current = build_fetch_result(owner, repo, pr, deadline=deadline, gh_timeout=gh_timeout_seconds)
+            current = provider.snapshot(target, deadline=deadline, command_timeout=gh_timeout_seconds)
             last_poll_ok = True
         except subprocess.TimeoutExpired:
             # A timeout is the one failure the clock can explain: `gh_timeout_budget` deliberately
@@ -546,12 +587,20 @@ def watch(
         )
         raise typer.Exit(code=1)
     timed_out = not current.has_outstanding_work()
+    attempt_budget_exhausted = timed_out and attempts >= max_attempts
     if summary:
         fetch_summary = _summarize(current, pr=pr, max_body=max_body)
-        watch_summary = WatchSummary(**fetch_summary.model_dump(), timed_out=timed_out)
+        watch_summary = WatchSummary(
+            **fetch_summary.model_dump(),
+            timed_out=timed_out,
+            attempts=attempts,
+            attempt_budget_exhausted=attempt_budget_exhausted,
+        )
         typer.echo(watch_summary.model_dump_json())
         return
-    result = WatchResult(timed_out=timed_out, state=current)
+    result = WatchResult(
+        timed_out=timed_out, state=current, attempts=attempts, attempt_budget_exhausted=attempt_budget_exhausted
+    )
     typer.echo(result.model_dump_json())
 
 
@@ -566,12 +615,13 @@ def reply(
     ] = None,
 ) -> None:
     """Reply to a review comment. Prints gh's created-comment response as compact JSON."""
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
-    raw = run_gh(
-        ["api", "-X", "POST", f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies", "-f", f"body={body}"],
-        timeout=gh_timeout_seconds,
+    target = _target(github, pr, gh_timeout=gh_timeout_seconds)
+    result = _provider().act(
+        target,
+        ReplyAction(thread=ThreadRef(thread_id=f"comment:{comment_id}", opening_comment_id=comment_id), body=body),
+        command_timeout=gh_timeout_seconds,
     )
-    typer.echo(raw.strip())
+    typer.echo(json.dumps(result.raw))
 
 
 @app.command()
@@ -582,11 +632,33 @@ def resolve(
     ] = None,
 ) -> None:
     """Resolve a review thread. Prints gh's mutation response as compact JSON."""
-    raw = run_gh(
-        ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"],
-        timeout=gh_timeout_seconds,
+    result = _provider().act(
+        _legacy_global_thread_target(),
+        ResolveAction(thread=ThreadRef(thread_id=thread_id)),
+        command_timeout=gh_timeout_seconds,
     )
-    typer.echo(raw.strip())
+    typer.echo(json.dumps(result.raw))
+
+
+@app.command(name="comment")
+def comment(
+    pr: Annotated[int, typer.Option(help="Pull request number.")],
+    body: Annotated[str, typer.Option(help="Top-level response text.")],
+    reference: Annotated[
+        list[str] | None,
+        typer.Option("--reference", help="Stable review URL to append when absent. Repeat for several reviews."),
+    ] = None,
+    github: GithubOption = None,
+    gh_timeout_seconds: Annotated[
+        float | None, typer.Option(min=0, help="Seconds to bound the `gh` call to. Unbounded by default.")
+    ] = None,
+) -> None:
+    """Post a validated top-level PR response with exact review references."""
+    target = _target(github, pr, gh_timeout=gh_timeout_seconds)
+    result = _provider().act(
+        target, TopLevelCommentAction(body=body, references=reference or []), command_timeout=gh_timeout_seconds
+    )
+    typer.echo(json.dumps(result.raw))
 
 
 @app.command(name="reply-and-resolve")
@@ -605,17 +677,13 @@ def reply_and_resolve(
     Prints two compact JSON lines: the created-comment response, then the
     resolve mutation response. The resolve runs only if the reply succeeded.
     """
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
-    reply_raw = run_gh(
-        ["api", "-X", "POST", f"repos/{owner}/{repo}/pulls/{pr}/comments/{comment_id}/replies", "-f", f"body={body}"],
-        timeout=gh_timeout_seconds,
-    )
-    typer.echo(reply_raw.strip())
-    resolve_raw = run_gh(
-        ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={thread_id}"],
-        timeout=gh_timeout_seconds,
-    )
-    typer.echo(resolve_raw.strip())
+    target = _target(github, pr, gh_timeout=gh_timeout_seconds)
+    provider = _provider()
+    thread = ThreadRef(thread_id=thread_id, opening_comment_id=comment_id)
+    reply_result = provider.act(target, ReplyAction(thread=thread, body=body), command_timeout=gh_timeout_seconds)
+    typer.echo(json.dumps(reply_result.raw))
+    resolve_result = provider.act(target, ResolveAction(thread=thread), command_timeout=gh_timeout_seconds)
+    typer.echo(json.dumps(resolve_result.raw))
 
 
 @app.command(name="reply-and-resolve-batch")
@@ -634,27 +702,22 @@ def reply_and_resolve_batch(
     Stops at the first failure. Prints one compact JSON line per thread:
     {thread_id, replied, resolved}.
     """
-    entries = json.loads(input_file.read_text())
-    owner, repo = _owner_repo(github, gh_timeout=gh_timeout_seconds)
+    entries = BatchReviewActions.model_validate(json.loads(input_file.read_text())).root
+    target = _target(github, pr, gh_timeout=gh_timeout_seconds)
+    provider = _provider()
     for entry in entries:
-        reply_raw = run_gh(
-            [
-                "api",
-                "-X",
-                "POST",
-                f"repos/{owner}/{repo}/pulls/{pr}/comments/{entry['comment_id']}/replies",
-                "-f",
-                f"body={entry['body']}",
-            ],
-            timeout=gh_timeout_seconds,
-        )
-        resolve_raw = run_gh(
-            ["api", "graphql", "-f", f"query={RESOLVE_THREAD_MUTATION}", "-f", f"threadId={entry['thread_id']}"],
-            timeout=gh_timeout_seconds,
-        )
-        replied = json.loads(reply_raw).get("id") is not None
-        resolved = "errors" not in json.loads(resolve_raw)
-        typer.echo(json.dumps({"thread_id": entry["thread_id"], "replied": replied, "resolved": resolved}))
+        thread = ThreadRef(thread_id=entry.thread_id, opening_comment_id=entry.comment_id)
+        replied = False
+        try:
+            provider.act(target, ReplyAction(thread=thread, body=entry.body), command_timeout=gh_timeout_seconds)
+            replied = True
+            provider.act(target, ResolveAction(thread=thread), command_timeout=gh_timeout_seconds)
+        except (ProviderResponseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            typer.echo(
+                json.dumps({"thread_id": entry.thread_id, "replied": replied, "resolved": False, "error": str(exc)})
+            )
+            raise typer.Exit(code=1) from exc
+        typer.echo(json.dumps({"thread_id": entry.thread_id, "replied": True, "resolved": True}))
 
 
 if __name__ == "__main__":

@@ -11,13 +11,16 @@ documents and what a caller already parses.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
 
 __all__ = [
     "Author",
+    "BatchReviewAction",
+    "BatchReviewActions",
     "BoardEntry",
+    "ChangeRequestTarget",
     "CommentNode",
     "CommentSummary",
     "FetchResult",
@@ -28,15 +31,217 @@ __all__ = [
     "IssueComment",
     "PullRequestHeadState",
     "Reaction",
+    "ReplyAction",
     "RepoIdentity",
+    "RepositoryTarget",
+    "ResolveAction",
+    "ReviewAction",
+    "ReviewActionResult",
     "ReviewNode",
+    "ReviewSnapshot",
     "ReviewSummary",
     "Reviewability",
+    "ThreadRef",
     "ThreadSummary",
+    "TopLevelCommentAction",
     "UnresolvedThread",
     "WatchResult",
     "WatchSummary",
 ]
+
+
+ProviderName = Literal["github", "gitlab"]
+ReviewTransport = Literal["github_cli", "github_mcp", "gitlab_cli"]
+
+
+class RepositoryTarget(BaseModel):
+    """A forge repository selected before any read or mutation occurs."""
+
+    model_config = ConfigDict(strict=True)
+
+    provider: ProviderName
+    hostname: str = Field(min_length=1)
+    full_name: str = Field(min_length=3)
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        """Require a namespace and repository name without ambiguous empty segments.
+
+        Returns:
+            The validated repository full name.
+        """
+        if value.startswith("/") or value.endswith("/") or "//" in value or "/" not in value:
+            message = "repository full_name must contain non-empty namespace and repository segments"
+            raise ValueError(message)
+        return value
+
+
+class ChangeRequestTarget(BaseModel):
+    """One pull or merge request within a resolved repository target."""
+
+    model_config = ConfigDict(strict=True)
+
+    repository: RepositoryTarget
+    number: int = Field(gt=0)
+
+
+class ThreadRef(BaseModel):
+    """Provider-neutral identifiers needed to reply to or resolve one discussion."""
+
+    model_config = ConfigDict(strict=True)
+
+    thread_id: str = Field(min_length=1)
+    opening_comment_id: int | str | None = None
+
+
+class ReplyAction(BaseModel):
+    """Post an inline reply to a review discussion."""
+
+    model_config = ConfigDict(strict=True)
+
+    kind: Literal["reply"] = "reply"
+    thread: ThreadRef
+    body: str = Field(min_length=1)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: str) -> str:
+        """Reject a whitespace-only provider mutation.
+
+        Returns:
+            The original non-blank reply body.
+        """
+        if not value.strip():
+            message = "reply body must contain non-whitespace text"
+            raise ValueError(message)
+        return value
+
+    @model_validator(mode="after")
+    def require_opening_comment(self) -> ReplyAction:
+        """Require the opening review-comment id needed by the GitHub adapter.
+
+        Returns:
+            This validated reply action.
+        """
+        if self.thread.opening_comment_id is None:
+            message = "reply action requires opening_comment_id"
+            raise ValueError(message)
+        return self
+
+
+class ResolveAction(BaseModel):
+    """Resolve one review discussion after communication succeeds."""
+
+    model_config = ConfigDict(strict=True)
+
+    kind: Literal["resolve"] = "resolve"
+    thread: ThreadRef
+
+
+class TopLevelCommentAction(BaseModel):
+    """Post a change-request-level response with stable input references."""
+
+    model_config = ConfigDict(strict=True)
+
+    kind: Literal["comment"] = "comment"
+    body: str = Field(min_length=1)
+    references: list[str] = Field(default_factory=list)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: str) -> str:
+        """Reject a whitespace-only provider mutation.
+
+        Returns:
+            The original non-blank comment body.
+        """
+        if not value.strip():
+            message = "comment body must contain non-whitespace text"
+            raise ValueError(message)
+        return value
+
+    @field_validator("references")
+    @classmethod
+    def validate_references(cls, value: list[str]) -> list[str]:
+        """Reject empty or duplicate references before a provider mutation.
+
+        Returns:
+            The validated stable references.
+        """
+        if any(not reference.strip() for reference in value):
+            message = "comment references must be non-empty"
+            raise ValueError(message)
+        if len(value) != len(set(value)):
+            message = "comment references must be unique"
+            raise ValueError(message)
+        return value
+
+    def rendered_body(self) -> str:
+        """Append each missing stable reference exactly once.
+
+        Returns:
+            The response body including every requested reference.
+        """
+        missing = [reference for reference in self.references if reference not in self.body]
+        if not missing:
+            return self.body
+        references = "\n".join(missing)
+        return f"{self.body}\n\n{references}"
+
+
+ReviewAction = Annotated[ReplyAction | ResolveAction | TopLevelCommentAction, Field(discriminator="kind")]
+
+
+class ReviewActionResult(BaseModel):
+    """Validated provider result for one mutation."""
+
+    provider: ProviderName
+    action_kind: Literal["reply", "resolve", "comment"]
+    success: bool
+    provider_object_id: str | None = None
+    resolved: bool | None = None
+    raw: dict[str, object]
+
+
+class BatchReviewAction(BaseModel):
+    """One validated reply-and-resolve entry from a batch input file."""
+
+    model_config = ConfigDict(strict=True)
+
+    thread_id: str = Field(min_length=1)
+    comment_id: int = Field(gt=0)
+    body: str = Field(min_length=1)
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, value: str) -> str:
+        """Reject a whitespace-only batch mutation.
+
+        Returns:
+            The original non-blank reply body.
+        """
+        if not value.strip():
+            message = "batch reply body must contain non-whitespace text"
+            raise ValueError(message)
+        return value
+
+
+class BatchReviewActions(RootModel[list[BatchReviewAction]]):
+    """A complete batch validated before its first provider mutation."""
+
+    @model_validator(mode="after")
+    def require_unique_threads(self) -> BatchReviewActions:
+        """Reject ambiguous duplicate work rather than mutating the same thread twice.
+
+        Returns:
+            This validated batch.
+        """
+        thread_ids = [entry.thread_id for entry in self.root]
+        if len(thread_ids) != len(set(thread_ids)):
+            message = "batch thread_id values must be unique"
+            raise ValueError(message)
+        return self
 
 
 class GitHubResponseModel(BaseModel):
@@ -346,20 +551,34 @@ class FetchResult(BaseModel):
         return self.unresolved_count > 0 or bool(self.unresponded_reviews) or self.codex_approved
 
 
+class ReviewSnapshot(FetchResult):
+    """One complete provider snapshot plus the transport and target that produced it.
+
+    The inherited fields preserve the established GitHub output contract while the provider,
+    target, and transport fields form the shared seam. Completeness is true only after the selected
+    adapter has finished every required page; a failed read raises instead of producing this model.
+    """
+
+    provider: ProviderName
+    target: ChangeRequestTarget
+    transport: ReviewTransport
+    snapshot_complete: Literal[True] = True
+
+
 class WatchResult(BaseModel):
     """Result of `watch`: the final fetch snapshot plus how the poll loop ended.
 
     `timed_out` is `False` exactly when `state.has_outstanding_work()` was `True` on the poll that
     ended the loop — every field driving that decision (`unresolved_count`, `unresponded_reviews`,
     `codex_approved`) lives on `state` itself, derived fresh from that poll's own `gh` snapshot.
-    Nothing here is a diff against an earlier call's baseline: two `watch` calls back to back, or a
-    `watch` call issued right after a `fetch`, can never miss or double-count activity that
-    happened in between, because neither call remembers anything from before its own first `gh`
-    request.
+    Nothing here is a diff against an earlier call's baseline. It reports sampled snapshots only;
+    activity that appears and disappears between samples is not claimed as observed.
     """
 
     timed_out: bool
     state: FetchResult
+    attempts: int = Field(default=1, gt=0)
+    attempt_budget_exhausted: bool = False
 
 
 class CommentSummary(BaseModel):
@@ -441,6 +660,8 @@ class WatchSummary(FetchSummary):
     """
 
     timed_out: bool
+    attempts: int = Field(default=1, gt=0)
+    attempt_budget_exhausted: bool = False
 
 
 class BoardEntry(BaseModel):

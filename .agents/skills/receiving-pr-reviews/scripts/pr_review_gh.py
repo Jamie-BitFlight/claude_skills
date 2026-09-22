@@ -2,9 +2,9 @@
 
 Every function here shells out to `gh` (GitHub CLI) rather than talking to the GitHub API
 directly, relying on `gh`'s own authentication. `build_fetch_result` is the one function the CLI
-layer (`pr_review_threads.py`) calls directly — it composes the seven independent `gh` calls below
-into one `FetchResult` snapshot, fresh every time it runs. `run_gh` is exported too: the CLI
-layer's `reply`/`resolve` commands call it directly for their own single-shot `gh` invocations.
+layer (`pr_review_threads.py`) reaches through `GitHubProvider` — it composes the seven independent
+`gh` calls below into one `FetchResult` snapshot, fresh every time it runs. `GitHubProvider` also
+owns every mutation path and validates the provider response before reporting success.
 """
 
 from __future__ import annotations
@@ -14,23 +14,33 @@ import re
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from datetime import datetime
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
+from pr_review_gh_models import GitHubCreatedComment, GitHubResolveResponse
 from pr_review_models import (
+    ChangeRequestTarget,
     FetchResult,
     ForcePushEvent,
     IssueComment,
     PullRequestHeadState,
     Reaction,
+    ReplyAction,
     RepoIdentity,
+    ResolveAction,
     Reviewability,
+    ReviewAction,
+    ReviewActionResult,
     ReviewNode,
     ReviewsConnection,
+    ReviewSnapshot,
     ReviewThreadsConnection,
+    TopLevelCommentAction,
     UnresolvedThread,
 )
+from pr_review_provider import ProviderResponseError
 
 _UNRESOLVED_THREADS_QUERY = """
 query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
@@ -629,9 +639,9 @@ def _is_codex_thumbs_up(reaction: Reaction) -> bool:
 def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float | None:
     """Choose the timeout for one `gh` call.
 
-    `deadline` is `None` for a plain `fetch` and for `watch`'s mandatory first fetch: neither has a
-    window to respect, so the caller's `--gh-timeout-seconds` applies unchanged (`None` = no
-    bound). `watch` passes its own `deadline` for each *poll*, so all seven of
+    `deadline` is `None` for a plain `fetch` and for `watch --timeout-seconds 0`'s mandatory
+    immediate snapshot, so the caller's `--gh-timeout-seconds` applies unchanged (`None` = no
+    bound). A positive `watch` window passes one shared deadline to every snapshot, so all seven of
     `build_fetch_result`'s `gh` calls are bounded by whatever is actually left, re-measured between
     them, rather than by a fixed reservation subtracted from every poll regardless of how fast
     GitHub responds.
@@ -661,10 +671,9 @@ def build_fetch_result(
     currently-authenticated `gh` identity (also for `unresponded_reviews`), and the PR's head
     commit date plus its most recent force-push timestamp, if any (both also for `codex_approved`
     — see `_fetch_head_state` and `_fetch_latest_force_push_at`). Every one of the seven is
-    a fresh snapshot taken by this call alone — nothing here is compared against an earlier call's
-    result, which is what makes two `watch` calls back to back, or a `watch` call issued right
-    after a `fetch`, incapable of missing or double-counting activity that happened in between (the
-    failure mode a per-invocation in-memory baseline used to have).
+    a fresh read made for this call alone — nothing here is compared against an earlier call's
+    result. A later call samples the provider again; neither call claims to observe activity that
+    appeared and disappeared between samples.
 
     `unresponded_reviews` is every `reviews_with_body` entry `_unresponded_reviews` cannot find an
     explicit, postdating reference to among the currently-authenticated `gh` identity's own
@@ -745,3 +754,172 @@ def build_fetch_result(
         codex_approved=codex_approved,
         reviewability=_reviewability(head_state),
     )
+
+
+SnapshotLoader = Callable[..., FetchResult]
+CommandRunner = Callable[..., str]
+
+
+class GitHubProvider:
+    """GitHub adapter satisfying the two-method review-provider interface.
+
+    The adapter owns every GitHub wire detail. Callers provide a resolved target and one
+    provider-neutral action; they do not construct REST paths, GraphQL mutations, or success
+    predicates.
+    """
+
+    def __init__(
+        self, *, snapshot_loader: SnapshotLoader = build_fetch_result, command_runner: CommandRunner = run_gh
+    ) -> None:
+        """Bind replaceable transport functions for production use and interface-level tests."""
+        self.snapshot_loader = snapshot_loader
+        self.command_runner = command_runner
+
+    @staticmethod
+    def owner_repo(target: ChangeRequestTarget) -> tuple[str, str]:
+        """Validate a GitHub target and return its owner/repository pair.
+
+        Returns:
+            The repository owner and name.
+        """
+        if target.repository.provider != "github":
+            message = f"GitHubProvider cannot operate on provider {target.repository.provider!r}"
+            raise ValueError(message)
+        owner, repo = target.repository.full_name.split("/", 1)
+        if "/" in repo:
+            message = "GitHub repository target must be exactly 'owner/repo'"
+            raise ValueError(message)
+        return owner, repo
+
+    def snapshot(
+        self, target: ChangeRequestTarget, *, deadline: float | None, command_timeout: float | None
+    ) -> ReviewSnapshot:
+        """Fetch one complete snapshot through GitHub CLI only.
+
+        Returns:
+            The validated snapshot with explicit target and transport evidence.
+        """
+        owner, repo = self.owner_repo(target)
+        kwargs: dict[str, float | None] = {"gh_timeout": command_timeout}
+        if deadline is not None:
+            kwargs["deadline"] = deadline
+        legacy = self.snapshot_loader(owner, repo, target.number, **kwargs)
+        return ReviewSnapshot.model_validate({
+            **legacy.model_dump(),
+            "provider": "github",
+            "target": target,
+            "transport": "github_cli",
+            "snapshot_complete": True,
+        })
+
+    def act(
+        self, target: ChangeRequestTarget, action: ReviewAction, *, command_timeout: float | None
+    ) -> ReviewActionResult:
+        """Perform one GitHub mutation and validate its response before returning success.
+
+        Returns:
+            A normalized result after the GitHub response confirms success.
+        """
+        owner, repo = self.owner_repo(target)
+        if isinstance(action, ReplyAction):
+            comment_id = action.thread.opening_comment_id
+            if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id <= 0:
+                message = "GitHub reply requires a positive integer opening_comment_id"
+                raise ProviderResponseError(message)
+            raw = self.command_runner(
+                [
+                    "api",
+                    "-X",
+                    "POST",
+                    f"repos/{owner}/{repo}/pulls/{target.number}/comments/{comment_id}/replies",
+                    "-f",
+                    f"body={action.body}",
+                ],
+                timeout=command_timeout,
+            )
+            response = self.validate_created_comment(raw, operation="reply")
+            payload = json.loads(raw)
+            return ReviewActionResult(
+                provider="github", action_kind="reply", success=True, provider_object_id=str(response.id), raw=payload
+            )
+        if isinstance(action, ResolveAction):
+            raw = self.command_runner(
+                [
+                    "api",
+                    "graphql",
+                    "-f",
+                    f"query={RESOLVE_THREAD_MUTATION}",
+                    "-f",
+                    f"threadId={action.thread.thread_id}",
+                ],
+                timeout=command_timeout,
+            )
+            response = self.validate_resolve(raw)
+            payload = json.loads(raw)
+            return ReviewActionResult(
+                provider="github",
+                action_kind="resolve",
+                success=True,
+                resolved=response.data.resolveReviewThread.thread.isResolved,
+                raw=payload,
+            )
+        if isinstance(action, TopLevelCommentAction):
+            raw = self.command_runner(
+                [
+                    "api",
+                    "-X",
+                    "POST",
+                    f"repos/{owner}/{repo}/issues/{target.number}/comments",
+                    "-f",
+                    f"body={action.rendered_body()}",
+                ],
+                timeout=command_timeout,
+            )
+            response = self.validate_created_comment(raw, operation="top-level comment")
+            payload = json.loads(raw)
+            return ReviewActionResult(
+                provider="github", action_kind="comment", success=True, provider_object_id=str(response.id), raw=payload
+            )
+        message = f"unsupported GitHub review action: {type(action).__name__}"
+        raise TypeError(message)
+
+    @staticmethod
+    def validate_created_comment(raw: str, *, operation: str) -> GitHubCreatedComment:
+        """Require GitHub REST to return a positive created-comment id.
+
+        Returns:
+            The validated created comment.
+        """
+        try:
+            return GitHubCreatedComment.model_validate(json.loads(raw))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            message = f"GitHub {operation} response did not confirm a created comment: {exc}"
+            raise ProviderResponseError(message) from exc
+
+    @staticmethod
+    def validate_resolve(raw: str) -> GitHubResolveResponse:
+        """Reject GraphQL errors, missing threads, and unconfirmed resolution.
+
+        Returns:
+            The validated response confirming the thread is resolved.
+        """
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            message = f"GitHub resolve response was not valid JSON: {exc}"
+            raise ProviderResponseError(message) from exc
+        if not isinstance(payload, dict):
+            message = "GitHub resolve response must be a JSON object"
+            raise ProviderResponseError(message)
+        if payload.get("errors"):
+            message = f"GitHub resolve returned GraphQL errors: {payload['errors']}"
+            raise ProviderResponseError(message)
+        try:
+            response = GitHubResolveResponse.model_validate(payload)
+        except ValidationError as exc:
+            message = f"GitHub resolve response did not contain the resolved thread: {exc}"
+            raise ProviderResponseError(message) from exc
+        if not response.data.resolveReviewThread.thread.isResolved:
+            message = "GitHub resolve response reported isResolved=false"
+            raise ProviderResponseError(message)
+        return response

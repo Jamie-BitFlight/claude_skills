@@ -45,6 +45,7 @@ import string
 import subprocess
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -1009,7 +1010,8 @@ def test_every_gh_backed_command_accepts_a_timeout_bound(argv: list[str], mocker
     all, so an unattended workflow could hang on them indefinitely with no option to prevent it.
     """
     mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
-    run_gh_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value="{}")
+    response = _resolved_response() if argv[0] == "resolve" else json.dumps({"id": 1})
+    run_gh_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value=response)
 
     result = runner.invoke(app, argv)
 
@@ -1752,14 +1754,16 @@ def test_fetch_summary_max_body_leaves_short_bodies_untouched(mocker: MockerFixt
 
 
 def test_fetch_without_summary_still_prints_the_full_result_by_default(mocker: MockerFixture) -> None:
-    """A single `--pr` with no `--summary` is unchanged: the full `FetchResult` JSON."""
+    """A single `--pr` preserves every established `FetchResult` field in the full snapshot."""
     state = _fetch_result(unresolved=[_thread_with_comment()])
     mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=state)
 
     result = runner.invoke(app, ["fetch", "--pr", "3208"])
 
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output) == json.loads(state.model_dump_json())
+    data = json.loads(result.output)
+    for field, value in json.loads(state.model_dump_json()).items():
+        assert data[field] == value
 
 
 def test_watch_summary_flattens_timed_out_instead_of_nesting_under_state(mocker: MockerFixture) -> None:
@@ -1874,3 +1878,125 @@ def test_fetch_rejects_a_malformed_pr_list(value: str, mocker: MockerFixture) ->
     assert result.exit_code != 0
     fetch_mock.assert_not_called()
     detect_mock.assert_not_called()
+
+
+# --- mutation orchestration --------------------------------------------------------------------
+
+
+def _resolved_response() -> str:
+    return json.dumps({"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}})
+
+
+def test_reply_and_resolve_does_not_resolve_when_reply_response_is_invalid(mocker: MockerFixture) -> None:
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value="{}")
+
+    result = runner.invoke(
+        app,
+        [
+            "reply-and-resolve",
+            "--pr",
+            "17",
+            "--thread-id",
+            "T1",
+            "--comment-id",
+            "42",
+            "--body",
+            "Addressed.",
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 1
+
+
+def test_reply_and_resolve_rejects_graphql_errors(mocker: MockerFixture) -> None:
+    run_mock = mocker.patch.object(
+        pr_review_threads,
+        "run_gh",
+        side_effect=[json.dumps({"id": 99}), json.dumps({"errors": [{"message": "denied"}]})],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "reply-and-resolve",
+            "--pr",
+            "17",
+            "--thread-id",
+            "T1",
+            "--comment-id",
+            "42",
+            "--body",
+            "Addressed.",
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 2
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        [{"thread_id": "T1", "comment_id": 0, "body": "x"}],
+        [{"thread_id": "T1", "comment_id": 1, "body": ""}],
+        [{"thread_id": "T1", "comment_id": 1, "body": "   "}],
+        [{"thread_id": "T1", "comment_id": 1, "body": "x"}, {"thread_id": "T1", "comment_id": 2, "body": "y"}],
+    ],
+    ids=["not-list", "non-positive-comment", "empty-body", "blank-body", "duplicate-thread"],
+)
+def test_batch_validates_every_entry_before_first_remote_call(
+    payload: object, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    input_file = tmp_path / "batch.json"
+    input_file.write_text(json.dumps(payload))
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(
+        app, ["reply-and-resolve-batch", "--pr", "17", "--input-file", str(input_file), "--github", "acme/widgets"]
+    )
+
+    assert result.exit_code != 0
+    run_mock.assert_not_called()
+
+
+def test_batch_stops_after_first_failed_action(tmp_path: Path, mocker: MockerFixture) -> None:
+    input_file = tmp_path / "batch.json"
+    input_file.write_text(
+        json.dumps([
+            {"thread_id": "T1", "comment_id": 1, "body": "first"},
+            {"thread_id": "T2", "comment_id": 2, "body": "second"},
+        ])
+    )
+    run_mock = mocker.patch.object(
+        pr_review_threads,
+        "run_gh",
+        side_effect=[json.dumps({"id": 11}), json.dumps({"errors": [{"message": "denied"}]})],
+    )
+
+    result = runner.invoke(
+        app, ["reply-and-resolve-batch", "--pr", "17", "--input-file", str(input_file), "--github", "acme/widgets"]
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 2
+
+
+def test_watch_attempt_budget_bounds_provider_snapshots(mocker: MockerFixture) -> None:
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state())
+    mocker.patch.object(pr_review_threads.time, "sleep")
+    mocker.patch.object(pr_review_threads.time, "monotonic", side_effect=[0.0, 0.0, 1.0])
+
+    result = runner.invoke(
+        app, ["watch", "--pr", "17", "--interval-seconds", "1", "--timeout-seconds", "100", "--max-attempts", "2"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fetch_mock.call_count == 2
+    assert json.loads(result.output)["attempts"] == 2
+    assert json.loads(result.output)["attempt_budget_exhausted"] is True
