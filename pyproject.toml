@@ -392,7 +392,15 @@ max-complexity = 12
 # FastMCP lifespan hook requires async def + yield without await — RUF029 is a false positive
 # SLF001 — server.py calls _startup_sync_loop via module reference for test mockability;
 # underscore prefix marks it as a background-task entry point, not a user-facing tool
-"**/backlog_core/server.py" = ["private-member-access", "unused-async"]
+# DOC201 — an @mcp.tool docstring is the tool description every connecting session loads in
+# full, not maintainer prose. A Returns section there restates the outputSchema FastMCP
+# already derives from the return annotation, and tests/test_tool_docstring_surface.py
+# forbids one for that reason. The two rules cannot both hold; the shipped surface wins.
+"**/backlog_core/server.py" = [
+    "docstring-missing-returns",
+    "private-member-access",
+    "unused-async",
+]
 # PyGithub's Requester issues HTTP calls through requests (not httpx), so classify_sync_error
 # must reference requests.exceptions types to distinguish transient network-transport OSErrors
 # (retryable) from genuine local filesystem OSErrors (non-retryable) — not a new HTTP client
@@ -416,6 +424,8 @@ max-complexity = 12
 ]
 # I002 — same PEP 563 / NotRequired problem: this module is entirely TypedDict declarations
 "**/sam_schema/core/task_backend_types.py" = ["missing-required-import"]
+# DOC201 — see backlog_core/server.py above; the same tool-description rule applies here.
+"**/sam_schema/server.py" = ["docstring-missing-returns"]
 # FastMCP @mcp.tool uses get_type_hints() at decoration time to build tool schemas — annotated
 # parameter types (PlanActionConfig, TaskActionConfig, ActiveTaskActionConfig, etc.) must be
 # present in the module's global namespace even with `from __future__ import annotations`.
