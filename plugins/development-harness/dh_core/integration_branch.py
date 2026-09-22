@@ -169,6 +169,47 @@ class GitPushPort(Protocol):
         ...
 
 
+CAPABILITY_AUTHORITY_FIELDS: tuple[str, ...] = (
+    "identity",
+    "remote_identity",
+    "target_ref_pattern",
+    "actor_identity",
+    "git_version",
+    "proof_evidence_digest",
+    "proof_transcript_digest",
+    "supported_result_shape",
+)
+"""Attempt-2 authority projection; attempt-3 closure requires the complete strict field set."""
+
+
+def capability_authority_projection(capability: GitPushCapability) -> tuple[object, ...]:
+    """Project classified authority fields for one equality comparison.
+
+    Returns:
+        Capability values in canonical authority order.
+    """
+    return tuple(getattr(capability, field) for field in CAPABILITY_AUTHORITY_FIELDS)
+
+
+def canonical_authority_projection(canonical: CanonicalCapabilityIdentity) -> tuple[object, ...]:
+    """Project canonical values corresponding to capability authority fields.
+
+    Returns:
+        Canonical values in capability authority order.
+    """
+    values = {
+        "identity": canonical.digest,
+        "remote_identity": canonical.canonical_remote_identity,
+        "target_ref_pattern": canonical.target_ref,
+        "actor_identity": canonical.actor_identity,
+        "git_version": canonical.git_version,
+        "proof_evidence_digest": canonical.sandbox_report_digest,
+        "proof_transcript_digest": canonical.sandbox_transcript_digest,
+        "supported_result_shape": canonical.supported_result_shape,
+    }
+    return tuple(values[field] for field in CAPABILITY_AUTHORITY_FIELDS)
+
+
 def prepared_identity_digest(prepared: PreparedAdvance) -> str:
     """Hash every prepared operand except the digest field itself.
 
@@ -280,29 +321,9 @@ class IntegrationBranchAdvancer:
         canonical = capability.canonical_identity
         if canonical is None:
             return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
-        capability_identity = (
-            capability.identity,
-            capability.remote_identity,
-            capability.target_ref_pattern,
-            capability.actor_identity,
-            capability.git_version,
-            capability.proof_evidence_digest,
-            capability.proof_transcript_digest,
-            capability.supported_result_shape,
-        )
-        canonical_identity = (
-            canonical.digest,
-            canonical.canonical_remote_identity,
-            canonical.target_ref,
-            canonical.actor_identity,
-            canonical.git_version,
-            canonical.sandbox_report_digest,
-            canonical.sandbox_transcript_digest,
-            canonical.supported_result_shape,
-        )
         if (
             not capability.supports_expected_head_advance
-            or capability_identity != canonical_identity
+            or capability_authority_projection(capability) != canonical_authority_projection(canonical)
             or self.remote_identity != canonical.canonical_remote_identity
             or self.target_ref != canonical.target_ref
         ):

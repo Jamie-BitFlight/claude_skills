@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from dh_core.integration_branch import (
+    CAPABILITY_AUTHORITY_FIELDS,
     CanonicalCapabilityIdentity,
     GitObjectFacts,
     GitPushAttempt,
@@ -201,6 +202,11 @@ def test_f14_exact_prepared_operands_advance() -> None:
         {"proof_transcript_digest": "sha256:" + "8" * 64},
         {"remote_identity": "github.com/attacker/other"},
         {"target_ref_pattern": "refs/heads/main"},
+        {"actor_permissions_snapshot_digest": "sha256:" + "7" * 64},
+        {"rules_snapshot_digest": "sha256:" + "8" * 64},
+        {"primitive": "other"},
+        {"supported_target_policy": "other"},
+        {"supports_atomic_review_guard": True},
     ],
 )
 def test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity(change: dict[str, str]) -> None:
@@ -215,3 +221,8 @@ def test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity
 
     assert result.outcome == "expected-head-unsupported"
     assert port.pushes == []
+
+
+def test_f14_capability_projection_classifies_every_strict_model_field() -> None:
+    classified = set(CAPABILITY_AUTHORITY_FIELDS) | {"supports_expected_head_advance", "canonical_identity"}
+    assert classified == set(GitPushCapability.model_fields)

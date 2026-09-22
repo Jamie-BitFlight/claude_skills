@@ -525,7 +525,57 @@ MUTANTS: tuple[Mutant, ...] = (
         "repository_matches = True or (",
         "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_rejects_preflight_identity_mismatch",
     ),
+    *(
+        Mutant(
+            f"T2-M{index:02d}",
+            "dh_core/integration_branch.py",
+            f'    "{field}",\n',
+            "",
+            "tests_sam/test_integration_branch_advancer.py::test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity",
+        )
+        for index, field in enumerate(
+            (
+                "actor_permissions_snapshot_digest",
+                "rules_snapshot_digest",
+                "primitive",
+                "supported_target_policy",
+                "supports_atomic_review_guard",
+            ),
+            start=59,
+        )
+    ),
+    Mutant(
+        "T2-M64",
+        "dh_core/integration_branch.py",
+        "    canonical_identity: CanonicalCapabilityIdentity | None = None\n",
+        "    canonical_identity: CanonicalCapabilityIdentity | None = None\n    unclassified_authority: str | None = None\n",
+        "tests_sam/test_integration_branch_advancer.py::test_f14_capability_projection_classifies_every_strict_model_field",
+    ),
+    Mutant(
+        "T2-M65",
+        "dh_core/github_git_push.py",
+        "def evaluate(\n        self, observed: GitHubCapabilityObservation, repository: RepositoryIdentityObservation\n    )",
+        "def evaluate(\n        self, observed: GitHubCapabilityObservation, repository: RepositoryIdentityObservation | None = None\n    )",
+        "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_admission_requires_concrete_repository_observation",
+    ),
+    Mutant(
+        "T2-M66",
+        "dh_core/github_git_push.py",
+        "repository = port.preflight_repository()",
+        "repository = RepositoryIdentityObservation(remote_identity=observed.hostname + '/' + observed.repository_owner + '/' + observed.repository_name, hostname=observed.hostname, repository_owner=observed.repository_owner, repository_name=observed.repository_name, target_ref=observed.target_ref, available=True)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f21_production_admission_uses_port_derived_repository_observation",
+    ),
+    Mutant(
+        "T2-M67",
+        "tests_sam/run_merge_train_t2_mutations.py",
+        "MUTATION_MANIFEST: tuple[Mutant, ...]" + " = MUTANTS",
+        "MUTATION_MANIFEST: tuple[Mutant, ...] = MUTANTS[:-1]",
+        "tests_sam/test_merge_train_t2_rebuild.py::test_f25_mutation_manifest_is_complete_and_each_seam_unique",
+    ),
 )
+
+MUTATION_MANIFEST: tuple[Mutant, ...] = MUTANTS
+"""Exact runner-owned mutation manifest used by collection, execution, and score reporting."""
 
 
 def run_selector(plugin: Path, selector: str) -> subprocess.CompletedProcess[str]:
@@ -586,25 +636,25 @@ def runner_self_tests() -> bool:
 
 def main() -> int:
     """Require baseline selectors to pass and every concrete mutant to be killed."""
-    if [mutant.identity for mutant in MUTANTS] != [f"T2-M{index:02d}" for index in range(1, 59)]:
+    if [mutant.identity for mutant in MUTATION_MANIFEST] != [f"T2-M{index:02d}" for index in range(1, 68)]:
         print("manifest identities are incomplete", file=sys.stderr)
         return 2
     if not runner_self_tests():
         return 2
-    selectors = tuple(dict.fromkeys(mutant.selector for mutant in MUTANTS))
+    selectors = tuple(dict.fromkeys(mutant.selector for mutant in MUTATION_MANIFEST))
     for selector in selectors:
         baseline = run_selector(PLUGIN, selector)
         if baseline.returncode != 0:
             print(f"BASELINE FAILED: {selector}\n{baseline.stdout}{baseline.stderr}", file=sys.stderr)
             return 2
     survivors: list[str] = []
-    for mutant in MUTANTS:
+    for mutant in MUTATION_MANIFEST:
         killed, output = mutate(mutant)
         print(f"MUTANT {mutant.identity}: {'KILLED' if killed else 'SURVIVED'}")
         print(output)
         if not killed:
             survivors.append(mutant.identity)
-    print(f"mutation score: {len(MUTANTS) - len(survivors)}/{len(MUTANTS)} killed")
+    print(f"mutation score: {len(MUTATION_MANIFEST) - len(survivors)}/{len(MUTATION_MANIFEST)} killed")
     if survivors:
         print("survivors: " + ", ".join(survivors), file=sys.stderr)
         return 1

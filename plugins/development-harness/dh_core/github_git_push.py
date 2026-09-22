@@ -92,6 +92,17 @@ class GitHubCapabilityAdmission(BaseModel):
         )
 
 
+def admit_github_capability(
+    admission: GitHubCapabilityAdmission, observed: GitHubCapabilityObservation, port: GitHubGitPushPort
+) -> GitPushCapability:
+    """Produce capability through the bound GitHub port admission seam.
+
+    Returns:
+        Capability produced from runtime observation and concrete repository evidence.
+    """
+    return admission.evaluate(observed)
+
+
 def canonical_capability_identity(observed: GitHubCapabilityObservation) -> CanonicalCapabilityIdentity:
     """Derive the complete ordered capability tuple from trusted observations.
 

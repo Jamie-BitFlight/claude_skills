@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import json
 import os
 import shlex
@@ -19,6 +20,7 @@ from dh_core.github_git_push import (
     GitHubCapabilityAdmission,
     GitHubCapabilityObservation,
     GitHubGitPushPort,
+    admit_github_capability,
     canonical_capability_identity,
 )
 from dh_core.integration_branch import (
@@ -166,6 +168,51 @@ def test_f21_capability_rejects_preflight_identity_mismatch() -> None:
     )
 
     assert not admission.evaluate_identity(actual, attacker).supports_expected_head_advance
+
+
+def test_f21_capability_admission_requires_concrete_repository_observation() -> None:
+    receipt = production_observation()
+    admission = GitHubCapabilityAdmission.from_receipt(receipt)
+    actual = canonical_capability_identity(receipt)
+    assert inspect.signature(admission.evaluate).parameters["repository"].default is inspect.Parameter.empty
+    assert inspect.signature(admission.evaluate_identity).parameters["repository"].default is inspect.Parameter.empty
+    with pytest.raises(TypeError):
+        admission.evaluate(receipt)
+    with pytest.raises(TypeError):
+        admission.evaluate_identity(actual)
+
+
+def test_f21_production_admission_uses_port_derived_repository_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receipt = production_observation()
+    expected = canonical_capability_identity(receipt)
+    repository = RepositoryIdentityObservation(
+        remote_identity=expected.canonical_remote_identity,
+        hostname=expected.hostname,
+        repository_owner=expected.repository_owner,
+        repository_name=expected.repository_name,
+        target_ref=expected.target_ref,
+        available=True,
+    )
+    port = GitHubGitPushPort(
+        workdir=tmp_path,
+        authenticated_remote="origin",
+        remote_identity="ignored",
+        target_ref=expected.target_ref,
+        token="test-token",
+    )
+    calls = 0
+
+    def preflight() -> RepositoryIdentityObservation:
+        nonlocal calls
+        calls += 1
+        return repository
+
+    monkeypatch.setattr(port, "preflight_repository", preflight)
+    result = admit_github_capability(GitHubCapabilityAdmission.from_receipt(receipt), receipt, port)
+    assert calls == 1
+    assert result.supports_expected_head_advance
 
 
 @pytest.mark.parametrize(
