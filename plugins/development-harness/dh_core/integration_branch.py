@@ -51,6 +51,12 @@ class CanonicalCapabilityIdentity(StrictModel):
     supported_result_shape: Literal["DIRECT_FAST_FORWARD"]
     supports_atomic_review_guard: bool
 
+    @property
+    def digest(self) -> str:
+        """Return the canonical compact JSON plus LF identity digest."""
+        content = (json.dumps(self.model_dump(mode="json"), sort_keys=True, separators=(",", ":")) + "\n").encode()
+        return "sha256:" + hashlib.sha256(content).hexdigest()
+
 
 class GitPushCapability(StrictModel):
     """Exact admitted runtime capability identity."""
@@ -70,6 +76,33 @@ class GitPushCapability(StrictModel):
     supports_atomic_review_guard: bool = False
     primitive: Literal["git-smart-push-explicit-lease"] = "git-smart-push-explicit-lease"
     canonical_identity: CanonicalCapabilityIdentity | None = None
+
+    @classmethod
+    def from_canonical(
+        cls, canonical: CanonicalCapabilityIdentity, *, supports_expected_head_advance: bool
+    ) -> GitPushCapability:
+        """Construct every public field from one canonical identity.
+
+        Returns:
+            A capability containing no independently supplied authority fields.
+        """
+        return cls(
+            identity=canonical.digest,
+            remote_identity=canonical.canonical_remote_identity,
+            target_ref_pattern=canonical.target_ref,
+            actor_identity=canonical.actor_identity,
+            actor_permissions_snapshot_digest=canonical.actor_permissions_snapshot_digest,
+            rules_snapshot_digest=canonical.rules_snapshot_digest,
+            proof_evidence_digest=canonical.sandbox_report_digest,
+            proof_transcript_digest=canonical.sandbox_transcript_digest,
+            git_version=canonical.git_version,
+            supported_target_policy=canonical.supported_target_policy,
+            supported_result_shape=canonical.supported_result_shape,
+            supports_expected_head_advance=supports_expected_head_advance,
+            supports_atomic_review_guard=canonical.supports_atomic_review_guard,
+            primitive=canonical.primitive,
+            canonical_identity=canonical,
+        )
 
 
 class RepositoryIdentityObservation(StrictModel):
@@ -192,6 +225,15 @@ class IntegrationBranchAdvancer:
         Returns:
             The immutable prepared identity.
         """
+        repository = self.port.preflight_repository()
+        canonical = self.push_capability.canonical_identity
+        if (
+            canonical is None
+            or not repository.available
+            or repository.remote_identity != canonical.canonical_remote_identity
+            or repository.target_ref != canonical.target_ref
+        ):
+            raise ValueError("repository-identity-mismatch")
         target = self.port.observe_ref(ref=self.target_ref)
         candidate = self.port.observe_ref(ref=self.candidate_ref)
         if not target.available or target.oid is None or candidate.oid != candidate_sha:
@@ -201,7 +243,7 @@ class IntegrationBranchAdvancer:
         if candidate_facts.object_type != "commit" or candidate_facts.tree_oid is None:
             raise ValueError("candidate-object-invalid")
         value = PreparedAdvance(
-            remote_identity=self.remote_identity,
+            remote_identity=repository.remote_identity,
             target_ref=self.target_ref,
             candidate_ref=self.candidate_ref,
             expected_target_oid=target.oid,
@@ -235,11 +277,34 @@ class IntegrationBranchAdvancer:
             A refusal result, or None when input validation passes.
         """
         capability = self.push_capability
+        canonical = capability.canonical_identity
+        if canonical is None:
+            return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
+        capability_identity = (
+            capability.identity,
+            capability.remote_identity,
+            capability.target_ref_pattern,
+            capability.actor_identity,
+            capability.git_version,
+            capability.proof_evidence_digest,
+            capability.proof_transcript_digest,
+            capability.supported_result_shape,
+        )
+        canonical_identity = (
+            canonical.digest,
+            canonical.canonical_remote_identity,
+            canonical.target_ref,
+            canonical.actor_identity,
+            canonical.git_version,
+            canonical.sandbox_report_digest,
+            canonical.sandbox_transcript_digest,
+            canonical.supported_result_shape,
+        )
         if (
             not capability.supports_expected_head_advance
-            or capability.supported_result_shape != "DIRECT_FAST_FORWARD"
-            or capability.remote_identity != self.remote_identity
-            or capability.target_ref_pattern != self.target_ref
+            or capability_identity != canonical_identity
+            or self.remote_identity != canonical.canonical_remote_identity
+            or self.target_ref != canonical.target_ref
         ):
             return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
         if prepared.remote_identity != self.remote_identity or prepared.target_ref != self.target_ref:
@@ -257,7 +322,24 @@ class IntegrationBranchAdvancer:
             A refusal result, or None when observations match.
         """
         repository = self.port.preflight_repository()
-        if not repository.available or repository.remote_identity != self.remote_identity:
+        canonical = self.push_capability.canonical_identity
+        if canonical is None:
+            return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
+        observed_identity = (
+            repository.remote_identity,
+            repository.hostname,
+            repository.repository_owner,
+            repository.repository_name,
+            repository.target_ref,
+        )
+        canonical_identity = (
+            canonical.canonical_remote_identity,
+            canonical.hostname,
+            canonical.repository_owner,
+            canonical.repository_name,
+            canonical.target_ref,
+        )
+        if not repository.available or observed_identity != canonical_identity:
             return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
         target = self.port.observe_ref(ref=self.target_ref)
         if not target.available:

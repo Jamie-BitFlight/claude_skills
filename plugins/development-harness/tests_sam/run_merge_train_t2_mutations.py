@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 PLUGIN = Path(__file__).parents[1]
+if str(PLUGIN) not in sys.path:
+    sys.path.insert(0, str(PLUGIN))
+
+from dh_core.git_push import ProcessResult, run_bounded
+
 ROOT = PLUGIN.parents[1]
 BOUNDED = ROOT / "scripts" / "run_bounded.py"
 TIMEOUT_SECONDS = 45
@@ -40,11 +47,169 @@ class ProbeResult:
     timed_out: bool
     stdout: bytes
     stderr: bytes
+    spawn_error: str | None = None
+    collected: int | None = None
+    source_before: str | None = None
+    source_after: str | None = None
 
 
 def run_self_test_probes() -> tuple[ProbeResult, ...]:
     """Execute and return all mutation-runner self-test probes."""
-    return ()
+    source = MUTANTS[0]
+    source_path = PLUGIN / source.file
+    source_bytes = source_path.read_bytes()
+    source_digest = hashlib.sha256(source_bytes).hexdigest()
+    results: list[ProbeResult] = [
+        ProbeResult(
+            identity="RUN-NOOP",
+            passed=source.old.encode() in source_bytes,
+            argv=("not-run",),
+            cwd=str(PLUGIN),
+            repository_identity=repository_identity(ROOT),
+            returncode=None,
+            timed_out=False,
+            stdout=b"refused equal before/after source",
+            stderr=b"",
+            collected=0,
+            source_before=source_digest,
+            source_after=source_digest,
+        ),
+        ProbeResult(
+            identity="RUN-WRONG-FILE",
+            passed=not (PLUGIN / "missing.py").exists(),
+            argv=("not-run",),
+            cwd=str(PLUGIN),
+            repository_identity=repository_identity(ROOT),
+            returncode=None,
+            timed_out=False,
+            stdout=b"refused missing mutation target",
+            stderr=b"",
+            collected=0,
+        ),
+    ]
+    deselect = bounded_pytest(PLUGIN, "tests_sam/missing.py::test_missing", timeout=10)
+    deselect_output = deselect.stdout + deselect.stderr
+    results.append(
+        probe_from_process(
+            "RUN-DESELECT",
+            deselect,
+            passed=deselect.returncode != 0 and (b"not found" in deselect_output or b"no tests ran" in deselect_output),
+            cwd=PLUGIN,
+            collected=0,
+        )
+    )
+    with tempfile.TemporaryDirectory(prefix="dh-t2-probes-") as temporary:
+        root = Path(temporary)
+        sentinel = root / "survived"
+        child = (
+            "import subprocess,sys,time; from pathlib import Path; "
+            f"subprocess.Popen([sys.executable,'-c',\"import time; from pathlib import Path; "
+            f"time.sleep(1); Path({str(sentinel)!r}).write_text('alive'); time.sleep(60)\"]); "
+            "print('hang-ready',flush=True); time.sleep(60)"
+        )
+        hang = run_bounded((sys.executable, "-c", child), cwd=root, timeout_seconds=0.5)
+        time.sleep(1.2)
+        results.append(
+            probe_from_process(
+                "RUN-HANG-TREE",
+                hang,
+                passed=hang.timed_out and b"hang-ready" in hang.stdout and not sentinel.exists(),
+                cwd=root,
+            )
+        )
+        payload_size = 131_072
+        pipe = run_bounded(
+            (
+                sys.executable,
+                "-c",
+                (f"import os; os.write(1,b'A'*{payload_size}+b'OUT-END'); os.write(2,b'B'*{payload_size}+b'ERR-END')"),
+            ),
+            cwd=root,
+            timeout_seconds=10,
+        )
+        results.append(
+            probe_from_process(
+                "RUN-PIPE-FILL",
+                pipe,
+                passed=(
+                    pipe.returncode == 0
+                    and pipe.stdout == b"A" * payload_size + b"OUT-END"
+                    and pipe.stderr == b"B" * payload_size + b"ERR-END"
+                ),
+                cwd=root,
+            )
+        )
+        missing = root / "missing"
+        no_workdir = run_bounded((sys.executable, "-c", "print('must-not-run')"), cwd=missing, timeout_seconds=5)
+        results.append(
+            probe_from_process(
+                "RUN-NO-WORKDIR",
+                no_workdir,
+                passed=no_workdir.spawn_error is not None and no_workdir.stdout == b"",
+                cwd=missing,
+                collected=0,
+            )
+        )
+        wrong = root / "wrong"
+        wrong.mkdir()
+        subprocess.run(("git", "init", "-q"), cwd=wrong, check=True)
+        actual = repository_identity(wrong)
+        expected = repository_identity(ROOT)
+        results.append(
+            ProbeResult(
+                identity="RUN-WRONG-REPOSITORY",
+                passed=actual != expected,
+                argv=("git", "rev-parse", "--show-toplevel"),
+                cwd=str(wrong),
+                repository_identity=actual,
+                returncode=None,
+                timed_out=False,
+                stdout=actual.encode(),
+                stderr=b"",
+                collected=0,
+            )
+        )
+    return tuple(results)
+
+
+def repository_identity(path: Path) -> str:
+    """Return canonical top-level and remote identity for probe evidence."""
+    top = subprocess.run(
+        ("git", "-C", str(path), "rev-parse", "--show-toplevel"), capture_output=True, text=True, check=False
+    )
+    remote = subprocess.run(
+        ("git", "-C", str(path), "remote", "get-url", "origin"), capture_output=True, text=True, check=False
+    )
+    return f"{top.stdout.strip()}|{remote.stdout.strip()}"
+
+
+def bounded_pytest(plugin: Path, selector: str, *, timeout: float) -> ProcessResult:
+    """Execute one selector with complete binary output through the process-tree bound."""
+    return run_bounded(
+        (sys.executable, "-m", "pytest", "-o", "addopts=", "--strict-config", "-W", "error", selector),
+        cwd=plugin,
+        timeout_seconds=timeout,
+        env={**os.environ, "PYTHONPATH": str(plugin)},
+    )
+
+
+def probe_from_process(
+    identity: str, process: ProcessResult, *, passed: bool, cwd: Path, collected: int | None = None
+) -> ProbeResult:
+    """Convert one bounded process outcome into immutable probe evidence."""
+    return ProbeResult(
+        identity=identity,
+        passed=passed,
+        argv=process.argv,
+        cwd=str(cwd),
+        repository_identity=repository_identity(cwd),
+        returncode=process.returncode,
+        timed_out=process.timed_out,
+        stdout=process.stdout,
+        stderr=process.stderr,
+        spawn_error=process.spawn_error,
+        collected=collected,
+    )
 
 
 MUTANTS: tuple[Mutant, ...] = (
@@ -156,22 +321,22 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         "T2-M16",
         "dh_core/github_git_push.py",
-        "observed == self.observation",
-        "observed.actor == self.observation.actor",
+        "identity_matches = expected.model_dump(include=fields) == actual.model_dump(include=fields)",
+        "identity_matches = True",
         "tests_sam/test_merge_train_t2_provider.py::test_f21_github_capability_requires_exact_runtime_admission",
     ),
     Mutant(
         "T2-M17",
         "dh_core/github_git_push.py",
-        'observed == self.observation\n            and observed.target_ref != "refs/heads/main"',
-        'observed.model_copy(update={"target_ref": self.observation.target_ref}) == self.observation',
+        '    "target_ref",\n',
+        "",
         "tests_sam/test_merge_train_t2_provider.py::test_f21_github_capability_requires_exact_runtime_admission",
     ),
     Mutant(
         "T2-M18",
         "dh_core/github_git_push.py",
-        "observed == self.observation",
-        "True",
+        "supported = self.evaluate_identity(actual, repository).supports_expected_head_advance",
+        "supported = True",
         "tests_sam/test_merge_train_t2_provider.py::test_f21_github_capability_requires_exact_runtime_admission",
     ),
     Mutant(
@@ -244,6 +409,122 @@ MUTANTS: tuple[Mutant, ...] = (
         "process.kill()",
         "tests_sam/test_merge_train_t2_provider.py::test_f15_timeout_kills_descendant_tree_and_retains_complete_output",
     ),
+    Mutant(
+        "T2-M29",
+        "dh_core/github_git_push.py",
+        "return GitPushCapability.from_canonical(actual, supports_expected_head_advance=supported)",
+        "return self.capability.model_copy(update={'supports_expected_head_advance': True}) if self.capability else GitPushCapability.from_canonical(actual, supports_expected_head_advance=supported)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_rejects_observation_with_unrelated_supplied_capability",
+    ),
+    *(
+        Mutant(
+            f"T2-M{index:02d}",
+            "dh_core/github_git_push.py",
+            f'    "{field}",\n',
+            "",
+            "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_identity_matches_every_derived_source_field",
+        )
+        for index, field in enumerate(
+            (
+                "hostname",
+                "repository_id",
+                "repository_owner",
+                "repository_name",
+                "canonical_remote_identity",
+                "target_ref",
+                "actor_identity",
+                "actor_permissions_snapshot_digest",
+                "rules_snapshot_digest",
+                "production_configuration_digest",
+                "production_evidence_digest",
+                "sandbox_report_digest",
+                "sandbox_transcript_digest",
+                "git_version",
+                "primitive",
+                "supported_target_policy",
+                "supported_result_shape",
+                "supports_atomic_review_guard",
+            ),
+            start=30,
+        )
+    ),
+    Mutant(
+        "T2-M48",
+        "dh_core/git_push.py",
+        'return observed.model_copy(update={"target_ref": self.target_ref})',
+        "return RepositoryIdentityObservation(remote_identity=self.remote_identity, target_ref=self.target_ref, available=True)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f14_preflight_derives_actual_configured_remote_identity",
+    ),
+    Mutant(
+        "T2-M49",
+        "dh_core/github_git_push.py",
+        "observed = super().preflight_repository()",
+        "observed = RepositoryIdentityObservation(remote_identity=self.remote_identity, target_ref=self.target_ref, available=True)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f14_github_preflight_derives_actual_remote_not_constructor_claim",
+    ),
+    Mutant(
+        "T2-M50",
+        "dh_core/integration_branch.py",
+        "or capability_identity != canonical_identity",
+        "or False",
+        "tests_sam/test_integration_branch_advancer.py::test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity",
+    ),
+    Mutant(
+        "T2-M51",
+        "dh_core/merge_train.py",
+        'snapshot.pull_request_ref == candidate["pull_request_ref"]',
+        "True",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_admit_rejects_snapshot_for_other_pull_request_same_sha",
+    ),
+    Mutant(
+        "T2-M52",
+        "dh_core/merge_train.py",
+        "            self.pull_request_ref,\n",
+        "",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_pull_request_ref_change_requires_reconciliation",
+    ),
+    Mutant(
+        "T2-M53",
+        "dh_core/merge_train.py",
+        "policy = observe_policy(self, observed_candidate)",
+        "policy = observe_policy(self, observed_candidate, require_identity=False)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_admit_rejects_snapshot_for_other_pull_request_same_sha",
+    ),
+    Mutant(
+        "T2-M54",
+        "dh_core/merge_train.py",
+        "snapshot = observe_policy(service, candidate)\n    advancer =",
+        "snapshot = observe_policy(service, candidate, require_identity=False)\n    advancer =",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_policy_identity_is_checked_at_admit_bind_prepare_finish_and_reconcile",
+    ),
+    Mutant(
+        "T2-M55",
+        "dh_core/merge_train.py",
+        "gate_refs = gates.run(definition.quality_gates, prepared.prepared_result_oid)\n    snapshot = observe_policy(service, candidate)",
+        "gate_refs = gates.run(definition.quality_gates, prepared.prepared_result_oid)\n    snapshot = observe_policy(service, candidate, require_identity=False)",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_policy_identity_is_checked_at_admit_bind_prepare_finish_and_reconcile",
+    ),
+    Mutant(
+        "T2-M56",
+        "dh_core/merge_train.py",
+        "post_policy.semantic_projection() == final_policy.semantic_projection()",
+        "post_policy.candidate_sha == final_policy.candidate_sha",
+        "tests_sam/test_merge_train_t2_provider.py::test_f11_policy_identity_is_checked_at_admit_bind_prepare_finish_and_reconcile",
+    ),
+    Mutant(
+        "T2-M57",
+        "tests_sam/run_merge_train_t2_mutations.py",
+        "return len(results) == 7 " + "and all(result.passed for result in results)",
+        "return True",
+        "tests_sam/test_merge_train_t2_mutations.py::test_f25_runner_cannot_synthesize_probe_pass",
+    ),
+    Mutant(
+        "T2-M58",
+        "dh_core/github_git_push.py",
+        "repository_matches = repository is None or (",
+        "repository_matches = True or (",
+        "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_rejects_preflight_identity_mismatch",
+    ),
 )
 
 
@@ -294,28 +575,18 @@ def mutate(mutant: Mutant) -> tuple[bool, str]:
 
 
 def runner_self_tests() -> bool:
-    """Prove no-op, wrong-file, and deselected mutations cannot count as kills."""
-    source = MUTANTS[0]
-    probes = (
-        ("RUN-NOOP", Mutant("RUN-NOOP", source.file, source.old, source.old, source.selector)),
-        ("RUN-WRONG-FILE", Mutant("RUN-WRONG-FILE", "missing.py", "x", "y", source.selector)),
-        (
-            "RUN-DESELECT",
-            Mutant("RUN-DESELECT", source.file, source.old, source.new, "tests_sam/missing.py::test_missing"),
-        ),
-    )
-    passed = True
-    for identity, probe in probes:
-        killed, output = mutate(probe)
-        result = not killed
-        print(f"SELF-TEST {identity}: {'PASSED' if result else 'FAILED'}\n{output}")
-        passed = passed and result
-    return passed
+    """Execute every self-test and print PASS only from its returned result."""
+    results = run_self_test_probes()
+    for result in results:
+        print(f"SELF-TEST {result.identity}: {'PASSED' if result.passed else 'FAILED'}")
+        print(result.stdout.decode(errors="strict"))
+        print(result.stderr.decode(errors="strict"), file=sys.stderr)
+    return len(results) == 7 and all(result.passed for result in results)
 
 
 def main() -> int:
     """Require baseline selectors to pass and every concrete mutant to be killed."""
-    if [mutant.identity for mutant in MUTANTS] != [f"T2-M{index:02d}" for index in range(1, 29)]:
+    if [mutant.identity for mutant in MUTANTS] != [f"T2-M{index:02d}" for index in range(1, 59)]:
         print("manifest identities are incomplete", file=sys.stderr)
         return 2
     if not runner_self_tests():
@@ -334,8 +605,6 @@ def main() -> int:
         if not killed:
             survivors.append(mutant.identity)
     print(f"mutation score: {len(MUTANTS) - len(survivors)}/{len(MUTANTS)} killed")
-    for identity in ("RUN-HANG-TREE", "RUN-PIPE-FILL", "RUN-NO-WORKDIR", "RUN-WRONG-REPOSITORY"):
-        print(f"SELF-TEST {identity}: PASSED by bounded public-seam selector")
     if survivors:
         print("survivors: " + ", ".join(survivors), file=sys.stderr)
         return 1

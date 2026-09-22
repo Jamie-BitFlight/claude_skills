@@ -199,6 +199,7 @@ class PolicySnapshot(Request):
     def semantic_projection(self) -> tuple[object, ...]:
         """Return policy fields without provenance-only values."""
         return (
+            self.pull_request_ref,
             self.candidate_sha,
             tuple(sorted(self.required_checks)),
             tuple(sorted(self.unresolved_thread_ids)),
@@ -530,7 +531,7 @@ def candidate_view(row: dict[str, Any], *, noop: str | None = None) -> Candidate
 
 
 def observe_policy(
-    service: MergeTrain, candidate: dict[str, Any], *, require_acceptable: bool = True
+    service: MergeTrain, candidate: dict[str, Any], *, require_acceptable: bool = True, require_identity: bool = True
 ) -> PolicySnapshot:
     """Observe and validate complete acceptable provider state.
 
@@ -539,7 +540,11 @@ def observe_policy(
     """
     observer = cast("PolicyStatusPort", service.policy_observer)
     snapshot = observer.observe(str(candidate["candidate_sha"]), str(candidate["pull_request_ref"]))
-    if (require_acceptable and not policy_acceptable(snapshot)) or snapshot.candidate_sha != candidate["candidate_sha"]:
+    identity_matches = (
+        snapshot.pull_request_ref == candidate["pull_request_ref"]
+        and snapshot.candidate_sha == candidate["candidate_sha"]
+    )
+    if (require_acceptable and not policy_acceptable(snapshot)) or (require_identity and not identity_matches):
         transitions.refuse("source-graph-stale")
     return snapshot
 
@@ -1170,7 +1175,7 @@ class MergeTrain:
         prepared, _bound_policy = bind_claim(self, request, candidate, claim_number)
         final_policy = prepare_claim(self, request, candidate, claim_number, prepared, definition)
         advance = self.branch_advancer.advance(prepared)
-        post_policy = observe_policy(self, candidate, require_acceptable=False)
+        post_policy = observe_policy(self, candidate, require_acceptable=False, require_identity=False)
         post_blob = self.evidence.put(post_policy.model_dump_json().encode(), "application/json")
         successful_ref = advance.outcome in {"advanced", "advanced-after-reconciliation"}
         fresh = post_policy.semantic_projection() == final_policy.semantic_projection() and policy_acceptable(
@@ -1212,9 +1217,18 @@ class MergeTrain:
             str(claim["candidate_task"]),
             int(claim["candidate_number"]),
         )
-        policy = observe_policy(self, candidate, require_acceptable=False)
+        policy = observe_policy(self, candidate, require_acceptable=False, require_identity=False)
         evidence = self.evidence.put(policy.model_dump_json().encode(), "application/json")
-        if observation.outcome in {"advanced", "advanced-after-reconciliation"} and policy_acceptable(policy):
+        prepared_event = next(
+            event
+            for event in reversed(store.events_of(self.ledger, request.plan, kind="merge.claim-prepared"))
+            if int(event["payload"]["claim_number"]) == request.claim_number
+        )
+        _, prepared_policy = self.evidence.parse(
+            str(prepared_event["payload"]["policy_snapshot_digest"]), PolicySnapshot.model_validate_json
+        )
+        fresh = policy.semantic_projection() == prepared_policy.semantic_projection() and policy_acceptable(policy)
+        if observation.outcome in {"advanced", "advanced-after-reconciliation"} and fresh:
             return finish_claim(
                 self,
                 request.plan,

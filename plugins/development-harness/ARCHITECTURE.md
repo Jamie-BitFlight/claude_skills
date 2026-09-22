@@ -527,6 +527,11 @@ Admission binds a distinct accepted checker tuple and a complete provider-policy
 authority-host marker is checked before external I/O; it detects configuration mismatch and is not actor
 authentication.
 
+The provider snapshot identity is `(pull_request_ref, candidate_sha)`. Both values must equal the
+frozen candidate at admission, claim binding, preparation, finish, and reconciliation. The PR ref is
+the first semantic projection field; changing only the PR while retaining the same commit is policy
+drift, not freshness provenance.
+
 Integration uses durable `UNBOUND`, `BOUND`, and `PREPARED` claim phases. Provider observations, gate
 execution, object preparation, and push operations occur outside SQLite writer transactions, followed by
 an authority recheck before each phase event. Only a prepared claim can invoke the branch advancer. A
@@ -538,7 +543,19 @@ the exact candidate/result/tree/parents and fast-forward ancestry, then `GitPush
 `--force-with-lease=<full-target-ref>:<expected-old-oid>` update for the exact result OID. The admitted
 GitHub result shape is direct fast-forward only, so result equals candidate. Capability identity binds
 repository, full target ref, actor/rules evidence, Git version, and proof digests; support defaults false.
+The port derives canonical remote host/owner/repository from `git remote get-url` in the guarded
+workdir (or an exact configured transport URL found in that repository). It never reports a
+constructor identity after a reachability check. Admission constructs one
+`CanonicalCapabilityIdentity` from runtime observation and the immutable production/proof receipt,
+compares every tuple field, and derives `GitPushCapability` from that value. A caller-supplied
+capability contributes no authority. The advancer rechecks canonical capability digest, port
+preflight identity, prepared remote, and target before object inspection or upload.
 The legacy `BranchBackend` and PyGithub merge path remain unchanged for unregistered workflows.
+
+The mutation runner's seven self-tests are executable bounded probes. Each PASS is printed only from
+a returned `ProbeResult` carrying argv, cwd, repository identity, process classification, collection
+evidence, and complete binary output; no static PASS labels exist. No-op, wrong-file, deselection,
+hang-tree, pipe-fill, missing-workdir, and wrong-repository failures cannot count as mutant kills.
 
 An omitted generation in a train query selects only the active generation. An explicit generation
 selects that exact immutable generation, including retired history. Current validation re-reads both

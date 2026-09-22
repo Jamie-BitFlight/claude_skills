@@ -63,7 +63,7 @@ def test_f10_rebuild_rejects_invalid_typed_json_evidence(tmp_path: Path) -> None
 
 
 def test_f25_t2_mutation_manifest_is_complete_and_each_seam_unique() -> None:
-    assert [mutant.identity for mutant in MUTANTS] == [f"T2-M{index:02d}" for index in range(1, 29)]
+    assert [mutant.identity for mutant in MUTANTS] == [f"T2-M{index:02d}" for index in range(1, 59)]
     for mutant in MUTANTS:
         assert (PLUGIN / mutant.file).read_text(encoding="utf-8").count(mutant.old) == 1, mutant.identity
         assert "::test_" in mutant.selector

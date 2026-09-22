@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -13,9 +14,54 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
+from urllib.parse import unquote, urlsplit
 
 from dh_core.integration_branch import GitObjectFacts, GitPushAttempt, RefObservation, RepositoryIdentityObservation
 from dh_core.merge_evidence import MergeEvidenceStore
+
+SCP_REMOTE = re.compile(r"^(?:[^@]+@)?(?P<host>[^:]+):(?P<path>[^:]+)$")
+REMOTE_PATH_PARTS = 2
+
+
+def normalize_remote_identity(remote_url: str, *, workdir: Path) -> RepositoryIdentityObservation:
+    """Derive a credential-free canonical identity from an actual Git remote URL.
+
+    Returns:
+        Parsed host/repository fields, or an unavailable observation on ambiguity.
+    """
+    value = remote_url.strip()
+    match = SCP_REMOTE.fullmatch(value)
+    if match is not None:
+        host = match.group("host").lower()
+        parts = match.group("path").removesuffix(".git").strip("/").split("/")
+        if len(parts) == REMOTE_PATH_PARTS:
+            return RepositoryIdentityObservation(
+                remote_identity=f"{host}/{parts[0]}/{parts[1]}",
+                hostname=host,
+                repository_owner=parts[0],
+                repository_name=parts[1],
+                available=True,
+            )
+    parsed = urlsplit(value)
+    if parsed.scheme in {"ssh", "http", "https"} and parsed.hostname:
+        parts = parsed.path.removesuffix(".git").strip("/").split("/")
+        if len(parts) == REMOTE_PATH_PARTS:
+            host = parsed.hostname.lower()
+            return RepositoryIdentityObservation(
+                remote_identity=f"{host}/{parts[0]}/{parts[1]}",
+                hostname=host,
+                repository_owner=parts[0],
+                repository_name=parts[1],
+                available=True,
+            )
+    try:
+        local = Path(unquote(parsed.path)) if parsed.scheme == "file" else Path(value)
+        resolved = (local if local.is_absolute() else workdir / local).resolve(strict=False)
+    except (OSError, ValueError):
+        return RepositoryIdentityObservation(remote_identity="", available=False)
+    return RepositoryIdentityObservation(
+        remote_identity=resolved.as_uri(), hostname="file", repository_name=resolved.name, available=True
+    )
 
 
 @dataclass(frozen=True)
@@ -147,7 +193,17 @@ class LocalBareGitPushPort:
             Repository identity and availability.
         """
         result = self.git("remote", "get-url", self.remote)
-        return RepositoryIdentityObservation(remote_identity=self.remote_identity, available=result.returncode == 0)
+        if result.returncode != 0:
+            names = self.git("remote")
+            for name in os.fsdecode(names.stdout).splitlines() if names.returncode == 0 else ():
+                candidate = self.git("remote", "get-url", name)
+                if candidate.returncode == 0 and os.fsdecode(candidate.stdout).strip() == self.remote:
+                    result = candidate
+                    break
+        if result.returncode != 0:
+            return RepositoryIdentityObservation(remote_identity="", target_ref=self.target_ref, available=False)
+        observed = normalize_remote_identity(os.fsdecode(result.stdout), workdir=self.workdir)
+        return observed.model_copy(update={"target_ref": self.target_ref})
 
     def observe_ref(self, *, ref: str) -> RefObservation:
         """Observe one exact remote full ref.

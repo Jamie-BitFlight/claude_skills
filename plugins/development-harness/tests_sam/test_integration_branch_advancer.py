@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from dh_core.integration_branch import (
     CanonicalCapabilityIdentity,
     GitObjectFacts,
@@ -21,7 +22,14 @@ class PushSpy:
         self.refs = {"refs/heads/integration/runtime-integrity": "a" * 40, "refs/heads/candidate": "b" * 40}
 
     def preflight_repository(self) -> RepositoryIdentityObservation:
-        return RepositoryIdentityObservation(remote_identity="github.com/Jamie-BitFlight/claude_skills", available=True)
+        return RepositoryIdentityObservation(
+            remote_identity="github.com/Jamie-BitFlight/claude_skills",
+            hostname="github.com",
+            repository_owner="Jamie-BitFlight",
+            repository_name="claude_skills",
+            target_ref="refs/heads/integration/runtime-integrity",
+            available=True,
+        )
 
     def observe_ref(self, *, ref: str) -> RefObservation:
         return RefObservation(ref=ref, oid=self.refs.get(ref), available=True)
@@ -45,8 +53,9 @@ class PushSpy:
 
 
 def capability(*, supported: bool = True) -> GitPushCapability:
+    canonical = canonical_identity()
     return GitPushCapability(
-        identity="capability-1",
+        identity=canonical.digest,
         remote_identity="github.com/Jamie-BitFlight/claude_skills",
         target_ref_pattern="refs/heads/integration/runtime-integrity",
         actor_identity="Jamie-BitFlight",
@@ -56,6 +65,7 @@ def capability(*, supported: bool = True) -> GitPushCapability:
         proof_transcript_digest="sha256:" + "4" * 64,
         git_version="2.55.0",
         supports_expected_head_advance=supported,
+        canonical_identity=canonical,
     )
 
 
@@ -72,8 +82,8 @@ def canonical_identity() -> CanonicalCapabilityIdentity:
         rules_snapshot_digest="sha256:" + "2" * 64,
         production_configuration_digest="sha256:" + "3" * 64,
         production_evidence_digest="sha256:" + "4" * 64,
-        sandbox_report_digest="sha256:" + "5" * 64,
-        sandbox_transcript_digest="sha256:" + "6" * 64,
+        sandbox_report_digest="sha256:" + "3" * 64,
+        sandbox_transcript_digest="sha256:" + "4" * 64,
         git_version="2.55.0",
         primitive="git-smart-push-explicit-lease",
         supported_target_policy="direct-fast-forward",
@@ -182,10 +192,21 @@ def test_f14_exact_prepared_operands_advance() -> None:
     assert port.pushes == [("a" * 40, "b" * 40)]
 
 
-def test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity() -> None:
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"actor_identity": "attacker"},
+        {"git_version": "0.0.0"},
+        {"proof_evidence_digest": "sha256:" + "9" * 64},
+        {"proof_transcript_digest": "sha256:" + "8" * 64},
+        {"remote_identity": "github.com/attacker/other"},
+        {"target_ref_pattern": "refs/heads/main"},
+    ],
+)
+def test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity(change: dict[str, str]) -> None:
     port = PushSpy()
     admitted = capability().model_copy(update={"canonical_identity": canonical_identity()})
-    attacker = admitted.model_copy(update={"actor_identity": "attacker", "git_version": "0.0.0"})
+    attacker = admitted.model_copy(update=change)
     advancer = IntegrationBranchAdvancer(
         port, attacker, remote_identity=attacker.remote_identity, target_ref="refs/heads/integration/runtime-integrity"
     )

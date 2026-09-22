@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from tests_sam.run_merge_train_t2_mutations import run_self_test_probes
+import pytest
+
+from tests_sam import run_merge_train_t2_mutations as runner
+from tests_sam.run_merge_train_t2_mutations import ProbeResult, run_self_test_probes
 
 
 def test_f25_runner_executes_every_self_test_probe() -> None:
@@ -23,3 +26,19 @@ def test_f25_runner_executes_every_self_test_probe() -> None:
         assert result.repository_identity
         assert isinstance(result.stdout, bytes)
         assert isinstance(result.stderr, bytes)
+
+
+def test_f25_runner_cannot_synthesize_probe_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    failed = ProbeResult(
+        identity="RUN-HANG-TREE",
+        passed=False,
+        argv=("probe",),
+        cwd="/tmp",
+        repository_identity="repo",
+        returncode=0,
+        timed_out=False,
+        stdout=b"",
+        stderr=b"",
+    )
+    monkeypatch.setattr(runner, "run_self_test_probes", lambda: (failed,))
+    assert not runner.runner_self_tests()

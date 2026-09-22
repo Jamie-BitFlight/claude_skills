@@ -15,13 +15,24 @@ from pathlib import Path
 
 import pytest
 from dh_core.git_push import GateRunner, LocalBareGitPushPort, ProcessResult
-from dh_core.github_git_push import GitHubCapabilityAdmission, GitHubCapabilityObservation
-from dh_core.integration_branch import GitPushCapability, IntegrationBranchAdvancer
+from dh_core.github_git_push import (
+    GitHubCapabilityAdmission,
+    GitHubCapabilityObservation,
+    GitHubGitPushPort,
+    canonical_capability_identity,
+)
+from dh_core.integration_branch import (
+    CanonicalCapabilityIdentity,
+    GitPushCapability,
+    IntegrationBranchAdvancer,
+    RepositoryIdentityObservation,
+)
 from dh_core.ledger import store
 from dh_core.merge_evidence import MergeEvidenceStore
-from dh_core.merge_train import AdmitCandidate, PolicySnapshot, SubmitCandidate
+from dh_core.merge_train import AdmitCandidate, MergeNext, PolicySnapshot, ReconcileClaim, SubmitCandidate
 
 from tests_sam.test_merge_train_t2_candidates import accept_assignment, service
+from tests_sam.test_merge_train_t2_claims import admitted
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -49,9 +60,29 @@ def repository(tmp_path: Path) -> tuple[Path, Path, str, str]:
 
 
 def capability(remote: Path) -> GitPushCapability:
+    identity = CanonicalCapabilityIdentity(
+        hostname="file",
+        repository_id=0,
+        repository_owner="",
+        repository_name=remote.name,
+        canonical_remote_identity=remote.resolve().as_uri(),
+        target_ref="refs/heads/integration/t2",
+        actor_identity="test",
+        actor_permissions_snapshot_digest="sha256:" + "1" * 64,
+        rules_snapshot_digest="sha256:" + "2" * 64,
+        production_configuration_digest="sha256:" + "3" * 64,
+        production_evidence_digest="sha256:" + "4" * 64,
+        sandbox_report_digest="sha256:" + "3" * 64,
+        sandbox_transcript_digest="sha256:" + "4" * 64,
+        git_version="test",
+        primitive="git-smart-push-explicit-lease",
+        supported_target_policy="direct-fast-forward",
+        supported_result_shape="DIRECT_FAST_FORWARD",
+        supports_atomic_review_guard=False,
+    )
     return GitPushCapability(
-        identity="local-cap",
-        remote_identity=str(remote),
+        identity=identity.digest,
+        remote_identity=identity.canonical_remote_identity,
         target_ref_pattern="refs/heads/integration/t2",
         actor_identity="test",
         actor_permissions_snapshot_digest="sha256:" + "1" * 64,
@@ -60,6 +91,7 @@ def capability(remote: Path) -> GitPushCapability:
         proof_transcript_digest="sha256:" + "4" * 64,
         git_version="test",
         supports_expected_head_advance=True,
+        canonical_identity=identity,
     )
 
 
@@ -67,7 +99,8 @@ def production_observation(**changes: object) -> GitHubCapabilityObservation:
     values = {
         "hostname": "github.com",
         "repository_id": 1080600074,
-        "repository": "Jamie-BitFlight/claude_skills",
+        "repository_owner": "Jamie-BitFlight",
+        "repository_name": "claude_skills",
         "target_ref": "refs/heads/integration/runtime-integrity",
         "actor": "Jamie-BitFlight",
         "actor_permissions_snapshot_digest": "sha256:" + "1" * 64,
@@ -107,7 +140,10 @@ def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) 
 
 def test_f21_capability_rejects_observation_with_unrelated_supplied_capability(tmp_path: Path) -> None:
     observation = production_observation()
-    admission = GitHubCapabilityAdmission.from_receipt(observation)
+    attacker = capability(tmp_path).model_copy(
+        update={"remote_identity": "github.com/attacker/other", "actor_identity": "attacker", "git_version": "0.0.0"}
+    )
+    admission = GitHubCapabilityAdmission.from_receipt(observation).model_copy(update={"capability": attacker})
 
     result = admission.evaluate(observation)
 
@@ -116,28 +152,51 @@ def test_f21_capability_rejects_observation_with_unrelated_supplied_capability(t
     assert result.git_version == "2.55.0"
 
 
+def test_f21_capability_rejects_preflight_identity_mismatch() -> None:
+    receipt = production_observation()
+    admission = GitHubCapabilityAdmission.from_receipt(receipt)
+    actual = canonical_capability_identity(receipt)
+    attacker = RepositoryIdentityObservation(
+        remote_identity="github.com/attacker/other",
+        hostname="github.com",
+        repository_owner="attacker",
+        repository_name="other",
+        target_ref=actual.target_ref,
+        available=True,
+    )
+
+    assert not admission.evaluate_identity(actual, attacker).supports_expected_head_advance
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
         ("hostname", "evil.example"),
         ("repository_id", 1),
-        ("repository", "attacker/other"),
+        ("repository_owner", "attacker"),
+        ("repository_name", "other"),
+        ("canonical_remote_identity", "github.com/attacker/other"),
         ("target_ref", "refs/heads/main"),
-        ("actor", "attacker"),
+        ("actor_identity", "attacker"),
         ("actor_permissions_snapshot_digest", "sha256:" + "7" * 64),
         ("rules_snapshot_digest", "sha256:" + "8" * 64),
         ("git_version", "0.0.0"),
-        ("configuration_digest", "sha256:" + "9" * 64),
-        ("evidence_digest", "sha256:" + "a" * 64),
-        ("result_shape", "MERGE_COMMIT"),
-        ("atomic_review_guard", True),
+        ("production_configuration_digest", "sha256:" + "9" * 64),
+        ("production_evidence_digest", "sha256:" + "a" * 64),
+        ("supported_result_shape", "MERGE_COMMIT"),
+        ("supports_atomic_review_guard", True),
+        ("sandbox_report_digest", "sha256:" + "b" * 64),
+        ("sandbox_transcript_digest", "sha256:" + "c" * 64),
+        ("primitive", "other"),
+        ("supported_target_policy", "other"),
     ],
 )
 def test_f21_capability_identity_matches_every_derived_source_field(field: str, value: object) -> None:
     receipt = production_observation()
     admission = GitHubCapabilityAdmission.from_receipt(receipt)
+    actual = canonical_capability_identity(receipt).model_copy(update={field: value})
 
-    result = admission.evaluate(production_observation(**{field: value}))
+    result = admission.evaluate_identity(actual)
 
     assert not result.supports_expected_head_advance
 
@@ -156,6 +215,36 @@ def test_f14_preflight_derives_actual_configured_remote_identity(tmp_path: Path)
     assert observed.available
     assert observed.remote_identity != "github.com/attacker/other"
     assert Path(observed.remote_identity.removeprefix("file://")) == remote.resolve()
+
+
+def test_f14_github_preflight_derives_actual_remote_not_constructor_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = GitHubGitPushPort(
+        workdir=tmp_path,
+        authenticated_remote="git@github.com:Jamie-BitFlight/claude_skills.git",
+        remote_identity="github.com/attacker/other",
+        target_ref="refs/heads/integration/runtime-integrity",
+        token="test-token",
+    )
+
+    def scripted(*args: str) -> ProcessResult:
+        if args == ("remote", "get-url", port.remote):
+            return ProcessResult(argv=args, returncode=2, stdout=b"", stderr=b"unknown remote")
+        if args == ("remote",):
+            return ProcessResult(argv=args, returncode=0, stdout=b"origin\n", stderr=b"")
+        if args == ("remote", "get-url", "origin"):
+            return ProcessResult(
+                argv=args, returncode=0, stdout=b"git@github.com:Jamie-BitFlight/claude_skills.git\n", stderr=b""
+            )
+        return ProcessResult(argv=args, returncode=0, stdout=b"oid\tref\n", stderr=b"")
+
+    monkeypatch.setattr(port, "git", scripted)
+    observed = port.preflight_repository()
+
+    assert observed.remote_identity == "github.com/Jamie-BitFlight/claude_skills"
+    assert observed.repository_owner == "Jamie-BitFlight"
+    assert observed.repository_name == "claude_skills"
 
 
 def test_f11_admit_rejects_snapshot_for_other_pull_request_same_sha(tmp_path: Path) -> None:
@@ -219,6 +308,61 @@ def test_f11_pull_request_ref_change_requires_reconciliation() -> None:
     assert expected.semantic_projection() != other.semantic_projection()
 
 
+@pytest.mark.parametrize(("phase", "wrong_call"), [("bind", 1), ("prepare", 2), ("finish", 3)])
+def test_f11_policy_identity_is_checked_at_admit_bind_prepare_finish_and_reconcile(
+    tmp_path: Path, phase: str, wrong_call: int
+) -> None:
+    train, _connection, integrator, _policies, _gates, _branch = admitted(tmp_path)
+
+    class WrongAtCall:
+        calls = 0
+
+        def observe(self, candidate_sha: str, pull_request_ref: str) -> PolicySnapshot:
+            self.calls += 1
+            return PolicySnapshot(
+                candidate_sha=candidate_sha,
+                pull_request_ref="PR-OTHER" if self.calls == wrong_call else pull_request_ref,
+                required_checks=(("tests", candidate_sha, "success"),),
+                capability_identity="cap-1",
+                complete=True,
+                available=True,
+                freshness_token=f"token-{self.calls}",
+                observed_at=datetime(2026, 1, 1, 0, 0, self.calls),
+            )
+
+    train.policy_observer = WrongAtCall()
+    if phase in {"bind", "prepare"}:
+        with pytest.raises(store.Refusal):
+            train.merge_next(MergeNext(plan="Pt2", generation=1, integrator=integrator))
+    else:
+        result = train.merge_next(MergeNext(plan="Pt2", generation=1, integrator=integrator))
+        assert result.phase == "RECONCILIATION_REQUIRED"
+
+
+def test_f11_policy_identity_is_checked_during_reconcile(tmp_path: Path) -> None:
+    train, _connection, integrator, policies, _gates, branch = admitted(tmp_path, drift=True)
+    unresolved = train.merge_next(MergeNext(plan="Pt2", generation=1, integrator=integrator))
+    policies.drift = False
+    branch.outcome = "advanced-after-reconciliation"
+
+    class OtherPullRequest:
+        def observe(self, candidate_sha: str, pull_request_ref: str) -> PolicySnapshot:
+            return PolicySnapshot(
+                candidate_sha=candidate_sha,
+                pull_request_ref="PR-OTHER",
+                required_checks=(("tests", candidate_sha, "success"),),
+                capability_identity="cap-1",
+                complete=True,
+                available=True,
+                freshness_token="reconcile",
+                observed_at=datetime(2026, 1, 2),
+            )
+
+    train.policy_observer = OtherPullRequest()
+    result = train.reconcile(ReconcileClaim(plan="Pt2", claim_number=unresolved.claim_number))
+    assert result.noop == "reconciliation-still-required"
+
+
 def test_f14_local_bare_push_uses_exact_old_and_prepared_result(tmp_path: Path) -> None:
     work, remote, base, candidate = repository(tmp_path)
     port = LocalBareGitPushPort(
@@ -227,7 +371,7 @@ def test_f14_local_bare_push_uses_exact_old_and_prepared_result(tmp_path: Path) 
     advancer = IntegrationBranchAdvancer(
         port,
         capability(remote),
-        remote_identity=str(remote),
+        remote_identity=remote.resolve().as_uri(),
         target_ref="refs/heads/integration/t2",
         candidate_ref="refs/heads/candidate",
     )
