@@ -55,9 +55,11 @@ and flag by flag, so a command or a flag added to the specification is a loud fa
 than a surface that quietly lacks it; the union is expressed by :data:`LEGACY_FLAGS`, so a legacy
 flag that outlives its command is loud too.
 
-What a ledger command prints follows ``ledger_spec.REASONS``. A refusal writes its reason code to
-stderr and exits non-zero; a no-op writes its reason code to stdout and exits zero; anything else
-writes the result as compact JSON. ``dispatch`` is the one exception: it prints the new attempt
+What a ledger command prints follows ``ledger_spec.REASONS``. A refusal writes its reason code
+and that reason's ``message`` to stderr and exits non-zero; a no-op writes the same pair to
+stdout and exits zero; anything else writes the result as compact JSON. The code stays the
+first token on the line, so a caller matching on it keeps working; the message is there because
+the caller cannot read this repository to find out what the code meant. ``dispatch`` is the one exception: it prints the new attempt
 number and nothing else, because that number is the runner key every later command passes back as
 ``--attempt``.
 
@@ -568,8 +570,25 @@ def check_routing_defaults() -> None:
         raise ValueError("; ".join(parts))
 
 
+def _reason_line(reason: str) -> str:
+    """Return the reason code followed by what it means to the caller.
+
+    The code leads, so a caller matching on it is unaffected. The message follows, because the
+    caller ran a command and cannot read this repository to find out what the code stood for.
+    A code with no entry prints alone rather than failing the command it was already refusing.
+
+    Args:
+        reason: A ``ledger_spec.REASONS`` code.
+
+    Returns:
+        ``"{code}: {message}"``, or the bare code when the table does not carry it.
+    """
+    known = ledger_spec.REASON_BY_CODE.get(reason)
+    return f"{reason}: {known.message}" if known else reason
+
+
 def _refused(reason: str) -> NoReturn:
-    """Print a refusal's reason code on stderr and exit non-zero.
+    """Print a refusal's reason code and meaning on stderr, then exit non-zero.
 
     Args:
         reason: A ``ledger_spec.REASONS`` code of kind ``REFUSAL``.
@@ -577,12 +596,12 @@ def _refused(reason: str) -> NoReturn:
     Raises:
         typer.Exit: Always.
     """
-    typer.echo(reason, err=True)
+    typer.echo(_reason_line(reason), err=True)
     raise typer.Exit(1)
 
 
 def _noop(reason: str) -> NoReturn:
-    """Print a no-op's reason code on stdout and exit zero.
+    """Print a no-op's reason code and meaning on stdout, then exit zero.
 
     Args:
         reason: A ``ledger_spec.REASONS`` code of kind ``NOOP``.
@@ -590,7 +609,7 @@ def _noop(reason: str) -> NoReturn:
     Raises:
         typer.Exit: Always.
     """
-    typer.echo(reason)
+    typer.echo(_reason_line(reason))
     raise typer.Exit(0)
 
 

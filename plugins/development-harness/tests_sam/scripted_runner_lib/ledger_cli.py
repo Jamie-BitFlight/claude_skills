@@ -3,7 +3,8 @@
 This is the whole of the runner's contact with the ledger. Every command runs as a subprocess with
 its arguments as a list, never through a shell, and every result is read as the JSON object or array
 it is; ``dispatch``'s bare attempt number and the ``unchanged`` no-op line are handled as their own
-documented shapes.
+documented shapes. A no-op line leads with its reason code and continues with what that code
+means, so the code is read as the leading token rather than as the whole line.
 """
 
 from __future__ import annotations
@@ -23,8 +24,11 @@ from tests_sam.scripted_runner_lib.workspace import Toolchain
 ADDRESS_FLAGS: frozenset[str] = frozenset({"--address", "--plan-address"})
 """The flags that carry the plan or task a command acts on."""
 
-NO_OP_CODE = re.compile(r"^[a-z][a-z-]*$")
-"""A bare reason code, such as ``unchanged``, printed instead of a JSON result."""
+NO_OP_CODE = re.compile(r"^([a-z][a-z-]*)(?::\s|$)")
+"""A no-op line, such as ``unchanged: The export already matches the ledger. Nothing changed.``,
+printed instead of a JSON result. The code leads and the rest says what it means to a caller
+who cannot read this repository, so the runner reads the leading token the way that caller
+does rather than requiring the whole line to be the code."""
 
 
 class Argument(BaseModel):
@@ -130,9 +134,11 @@ class CommandResult(BaseModel):
 
     @property
     def noop(self) -> str | None:
-        """Return the bare no-op code the command printed instead of a result, when it did."""
-        printed = self.stdout.strip()
-        return printed if self.payload is None and NO_OP_CODE.match(printed) else None
+        """Return the no-op code the command printed instead of a result, when it did."""
+        if self.payload is not None:
+            return None
+        matched = NO_OP_CODE.match(self.stdout.strip())
+        return matched.group(1) if matched else None
 
 
 class LedgerCommandError(ScriptedRunnerError):

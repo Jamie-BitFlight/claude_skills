@@ -523,6 +523,11 @@ class Reason(BaseModel):
     code: str
     kind: ReasonKind
     condition: str
+    """When the code fires, in this ledger's own vocabulary. For a maintainer reading the spec."""
+    message: str
+    """What the command prints beside the code. For the agent that ran the command, which can
+    see neither this file nor the ledger's tables: it says what happened and, where the agent
+    has one, what its next move is."""
 
 
 REASONS: list[Reason] = [
@@ -530,73 +535,121 @@ REASONS: list[Reason] = [
         code="network-filesystem",
         kind=ReasonKind.REFUSAL,
         condition="the mount holding the database path has a type in NETWORK_FILESYSTEMS",
+        message="The work ledger cannot run on a network filesystem. Move the repository onto a local disk.",
     ),
-    Reason(code="archived", kind=ReasonKind.REFUSAL, condition="plans.archived is set"),
+    Reason(
+        code="archived",
+        kind=ReasonKind.REFUSAL,
+        condition="plans.archived is set",
+        message="This plan is archived and does not accept changes.",
+    ),
     Reason(
         code="leased",
         kind=ReasonKind.REFUSAL,
         condition="attempt_open is 1 and the command's exception (returned, stale, --force) does not hold",
+        message="Another attempt on this task is already open. Wait for it to close, or pass --force to take it over.",
     ),
-    Reason(code="not-ready", kind=ReasonKind.REFUSAL, condition="tasks.ready is false"),
-    Reason(code="stale-attempt", kind=ReasonKind.REFUSAL, condition="--attempt differs from tasks.attempts"),
+    Reason(
+        code="not-ready",
+        kind=ReasonKind.REFUSAL,
+        condition="tasks.ready is false",
+        message="This task is not ready. A task it depends on has not finished yet.",
+    ),
+    Reason(
+        code="stale-attempt",
+        kind=ReasonKind.REFUSAL,
+        condition="--attempt differs from tasks.attempts",
+        message="A later attempt superseded the one you passed to --attempt. Read the task again for the current attempt number.",
+    ),
     Reason(
         code="attempt-closed",
         kind=ReasonKind.REFUSAL,
         condition="--attempt equals tasks.attempts and attempt_open is 0",
+        message="The attempt you passed to --attempt is already closed. Open a new attempt before writing to it.",
     ),
     Reason(
         code="attempt-required",
         kind=ReasonKind.REFUSAL,
         condition="--append-section names a report section and --attempt is absent",
+        message="Writing a report section needs --attempt. Pass the attempt number you are writing under.",
     ),
     Reason(
         code="reason-required",
         kind=ReasonKind.REFUSAL,
         condition="--reason is absent from a status moved without a runner",
+        message="Moving this status without a runner needs --reason. Say why it moved.",
     ),
     Reason(
         code="unmatched-path",
         kind=ReasonKind.REFUSAL,
         condition="no task with attempt_open 1 has a worktree that contains --path",
+        message="No open attempt holds a worktree that contains the path you passed to --path. Check the path, or open an attempt first.",
     ),
     Reason(
         code="report-missing",
         kind=ReasonKind.REFUSAL,
         condition="a section in REPORT_SECTIONS has no row tagged with the current attempt",
+        message="A required report section has nothing written under this attempt. Write it, then close the attempt.",
     ),
     Reason(
         code="not-complete",
         kind=ReasonKind.REFUSAL,
         condition="status is not complete-with-attempt-closed and the task is not returned",
+        message="This task is neither complete nor returned, so it cannot be accepted yet.",
     ),
-    Reason(code="task-accepted", kind=ReasonKind.REFUSAL, condition="accepted is 1 and --force is absent"),
+    Reason(
+        code="task-accepted",
+        kind=ReasonKind.REFUSAL,
+        condition="accepted is 1 and --force is absent",
+        message="This task is already accepted. Pass --force to change it anyway.",
+    ),
     Reason(
         code="dependents-started",
         kind=ReasonKind.REFUSAL,
         condition="a task naming this one in dependencies has attempts above 0, is not skipped by this task's cascade, and --force is absent",
+        message="A task that depends on this one has already started. Pass --force to proceed anyway.",
     ),
     Reason(
         code="attempts-exhausted",
         kind=ReasonKind.REFUSAL,
         condition="attempts is at or above attempts_allowed and --more-attempts is absent",
+        message="This task has used every attempt it was allowed. Pass --more-attempts to raise the limit.",
     ),
     Reason(
         code="status-invalid",
         kind=ReasonKind.REFUSAL,
         condition="--new-status is not one of complete, failed, blocked, deferred, skipped",
+        message="--new-status takes one of complete, failed, blocked, deferred, skipped.",
     ),
     Reason(
         code="exists",
         kind=ReasonKind.REFUSAL,
         condition="a plan with this id, or an unarchived plan with this milestone, exists and --replace is absent",
+        message="A plan with this id, or an unarchived plan for this milestone, already exists. Pass --replace to overwrite it.",
     ),
-    Reason(code="already-settled", kind=ReasonKind.NOOP, condition="settled is 1 for the named attempt"),
-    Reason(code="already-accepted", kind=ReasonKind.NOOP, condition="accepted is 1"),
-    Reason(code="already-open", kind=ReasonKind.NOOP, condition="status is not-started"),
+    Reason(
+        code="already-settled",
+        kind=ReasonKind.NOOP,
+        condition="settled is 1 for the named attempt",
+        message="That attempt was already settled. Nothing changed.",
+    ),
+    Reason(
+        code="already-accepted",
+        kind=ReasonKind.NOOP,
+        condition="accepted is 1",
+        message="This task was already accepted. Nothing changed.",
+    ),
+    Reason(
+        code="already-open",
+        kind=ReasonKind.NOOP,
+        condition="status is not-started",
+        message="This task is already not-started. Nothing changed.",
+    ),
     Reason(
         code="unchanged",
         kind=ReasonKind.NOOP,
         condition="the projection hash equals export_cursors.projection_hash for the target",
+        message="The export already matches the ledger. Nothing changed.",
     ),
     Reason(
         code="cascade:T{n}",
@@ -605,6 +658,7 @@ REASONS: list[Reason] = [
             "the task became failed and this transitive dependent was not-started, so it moved to skipped, "
             "or was already held skipped by another cascade, so it stayed there with one more failure blocking it"
         ),
+        message="This task failed, so dependent T{n} moved to skipped.",
     ),
     Reason(
         code="cascade-reversed:T{n}",
@@ -613,13 +667,18 @@ REASONS: list[Reason] = [
             "the task left failed and released its cascade's hold on this dependent, which moved to not-started "
             "when no other cascade still held it and stayed skipped when one did"
         ),
+        message="This task left failed, so it no longer holds dependent T{n} skipped.",
     ),
     Reason(
         code="returned-complete",
         kind=ReasonKind.OUTCOME,
         condition="accept moved a returned task to complete before accepting it",
+        message="The returned task moved to complete before it was accepted.",
     ),
 ]
+
+REASON_BY_CODE: dict[str, Reason] = {reason.code: reason for reason in REASONS}
+"""Every reason by its code, so a command that refuses can print what the code means."""
 
 NETWORK_FILESYSTEMS: tuple[str, ...] = ("nfs", "nfs4", "cifs", "smb2", "fuse.sshfs", "9p")
 """Mount types on which WAL mode cannot share memory; open refuses with ``network-filesystem``."""
