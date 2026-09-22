@@ -87,7 +87,7 @@ class TopLevelCommentAction(BaseModel):
 
     kind: Literal["comment"] = "comment"
     body: NonBlankText
-    references: list[str] = Field(default_factory=list)
+    references: list[str] = Field(min_length=1)
 
     @field_validator("references")
     @classmethod

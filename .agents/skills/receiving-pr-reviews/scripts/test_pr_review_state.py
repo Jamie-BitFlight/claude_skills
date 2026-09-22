@@ -33,9 +33,11 @@ from pr_review_models import (
     Reviewability,
     ReviewNode,
     ReviewSnapshot,
+    TopLevelCommentAction,
 )
 from pr_review_state import ReviewAuthorizationError, authorize_action
 from pr_review_state_models import (
+    ProviderInputIdentity,
     ReviewActor,
     ReviewAssessment,
     ReviewCapabilities,
@@ -60,7 +62,7 @@ def review_input(input_id: str = "github:review-comment:42") -> ReviewInput:
     return ReviewInput(
         input_id=input_id,
         provider="github",
-        provider_ids={"thread_id": "T1", "opening_comment_id": "42"},
+        provider_ids=ProviderInputIdentity(object_id="42", reply_target_id="42", resolution_target_id="T1"),
         source_kind="review_comment",
         kinds={"comment"},
         location="inline",
@@ -189,6 +191,15 @@ def test_shared_reply_action_does_not_require_github_comment_identifier() -> Non
     assert action.body == "Addressed systemically."
 
 
+def test_review_input_rejects_advertised_mutation_without_typed_provider_target() -> None:
+    payload = review_input().model_dump()
+    payload["kinds"] = {"comment"}
+    payload["provider_ids"] = {"object_id": "42"}
+
+    with pytest.raises(ValidationError, match="reply_target_id"):
+        ReviewInput.model_validate(payload)
+
+
 def test_actor_classification_uses_provider_type_instead_of_login_guessing() -> None:
     untyped = actor(Author(login="service-bot"), pull_author_login=None, observed_role=None)
     typed = actor(
@@ -274,6 +285,70 @@ def test_authorization_requires_kind_assessment_to_match_approval_signal() -> No
 
     with pytest.raises(ReviewAuthorizationError, match="approval/rejection semantics"):
         authorize_action(snapshot_value, cycle_value, item.input_id, ReplyAction(body="Done."))
+
+
+def test_assessment_can_classify_a_normalized_comment_as_a_question() -> None:
+    item = review_input()
+    assessment = ready_cycle().assessments[0].model_copy(update={"semantic_kinds": {"comment", "question"}})
+    snapshot_value, cycle_value = state_for_input(item, assessment)
+
+    authorized = authorize_action(snapshot_value, cycle_value, item.input_id, ReplyAction(body="Answered."))
+
+    assert authorized.review_input.input_id == item.input_id
+
+
+def test_top_level_communication_accepts_truthful_unavailable_resolution_state() -> None:
+    item = review_input().model_copy(
+        update={
+            "location": "top_level",
+            "capabilities": ReviewCapabilities(
+                can_reply=False, can_resolve=False, can_comment=True, unavailable=["reply", "resolve"]
+            ),
+            "provider_state": "COMMENTED",
+            "thread_id": None,
+        }
+    )
+    assessment = ready_cycle().assessments[0]
+    snapshot_value, cycle_value = state_for_input(item, assessment)
+    cycle_value = cycle_value.model_copy(
+        update={
+            "resolution_states": {item.input_id: "unavailable"},
+            "clusters": [cycle_value.clusters[0].model_copy(update={"resolution_policy": "unavailable"})],
+        }
+    )
+
+    authorized = authorize_action(
+        snapshot_value,
+        cycle_value,
+        item.input_id,
+        TopLevelCommentAction(body="Addressed.", references=[item.stable_reference]),
+    )
+
+    assert isinstance(authorized.action, TopLevelCommentAction)
+    assert authorized.action.references == [item.stable_reference]
+
+
+def test_top_level_communication_requires_selected_input_reference() -> None:
+    item = review_input().model_copy(
+        update={
+            "location": "top_level",
+            "capabilities": ReviewCapabilities(
+                can_reply=False, can_resolve=False, can_comment=True, unavailable=["reply", "resolve"]
+            ),
+            "provider_state": "COMMENTED",
+            "thread_id": None,
+        }
+    )
+    snapshot_value, cycle_value = state_for_input(item, ready_cycle().assessments[0])
+    cycle_value = cycle_value.model_copy(update={"resolution_states": {item.input_id: "unavailable"}})
+
+    with pytest.raises(ReviewAuthorizationError, match="stable reference"):
+        authorize_action(
+            snapshot_value,
+            cycle_value,
+            item.input_id,
+            TopLevelCommentAction(body="Addressed.", references=["https://example.invalid/another-input"]),
+        )
 
 
 def test_resolution_requires_capability_and_completed_communication() -> None:

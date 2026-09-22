@@ -8,6 +8,7 @@ from pathlib import Path
 from pr_review_contracts import ChangeRequestTarget, RepositoryTarget
 from pr_review_models import Reviewability, ReviewSnapshot
 from pr_review_state_models import (
+    ProviderInputIdentity,
     ReviewActor,
     ReviewAssessment,
     ReviewCapabilities,
@@ -32,7 +33,7 @@ def canonical_input(input_id: str = "github:review-comment:42") -> ReviewInput:
     return ReviewInput(
         input_id=input_id,
         provider="github",
-        provider_ids={"thread_id": "T1", "opening_comment_id": "42"},
+        provider_ids=ProviderInputIdentity(object_id="42", reply_target_id="42", resolution_target_id="T1"),
         source_kind="review_comment",
         kinds={"comment"},
         location="inline",

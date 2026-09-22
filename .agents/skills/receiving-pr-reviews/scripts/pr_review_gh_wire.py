@@ -56,6 +56,7 @@ class PageInfo(GitHubResponseModel):
     """Pagination state for one GraphQL connection."""
 
     hasNextPage: bool
+    endCursor: str | None = None
 
 
 class CommentsConnection(GitHubResponseModel):

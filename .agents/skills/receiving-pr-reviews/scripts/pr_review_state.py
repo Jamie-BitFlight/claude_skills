@@ -163,9 +163,14 @@ def validate_cycle_coverage(
             required_fact_decisions.issubset(assessment.unknowns),
             f"assessment for {input_id!r} does not record every unknown provider fact",
         )
+        added_kinds = assessment.semantic_kinds - review_input.kinds
         require_authorization(
-            assessment.semantic_kinds == review_input.kinds,
-            f"assessment kinds for {input_id!r} do not match normalized input kinds",
+            review_input.kinds.issubset(assessment.semantic_kinds) and added_kinds.issubset({"question"}),
+            f"assessment kinds for {input_id!r} do not preserve normalized input kinds",
+        )
+        require_authorization(
+            "question" not in added_kinds or "comment" in review_input.kinds,
+            f"assessment for {input_id!r} can classify only a normalized comment as a question",
         )
         expected_kind_assessment = "not_applicable"
         if "rejection" in review_input.kinds:
@@ -196,16 +201,27 @@ def validate_action_state(
         action: Requested provider-neutral mutation.
     """
     input_id = review_input.input_id
-    require_authorization(cycle.resolution_states[input_id] == "open", "input resolution state must be open")
     if isinstance(action, ReplyAction):
+        require_authorization(cycle.resolution_states[input_id] == "open", "reply input resolution state must be open")
         require_authorization(review_input.capabilities.can_reply, "input does not support inline replies")
         require_authorization(cycle.communication_states[input_id] == "pending", "reply communication must be pending")
     elif isinstance(action, TopLevelCommentAction):
+        require_authorization(
+            cycle.resolution_states[input_id] in {"open", "unavailable"},
+            "top-level input resolution state must be open or unavailable",
+        )
         require_authorization(review_input.capabilities.can_comment, "input does not support top-level comments")
         require_authorization(
             cycle.communication_states[input_id] == "pending", "top-level communication must be pending"
         )
+        require_authorization(
+            review_input.stable_reference in action.references,
+            "top-level communication must include the selected input stable reference",
+        )
     elif isinstance(action, ResolveAction):
+        require_authorization(
+            cycle.resolution_states[input_id] == "open", "resolution input resolution state must be open"
+        )
         require_authorization(review_input.capabilities.can_resolve, "input does not support resolution")
         require_authorization(
             cycle.communication_states[input_id] == "completed", "resolution requires completed communication"

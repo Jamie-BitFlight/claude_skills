@@ -14,14 +14,19 @@ arrival order.
 1. Fetch one full snapshot and preserve it as the mutation evidence:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch \
      --pr <N> --github <owner/repo> > review-snapshot.json
    ```
 
    Use the full form for action work. It contains all normalized `review_inputs`, including
    resolved history used for pattern analysis, plus target, revision, fingerprint, completeness,
    capabilities, and stable references. A false `snapshot_complete` stops the cycle: fetch the
-   truncated/unavailable surface before assessing or acting.
+   truncated/unavailable surface before assessing or acting. Completion is one saved snapshot
+   with `snapshot_complete: true`. According to lines 135–229 of
+   [pr_review_gh.py](./scripts/pr_review_gh.py), GitHub normalization retains resolved history and
+   derives the snapshot completeness evidence; lines 110–197 of
+   [pr_review_github_transport.py](./scripts/pr_review_github_transport.py) fetch both outer and
+   nested thread pages.
 
    If `gh` is unavailable and GitHub MCP tools are available, use the
    [GitHub MCP fallback](./references/github-mcp-fallback.md) for the entire snapshot. One snapshot
@@ -30,11 +35,16 @@ arrival order.
 2. Assess the complete inbound census before editing. Validate each claim against the change goal,
    repository instructions, current code, and other review inputs. Cluster repeated symptoms by
    shared cause; make a singleton explicit when an input has no related input. Record observed
-   actor/revision unknowns instead of guessing them.
+   actor/revision unknowns instead of guessing them. A comment may be classified as a question
+   during assessment while retaining its normalized comment kind. Completion is one assessment per
+   inbound input and cluster membership covering that same set exactly once. According to lines
+   98–184 of [pr_review_state.py](./scripts/pr_review_state.py), the gate enforces that coverage,
+   unknown decisions, and semantic classification.
 
 3. Implement warranted clusters at their owning design seam. Verify the complete affected surface,
    then push an inspectable revision. Fetch a new full snapshot at that remote revision; this is
-   the recheck snapshot that actions bind to.
+   the recheck snapshot that actions bind to. Completion is a verified remote revision whose new
+   complete snapshot fingerprint is recorded in the cycle.
 
 4. Write `review-cycle.json` as `ReviewCycleState` from `pr_review_state_models.py`. Completion
    requires:
@@ -53,24 +63,28 @@ arrival order.
    Validate without mutating:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py validate-cycle \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py validate-cycle \
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
+
+   Completion is a zero exit from `validate-cycle`. According to lines 61–184 of
+   [pr_review_state.py](./scripts/pr_review_state.py), validation binds completeness, revision,
+   fingerprint, evidence, census, assessments, clusters, unknown decisions, and action state.
 
 5. Communicate each disposition before resolving. Every mutation requires the same snapshot and
    cycle evidence:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply \
      --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
      --snapshot-file review-snapshot.json --state-file review-cycle.json
 
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py comment \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py comment \
      --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
      --reference '<stable-reference>' \
      --snapshot-file review-snapshot.json --state-file review-cycle.json
 
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve \
      --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
@@ -79,35 +93,42 @@ arrival order.
    Clarification-required inputs remain open. Provider capabilities and the cluster resolution
    policy must authorize the requested action. Successful commands atomically advance the local
    communication/resolution state; a failed resolution retains completed communication for safe
-   resolve-only recovery.
+   resolve-only recovery. Combined and batch actions pre-authorize every reply and resolution
+   before their first provider call. According to lines 187–235 of
+   [pr_review_state.py](./scripts/pr_review_state.py), action authorization checks capabilities,
+   communication, resolution, policy, and stable references; lines 341–509 of
+   [pr_review_threads.py](./scripts/pr_review_threads.py) persist only provider-confirmed progress.
 
    Batch combined actions use complete canonical input IDs and stop at the first failed action:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve-batch \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve-batch \
      --pr <N> --github <owner/repo> --input-file actions.json \
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   `actions.json` is `[{"input_id": "...", "body": "..."}, ...]`.
+   `actions.json` is `[{"input_id": "...", "body": "..."}, ...]`. Completion is every inbound
+   input in communication state `completed` or `not_required`, with each resolvable input either
+   resolved or deliberately left open for clarification.
 
 6. Re-check with short bounded calls after current inputs are communicated:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py watch \
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py watch \
      --pr <N> --github <owner/repo>
    ```
 
    A call stops on outstanding work or its window/attempt bound. `timed_out: true` means no stop
    signal appeared in that sampled window; issue another call to cover a longer intended window.
-   Full watch output preserves the canonical snapshot under `state`.
+   Full watch output preserves the canonical snapshot under `state`. Completion is a final complete
+   provider snapshot with no unresolved or newly arrived input. According to lines 242–310 of
+   [pr_review_threads.py](./scripts/pr_review_threads.py), watch reports its attempts, bound
+   exhaustion, timeout state, and final canonical snapshot.
 
-## Operational bounds
+## Command reference
 
-- Every `gh` subprocess has a 30-second default process-tree bound. Set `--gh-timeout-seconds` to a
-  smaller positive bound when needed; watch uses the tighter caller bound or remaining deadline.
-- `watch` defaults to a 90-second interval, 270-second window, and four complete snapshots.
-- `--summary` is for status inspection, not action evidence. `--max-body` visibly truncates only
-  when the caller requests it.
-- Comma-separated `--pr` is fetch-only and emits lightweight board entries; action cycles use one
-  target and revision.
+Run `./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py <command> --help` for the
+current options and defaults. Use full output for action evidence; use `--summary` only for status
+inspection. According to lines 67–94 of
+[pr_review_subprocess.py](./scripts/pr_review_subprocess.py), every provider subprocess has a
+mandatory positive bound and process-tree cleanup before a timeout is raised.

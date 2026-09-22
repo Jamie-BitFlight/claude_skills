@@ -306,7 +306,7 @@ def test_watch_first_snapshot_uses_tighter_caller_command_timeout(mocker: Mocker
 
 
 def test_gh_timeout_budget_without_a_deadline_uses_the_callers_bound() -> None:
-    """No deadline means the caller's `--gh-timeout-seconds` applies unchanged, `None` included."""
+    """No deadline uses the caller's timeout or the mandatory default when omitted."""
     assert pr_review_gh.gh_timeout_budget(None, None) == pytest.approx(30)
     assert pr_review_gh.gh_timeout_budget(None, 12.5) == pytest.approx(12.5)
 

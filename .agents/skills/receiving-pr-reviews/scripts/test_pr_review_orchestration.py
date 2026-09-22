@@ -25,7 +25,12 @@ import pytest
 from typer.testing import CliRunner
 
 import pr_review_threads
-from pr_review_state_models import ReviewAssessment, ReviewCluster, calculate_snapshot_fingerprint
+from pr_review_state_models import (
+    ProviderInputIdentity,
+    ReviewAssessment,
+    ReviewCluster,
+    calculate_snapshot_fingerprint,
+)
 from pr_review_threads import app
 from review_test_fixtures import canonical_input, canonical_snapshot, ready_cycle, write_ready_files
 
@@ -142,6 +147,30 @@ def test_reply_and_resolve_rejects_graphql_errors(tmp_path: Path, mocker: Mocker
     assert persisted.resolution_states[canonical_input().input_id] == "open"
 
 
+def test_reply_and_resolve_preflights_resolution_before_reply(tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    snapshot = pr_review_threads.load_snapshot(snapshot_file)
+    item = snapshot.review_inputs[0].model_copy(
+        update={"capabilities": snapshot.review_inputs[0].capabilities.model_copy(update={"can_resolve": False})}
+    )
+    fingerprint = calculate_snapshot_fingerprint(snapshot.target, snapshot.head_revision, [item], snapshot.completeness)
+    snapshot_file.write_text(
+        snapshot.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint}).model_dump_json()
+    )
+    cycle = pr_review_threads.load_cycle(state_file).model_copy(
+        update={"snapshot_fingerprint": fingerprint, "recheck_snapshot_fingerprint": fingerprint}
+    )
+    state_file.write_text(cycle.model_dump_json())
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(
+        app, ["reply-and-resolve", "--pr", "17", "--body", "Addressed.", *gated_args(snapshot_file, state_file)]
+    )
+
+    assert result.exit_code != 0
+    run_mock.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -187,7 +216,7 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
     second = first.model_copy(
         update={
             "input_id": "github:review-comment:43",
-            "provider_ids": {"thread_id": "T2", "opening_comment_id": "43"},
+            "provider_ids": ProviderInputIdentity(object_id="43", reply_target_id="43", resolution_target_id="T2"),
             "stable_reference": "https://github.com/acme/widgets/pull/17#discussion_r43",
             "thread_id": "T2",
         }
@@ -264,6 +293,51 @@ def test_batch_stops_after_first_failed_action(tmp_path: Path, mocker: MockerFix
 
     assert result.exit_code != 0
     assert run_mock.call_count == 2
+
+
+def test_batch_preflights_every_resolution_before_first_reply(tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_two_input_cycle(tmp_path)
+    snapshot = pr_review_threads.load_snapshot(snapshot_file)
+    second = snapshot.review_inputs[1].model_copy(
+        update={"capabilities": snapshot.review_inputs[1].capabilities.model_copy(update={"can_resolve": False})}
+    )
+    inputs = [snapshot.review_inputs[0], second]
+    fingerprint = calculate_snapshot_fingerprint(snapshot.target, snapshot.head_revision, inputs, snapshot.completeness)
+    snapshot_file.write_text(
+        snapshot.model_copy(update={"review_inputs": inputs, "snapshot_fingerprint": fingerprint}).model_dump_json()
+    )
+    cycle = pr_review_threads.load_cycle(state_file).model_copy(
+        update={"snapshot_fingerprint": fingerprint, "recheck_snapshot_fingerprint": fingerprint}
+    )
+    state_file.write_text(cycle.model_dump_json())
+    input_file = tmp_path / "batch-preflight.json"
+    input_file.write_text(
+        json.dumps([
+            {"input_id": canonical_input().input_id, "body": "first"},
+            {"input_id": second.input_id, "body": "second"},
+        ])
+    )
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(
+        app,
+        [
+            "reply-and-resolve-batch",
+            "--pr",
+            "17",
+            "--input-file",
+            str(input_file),
+            "--snapshot-file",
+            str(snapshot_file),
+            "--state-file",
+            str(state_file),
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    run_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ from datetime import datetime
 from pydantic import TypeAdapter
 
 from pr_review_gh_wire import (
+    CommentsConnection,
     ForcePushEvent,
     IssueComment,
     PullRequestHeadState,
@@ -27,6 +28,15 @@ query($endCursor: String, $o: String!, $r: String!, $pr: Int!) {
         nodes { id databaseId body line originalLine createdAt updatedAt url
           commit { oid } author { login __typename } } } }
     }
+  } }
+}
+"""
+THREAD_COMMENTS_QUERY = """
+query($endCursor: String, $threadId: ID!) {
+  node(id: $threadId) { ... on PullRequestReviewThread {
+    comments(first: 100, after: $endCursor) { totalCount pageInfo { hasNextPage endCursor }
+      nodes { id databaseId body line originalLine createdAt updatedAt url
+        commit { oid } author { login __typename } } }
   } }
 }
 """
@@ -129,10 +139,63 @@ def fetch_thread_pages(
         ],
         timeout=timeout,
     )
-    return [
+    pages = [
         ReviewThreadsConnection.model_validate(page["data"]["repository"]["pullRequest"]["reviewThreads"])
         for page in json.loads(raw)
     ]
+    completed_pages = []
+    for page in pages:
+        completed_nodes = []
+        for thread in page.nodes:
+            completed_thread = thread
+            if thread.comments.pageInfo.hasNextPage:
+                comment_pages = fetch_thread_comment_pages(runner, thread.id, timeout=timeout)
+                comment_nodes = [comment for comment_page in comment_pages for comment in comment_page.nodes]
+                if comment_pages[-1].pageInfo.hasNextPage or len(comment_nodes) != comment_pages[0].totalCount:
+                    message = f"GitHub nested comment pagination for thread {thread.id!r} was incomplete"
+                    raise ValueError(message)
+                comments = thread.comments.model_copy(
+                    update={
+                        "totalCount": comment_pages[0].totalCount,
+                        "nodes": comment_nodes,
+                        "pageInfo": comment_pages[-1].pageInfo,
+                    }
+                )
+                completed_thread = thread.model_copy(update={"comments": comments})
+            completed_nodes.append(completed_thread)
+        completed_pages.append(page.model_copy(update={"nodes": completed_nodes}))
+    return completed_pages
+
+
+def fetch_thread_comment_pages(runner: Runner, thread_id: str, *, timeout: float | None) -> list[CommentsConnection]:
+    """Fetch every comment page for one truncated review thread.
+
+    Args:
+        runner: Bounded GitHub command transport.
+        thread_id: GitHub review-thread node identity.
+        timeout: Positive per-command bound.
+
+    Returns:
+        Every validated nested comment page in provider order.
+    """
+    raw = runner(
+        [
+            "api",
+            "graphql",
+            "--paginate",
+            "--slurp",
+            "-f",
+            f"query={THREAD_COMMENTS_QUERY}",
+            "-f",
+            f"threadId={thread_id}",
+        ],
+        timeout=timeout,
+    )
+    pages = [CommentsConnection.model_validate(page["data"]["node"]["comments"]) for page in json.loads(raw)]
+    if not pages:
+        message = f"GitHub returned no comment pages for truncated thread {thread_id!r}"
+        raise ValueError(message)
+    return pages
 
 
 def fetch_review_pages(

@@ -11,6 +11,7 @@ from pr_review_contracts import ChangeRequestTarget
 from pr_review_gh_wire import ReviewThreadNode
 from pr_review_models import Author, IssueComment, Reaction, ReviewNode
 from pr_review_state_models import (
+    ProviderInputIdentity,
     ReviewActor,
     ReviewCapabilities,
     ReviewInput,
@@ -98,11 +99,11 @@ def inline_inputs(
                 ReviewInput(
                     input_id=input_id,
                     provider="github",
-                    provider_ids={
-                        "thread_id": thread.id,
-                        "comment_id": str(comment.databaseId),
-                        "opening_comment_id": str(opening_id or comment.databaseId),
-                    },
+                    provider_ids=ProviderInputIdentity(
+                        object_id=str(comment.databaseId),
+                        reply_target_id=str(opening_id or comment.databaseId),
+                        resolution_target_id=thread.id,
+                    ),
                     source_kind="review_comment",
                     kinds={"comment"},
                     location="inline",
@@ -173,7 +174,7 @@ def review_inputs(
             ReviewInput.model_validate({
                 "input_id": f"github:review:{review.id}",
                 "provider": "github",
-                "provider_ids": {"review_id": review.id},
+                "provider_ids": ProviderInputIdentity(object_id=review.id),
                 "source_kind": "review",
                 "kinds": kinds,
                 "location": "top_level",
@@ -225,7 +226,7 @@ def issue_comment_inputs(
             ReviewInput(
                 input_id=f"github:issue-comment:{identity}",
                 provider="github",
-                provider_ids={"issue_comment_id": identity},
+                provider_ids=ProviderInputIdentity(object_id=identity),
                 source_kind="issue_comment",
                 kinds={"comment"},
                 location="top_level",
@@ -279,7 +280,7 @@ def approval_inputs(
             ReviewInput(
                 input_id=f"github:reaction:{identity}",
                 provider="github",
-                provider_ids={"reaction_id": identity},
+                provider_ids=ProviderInputIdentity(object_id=identity),
                 source_kind="reaction",
                 kinds={"approval"},
                 location="top_level",

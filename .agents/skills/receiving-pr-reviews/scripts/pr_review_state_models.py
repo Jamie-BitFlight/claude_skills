@@ -48,6 +48,14 @@ class ReviewCapabilities(BaseModel):
     unavailable: list[str]
 
 
+class ProviderInputIdentity(BaseModel):
+    """Typed provider object and mutation targets for one normalized input."""
+
+    object_id: NonBlankText
+    reply_target_id: NonBlankText | None = None
+    resolution_target_id: NonBlankText | None = None
+
+
 class ReviewInput(BaseModel):
     """One independently assessable provider object."""
 
@@ -55,7 +63,7 @@ class ReviewInput(BaseModel):
 
     input_id: str = Field(min_length=1)
     provider: ProviderName
-    provider_ids: dict[str, str]
+    provider_ids: ProviderInputIdentity
     source_kind: str = Field(min_length=1)
     kinds: set[InputKind] = Field(min_length=1)
     location: Literal["inline", "top_level"]
@@ -72,6 +80,21 @@ class ReviewInput(BaseModel):
     capabilities: ReviewCapabilities
     thread_id: str | None
     parent_id: str | None
+
+    @model_validator(mode="after")
+    def validate_mutation_targets(self) -> ReviewInput:
+        """Require every advertised mutation to have a typed provider target.
+
+        Returns:
+            This input after capability and identity validation.
+        """
+        if self.capabilities.can_reply and self.provider_ids.reply_target_id is None:
+            message = "reply-capable input requires provider reply_target_id"
+            raise ValueError(message)
+        if self.capabilities.can_resolve and self.provider_ids.resolution_target_id is None:
+            message = "resolution-capable input requires provider resolution_target_id"
+            raise ValueError(message)
+        return self
 
     @field_serializer("kinds")
     def serialize_kinds(self, value: set[InputKind]) -> list[InputKind]:

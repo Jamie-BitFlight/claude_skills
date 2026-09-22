@@ -19,7 +19,7 @@ from pr_review_contracts import (
 from pr_review_gh_models import GitHubCreatedComment, GitHubResolveResponse
 from pr_review_models import FetchResult, ReviewSnapshot
 from pr_review_provider import ProviderResponseError
-from pr_review_state_models import AuthorizedReviewAction, ReviewInput, SnapshotCompleteness
+from pr_review_state_models import AuthorizedReviewAction, SnapshotCompleteness
 
 SnapshotLoader = Callable[..., FetchResult | ReviewSnapshot]
 CommandRunner = Callable[..., str]
@@ -173,7 +173,7 @@ class GitHubProvider:
             raise ProviderResponseError(message)
         owner, repo = self.owner_repo(target)
         if isinstance(action.action, ReplyAction):
-            comment_id = self.positive_provider_id(action.review_input, "opening_comment_id")
+            comment_id = self.positive_provider_id(action.review_input.provider_ids.reply_target_id, "reply_target_id")
             raw = self.command_runner(
                 [
                     "api",
@@ -194,9 +194,9 @@ class GitHubProvider:
                 raw=json.loads(raw),
             )
         if isinstance(action.action, ResolveAction):
-            thread_id = action.review_input.provider_ids.get("thread_id")
+            thread_id = action.review_input.provider_ids.resolution_target_id
             if not thread_id:
-                message = "GitHub resolve input lacks thread_id"
+                message = "GitHub resolve input lacks resolution_target_id"
                 raise ProviderResponseError(message)
             raw = self.command_runner(
                 ["api", "graphql", "-f", f"query={self.resolve_query}", "-f", f"threadId={thread_id}"],
@@ -228,17 +228,16 @@ class GitHubProvider:
         raise TypeError(message)
 
     @staticmethod
-    def positive_provider_id(review_input: ReviewInput, name: str) -> int:
+    def positive_provider_id(raw: str | None, name: str) -> int:
         """Read one positive integer identifier owned by the GitHub adapter.
 
         Args:
-            review_input: Normalized input carrying provider-owned identifiers.
+            raw: Provider-owned identifier value.
             name: Identifier key required by the operation.
 
         Returns:
             The parsed identifier.
         """
-        raw = review_input.provider_ids.get(name)
         try:
             value = int(raw) if raw is not None else 0
         except ValueError as exc:

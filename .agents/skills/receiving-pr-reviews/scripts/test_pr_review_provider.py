@@ -38,7 +38,13 @@ from pr_review_models import (
     TopLevelCommentAction,
 )
 from pr_review_provider import ProviderResponseError, ReviewProvider
-from pr_review_state_models import AuthorizedReviewAction, ReviewActor, ReviewCapabilities, ReviewInput
+from pr_review_state_models import (
+    AuthorizedReviewAction,
+    ProviderInputIdentity,
+    ReviewActor,
+    ReviewCapabilities,
+    ReviewInput,
+)
 from pr_review_threads import app
 
 if TYPE_CHECKING:
@@ -83,7 +89,7 @@ def authorized(action: ReplyAction | ResolveAction | TopLevelCommentAction) -> A
     item = ReviewInput(
         input_id="github:review-comment:42",
         provider="github",
-        provider_ids={"thread_id": "T1", "opening_comment_id": "42"},
+        provider_ids=ProviderInputIdentity(object_id="42", reply_target_id="42", resolution_target_id="T1"),
         source_kind="review_comment",
         kinds={"comment"},
         location="inline",

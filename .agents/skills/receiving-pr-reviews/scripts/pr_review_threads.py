@@ -31,7 +31,7 @@ from pr_review_contracts import (
 )
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_github_provider import GitHubProvider
-from pr_review_models import WatchResult, WatchSummary
+from pr_review_models import ReviewSnapshot, WatchResult, WatchSummary
 from pr_review_output import board_entry, summarize
 from pr_review_provider import ProviderResponseError, ReviewProvider
 from pr_review_state import (
@@ -157,6 +157,26 @@ def authorized_action(
     if snapshot.target != target:
         raise ProviderResponseError("snapshot target does not match command target")
     return authorize_action(snapshot, cycle, input_id, action), cycle
+
+
+def authorize_reply_and_resolve(
+    snapshot: ReviewSnapshot, cycle: ReviewCycleState, input_id: str, body: str
+) -> tuple[AuthorizedReviewAction, AuthorizedReviewAction, ReviewCycleState]:
+    """Preflight both halves of a combined mutation without provider calls.
+
+    Args:
+        snapshot: Current complete provider snapshot.
+        cycle: Current complete review cycle.
+        input_id: Canonical inline input selected for both actions.
+        body: Evidence-bearing reply body.
+
+    Returns:
+        Authorized reply, authorized resolution, and simulated completed state.
+    """
+    reply_action = authorize_action(snapshot, cycle, input_id, ReplyAction(body=body))
+    simulated = record_completed_communication(cycle, input_id)
+    resolve_action = authorize_action(snapshot, simulated, input_id, ResolveAction())
+    return reply_action, resolve_action, record_completed_resolution(simulated, input_id)
 
 
 def parse_pr_list(value: str) -> list[int]:
@@ -430,12 +450,11 @@ def reply_and_resolve(
     cycle = load_cycle(state_file)
     if snapshot.target != target:
         raise ProviderResponseError("snapshot target does not match command target")
-    reply_action = authorize_action(snapshot, cycle, input_id, ReplyAction(body=body))
+    reply_action, resolve_action, _simulated = authorize_reply_and_resolve(snapshot, cycle, input_id, body)
     provider = review_provider()
     typer.echo(json.dumps(provider.act(target, reply_action, command_timeout=gh_timeout_seconds).raw))
     cycle = record_completed_communication(cycle, input_id)
     save_cycle(state_file, cycle)
-    resolve_action = authorize_action(snapshot, cycle, input_id, ResolveAction())
     typer.echo(json.dumps(provider.act(target, resolve_action, command_timeout=gh_timeout_seconds).raw))
     cycle = record_completed_resolution(cycle, input_id)
     save_cycle(state_file, cycle)
@@ -466,19 +485,21 @@ def reply_and_resolve_batch(
     cycle = load_cycle(state_file)
     if snapshot.target != target:
         raise ProviderResponseError("snapshot target does not match command target")
-    planned = [
-        (entry.input_id, authorize_action(snapshot, cycle, entry.input_id, ReplyAction(body=entry.body)))
-        for entry in entries
-    ]
+    planned: list[tuple[str, AuthorizedReviewAction, AuthorizedReviewAction]] = []
+    simulated = cycle
+    for entry in entries:
+        reply_action, resolve_action, simulated = authorize_reply_and_resolve(
+            snapshot, simulated, entry.input_id, entry.body
+        )
+        planned.append((entry.input_id, reply_action, resolve_action))
     provider = review_provider()
-    for input_id, reply_action in planned:
+    for input_id, reply_action, resolve_action in planned:
         replied = False
         try:
             provider.act(target, reply_action, command_timeout=gh_timeout_seconds)
             replied = True
             cycle = record_completed_communication(cycle, input_id)
             save_cycle(state_file, cycle)
-            resolve_action = authorize_action(snapshot, cycle, input_id, ResolveAction())
             provider.act(target, resolve_action, command_timeout=gh_timeout_seconds)
             cycle = record_completed_resolution(cycle, input_id)
             save_cycle(state_file, cycle)

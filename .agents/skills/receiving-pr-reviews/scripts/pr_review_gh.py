@@ -88,7 +88,7 @@ def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float
         gh_timeout: Caller-selected per-command timeout, or the default.
 
     Returns:
-        The effective timeout, or no bound when neither input supplies one.
+        The tighter remaining deadline or caller bound, using the 30-second default when omitted.
     """
     caller_timeout = DEFAULT_COMMAND_TIMEOUT_SECONDS if gh_timeout is None else gh_timeout
     if deadline is None:

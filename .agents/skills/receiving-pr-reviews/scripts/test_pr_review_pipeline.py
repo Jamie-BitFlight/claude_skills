@@ -110,6 +110,46 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
             ],
         ),
     ]
+    nested_comment_pages = [
+        {
+            "data": {
+                "node": {
+                    "comments": {
+                        "totalCount": 2,
+                        "pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"},
+                        "nodes": [
+                            {
+                                "databaseId": 2,
+                                "body": "already resolved",
+                                "line": 1,
+                                "originalLine": 1,
+                                "author": {"login": "codex"},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+        {
+            "data": {
+                "node": {
+                    "comments": {
+                        "totalCount": 2,
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "databaseId": 22,
+                                "body": "resolved follow-up",
+                                "line": 1,
+                                "originalLine": 1,
+                                "author": {"login": "reviewer"},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    ]
     r1_url = _review_url("R1")
     reviews_pages = [
         _reviews_page(
@@ -165,6 +205,7 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
         "run_gh",
         side_effect=[
             json.dumps(thread_pages),
+            json.dumps(nested_comment_pages),
             json.dumps(reviews_pages),
             issue_comments_raw,
             reactions_raw,
@@ -198,12 +239,13 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
         "merge_state_status": "CLEAN",
         "blockers": [],
     }
-    assert data["snapshot_complete"] is False
-    assert data["cycle_state"] == "SNAPSHOT_INCOMPLETE"
-    assert data["completeness"]["truncated_input_ids"] == ["github:review-comment:2"]
+    assert data["snapshot_complete"] is True
+    assert data["cycle_state"] == "ASSESSMENT_REQUIRED"
+    assert data["completeness"]["truncated_input_ids"] == []
     normalized = {item["input_id"]: item for item in data["review_inputs"]}
     assert normalized["github:review-comment:2"]["provider_state"] == "resolved"
     assert normalized["github:review-comment:2"]["capabilities"]["can_resolve"] is False
+    assert normalized["github:review-comment:22"]["parent_id"] == "github:review-comment:2"
     assert set(normalized["github:review:R2"]["kinds"]) == {"approval"}
     assert normalized["github:review:R2"]["body"] == ""
     assert set(normalized["github:review:R1"]["kinds"]) == {"comment"}
