@@ -64,11 +64,11 @@
     {
       "id": 7,
       "should_activate": true,
-      "reference": "references/glab-ci-inspection.md",
+      "reference": "references/glab-ci-existing-ref-inspection.md",
       "prompt": "Retry the failed production pipeline and inspect its job logs.",
       "expected_output": "The skill activates for read-only inspection and retry command drafting while leaving execution to the operator.",
       "expectations": [
-        "Routes to references/glab-ci-inspection.md",
+        "Routes to references/glab-ci-existing-ref-inspection.md",
         "Inspects the requested pipeline and job log",
         "Leaves retry execution to the operator"
       ]
@@ -108,10 +108,13 @@
     {
       "id": 12,
       "should_activate": true,
-      "reference": "references/glab-ci-inspection.md",
+      "reference": "references/glab-ci-existing-ref-inspection.md",
       "prompt": "Use glab against our self-managed GitLab host to inspect a tag pipeline and its jobs with an environment token.",
       "expected_output": "The gitlab-skill activates and routes to CI read-only inspection.",
-      "expectations": ["The gitlab-skill activates", "Routes to references/glab-ci-inspection.md"]
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/glab-ci-existing-ref-inspection.md"
+      ]
     },
     {
       "id": 13,
@@ -129,11 +132,11 @@
     {
       "id": 14,
       "should_activate": true,
-      "reference": "references/glab-ci-inspection.md",
+      "reference": "references/glab-ci-existing-ref-inspection.md",
       "prompt": "Retry yesterday's failed GitLab release job, but first inspect its pipeline state and completed log.",
       "expected_output": "Activates for read-only inspection and command drafting while leaving retry execution to the operator.",
       "expectations": [
-        "Routes to references/glab-ci-inspection.md",
+        "Routes to references/glab-ci-existing-ref-inspection.md",
         "Inspects pipeline and job state read-only",
         "Drafts retry guidance without executing the retry"
       ]
@@ -304,23 +307,45 @@
     {
       "id": 30,
       "should_activate": true,
-      "reference": "references/glab-ci-inspection.md",
-      "prompt": "Validate this unmerged GitLab CI candidate whose root file has project-local includes.",
-      "expected_output": "Uses the bundled include-resolving static candidate helper and defers remote context simulation.",
+      "reference": "references/glab-ci-candidate-validation.md",
+      "prompt": "Validate this unmerged local GitLab CI candidate, whether its root is monolithic or has project-local includes.",
+      "expected_output": "Uses the bundled complete-content candidate helper and defers remote context simulation.",
       "expectations": [
-        "Routes to references/glab-ci-inspection.md",
+        "Routes to references/glab-ci-candidate-validation.md",
         "Uses validate_release_candidate.py exactly once"
       ]
     },
     {
       "id": 31,
       "should_activate": true,
-      "reference": "references/glab-ci-inspection.md",
+      "reference": "references/glab-ci-existing-ref-inspection.md",
       "prompt": "Trace the failed job from pipeline 5748 using the observed pipeline response.",
       "expected_output": "Gets job details and traces only the returned job ID.",
       "expectations": [
-        "Routes to references/glab-ci-inspection.md",
+        "Routes to references/glab-ci-existing-ref-inspection.md",
         "Never guesses or increments a job ID"
+      ]
+    },
+    {
+      "id": 32,
+      "should_activate": true,
+      "reference": "references/glab-ci-existing-ref-inspection.md",
+      "prompt": "Validate an existing nonmatching GitLab tag and treat workflow exclusion as the expected negative assertion.",
+      "expected_output": "Uses the existing-ref lint branch and preserves unexpected lint failures.",
+      "expectations": [
+        "Routes to references/glab-ci-existing-ref-inspection.md",
+        "Treats only the documented no-pipeline result as passing negative evidence"
+      ]
+    },
+    {
+      "id": 33,
+      "should_activate": true,
+      "reference": "references/glab-ci-existing-ref-inspection.md",
+      "prompt": "Boundedly poll an observed GitLab pipeline ID through transient read failures.",
+      "expected_output": "Uses read-only bounded polling with an explicit request-error branch before status parsing.",
+      "expectations": [
+        "Routes to references/glab-ci-existing-ref-inspection.md",
+        "Records request_error and preserves the polling bound"
       ]
     }
   ]

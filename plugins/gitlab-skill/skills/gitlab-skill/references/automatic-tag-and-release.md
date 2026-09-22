@@ -32,6 +32,12 @@ SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; this is the user's c
 
 ## Project Intake
 
+New setup branch: use shipped assets and the current project state as the implementation authority.
+Migration branch: when the owner explicitly requests migration, include deleted historical
+configuration as migration input.
+Uncertainty branch: when a current authority leaves one named unresolved uncertainty that deleted
+configuration can answer, consult only the history needed to answer that uncertainty.
+
 Resolve the GitLab target and Git remote; actual default branch; approved merge path; existing
 workflow sources/jobs; one version adapter and release policy; one resolved tag contract whose
 neutral default is owned by `base.gitlab-ci.yml` (or one explicit project override changing all
@@ -116,11 +122,10 @@ Apply **Gates G2 and G3** after composition.
    existing workflow behavior is accounted for.
 2. **G2 Substitution:** no unresolved marker or mutable image reference remains; version tag output,
    CI regex, and protected wildcard agree.
-3. **G3 CI Lint:** before merge, the bundled candidate helper resolves all worktree-local includes
-   and statically validates one complete include-free configuration. After files and context refs
-   exist remotely, one default-branch simulation selects version evaluation, one matching-tag
-   simulation selects all tag jobs, one nonmatching-tag simulation selects no lifecycle, and
-   preserved existing sources select their jobs. Pre-merge static lint is not event simulation.
+3. **G3 CI Lint:** before merge, load [Pre-Merge Candidate Validation](./glab-ci-candidate-validation.md)
+   and validate the complete worktree-resolved candidate. After files and context refs exist
+   remotely, load [Post-Merge and Existing-Ref Inspection](./glab-ci-existing-ref-inspection.md) and
+   simulate the default branch, matching tag, nonmatching tag, and preserved existing sources.
 4. **G4 Credential:** protected refs, credential role/scope/state/expiry, and variable
    flags/type/scope equal the resolved interface.
 5. **G5 Main:** the version job succeeds. No-release creates no matching tag or lifecycle tag
@@ -140,7 +145,7 @@ The lifecycle is complete only when every applicable named gate passes.
 ## Evidence-Minimizing Golden Sequence
 
 1. Resolve intake, substitutions, notes executables, latest matching tag, and complete forecast range.
-2. Run the pre-merge candidate helper once; defer context simulations until their refs exist.
+2. Follow the pre-merge candidate reference once; defer the post-merge reference until its refs exist.
 3. Reuse or establish credential/protected-ref state, then merge one release-worthy change.
 4. Observe main and matching-tag pipelines and run the Generic verifier once. Its named checks replace
    separate final reads for protected refs, token/variable metadata, pipelines/jobs, tag binding,
@@ -148,4 +153,5 @@ The lifecycle is complete only when every applicable named gate passes.
 5. Collect only evidence outside verifier scope: the no-release version-job trace, absence of a
    pipeline for the fetched nonmatching tag, and a secret scan of worktree/traces/report.
 
-Do not repeat final metadata reads or polling after the verifier establishes the same state.
+Verifier-established state completes those final metadata reads and polling; only the named evidence
+outside verifier scope remains.

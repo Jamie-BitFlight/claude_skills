@@ -34,6 +34,15 @@ def test_local_include_order_and_root_precedence() -> None:
     assert candidate["root_job"]["stage"] == "verify"
 
 
+def test_monolithic_candidate_is_complete_static_content(tmp_path: Path) -> None:
+    """A local root without includes uses the same complete-content authority."""
+    module = load_module()
+    root = tmp_path / ".gitlab-ci.yml"
+    root.write_text("build:\n  script: echo build\n", encoding="utf-8")
+
+    assert module.resolve_candidate(root) == {"build": {"script": "echo build"}}
+
+
 def test_candidate_lint_submits_include_free_static_content() -> None:
     """The helper makes one static content request and defers event contexts."""
     module = load_module()
