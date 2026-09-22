@@ -1,0 +1,98 @@
+{
+  "schema_version": 4,
+  "skill_name": "rebase",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Rebase feature/a onto main.",
+      "expected_activation": true,
+      "required_terminal": "BLOCKED_INVALID_REF",
+      "required_sources": ["SKILL.md", "references/start-rebase.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "exact_action_order": [
+        "load rebase skill",
+        "load start-rebase reference",
+        "rebase_plan.py capture --branch feature/a --target main",
+        "BLOCKED_INVALID_REF"
+      ],
+      "expectations": [
+        "Activates the new-rebase route.",
+        "Stops at the absent local branch in the empty fixture without mutation."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Continue the rebase after I fixed this conflict.",
+      "expected_activation": true,
+      "required_terminal": "NO_ACTIVE_REBASE",
+      "required_sources": ["SKILL.md", "references/active-rebase.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "expectations": [
+        "Activates the active-rebase entry route without requiring a named ref.",
+        "Proves the fixture has no active rebase and runs no continuation mutation."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Abort this rebase and restore the original branch.",
+      "expected_activation": true,
+      "required_terminal": "NO_ACTIVE_REBASE",
+      "required_sources": ["SKILL.md", "references/active-rebase.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "expectations": [
+        "Activates the active-rebase entry route without requiring a named ref.",
+        "Proves the fixture has no active rebase and runs no abort mutation."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Update my branch from main using a merge commit.",
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "expectations": ["Preserves the requested merge-based update without activating rebase."]
+    },
+    {
+      "id": 5,
+      "prompt": "Enable rebase-and-merge on this GitHub repository.",
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": ["gh auth status", "gh repo view --json nameWithOwner,url"],
+      "expectations": ["Treats forge merge-method configuration as outside the local rebase skill."]
+    },
+    {
+      "id": 6,
+      "prompt": "Merge this GitLab MR.",
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [
+        "glab mr list --repo $GITLAB_PROJECT_PATH --state opened",
+        "glab mr list --repo $GITLAB_PROJECT_PATH --output json"
+      ],
+      "expectations": ["Treats merge-request merging as outside the local rebase skill."]
+    },
+    {
+      "id": 7,
+      "prompt": "Rebase feature/a onto main without loaded-skill directory metadata.",
+      "expected_activation": true,
+      "required_terminal": "BLOCKED_SKILL_DIR_UNAVAILABLE",
+      "required_sources": ["SKILL.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "exact_action_order": ["load rebase skill", "BLOCKED_SKILL_DIR_UNAVAILABLE"],
+      "expectations": [
+        "Activates from the explicit local-rebase request.",
+        "Stops before every Git or tool command when the harness supplies no absolute skill directory."
+      ]
+    }
+  ]
+}

@@ -13,8 +13,10 @@ import argparse
 import hashlib
 import json
 import queue
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -54,6 +56,17 @@ class ActivationResult:
     response_text: str
 
 
+@dataclass(frozen=True)
+class ActivationContext:
+    """Prepared installed consumer and its isolated runtime environment."""
+
+    workspace: isolated.ValidationWorkspace
+    installed: InstalledSkill
+    source_digest: str
+    env: dict[str, str]
+    installation_kind: str
+
+
 def create_parser() -> argparse.ArgumentParser:
     """Build the activation-harness command-line parser.
 
@@ -80,7 +93,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def tree_sha256(root: Path) -> str:
+def tree_sha256(root: Path, *, exclude_python_cache: bool = False) -> str:
     """Hash the complete regular-file tree and reject every symbolic link.
 
     Returns:
@@ -90,9 +103,12 @@ def tree_sha256(root: Path) -> str:
         raise HarnessError(f"Plugin tree is not a regular directory: {root.name}")
     digest = hashlib.sha256()
     for path in sorted(root.rglob("*")):
+        relative_path = path.relative_to(root)
+        if exclude_python_cache and ("__pycache__" in relative_path.parts or path.suffix == ".pyc"):
+            continue
         if path.is_symlink():
-            raise HarnessError(f"Plugin tree contains a symbolic link: {path.relative_to(root)}")
-        relative = path.relative_to(root).as_posix().encode("utf-8")
+            raise HarnessError(f"Plugin tree contains a symbolic link: {relative_path}")
+        relative = relative_path.as_posix().encode("utf-8")
         if path.is_dir():
             digest.update(b"D\0" + relative + b"\0")
         elif path.is_file():
@@ -101,8 +117,17 @@ def tree_sha256(root: Path) -> str:
                 while chunk := stream.read(65_536):
                     digest.update(chunk)
         else:
-            raise HarnessError(f"Plugin tree contains an unsupported entry: {path.relative_to(root)}")
+            raise HarnessError(f"Plugin tree contains an unsupported entry: {relative_path}")
     return digest.hexdigest()
+
+
+def repo_skill_tree_sha256(root: Path) -> str:
+    """Hash the distributable repo-skill tree, excluding local Python caches.
+
+    Returns:
+        Hex digest of distributable repo-skill paths and contents.
+    """
+    return tree_sha256(root, exclude_python_cache=True)
 
 
 def resolve_installed_skill(plugin_cache_root: Path, skill_name: str) -> InstalledSkill:
@@ -143,7 +168,7 @@ def load_matrix_target(target: str) -> dict[str, object]:
     for line in MATRIX_PATH.read_text(encoding="utf-8").splitlines():
         row = json.loads(line)
         if isinstance(row, dict) and row.get("target") == target:
-            if row.get("status") != "MAPPED":
+            if row.get("status") not in {"MAPPED", "PASSED"}:
                 raise HarnessError(f"Target is not mapped: {target}")
             if not isinstance(row.get("task_text"), str) or not row["task_text"]:
                 raise HarnessError(f"Mapped target has no task: {target}")
@@ -448,6 +473,23 @@ def run_app_server(
         isolated.terminate_process_tree(process)
 
 
+def terminate_owned_process(process: subprocess.Popen[str], timeout_seconds: float) -> None:
+    """Terminate the process tree and boundedly reap the owned direct child.
+
+    Raises:
+        HarnessError: If the direct child remains alive after the kill fallback.
+    """
+    isolated.terminate_process_tree(process)
+    if process.poll() is not None:
+        return
+    process.kill()
+    reap_timeout = max(0.1, min(timeout_seconds, 1.0))
+    try:
+        process.wait(timeout=reap_timeout)
+    except subprocess.TimeoutExpired as error:
+        raise HarnessError(f"Could not reap subprocess within {reap_timeout:g} seconds") from error
+
+
 def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str, timeout_seconds: float) -> None:
     """Run a setup command without exposing its output or ambient credentials.
 
@@ -465,8 +507,17 @@ def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str, t
     try:
         _stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        isolated.terminate_process_tree(process)
+        terminate_owned_process(process, timeout_seconds)
         raise HarnessError(f"{label} timed out after {timeout_seconds:g} seconds") from exc
+    finally:
+        try:
+            if process.poll() is None:
+                terminate_owned_process(process, timeout_seconds)
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
     if process.returncode != 0:
         stderr_log = cwd / f"{label.replace(' ', '_')}.stderr.log"
         stderr_log.write_text(stderr, encoding="utf-8")
@@ -515,6 +566,148 @@ def verify_cache_provenance(installed: InstalledSkill, source_digest: str) -> No
         raise HarnessError("Installed cache tree does not match the distributed plugin tree")
 
 
+def configure_isolated_runtime(env: dict[str, str], codex_home: Path) -> None:
+    """Declare the environment-backed Portkey provider in an empty Codex home."""
+    base_url = env.get("PORTKEY_API_BASE")
+    model = env.get("PORTKEY_MODEL")
+    api_key = env.get("PORTKEY_API_KEY")
+    if not base_url or not model or not api_key:
+        return
+    lines = ['model_provider = "portkey"', f"model = {json.dumps(model)}"]
+    reasoning_effort = env.get("PORTKEY_REASONING_EFFORT")
+    if reasoning_effort:
+        lines.append(f"model_reasoning_effort = {json.dumps(reasoning_effort)}")
+    lines.extend([
+        "",
+        "[model_providers.portkey]",
+        'name = "Portkey"',
+        f"base_url = {json.dumps(base_url)}",
+        'env_key = "PORTKEY_API_KEY"',
+        'wire_api = "responses"',
+    ])
+    (codex_home / "config.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def create_repo_skill_workspace(target: dict[str, object], skill_name: str) -> isolated.ValidationWorkspace:
+    """Copy one repository skill into an isolated Git consumer workspace.
+
+    Returns:
+        Workspace whose project owns the installed `.agents/skills` copy.
+    """
+    source_path = target.get("source_path")
+    if not isinstance(source_path, str):
+        raise HarnessError("Repo-skill target has no source path")
+    source_skill = (REPO_ROOT / source_path).resolve(strict=True)
+    if not source_skill.is_relative_to(REPO_ROOT.resolve()) or source_skill.name != "SKILL.md":
+        raise HarnessError("Repo-skill source path is invalid")
+    root = Path(tempfile.mkdtemp(prefix=f"codex-repo-skill-{skill_name}-"))
+    project_dir = root / "project"
+    installed_dir = project_dir / ".agents" / "skills" / skill_name
+    installed_dir.parent.mkdir(parents=True)
+    shutil.copytree(source_skill.parent, installed_dir, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    codex_home = root / "codex-home"
+    codex_home.mkdir()
+    return isolated.ValidationWorkspace(
+        root=root,
+        mode="repo-skill-copy",
+        marketplace_name="repo-skills",
+        marketplace_source=root,
+        marketplace_path=root / "unused-marketplace.json",
+        plugin_dir=installed_dir,
+        plugin_id="repo-skills",
+        project_dir=project_dir,
+        codex_home=codex_home,
+    )
+
+
+def prepare_repo_skill_context(
+    args: argparse.Namespace, target: dict[str, object], skill_name: str
+) -> ActivationContext:
+    """Prepare a real repo-scoped Codex skill consumer.
+
+    Returns:
+        Isolated workspace, installed skill provenance, and runtime environment.
+    """
+    workspace = create_repo_skill_workspace(target, skill_name)
+    env = isolated.build_env(args.path_prefix, workspace.codex_home)
+    configure_isolated_runtime(env, workspace.codex_home)
+    run_silent(
+        ["git", "init", "--quiet", "--initial-branch=main"],
+        cwd=workspace.project_dir,
+        env=env,
+        label="repo skill git init",
+        timeout_seconds=args.timeout_seconds,
+    )
+    source_skill_dir = (REPO_ROOT / str(target["source_path"])).resolve(strict=True).parent
+    installed_skill = workspace.plugin_dir / "SKILL.md"
+    installed = InstalledSkill(
+        path=installed_skill.resolve(strict=True),
+        relative_path=installed_skill.relative_to(workspace.project_dir),
+        sha256=sha256_file(installed_skill),
+        tree_sha256=tree_sha256(workspace.plugin_dir),
+    )
+    source_digest = repo_skill_tree_sha256(source_skill_dir)
+    verify_cache_provenance(installed, source_digest)
+    return ActivationContext(workspace, installed, source_digest, env, "repo-scoped-skill-copy")
+
+
+def prepare_plugin_context(args: argparse.Namespace, skill_name: str) -> ActivationContext:
+    """Install one plugin and resolve its cache-provenanced skill.
+
+    Returns:
+        Isolated plugin-cache consumer context.
+    """
+    workspace = isolated.create_temp_workspace(args.plugin)
+    ensure_no_mcp_configuration(workspace.plugin_dir)
+    source_digest = tree_sha256(workspace.plugin_dir)
+    env = isolated.build_env(args.path_prefix, workspace.codex_home)
+    configure_isolated_runtime(env, workspace.codex_home)
+    run_silent(
+        ["codex", "plugin", "marketplace", "add", str(workspace.marketplace_source)],
+        cwd=workspace.project_dir,
+        env=env,
+        label="marketplace registration",
+        timeout_seconds=args.timeout_seconds,
+    )
+    run_silent(
+        ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
+        cwd=workspace.project_dir,
+        env=env,
+        label="plugin installation",
+        timeout_seconds=args.timeout_seconds,
+    )
+    cache_root = workspace.codex_home / "plugins" / "cache" / workspace.marketplace_name / workspace.plugin_id
+    installed = resolve_installed_skill(cache_root, skill_name)
+    verify_cache_provenance(installed, source_digest)
+    return ActivationContext(workspace, installed, source_digest, env, "plugin-cache")
+
+
+def proxy_provenance(env: dict[str, str]) -> dict[str, object]:
+    """Record proxy routing without persisting credential values.
+
+    Returns:
+        Sanitized transport name and present configuration-variable names.
+    """
+    names = sorted(name for name in env if name.startswith("PORTKEY_") or name == "OPENAI_API_BASE")
+    required_portkey_names = {"PORTKEY_API_BASE", "PORTKEY_API_KEY", "PORTKEY_MODEL"}
+    transport = "portkey" if required_portkey_names.issubset(names) else "default"
+    return {"transport": transport, "configuration_names": names}
+
+
+def require_repo_skill_resolution(response_text: str, installed: InstalledSkill) -> tuple[bool, bool]:
+    """Prove the Codex response received the installed root and resolved command.
+
+    Returns:
+        Successful skill-root and instructed-command matches.
+    """
+    skill_root = str(installed.path.parent)
+    command_path = str(installed.path.parent / "scripts" / "rebase_plan.py")
+    expected_lines = [f"SKILL_ROOT={skill_root}", f"COMMAND={command_path}"]
+    if response_text.splitlines() != expected_lines:
+        raise HarnessError("Codex response did not resolve the installed skill root and instructed command")
+    return True, True
+
+
 def require_task_text(target: dict[str, object]) -> str:
     """Extract the mapped task text, failing closed if it is missing.
 
@@ -531,6 +724,40 @@ def require_task_text(target: dict[str, object]) -> str:
     if not isinstance(task_text, str):
         raise HarnessError("Mapped target has no task text")
     return task_text
+
+
+def require_plugin_id(target: dict[str, object]) -> str:
+    """Extract a non-empty plugin identifier from a mapped target.
+
+    Returns:
+        Validated plugin identifier.
+
+    Raises:
+        HarnessError: If the target has no non-empty plugin identifier.
+    """
+    plugin_id = target.get("plugin_id")
+    if not isinstance(plugin_id, str) or not plugin_id:
+        raise HarnessError("Mapped target has no plugin id")
+    return plugin_id
+
+
+def prepare_activation_context(
+    args: argparse.Namespace, target: dict[str, object], plugin_id: str, skill_name: str
+) -> ActivationContext:
+    """Prepare and validate the target's installed consumer context.
+
+    Returns:
+        Isolated repo-skill or plugin-cache activation context.
+
+    Raises:
+        HarnessError: If the selected plugin does not match the mapped target.
+    """
+    if plugin_id == "repo-skills":
+        return prepare_repo_skill_context(args, target, skill_name)
+    context = prepare_plugin_context(args, skill_name)
+    if context.workspace.plugin_id != plugin_id:
+        raise HarnessError("Target plugin id does not match the selected plugin directory")
+    return context
 
 
 def require_expected_tokens_matched(response_text: str, expect_contains: list[str]) -> list[str]:
@@ -562,52 +789,44 @@ def main() -> int:
     workspace: isolated.ValidationWorkspace | None = None
     try:
         target = load_matrix_target(args.target)
-        workspace = isolated.create_temp_workspace(args.plugin)
-        skill_name = resolve_skill_name(args.target, workspace.plugin_id)
-        ensure_no_mcp_configuration(workspace.plugin_dir)
-        source_digest = tree_sha256(workspace.plugin_dir)
-        env = isolated.build_env(args.path_prefix, workspace.codex_home)
-        run_silent(
-            ["codex", "plugin", "marketplace", "add", str(workspace.marketplace_source)],
-            cwd=workspace.project_dir,
-            env=env,
-            label="marketplace registration",
-            timeout_seconds=args.timeout_seconds,
-        )
-        run_silent(
-            ["codex", "plugin", "add", f"{workspace.plugin_id}@{workspace.marketplace_name}"],
-            cwd=workspace.project_dir,
-            env=env,
-            label="plugin installation",
-            timeout_seconds=args.timeout_seconds,
-        )
-        cache_root = workspace.codex_home / "plugins" / "cache" / workspace.marketplace_name / workspace.plugin_id
-        installed = resolve_installed_skill(cache_root, skill_name)
-        verify_cache_provenance(installed, source_digest)
+        plugin_id = require_plugin_id(target)
+        skill_name = resolve_skill_name(args.target, plugin_id)
+        context = prepare_activation_context(args, target, plugin_id, skill_name)
+        workspace = context.workspace
         if args.copy_auth_from_current_home:
             isolated.copy_auth_from_current_home(workspace)
         task_text = require_task_text(target)
         result = run_app_server(
-            env=env,
+            env=context.env,
             project_dir=workspace.project_dir,
             skill_name=skill_name,
-            skill_path=installed.path,
+            skill_path=context.installed.path,
             task_text=task_text,
             timeout_seconds=args.timeout_seconds,
         )
         matched = require_expected_tokens_matched(result.response_text, args.expect_contains)
+        skill_root_matched = False
+        instructed_command_path_matched = False
+        if plugin_id == "repo-skills":
+            skill_root_matched, instructed_command_path_matched = require_repo_skill_resolution(
+                result.response_text, context.installed
+            )
         write_evidence(
             args.evidence_file,
             {
-                "cache_relative_skill": installed.relative_path.as_posix(),
                 "expected_tokens_matched": len(matched),
                 "expected_tokens_requested": len(args.expect_contains),
-                "installed_tree_sha256": installed.tree_sha256,
+                "installation_kind": context.installation_kind,
+                "installed_skill": context.installed.relative_path.as_posix(),
+                "installed_tree_sha256": context.installed.tree_sha256,
+                "instructed_command_path_matched": instructed_command_path_matched,
                 "observed_methods": list(result.observed_methods),
+                "proxy": proxy_provenance(context.env),
                 "response_characters": len(result.response_text),
                 "response_sha256": hashlib.sha256(result.response_text.encode()).hexdigest(),
-                "skill_sha256": installed.sha256,
-                "source_tree_sha256": source_digest,
+                "skill_root_matched": skill_root_matched,
+                "skill_sha256": context.installed.sha256,
+                "source_tree_sha256": context.source_digest,
                 "status": "PASSED",
                 "target": args.target,
             },

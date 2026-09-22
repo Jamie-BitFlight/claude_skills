@@ -96,6 +96,37 @@ def test_build_rows_rejects_duplicate_targets(tmp_path: Path) -> None:
         generator.build_rows(tmp_path)
 
 
+def test_build_rows_includes_repo_scoped_codex_skills(tmp_path: Path) -> None:
+    """Expose repository `.agents/skills` through the real-consumer activation matrix."""
+    skill_path = tmp_path / ".agents" / "skills" / "rebase" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True)
+    skill_path.write_text("---\nname: rebase\ndescription: Rebase safely.\n---\nBody\n", encoding="utf-8")
+
+    rows = generator.build_rows(tmp_path)
+
+    assert rows == [
+        {
+            "target": "repo-skills:rebase",
+            "plugin_id": "repo-skills",
+            "skill": "rebase",
+            "source_path": ".agents/skills/rebase/SKILL.md",
+            "task_source": None,
+            "task_text": None,
+            "expected_outcome": None,
+            "safety_class": "UNCLASSIFIED",
+            "chain": [],
+            "status": "NO_ORACLE",
+            "evidence": {
+                "distribution": None,
+                "cache_provenance": None,
+                "injection": None,
+                "behavior": None,
+                "safety": None,
+            },
+        }
+    ]
+
+
 def test_cli_check_flag_fails_on_stale_matrix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """--check exits non-zero when no matrix has ever been written for the fixture tree."""
     plugins_root = tmp_path / "plugins"

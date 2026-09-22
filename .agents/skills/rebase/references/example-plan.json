@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "plan_id": "feature-parser-onto-main",
+  "branch": {
+    "ref": "refs/heads/feature/parser",
+    "oid": "1111111111111111111111111111111111111111"
+  },
+  "target": {
+    "ref": "refs/heads/main",
+    "oid": "2222222222222222222222222222222222222222"
+  },
+  "merge_base_oid": "4444444444444444444444444444444444444444",
+  "execution_worktree": "/work/project",
+  "execution_mode": "CURRENT_BRANCH",
+  "worktree_authorized": true,
+  "status_porcelain": "",
+  "active_operations": [],
+  "repository_state": {
+    "repository_root": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--show-toplevel"],
+      "exit_code": 0,
+      "stdout": "/work/project\n",
+      "stderr": ""
+    },
+    "branch_ref": {
+      "source": "local-git",
+      "argv": ["git", "show-ref", "--verify", "refs/heads/feature/parser"],
+      "exit_code": 0,
+      "stdout": "1111111111111111111111111111111111111111 refs/heads/feature/parser\n",
+      "stderr": ""
+    },
+    "branch_oid": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--verify", "refs/heads/feature/parser^{commit}"],
+      "exit_code": 0,
+      "stdout": "1111111111111111111111111111111111111111\n",
+      "stderr": ""
+    },
+    "target_oid": {
+      "source": "local-git",
+      "argv": ["git", "rev-parse", "--verify", "refs/heads/main^{commit}"],
+      "exit_code": 0,
+      "stdout": "2222222222222222222222222222222222222222\n",
+      "stderr": ""
+    },
+    "merge_base": {
+      "source": "local-git",
+      "argv": ["git", "merge-base", "refs/heads/feature/parser", "refs/heads/main"],
+      "exit_code": 0,
+      "stdout": "4444444444444444444444444444444444444444\n",
+      "stderr": ""
+    },
+    "worktrees": {
+      "source": "local-git",
+      "argv": ["git", "worktree", "list", "--porcelain"],
+      "exit_code": 0,
+      "stdout": "worktree /work/project\nHEAD 1111111111111111111111111111111111111111\nbranch refs/heads/feature/parser\n",
+      "stderr": ""
+    },
+    "status": {
+      "source": "local-git",
+      "argv": ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "current_branch": {
+      "source": "local-git",
+      "argv": ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+      "exit_code": 0,
+      "stdout": "feature/parser\n",
+      "stderr": ""
+    },
+    "rebase_merge": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--git-path", "rebase-merge"],
+        "exit_code": 0,
+        "stdout": ".git/rebase-merge\n",
+        "stderr": ""
+      },
+      "existence": {
+        "source": "local-filesystem",
+        "argv": [
+          "uv",
+          "run",
+          "--script",
+          "/skills/rebase/scripts/rebase_plan.py",
+          "path-state",
+          "/work/project/.git/rebase-merge"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"response_kind\":\"path-state\",\"path\":\"/work/project/.git/rebase-merge\",\"present\":false}\n",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "rebase_apply": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--git-path", "rebase-apply"],
+        "exit_code": 0,
+        "stdout": ".git/rebase-apply\n",
+        "stderr": ""
+      },
+      "existence": {
+        "source": "local-filesystem",
+        "argv": [
+          "uv",
+          "run",
+          "--script",
+          "/skills/rebase/scripts/rebase_plan.py",
+          "path-state",
+          "/work/project/.git/rebase-apply"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"response_kind\":\"path-state\",\"path\":\"/work/project/.git/rebase-apply\",\"present\":false}\n",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "merge_head": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "cherry_pick_head": {
+      "command": {
+        "source": "local-git",
+        "argv": ["git", "rev-parse", "--verify", "--quiet", "CHERRY_PICK_HEAD"],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": ""
+      },
+      "present": false
+    },
+    "upstream": {
+      "source": "local-git",
+      "argv": ["git", "for-each-ref", "--format=%(upstream)", "refs/heads/feature/parser"],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  },
+  "repository_instruction_search": [
+    {
+      "path": "AGENTS.md",
+      "present": true,
+      "content": "# Agent rules\n",
+      "sha256": "d2e2a32d37b83ebbcdbbfea0d86642516dc5010642ec2a404c626c1c0bf1e068"
+    },
+    { "path": ".claude/CLAUDE.md", "present": false }
+  ],
+  "repository_instruction_sources": ["AGENTS.md"],
+  "repository_preflights": [
+    {
+      "source": "AGENTS.md",
+      "argv": ["uv", "run", "scripts/audit_branch_transfer.py"],
+      "exit_code": 0,
+      "stdout": "{\"ok\":true}",
+      "stderr": ""
+    }
+  ],
+  "required_preflights": [["uv", "run", "scripts/audit_branch_transfer.py"]],
+  "publication": {
+    "configured_upstream": null,
+    "remote_refs_containing_old_tip": [],
+    "evidence_commands": [
+      {
+        "source": "local-git",
+        "argv": [
+          "git",
+          "for-each-ref",
+          "--format=%(refname)",
+          "--contains",
+          "1111111111111111111111111111111111111111",
+          "refs/remotes"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ]
+  },
+  "replay_inventory": {
+    "source": "local-git",
+    "argv": [
+      "git",
+      "rev-list",
+      "--reverse",
+      "--topo-order",
+      "--parents",
+      "2222222222222222222222222222222222222222..1111111111111111111111111111111111111111"
+    ],
+    "exit_code": 0,
+    "stdout": "3333333333333333333333333333333333333333 4444444444444444444444444444444444444444\n",
+    "stderr": ""
+  },
+  "candidates": [
+    {
+      "oid": "3333333333333333333333333333333333333333",
+      "parents": ["4444444444444444444444444444444444444444"],
+      "paths": ["parser.py", "tests/test_parser.py"],
+      "intent": "Add parser validation and tests.",
+      "evidence": ["candidate patch", "target rename diff"],
+      "disposition": "ADAPT",
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
+      "expected_conflict_paths": [],
+      "equivalence_evidence": [],
+      "drop_approval_decision_id": null
+    }
+  ],
+  "affected_paths": [
+    {
+      "path": "parser.py",
+      "candidate_oids": ["3333333333333333333333333333333333333333"],
+      "target_interaction": "Target renamed the API used by this path.",
+      "dependencies": ["tests/test_parser.py"],
+      "evidence": ["candidate patch", "target diff"],
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]]
+    },
+    {
+      "path": "tests/test_parser.py",
+      "candidate_oids": ["3333333333333333333333333333333333333333"],
+      "target_interaction": "Tests depend on the adapted parser path.",
+      "dependencies": ["parser.py"],
+      "evidence": ["candidate patch"],
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]]
+    }
+  ],
+  "merge_policy": "LINEAR_NO_MERGES",
+  "clean_cherry_pick_policy": "SURFACE",
+  "becomes_empty_policy": "STOP",
+  "becomes_empty_option": "stop",
+  "rebase_help": {
+    "source": "installed-git",
+    "argv": ["git", "rebase", "-h"],
+    "exit_code": 129,
+    "stdout": "",
+    "stderr": "--reapply-cherry-picks --rebase-merges --empty (drop|keep|stop)\n"
+  },
+  "recovery_ref": "refs/heads/rebase-backup/feature-parser-onto-main",
+  "recovery_verification": {
+    "source": "local-git",
+    "argv": [
+      "git",
+      "rev-parse",
+      "--verify",
+      "refs/heads/rebase-backup/feature-parser-onto-main^{commit}"
+    ],
+    "exit_code": 0,
+    "stdout": "1111111111111111111111111111111111111111\n",
+    "stderr": ""
+  },
+  "repository_checks": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
+  "unknowns": [],
+  "user_decisions": []
+}

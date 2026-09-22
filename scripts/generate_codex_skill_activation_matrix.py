@@ -99,6 +99,29 @@ def build_rows(repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
                 },
             })
 
+    repo_skills_root = repo_root / ".agents" / "skills"
+    for skill_path in sorted(repo_skills_root.glob("*/SKILL.md")):
+        skill_name = load_skill_name(skill_path)
+        rows.append({
+            "target": f"repo-skills:{skill_name}",
+            "plugin_id": "repo-skills",
+            "skill": skill_name,
+            "source_path": skill_path.relative_to(repo_root).as_posix(),
+            "task_source": None,
+            "task_text": None,
+            "expected_outcome": None,
+            "safety_class": "UNCLASSIFIED",
+            "chain": [],
+            "status": "NO_ORACLE",
+            "evidence": {
+                "distribution": None,
+                "cache_provenance": None,
+                "injection": None,
+                "behavior": None,
+                "safety": None,
+            },
+        })
+
     rows.sort(key=lambda row: str(row["target"]))
     targets = [str(row["target"]) for row in rows]
     if len(targets) != len(set(targets)):

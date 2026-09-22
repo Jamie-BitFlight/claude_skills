@@ -55,6 +55,7 @@ tools = [
 addopts = [
     "--cov=scripts",
     "--cov=plugins",
+    "--cov=.agents/skills/rebase/scripts",
     "--cov=.agents/skills/receiving-pr-reviews/scripts",
     "--strict-config",
     "--strict-markers",
@@ -95,6 +96,7 @@ pythonpath = [
     "./plugins/summarizer/scripts",
     "./plugins/frustration-analyzer/tests",
     "./examples/solid-review-ab",
+    "./.agents/skills/rebase/scripts",
     "./.agents/skills/receiving-pr-reviews/scripts",
 ]
 testpaths = [
@@ -111,6 +113,7 @@ testpaths = [
     "examples/solid-review-ab/tests",
     "plugins/plugin-creator/skills/ensemble-rule-review/scripts",
     "plugins/plugin-creator/skills/output-style-creator/scripts",
+    ".agents/skills/rebase/scripts",
     ".agents/skills/receiving-pr-reviews/scripts",
 ]
 
@@ -125,7 +128,6 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-core = "sysmon"
 omit = [
     "tests/*",
     "*/tests/*",
@@ -135,6 +137,7 @@ omit = [
     "tests_backlog/*",
     "*/tests_backlog/*",
 ]
+patch = ["subprocess"]
 source = ["**/scripts"]
 
 [tool.ty.environment]
@@ -162,6 +165,7 @@ extra-paths = [
     "./plugins/summarizer/scripts",
     "./.claude/skills/daily-releases/scripts/daily_releases_lib",
     "./plugins/scientific-method/mcp/experiment-registry",
+    "./.agents/skills/rebase/scripts",
     "./.agents/skills/receiving-pr-reviews/scripts",
 ]
 root = ["./"]

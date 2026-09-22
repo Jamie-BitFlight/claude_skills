@@ -245,6 +245,58 @@ def test_run_silent_terminates_the_full_process_tree_on_timeout(tmp_path: Path) 
         )
 
 
+def test_run_silent_reaps_when_tree_terminator_returns_before_process_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-waiting platform tree terminator cannot leave the owned child alive or block draining pipes."""
+
+    class FakeStream:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeProcess:
+        stdout = FakeStream()
+        stderr = FakeStream()
+        returncode: int | None = None
+        communicate_calls = 0
+        killed = False
+        waited = False
+
+        def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                assert timeout is not None
+                raise subprocess.TimeoutExpired(["stalled"], timeout)
+            raise AssertionError("timeout cleanup must not enter an unbounded pipe drain")
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.killed = True
+            self.returncode = -9
+
+        def wait(self, timeout: float | None = None) -> int:
+            del timeout
+            self.waited = True
+            assert self.returncode is not None
+            return self.returncode
+
+    process = FakeProcess()
+    monkeypatch.setattr(activation.subprocess, "Popen", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(activation.isolated, "terminate_process_tree", lambda _process: None)
+
+    with pytest.raises(activation.HarnessError, match="timed out after"):
+        activation.run_silent(["stalled"], cwd=tmp_path, env={}, label="stalled", timeout_seconds=0.1)
+
+    assert process.killed is True
+    assert process.waited is True
+    assert process.stdout.closed is True
+    assert process.stderr.closed is True
+
+
 def test_run_app_server_isolates_and_tree_terminates_the_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -294,3 +346,189 @@ def test_run_app_server_isolates_and_tree_terminates_the_process(
     assert popen_calls[0]["start_new_session"] is True
     assert len(terminated) == 1
     assert isinstance(terminated[0], FakeProcess)
+
+
+def test_repo_skill_workspace_copies_the_complete_skill_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The consumer receives a contained repo-scoped copy with matching provenance."""
+    source_dir = tmp_path / "source" / ".agents" / "skills" / "rebase"
+    (source_dir / "scripts").mkdir(parents=True)
+    (source_dir / "SKILL.md").write_text("---\nname: rebase\n---\n", encoding="utf-8")
+    (source_dir / "scripts" / "rebase_plan.py").write_text("print('plan')\n", encoding="utf-8")
+    (source_dir / "scripts" / "__pycache__").mkdir()
+    (source_dir / "scripts" / "__pycache__" / "rebase_plan.cpython-313.pyc").write_bytes(b"local bytecode")
+    monkeypatch.setattr(activation, "REPO_ROOT", tmp_path / "source")
+
+    workspace = activation.create_repo_skill_workspace({"source_path": ".agents/skills/rebase/SKILL.md"}, "rebase")
+    try:
+        installed_dir = workspace.project_dir / ".agents" / "skills" / "rebase"
+        assert installed_dir.is_relative_to(workspace.project_dir)
+        assert (installed_dir / "scripts" / "rebase_plan.py").read_text(encoding="utf-8") == "print('plan')\n"
+        assert not (installed_dir / "scripts" / "__pycache__").exists()
+        assert activation.tree_sha256(installed_dir) == activation.repo_skill_tree_sha256(source_dir)
+    finally:
+        activation.isolated.cleanup_workspace(workspace)
+
+
+def test_repo_skill_resolution_requires_the_installed_root_and_command(tmp_path: Path) -> None:
+    """A response passes only when both installed paths came through the real turn."""
+    skill_file = tmp_path / ".agents" / "skills" / "rebase" / "SKILL.md"
+    skill_file.parent.mkdir(parents=True)
+    skill_file.write_text("skill\n", encoding="utf-8")
+    installed = activation.InstalledSkill(skill_file, Path(".agents/skills/rebase/SKILL.md"), "a", "b")
+    root = str(skill_file.parent)
+
+    assert activation.require_repo_skill_resolution(
+        f"SKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
+    ) == (True, True)
+    with pytest.raises(activation.HarnessError, match="did not resolve"):
+        activation.require_repo_skill_resolution(f"SKILL_ROOT={root}", installed)
+    with pytest.raises(activation.HarnessError, match="did not resolve"):
+        activation.require_repo_skill_resolution(f"COMMAND={root}/scripts/rebase_plan.py", installed)
+    with pytest.raises(activation.HarnessError, match="did not resolve"):
+        activation.require_repo_skill_resolution(
+            f"Paths:\nSKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
+        )
+
+
+def test_proxy_provenance_records_configuration_names_without_values() -> None:
+    """Persist transport metadata without credentials or endpoint values."""
+    provenance = activation.proxy_provenance({
+        "OPENAI_API_BASE": "https://example.invalid",
+        "PORTKEY_API_BASE": "https://gateway.invalid",
+        "PORTKEY_API_KEY": "secret-value",
+        "PORTKEY_MODEL": "test-model",
+        "UNRELATED": "another-secret",
+    })
+
+    assert provenance == {
+        "transport": "portkey",
+        "configuration_names": ["OPENAI_API_BASE", "PORTKEY_API_BASE", "PORTKEY_API_KEY", "PORTKEY_MODEL"],
+    }
+    serialized = json.dumps(provenance)
+    assert "secret-value" not in serialized
+    assert "gateway.invalid" not in serialized
+    assert "example.invalid" not in serialized
+
+
+def test_proxy_provenance_identifies_portkey_without_unrelated_openai_base() -> None:
+    """Transport classification follows the variables the isolated provider actually consumes."""
+    provenance = activation.proxy_provenance({
+        "PORTKEY_API_BASE": "https://gateway.invalid",
+        "PORTKEY_API_KEY": "secret-value",
+        "PORTKEY_MODEL": "test-model",
+    })
+
+    assert provenance["transport"] == "portkey"
+
+
+def test_configure_isolated_runtime_writes_minimal_portkey_provider_without_secret(tmp_path: Path) -> None:
+    """An empty Codex home gets only the provider metadata required by the configured gateway."""
+    env = {
+        "PORTKEY_API_BASE": "https://gateway.invalid/v1",
+        "PORTKEY_API_KEY": "must-not-be-written",
+        "PORTKEY_MODEL": "test-model",
+        "PORTKEY_REASONING_EFFORT": "high",
+    }
+
+    activation.configure_isolated_runtime(env, tmp_path)
+
+    config = (tmp_path / "config.toml").read_text(encoding="utf-8")
+    assert 'model_provider = "portkey"' in config
+    assert 'model = "test-model"' in config
+    assert 'model_reasoning_effort = "high"' in config
+    assert 'base_url = "https://gateway.invalid/v1"' in config
+    assert 'env_key = "PORTKEY_API_KEY"' in config
+    assert 'wire_api = "responses"' in config
+    assert "must-not-be-written" not in config
+
+
+def test_configure_isolated_runtime_leaves_default_transport_unconfigured(tmp_path: Path) -> None:
+    """No provider file is invented when the required Portkey variables are absent."""
+    activation.configure_isolated_runtime({"OPENAI_API_KEY": "secret"}, tmp_path)
+
+    assert not (tmp_path / "config.toml").exists()
+
+
+def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The repo target is activated by app-server and leaves no private path or secret in evidence."""
+    workspace_root = tmp_path / "consumer"
+    project_dir = workspace_root / "project"
+    skill_file = project_dir / ".agents" / "skills" / "rebase" / "SKILL.md"
+    skill_file.parent.mkdir(parents=True)
+    skill_file.write_text("skill\n", encoding="utf-8")
+    workspace = activation.isolated.ValidationWorkspace(
+        root=workspace_root,
+        mode="repo-skill-copy",
+        marketplace_name="repo-skills",
+        marketplace_source=workspace_root,
+        marketplace_path=workspace_root / "unused.json",
+        plugin_dir=skill_file.parent,
+        plugin_id="repo-skills",
+        project_dir=project_dir,
+        codex_home=workspace_root / "codex-home",
+    )
+    installed = activation.InstalledSkill(
+        path=skill_file,
+        relative_path=Path(".agents/skills/rebase/SKILL.md"),
+        sha256="skill-digest",
+        tree_sha256="tree-digest",
+    )
+    context = activation.ActivationContext(
+        workspace=workspace,
+        installed=installed,
+        source_digest="tree-digest",
+        env={
+            "OPENAI_API_BASE": "https://example.invalid",
+            "PORTKEY_API_BASE": "https://gateway.invalid",
+            "PORTKEY_API_KEY": "must-not-persist",
+            "PORTKEY_MODEL": "test-model",
+        },
+        installation_kind="repo-scoped-skill-copy",
+    )
+    response = f"SKILL_ROOT={skill_file.parent}\nCOMMAND={skill_file.parent}/scripts/rebase_plan.py"
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        activation,
+        "load_matrix_target",
+        lambda _target: {"target": "repo-skills:rebase", "plugin_id": "repo-skills", "task_text": "report paths"},
+    )
+    monkeypatch.setattr(activation, "prepare_repo_skill_context", lambda *_args: context)
+    monkeypatch.setattr(
+        activation,
+        "prepare_plugin_context",
+        lambda *_args: pytest.fail("plugin installation must not run for a repo-scoped skill"),
+    )
+    monkeypatch.setattr(
+        activation, "run_app_server", lambda **_kwargs: activation.ActivationResult(("turn/completed",), response)
+    )
+    monkeypatch.setattr(activation, "write_evidence", lambda _path, evidence: captured.update(evidence))
+    monkeypatch.setattr(activation.isolated, "cleanup_workspace", lambda _workspace: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "validate_codex_skill_activation.py",
+            "--target",
+            "repo-skills:rebase",
+            "--evidence-file",
+            str(tmp_path / "evidence.json"),
+            "--expect-contains",
+            "skill_root",
+        ],
+    )
+
+    assert activation.main() == 0
+    assert captured["status"] == "PASSED"
+    assert captured["installation_kind"] == "repo-scoped-skill-copy"
+    assert captured["installed_skill"] == ".agents/skills/rebase/SKILL.md"
+    assert captured["skill_root_matched"] is True
+    assert captured["instructed_command_path_matched"] is True
+    assert captured["proxy"] == {
+        "transport": "portkey",
+        "configuration_names": ["OPENAI_API_BASE", "PORTKEY_API_BASE", "PORTKEY_API_KEY", "PORTKEY_MODEL"],
+    }
+    serialized = json.dumps(captured)
+    assert str(workspace_root) not in serialized
+    assert "must-not-persist" not in serialized

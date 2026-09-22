@@ -64,6 +64,18 @@ def terminate_process_tree(process: subprocess.Popen[Any]) -> None:
     process.wait()
 
 
+def terminate_and_reap_owned_process(process: subprocess.Popen[Any]) -> None:
+    """Terminate the process tree and boundedly reap its owned direct child.
+
+    Args:
+        process: Root process owned by this module.
+    """
+    terminate_process_tree(process)
+    if process.poll() is None:
+        process.kill()
+    process.wait(timeout=TERMINATION_GRACE_SECONDS)
+
+
 def run_capture(command: list[str], *, timeout: float | None = None) -> str:
     """Run a command and capture its complete output.
 
@@ -90,10 +102,20 @@ def run_capture(command: list[str], *, timeout: float | None = None) -> str:
     try:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        terminate_process_tree(process)
+        terminate_and_reap_owned_process(process)
         if timeout_seconds is None:
             raise RuntimeError("an unbounded subprocess unexpectedly timed out") from exc
         raise subprocess.TimeoutExpired(command, timeout_seconds, output=exc.output, stderr=exc.stderr) from exc
+    except BaseException:
+        terminate_and_reap_owned_process(process)
+        raise
+    finally:
+        stdout_stream = getattr(process, "stdout", None)
+        stderr_stream = getattr(process, "stderr", None)
+        if stdout_stream is not None:
+            stdout_stream.close()
+        if stderr_stream is not None:
+            stderr_stream.close()
     if process.returncode:
         raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
     return stdout
