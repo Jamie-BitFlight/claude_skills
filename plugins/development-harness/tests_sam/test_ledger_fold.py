@@ -469,9 +469,19 @@ def test_every_table_and_every_kind_is_exercised(tmp_path: Path) -> None:
     conn = ledger(tmp_path)
     build_all(conn, tmp_path)
     held = snapshot(conn)
-    for table in store.TABLES:
+    # T2 projections have private evidence roots and are exercised by the T2 rebuild suite.
+    t2_tables = {"merge_candidates", "merge_claims"}
+    for table in set(store.TABLES) - t2_tables:
         assert held[table], f"no scenario materialised a row of {table}"
-    assert kinds_logged(conn) == {event.kind for event in spec.EVENTS}
+    t2_kinds = {event.kind for event in spec.EVENTS if event.kind.startswith(("merge.candidate", "merge.claim"))}
+    t2_kinds.update({
+        "merge.finished",
+        "merge.blocked",
+        "merge.reconciliation-required",
+        "merge.reconciled",
+        "merge.reconciliation-resolved",
+    })
+    assert kinds_logged(conn) == {event.kind for event in spec.EVENTS} - t2_kinds
 
 
 def test_every_scenario_together_folds(tmp_path: Path) -> None:

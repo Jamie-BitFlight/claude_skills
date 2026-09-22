@@ -745,6 +745,11 @@ implementation details.
 - `WorkItemBackend` — `@runtime_checkable` Protocol defining the provider-neutral work-item
   contract. Optional provider capabilities use separate protocols such as `SyncProvider` and
   `ContentProvider` and `BranchBackend`.
+- `BranchBackend` owns legacy work-item branch lifecycle operations. Its structural presence and
+  `supports_branches` flag do not establish expected-old-OID advancement, immutable prepared-result
+  identity, or atomic review policy. Registered merge trains use the separately constructed,
+  repository-bound `dh_core.integration_branch.IntegrationBranchAdvancer`; no expected-head method is
+  added to a backlog backend or branch delegate.
 - `SyncProvider` — optional one-method `reconcile(request) -> ReconcileResult` capability implemented
   only by remote-capable backends.
 - `WorkItemBackend.batch_fetch_statuses()` and `view_enrich_from_github()` return Pydantic

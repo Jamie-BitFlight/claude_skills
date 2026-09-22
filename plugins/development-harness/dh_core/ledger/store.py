@@ -33,7 +33,9 @@ dictionaries by :func:`rows_of`; and a refusal is :class:`Refusal`, carrying one
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -1541,6 +1543,12 @@ def fold_claim_changed(tables: Folded, event: Mapping[str, Any]) -> None:
     claim_of(tables, event).update(carried("merge_claims", event["payload"]))
 
 
+def fold_claim_recovered(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Terminalize one expired definitely unmutated claim."""
+    row = claim_of(tables, event)
+    row.update(active=0, conclusion=str(event["payload"]["conclusion"]), concluded_seq=int(event["seq"]))
+
+
 def fold_merge_terminal(tables: Folded, event: Mapping[str, Any]) -> None:
     """Conclude one claim and its candidate with the same outcome."""
     claim = claim_of(tables, event)
@@ -1585,7 +1593,7 @@ HANDLERS: dict[str, Any] = {
     "merge.claim-bound": fold_claim_changed,
     "merge.claim-prepared": fold_claim_changed,
     "merge.claim-renewed": fold_claim_changed,
-    "merge.claim-recovered": fold_claim_changed,
+    "merge.claim-recovered": fold_claim_recovered,
     "merge.reconciliation-required": fold_claim_changed,
     "merge.finished": fold_merge_terminal,
     "merge.blocked": fold_merge_terminal,
@@ -1654,7 +1662,9 @@ def rebuild(conn: sqlite3.Connection) -> None:
         conn: An open ledger connection.
     """
     with transaction(conn):
-        folded = fold_events(all_events(conn))
+        events = all_events(conn)
+        validate_evidence_references(conn, events)
+        folded = fold_events(events)
         for table in TABLES:
             words = ["DELETE FROM", table]
             conn.execute(" ".join(words))
@@ -1663,3 +1673,32 @@ def rebuild(conn: sqlite3.Connection) -> None:
                 continue
             columns = [column.name for column in TABLES[table]]
             conn.executemany(insert_statement(table, columns), [{name: row[name] for name in columns} for row in rows])
+
+
+def validate_evidence_references(conn: sqlite3.Connection, events: Sequence[Mapping[str, Any]]) -> None:
+    """Resolve and verify every typed event evidence reference before rebuild deletion."""
+    for event in events:
+        payload = event["payload"]
+        if not isinstance(payload, dict):
+            continue
+        for (kind, field), (cardinality, media_type) in ledger_spec.EVIDENCE_REFERENCE_FIELDS.items():
+            if event["kind"] != kind or field not in payload:
+                continue
+            raw = payload[field]
+            digests = json.loads(raw) if cardinality == "MANY" and isinstance(raw, str) else [raw]
+            if not isinstance(digests, list):
+                raise TypeError(f"event {event['seq']} has invalid evidence cardinality")
+            for raw_digest in digests:
+                digest_value = str(raw_digest)
+                if re.fullmatch(r"sha256:[0-9a-f]{64}", digest_value) is None:
+                    raise LookupError(f"event {event['seq']} has invalid evidence digest")
+                row = conn.execute(
+                    "SELECT byte_length, media_type, content FROM merge_evidence_blobs WHERE digest=?", (digest_value,)
+                ).fetchone()
+                if row is None or row[1] != media_type or not isinstance(row[2], bytes):
+                    raise LookupError(f"event {event['seq']} has unresolved evidence")
+                content = row[2]
+                if len(content) != int(row[0]) or "sha256:" + hashlib.sha256(content).hexdigest() != digest_value:
+                    raise LookupError(f"event {event['seq']} has corrupt evidence")
+                if media_type.endswith("+json") or media_type == "application/json":
+                    json.loads(content)

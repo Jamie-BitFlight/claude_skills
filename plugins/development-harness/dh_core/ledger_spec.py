@@ -758,6 +758,7 @@ EVENTS: list[EventKind] = [
             "expires",
             "result_sha",
             "prepared_identity_digest",
+            "prepared_json",
             "gate_evidence_refs",
             "policy_snapshot_digest",
         ],
@@ -811,6 +812,21 @@ EVENTS: list[EventKind] = [
     # is appended by the cascade and its reversal, which move a dependent's status and leave both
     # columns alone -- so the fold reads the value rather than inferring it from the command.
 ]
+
+EVIDENCE_REFERENCE_FIELDS: dict[tuple[str, str], tuple[str, str]] = {
+    ("merge.train-superseded", "replacement_checker_evidence_digest"): ("ONE", "application/json"),
+    ("merge.candidate-submitted", "maker_evidence_digest"): ("ONE", "application/json"),
+    ("merge.candidate-admitted", "checker_evidence_digest"): ("ONE", "application/json"),
+    ("merge.candidate-admitted", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.claim-bound", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.claim-prepared", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.claim-prepared", "gate_evidence_refs"): ("MANY", "application/vnd.dh.gate+json"),
+    ("merge.finished", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.reconciliation-required", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.reconciled", "policy_snapshot_digest"): ("ONE", "application/json"),
+    ("merge.reconciliation-resolved", "policy_snapshot_digest"): ("ONE", "application/json"),
+}
+"""Typed immutable BLOB references required to reconstruct T2 event effects."""
 
 
 # ---------------------------------------------------------------------------

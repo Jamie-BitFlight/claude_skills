@@ -194,6 +194,8 @@ class IntegrationBranchAdvancer:
         observed = self.port.observe_ref(ref=self.target_ref)
         if observed.available and observed.oid == prepared.prepared_result_oid:
             return ExpectedHeadAdvanceResult("advanced-after-reconciliation")
+        if observed.available and observed.oid == prepared.expected_target_oid:
+            return ExpectedHeadAdvanceResult("not-advanced")
         if observed.available:
             return ExpectedHeadAdvanceResult("target-stale")
         return ExpectedHeadAdvanceResult("reconciliation-required")

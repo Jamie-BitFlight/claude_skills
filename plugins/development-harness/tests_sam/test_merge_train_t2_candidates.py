@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
 import pytest
+from backlog_core.backend_types import BranchBackend
 from dh_core.ledger import store, transitions
 from dh_core.merge_evidence import MergeEvidenceStore
 from dh_core.merge_train import (
@@ -20,10 +22,11 @@ from dh_core.merge_train import (
     HostAuthority,
     MergeQuery,
     MergeTrain,
+    PolicySnapshot,
     RegisterTrain,
     SourceGraphSnapshot,
     SubmitCandidate,
-    SupersedeTrain,
+    TrainSupersession,
 )
 
 
@@ -33,6 +36,20 @@ class Reader:
 
     def read(self, _key):
         return self.value
+
+
+class AcceptPolicy:
+    def observe(self, candidate_sha: str, pull_request_ref: str) -> PolicySnapshot:
+        return PolicySnapshot(
+            candidate_sha=candidate_sha,
+            pull_request_ref=pull_request_ref,
+            required_checks=(("tests", candidate_sha, "success"),),
+            capability_identity="cap",
+            complete=True,
+            available=True,
+            freshness_token="fresh",
+            observed_at=datetime(2026, 1, 1),
+        )
 
 
 def service(tmp_path: Path) -> tuple[MergeTrain, sqlite3.Connection]:
@@ -73,7 +90,9 @@ def service(tmp_path: Path) -> tuple[MergeTrain, sqlite3.Connection]:
             members=definition.members,
         )
     )
-    result = MergeTrain(connection, plans, graph, HostAuthority(authority_host_id="h"), MergeEvidenceStore(connection))
+    result = MergeTrain(
+        connection, plans, graph, HostAuthority(authority_host_id="h"), MergeEvidenceStore(connection), AcceptPolicy()
+    )
     result.register(RegisterTrain(plan_ref="d", milestone=1, plan="Pt2"))
     return result, connection
 
@@ -93,7 +112,7 @@ def accept_assignment(train: MergeTrain, connection, task: str) -> Assignment:
 def test_f09_changed_head_atomically_supersedes_candidate(tmp_path: Path) -> None:
     train, connection = service(tmp_path)
     maker = accept_assignment(train, connection, "T1")
-    evidence = train.evidence.put(b"maker", "application/json")
+    evidence = train.evidence.put(b'{"maker":true}', "application/json")
 
     first = train.submit(
         SubmitCandidate(
@@ -143,7 +162,7 @@ def test_f09_changed_head_atomically_supersedes_candidate(tmp_path: Path) -> Non
 def test_f08_role_tuple_substitution_refuses_without_mutation(tmp_path: Path) -> None:
     train, connection = service(tmp_path)
     maker = accept_assignment(train, connection, "T1")
-    evidence = train.evidence.put(b"maker", "application/json")
+    evidence = train.evidence.put(b'{"maker":true}', "application/json")
     wrong = maker.model_copy(update={"issue": 99})
 
     with pytest.raises(store.Refusal, match="role-assignment-mismatch"):
@@ -165,7 +184,7 @@ def test_f08_role_tuple_substitution_refuses_without_mutation(tmp_path: Path) ->
 def test_f11_admission_binds_distinct_accepted_checker(tmp_path: Path) -> None:
     train, connection = service(tmp_path)
     maker = accept_assignment(train, connection, "T1")
-    maker_evidence = train.evidence.put(b"maker", "application/json")
+    maker_evidence = train.evidence.put(b'{"maker":true}', "application/json")
     candidate = train.submit(
         SubmitCandidate(
             plan="Pt2",
@@ -179,7 +198,7 @@ def test_f11_admission_binds_distinct_accepted_checker(tmp_path: Path) -> None:
         )
     )
     checker = accept_assignment(train, connection, "T2")
-    checker_evidence = train.evidence.put(b"checker", "application/json")
+    checker_evidence = train.evidence.put(b'{"checker":true}', "application/json")
 
     admitted = train.admit(
         AdmitCandidate(
@@ -212,7 +231,7 @@ def test_f02_supersede_resolves_replacement_and_checker_evidence(tmp_path: Path)
     )
 
     retired = train.supersede(
-        SupersedeTrain(
+        TrainSupersession(
             plan="Pt2",
             generation=1,
             replacement_plan_ref="d2",
@@ -225,3 +244,57 @@ def test_f02_supersede_resolves_replacement_and_checker_evidence(tmp_path: Path)
     assert retired.superseded_seq is not None
     store.rebuild(connection)
     assert train.status(MergeQuery(plan="Pt2", generation=1)).train.superseded_seq == retired.superseded_seq
+
+
+def test_f22_t2_models_and_branch_backend_have_no_retired_surfaces() -> None:
+    forbidden = {
+        "path",
+        "url",
+        "ledger_path",
+        "lock_path",
+        "mirror",
+        "pid",
+        "session",
+        "provider_reservation",
+        "certification",
+        "project_id",
+    }
+    for model in (SubmitCandidate, AdmitCandidate, TrainSupersession):
+        assert forbidden.isdisjoint(model.model_fields)
+    assert not hasattr(BranchBackend, "advance_integration_branch")
+
+
+def test_f24_wrong_host_refuses_before_evidence_or_provider_io(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    train, connection = service(tmp_path)
+    maker = accept_assignment(train, connection, "T1")
+    evidence = train.evidence.put(b'{"maker":true}', "application/json")
+    wrong = MergeTrain(
+        connection,
+        train.dispatch_plans,
+        train.source_graph,
+        HostAuthority(authority_host_id="other"),
+        train.evidence,
+        train.policy_observer,
+    )
+    calls = 0
+
+    def forbidden_get(_digest: str):
+        nonlocal calls
+        calls += 1
+        raise AssertionError("evidence I/O occurred")
+
+    monkeypatch.setattr(train.evidence, "require", forbidden_get)
+    with pytest.raises(store.Refusal, match="wrong-authority-host"):
+        wrong.submit(
+            SubmitCandidate(
+                plan="Pt2",
+                generation=1,
+                branch="candidate",
+                pull_request_ref="PR1",
+                candidate_sha="b" * 40,
+                base_sha="a" * 40,
+                maker=maker,
+                maker_evidence_digest=evidence.digest,
+            )
+        )
+    assert calls == 0

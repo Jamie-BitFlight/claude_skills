@@ -221,7 +221,7 @@ class AdmitCandidate(Request):
     checker_evidence_digest: str
 
 
-class SupersedeTrain(Request):
+class TrainSupersession(Request):
     """Checker-approved replacement definition request."""
 
     plan: str
@@ -373,6 +373,20 @@ class MergePage(BaseModel):
 
     train: TrainView
     reservations: list[ReservationView]
+    candidates: list[CandidateView] = Field(default_factory=list)
+    claims: list[MergeResult] = Field(default_factory=list)
+
+
+class ExplainQuery(MergeQuery):
+    """Explain stored blockers for one generation."""
+
+
+class Explanation(BaseModel):
+    """Stored-state merge readiness explanation."""
+
+    plan: str
+    generation: int
+    blockers: list[str]
 
 
 class HistoryPage(BaseModel):
@@ -621,6 +635,7 @@ def open_claim(
         Candidate row, claim number, and frozen definition.
     """
     with store.transaction(service.ledger):
+        recover_expired_claim(service, request)
         if service.ledger.execute("SELECT 1 FROM merge_claims WHERE plan=? AND active=1", (request.plan,)).fetchone():
             transitions.refuse("registered-plan-active")
         rows = store.rows_of(
@@ -660,6 +675,37 @@ def open_claim(
         columns = [column.name for column in store.TABLES["merge_claims"]]
         service.ledger.execute(store.insert_statement("merge_claims", columns), {name: row[name] for name in columns})
     return candidate, number, definition
+
+
+def recover_expired_claim(service: MergeTrain, request: MergeNext) -> None:
+    """Recover an expired pre-mutation claim or preserve ambiguous prepared state."""
+    rows = store.rows_of(
+        service.ledger.execute(
+            "SELECT * FROM merge_claims WHERE plan=? AND active=1 ORDER BY claim_number LIMIT 1", (request.plan,)
+        )
+    )
+    if not rows:
+        return
+    claim = rows[0]
+    deadline = store.moment(claim["expires"])
+    if deadline is None or store.now() <= deadline:
+        transitions.refuse("registered-plan-active")
+    if claim["phase"] in {"UNBOUND", "BOUND"}:
+        payload = {"claim_number": claim["claim_number"], "conclusion": "EXPIRED_NO_MUTATION"}
+        sequence = store.append_event(
+            service.ledger,
+            kind="merge.claim-recovered",
+            plan=request.plan,
+            task=str(claim["candidate_task"]),
+            payload=payload,
+            at=store.now(),
+        )
+        service.ledger.execute(
+            "UPDATE merge_claims SET active=0, conclusion=?, concluded_seq=? WHERE plan=? AND claim_number=?",
+            (payload["conclusion"], sequence, request.plan, claim["claim_number"]),
+        )
+        return
+    transitions.refuse("registered-plan-active")
 
 
 def bind_claim(
@@ -857,7 +903,7 @@ class MergeTrain:
         self.gates = gates
         self.supersede = self.execute_supersede
 
-    def execute_supersede(self, request: SupersedeTrain) -> TrainView:
+    def execute_supersede(self, request: TrainSupersession) -> TrainView:
         """Conclude a generation using resolved replacement evidence.
 
         Returns:
@@ -1028,6 +1074,13 @@ class MergeTrain:
         self.require_host(train)
         self.fresh_definition(train)
         self.evidence.require(request.checker_evidence_digest)
+        observed_candidate = candidate_row(
+            self.ledger, request.plan, request.generation, request.task, request.candidate_number
+        )
+        if self.policy_observer is None:
+            transitions.refuse("expected-head-unsupported")
+        policy = observe_policy(self, observed_candidate)
+        policy_evidence = self.evidence.put(policy.model_dump_json().encode(), "application/json")
         with store.transaction(self.ledger):
             train = train_row(self.ledger, request.plan)
             self.require_host(train)
@@ -1061,7 +1114,7 @@ class MergeTrain:
                 "checker_task": request.checker.task,
                 "checker_attempt": request.checker.attempt,
                 "checker_evidence_digest": request.checker_evidence_digest,
-                "policy_snapshot_digest": request.checker_evidence_digest,
+                "policy_snapshot_digest": policy_evidence.digest,
             }
             admitted_seq = store.append_event(
                 self.ledger,
@@ -1087,7 +1140,7 @@ class MergeTrain:
                     request.checker.task,
                     request.checker.attempt,
                     request.checker_evidence_digest,
-                    request.checker_evidence_digest,
+                    policy_evidence.digest,
                     admitted_seq,
                     enqueued_seq,
                     request.plan,
@@ -1397,9 +1450,44 @@ class MergeTrain:
                 {"plan": query.plan, "generation": row["generation"]},
             )
         )
-        return MergePage(
-            train=self.train_view(row), reservations=[ReservationView.model_validate(item) for item in reservations]
+        candidates = store.rows_of(
+            self.ledger.execute(
+                "SELECT * FROM merge_candidates WHERE plan=? AND generation=? ORDER BY task, candidate_number",
+                (query.plan, row["generation"]),
+            )
         )
+        claims = store.rows_of(
+            self.ledger.execute("SELECT * FROM merge_claims WHERE plan=? ORDER BY claim_number", (query.plan,))
+        )
+        return MergePage(
+            train=self.train_view(row),
+            reservations=[ReservationView.model_validate(item) for item in reservations],
+            candidates=[candidate_view(item) for item in candidates],
+            claims=[
+                MergeResult(
+                    plan=query.plan,
+                    claim_number=int(item["claim_number"]),
+                    phase=str(item["phase"]),
+                    outcome=str(item["conclusion"]) if item["conclusion"] is not None else None,
+                    result_sha=str(item["result_sha"]) if item["result_sha"] is not None else None,
+                )
+                for item in claims
+            ],
+        )
+
+    def explain(self, query: ExplainQuery) -> Explanation:
+        """Derive stable blockers solely from stored state.
+
+        Returns:
+            Ordered blocker codes.
+        """
+        page = self.status(query)
+        blockers: list[str] = []
+        if any(claim.phase == "RECONCILIATION_REQUIRED" and claim.outcome is None for claim in page.claims):
+            blockers.append("reconciliation-required")
+        if not any(candidate.admitted_seq is not None and candidate.outcome is None for candidate in page.candidates):
+            blockers.append("no-admitted-candidate")
+        return Explanation(plan=query.plan, generation=page.train.generation, blockers=blockers)
 
     def history(self, query: HistoryQuery) -> HistoryPage:
         """Return complete matching event envelopes without implicit truncation."""
@@ -1452,6 +1540,8 @@ class MergeTrain:
             "merge_reservations": (
                 "SELECT * FROM merge_reservations ORDER BY plan, generation, conflict_group, task, attempt"
             ),
+            "merge_candidates": "SELECT * FROM merge_candidates ORDER BY plan, generation, task, candidate_number",
+            "merge_claims": "SELECT * FROM merge_claims ORDER BY plan, claim_number",
         }
         for table, query in queries.items():
             current = store.rows_of(self.ledger.execute(query))

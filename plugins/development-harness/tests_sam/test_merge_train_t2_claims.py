@@ -87,7 +87,7 @@ class Branch:
 def admitted(tmp_path: Path, *, drift: bool = False, outcome: str = "advanced"):
     train, connection = service(tmp_path)
     maker = accept_assignment(train, connection, "T1")
-    maker_evidence = train.evidence.put(b"maker", "application/json")
+    maker_evidence = train.evidence.put(b'{"maker":true}', "application/json")
     candidate = train.submit(
         SubmitCandidate(
             plan="Pt2",
@@ -101,7 +101,7 @@ def admitted(tmp_path: Path, *, drift: bool = False, outcome: str = "advanced"):
         )
     )
     checker = accept_assignment(train, connection, "T2")
-    checker_evidence = train.evidence.put(b"checker", "application/json")
+    checker_evidence = train.evidence.put(b'{"checker":true}', "application/json")
     train.admit(
         AdmitCandidate(
             plan="Pt2",
@@ -117,7 +117,7 @@ def admitted(tmp_path: Path, *, drift: bool = False, outcome: str = "advanced"):
     integrator = Assignment(issue=3, task="T3", attempt=dispatched.attempt, role=role)
     policies = Policies("b" * 40)
     policies.drift = drift
-    gate_blob = train.evidence.put(b"gate", "application/octet-stream")
+    gate_blob = train.evidence.put(b'{"gate":"passed"}', "application/vnd.dh.gate+json")
     gates = Gates(gate_blob.digest)
     branch = Branch(outcome)
     train.policy_observer = policies

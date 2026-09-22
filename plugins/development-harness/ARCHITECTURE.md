@@ -515,6 +515,31 @@ Reservation ownership survives returned settlement, successful completion, and e
 to complete until judge acceptance or reclaim. Every registered dispatch has a generation-specific
 binding; only grouped dispatch additionally has a reservation.
 
+T2 extends a registered generation with immutable candidates and safe integration. Complete evidence
+bytes live in the private `merge_evidence_blobs` source table in the same SQLite database; events and
+projections retain only typed digest references. Rebuild verifies every referenced BLOB, media type,
+length, digest, and JSON payload before deleting a projection. Source BLOBs are never folded, cleared,
+exported as content, or selected through caller paths.
+
+Candidate submissions bind an accepted maker assignment tuple and immutable commit identity. A changed
+submission concludes the prior numbered candidate without transferring its admission or queue position.
+Admission binds a distinct accepted checker tuple and a complete provider-policy snapshot. The opaque
+authority-host marker is checked before external I/O; it detects configuration mismatch and is not actor
+authentication.
+
+Integration uses durable `UNBOUND`, `BOUND`, and `PREPARED` claim phases. Provider observations, gate
+execution, object preparation, and push operations occur outside SQLite writer transactions, followed by
+an authority recheck before each phase event. Only a prepared claim can invoke the branch advancer. A
+post-CAS policy change or unavailable observation produces active `RECONCILIATION_REQUIRED` state;
+reconciliation reads the durable prepared identity and observes only, never issuing a second CAS.
+
+Expected-head advancement is a separate branch-bound deep module. `IntegrationBranchAdvancer` proves
+the exact candidate/result/tree/parents and fast-forward ancestry, then `GitPushPort` sends one
+`--force-with-lease=<full-target-ref>:<expected-old-oid>` update for the exact result OID. The admitted
+GitHub result shape is direct fast-forward only, so result equals candidate. Capability identity binds
+repository, full target ref, actor/rules evidence, Git version, and proof digests; support defaults false.
+The legacy `BranchBackend` and PyGithub merge path remain unchanged for unregistered workflows.
+
 An omitted generation in a train query selects only the active generation. An explicit generation
 selects that exact immutable generation, including retired history. Current validation re-reads both
 authority sources and the current ledger projection; explicit historical validation uses retained
