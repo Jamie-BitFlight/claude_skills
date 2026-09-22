@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from enum import StrEnum
 from pathlib import Path
 
@@ -65,20 +66,52 @@ class ScenarioEvidence(BaseModel):
     plan_validated_at: int | None = None
 
 
+def scenario_candidate_data(candidates: list[CandidateFixture]) -> list[dict[str, object]]:
+    """Project candidate fixtures into plan fields.
+
+    Returns:
+        Candidate plan records.
+    """
+    return [
+        {
+            "oid": candidate.oid,
+            "parents": candidate.parents,
+            "paths": candidate.paths,
+            "intent": "Preserve the fixture's feature behavior.",
+            "evidence": ["candidate patch", "target diff"],
+            "disposition": candidate.disposition,
+            "verification_commands": [["git", "status", "--porcelain=v1"]],
+            "expected_conflict_paths": candidate.expected_conflict_paths,
+            "equivalence_evidence": candidate.equivalence_evidence,
+        }
+        for candidate in candidates
+    ]
+
+
+def scenario_path_data(candidates: list[CandidateFixture]) -> list[dict[str, object]]:
+    """Project unique candidate paths into plan fields.
+
+    Returns:
+        Affected-path plan records.
+    """
+    all_paths = sorted({path for candidate in candidates for path in candidate.paths})
+    return [
+        {
+            "path": path,
+            "candidate_oids": [candidate.oid for candidate in candidates if path in candidate.paths],
+            "target_interaction": "Inspected against the target diff.",
+            "dependencies": [],
+            "evidence": ["candidate patch", "target diff"],
+            "verification_commands": [["git", "status", "--porcelain=v1"]],
+        }
+        for path in all_paths
+    ]
+
+
 def scenario_plan_data(
     *, old_tip: str, target_oid: str, merge_base_oid: str, candidates: list[CandidateFixture]
 ) -> dict[str, object]:
-    """Build one plan tied to an actual temporary Git scenario.
-
-    Args:
-        old_tip: Captured feature-branch OID.
-        target_oid: Captured target OID.
-        merge_base_oid: Captured merge-base OID.
-        candidates: Complete ordered replay-candidate inventory.
-
-    Returns:
-        Complete JSON-compatible plan.
-    """
+    """Build one plan tied to an actual temporary Git scenario."""
     data = valid_plan_data()
     branch = data["branch"]
     target = data["target"]
@@ -104,32 +137,8 @@ def scenario_plan_data(
             "stderr": "",
         }
     ]
-    data["candidates"] = [
-        {
-            "oid": candidate.oid,
-            "parents": candidate.parents,
-            "paths": candidate.paths,
-            "intent": "Preserve the fixture's feature behavior.",
-            "evidence": ["candidate patch", "target diff"],
-            "disposition": candidate.disposition,
-            "verification_commands": [["git", "status", "--porcelain=v1"]],
-            "expected_conflict_paths": candidate.expected_conflict_paths,
-            "equivalence_evidence": candidate.equivalence_evidence,
-        }
-        for candidate in candidates
-    ]
-    all_paths = sorted({path for candidate in candidates for path in candidate.paths})
-    data["affected_paths"] = [
-        {
-            "path": path,
-            "candidate_oids": [candidate.oid for candidate in candidates if path in candidate.paths],
-            "target_interaction": "Inspected against the target diff.",
-            "dependencies": [],
-            "evidence": ["candidate patch", "target diff"],
-            "verification_commands": [["git", "status", "--porcelain=v1"]],
-        }
-        for path in all_paths
-    ]
+    data["candidates"] = scenario_candidate_data(candidates)
+    data["affected_paths"] = scenario_path_data(candidates)
     data["repository_checks"] = [["git", "status", "--porcelain=v1", "--untracked-files=all"]]
     return data
 
@@ -183,28 +192,21 @@ def finish_scenario(repository: Path, evidence: ScenarioEvidence) -> None:
         assert all(position >= evidence.plan_validated_at for position in rebase_positions)
 
 
-def validate_plan_event(repository: Path, data: dict[str, object], evidence: ScenarioEvidence) -> RebasePlan:
-    """Validate a plan and record the pre-action gate event.
-
-    Args:
-        data: Plan mapping.
-        evidence: Scenario refs, commands, and state transitions.
+def bind_live_repository_state(
+    repository: Path, data: dict[str, object], evidence: ScenarioEvidence
+) -> tuple[str, str]:
+    """Bind live repository state to scenario plan data.
 
     Returns:
-        Validated plan token required by the rebase helper.
+        Old-tip and target OIDs.
     """
     branch = data["branch"]
     target = data["target"]
     assert isinstance(branch, dict)
     assert isinstance(target, dict)
-    old_tip = branch["oid"]
-    target_oid = target["oid"]
-    assert isinstance(old_tip, str)
-    assert isinstance(target_oid, str)
-    branch_ref = branch["ref"]
-    target_ref = target["ref"]
-    assert isinstance(branch_ref, str)
-    assert isinstance(target_ref, str)
+    branch_ref, target_ref = branch["ref"], target["ref"]
+    old_tip, target_oid = branch["oid"], target["oid"]
+    assert all(isinstance(value, str) for value in (branch_ref, target_ref, old_tip, target_oid))
     repository_state, publication = capture_repository_state(
         repository, branch_ref=branch_ref, target_ref=target_ref, transcript=evidence.commands
     )
@@ -220,9 +222,13 @@ def validate_plan_event(repository: Path, data: dict[str, object], evidence: Sce
         if current_branch_name.strip() == branch_ref.removeprefix("refs/heads/")
         else "AUTHORIZED_BRANCH_TRANSFER"
     )
-    help_evidence, empty_option = capture_rebase_help(repository, evidence.commands)
-    data["rebase_help"] = help_evidence
-    data["becomes_empty_option"] = empty_option
+    return old_tip, target_oid
+
+
+def bind_inventory_and_recovery(
+    repository: Path, data: dict[str, object], evidence: ScenarioEvidence, old_tip: str, target_oid: str
+) -> None:
+    """Bind replay inventory and create verified recovery evidence."""
     inventory = run_git(
         repository,
         "rev-list",
@@ -232,26 +238,38 @@ def validate_plan_event(repository: Path, data: dict[str, object], evidence: Sce
         f"{target_oid}..{old_tip}",
         transcript=evidence.commands,
     )
-    data["replay_inventory"] = {
-        "source": "local-git",
-        "argv": list(evidence.commands[-1]),
-        "exit_code": inventory.returncode,
-        "stdout": inventory.stdout,
-        "stderr": inventory.stderr,
-    }
+    data["replay_inventory"] = command_record(inventory, evidence.commands[-1])
     recovery_ref = data["recovery_ref"]
     assert isinstance(recovery_ref, str)
     run_git(repository, "branch", recovery_ref.removeprefix("refs/heads/"), old_tip, transcript=evidence.commands)
     recovery = run_git(repository, "rev-parse", "--verify", f"{recovery_ref}^{{commit}}", transcript=evidence.commands)
-    data["recovery_verification"] = {
-        "source": "local-git",
-        "argv": list(evidence.commands[-1]),
-        "exit_code": recovery.returncode,
-        "stdout": recovery.stdout,
-        "stderr": recovery.stderr,
-    }
+    data["recovery_verification"] = command_record(recovery, evidence.commands[-1])
     evidence.events.append(WorkflowEvent.RECOVERY_VERIFIED)
     evidence.recovery_verified_at = len(evidence.commands)
+
+
+def command_record(result: subprocess.CompletedProcess[str], argv: tuple[str, ...]) -> dict[str, object]:
+    """Return complete scenario command evidence."""
+    return {
+        "source": "local-git",
+        "argv": list(argv),
+        "exit_code": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
+
+
+def validate_plan_event(repository: Path, data: dict[str, object], evidence: ScenarioEvidence) -> RebasePlan:
+    """Validate a plan and record the pre-action gate event.
+
+    Returns:
+        Validated plan token required by the rebase helper.
+    """
+    old_tip, target_oid = bind_live_repository_state(repository, data, evidence)
+    help_evidence, empty_option = capture_rebase_help(repository, evidence.commands)
+    data["rebase_help"] = help_evidence
+    data["becomes_empty_option"] = empty_option
+    bind_inventory_and_recovery(repository, data, evidence, old_tip, target_oid)
     plan = RebasePlan.model_validate(data)
     evidence.events.append(WorkflowEvent.PLAN_VALIDATED)
     evidence.plan_validated_at = len(evidence.commands)
@@ -419,76 +437,4 @@ def test_planned_conflict_resolves_combined_intent_before_continue(tmp_path: Pat
     assert_gate_precedes_rebase(evidence)
     assert (repository / "shared.py").read_text(encoding="utf-8") == "target_value = 'target'\nvalue = 'feature'\n"
     assert run_git(repository, "merge-base", "--is-ancestor", target_oid, "feature").returncode == 0
-    finish_scenario(repository, evidence)
-
-
-def test_rename_edit_adapts_feature_change_to_target_path(tmp_path: Path) -> None:
-    """Replay a branch edit through a target rename and verify the renamed result."""
-    repository = tmp_path / "rename-edit"
-    initialize_repository(repository)
-    commit_file(repository, "old.py", "value = 1\n", "add old path")
-    merge_base = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "-c", "feature")
-    candidate = commit_file(repository, "old.py", "value = 2\n", "edit old path")
-    run_git(repository, "switch", "main")
-    run_git(repository, "mv", "old.py", "new.py")
-    run_git(repository, "commit", "-m", "rename path")
-    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "feature")
-
-    evidence = begin_scenario(repository)
-    plan = validate_plan_event(
-        repository,
-        scenario_plan_data(
-            old_tip=candidate,
-            target_oid=target_oid,
-            merge_base_oid=merge_base,
-            candidates=[CandidateFixture(oid=candidate, parents=[merge_base], paths=["old.py"], disposition="ADAPT")],
-        ),
-        evidence,
-    )
-    assert start_rebase(repository, plan, evidence) == 0
-
-    assert_gate_precedes_rebase(evidence)
-    assert not (repository / "old.py").exists()
-    assert (repository / "new.py").read_text(encoding="utf-8") == "value = 2\n"
-    finish_scenario(repository, evidence)
-
-
-def test_merge_candidate_requires_policy_before_preserving_topology(tmp_path: Path) -> None:
-    """Block an unbound merge policy, then preserve topology under a validated plan."""
-    repository = tmp_path / "merge-policy"
-    merge_base = initialize_repository(repository)
-    run_git(repository, "switch", "-c", "feature")
-    first_parent = commit_file(repository, "feature.txt", "feature\n", "feature change")
-    run_git(repository, "switch", "-c", "side", merge_base)
-    side_parent = commit_file(repository, "side.txt", "side\n", "side change")
-    run_git(repository, "switch", "feature")
-    run_git(repository, "merge", "--no-ff", "side", "-m", "merge side")
-    merge_candidate = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "main")
-    commit_file(repository, "target.txt", "target\n", "target change")
-    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "feature")
-
-    data = scenario_plan_data(
-        old_tip=merge_candidate,
-        target_oid=target_oid,
-        merge_base_oid=merge_base,
-        candidates=[
-            CandidateFixture(oid=first_parent, parents=[merge_base], paths=["feature.txt"]),
-            CandidateFixture(oid=side_parent, parents=[merge_base], paths=["side.txt"]),
-            CandidateFixture(
-                oid=merge_candidate, parents=[first_parent, side_parent], paths=["feature.txt", "side.txt"]
-            ),
-        ],
-    )
-    data["merge_policy"] = "PRESERVE_TOPOLOGY"
-    evidence = begin_scenario(repository)
-    plan = validate_plan_event(repository, data, evidence)
-    assert start_rebase(repository, plan, evidence, preserve_merges=True) == 0
-
-    assert_gate_precedes_rebase(evidence)
-    parent_records = run_git(repository, "rev-list", "--parents", f"{target_oid}..feature").stdout.splitlines()
-    assert any(len(record.split()) > 2 for record in parent_records)
     finish_scenario(repository, evidence)

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "claims": [
+    {
+      "id": "managed-capture",
+      "source_path": "scripts/rebase_capture.py",
+      "source_symbol": "capture_rebase",
+      "source_lines": [377, 419],
+      "observed_by": "scripts/test_rebase_managed.py::test_invalid_ref_capture_is_the_final_tool_boundary"
+    },
+    {
+      "id": "active-inspection",
+      "source_path": "scripts/rebase_active.py",
+      "source_symbol": "inspect_active_rebase",
+      "source_lines": [77, 119],
+      "observed_by": "scripts/test_rebase_active.py::test_repository_without_rebase_routes_to_no_active_terminal"
+    },
+    {
+      "id": "single-use-execution",
+      "source_path": "scripts/rebase_prepare.py",
+      "source_symbol": "consume_replay_authorization",
+      "source_lines": [200, 213],
+      "observed_by": "scripts/test_rebase_prepare.py::test_execute_consumes_one_plan_hash_before_replay_and_rejects_retry"
+    },
+    {
+      "id": "plan-evidence-validation",
+      "source_path": "scripts/rebase_evidence.py",
+      "source_symbol": "validate_path_marker",
+      "source_lines": [160, 190],
+      "observed_by": "scripts/test_rebase_plan_validation.py::test_path_marker_present_must_match_command_backed_existence"
+    },
+    {
+      "id": "merge-policy-replay",
+      "source_path": "scripts/rebase_prepare.py",
+      "source_symbol": "derive_replay_argv",
+      "source_lines": [149, 163],
+      "observed_by": "scripts/test_rebase_prepare.py::test_execute_derives_merge_preservation_from_the_typed_policy"
+    },
+    {
+      "id": "managed-finalization",
+      "source_path": "scripts/rebase_finalize.py",
+      "source_symbol": "build_managed_plan",
+      "source_lines": [279, 325],
+      "observed_by": "scripts/test_rebase_managed_replay.py::test_managed_capture_finalize_execute_keeps_worktree_clean"
+    },
+    {
+      "id": "managed-execution",
+      "source_path": "scripts/rebase_cli.py",
+      "source_symbol": "execute_plan",
+      "source_lines": [217, 248],
+      "observed_by": "scripts/test_rebase_prepare.py::test_execute_uses_only_the_canonical_current_branch_replay_argv"
+    }
+  ]
+}

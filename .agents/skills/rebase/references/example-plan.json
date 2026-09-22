@@ -91,7 +91,7 @@
           "/work/project/.git/rebase-merge"
         ],
         "exit_code": 0,
-        "stdout": "{\"path\":\"/work/project/.git/rebase-merge\",\"present\":false}\n",
+        "stdout": "{\"response_kind\":\"path-state\",\"path\":\"/work/project/.git/rebase-merge\",\"present\":false}\n",
         "stderr": ""
       },
       "present": false
@@ -115,7 +115,7 @@
           "/work/project/.git/rebase-apply"
         ],
         "exit_code": 0,
-        "stdout": "{\"path\":\"/work/project/.git/rebase-apply\",\"present\":false}\n",
+        "stdout": "{\"response_kind\":\"path-state\",\"path\":\"/work/project/.git/rebase-apply\",\"present\":false}\n",
         "stderr": ""
       },
       "present": false

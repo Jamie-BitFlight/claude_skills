@@ -2,7 +2,8 @@
 
 Enter only after `rebase_active.py` returns `active`. Run
 `uv run --script "<skill-dir>/scripts/rebase_plan.py" states` for the canonical state, next action,
-artifact, and evidence contract.
+artifact, and evidence contract. Validate operation-marker paths against their command-backed state
+([runtime evidence](./runtime-evidence.json#plan-evidence-validation)).
 
 Bind current branch, status, rebase metadata, `REBASE_HEAD`, and recovery ref. If the plan is absent,
 reconstruct old tip, target, current and remaining candidates, and affected paths from Git evidence.

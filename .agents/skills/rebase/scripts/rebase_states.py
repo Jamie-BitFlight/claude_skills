@@ -19,6 +19,7 @@ class WorkflowState(StrEnum):
     """Canonical state vocabulary for the rebase workflow."""
 
     READY_TO_ANALYZE = "READY_TO_ANALYZE"
+    BLOCKED_SKILL_DIR_UNAVAILABLE = "BLOCKED_SKILL_DIR_UNAVAILABLE"
     PLAN_INVALID = "PLAN_INVALID"
     READY_TO_REBASE = "READY_TO_REBASE"
     BLOCKED_INVALID_REF = "BLOCKED_INVALID_REF"
@@ -52,6 +53,14 @@ class WorkflowStateDefinition(BaseModel):
 
 
 WORKFLOW_STATE_DEFINITIONS = (
+    WorkflowStateDefinition(
+        name=WorkflowState.BLOCKED_SKILL_DIR_UNAVAILABLE,
+        kind=StateKind.TERMINAL,
+        condition="The harness supplied no absolute loaded-skill directory metadata.",
+        next_action="End before any Git or tool command; do not search installation roots or infer a path.",
+        artifact_policy="Create no workflow artifact.",
+        evidence=["missing Codex skill_root and missing injected base-directory metadata", "no command or mutation"],
+    ),
     WorkflowStateDefinition(
         name=WorkflowState.READY_TO_ANALYZE,
         kind=StateKind.TRANSITION,

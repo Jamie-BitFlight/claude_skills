@@ -55,6 +55,7 @@ tools = [
 addopts = [
     "--cov=scripts",
     "--cov=plugins",
+    "--cov=.agents/skills/rebase/scripts",
     "--strict-config",
     "--strict-markers",
     "--tb=short",

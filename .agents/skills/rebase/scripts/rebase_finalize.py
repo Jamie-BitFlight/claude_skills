@@ -6,10 +6,12 @@ import hashlib
 import stat
 from pathlib import Path
 
+from rebase_contracts import Candidate, PathImpact, RebasePlan, UserDecision
 from rebase_evidence import CommandEvidence
 from rebase_managed import MANAGED_ID_PATTERN, ManagedCapture, command_evidence, managed_root
 from rebase_models import ExternalApprovalReceipt, FinalizeSemantics
 from rebase_prepare import run_command
+from rebase_responses import PlanBuildResult, WorkflowTerminal
 from rebase_states import WorkflowState
 
 
@@ -164,113 +166,160 @@ def create_recovery(repository: Path, capture: ManagedCapture, plan_id: str) -> 
     return recovery_ref, verification
 
 
+def delete_verified_recovery(repository: Path, recovery_ref: str, old_tip_oid: str) -> None:
+    """Delete only the recovery ref still bound to the captured old tip."""
+    observed = command_evidence(repository, "rev-parse", "--verify", f"{recovery_ref}^{{commit}}")
+    if observed.exit_code != 0 or observed.stdout.strip() != old_tip_oid:
+        raise ValueError("recovery ref changed before cleanup")
+    deleted = command_evidence(repository, "update-ref", "-d", recovery_ref, old_tip_oid)
+    if deleted.exit_code != 0:
+        raise ValueError(f"recovery ref cleanup failed: {deleted.stderr}")
+
+
+def project_candidates(capture: ManagedCapture, semantics: FinalizeSemantics) -> list[Candidate]:
+    """Combine immutable candidate evidence with semantic judgments.
+
+    Returns:
+        Typed plan candidates in semantic-input order.
+    """
+    captured_by_oid = {candidate.oid: candidate for candidate in capture.candidates}
+    return [
+        Candidate(
+            **semantic.model_dump(mode="json"),
+            parents=captured_by_oid[semantic.oid].parents,
+            paths=captured_by_oid[semantic.oid].paths,
+        )
+        for semantic in semantics.candidates
+    ]
+
+
+def project_paths(capture: ManagedCapture, semantics: FinalizeSemantics) -> list[PathImpact]:
+    """Combine immutable path membership with semantic judgments.
+
+    Returns:
+        Typed affected-path impacts in semantic-input order.
+    """
+    captured_by_path = {path.path: path for path in capture.affected_paths}
+    return [
+        PathImpact(**semantic.model_dump(mode="json"), candidate_oids=captured_by_path[semantic.path].candidate_oids)
+        for semantic in semantics.affected_paths
+    ]
+
+
+def project_decisions(semantics: FinalizeSemantics) -> list[UserDecision]:
+    """Project semantic decisions into the persisted plan contract.
+
+    Returns:
+        Typed user decisions in semantic-input order.
+    """
+    return [UserDecision.model_validate(decision.model_dump(mode="json")) for decision in semantics.decisions]
+
+
+def project_plan(
+    capture: ManagedCapture,
+    capture_sha256: str,
+    semantics: FinalizeSemantics,
+    receipts: list[ExternalApprovalReceipt],
+    repository_preflights: list[CommandEvidence],
+    required_preflights: list[list[str]],
+    recovery_ref: str,
+    recovery_verification: CommandEvidence,
+) -> RebasePlan:
+    """Project a validated capture into the persisted plan contract.
+
+    Returns:
+        Fully validated rebase plan.
+    """
+    return RebasePlan(
+        schema_version=1,
+        plan_id=capture.capture_id,
+        capture_id=capture.capture_id,
+        capture_sha256=capture_sha256,
+        branch={"ref": capture.branch_ref, "oid": capture.branch_oid},
+        target={"ref": capture.target_ref, "oid": capture.target_oid},
+        merge_base_oid=capture.merge_base_oid,
+        execution_worktree=capture.execution_worktree,
+        execution_mode=capture.execution_mode,
+        worktree_authorized=True,
+        status_porcelain=capture.status_porcelain,
+        active_operations=capture.active_operations,
+        repository_state=capture.repository_state,
+        repository_instruction_search=[source.model_dump() for source in capture.repository_instruction_search],
+        repository_instruction_sources=capture.repository_instruction_sources,
+        repository_preflights=repository_preflights,
+        required_preflights=required_preflights,
+        publication=capture.publication.model_dump(),
+        replay_inventory=capture.replay_inventory,
+        candidates=project_candidates(capture, semantics),
+        affected_paths=project_paths(capture, semantics),
+        merge_policy=semantics.merge_policy,
+        clean_cherry_pick_policy="SURFACE",
+        becomes_empty_policy="STOP",
+        becomes_empty_option=capture.becomes_empty_option,
+        rebase_help=capture.rebase_help,
+        recovery_ref=recovery_ref,
+        recovery_verification=recovery_verification,
+        repository_checks=semantics.repository_checks,
+        unknowns=semantics.unknowns,
+        user_decisions=project_decisions(semantics),
+        approval_receipts=receipts,
+    )
+
+
+def terminal_result(state: WorkflowState, status: str, **details: object) -> PlanBuildResult:
+    """Build one typed terminal plan-construction result.
+
+    Returns:
+        Terminal build result with exit code one.
+    """
+    terminal = WorkflowTerminal.model_validate({"state": state, "status": status, **details})
+    return PlanBuildResult(terminal=terminal, exit_code=1)
+
+
 def build_managed_plan(
     repository: Path, capture_id: str, semantics: FinalizeSemantics, receipt_paths: list[Path]
-) -> tuple[dict[str, object] | None, dict[str, object], int]:
+) -> PlanBuildResult:
     """Merge managed evidence with semantics after authority checks.
 
     Returns:
-        Plan data or terminal output and its exit code.
+        Typed plan or terminal construction result.
     """
     try:
         capture, capture_sha256 = load_capture(repository, capture_id)
         validate_semantic_cover(capture, semantics)
         receipts = load_external_receipts(repository, capture, capture_sha256, receipt_paths)
     except (OSError, ValueError) as error:
-        return (
-            None,
-            {"error": str(error), "state": WorkflowState.PLAN_INVALID, "status": "INVALID", "terminal": True},
-            1,
-        )
+        return terminal_result(WorkflowState.PLAN_INVALID, "INVALID", error=str(error))
     missing_receipts = required_receipts(capture, semantics, receipts)
     if missing_receipts:
-        return (
-            None,
-            {
-                "missing_approvals": missing_receipts,
-                "state": WorkflowState.NEEDS_USER_DECISION,
-                "status": "DECISION_REQUIRED",
-                "terminal": True,
-            },
-            1,
+        return terminal_result(
+            WorkflowState.NEEDS_USER_DECISION, "DECISION_REQUIRED", missing_approvals=missing_receipts
         )
     try:
         repository_preflights, required_preflights = execute_repository_preflights(repository, semantics)
     except ValueError as error:
-        return (
-            None,
-            {
-                "error": str(error),
-                "state": WorkflowState.BLOCKED_PREFLIGHT_FAILED,
-                "status": "BLOCKED",
-                "terminal": True,
-            },
-            1,
-        )
-    plan_id = capture.capture_id
+        return terminal_result(WorkflowState.BLOCKED_PREFLIGHT_FAILED, "BLOCKED", error=str(error))
     try:
-        recovery_ref, recovery_verification = create_recovery(repository, capture, plan_id)
+        recovery_ref, recovery_verification = create_recovery(repository, capture, capture.capture_id)
     except ValueError as error:
-        return (
-            None,
-            {"error": str(error), "state": WorkflowState.BLOCKED_GIT_STATE, "status": "BLOCKED", "terminal": True},
-            1,
+        return terminal_result(WorkflowState.BLOCKED_GIT_STATE, "BLOCKED", error=str(error))
+    try:
+        plan = project_plan(
+            capture,
+            capture_sha256,
+            semantics,
+            receipts,
+            repository_preflights,
+            required_preflights,
+            recovery_ref,
+            recovery_verification,
         )
-    captured_by_oid = {candidate.oid: candidate for candidate in capture.candidates}
-    candidate_data = [
-        {
-            **semantic.model_dump(mode="json"),
-            "parents": captured_by_oid[semantic.oid].parents,
-            "paths": captured_by_oid[semantic.oid].paths,
-        }
-        for semantic in semantics.candidates
-    ]
-    path_data = [
-        {
-            **semantic.model_dump(mode="json"),
-            "candidate_oids": next(
-                path.candidate_oids for path in capture.affected_paths if path.path == semantic.path
-            ),
-        }
-        for semantic in semantics.affected_paths
-    ]
-    plan: dict[str, object] = {
-        "schema_version": 1,
-        "plan_id": plan_id,
-        "capture_id": capture.capture_id,
-        "capture_sha256": capture_sha256,
-        "branch": {"ref": capture.branch_ref, "oid": capture.branch_oid},
-        "target": {"ref": capture.target_ref, "oid": capture.target_oid},
-        "merge_base_oid": capture.merge_base_oid,
-        "execution_worktree": capture.execution_worktree,
-        "execution_mode": capture.execution_mode,
-        "worktree_authorized": True,
-        "status_porcelain": capture.status_porcelain,
-        "active_operations": capture.active_operations,
-        "repository_state": capture.repository_state.model_dump(mode="json"),
-        "repository_instruction_search": [
-            observation.model_dump(mode="json") for observation in capture.repository_instruction_search
-        ],
-        "repository_instruction_sources": capture.repository_instruction_sources,
-        "repository_preflights": [evidence.model_dump(mode="json") for evidence in repository_preflights],
-        "required_preflights": required_preflights,
-        "publication": capture.publication.model_dump(mode="json"),
-        "replay_inventory": capture.replay_inventory.model_dump(mode="json"),
-        "candidates": candidate_data,
-        "affected_paths": path_data,
-        "merge_policy": semantics.merge_policy,
-        "clean_cherry_pick_policy": "SURFACE",
-        "becomes_empty_policy": "STOP",
-        "becomes_empty_option": capture.becomes_empty_option,
-        "rebase_help": capture.rebase_help.model_dump(mode="json"),
-        "recovery_ref": recovery_ref,
-        "recovery_verification": recovery_verification.model_dump(mode="json"),
-        "repository_checks": semantics.repository_checks,
-        "unknowns": semantics.unknowns,
-        "user_decisions": [
-            {"decision_id": decision.decision_id, "question": decision.question, "operation": decision.operation}
-            for decision in semantics.decisions
-        ],
-        "approval_receipts": [receipt.model_dump(mode="json") for receipt in receipts],
-    }
-    return plan, {}, 0
+    except ValueError as error:
+        try:
+            delete_verified_recovery(repository, recovery_ref, capture.branch_oid)
+        except ValueError as cleanup_error:
+            return terminal_result(WorkflowState.BLOCKED_GIT_STATE, "BLOCKED", error=str(cleanup_error))
+        result = terminal_result(WorkflowState.PLAN_INVALID, "INVALID", error=str(error))
+    else:
+        result = PlanBuildResult(plan=plan, exit_code=0)
+    return result

@@ -22,7 +22,7 @@ authority. Report its path as the blocker.
 For every multiple-parent candidate, bind one policy before execution:
 
 - `PRESERVE_TOPOLOGY`: account for the merge and resolution, then use the validated
-  merge-preserving mode.
+  merge-preserving mode ([runtime evidence](./runtime-evidence.json#merge-policy-replay)).
 - `APPROVED_FLATTEN`: enumerate retained and omitted commits and resolution changes; proceed only
   after explicit approval of every topology or intent change.
 

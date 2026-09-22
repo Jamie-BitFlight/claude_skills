@@ -36,10 +36,12 @@ VALIDATOR_PATH = SKILL_ROOT / "scripts" / "rebase_plan.py"
 TEST_COMMAND_TIMEOUT_SECONDS = 20
 
 
-def live_plan_data(
-    repository: Path, execution_mode: str = "CURRENT_BRANCH", *, conflict: bool = False
-) -> dict[str, object]:
-    """Build one schema-valid plan whose immutable bindings exist in a real repository."""
+def initialize_live_plan_repository(repository: Path, execution_mode: str, conflict: bool) -> tuple[str, str, str, str]:
+    """Create a real branch/target fixture.
+
+    Returns:
+        Merge base, candidate path, candidate OID, and target OID.
+    """
     merge_base = initialize_repository(repository)
     if conflict:
         merge_base = commit_file(repository, "shared.txt", "base\n", "add shared file")
@@ -52,6 +54,55 @@ def live_plan_data(
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     if execution_mode == "CURRENT_BRANCH":
         run_git(repository, "switch", "feature")
+    return merge_base, candidate_path, candidate, target_oid
+
+
+def live_plan_overrides(
+    repository: Path,
+    execution_mode: str,
+    merge_base: str,
+    candidate_path: str,
+    candidate: str,
+    target_oid: str,
+    repository_state: dict[str, object],
+    publication: dict[str, object],
+    inventory: subprocess.CompletedProcess[str],
+    inventory_argv: list[str],
+    empty_option: str,
+    help_result: subprocess.CompletedProcess[str],
+    recovery_ref: str,
+    recovery: subprocess.CompletedProcess[str],
+) -> dict[str, object]:
+    """Return live plan fields captured from the fixture."""
+    return {
+        "plan_id": "prepare-test",
+        "branch": {"ref": "refs/heads/feature", "oid": candidate},
+        "target": {"ref": "refs/heads/main", "oid": target_oid},
+        "merge_base_oid": merge_base,
+        "execution_worktree": str(repository.resolve()),
+        "execution_mode": execution_mode,
+        "repository_state": repository_state,
+        "repository_preflights": [],
+        "required_preflights": [],
+        "publication": publication,
+        "replay_inventory": command_data(inventory, inventory_argv),
+        "candidates": [live_candidate(candidate, merge_base, candidate_path)],
+        "affected_paths": [live_path_impact(candidate, candidate_path)],
+        "becomes_empty_option": empty_option,
+        "rebase_help": command_data(help_result, ["git", "rebase", "-h"]),
+        "recovery_ref": recovery_ref,
+        "recovery_verification": command_data(recovery, ["git", "rev-parse", "--verify", f"{recovery_ref}^{{commit}}"]),
+        "repository_checks": [["git", "status", "--porcelain=v1", "--untracked-files=all"]],
+    }
+
+
+def live_plan_data(
+    repository: Path, execution_mode: str = "CURRENT_BRANCH", *, conflict: bool = False
+) -> dict[str, object]:
+    """Build one schema-valid plan whose immutable bindings exist in a real repository."""
+    merge_base, candidate_path, candidate, target_oid = initialize_live_plan_repository(
+        repository, execution_mode, conflict
+    )
 
     transcript: list[tuple[str, ...]] = []
     repository_state, publication = capture_repository_state(
@@ -74,66 +125,63 @@ def live_plan_data(
     recovery = run_git(repository, "rev-parse", "--verify", f"{recovery_ref}^{{commit}}")
 
     data = valid_plan_data()
-    data.update({
-        "plan_id": "prepare-test",
-        "branch": {"ref": "refs/heads/feature", "oid": candidate},
-        "target": {"ref": "refs/heads/main", "oid": target_oid},
-        "merge_base_oid": merge_base,
-        "execution_worktree": str(repository.resolve()),
-        "execution_mode": execution_mode,
-        "repository_state": repository_state,
-        "repository_preflights": [],
-        "required_preflights": [],
-        "publication": publication,
-        "replay_inventory": {
-            "source": "local-git",
-            "argv": inventory_argv,
-            "exit_code": inventory.returncode,
-            "stdout": inventory.stdout,
-            "stderr": inventory.stderr,
-        },
-        "candidates": [
-            {
-                "oid": candidate,
-                "parents": [merge_base],
-                "paths": [candidate_path],
-                "intent": "Preserve the feature change.",
-                "evidence": ["candidate patch"],
-                "disposition": "RETAIN",
-                "verification_commands": [["git", "status", "--porcelain=v1"]],
-                "expected_conflict_paths": [],
-                "equivalence_evidence": [],
-            }
-        ],
-        "affected_paths": [
-            {
-                "path": candidate_path,
-                "candidate_oids": [candidate],
-                "target_interaction": "No target overlap.",
-                "dependencies": [],
-                "evidence": ["candidate patch"],
-                "verification_commands": [["git", "status", "--porcelain=v1"]],
-            }
-        ],
-        "becomes_empty_option": empty_option,
-        "rebase_help": {
-            "source": "installed-git",
-            "argv": ["git", "rebase", "-h"],
-            "exit_code": help_result.returncode,
-            "stdout": help_result.stdout,
-            "stderr": help_result.stderr,
-        },
-        "recovery_ref": recovery_ref,
-        "recovery_verification": {
-            "source": "local-git",
-            "argv": ["git", "rev-parse", "--verify", f"{recovery_ref}^{{commit}}"],
-            "exit_code": recovery.returncode,
-            "stdout": recovery.stdout,
-            "stderr": recovery.stderr,
-        },
-        "repository_checks": [["git", "status", "--porcelain=v1", "--untracked-files=all"]],
-    })
+    data.update(
+        live_plan_overrides(
+            repository,
+            execution_mode,
+            merge_base,
+            candidate_path,
+            candidate,
+            target_oid,
+            repository_state,
+            publication,
+            inventory,
+            inventory_argv,
+            empty_option,
+            help_result,
+            recovery_ref,
+            recovery,
+        )
+    )
     return data
+
+
+def command_data(result: subprocess.CompletedProcess[str], argv: list[str]) -> dict[str, object]:
+    """Return complete command fixture data."""
+    return {
+        "source": "local-git",
+        "argv": argv,
+        "exit_code": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
+
+
+def live_candidate(candidate: str, merge_base: str, candidate_path: str) -> dict[str, object]:
+    """Return one live candidate fixture."""
+    return {
+        "oid": candidate,
+        "parents": [merge_base],
+        "paths": [candidate_path],
+        "intent": "Preserve the feature change.",
+        "evidence": ["candidate patch"],
+        "disposition": "RETAIN",
+        "verification_commands": [["git", "status", "--porcelain=v1"]],
+        "expected_conflict_paths": [],
+        "equivalence_evidence": [],
+    }
+
+
+def live_path_impact(candidate: str, candidate_path: str) -> dict[str, object]:
+    """Return one live path-impact fixture."""
+    return {
+        "path": candidate_path,
+        "candidate_oids": [candidate],
+        "target_interaction": "No target overlap.",
+        "dependencies": [],
+        "evidence": ["candidate patch"],
+        "verification_commands": [["git", "status", "--porcelain=v1"]],
+    }
 
 
 def run_execute(repository: Path, plan_path: Path, expected_hash: str) -> subprocess.CompletedProcess[str]:

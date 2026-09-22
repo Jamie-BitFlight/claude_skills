@@ -7,11 +7,15 @@ description: "Start a local Git rebase when the user explicitly requests history
 
 Rewrite local history only: no force-push, remote backup, merge, forge action, or publication.
 
-Bind `<skill-dir>` to this loaded `SKILL.md`'s absolute directory.
+Before any Git or tool command, bind `<skill-dir>` only from loaded-skill metadata: Codex
+`skill_root`, or the absolute **Base directory for this skill** line injected by another supported
+harness. Do not search install roots or derive the directory from the repository. If neither value
+is present and absolute, emit `BLOCKED_SKILL_DIR_UNAVAILABLE` and end without a command or mutation.
 
 Routine starts use managed `capture`, `finalize`, and `execute`. The agent supplies semantic
 judgment; the tools own evidence, storage, recovery, replay argv, and single use. Approval requires
-an externally bound receipt, never a plan field. A terminal result ends the invocation. Local
+an externally bound receipt, never a plan field. Replay authorization is consumed before execution
+([runtime evidence](./references/runtime-evidence.json#single-use-execution)). A terminal result ends the invocation. Local
 success is `REBASE_COMPLETE_VERIFIED` and `not published`.
 
 Before any Git command, choose one route and load only its reference:

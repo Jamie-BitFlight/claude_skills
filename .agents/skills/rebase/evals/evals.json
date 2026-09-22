@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "skill_name": "rebase",
   "evals": [
     {
@@ -79,6 +79,20 @@
         "glab mr list --repo $GITLAB_PROJECT_PATH --output json"
       ],
       "expectations": ["Treats merge-request merging as outside the local rebase skill."]
+    },
+    {
+      "id": 7,
+      "prompt": "Rebase feature/a onto main without loaded-skill directory metadata.",
+      "expected_activation": true,
+      "required_terminal": "BLOCKED_SKILL_DIR_UNAVAILABLE",
+      "required_sources": ["SKILL.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "exact_action_order": ["load rebase skill", "BLOCKED_SKILL_DIR_UNAVAILABLE"],
+      "expectations": [
+        "Activates from the explicit local-rebase request.",
+        "Stops before every Git or tool command when the harness supplies no absolute skill directory."
+      ]
     }
   ]
 }

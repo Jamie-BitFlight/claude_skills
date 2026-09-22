@@ -72,23 +72,42 @@ class RepositoryStateEvidence(BaseModel):
         execution_mode: ExecutionMode,
     ) -> None:
         """Require every command and observation to bind the plan's declared state."""
+        self.validate_refs(branch_ref, branch_oid, target_ref, target_oid, merge_base_oid, execution_worktree)
+        self.validate_worktree(branch_ref, execution_worktree, status_porcelain, execution_mode)
+        self.validate_operations(execution_worktree, active_operations)
+        require_success(self.upstream, ["git", "for-each-ref", "--format=%(upstream)", branch_ref])
+        if self.upstream.stdout.strip() != (configured_upstream or ""):
+            raise ValueError("upstream evidence does not match configured_upstream")
+
+    def validate_refs(
+        self,
+        branch_ref: str,
+        branch_oid: str,
+        target_ref: str,
+        target_oid: str,
+        merge_base_oid: str,
+        execution_worktree: str,
+    ) -> None:
+        """Require repository, branch, target, and merge-base bindings."""
         require_success(self.repository_root, ["git", "rev-parse", "--show-toplevel"])
         if Path(self.repository_root.stdout.strip()) != Path(execution_worktree):
             raise ValueError("repository-root evidence does not match the execution worktree")
-
         require_success(self.branch_ref, ["git", "show-ref", "--verify", branch_ref])
         if self.branch_ref.stdout.strip() != f"{branch_oid} {branch_ref}":
             raise ValueError("branch-ref evidence does not match the planned branch")
-
         require_oid(self.branch_oid, ["git", "rev-parse", "--verify", f"{branch_ref}^{{commit}}"], branch_oid)
         require_oid(self.target_oid, ["git", "rev-parse", "--verify", f"{target_ref}^{{commit}}"], target_oid)
         require_oid(self.merge_base, ["git", "merge-base", branch_ref, target_ref], merge_base_oid)
+
+    def validate_worktree(
+        self, branch_ref: str, execution_worktree: str, status_porcelain: str, execution_mode: ExecutionMode
+    ) -> None:
+        """Require clean status and exact worktree ownership."""
         require_success(self.worktrees, ["git", "worktree", "list", "--porcelain"])
         branch_owners = worktree_branch_owners(self.worktrees.stdout, branch_ref)
         require_success(self.status, ["git", "status", "--porcelain=v1", "--untracked-files=all"])
         if self.status.stdout != status_porcelain:
             raise ValueError("status evidence does not match status_porcelain")
-
         require_success(self.current_branch, ["git", "symbolic-ref", "--quiet", "--short", "HEAD"])
         branch_prefix = "refs/heads/"
         if not branch_ref.startswith(branch_prefix):
@@ -102,11 +121,13 @@ class RepositoryStateEvidence(BaseModel):
                 raise ValueError("planned branch is not owned by the execution worktree")
         elif current_short_branch == planned_short_branch or branch_owners:
             raise ValueError("branch-transfer evidence requires an unowned non-current planned branch")
+
+    def validate_operations(self, execution_worktree: str, active_operations: list[str]) -> None:
+        """Require operation markers to match the declared active-operation set."""
         validate_path_marker(self.rebase_merge, "rebase-merge", Path(execution_worktree))
         validate_path_marker(self.rebase_apply, "rebase-apply", Path(execution_worktree))
         validate_ref_marker(self.merge_head, "MERGE_HEAD")
         validate_ref_marker(self.cherry_pick_head, "CHERRY_PICK_HEAD")
-
         observed_operations = {
             operation
             for operation, present in (
@@ -119,10 +140,6 @@ class RepositoryStateEvidence(BaseModel):
         }
         if observed_operations != set(active_operations):
             raise ValueError("operation-marker evidence does not match active_operations")
-
-        require_success(self.upstream, ["git", "for-each-ref", "--format=%(upstream)", branch_ref])
-        if self.upstream.stdout.strip() != (configured_upstream or ""):
-            raise ValueError("upstream evidence does not match configured_upstream")
 
 
 def require_success(evidence: CommandEvidence, argv: list[str]) -> None:
@@ -169,7 +186,7 @@ def validate_path_marker(marker: PathMarkerEvidence, name: str, execution_worktr
         observation = json.loads(marker.existence.stdout)
     except json.JSONDecodeError as error:
         raise ValueError(f"operation-marker existence output is invalid JSON: {name}") from error
-    if observation != {"path": str(resolved_path), "present": marker.present}:
+    if observation != {"response_kind": "path-state", "path": str(resolved_path), "present": marker.present}:
         raise ValueError(f"operation-marker path state disagrees with presence: {name}")
 
 

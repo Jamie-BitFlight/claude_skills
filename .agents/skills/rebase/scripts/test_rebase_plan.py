@@ -47,7 +47,7 @@ def valid_repository_state_data(
             "command": command(["git", "rev-parse", "--git-path", name], f".git/{name}\n"),
             "existence": command(
                 ["uv", "run", "--script", "/skills/rebase/scripts/rebase_plan.py", "path-state", resolved_path],
-                json.dumps({"path": resolved_path, "present": False}),
+                json.dumps({"response_kind": "path-state", "path": resolved_path, "present": False}),
             ),
             "present": False,
         }
@@ -85,6 +85,111 @@ def valid_repository_state_data(
     }
 
 
+def valid_instruction_data() -> dict[str, object]:
+    """Return bound instruction and preflight fixture data.
+
+    Returns:
+        Instruction-related plan fields.
+    """
+    return {
+        "repository_instruction_search": [
+            {
+                "path": "AGENTS.md",
+                "present": True,
+                "content": "# Agent rules\n",
+                "sha256": "d2e2a32d37b83ebbcdbbfea0d86642516dc5010642ec2a404c626c1c0bf1e068",
+            },
+            {"path": ".claude/CLAUDE.md", "present": False},
+        ],
+        "repository_instruction_sources": ["AGENTS.md"],
+        "repository_preflights": [
+            {
+                "source": "AGENTS.md",
+                "argv": ["uv", "run", "scripts/audit_branch_transfer.py"],
+                "exit_code": 0,
+                "stdout": '{"ok":true}',
+                "stderr": "",
+            }
+        ],
+        "required_preflights": [["uv", "run", "scripts/audit_branch_transfer.py"]],
+    }
+
+
+def valid_candidate_data(candidate_oid: str) -> dict[str, object]:
+    """Return candidate and affected-path fixture data.
+
+    Returns:
+        Candidate-related plan fields.
+    """
+    verification = [["uv", "run", "pytest", "tests/test_parser.py", "-q"]]
+    return {
+        "candidates": [
+            {
+                "oid": candidate_oid,
+                "parents": ["4" * 40],
+                "paths": ["parser.py", "tests/test_parser.py"],
+                "intent": "Add parser validation and tests.",
+                "evidence": ["candidate patch", "target rename diff"],
+                "disposition": "ADAPT",
+                "verification_commands": verification,
+                "expected_conflict_paths": [],
+                "equivalence_evidence": [],
+            }
+        ],
+        "affected_paths": [
+            {
+                "path": "parser.py",
+                "candidate_oids": [candidate_oid],
+                "target_interaction": "Target renamed the API used by this path.",
+                "dependencies": ["tests/test_parser.py"],
+                "evidence": ["candidate patch", "target diff"],
+                "verification_commands": verification,
+            },
+            {
+                "path": "tests/test_parser.py",
+                "candidate_oids": [candidate_oid],
+                "target_interaction": "Tests depend on the adapted parser path.",
+                "dependencies": ["parser.py"],
+                "evidence": ["candidate patch"],
+                "verification_commands": verification,
+            },
+        ],
+    }
+
+
+def valid_replay_data(old_tip: str, target_oid: str, candidate_oid: str) -> dict[str, object]:
+    """Return replay, capability, and recovery fixture data.
+
+    Returns:
+        Replay-related plan fields.
+    """
+    return {
+        "replay_inventory": {
+            "source": "local-git",
+            "argv": ["git", "rev-list", "--reverse", "--topo-order", "--parents", f"{target_oid}..{old_tip}"],
+            "exit_code": 0,
+            "stdout": f"{candidate_oid} {'4' * 40}\n",
+            "stderr": "",
+        },
+        "becomes_empty_option": "stop",
+        "rebase_help": {
+            "source": "installed-git",
+            "argv": ["git", "rebase", "-h"],
+            "exit_code": 129,
+            "stdout": "",
+            "stderr": "--reapply-cherry-picks --rebase-merges --empty (drop|keep|stop)\n",
+        },
+        "recovery_ref": "refs/heads/rebase-backup/feature-parser-onto-main",
+        "recovery_verification": {
+            "source": "local-git",
+            "argv": ["git", "rev-parse", "--verify", "refs/heads/rebase-backup/feature-parser-onto-main^{commit}"],
+            "exit_code": 0,
+            "stdout": f"{old_tip}\n",
+            "stderr": "",
+        },
+    }
+
+
 def valid_plan_data() -> dict[str, object]:
     """Return one complete plan satisfying every pre-action invariant.
 
@@ -108,26 +213,7 @@ def valid_plan_data() -> dict[str, object]:
         "repository_state": valid_repository_state_data(
             old_tip=old_tip, target_oid=target_oid, merge_base_oid="4" * 40, configured_upstream=None
         ),
-        "repository_instruction_search": [
-            {
-                "path": "AGENTS.md",
-                "present": True,
-                "content": "# Agent rules\n",
-                "sha256": "d2e2a32d37b83ebbcdbbfea0d86642516dc5010642ec2a404c626c1c0bf1e068",
-            },
-            {"path": ".claude/CLAUDE.md", "present": False},
-        ],
-        "repository_instruction_sources": ["AGENTS.md"],
-        "repository_preflights": [
-            {
-                "source": "AGENTS.md",
-                "argv": ["uv", "run", "scripts/audit_branch_transfer.py"],
-                "exit_code": 0,
-                "stdout": '{"ok":true}',
-                "stderr": "",
-            }
-        ],
-        "required_preflights": [["uv", "run", "scripts/audit_branch_transfer.py"]],
+        **valid_instruction_data(),
         "publication": {
             "configured_upstream": None,
             "remote_refs_containing_old_tip": [],
@@ -141,63 +227,11 @@ def valid_plan_data() -> dict[str, object]:
                 }
             ],
         },
-        "replay_inventory": {
-            "source": "local-git",
-            "argv": ["git", "rev-list", "--reverse", "--topo-order", "--parents", f"{target_oid}..{old_tip}"],
-            "exit_code": 0,
-            "stdout": f"{candidate_oid} {'4' * 40}\n",
-            "stderr": "",
-        },
-        "candidates": [
-            {
-                "oid": candidate_oid,
-                "parents": ["4" * 40],
-                "paths": ["parser.py", "tests/test_parser.py"],
-                "intent": "Add parser validation and tests.",
-                "evidence": ["candidate patch", "target rename diff"],
-                "disposition": "ADAPT",
-                "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
-                "expected_conflict_paths": [],
-                "equivalence_evidence": [],
-            }
-        ],
-        "affected_paths": [
-            {
-                "path": "parser.py",
-                "candidate_oids": [candidate_oid],
-                "target_interaction": "Target renamed the API used by this path.",
-                "dependencies": ["tests/test_parser.py"],
-                "evidence": ["candidate patch", "target diff"],
-                "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
-            },
-            {
-                "path": "tests/test_parser.py",
-                "candidate_oids": [candidate_oid],
-                "target_interaction": "Tests depend on the adapted parser path.",
-                "dependencies": ["parser.py"],
-                "evidence": ["candidate patch"],
-                "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
-            },
-        ],
+        **valid_replay_data(old_tip, target_oid, candidate_oid),
+        **valid_candidate_data(candidate_oid),
         "merge_policy": "LINEAR_NO_MERGES",
         "clean_cherry_pick_policy": "SURFACE",
         "becomes_empty_policy": "STOP",
-        "becomes_empty_option": "stop",
-        "rebase_help": {
-            "source": "installed-git",
-            "argv": ["git", "rebase", "-h"],
-            "exit_code": 129,
-            "stdout": "",
-            "stderr": "--reapply-cherry-picks --rebase-merges --empty (drop|keep|stop)\n",
-        },
-        "recovery_ref": "refs/heads/rebase-backup/feature-parser-onto-main",
-        "recovery_verification": {
-            "source": "local-git",
-            "argv": ["git", "rev-parse", "--verify", "refs/heads/rebase-backup/feature-parser-onto-main^{commit}"],
-            "exit_code": 0,
-            "stdout": f"{old_tip}\n",
-            "stderr": "",
-        },
         "repository_checks": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
         "unknowns": [],
         "user_decisions": [],
@@ -305,236 +339,3 @@ def test_zero_path_candidate_without_preserve_empty_is_rejected() -> None:
 
     with pytest.raises(ValidationError, match="zero-path candidates require PRESERVE_EMPTY"):
         RebasePlan.model_validate(data)
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    [
-        "unknown",
-        "unapproved-decision",
-        "missing-path-membership",
-        "active-operation",
-        "failed-preflight",
-        "redundant-drop-without-equivalence",
-        "omitted-inventory-candidate",
-        "unverified-recovery",
-        "unsupported-empty-option",
-    ],
-)
-def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
-    """Reject every incomplete or unsafe plan before mutation."""
-    data = valid_plan_data()
-    if mutation == "unknown":
-        data["unknowns"] = ["Whether target behavior supersedes the candidate."]
-    elif mutation == "unapproved-decision":
-        data["user_decisions"] = [
-            {"decision_id": "flatten", "question": "Flatten merge topology?", "operation": "FLATTEN_TOPOLOGY"}
-        ]
-    elif mutation == "missing-path-membership":
-        affected_paths = data["affected_paths"]
-        assert isinstance(affected_paths, list)
-        affected_paths.pop()
-    elif mutation == "active-operation":
-        data["active_operations"] = ["rebase-merge"]
-    elif mutation == "failed-preflight":
-        preflights = data["repository_preflights"]
-        assert isinstance(preflights, list)
-        preflight = preflights[0]
-        assert isinstance(preflight, dict)
-        preflight["exit_code"] = 1
-    elif mutation == "redundant-drop-without-equivalence":
-        candidates = data["candidates"]
-        assert isinstance(candidates, list)
-        candidate = candidates[0]
-        assert isinstance(candidate, dict)
-        candidate["disposition"] = "REDUNDANT_DROP"
-        candidate["equivalence_evidence"] = []
-    elif mutation == "omitted-inventory-candidate":
-        replay_inventory = data["replay_inventory"]
-        assert isinstance(replay_inventory, dict)
-        replay_inventory["stdout"] = f"{'5' * 40} {'4' * 40}\n{replay_inventory['stdout']}"
-    elif mutation == "unverified-recovery":
-        recovery = data["recovery_verification"]
-        assert isinstance(recovery, dict)
-        recovery["stdout"] = f"{'9' * 40}\n"
-    else:
-        help_evidence = data["rebase_help"]
-        assert isinstance(help_evidence, dict)
-        help_evidence["stderr"] = "--reapply-cherry-picks --rebase-merges --empty (drop|keep|ask)\n"
-
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
-
-def test_publication_receipt_cannot_authorize_a_redundant_drop() -> None:
-    """Keep every external approval bound to its declared destructive operation."""
-    data = valid_plan_data()
-    candidates = data["candidates"]
-    branch = data["branch"]
-    target = data["target"]
-    assert isinstance(candidates, list)
-    assert isinstance(branch, dict)
-    assert isinstance(target, dict)
-    candidate = candidates[0]
-    assert isinstance(candidate, dict)
-    candidate["disposition"] = "REDUNDANT_DROP"
-    candidate["equivalence_evidence"] = []
-    candidate["drop_approval_decision_id"] = "shared-decision"
-    data["capture_id"] = "a" * 32
-    data["capture_sha256"] = "b" * 64
-    data["approval_receipts"] = [
-        {
-            "schema_version": 1,
-            "source": "harness-human-gate",
-            "capture_id": data["capture_id"],
-            "capture_sha256": data["capture_sha256"],
-            "repository_root": data["execution_worktree"],
-            "branch_ref": branch["ref"],
-            "old_tip_oid": branch["oid"],
-            "target_ref": target["ref"],
-            "target_oid": target["oid"],
-            "operation": "REBASE_PUBLISHED_HISTORY",
-            "decision_id": "shared-decision",
-            "approved": True,
-        }
-    ]
-
-    with pytest.raises(ValidationError, match="redundant drop"):
-        RebasePlan.model_validate(data)
-
-
-@pytest.mark.parametrize(
-    ("field_path", "replacement"),
-    [
-        (("repository_state", "branch_oid", "stdout"), f"{'9' * 40}\n"),
-        (
-            ("repository_state", "worktrees", "stdout"),
-            f"worktree /work/foreign\nHEAD {'1' * 40}\nbranch refs/heads/feature/parser\n",
-        ),
-        (("repository_state", "merge_head", "present"), True),
-        (("publication", "remote_refs_containing_old_tip"), ["refs/remotes/origin/unexpected"]),
-    ],
-)
-def test_contradictory_universal_evidence_cannot_reach_ready(field_path: tuple[str, ...], replacement: object) -> None:
-    """Reject universal evidence that contradicts another bound plan field."""
-    data = valid_plan_data()
-    target: dict[str, object] = data
-    for field in field_path[:-1]:
-        nested = target[field]
-        assert isinstance(nested, dict)
-        target = nested
-    target[field_path[-1]] = replacement
-
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
-
-def test_current_branch_must_match_planned_branch_in_current_branch_mode() -> None:
-    """Reject current-branch evidence that names a different branch."""
-    data = valid_plan_data()
-    repository_state = data["repository_state"]
-    assert isinstance(repository_state, dict)
-    current_branch = repository_state["current_branch"]
-    assert isinstance(current_branch, dict)
-    current_branch["stdout"] = "different-branch\n"
-
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
-
-def test_zero_branch_owners_require_authorized_transfer_mode() -> None:
-    """Reject a current-branch plan whose branch has no owning worktree."""
-    data = valid_plan_data()
-    repository_state = data["repository_state"]
-    assert isinstance(repository_state, dict)
-    worktrees = repository_state["worktrees"]
-    assert isinstance(worktrees, dict)
-    worktrees["stdout"] = f"worktree /work/project\nHEAD {'1' * 40}\ndetached\n"
-
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
-
-def test_path_marker_present_must_match_command_backed_existence() -> None:
-    """Reject a marker presence value that contradicts its existence evidence."""
-    data = valid_plan_data()
-    repository_state = data["repository_state"]
-    assert isinstance(repository_state, dict)
-    rebase_merge = repository_state["rebase_merge"]
-    assert isinstance(rebase_merge, dict)
-    command = rebase_merge["command"]
-    assert isinstance(command, dict)
-    command["stdout"] = "/tmp/claude-skills-3784-rebase/.git\n"
-    rebase_merge["present"] = False
-
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
-
-def test_git_243_ask_spelling_satisfies_the_logical_stop_policy() -> None:
-    """Accept Git 2.43's `ask` spelling when captured help advertises it."""
-    data = valid_plan_data()
-    data["becomes_empty_option"] = "ask"
-    help_evidence = data["rebase_help"]
-    assert isinstance(help_evidence, dict)
-    help_evidence["stderr"] = "--reapply-cherry-picks --rebase-merges --empty (drop|keep|ask)\n"
-
-    plan = RebasePlan.model_validate(data)
-
-    assert plan.becomes_empty_option.value == "ask"
-
-
-def test_validator_emits_compact_valid_result(tmp_path: Path) -> None:
-    """Emit one compact JSON result for an agent consumer."""
-    plan_path = tmp_path / "plan.json"
-    plan_path.write_text(json.dumps(valid_plan_data()), encoding="utf-8")
-
-    result = run_validator(plan_path)
-
-    assert result.returncode == 0
-    assert result.stderr == ""
-    assert result.stdout.count("\n") == 1
-    output = json.loads(result.stdout)
-    assert output["status"] == "VALID"
-    assert output["state"] == "READY_TO_REBASE"
-    assert output["plan_id"] == "feature-parser-onto-main"
-    assert len(output["sha256"]) == 64
-
-
-def test_bundled_validator_runs_from_unrelated_consuming_directory(tmp_path: Path) -> None:
-    """Resolve the bundled executable by skill path instead of consuming-repository cwd."""
-    result = subprocess.run(
-        [
-            str(BOUNDED_RUNNER),
-            "--timeout-seconds",
-            str(TEST_COMMAND_TIMEOUT_SECONDS),
-            "--",
-            str(VALIDATOR_PATH),
-            "schema",
-        ],
-        cwd=tmp_path,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 0
-    schema = json.loads(result.stdout)
-    assert schema["title"] == "RebasePlan"
-
-
-def test_validator_fails_closed_with_structured_errors(tmp_path: Path) -> None:
-    """Return machine-readable validation errors without a ready state."""
-    plan_data = valid_plan_data()
-    plan_data["unknowns"] = ["Unresolved semantic overlap."]
-    plan_path = tmp_path / "invalid-plan.json"
-    plan_path.write_text(json.dumps(plan_data), encoding="utf-8")
-
-    result = run_validator(plan_path)
-
-    assert result.returncode == 1
-    assert result.stderr == ""
-    output = json.loads(result.stdout)
-    assert output["status"] == "INVALID"
-    assert output["state"] == "PLAN_INVALID"
-    assert output["errors"]

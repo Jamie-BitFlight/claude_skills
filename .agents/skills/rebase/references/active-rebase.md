@@ -10,6 +10,9 @@ run this single inspector instead of reconstructing its Git checks:
 uv run --script "<skill-dir>/scripts/rebase_active.py"
 ```
 
+The inspector derives active state from Git-backed operation metadata
+([runtime evidence](./runtime-evidence.json#active-inspection)).
+
 Treat the inspector result as an immediate route:
 
 - `BLOCKED_PREFLIGHT_FAILED`: end without mutation.

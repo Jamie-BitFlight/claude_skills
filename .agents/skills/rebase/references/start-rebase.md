@@ -15,7 +15,7 @@ uv run --script "<skill-dir>/scripts/rebase_plan.py" capture --branch "<branch>"
 Pass the expected target OID whenever the invocation supplies one. Never replace an expected OID
 with a newly observed value. `capture` performs ordered ref, repository, publication, graph,
 candidate, and path capture and stores immutable evidence under Git metadata without dirtying the
-worktree.
+worktree ([runtime evidence](./runtime-evidence.json#managed-capture)).
 
 Every result with `terminal=true` ends the invocation. It is the final tool result: emit that
 state immediately, with no bookkeeping, repair, recapture, retry, or other tool call. In particular:
@@ -62,7 +62,8 @@ uv run --script "<skill-dir>/scripts/rebase_plan.py" finalize "<capture-id>" --s
 then creates recovery and the plan under Git metadata. Files in the repository or its Git directory
 are not external approval authority. The portable receipt contract records provenance but cannot
 cryptographically prove which actor created it; when the harness cannot supply trustworthy
-human-gate evidence, fail closed at `NEEDS_USER_DECISION`.
+human-gate evidence, fail closed at `NEEDS_USER_DECISION`
+([runtime evidence](./runtime-evidence.json#managed-finalization)).
 
 A terminal finalize result is the invocation's final tool result. Do not edit `.git/info/exclude`,
 write workflow artifacts into the worktree, or repair and retry in the same invocation.
@@ -82,7 +83,8 @@ uv run --script "<skill-dir>/scripts/rebase_plan.py" execute "<managed-plan-id>"
 `execute` rejects unmanaged worktree plans, revalidates live refs, worktree ownership, clean
 state, operation absence and recovery, derives canonical replay argv, atomically consumes the plan
 hash, then runs that argv once. Any blocked or decision result ends the invocation; recovery or
-retry requires a later invocation and a newly authorized managed flow.
+retry requires a later invocation and a newly authorized managed flow
+([runtime evidence](./runtime-evidence.json#managed-execution)).
 
 When replay stops in an active operation, route a later invocation through
 [active rebase](./active-rebase.md). After successful replay, verify the accounted candidate intent,

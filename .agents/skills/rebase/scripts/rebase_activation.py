@@ -27,6 +27,7 @@ class ActionEvent(BaseModel):
 
     kind: ActionKind
     operation: str = Field(min_length=1)
+    script_path: str | None = None
     exit_code: int | None = None
     resulting_terminal: WorkflowState | None = None
 
@@ -48,7 +49,7 @@ class EvalCase(BaseModel):
 class EvalPackage(BaseModel):
     """Validated activation-evaluation package."""
 
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     skill_name: str
     evals: list[EvalCase]
 
@@ -70,6 +71,7 @@ class ActivationCaseResult(BaseModel):
     eval_id: int
     prompt: str
     observed_activation: bool
+    skill_directory: str | None = None
     loaded_sources: list[str]
     actions: list[ActionEvent]
     state_transitions: list[WorkflowState]
@@ -83,7 +85,7 @@ class ActivationCaseResult(BaseModel):
 class ActivationResults(BaseModel):
     """Persisted evidence plus an explicit harness/branch acceptance matrix."""
 
-    schema_version: Literal[4]
+    schema_version: Literal[5]
     skill_name: str
     observed_on: str
     content_sha256: dict[str, str]
@@ -148,6 +150,7 @@ def evaluate_case(case: ActivationCaseResult, evaluation: EvalCase) -> list[str]
         failures.append(f"prompt mismatch: {key}")
     if case.observed_activation is not evaluation.expected_activation:
         failures.append(f"activation mismatch: {key}")
+    failures.extend(evaluate_skill_directory(case))
     if case.final_terminal != evaluation.required_terminal:
         failures.append(f"terminal mismatch: {key}")
     if not set(evaluation.required_sources) <= set(case.loaded_sources):
@@ -165,6 +168,28 @@ def evaluate_case(case: ActivationCaseResult, evaluation: EvalCase) -> list[str]
         failures.append(f"repository HEAD changed: {key}")
     if case.repository_status_before != case.repository_status_after:
         failures.append(f"repository status changed: {key}")
+    return failures
+
+
+def evaluate_skill_directory(case: ActivationCaseResult) -> list[str]:
+    """Require command scripts to remain inside harness-supplied skill metadata.
+
+    Returns:
+        Every skill-directory evidence failure.
+    """
+    key = (case.harness, case.eval_id)
+    if not case.observed_activation or case.final_terminal == WorkflowState.BLOCKED_SKILL_DIR_UNAVAILABLE:
+        return []
+    if case.skill_directory is None or not Path(case.skill_directory).is_absolute():
+        return [f"absolute skill directory unavailable: {key}"]
+    skill_directory = Path(case.skill_directory)
+    failures: list[str] = []
+    for action in case.actions:
+        if action.kind is not ActionKind.COMMAND or action.script_path is None:
+            continue
+        script_path = Path(action.script_path)
+        if not script_path.is_absolute() or not script_path.is_relative_to(skill_directory):
+            failures.append(f"command script escapes skill directory: {key}")
     return failures
 
 

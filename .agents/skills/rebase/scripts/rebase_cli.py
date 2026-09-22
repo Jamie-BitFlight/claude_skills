@@ -7,14 +7,23 @@ import hashlib
 import json
 from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from rebase_capture import capture_rebase
 from rebase_contracts import RebasePlan
-from rebase_finalize import build_managed_plan
+from rebase_finalize import build_managed_plan, delete_verified_recovery
 from rebase_managed import atomic_write, managed_root, resolve_managed_plan
 from rebase_models import CaptureRequest, FinalizeSemantics, PrepareRequest
-from rebase_prepare import PrepareFailure, execute_replay, run_git
+from rebase_prepare import PrepareFailure, execute_replay
+from rebase_responses import (
+    FinalizeReady,
+    PathStateResult,
+    ReplayResult,
+    SchemaDocument,
+    StateDocument,
+    ValidationReady,
+    WorkflowTerminal,
+)
 from rebase_states import WORKFLOW_STATE_DEFINITIONS, WorkflowState
 
 
@@ -46,9 +55,11 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def emit_json(value: object) -> None:
+def emit_json(value: BaseModel) -> None:
     """Emit compact JSON for the agent-only consumer."""
-    print(json.dumps(value, separators=(",", ":"), sort_keys=True))
+    if not isinstance(value, BaseModel):
+        raise TypeError("structured CLI output requires a Pydantic model")
+    print(json.dumps(value.model_dump(mode="json", exclude_none=True), separators=(",", ":"), sort_keys=True))
 
 
 def raw_publication_requires_approval(raw: bytes) -> bool:
@@ -65,14 +76,24 @@ def raw_publication_requires_approval(raw: bytes) -> bool:
     )
 
 
-def publication_terminal() -> dict[str, object]:
+def publication_terminal() -> WorkflowTerminal:
     """Return the fail-closed publication terminal for this harness."""
-    return {
-        "error": "published-history replay requires a harness-owned human approval channel",
-        "state": WorkflowState.NEEDS_USER_DECISION,
-        "status": "DECISION_REQUIRED",
-        "terminal": True,
-    }
+    return WorkflowTerminal(
+        error="published-history replay requires a harness-owned human approval channel",
+        state=WorkflowState.NEEDS_USER_DECISION,
+        status="DECISION_REQUIRED",
+    )
+
+
+def validation_terminal(error: ValidationError) -> WorkflowTerminal:
+    """Convert Pydantic validation details to one typed terminal.
+
+    Returns:
+        Invalid-plan terminal with complete validation errors.
+    """
+    return WorkflowTerminal(
+        errors=json.loads(error.json(include_url=False)), state=WorkflowState.PLAN_INVALID, status="INVALID"
+    )
 
 
 def validate_plan(path: Path) -> int:
@@ -88,24 +109,15 @@ def validate_plan(path: Path) -> int:
             return 1
         plan = RebasePlan.model_validate_json(raw)
     except ValidationError as error:
-        emit_json({
-            "errors": json.loads(error.json(include_url=False)),
-            "state": WorkflowState.PLAN_INVALID,
-            "status": "INVALID",
-        })
+        emit_json(validation_terminal(error))
         return 1
     except OSError as error:
-        emit_json({"error": str(error), "state": WorkflowState.PLAN_INVALID, "status": "ERROR"})
+        emit_json(WorkflowTerminal(error=str(error), state=WorkflowState.PLAN_INVALID, status="ERROR"))
         return 2
     if not plan.has_publication_approval():
         emit_json(publication_terminal())
         return 1
-    emit_json({
-        "plan_id": plan.plan_id,
-        "sha256": hashlib.sha256(raw).hexdigest(),
-        "state": plan.ready_state,
-        "status": "VALID",
-    })
+    emit_json(ValidationReady(plan_id=plan.plan_id, sha256=hashlib.sha256(raw).hexdigest()))
     return 0
 
 
@@ -118,15 +130,17 @@ def load_unchanged_plan(path: Path, expected_sha256: str) -> tuple[RebasePlan, s
     try:
         raw = path.read_bytes()
     except OSError as error:
-        emit_json({"error": str(error), "state": WorkflowState.PLAN_INVALID, "status": "ERROR"})
+        emit_json(WorkflowTerminal(error=str(error), state=WorkflowState.PLAN_INVALID, status="ERROR"))
         return 2
     actual_sha256 = hashlib.sha256(raw).hexdigest()
     if actual_sha256 != expected_sha256:
-        emit_json({
-            "error": "plan artifact SHA-256 differs from the validated hash",
-            "state": WorkflowState.PLAN_INVALID,
-            "status": "INVALID",
-        })
+        emit_json(
+            WorkflowTerminal(
+                error="plan artifact SHA-256 differs from the validated hash",
+                state=WorkflowState.PLAN_INVALID,
+                status="INVALID",
+            )
+        )
         return 1
     if raw_publication_requires_approval(raw):
         emit_json(publication_terminal())
@@ -134,11 +148,7 @@ def load_unchanged_plan(path: Path, expected_sha256: str) -> tuple[RebasePlan, s
     try:
         plan = RebasePlan.model_validate_json(raw)
     except ValidationError as error:
-        emit_json({
-            "errors": json.loads(error.json(include_url=False)),
-            "state": WorkflowState.PLAN_INVALID,
-            "status": "INVALID",
-        })
+        emit_json(validation_terminal(error))
         return 1
     if not plan.has_publication_approval():
         emit_json(publication_terminal())
@@ -176,56 +186,31 @@ def finalize_plan(capture_id: str, semantics_json: str, approval_receipts: list[
     try:
         semantics = FinalizeSemantics.model_validate_json(semantics_json)
     except ValidationError as error:
-        emit_json({
-            "errors": json.loads(error.json(include_url=False)),
-            "state": WorkflowState.PLAN_INVALID,
-            "status": "INVALID",
-            "terminal": True,
-        })
+        emit_json(validation_terminal(error))
         return 1
-    raw_plan, terminal, exit_code = build_managed_plan(
-        Path.cwd(), capture_id, semantics, [Path(path) for path in approval_receipts]
-    )
-    if raw_plan is None:
-        emit_json(terminal)
-        return exit_code
-    try:
-        plan = RebasePlan.model_validate(raw_plan)
-    except ValidationError as error:
-        recovery_ref = str(raw_plan["recovery_ref"])
-        branch = raw_plan["branch"]
-        if isinstance(branch, dict) and isinstance(branch.get("oid"), str):
-            observed = run_git(Path.cwd(), "rev-parse", "--verify", f"{recovery_ref}^{{commit}}")
-            if observed.exit_code == 0 and observed.stdout.strip() == branch["oid"]:
-                run_git(Path.cwd(), "update-ref", "-d", recovery_ref, branch["oid"])
-        emit_json({
-            "errors": json.loads(error.json(include_url=False)),
-            "state": WorkflowState.PLAN_INVALID,
-            "status": "INVALID",
-            "terminal": True,
-        })
-        return 1
+    build = build_managed_plan(Path.cwd(), capture_id, semantics, [Path(path) for path in approval_receipts])
+    if build.terminal is not None:
+        emit_json(build.terminal)
+        return build.exit_code
+    if build.plan is None:
+        raise RuntimeError("plan build produced neither plan nor terminal")
+    plan = build.plan
     payload = plan.model_dump_json().encode() + b"\n"
     sha256 = hashlib.sha256(payload).hexdigest()
     plan_path = managed_root(Path.cwd()) / "plans" / f"{plan.plan_id}.json"
     try:
         atomic_write(plan_path, payload)
     except (FileExistsError, OSError) as error:
-        emit_json({
-            "error": str(error),
-            "state": WorkflowState.BLOCKED_GIT_STATE,
-            "status": "BLOCKED",
-            "terminal": True,
-        })
+        try:
+            delete_verified_recovery(Path.cwd(), plan.recovery_ref, plan.branch.oid)
+        except ValueError as cleanup_error:
+            emit_json(
+                WorkflowTerminal(error=str(cleanup_error), state=WorkflowState.BLOCKED_GIT_STATE, status="BLOCKED")
+            )
+            return 1
+        emit_json(WorkflowTerminal(error=str(error), state=WorkflowState.BLOCKED_GIT_STATE, status="BLOCKED"))
         return 1
-    emit_json({
-        "plan_id": plan.plan_id,
-        "plan_path": str(plan_path),
-        "sha256": sha256,
-        "state": WorkflowState.READY_TO_REBASE,
-        "status": "FINALIZED",
-        "terminal": False,
-    })
+    emit_json(FinalizeReady(plan_id=plan.plan_id, plan_path=str(plan_path), sha256=sha256))
     return 0
 
 
@@ -238,7 +223,7 @@ def execute_plan(path: Path, expected_sha256: str) -> int:
     try:
         managed_path = resolve_managed_plan(Path.cwd(), str(path))
     except (OSError, ValueError) as error:
-        emit_json({"error": str(error), "state": WorkflowState.PLAN_INVALID, "status": "INVALID", "terminal": True})
+        emit_json(WorkflowTerminal(error=str(error), state=WorkflowState.PLAN_INVALID, status="INVALID"))
         return 1
     loaded = load_unchanged_plan(managed_path, expected_sha256)
     if isinstance(loaded, int):
@@ -247,17 +232,19 @@ def execute_plan(path: Path, expected_sha256: str) -> int:
     try:
         execution = execute_replay(prepare_request(plan), Path.cwd(), actual_sha256)
     except PrepareFailure as error:
-        emit_json({"error": str(error), "state": error.state, "status": "BLOCKED"})
+        emit_json(WorkflowTerminal(error=str(error), state=error.state, status="BLOCKED"))
         return 1
     command = execution.command
-    emit_json({
-        "argv": command.argv,
-        "plan_id": plan.plan_id,
-        "receipt_path": execution.receipt_path,
-        "replay": command.model_dump(mode="json"),
-        "sha256": actual_sha256,
-        "status": "REPLAY_FINISHED" if command.exit_code == 0 else "REPLAY_STOPPED",
-    })
+    emit_json(
+        ReplayResult(
+            argv=command.argv,
+            plan_id=plan.plan_id,
+            receipt_path=execution.receipt_path,
+            replay=command,
+            sha256=actual_sha256,
+            status="REPLAY_FINISHED" if command.exit_code == 0 else "REPLAY_STOPPED",
+        )
+    )
     return 0 if command.exit_code == 0 else 1
 
 
@@ -280,9 +267,9 @@ def main() -> int:
     if args.command == "execute":
         return execute_plan(args.plan, args.expected_sha256)
     if args.command == "schema":
-        emit_json(RebasePlan.model_json_schema())
+        emit_json(SchemaDocument(root=RebasePlan.model_json_schema()))
     elif args.command == "path-state":
-        emit_json({"path": str(args.path), "present": args.path.exists()})
+        emit_json(PathStateResult(path=str(args.path), present=args.path.exists()))
     else:
-        emit_json([definition.model_dump(mode="json") for definition in WORKFLOW_STATE_DEFINITIONS])
+        emit_json(StateDocument(root=list(WORKFLOW_STATE_DEFINITIONS)))
     return 0

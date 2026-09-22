@@ -1,11 +1,11 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "skill_name": "rebase",
-  "observed_on": "2026-09-22",
+  "observed_on": "2026-09-23",
   "content_sha256": {
-    "SKILL.md": "caf58ad5d7909fc05a4bf07dabd98b221229954907757cc8031d22008153574d",
-    "references/active-rebase.md": "dcf11d64ecd7119a6cf4e3d4c5a92ae6a7d0f3a33726d2444963a63ce0bec3fe",
-    "references/start-rebase.md": "6325d7b6d1f120d4ca409fc6a660eccd3c8ab28e9e98c2f617418b78f9277382"
+    "SKILL.md": "a90bfd00aeb3340b01e357f97f691278599f86bb077109419129caf8ca7d5b7e",
+    "references/active-rebase.md": "9d1dd8fd6c99d6e36f733e0b7c090e2ba45b6e489552b5ba487d9a78278ea167",
+    "references/start-rebase.md": "3ba42880f7d90463a9a29a6244243da707dc9d2b48322f1d300b669807579277"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },
@@ -14,7 +14,8 @@
     { "harness": "opencode", "eval_id": 4 },
     { "harness": "opencode", "eval_id": 5 },
     { "harness": "opencode", "eval_id": 6 },
-    { "harness": "codex", "eval_id": 2 }
+    { "harness": "codex", "eval_id": 2 },
+    { "harness": "isolated", "eval_id": 7 }
   ],
   "cases": [
     {
@@ -25,6 +26,7 @@
       "eval_id": 1,
       "prompt": "Rebase feature/a onto main.",
       "observed_activation": true,
+      "skill_directory": "/tmp/rebase-skill-isolated.fZHi4E/rebase",
       "loaded_sources": ["SKILL.md", "references/start-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
@@ -32,6 +34,7 @@
         {
           "kind": "command",
           "operation": "rebase_plan.py capture --branch feature/a --target main",
+          "script_path": "/tmp/rebase-skill-isolated.fZHi4E/rebase/scripts/rebase_plan.py",
           "exit_code": 1,
           "resulting_terminal": "BLOCKED_INVALID_REF"
         },
@@ -52,11 +55,17 @@
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
+      "skill_directory": "/tmp/rebase-skill-isolated.fZHi4E/rebase",
       "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
         { "kind": "read", "operation": "load active-rebase entry reference" },
-        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        {
+          "kind": "command",
+          "operation": "rebase_active.py",
+          "script_path": "/tmp/rebase-skill-isolated.fZHi4E/rebase/scripts/rebase_active.py",
+          "exit_code": 0
+        },
         { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
@@ -74,11 +83,17 @@
       "eval_id": 3,
       "prompt": "Abort this rebase and restore the original branch.",
       "observed_activation": true,
+      "skill_directory": "/tmp/rebase-skill-isolated.fZHi4E/rebase",
       "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
         { "kind": "read", "operation": "load active-rebase entry reference" },
-        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        {
+          "kind": "command",
+          "operation": "rebase_active.py",
+          "script_path": "/tmp/rebase-skill-isolated.fZHi4E/rebase/scripts/rebase_active.py",
+          "exit_code": 0
+        },
         { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
@@ -200,11 +215,17 @@
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
+      "skill_directory": "/tmp/rebase-skill-isolated.fZHi4E/rebase",
       "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "read complete rebase SKILL.md" },
         { "kind": "read", "operation": "read complete active-rebase entry reference" },
-        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        {
+          "kind": "command",
+          "operation": "rebase_active.py",
+          "script_path": "/tmp/rebase-skill-isolated.fZHi4E/rebase/scripts/rebase_active.py",
+          "exit_code": 0
+        },
         { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
@@ -213,6 +234,27 @@
       "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
       "repository_status_before": "?? .agents/\n",
       "repository_status_after": "?? .agents/\n"
+    },
+    {
+      "harness": "isolated",
+      "model": "gpt-5.6-sol",
+      "proxy": "local",
+      "session_id": "isolated_rebase_metadata_eval",
+      "eval_id": 7,
+      "prompt": "Rebase feature/a onto main without loaded-skill directory metadata.",
+      "observed_activation": true,
+      "skill_directory": null,
+      "loaded_sources": ["SKILL.md"],
+      "actions": [
+        { "kind": "read", "operation": "load rebase skill" },
+        { "kind": "terminal", "operation": "BLOCKED_SKILL_DIR_UNAVAILABLE" }
+      ],
+      "state_transitions": ["BLOCKED_SKILL_DIR_UNAVAILABLE"],
+      "final_terminal": "BLOCKED_SKILL_DIR_UNAVAILABLE",
+      "repository_head_before": "NO_REPOSITORY_ACCESSED",
+      "repository_head_after": "NO_REPOSITORY_ACCESSED",
+      "repository_status_before": "NO_REPOSITORY_ACCESSED",
+      "repository_status_after": "NO_REPOSITORY_ACCESSED"
     }
   ]
 }

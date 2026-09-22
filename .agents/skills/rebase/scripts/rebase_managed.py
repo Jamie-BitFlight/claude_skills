@@ -22,6 +22,7 @@ from rebase_models import (
     ObjectId,
 )
 from rebase_prepare import COMMAND_TIMEOUT_SECONDS, TERMINATION_GRACE_SECONDS, run_git
+from rebase_responses import WorkflowTerminal
 from rebase_states import WorkflowState
 
 PLAN_SCRIPT = Path(__file__).with_name("rebase_plan.py")
@@ -98,16 +99,15 @@ def command_evidence(repository: Path, *arguments: str) -> CommandEvidence:
     )
 
 
-def ref_terminal(evidence: CommandEvidence, ref: str) -> tuple[dict[str, object], int]:
+def ref_terminal(evidence: CommandEvidence, ref: str) -> tuple[WorkflowTerminal, int]:
     """Return the canonical invalid-ref terminal."""
     return (
-        {
-            "command": evidence.model_dump(mode="json"),
-            "error": f"invalid local ref: {ref}",
-            "state": WorkflowState.BLOCKED_INVALID_REF,
-            "status": "BLOCKED",
-            "terminal": True,
-        },
+        WorkflowTerminal(
+            command=evidence,
+            error=f"invalid local ref: {ref}",
+            state=WorkflowState.BLOCKED_INVALID_REF,
+            status="BLOCKED",
+        ),
         1,
     )
 
