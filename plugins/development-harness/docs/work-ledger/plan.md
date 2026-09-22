@@ -117,7 +117,7 @@ pull request that merged it, and ADR-1770-1 carries its `Superseded by` line.
    `dispatch` and exactly one wins, red against a read-then-write implementation; a worktree and
    its main checkout open one database; a network mount type refuses; a database written by the
    previous schema version opens and folds; every M3 fixture round-trips through import field
-   for field; `export` prints `unchanged` after a wave that only renewed.
+   for field; `export` prints a line starting `unchanged` after a wave that only renewed.
 4. `tests_sam/fixtures/loop-plan/` (three tasks, two parallel, one whose first attempt leaves a
    criterion unmet, `lease.ttl_seconds` 60) and `tests_sam/scripted_runner.py`, the PEP 723 entry
    script over `tests_sam/scripted_runner_lib/`, driving dispatch, read, renew, both report

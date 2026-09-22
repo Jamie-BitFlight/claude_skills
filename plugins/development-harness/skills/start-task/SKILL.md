@@ -125,13 +125,20 @@ Without an attempt number, no runner is closing anything, so move the status dir
    task claimed that way leaves the ledger row exactly where it was and the orchestrator watching a
    task that never moved. Use `plan read --attempt {n}` (step 1) as your first command instead.
 
-   A refusal prints its reason code and what that code means. Read the message; it names the
-   flag that lifts the refusal where one exists. Three codes need a reply beyond what the
-   message says:
+   A refusal prints its reason code and what that code means. Read the message, then decide by
+   which flag it offers:
+
+   - **A flag that corrects your own call** — `--attempt`, `--reason`, `--path`, `--new-status` —
+     is yours to fix. Correct the call and run it again.
+   - **A flag that overrides the refusal** — `--force`, `--more-attempts`, `--replace` — is the
+     orchestrator's decision, never yours. `--force` past `leased` takes over an attempt another
+     agent is working in. Report the refusal and stop.
+
+   Three codes need a reply beyond what the message says:
 
    | code | what to return |
    |---|---|
-   | `stale-attempt` | STATUS: BLOCKED with `stale-attempt` as the reason. |
+   | `stale-attempt` | STATUS: BLOCKED with `stale-attempt` as the reason. Do not re-read and continue on the new attempt — the orchestrator reassigned it. |
    | `attempt-closed` | STATUS: DONE when you had already run `finish`, otherwise STATUS: BLOCKED with `attempt-closed`. |
    | `archived` | Stop and report it. |
 

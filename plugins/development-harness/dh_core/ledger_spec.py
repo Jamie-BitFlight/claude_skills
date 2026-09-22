@@ -553,13 +553,18 @@ REASONS: list[Reason] = [
         code="not-ready",
         kind=ReasonKind.REFUSAL,
         condition="tasks.ready is false",
-        message="This task is not ready. A task it depends on has not finished yet.",
+        message=(
+            "This task is not ready. Either a task it depends on has not finished, or another "
+            "task in its conflict group is still running, or it has already been started."
+        ),
     ),
     Reason(
         code="stale-attempt",
         kind=ReasonKind.REFUSAL,
         condition="--attempt differs from tasks.attempts",
-        message="A later attempt superseded the one you passed to --attempt. Read the task again for the current attempt number.",
+        message=(
+            "The --attempt you passed is not the attempt this task is on. Read the task again for the current number."
+        ),
     ),
     Reason(
         code="attempt-closed",
@@ -619,7 +624,7 @@ REASONS: list[Reason] = [
         code="status-invalid",
         kind=ReasonKind.REFUSAL,
         condition="--new-status is not one of complete, failed, blocked, deferred, skipped",
-        message="--new-status takes one of complete, failed, blocked, deferred, skipped.",
+        message=f"--new-status takes one of {', '.join(sorted(s.value for s in BATCH_TERMINAL))}.",
     ),
     Reason(
         code="exists",
@@ -679,6 +684,11 @@ REASONS: list[Reason] = [
 
 REASON_BY_CODE: dict[str, Reason] = {reason.code: reason for reason in REASONS}
 """Every reason by its code, so a command that refuses can print what the code means."""
+
+if len(REASON_BY_CODE) != len(REASONS):
+    _repeated = sorted({r.code for r in REASONS if sum(x.code == r.code for x in REASONS) > 1})
+    _msg = f"REASONS repeats {_repeated}; the later entry silently replaces the earlier one."
+    raise AssertionError(_msg)
 
 NETWORK_FILESYSTEMS: tuple[str, ...] = ("nfs", "nfs4", "cifs", "smb2", "fuse.sshfs", "9p")
 """Mount types on which WAL mode cannot share memory; open refuses with ``network-filesystem``."""

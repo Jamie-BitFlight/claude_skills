@@ -65,7 +65,7 @@ Read before deciding: `read --address P/T` gives the current attempt's `Completi
 | J15 | `reclaim` printed `attempts-exhausted` | put the attempt history to the user; on a go-ahead, `reclaim --address P/T --reason more --more-attempts --response "<the guidance>"`; on a stop, `state --address P/T --new-status skipped --reason user` |
 | J16 | `reclaim` printed `task-accepted` or `dependents-started` | add `--force` for a TN send-back (J17) or a user instruction, and say which in `--reason` |
 | J17 | TN verdict FAIL | `reclaim --force` on the TN task and on every task whose report's `FILES_CHANGED` overlaps the files the failing criterion names, each with the regression as `--response` |
-| J18 | `accept` printed `already-accepted`, `reclaim` printed `already-open`, `export` printed `unchanged` | proceed |
+| J18 | `accept`, `reclaim` or `export` printed a line starting `already-accepted`, `already-open` or `unchanged` | proceed |
 | J19 | `accept` printed `not-complete` | go to the row its status names |
 | J20 | any command printed `archived` | the plan is closed; stop and tell the user |
 
@@ -85,5 +85,5 @@ rather than working through the set you last received. Accept each task the mome
 
 ## Export
 
-Run `export --plan-address P` after each judgement and at completion; it prints `unchanged` when
+Run `export --plan-address P` after each judgement and at completion; it prints a line starting `unchanged` when
 there is nothing new to write.
