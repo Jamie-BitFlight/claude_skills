@@ -148,7 +148,7 @@ def create_context_backend(name: str | None = None) -> ContextBackend:
         return BeadsContextBackend()
 
     if resolved == "github":
-        msg = "GitHub context backend is not constructible pending #3455. Use 'local' or 'memory' instead."
+        msg = "The github context backend is not available. Set the context backend to 'local' or 'memory'."
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
