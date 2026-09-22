@@ -27,6 +27,26 @@ class Mutant:
     selector: str
 
 
+@dataclass(frozen=True)
+class ProbeResult:
+    """Complete returned evidence from one executable runner probe."""
+
+    identity: str
+    passed: bool
+    argv: tuple[str, ...]
+    cwd: str
+    repository_identity: str
+    returncode: int | None
+    timed_out: bool
+    stdout: bytes
+    stderr: bytes
+
+
+def run_self_test_probes() -> tuple[ProbeResult, ...]:
+    """Execute and return all mutation-runner self-test probes."""
+    return ()
+
+
 MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         "T2-M01",

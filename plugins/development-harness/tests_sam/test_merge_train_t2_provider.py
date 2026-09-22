@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,9 @@ from dh_core.github_git_push import GitHubCapabilityAdmission, GitHubCapabilityO
 from dh_core.integration_branch import GitPushCapability, IntegrationBranchAdvancer
 from dh_core.ledger import store
 from dh_core.merge_evidence import MergeEvidenceStore
+from dh_core.merge_train import AdmitCandidate, PolicySnapshot, SubmitCandidate
+
+from tests_sam.test_merge_train_t2_candidates import accept_assignment, service
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -99,6 +103,120 @@ def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) 
         {"atomic_review_guard": True},
     ):
         assert not admission.evaluate(production_observation(**drift)).supports_expected_head_advance
+
+
+def test_f21_capability_rejects_observation_with_unrelated_supplied_capability(tmp_path: Path) -> None:
+    observation = production_observation()
+    admission = GitHubCapabilityAdmission.from_receipt(observation)
+
+    result = admission.evaluate(observation)
+
+    assert result.remote_identity == "github.com/Jamie-BitFlight/claude_skills"
+    assert result.actor_identity == "Jamie-BitFlight"
+    assert result.git_version == "2.55.0"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("hostname", "evil.example"),
+        ("repository_id", 1),
+        ("repository", "attacker/other"),
+        ("target_ref", "refs/heads/main"),
+        ("actor", "attacker"),
+        ("actor_permissions_snapshot_digest", "sha256:" + "7" * 64),
+        ("rules_snapshot_digest", "sha256:" + "8" * 64),
+        ("git_version", "0.0.0"),
+        ("configuration_digest", "sha256:" + "9" * 64),
+        ("evidence_digest", "sha256:" + "a" * 64),
+        ("result_shape", "MERGE_COMMIT"),
+        ("atomic_review_guard", True),
+    ],
+)
+def test_f21_capability_identity_matches_every_derived_source_field(field: str, value: object) -> None:
+    receipt = production_observation()
+    admission = GitHubCapabilityAdmission.from_receipt(receipt)
+
+    result = admission.evaluate(production_observation(**{field: value}))
+
+    assert not result.supports_expected_head_advance
+
+
+def test_f14_preflight_derives_actual_configured_remote_identity(tmp_path: Path) -> None:
+    work, remote, _base, _candidate = repository(tmp_path)
+    port = LocalBareGitPushPort(
+        workdir=work,
+        remote="origin",
+        remote_identity="github.com/attacker/other",
+        target_ref="refs/heads/integration/t2",
+    )
+
+    observed = port.preflight_repository()
+
+    assert observed.available
+    assert observed.remote_identity != "github.com/attacker/other"
+    assert Path(observed.remote_identity.removeprefix("file://")) == remote.resolve()
+
+
+def test_f11_admit_rejects_snapshot_for_other_pull_request_same_sha(tmp_path: Path) -> None:
+    train, connection = service(tmp_path)
+    maker = accept_assignment(train, connection, "T1")
+    candidate = train.submit(
+        SubmitCandidate(
+            plan="Pt2",
+            generation=1,
+            branch="candidate",
+            pull_request_ref="PR-EXPECTED",
+            candidate_sha="b" * 40,
+            base_sha="a" * 40,
+            maker=maker,
+            maker_evidence_digest=train.evidence.put(b'{"maker":true}', "application/json").digest,
+        )
+    )
+    checker = accept_assignment(train, connection, "T2")
+    checker_evidence = train.evidence.put(b'{"checker":true}', "application/json")
+
+    class WrongPullRequest:
+        def observe(self, candidate_sha: str, pull_request_ref: str) -> PolicySnapshot:
+            return PolicySnapshot(
+                candidate_sha=candidate_sha,
+                pull_request_ref="PR-OTHER",
+                required_checks=(("tests", candidate_sha, "success"),),
+                capability_identity="cap",
+                complete=True,
+                available=True,
+                freshness_token="fresh",
+                observed_at=datetime(2026, 1, 1),
+            )
+
+    train.policy_observer = WrongPullRequest()
+    with pytest.raises(store.Refusal):
+        train.admit(
+            AdmitCandidate(
+                plan="Pt2",
+                generation=1,
+                task="T1",
+                candidate_number=candidate.candidate_number,
+                checker=checker,
+                checker_evidence_digest=checker_evidence.digest,
+            )
+        )
+    assert connection.execute("SELECT admitted_seq FROM merge_candidates").fetchone()[0] is None
+
+
+def test_f11_pull_request_ref_change_requires_reconciliation() -> None:
+    expected = PolicySnapshot(
+        candidate_sha="b" * 40,
+        pull_request_ref="PR-EXPECTED",
+        required_checks=(("tests", "b" * 40, "success"),),
+        capability_identity="cap",
+        complete=True,
+        available=True,
+        freshness_token="one",
+        observed_at=datetime(2026, 1, 1),
+    )
+    other = expected.model_copy(update={"pull_request_ref": "PR-OTHER", "freshness_token": "two"})
+    assert expected.semantic_projection() != other.semantic_projection()
 
 
 def test_f14_local_bare_push_uses_exact_old_and_prepared_result(tmp_path: Path) -> None:

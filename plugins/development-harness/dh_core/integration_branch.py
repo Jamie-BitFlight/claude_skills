@@ -29,6 +29,29 @@ class PreparedAdvance(StrictModel):
     prepared_identity_digest: str
 
 
+class CanonicalCapabilityIdentity(StrictModel):
+    """Canonical actual-remote capability tuple derived by admission."""
+
+    hostname: str
+    repository_id: int
+    repository_owner: str
+    repository_name: str
+    canonical_remote_identity: str
+    target_ref: str
+    actor_identity: str
+    actor_permissions_snapshot_digest: str
+    rules_snapshot_digest: str
+    production_configuration_digest: str
+    production_evidence_digest: str
+    sandbox_report_digest: str
+    sandbox_transcript_digest: str
+    git_version: str
+    primitive: Literal["git-smart-push-explicit-lease"]
+    supported_target_policy: Literal["direct-fast-forward"]
+    supported_result_shape: Literal["DIRECT_FAST_FORWARD"]
+    supports_atomic_review_guard: bool
+
+
 class GitPushCapability(StrictModel):
     """Exact admitted runtime capability identity."""
 
@@ -46,6 +69,7 @@ class GitPushCapability(StrictModel):
     supports_expected_head_advance: bool = False
     supports_atomic_review_guard: bool = False
     primitive: Literal["git-smart-push-explicit-lease"] = "git-smart-push-explicit-lease"
+    canonical_identity: CanonicalCapabilityIdentity | None = None
 
 
 class RepositoryIdentityObservation(StrictModel):
@@ -53,6 +77,10 @@ class RepositoryIdentityObservation(StrictModel):
 
     remote_identity: str
     available: bool
+    hostname: str = ""
+    repository_owner: str = ""
+    repository_name: str = ""
+    target_ref: str = ""
 
 
 class RefObservation(StrictModel):

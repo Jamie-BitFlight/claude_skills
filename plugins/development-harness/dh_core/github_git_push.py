@@ -41,6 +41,11 @@ class GitHubCapabilityAdmission(BaseModel):
     observation: GitHubCapabilityObservation
     capability: GitPushCapability
 
+    @classmethod
+    def from_receipt(cls, observation: GitHubCapabilityObservation) -> GitHubCapabilityAdmission:
+        """Construct admission from trusted receipt data rather than a supplied capability."""
+        raise NotImplementedError
+
     def evaluate(self, observed: GitHubCapabilityObservation) -> GitPushCapability:
         """Fail closed unless every semantic runtime fact matches.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dh_core.integration_branch import (
+    CanonicalCapabilityIdentity,
     GitObjectFacts,
     GitPushAttempt,
     GitPushCapability,
@@ -55,6 +56,29 @@ def capability(*, supported: bool = True) -> GitPushCapability:
         proof_transcript_digest="sha256:" + "4" * 64,
         git_version="2.55.0",
         supports_expected_head_advance=supported,
+    )
+
+
+def canonical_identity() -> CanonicalCapabilityIdentity:
+    return CanonicalCapabilityIdentity(
+        hostname="github.com",
+        repository_id=1080600074,
+        repository_owner="Jamie-BitFlight",
+        repository_name="claude_skills",
+        canonical_remote_identity="github.com/Jamie-BitFlight/claude_skills",
+        target_ref="refs/heads/integration/runtime-integrity",
+        actor_identity="Jamie-BitFlight",
+        actor_permissions_snapshot_digest="sha256:" + "1" * 64,
+        rules_snapshot_digest="sha256:" + "2" * 64,
+        production_configuration_digest="sha256:" + "3" * 64,
+        production_evidence_digest="sha256:" + "4" * 64,
+        sandbox_report_digest="sha256:" + "5" * 64,
+        sandbox_transcript_digest="sha256:" + "6" * 64,
+        git_version="2.55.0",
+        primitive="git-smart-push-explicit-lease",
+        supported_target_policy="direct-fast-forward",
+        supported_result_shape="DIRECT_FAST_FORWARD",
+        supports_atomic_review_guard=False,
     )
 
 
@@ -156,3 +180,17 @@ def test_f14_exact_prepared_operands_advance() -> None:
 
     assert result.outcome == "advanced"
     assert port.pushes == [("a" * 40, "b" * 40)]
+
+
+def test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity() -> None:
+    port = PushSpy()
+    admitted = capability().model_copy(update={"canonical_identity": canonical_identity()})
+    attacker = admitted.model_copy(update={"actor_identity": "attacker", "git_version": "0.0.0"})
+    advancer = IntegrationBranchAdvancer(
+        port, attacker, remote_identity=attacker.remote_identity, target_ref="refs/heads/integration/runtime-integrity"
+    )
+
+    result = advancer.advance(prepared())
+
+    assert result.outcome == "expected-head-unsupported"
+    assert port.pushes == []
