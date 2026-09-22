@@ -4,6 +4,12 @@
 
 A component project must have a root `README.md` documenting every component and a top-level `templates/` directory. Store each component in `templates/<name>.yml` or `templates/<name>/template.yml`.
 
+Use `assets/release-components/` for a complete release-component project shape. Keep orchestration
+in the consumer: workflow admission, the full stage list, policy rules, one version-adapter
+selection, project builds, dependencies, and immutable component pins. Component templates remain
+self-contained and expose configuration through typed inputs. Version component repository inputs
+must be credential-free HTTPS URLs.
+
 ```yaml
 spec:
   inputs:
@@ -19,6 +25,7 @@ All components in a project are versioned together. A project can contain up to 
 
 SOURCE: <https://docs.gitlab.com/ci/components/#create-a-component-project> (accessed 2026-09-21)
 SOURCE: <https://docs.gitlab.com/ci/components/#directory-structure> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/ci/components/#avoid-using-global-keywords> (accessed 2026-09-22)
 
 ## Test a Component
 
@@ -33,7 +40,17 @@ include:
 
 Authentication is required when the project is private.
 
+Resolve access for the actor that creates every consuming pipeline, including an ordinary tag
+pipeline created by a release credential. A project-access-token bot cannot be added to another
+private project. Use a public component project, an internal project visible to that actor, or a
+different release actor with the required role in the private component project.
+
+Compile every changed same-SHA component before advancing a consumer pin. Quote or use a block
+scalar for every YAML shell list item containing colon-space so YAML does not parse the command as a
+mapping.
+
 SOURCE: <https://docs.gitlab.com/ci/components/#test-the-component> (accessed 2026-09-21)
+SOURCE: <https://docs.gitlab.com/user/project/settings/project_access_tokens/> (accessed 2026-09-22)
 
 ## Publish to the CI/CD Catalog
 

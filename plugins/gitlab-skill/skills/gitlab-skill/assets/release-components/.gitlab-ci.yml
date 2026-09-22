@@ -1,0 +1,123 @@
+include:
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/semantic-release-version@$CI_COMMIT_SHA
+    inputs:
+      job-name: test-semantic-release-version
+      stage: test
+      image: node:__NODE_VERSION__-alpine@sha256:__NODE_IMAGE_DIGEST__
+      semantic-release-version: __SEMANTIC_RELEASE_VERSION__
+      git-remote-name: origin
+      repository-url: $CI_PROJECT_URL.git
+      environment: release-version
+      credential-variable: COMPONENT_TEST_RELEASE_TOKEN
+      rules:
+        - when: never
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/python-semantic-release-version@$CI_COMMIT_SHA
+    inputs:
+      job-name: test-python-semantic-release-version
+      stage: test
+      image: python:__PYTHON_VERSION__-alpine@sha256:__PYTHON_IMAGE_DIGEST__
+      python-semantic-release-version: __PYTHON_SEMANTIC_RELEASE_VERSION__
+      git-author-name: Release Bot
+      git-author-email: release-bot@example.invalid
+      git-remote-name: origin
+      repository-url: $CI_PROJECT_URL.git
+      environment: release-version
+      credential-variable: COMPONENT_TEST_RELEASE_TOKEN
+      rules:
+        - when: never
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/release-notes@$CI_COMMIT_SHA
+    inputs:
+      job-name: test-release-notes
+      stage: test
+      image: alpine:__ALPINE_VERSION__@sha256:__ALPINE_IMAGE_DIGEST__
+      release-tag-pattern: v*
+      rules:
+        - when: never
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/generic-package@$CI_COMMIT_SHA
+    inputs:
+      job-name: test-generic-package
+      stage: test
+      image: curlimages/curl:__CURL_VERSION__@sha256:__CURL_IMAGE_DIGEST__
+      artifact-path: dist/release.tar.gz
+      asset-name: release.tar.gz
+      needs: []
+      rules:
+        - when: never
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/gitlab-release@$CI_COMMIT_SHA
+    inputs:
+      job-name: test-gitlab-release
+      stage: test
+      image: registry.gitlab.com/gitlab-org/cli:__GLAB_VERSION__@sha256:__GLAB_IMAGE_DIGEST__
+      description-file: release-notes.md
+      asset-name: release.tar.gz
+      needs: []
+      rules:
+        - when: never
+
+stages:
+  - test
+  - release
+
+validate-component-tree:
+  stage: test
+  image: python:__PYTHON_VERSION__-alpine@sha256:__PYTHON_IMAGE_DIGEST__
+  script:
+    - >-
+      python -c 'import json, pathlib;
+      expected = set(json.loads(pathlib.Path("component-manifest.json").read_text())["templates"]);
+      actual = {path.name for path in pathlib.Path("templates").glob("*.yml")};
+      assert actual == expected, {"expected": sorted(expected), "actual": sorted(actual)}'
+
+test-release-basic-header:
+  stage: test
+  image: alpine/git:__GIT_VERSION__@sha256:__GIT_IMAGE_DIGEST__
+  script:
+    - |
+      set -eu
+      release_credential=release-credential-sentinel
+      git config credential.interactive never
+      git config url.https://gitlab-ci-token:job-token@fixture.invalid/.insteadOf https://fixture.invalid/
+      git config credential.https://fixture.invalid.helper '!f() { test "$1" = get || exit 0; printf "username=gitlab-ci-token\npassword=job-token\n"; }; f "$@"'
+      release_authorization="$(printf 'oauth2:%s' "$release_credential" | base64 | tr -d '\n')"
+      EXPECTED_HEADER="Authorization: Basic ${release_authorization}" \
+      EXPECTED_KEY=http.https://fixture.invalid/repo.git.extraHeader \
+      GIT_TERMINAL_PROMPT=0 \
+      GIT_CONFIG_COUNT=1 \
+      GIT_CONFIG_KEY_0=http.https://fixture.invalid/repo.git.extraHeader \
+      GIT_CONFIG_VALUE_0="Authorization: Basic ${release_authorization}" \
+      sh -c 'test "$(git config --get-all "$EXPECTED_KEY")" = "$EXPECTED_HEADER"'
+      ! git config --get-all http.https://fixture.invalid/repo.git.extraHeader
+      ! grep -Fq "$release_credential" .git/config
+
+test-release-tag-selection:
+  stage: test
+  image: alpine/git:__GIT_VERSION__@sha256:__GIT_IMAGE_DIGEST__
+  script:
+    - git init fixture
+    - git -C fixture config user.name Fixture
+    - git -C fixture config user.email fixture@example.invalid
+    - git -C fixture commit --allow-empty -m first
+    - git -C fixture tag v1.0.0
+    - git -C fixture commit --allow-empty -m unrelated
+    - git -C fixture tag unrelated-9.0.0
+    - git -C fixture commit --allow-empty -m current
+    - git -C fixture tag v1.1.0
+    - test "$(git -C fixture describe --tags --match 'v*' --abbrev=0 'v1.1.0^')" = v1.0.0
+
+publish-component-catalog:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:__GLAB_VERSION__@sha256:__GLAB_IMAGE_DIGEST__
+  needs:
+    - validate-component-tree
+    - test-release-basic-header
+    - test-release-tag-selection
+  script:
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test -n "$CI_COMMIT_TAG"
+    - test -z "${CI_COMMIT_BRANCH:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$/'
+  release:
+    tag_name: $CI_COMMIT_TAG
+    description: Release $CI_COMMIT_TAG of components in $CI_PROJECT_PATH

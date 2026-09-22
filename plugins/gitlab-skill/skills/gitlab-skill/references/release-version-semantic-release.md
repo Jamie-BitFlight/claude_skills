@@ -1,20 +1,29 @@
 # semantic-release Version Adapter
 
-Evidence: **LIVE-VERIFIED behavior** with semantic-release `25.0.9`; generalized assets are
-**DERIVED + CI-LINT-VERIFIED**.
+Evidence: **LIVE-VERIFIED** semantic-release `25.0.9` process-scoped Basic transport in consumer
+project `529` with component project `628`; the reusable component generalizes that correction. See
+[Cold Run 4 Semantic Component Evidence](./release-live-evidence.md#cold-run-4-semantic-component-evidence)
+for the retained project, pipeline, and job evidence.
 
-Copy `assets/release-playbook/semantic-release.gitlab-ci.yml` and `.releaserc.cjs`. The environment-
-aware config requires `CI_DEFAULT_BRANCH` and the base-provided `RELEASE_TAG_PREFIX`, then derives
-`tagFormat`. Resolve immutable Node image digest and tool version. Keep only commit analysis so the tag
-pipeline owns notes, build, publication, and Release creation.
+Include `assets/release-components/templates/semantic-release-version.yml` from a dedicated
+component project. Pass a unique job name, the consumer's version stage and rules, a digest-pinned
+Node image, an exact tool version, tag prefix, selected Git remote name, explicit credential-free
+HTTPS repository URL, and the dedicated version environment. It passes the URL as semantic-release's
+`repositoryUrl` and keeps only commit analysis so the tag pipeline owns notes, build, publication,
+and Release creation. Pass a collision-free credential variable name; its same-scope `_SHA256`
+companion must match before remote mutation. Basic authorization is process-scoped to the selected
+remote's effective HTTPS URL and does not apply to other hosts.
 
 Requirements:
 
 - complete Git history and tags (`GIT_DEPTH: "0"`);
 - Git in the selected image;
-- protected Git credential exposed as `GL_TOKEN` only in the version job;
-- `CI_DEFAULT_BRANCH` present and the resolved prefix/regex/wildcard contract aligned; and
+- selected remote exists and the explicit repository URL identifies its release target;
+- `CI_DEFAULT_BRANCH` present and the consumer's prefix, regex, and protected wildcard aligned; and
 - successful no-release output when no configured commit warrants release.
+
+Apply the exact variable scope and secret-handling boundary from the
+[component-project README](../assets/release-components/README.md).
 
 ## First-Release Forecast
 
@@ -43,7 +52,13 @@ checkout satisfying the configured release branch. A candidate-branch dry run is
 future merged default-branch history; report that distinction and forecast the prospective complete
 range rather than converting candidate output into a main outcome claim.
 
-Validation gate: apply **Gates G2, G3, and G5** from the universal lifecycle.
+Apply the structure, composition, credential, and main
+[validation gates](./automatic-tag-and-release.md#validation-gates).
 
 SOURCE: <https://semantic-release.org/foundation/plugins/> (accessed 2026-09-22; semantic-release `25.0.9` behavior live verified)
-SOURCE: <https://semantic-release.gitbook.io/semantic-release/usage/configuration#dryrun> (accessed 2026-09-22; dry-run behavior documentation-verified)
+SOURCE: <https://semantic-release.org/usage/configuration/#repositoryurl> (accessed 2026-09-22; explicit repository target)
+SOURCE: <https://semantic-release.org/usage/configuration/#dryrun> (accessed 2026-09-22; dry-run behavior documentation-verified)
+SOURCE: <https://docs.gitlab.com/ci/environments/#limit-the-environment-scope-of-a-cicd-variable> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/environments/#access-an-environment-for-preparation-or-verification-purposes> (accessed 2026-09-22)
+SOURCE: <https://semantic-release.org/usage/ci-configuration/#authentication> (accessed 2026-09-22; process-scoped Basic transport live verified in projects 529 and 628)
+SOURCE: <https://git-scm.com/docs/git-config#Documentation/git-config.txt-httpextraHeader> (accessed 2026-09-22)

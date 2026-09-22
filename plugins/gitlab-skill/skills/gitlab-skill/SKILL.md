@@ -15,8 +15,8 @@ Load each reference whose trigger matches the task:
 - [Security and Deprecations](./references/security-and-deprecations.md) - Load when reviewing untrusted includes/components, handling credentials, pinning dependencies, or modernizing deprecated CI syntax.
 - [GitLab CI Local](./references/gitlab-ci-local-guide.md) - Load for local executors, input validation, include caching, `--skip-input-validation`, or `--fetch-includes`.
 - [GitLab Flavored Markdown](./references/glfm-syntax.md) - Load for documented GLFM syntax and rendering constraints.
-- [glab CLI](./references/glab-cli.md) - Load for CI Lint validation decisions or before composing `glab` API, repository, CI inspection, merge-request, token, or variable commands, especially on self-managed hosts.
+- [glab CLI](./references/glab-cli.md) - Load for existing-ref CI Lint or before composing `glab` API, repository, CI inspection, merge-request, token, or variable commands, especially on self-managed hosts.
 - [Automatic Tags and Releases](./references/automatic-tag-and-release.md) - Load for automatic release intake, no-release or release branches, replaceable adapters, release-tag routing, composition, or universal checkpoint reporting; follow its conditional pointers for selected tools, destinations, and credentials.
 - [Release Live Evidence](./references/release-live-evidence.md) - Load only when the user requests live proof, sandbox IDs, observed failures, or evidence classification for the release lifecycle.
 
-For uncovered CI/CD subjects, consult the [official GitLab CI/CD documentation](https://docs.gitlab.com/ci/). For uncovered GLFM subjects, consult the [official GitLab Flavored Markdown documentation](https://docs.gitlab.com/user/markdown/). The glab CI inspection branch is this skill's CI Lint operational authority.
+For uncovered CI/CD subjects, consult the [official GitLab CI/CD documentation](https://docs.gitlab.com/ci/). For uncovered GLFM subjects, consult the [official GitLab Flavored Markdown documentation](https://docs.gitlab.com/user/markdown/). The existing-ref glab inspection branch is this skill's CI Lint operational authority.

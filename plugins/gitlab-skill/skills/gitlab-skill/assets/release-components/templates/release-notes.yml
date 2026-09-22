@@ -1,0 +1,56 @@
+spec:
+  inputs:
+    job-name:
+      description: Unique release-notes job name.
+    stage:
+      description: Consumer-owned stage for release-note generation.
+    rules:
+      description: Consumer-owned admission policy for the release-notes job.
+      type: array
+    needs:
+      description: Consumer-owned prerequisite jobs.
+      type: array
+      default: []
+    image:
+      description: Digest-pinned Alpine image.
+    output-file:
+      description: Markdown artifact consumed by the GitLab Release component.
+      default: release-notes.md
+    release-tag-pattern:
+      description: Git tag glob limiting current and previous release tags.
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  rules: $[[ inputs.rules ]]
+  needs: $[[ inputs.needs ]]
+  variables:
+    GIT_DEPTH: "0"
+    RELEASE_DESCRIPTION_PATH: "$[[ inputs.output-file ]]"
+    RELEASE_TAG_PATTERN: "$[[ inputs.release-tag-pattern ]]"
+  before_script:
+    - apk add --no-cache git
+  script:
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test -n "$CI_COMMIT_TAG"
+    - test -z "${CI_COMMIT_BRANCH:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+    - |
+      case "$CI_COMMIT_TAG" in
+        $RELEASE_TAG_PATTERN) ;;
+        *) printf 'tag does not match release pattern: %s\n' "$CI_COMMIT_TAG" >&2; exit 1 ;;
+      esac
+      previous_tag="$(git describe --tags --match "$RELEASE_TAG_PATTERN" --abbrev=0 "$CI_COMMIT_TAG^" 2>/dev/null || true)"
+      if test -n "$previous_tag"; then
+        release_range="$previous_tag..$CI_COMMIT_TAG"
+      else
+        release_range="$CI_COMMIT_TAG"
+      fi
+      {
+        printf '# Release %s\n\n' "$CI_COMMIT_TAG"
+        git log --format='- %s (%h)' "$release_range"
+      } >"$RELEASE_DESCRIPTION_PATH"
+    - test -s "$RELEASE_DESCRIPTION_PATH"
+  artifacts:
+    paths:
+      - $[[ inputs.output-file ]]

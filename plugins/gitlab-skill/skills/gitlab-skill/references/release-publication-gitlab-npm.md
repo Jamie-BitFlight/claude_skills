@@ -14,6 +14,7 @@ npm view "__PACKAGE_NAME__@__PACKAGE_VERSION__" version \
 
 Define durable-link authorization separately.
 
-Validation gate: apply **Gates G2, G3, G6, and G7**. This destination is outside G8.
+Apply the composition, tag, and per-destination read-back
+[validation gates](./automatic-tag-and-release.md#validation-gates).
 
 SOURCE: <https://docs.gitlab.com/user/packages/npm_registry/> (accessed 2026-09-22; documentation-verified, not live-tested)

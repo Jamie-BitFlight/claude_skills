@@ -1,0 +1,9 @@
+{
+  "templates": [
+    "generic-package.yml",
+    "gitlab-release.yml",
+    "python-semantic-release-version.yml",
+    "release-notes.yml",
+    "semantic-release-version.yml"
+  ]
+}

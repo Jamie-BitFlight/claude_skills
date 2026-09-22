@@ -1,0 +1,44 @@
+spec:
+  inputs:
+    job-name:
+      description: Unique Generic Package publication job name.
+    stage:
+      description: Consumer-owned publication stage.
+    rules:
+      description: Consumer-owned admission policy for publication.
+      type: array
+    needs:
+      description: Consumer-owned build job that supplies the artifact.
+      type: array
+    image:
+      description: Digest-pinned curl image.
+    artifact-path:
+      description: Consumer-built artifact path.
+    asset-name:
+      description: Package file name.
+    package-name:
+      description: Generic Package name; predefined project identity expands at runtime.
+      default: $CI_PROJECT_NAME
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image:
+    name: $[[ inputs.image ]]
+    entrypoint: [""]
+  rules: $[[ inputs.rules ]]
+  needs: $[[ inputs.needs ]]
+  variables:
+    RELEASE_ASSET_PATH: "$[[ inputs.artifact-path ]]"
+    RELEASE_ASSET_NAME: "$[[ inputs.asset-name ]]"
+    GENERIC_PACKAGE_NAME: "$[[ inputs.package-name ]]"
+  script:
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test -n "$CI_COMMIT_TAG"
+    - test -z "${CI_COMMIT_BRANCH:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+    - test -f "$RELEASE_ASSET_PATH"
+    - >-
+      curl --location --fail-with-body
+      --header "JOB-TOKEN: ${CI_JOB_TOKEN}"
+      --upload-file "${RELEASE_ASSET_PATH}"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${RELEASE_ASSET_NAME}"
