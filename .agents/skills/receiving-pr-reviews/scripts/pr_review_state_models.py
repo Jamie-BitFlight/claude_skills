@@ -45,6 +45,8 @@ class ReviewCapabilities(BaseModel):
     can_reply: bool
     can_resolve: bool
     can_comment: bool
+    can_approve: bool = False
+    can_unapprove: bool = False
     unavailable: list[str]
 
 

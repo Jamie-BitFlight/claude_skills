@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pr_review_contracts import ReplyAction, ResolveAction, ReviewAction, TopLevelCommentAction
+from pr_review_contracts import ApprovalStateAction, ReplyAction, ResolveAction, ReviewAction, TopLevelCommentAction
 from pr_review_models import ReviewSnapshot
 from pr_review_state_models import (
     AuthorizedReviewAction,
@@ -233,6 +233,11 @@ def validate_action_state(
         require_authorization(
             assessment.disposition != "clarification_required", "clarification-required input must remain open"
         )
+    elif isinstance(action, ApprovalStateAction):
+        capability = (
+            review_input.capabilities.can_approve if action.approved else review_input.capabilities.can_unapprove
+        )
+        require_authorization(capability, "input provider does not expose the requested approval-state operation")
 
 
 def record_completed_communication(cycle: ReviewCycleState, input_id: str) -> ReviewCycleState:

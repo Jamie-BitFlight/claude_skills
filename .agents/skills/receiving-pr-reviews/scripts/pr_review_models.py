@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from pr_review_contracts import (
+    ApprovalStateAction,
     BatchReviewAction,
     BatchReviewActions,
     ChangeRequestTarget,
@@ -39,6 +40,7 @@ from pr_review_gh_wire import (
 from pr_review_state_models import ReviewAssessment, ReviewCluster, ReviewInput, SnapshotCompleteness
 
 __all__ = [
+    "ApprovalStateAction",
     "Author",
     "BatchReviewAction",
     "BatchReviewActions",

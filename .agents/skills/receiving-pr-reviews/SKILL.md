@@ -11,7 +11,9 @@ arrival order.
 
 ## Workflow
 
-1. Fetch one full snapshot and preserve it as the mutation evidence:
+1. Fetch one full snapshot and preserve it as the mutation evidence. For a GitLab merge request,
+   first read [GitLab review operations](./references/gitlab-review-operations.md), then select the
+   GitLab provider and target; the remaining review-cycle gates are shared:
 
    ```bash
    ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch \
@@ -128,7 +130,8 @@ arrival order.
 ## Command reference
 
 Run `./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py <command> --help` for the
-current options and defaults. Use full output for action evidence; use `--summary` only for status
+current provider, target, operation, and timeout options. Use full output for action evidence; use
+`--summary` only for status
 inspection. According to lines 67–94 of
 [pr_review_subprocess.py](./scripts/pr_review_subprocess.py), every provider subprocess has a
 mandatory positive bound and process-tree cleanup before a timeout is raised.

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -19,41 +18,11 @@ from pr_review_contracts import (
 from pr_review_gh_models import GitHubCreatedComment, GitHubResolveResponse
 from pr_review_models import FetchResult, ReviewSnapshot
 from pr_review_provider import ProviderResponseError
+from pr_review_provider_text import render_top_level_body
 from pr_review_state_models import AuthorizedReviewAction, SnapshotCompleteness
 
 SnapshotLoader = Callable[..., FetchResult | ReviewSnapshot]
 CommandRunner = Callable[..., str]
-
-
-def reference_present(body: str, reference: str) -> bool:
-    """Match a stable reference without accepting a longer numeric identifier.
-
-    Args:
-        body: Existing response body.
-        reference: Stable provider reference to find exactly.
-
-    Returns:
-        True when the exact reference is already present.
-    """
-    suffix = r"(?!\d)" if reference and reference[-1].isdigit() else ""
-    return re.search(re.escape(reference) + suffix, body) is not None
-
-
-def render_top_level_body(body: str, references: list[str]) -> str:
-    """Append each exact missing stable reference once.
-
-    Args:
-        body: Human-readable disposition and evidence.
-        references: Stable references that must appear exactly once.
-
-    Returns:
-        The response body containing all requested references.
-    """
-    missing = [reference for reference in references if not reference_present(body, reference)]
-    if not missing:
-        return body
-    rendered_references = "\n".join(missing)
-    return f"{body}\n\n{rendered_references}"
 
 
 def upgrade_legacy_snapshot(legacy: FetchResult, target: ChangeRequestTarget) -> ReviewSnapshot:

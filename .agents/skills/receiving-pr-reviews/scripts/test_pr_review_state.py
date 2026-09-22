@@ -25,6 +25,7 @@ from pydantic import ValidationError
 
 from pr_review_github_normalize import actor, review_inputs
 from pr_review_models import (
+    ApprovalStateAction,
     Author,
     ChangeRequestTarget,
     ReplyAction,
@@ -216,6 +217,21 @@ def test_authorize_action_binds_complete_current_cycle() -> None:
     assert authorized.cycle_state == "READY_FOR_ACTION"
     assert authorized.review_input.input_id == review_input().input_id
     assert authorized.snapshot_fingerprint == snapshot().snapshot_fingerprint
+
+
+def test_approval_state_requires_explicit_provider_capability() -> None:
+    with pytest.raises(ReviewAuthorizationError, match="does not expose"):
+        authorize_action(snapshot(), ready_cycle(), review_input().input_id, ApprovalStateAction(approved=True))
+
+    capable = review_input().model_copy(
+        update={"capabilities": review_input().capabilities.model_copy(update={"can_approve": True})}
+    )
+    assessment = ready_cycle().assessments[0]
+    snapshot_value, cycle_value = state_for_input(capable, assessment)
+
+    authorized = authorize_action(snapshot_value, cycle_value, capable.input_id, ApprovalStateAction(approved=True))
+
+    assert isinstance(authorized.action, ApprovalStateAction)
 
 
 @pytest.mark.parametrize(
