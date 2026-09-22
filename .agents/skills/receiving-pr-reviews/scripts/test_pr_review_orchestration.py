@@ -360,6 +360,7 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
             "recheck_snapshot_fingerprint": fingerprint,
             "communication_states": {first.input_id: "pending", second.input_id: "pending"},
             "resolution_states": {first.input_id: "open", second.input_id: "open"},
+            "implementation_states": {first.input_id: "completed", second.input_id: "completed"},
         }
     )
     snapshot_path = directory / "snapshot-two.json"

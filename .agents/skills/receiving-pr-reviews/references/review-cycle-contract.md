@@ -1,28 +1,22 @@
 # Review-cycle contract
 
 Read this contract after obtaining a complete snapshot and before assessing inputs or authoring the
-cycle state. The Pydantic models are the exact schema; `validate-cycle` and `complete-cycle` are the
-executable gates.
+cycle state. The Pydantic models are the exact schema; `validate-projection`, `validate-cycle`, and
+`complete-cycle` are the executable gates.
 
 ## Typed dry-run projection
 
 A trace, dry-run, or check-only request still materializes one exhaustive provider-neutral
-`ReviewCycleState`. Read `ReviewAssessment`, `ReviewCluster`, `ReviewCycleState`, and the applicable
-action model before authoring exact fields. Represent unperformed work with schema-valid unknown,
-pending, blocked, open, `not_required`, or `unavailable` values; never omit state because a mutation
-did not run.
+`ReviewCycleState`. Read its Pydantic models before authoring fields. A projection may use `pending`
+implementation states, but it must not omit an inbound input because the corresponding mutation did
+not run.
 
-The projection includes the exact `input_census` and `assessed_inputs`, one full assessment per input,
-disjoint exact cluster cover, every unknown decision, implementation and verification evidence,
-per-input implementation/communication/resolution states, inspectable revision, snapshot and recheck
-fingerprints, terminal annotations, cycle state, and cycle terminal. Any projected provider action is
-bound to its canonical input and stable reference. Later gates stay ordered even when pending:
-provider-confirmed communication precedes a fresh complete recheck, which precedes `complete-cycle`.
-
-Run `validate-projection` against the saved snapshot and projected state. Its successful result proves
-schema, identity, fingerprint, and exhaustive coverage only and always reports
-`mutation_authorized: false`. Mutation still requires `validate-cycle` plus separate user or repository
-authority.
+Run `validate-projection` against the saved snapshot and projected state. Success proves a complete,
+internally consistent snapshot with a canonical fingerprint; matching target, revision, and snapshot
+identity; a non-completion terminal; exhaustive census, assessment, cluster, communication,
+resolution, and implementation-state coverage; and a recorded decision for every assessment unknown.
+It always reports `mutation_authorized: false`. Mutation still requires `validate-cycle` plus separate
+user or repository authority.
 
 ## Context and census
 
@@ -50,7 +44,7 @@ be assessed as a question. Explicitly assess approvals and rejections, including
 Resolve each unknown with evidence or name one missing fact and one focused clarification or
 escalation path. Actor class, actor role, and revision relation remain unknown unless provider evidence
 establishes them. This gate closes only when `assessed_inputs` preserves each exact canonical input and
-the census, assessment, and unknown-decision sets agree.
+every assessment unknown has a recorded decision.
 
 ## Clusters and systemic plans
 
@@ -73,9 +67,9 @@ source action.
 - `clarification_required`: record the missing fact and focused question; keep the input open and the
   cycle non-terminal.
 
-Map every input implementation state to `completed` or `not_required`. When source changes are
-authorized, verify and push them to the current inspectable remote revision before a response cites
-them.
+For action readiness, map every input implementation state to `completed` or `not_required`; a dry-run
+projection may instead use `pending`. When source changes are authorized, verify and push them to the
+current inspectable remote revision before a response cites them.
 
 ## Verification and authority
 

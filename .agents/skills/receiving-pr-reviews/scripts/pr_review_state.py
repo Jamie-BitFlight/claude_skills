@@ -58,6 +58,28 @@ def require_authorization(condition: bool, message: str) -> None:
         raise ReviewAuthorizationError(message)
 
 
+def validate_implementation_states(snapshot: ReviewSnapshot, cycle: ReviewCycleState, *, allow_pending: bool) -> None:
+    """Validate exact implementation-state coverage for the current gate.
+
+    Args:
+        snapshot: Complete canonical provider snapshot.
+        cycle: Typed review-cycle state.
+        allow_pending: Whether the read-only projection state is permitted.
+    """
+    inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
+    require_authorization(
+        set(cycle.implementation_states) == inbound_ids,
+        "implementation states must exactly cover inbound review inputs",
+    )
+    allowed_states = {"completed", "not_required"}
+    if allow_pending:
+        allowed_states.add("pending")
+    require_authorization(
+        all(value in allowed_states for value in cycle.implementation_states.values()),
+        "implementation states must be completed or not_required before action",
+    )
+
+
 def validate_snapshot_context(snapshot: ReviewSnapshot, cycle: ReviewCycleState) -> None:
     """Validate current revision, fingerprint, recheck, and terminal evidence.
 
@@ -71,6 +93,7 @@ def validate_snapshot_context(snapshot: ReviewSnapshot, cycle: ReviewCycleState)
     require_authorization(cycle.cycle_terminal == "action_pending", "cycle terminal must be action_pending")
     require_authorization(bool(cycle.implementation_evidence), "implementation evidence is required")
     require_authorization(bool(cycle.verification_evidence), "verification evidence is required")
+    validate_implementation_states(snapshot, cycle, allow_pending=False)
     require_authorization(cycle.context.target == snapshot.target, "cycle target does not match snapshot target")
     require_authorization(
         cycle.context.revision == snapshot.head_revision and cycle.context.remote_head == snapshot.head_revision,
@@ -241,11 +264,7 @@ def validate_cycle_projection(
         "read-only projection cannot assert REVIEW_COMPLETE",
     )
     indexes = validate_cycle_coverage(snapshot, cycle)
-    inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
-    require_authorization(
-        set(cycle.implementation_states) == inbound_ids,
-        "implementation states must exactly cover inbound review inputs",
-    )
+    validate_implementation_states(snapshot, cycle, allow_pending=True)
     return indexes
 
 
@@ -343,12 +362,8 @@ def evaluate_review_complete(snapshot: ReviewSnapshot, cycle: ReviewCycleState) 
         "provider snapshot has outstanding work",
     )
     validate_cycle_coverage(snapshot, cycle)
+    validate_implementation_states(snapshot, cycle, allow_pending=False)
     inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
-    require_authorization(
-        set(cycle.implementation_states) == inbound_ids
-        and all(value in {"completed", "not_required"} for value in cycle.implementation_states.values()),
-        "per-input implementation state is incomplete",
-    )
     require_authorization(set(cycle.terminal_annotations) == inbound_ids, "every input requires a terminal annotation")
     completed_communications = {
         input_id for input_id, value in cycle.communication_states.items() if value == "completed"

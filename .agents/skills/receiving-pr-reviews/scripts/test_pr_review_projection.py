@@ -65,6 +65,23 @@ def test_dry_run_projection_validates_exact_typed_cover_without_action_readiness
         authorize_action(snapshot, cycle, canonical_input().input_id, ReplyAction(body="Not authorized."))
 
 
+def test_action_authorization_rejects_omitted_implementation_state() -> None:
+    snapshot = canonical_snapshot()
+    cycle = ready_cycle().model_copy(update={"implementation_states": {}})
+
+    with pytest.raises(ReviewAuthorizationError, match="implementation states"):
+        authorize_action(snapshot, cycle, canonical_input().input_id, ReplyAction(body="Not authorized."))
+
+
+def test_action_authorization_rejects_pending_implementation_state() -> None:
+    snapshot = canonical_snapshot()
+    item = canonical_input()
+    cycle = ready_cycle().model_copy(update={"implementation_states": {item.input_id: "pending"}})
+
+    with pytest.raises(ReviewAuthorizationError, match="completed or not_required"):
+        authorize_action(snapshot, cycle, item.input_id, ReplyAction(body="Not authorized."))
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
