@@ -1,7 +1,7 @@
 {
   "name": "gitlab-skill",
   "description": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
