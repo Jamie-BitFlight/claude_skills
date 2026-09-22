@@ -32,13 +32,14 @@ class PrepareFailure(Exception):
         self.state = state
 
 
-def run_git(repository: Path, *arguments: str) -> CommandResult:
-    """Run one bounded Git inspection in the execution worktree.
+def run_command(repository: Path, argv: list[str]) -> CommandResult:
+    """Run one bounded argument vector without shell interpretation.
 
     Returns:
         Complete command evidence.
     """
-    argv = ["git", *arguments]
+    if not argv:
+        raise PrepareFailure("preflight argv is empty", WorkflowState.BLOCKED_PREFLIGHT_FAILED)
     process = subprocess.Popen(
         argv, cwd=repository, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True
     )
@@ -52,6 +53,15 @@ def run_git(repository: Path, *arguments: str) -> CommandResult:
             WorkflowState.BLOCKED_PREFLIGHT_FAILED,
         ) from error
     return CommandResult(argv=argv, exit_code=process.returncode, stdout=stdout, stderr=stderr)
+
+
+def run_git(repository: Path, *arguments: str) -> CommandResult:
+    """Run one bounded Git command in the execution worktree.
+
+    Returns:
+        Complete command evidence.
+    """
+    return run_command(repository, ["git", *arguments])
 
 
 def terminate_process_group(process: subprocess.Popen[str]) -> None:
@@ -166,6 +176,8 @@ def prepare_replay(request: PrepareRequest, repository: Path) -> list[str]:
     if status:
         raise PrepareFailure("execution worktree is not clean", WorkflowState.BLOCKED_GIT_STATE)
     require_operation_absence(repository)
+    for argv in request.required_preflights:
+        require_success(run_command(repository, argv))
     recovery = run_git(repository, "rev-parse", "--verify", f"{request.recovery_ref}^{{commit}}")
     if recovery.exit_code != 0 or recovery.stdout.strip() != request.branch_oid:
         raise PrepareFailure(

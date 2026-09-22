@@ -144,12 +144,17 @@
       "source": "local-git",
       "argv": ["git", "for-each-ref", "--format=%(upstream)", "refs/heads/feature/parser"],
       "exit_code": 0,
-      "stdout": "refs/remotes/origin/feature/parser\n",
+      "stdout": "",
       "stderr": ""
     }
   },
   "repository_instruction_search": [
-    { "path": "AGENTS.md", "present": true },
+    {
+      "path": "AGENTS.md",
+      "present": true,
+      "content": "# Agent rules\n",
+      "sha256": "d2e2a32d37b83ebbcdbbfea0d86642516dc5010642ec2a404c626c1c0bf1e068"
+    },
     { "path": ".claude/CLAUDE.md", "present": false }
   ],
   "repository_instruction_sources": ["AGENTS.md"],
@@ -162,9 +167,10 @@
       "stderr": ""
     }
   ],
+  "required_preflights": [["uv", "run", "scripts/audit_branch_transfer.py"]],
   "publication": {
-    "configured_upstream": "refs/remotes/origin/feature/parser",
-    "remote_refs_containing_old_tip": ["refs/remotes/origin/feature/parser"],
+    "configured_upstream": null,
+    "remote_refs_containing_old_tip": [],
     "evidence_commands": [
       {
         "source": "local-git",
@@ -177,7 +183,7 @@
           "refs/remotes"
         ],
         "exit_code": 0,
-        "stdout": "refs/remotes/origin/feature/parser\n",
+        "stdout": "",
         "stderr": ""
       }
     ]

@@ -109,7 +109,12 @@ def valid_plan_data() -> dict[str, object]:
             old_tip=old_tip, target_oid=target_oid, merge_base_oid="4" * 40, configured_upstream=None
         ),
         "repository_instruction_search": [
-            {"path": "AGENTS.md", "present": True},
+            {
+                "path": "AGENTS.md",
+                "present": True,
+                "content": "# Agent rules\n",
+                "sha256": "d2e2a32d37b83ebbcdbbfea0d86642516dc5010642ec2a404c626c1c0bf1e068",
+            },
             {"path": ".claude/CLAUDE.md", "present": False},
         ],
         "repository_instruction_sources": ["AGENTS.md"],
@@ -122,6 +127,7 @@ def valid_plan_data() -> dict[str, object]:
                 "stderr": "",
             }
         ],
+        "required_preflights": [["uv", "run", "scripts/audit_branch_transfer.py"]],
         "publication": {
             "configured_upstream": None,
             "remote_refs_containing_old_tip": [],

@@ -37,6 +37,12 @@ Review the captured candidates and affected paths returned by `capture`. Fill on
 expected conflicts and equivalence; path interaction, dependencies, evidence and verification;
 merge policy, repository checks, unknowns, and decision requests.
 
+Use captured evidence IDs verbatim. Candidate `disposition` is `RETAIN`, `ADAPT`, `MANUAL_MERGE`,
+`REDUNDANT_DROP`, or `PRESERVE_EMPTY`; `merge_policy` is `LINEAR_NO_MERGES`,
+`PRESERVE_TOPOLOGY`, or `APPROVED_FLATTEN`. Command fields are arrays of argv arrays, never command
+strings. Acknowledge every present repository-instruction source with its captured path and SHA-256,
+an applied-requirements summary, and any required preflight argv arrays.
+
 The semantic input cannot alter refs, OIDs, parents, paths, publication evidence, worktree state,
 recovery, or replay argv. Agent-authored `approved` booleans have no authority. Destructive,
 topology, semantic, or publication approvals require externally supplied receipts.

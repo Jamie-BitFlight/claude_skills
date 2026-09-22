@@ -83,6 +83,7 @@ def live_plan_data(
         "execution_mode": execution_mode,
         "repository_state": repository_state,
         "repository_preflights": [],
+        "required_preflights": [],
         "publication": publication,
         "replay_inventory": {
             "source": "local-git",

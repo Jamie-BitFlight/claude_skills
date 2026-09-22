@@ -85,7 +85,7 @@ def capture_bindings(repository: Path, request: CaptureRequest) -> CaptureBindin
         stop_capture(WorkflowState.BLOCKED_PREFLIGHT_FAILED, command=root_evidence.model_dump(mode="json"))
     root = Path(root_evidence.stdout.strip()).resolve()
     branch_ref = normalize_local_ref(request.branch)
-    target_ref = normalize_local_ref(request.target)
+    target_ref = request.target
     branch_ref_evidence = command_evidence(repository, "show-ref", "--verify", branch_ref)
     if branch_ref_evidence.exit_code != 0:
         output, exit_code = ref_terminal(branch_ref_evidence, branch_ref)
@@ -229,7 +229,9 @@ def assemble_capture(
     if inventory.exit_code != 0:
         stop_capture(WorkflowState.BLOCKED_PREFLIGHT_FAILED, command=inventory.model_dump(mode="json"))
     try:
-        candidates, affected_paths = capture_candidates(repository, inventory)
+        candidates, affected_paths, target_name_status, branch_name_status, clean_cherry = capture_candidates(
+            repository, inventory, bindings.merge_base.stdout.strip(), bindings.target_oid, bindings.branch_oid
+        )
         rebase_help = command_evidence(repository, "rebase", "-h")
         empty_option = detect_empty_option(rebase_help)
     except ValueError as error:
@@ -258,6 +260,9 @@ def assemble_capture(
         replay_inventory=inventory,
         candidates=candidates,
         affected_paths=affected_paths,
+        target_name_status=target_name_status,
+        branch_name_status=branch_name_status,
+        clean_cherry=clean_cherry,
         rebase_help=rebase_help,
         becomes_empty_option=empty_option,
         publication_requires_approval=publication_requires_approval,
@@ -297,8 +302,14 @@ def capture_rebase(repository: Path, request: CaptureRequest) -> tuple[dict[str,
     return (
         {
             **common_output,
-            "affected_paths": capture.affected_paths,
+            "affected_paths": [path.model_dump(mode="json") for path in capture.affected_paths],
             "candidates": [candidate.model_dump(mode="json") for candidate in capture.candidates],
+            "target_name_status": capture.target_name_status.model_dump(mode="json"),
+            "branch_name_status": capture.branch_name_status.model_dump(mode="json"),
+            "clean_cherry": capture.clean_cherry.model_dump(mode="json"),
+            "repository_instruction_search": [
+                source.model_dump(mode="json") for source in capture.repository_instruction_search
+            ],
             "state": WorkflowState.READY_TO_ANALYZE,
             "status": "CAPTURED",
             "terminal": False,

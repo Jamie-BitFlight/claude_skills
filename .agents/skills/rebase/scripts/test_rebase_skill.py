@@ -195,6 +195,14 @@ def test_invocation_routes_disclose_only_the_selected_workflow() -> None:
     assert len(EDGE_REFERENCE_PATH.read_bytes()) <= 2_500
 
 
+def test_python_modules_stay_below_the_repository_boundary() -> None:
+    """Keep every focused implementation module independently readable."""
+    scripts = SKILL_ROOT / "scripts"
+
+    for path in scripts.glob("rebase_*.py"):
+        assert len(path.read_text(encoding="utf-8").splitlines()) < 500, path.name
+
+
 def test_optional_walkthrough_is_never_a_routine_route_dependency() -> None:
     """Keep tutorials and the worked artifact outside routine execution context."""
     package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))

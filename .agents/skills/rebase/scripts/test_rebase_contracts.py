@@ -29,6 +29,7 @@ def test_repository_without_instruction_file_records_completed_empty_search() ->
     ]
     data["repository_instruction_sources"] = []
     data["repository_preflights"] = []
+    data["required_preflights"] = []
 
     plan = RebasePlan.model_validate(data)
 

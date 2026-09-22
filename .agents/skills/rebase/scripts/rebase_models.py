@@ -56,6 +56,18 @@ class CaptureRequest(BaseModel):
     expected_target_oid: ObjectId | None = None
 
 
+class CapturedCommandEvidence(BaseModel):
+    """Complete immutable output from one semantic-evidence command."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source: Annotated[str, Field(min_length=1)]
+    argv: ArgumentVector
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
 class CapturedCandidate(BaseModel):
     """Immutable graph and path facts for one replay candidate."""
 
@@ -64,6 +76,23 @@ class CapturedCandidate(BaseModel):
     oid: ObjectId
     parents: list[ObjectId]
     paths: list[str]
+    commit_metadata: CapturedCommandEvidence
+    patch: CapturedCommandEvidence
+    name_status: CapturedCommandEvidence
+    evidence_ids: Annotated[list[str], Field(min_length=1)]
+    clean_cherry_equivalent: bool
+
+
+class AffectedPathEvidence(BaseModel):
+    """Captured candidate and branch-side evidence for one affected path."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: Annotated[str, Field(min_length=1)]
+    candidate_oids: Annotated[list[ObjectId], Field(min_length=1)]
+    evidence_ids: Annotated[list[str], Field(min_length=1)]
+    target_evidence: CapturedCommandEvidence
+    branch_evidence: CapturedCommandEvidence
 
 
 class CandidateSemantics(BaseModel):
@@ -103,6 +132,17 @@ class SemanticDecision(BaseModel):
     operation: ApprovalOperation
 
 
+class InstructionAcknowledgement(BaseModel):
+    """Agent application of one immutable repository-instruction source."""
+
+    model_config = ConfigDict(frozen=True)
+
+    path: Annotated[str, Field(min_length=1)]
+    source_sha256: PlanSha256
+    applied_requirements_summary: Annotated[str, Field(min_length=1)]
+    required_preflight_argv: list[ArgumentVector]
+
+
 class FinalizeSemantics(BaseModel):
     """Only the semantic judgments accepted by managed finalization."""
 
@@ -112,6 +152,7 @@ class FinalizeSemantics(BaseModel):
     affected_paths: list[PathSemantics]
     merge_policy: MergePolicy
     repository_checks: Annotated[list[ArgumentVector], Field(min_length=1)]
+    instruction_acknowledgements: list[InstructionAcknowledgement]
     unknowns: list[str]
     decisions: list[SemanticDecision]
 
@@ -154,6 +195,7 @@ class PrepareRequest(BaseModel):
     becomes_empty_option: BecomesEmptyOption
     keep_empty: bool = False
     recovery_ref: RecoveryRef
+    required_preflights: list[ArgumentVector] = Field(default_factory=list)
 
 
 class CommandResult(BaseModel):

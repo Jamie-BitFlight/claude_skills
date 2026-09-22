@@ -92,6 +92,7 @@ def scenario_plan_data(
     target["oid"] = target_oid
     data["merge_base_oid"] = merge_base_oid
     data["repository_preflights"] = []
+    data["required_preflights"] = []
     publication["configured_upstream"] = None
     publication["remote_refs_containing_old_tip"] = []
     publication["evidence_commands"] = [
