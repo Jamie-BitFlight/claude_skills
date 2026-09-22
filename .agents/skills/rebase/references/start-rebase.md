@@ -73,22 +73,22 @@ recovery evidence and returns `READY_TO_REBASE` plus its SHA-256.
 ## 4. Reject drift immediately before mutation
 
 Run
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" prepare <plan.json> --expected-sha256 <validated-sha256>`.
-This gate revalidates the artifact and rechecks live refs, authorized worktree ownership, clean
-state, operation absence, and recovery before deriving replay argv from the execution mode,
-immutable target, merge policy, and empty policy. Only `status=PREPARED` with the retained SHA-256
-and emitted argv passes. Any response without argv blocks mutation; ref drift requires recapture
-from Step 1 through `REPLAN_REF_DRIFT`, and artifact/hash drift returns to Step 3.
+`uv run --script "<skill-dir>/scripts/rebase_plan.py" execute <plan.json> --expected-sha256 <validated-sha256>`.
+This single-use operation revalidates the artifact, rechecks live refs, authorized worktree
+ownership, clean state, operation absence, and recovery, derives replay argv from typed policy, then
+persists a consumed receipt before running that argv. Any response without a receipt and replay
+result blocks mutation; ref drift requires recapture from Step 1 through `REPLAN_REF_DRIFT`, and
+artifact/hash drift returns to Step 3.
 
-Completion criterion: every live binding matches the unchanged plan and the gate emits its canonical
-argv.
+Completion criterion: every live binding matches the unchanged plan and one durable receipt binds
+the plan hash to its canonical replay result.
 
 ## 5. Execute only validated intent
 
-Treat the validated plan hash as single-use: execute its validator-emitted argv exactly once. No
-other initial replay form is authorized; an `--onto` range requires a future typed schema that
-binds every boundary. After replay starts, retain the rewritten branch and recovery ref through the
-terminal. Route every conflict, empty stop, command failure, or requested abort through
+Treat the consumed plan hash as single-use. No other initial replay form is authorized; an `--onto`
+range requires a future typed schema that binds every boundary. Retain the receipt, rewritten
+branch, and recovery ref through the terminal. Route every conflict, empty stop, command failure, or
+requested abort through
 [active rebase](./active-rebase.md) before another mutation.
 
 Completion criterion: execution either has no active rebase metadata or ends at one canonical

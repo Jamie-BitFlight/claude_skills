@@ -5,30 +5,22 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 
-from rebase_evidence import ExecutionMode, worktree_branch_owners
+from rebase_evidence import worktree_branch_owners
+from rebase_models import (
+    CommandResult,
+    ExecutionMode,
+    MergePolicy,
+    PlanSha256,
+    PrepareRequest,
+    ReplayExecution,
+    ReplayReceipt,
+)
 from rebase_states import WorkflowState
 
 COMMAND_TIMEOUT_SECONDS = 20
 TERMINATION_GRACE_SECONDS = 2
-GIT_COMMAND_PREFIX_LENGTH = 2
-
-
-@dataclass(frozen=True)
-class PrepareRequest:
-    """Immutable fields needed to authorize one replay command."""
-
-    branch_ref: str
-    branch_oid: str
-    target_ref: str
-    target_oid: str
-    execution_worktree: str
-    execution_mode: ExecutionMode
-    merge_policy: str
-    becomes_empty_option: str
-    recovery_ref: str
 
 
 class PrepareFailure(Exception):
@@ -38,16 +30,6 @@ class PrepareFailure(Exception):
         """Initialize one failure with its canonical workflow state."""
         super().__init__(message)
         self.state = state
-
-
-@dataclass(frozen=True)
-class CommandResult:
-    """Complete result from one bounded Git inspection."""
-
-    argv: list[str]
-    exit_code: int
-    stdout: str
-    stderr: str
 
 
 def run_git(repository: Path, *arguments: str) -> CommandResult:
@@ -101,9 +83,12 @@ def require_success(result: CommandResult) -> str:
 def require_oid(repository: Path, ref: str, expected_oid: str) -> None:
     """Require one live ref to resolve to its planned immutable OID."""
     result = run_git(repository, "rev-parse", "--verify", f"{ref}^{{commit}}")
-    observed_oid = require_success(result).strip()
-    if observed_oid != expected_oid:
-        raise PrepareFailure(f"live ref drift: {ref}", WorkflowState.REPLAN_REF_DRIFT)
+    if result.exit_code != 0 or result.stdout.strip() != expected_oid:
+        raise PrepareFailure(
+            f"live ref drift: {result.argv}; exit={result.exit_code}; "
+            f"stdout={result.stdout!r}; stderr={result.stderr!r}",
+            WorkflowState.REPLAN_REF_DRIFT,
+        )
 
 
 def resolve_git_path(repository: Path, name: str) -> Path:
@@ -158,11 +143,11 @@ def derive_replay_argv(request: PrepareRequest) -> list[str]:
         Canonical replay argument vector.
     """
     argv = ["git", "rebase", "--reapply-cherry-picks", f"--empty={request.becomes_empty_option}"]
-    if request.merge_policy == "PRESERVE_TOPOLOGY":
+    if request.merge_policy is MergePolicy.PRESERVE_TOPOLOGY:
         argv.append("--rebase-merges")
     argv.append(request.target_oid)
     if request.execution_mode is ExecutionMode.AUTHORIZED_BRANCH_TRANSFER:
-        argv.append(request.branch_ref)
+        argv.append(request.branch_ref.removeprefix("refs/heads/"))
     return argv
 
 
@@ -179,60 +164,54 @@ def prepare_replay(request: PrepareRequest, repository: Path) -> list[str]:
     if status:
         raise PrepareFailure("execution worktree is not clean", WorkflowState.BLOCKED_GIT_STATE)
     require_operation_absence(repository)
-    recovery = require_success(
-        run_git(repository, "rev-parse", "--verify", f"{request.recovery_ref}^{{commit}}")
-    ).strip()
-    if recovery != request.branch_oid:
-        raise PrepareFailure("recovery ref drift", WorkflowState.BLOCKED_GIT_STATE)
+    recovery = run_git(repository, "rev-parse", "--verify", f"{request.recovery_ref}^{{commit}}")
+    if recovery.exit_code != 0 or recovery.stdout.strip() != request.branch_oid:
+        raise PrepareFailure(
+            f"recovery ref drift: {recovery.argv}; exit={recovery.exit_code}; "
+            f"stdout={recovery.stdout!r}; stderr={recovery.stderr!r}",
+            WorkflowState.BLOCKED_GIT_STATE,
+        )
     return derive_replay_argv(request)
 
 
-def audit_single_use_trace(prepared_argv: list[str], commands: list[list[str]], terminal: WorkflowState) -> list[str]:
-    """Reject unprepared replay argv and post-start history rewrites for one plan hash.
+def replay_receipt_path(repository: Path, plan_sha256: str) -> Path:
+    """Resolve the durable worktree-local receipt path for one plan hash.
 
     Returns:
-        Every single-use or freeze-contract failure.
+        Git-managed receipt path outside the worktree.
     """
-    failures: list[str] = []
-    replay_positions = [
-        index
-        for index, command in enumerate(commands)
-        if len(command) >= GIT_COMMAND_PREFIX_LENGTH
-        and command[:GIT_COMMAND_PREFIX_LENGTH] == ["git", "rebase"]
-        and not is_active_rebase_action(command)
-    ]
-    if len(replay_positions) != 1:
-        failures.append("validated plan hash must authorize exactly one initial replay")
-    elif commands[replay_positions[0]] != prepared_argv:
-        failures.append("initial replay argv differs from validator-emitted argv")
+    return resolve_git_path(repository, f"rebase-skill/receipts/{plan_sha256}.json")
 
-    if replay_positions:
-        first_replay = replay_positions[0]
-        failures.extend(
-            f"history mutation after single-use replay: {command}"
-            for command in commands[first_replay + 1 :]
-            if is_history_rewrite(command)
+
+def consume_replay_authorization(path: Path, receipt: ReplayReceipt) -> None:
+    """Atomically persist single use before starting the destructive replay."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as error:
+        raise PrepareFailure(
+            f"validated plan hash was already consumed: {receipt.plan_sha256}", WorkflowState.BLOCKED_GIT_STATE
+        ) from error
+    with os.fdopen(descriptor, "w", encoding="utf-8") as receipt_file:
+        receipt_file.write(receipt.model_dump_json())
+        receipt_file.write("\n")
+        receipt_file.flush()
+        os.fsync(receipt_file.fileno())
+
+
+def execute_replay(request: PrepareRequest, repository: Path, plan_sha256: PlanSha256) -> ReplayExecution:
+    """Consume one plan hash, then execute only its canonical argv once.
+
+    Returns:
+        Durable receipt path and complete replay command result.
+    """
+    receipt_path = replay_receipt_path(repository, plan_sha256)
+    if receipt_path.exists():
+        raise PrepareFailure(
+            f"validated plan hash was already consumed: {plan_sha256}", WorkflowState.BLOCKED_GIT_STATE
         )
-    if terminal is WorkflowState.REBASE_COMPLETE_VALIDATION_FAILED and not replay_positions:
-        failures.append("validation-failed terminal lacks its initial replay evidence")
-    return failures
-
-
-def is_active_rebase_action(command: list[str]) -> bool:
-    """Return whether a rebase command continues, skips, or aborts the active replay."""
-    return any(option in command for option in ("--continue", "--skip", "--abort"))
-
-
-def is_history_rewrite(command: list[str]) -> bool:
-    """Return whether a post-start command rewrites history or a ref."""
-    if len(command) < GIT_COMMAND_PREFIX_LENGTH or command[0] != "git":
-        return False
-    if command[1] == "rebase" and not is_active_rebase_action(command):
-        return True
-    if command[1] in {"reset", "update-ref"}:
-        return True
-    if command[1] == "branch" and any(option in command for option in ("-f", "--force", "-D", "-M")):
-        return True
-    if command[1] == "switch" and "-C" in command:
-        return True
-    return command[1] == "checkout" and "-B" in command
+    argv = prepare_replay(request, repository)
+    receipt = ReplayReceipt(plan_sha256=plan_sha256, argv=argv)
+    consume_replay_authorization(receipt_path, receipt)
+    command = run_git(repository, *argv[1:])
+    return ReplayExecution(receipt_path=str(receipt_path), command=command)

@@ -5,7 +5,7 @@
   "content_sha256": {
     "SKILL.md": "6840875489b7c5bb95b3de082b23dfef6103f0fc06bc18159c5f7bca978006e7",
     "references/active-rebase.md": "dcf11d64ecd7119a6cf4e3d4c5a92ae6a7d0f3a33726d2444963a63ce0bec3fe",
-    "references/start-rebase.md": "932313fbb389684ca224b9c7b6e9ce2507e8d7c808a3bdaa73536561e29bca07"
+    "references/start-rebase.md": "54750dbef0dc548747a55dbed15e1fa90d3fea53e68f5ba5462e70816a32a3a6"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },
@@ -21,7 +21,7 @@
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f37534afcffeW8b3wrcLAMrL22",
+      "session_id": "ses_f37024a28ffeI1s1HNnKGRQLEC",
       "eval_id": 1,
       "prompt": "Rebase feature/a onto main.",
       "observed_activation": true,
@@ -40,8 +40,8 @@
       ],
       "state_transitions": ["BLOCKED_INVALID_REF"],
       "final_terminal": "BLOCKED_INVALID_REF",
-      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
-      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_before": "4099d2d617421767570fdec01655615deb1cdf4a",
+      "repository_head_after": "4099d2d617421767570fdec01655615deb1cdf4a",
       "repository_status_before": "?? .agents/\n",
       "repository_status_after": "?? .agents/\n"
     },

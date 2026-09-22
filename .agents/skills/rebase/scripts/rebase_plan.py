@@ -21,11 +21,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
-from rebase_evidence import CommandEvidence, ExecutionMode, RepositoryStateEvidence
-from rebase_prepare import PrepareFailure, PrepareRequest, prepare_replay
+from rebase_evidence import CommandEvidence, RepositoryStateEvidence
+from rebase_models import BecomesEmptyOption, ExecutionMode, MergePolicy, ObjectId, PrepareRequest
+from rebase_prepare import PrepareFailure, execute_replay
 from rebase_states import WORKFLOW_STATE_DEFINITIONS, WorkflowState
 
-ObjectId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")]
 ArgumentVector = Annotated[list[str], Field(min_length=1)]
 
 
@@ -93,21 +93,6 @@ class UserDecision(BaseModel):
     decision_id: Annotated[str, Field(min_length=1)]
     question: Annotated[str, Field(min_length=1)]
     approved: bool
-
-
-class MergePolicy(StrEnum):
-    """How the plan treats merge topology."""
-
-    LINEAR_NO_MERGES = "LINEAR_NO_MERGES"
-    PRESERVE_TOPOLOGY = "PRESERVE_TOPOLOGY"
-    APPROVED_FLATTEN = "APPROVED_FLATTEN"
-
-
-class BecomesEmptyOption(StrEnum):
-    """Installed Git spelling that stops on a commit that becomes empty."""
-
-    ASK = "ask"
-    STOP = "stop"
 
 
 class RebasePlan(BaseModel):
@@ -341,9 +326,11 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate_parser = subparsers.add_parser("validate", help="Validate one JSON plan artifact.")
     validate_parser.add_argument("plan", type=Path)
-    prepare_parser = subparsers.add_parser("prepare", help="Recheck live state and emit canonical replay argv.")
-    prepare_parser.add_argument("plan", type=Path)
-    prepare_parser.add_argument("--expected-sha256", required=True)
+    execute_parser = subparsers.add_parser(
+        "execute", help="Consume one plan hash and run its canonical replay argv once."
+    )
+    execute_parser.add_argument("plan", type=Path)
+    execute_parser.add_argument("--expected-sha256", required=True)
     subparsers.add_parser("schema", help="Print the complete JSON Schema for a plan artifact.")
     subparsers.add_parser("states", help="Print the canonical workflow-state contract.")
     path_state_parser = subparsers.add_parser("path-state", help="Observe one resolved Git path.")
@@ -392,11 +379,11 @@ def validate_plan(path: Path) -> int:
     return 0
 
 
-def prepare_plan(path: Path, expected_sha256: str) -> int:
-    """Validate one unchanged artifact and emit replay argv only after live rechecks.
+def load_unchanged_plan(path: Path, expected_sha256: str) -> tuple[RebasePlan, str] | int:
+    """Load an unchanged schema-valid plan artifact.
 
     Returns:
-        Zero on complete preparation, one for a blocked/invalid gate, or two for I/O failure.
+        Validated plan plus its hash, or an emitted-error exit code.
     """
     try:
         raw = path.read_bytes()
@@ -421,31 +408,55 @@ def prepare_plan(path: Path, expected_sha256: str) -> int:
             "status": "INVALID",
         })
         return 1
+    return plan, actual_sha256
 
-    request = PrepareRequest(
+
+def prepare_request(plan: RebasePlan) -> PrepareRequest:
+    """Project a validated plan into the immutable execution request.
+
+    Returns:
+        Frozen typed preparation request.
+    """
+    return PrepareRequest(
         branch_ref=plan.branch.ref,
         branch_oid=plan.branch.oid,
         target_ref=plan.target.ref,
         target_oid=plan.target.oid,
         execution_worktree=plan.execution_worktree,
         execution_mode=plan.execution_mode,
-        merge_policy=plan.merge_policy.value,
-        becomes_empty_option=plan.becomes_empty_option.value,
+        merge_policy=plan.merge_policy,
+        becomes_empty_option=plan.becomes_empty_option,
         recovery_ref=plan.recovery_ref,
     )
+
+
+def execute_plan(path: Path, expected_sha256: str) -> int:
+    """Consume one unchanged plan hash and execute its canonical replay once.
+
+    Returns:
+        Zero after a completed replay, one for a blocked/stopped replay, or two for I/O failure.
+    """
+    loaded = load_unchanged_plan(path, expected_sha256)
+    if isinstance(loaded, int):
+        return loaded
+    plan, actual_sha256 = loaded
+    request = prepare_request(plan)
     try:
-        argv = prepare_replay(request, Path.cwd())
+        execution = execute_replay(request, Path.cwd(), actual_sha256)
     except PrepareFailure as error:
         emit_json({"error": str(error), "state": error.state, "status": "BLOCKED"})
         return 1
+    command = execution.command
+    status = "REPLAY_FINISHED" if command.exit_code == 0 else "REPLAY_STOPPED"
     emit_json({
-        "argv": argv,
+        "argv": command.argv,
         "plan_id": plan.plan_id,
+        "receipt_path": execution.receipt_path,
+        "replay": command.model_dump(mode="json"),
         "sha256": actual_sha256,
-        "state": WorkflowState.READY_TO_REBASE,
-        "status": "PREPARED",
+        "status": status,
     })
-    return 0
+    return 0 if command.exit_code == 0 else 1
 
 
 def main() -> int:
@@ -457,8 +468,8 @@ def main() -> int:
     args = create_parser().parse_args()
     if args.command == "validate":
         return validate_plan(args.plan)
-    if args.command == "prepare":
-        return prepare_plan(args.plan, args.expected_sha256)
+    if args.command == "execute":
+        return execute_plan(args.plan, args.expected_sha256)
     if args.command == "schema":
         emit_json(RebasePlan.model_json_schema())
         return 0

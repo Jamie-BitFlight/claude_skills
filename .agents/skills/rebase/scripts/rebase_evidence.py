@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
-from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
 from pydantic import BaseModel, Field
+
+from rebase_models import ExecutionMode
 
 ArgumentVector = Annotated[list[str], Field(min_length=1)]
 PATH_STATE_ARGV_LENGTH = 6
@@ -22,13 +23,6 @@ class CommandEvidence(BaseModel):
     exit_code: int
     stdout: str
     stderr: str
-
-
-class ExecutionMode(StrEnum):
-    """How the planned branch reaches the authorized execution worktree."""
-
-    CURRENT_BRANCH = "CURRENT_BRANCH"
-    AUTHORIZED_BRANCH_TRANSFER = "AUTHORIZED_BRANCH_TRANSFER"
 
 
 class PathMarkerEvidence(BaseModel):
