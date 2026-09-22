@@ -174,10 +174,15 @@ CAPABILITY_AUTHORITY_FIELDS: tuple[str, ...] = (
     "remote_identity",
     "target_ref_pattern",
     "actor_identity",
+    "actor_permissions_snapshot_digest",
+    "rules_snapshot_digest",
     "git_version",
     "proof_evidence_digest",
     "proof_transcript_digest",
     "supported_result_shape",
+    "primitive",
+    "supported_target_policy",
+    "supports_atomic_review_guard",
 )
 """Attempt-2 authority projection; attempt-3 closure requires the complete strict field set."""
 
@@ -202,10 +207,15 @@ def canonical_authority_projection(canonical: CanonicalCapabilityIdentity) -> tu
         "remote_identity": canonical.canonical_remote_identity,
         "target_ref_pattern": canonical.target_ref,
         "actor_identity": canonical.actor_identity,
+        "actor_permissions_snapshot_digest": canonical.actor_permissions_snapshot_digest,
+        "rules_snapshot_digest": canonical.rules_snapshot_digest,
         "git_version": canonical.git_version,
         "proof_evidence_digest": canonical.sandbox_report_digest,
         "proof_transcript_digest": canonical.sandbox_transcript_digest,
         "supported_result_shape": canonical.supported_result_shape,
+        "primitive": canonical.primitive,
+        "supported_target_policy": canonical.supported_target_policy,
+        "supports_atomic_review_guard": canonical.supports_atomic_review_guard,
     }
     return tuple(values[field] for field in CAPABILITY_AUTHORITY_FIELDS)
 

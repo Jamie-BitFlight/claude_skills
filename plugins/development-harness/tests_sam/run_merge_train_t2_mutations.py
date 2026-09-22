@@ -330,7 +330,7 @@ MUTANTS: tuple[Mutant, ...] = (
         "dh_core/github_git_push.py",
         '    "target_ref",\n',
         "",
-        "tests_sam/test_merge_train_t2_provider.py::test_f21_github_capability_requires_exact_runtime_admission",
+        "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_identity_matches_every_derived_source_field",
     ),
     Mutant(
         "T2-M18",
@@ -465,7 +465,7 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         "T2-M50",
         "dh_core/integration_branch.py",
-        "or capability_identity != canonical_identity",
+        "or capability_authority_projection(capability) != canonical_authority_projection(canonical)",
         "or False",
         "tests_sam/test_integration_branch_advancer.py::test_f14_advancer_requires_one_derived_capability_port_and_prepared_identity",
     ),
@@ -521,7 +521,7 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         "T2-M58",
         "dh_core/github_git_push.py",
-        "repository_matches = repository is None or (",
+        "repository_matches = (",
         "repository_matches = True or (",
         "tests_sam/test_merge_train_t2_provider.py::test_f21_capability_rejects_preflight_identity_mismatch",
     ),
@@ -569,8 +569,8 @@ MUTANTS: tuple[Mutant, ...] = (
         "T2-M67",
         "tests_sam/run_merge_train_t2_mutations.py",
         "MUTATION_MANIFEST: tuple[Mutant, ...]" + " = MUTANTS",
-        "MUTATION_MANIFEST: tuple[Mutant, ...] = MUTANTS[:-1]",
-        "tests_sam/test_merge_train_t2_rebuild.py::test_f25_mutation_manifest_is_complete_and_each_seam_unique",
+        "MUTATION_MANIFEST: tuple[Mutant, ...] " + "= MUTANTS[:-1]",
+        "tests_sam/test_merge_train_t2_rebuild.py::test_f25_t2_mutation_manifest_is_complete_and_each_seam_unique",
     ),
 )
 

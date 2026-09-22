@@ -56,7 +56,7 @@ class GitHubCapabilityAdmission(BaseModel):
         return cls(observation=observation)
 
     def evaluate(
-        self, observed: GitHubCapabilityObservation, repository: RepositoryIdentityObservation | None = None
+        self, observed: GitHubCapabilityObservation, repository: RepositoryIdentityObservation
     ) -> GitPushCapability:
         """Fail closed unless every semantic runtime fact matches.
 
@@ -68,7 +68,7 @@ class GitHubCapabilityAdmission(BaseModel):
         return GitPushCapability.from_canonical(actual, supports_expected_head_advance=supported)
 
     def evaluate_identity(
-        self, actual: CanonicalCapabilityIdentity, repository: RepositoryIdentityObservation | None = None
+        self, actual: CanonicalCapabilityIdentity, repository: RepositoryIdentityObservation
     ) -> GitPushCapability:
         """Compare every canonical tuple field and optional concrete-port observation.
 
@@ -78,7 +78,7 @@ class GitHubCapabilityAdmission(BaseModel):
         expected = canonical_capability_identity(self.observation)
         fields = set(CAPABILITY_IDENTITY_FIELDS)
         identity_matches = expected.model_dump(include=fields) == actual.model_dump(include=fields)
-        repository_matches = repository is None or (
+        repository_matches = (
             repository.available
             and repository.remote_identity == actual.canonical_remote_identity
             and repository.hostname == actual.hostname
@@ -100,7 +100,8 @@ def admit_github_capability(
     Returns:
         Capability produced from runtime observation and concrete repository evidence.
     """
-    return admission.evaluate(observed)
+    repository = port.preflight_repository()
+    return admission.evaluate(observed, repository)
 
 
 def canonical_capability_identity(observed: GitHubCapabilityObservation) -> CanonicalCapabilityIdentity:

@@ -550,12 +550,20 @@ constructor identity after a reachability check. Admission constructs one
 compares every tuple field, and derives `GitPushCapability` from that value. A caller-supplied
 capability contributes no authority. The advancer rechecks canonical capability digest, port
 preflight identity, prepared remote, and target before object inspection or upload.
+At the advancer use site, one `CAPABILITY_AUTHORITY_FIELDS` projection classifies every strict
+`GitPushCapability` field as canonical authority, admission decision, or retained canonical identity;
+one projection equality replaces hand-written per-field predicates. Admission `evaluate` and
+`evaluate_identity` require a concrete `RepositoryIdentityObservation` argument with no omission or
+`None` path, and the positive helper always obtains it from the bound port's preflight.
 The legacy `BranchBackend` and PyGithub merge path remain unchanged for unregistered workflows.
 
 The mutation runner's seven self-tests are executable bounded probes. Each PASS is printed only from
 a returned `ProbeResult` carrying argv, cwd, repository identity, process classification, collection
 evidence, and complete binary output; no static PASS labels exist. No-op, wrong-file, deselection,
 hang-tree, pipe-fill, missing-workdir, and wrong-repository failures cannot count as mutant kills.
+`tests_sam/test_merge_train_t2_rebuild.py` owns exact mutation-manifest equality under
+`CG-LEDGER-FACADE`; this ownership covers the sequential manifest assertion and existing rebuild
+closure only, not new ledger behavior.
 
 An omitted generation in a train query selects only the active generation. An explicit generation
 selects that exact immutable generation, including retired history. Current validation re-reads both

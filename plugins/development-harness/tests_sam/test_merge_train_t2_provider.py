@@ -11,8 +11,10 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from dh_core.git_push import GateRunner, LocalBareGitPushPort, ProcessResult
@@ -117,6 +119,17 @@ def production_observation(**changes: object) -> GitHubCapabilityObservation:
     return GitHubCapabilityObservation.model_validate(values)
 
 
+def production_repository_observation() -> RepositoryIdentityObservation:
+    return RepositoryIdentityObservation(
+        remote_identity="github.com/Jamie-BitFlight/claude_skills",
+        hostname="github.com",
+        repository_owner="Jamie-BitFlight",
+        repository_name="claude_skills",
+        target_ref="refs/heads/integration/runtime-integrity",
+        available=True,
+    )
+
+
 def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) -> None:
     admitted = capability(tmp_path).model_copy(
         update={
@@ -127,7 +140,8 @@ def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) 
     observation = production_observation()
     admission = GitHubCapabilityAdmission(observation=observation, capability=admitted)
 
-    assert admission.evaluate(observation).supports_expected_head_advance
+    repository = production_repository_observation()
+    assert admission.evaluate(observation, repository).supports_expected_head_advance
     for drift in (
         {"repository_id": 1},
         {"actor": "other"},
@@ -137,7 +151,7 @@ def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) 
         {"target_ref": "refs/heads/main"},
         {"atomic_review_guard": True},
     ):
-        assert not admission.evaluate(production_observation(**drift)).supports_expected_head_advance
+        assert not admission.evaluate(production_observation(**drift), repository).supports_expected_head_advance
 
 
 def test_f21_capability_rejects_observation_with_unrelated_supplied_capability(tmp_path: Path) -> None:
@@ -147,7 +161,7 @@ def test_f21_capability_rejects_observation_with_unrelated_supplied_capability(t
     )
     admission = GitHubCapabilityAdmission.from_receipt(observation).model_copy(update={"capability": attacker})
 
-    result = admission.evaluate(observation)
+    result = admission.evaluate(observation, production_repository_observation())
 
     assert result.remote_identity == "github.com/Jamie-BitFlight/claude_skills"
     assert result.actor_identity == "Jamie-BitFlight"
@@ -177,9 +191,9 @@ def test_f21_capability_admission_requires_concrete_repository_observation() -> 
     assert inspect.signature(admission.evaluate).parameters["repository"].default is inspect.Parameter.empty
     assert inspect.signature(admission.evaluate_identity).parameters["repository"].default is inspect.Parameter.empty
     with pytest.raises(TypeError):
-        admission.evaluate(receipt)
+        cast("Callable[..., object]", admission.evaluate)(receipt)
     with pytest.raises(TypeError):
-        admission.evaluate_identity(actual)
+        cast("Callable[..., object]", admission.evaluate_identity)(actual)
 
 
 def test_f21_production_admission_uses_port_derived_repository_observation(
@@ -242,8 +256,16 @@ def test_f21_capability_identity_matches_every_derived_source_field(field: str, 
     receipt = production_observation()
     admission = GitHubCapabilityAdmission.from_receipt(receipt)
     actual = canonical_capability_identity(receipt).model_copy(update={field: value})
+    repository = RepositoryIdentityObservation(
+        remote_identity=actual.canonical_remote_identity,
+        hostname=actual.hostname,
+        repository_owner=actual.repository_owner,
+        repository_name=actual.repository_name,
+        target_ref=actual.target_ref,
+        available=True,
+    )
 
-    result = admission.evaluate_identity(actual)
+    result = admission.evaluate_identity(actual, repository)
 
     assert not result.supports_expected_head_advance
 
