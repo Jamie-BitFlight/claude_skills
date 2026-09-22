@@ -204,12 +204,12 @@ def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path:
     runner = GateRunner(evidence, workdir=tmp_path, timeout_seconds=0.5)
     sentinel = tmp_path / "child-survived"
     child = (
-        "import os,time; from pathlib import Path; print(os.getpid(),flush=True); "
-        f"os.close(1); os.close(2); time.sleep(1); Path({str(sentinel)!r}).write_text('alive'); time.sleep(60)"
+        "import time; from pathlib import Path; "
+        f"time.sleep(1); Path({str(sentinel)!r}).write_text('alive'); time.sleep(60)"
     )
     parent = (
         "import os,subprocess,sys,time; print(os.getpid(),flush=True); "
-        f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
+        f"subprocess.Popen([sys.executable,'-c',{child!r}],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); "
         "sys.stderr.write('before-timeout\\n'); sys.stderr.flush(); time.sleep(60)"
     )
 
