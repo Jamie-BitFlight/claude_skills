@@ -13,9 +13,7 @@
       "exact_action_order": [
         "load rebase skill",
         "load start-rebase reference",
-        "search repository instruction locations",
-        "git rev-parse --show-toplevel",
-        "git show-ref --verify refs/heads/feature/a",
+        "rebase_plan.py capture --branch feature/a --target main",
         "BLOCKED_INVALID_REF"
       ],
       "expectations": [

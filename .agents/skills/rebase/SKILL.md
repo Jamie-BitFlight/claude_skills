@@ -9,10 +9,10 @@ Rewrite local history only: no force-push, remote backup, merge, forge action, o
 
 Bind `<skill-dir>` to this loaded `SKILL.md`'s absolute directory.
 
-Before mutation, require a named local ref, immutable target OID, authorized clean worktree, typed
-plan, verified recovery ref, and validation hash. Require explicit approval for discard, topology
-flattening, semantic change, publication impact, or ambiguous reconstruction. End with exactly one
-canonical terminal; local success is `REBASE_COMPLETE_VERIFIED` and `not published`.
+Routine starts use managed `capture`, `finalize`, and `execute`. The agent supplies semantic
+judgment; the tools own evidence, storage, recovery, replay argv, and single use. Approval requires
+an externally bound receipt, never a plan field. A terminal result ends the invocation. Local
+success is `REBASE_COMPLETE_VERIFIED` and `not published`.
 
 Before any Git command, choose one route and load only its reference:
 

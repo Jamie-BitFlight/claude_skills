@@ -55,10 +55,10 @@ WORKFLOW_STATE_DEFINITIONS = (
     WorkflowStateDefinition(
         name=WorkflowState.READY_TO_ANALYZE,
         kind=StateKind.TRANSITION,
-        condition="Every immutable preflight completed in the authorized execution worktree.",
-        next_action="Inventory every replay candidate and affected path.",
-        artifact_policy="Retain the complete immutable preflight evidence.",
-        evidence=["immutable refs", "authorized clean worktree", "no active Git operation"],
+        condition="Managed capture stored every immutable preflight and candidate/path fact.",
+        next_action="Supply only semantic candidate and path judgments to managed finalization.",
+        artifact_policy="Retain the immutable Git-dir capture.",
+        evidence=["managed capture ID", "immutable refs", "authorized clean worktree", "no active Git operation"],
     ),
     WorkflowStateDefinition(
         name=WorkflowState.PLAN_INVALID,
@@ -135,18 +135,21 @@ WORKFLOW_STATE_DEFINITIONS = (
     WorkflowStateDefinition(
         name=WorkflowState.NEEDS_USER_DECISION,
         kind=StateKind.TERMINAL,
-        condition="A destructive, semantic, topology, publication, or reconstruction decision remains unresolved.",
-        next_action="End after asking one concrete question for each unresolved decision.",
-        artifact_policy="Retain the plan or reconstructed active-operation evidence without mutation.",
-        evidence=["concrete unresolved decisions", "no new rebase"],
+        condition=(
+            "A destructive, semantic, topology, publication, or reconstruction decision lacks an externally "
+            "bound approval receipt."
+        ),
+        next_action="End this invocation; a later invocation may supply explicit bound approval evidence.",
+        artifact_policy="Retain managed capture evidence without recovery, plan, or replay state.",
+        evidence=["concrete unresolved decisions", "external approval absent", "no recovery or rebase"],
     ),
     WorkflowStateDefinition(
         name=WorkflowState.REPLAN_REF_DRIFT,
-        kind=StateKind.TRANSITION,
-        condition="A fresh branch or target lookup differs from the validated plan.",
-        next_action="Mark the retained plan stale and restart immutable evidence capture at Step 1.",
-        artifact_policy="Retain the stale plan and fresh ref evidence; never execute it.",
-        evidence=["fresh branch or target OID differs from plan", "no stale-plan rebase"],
+        kind=StateKind.TERMINAL,
+        condition="Captured or live branch/target state differs from invocation-bound intent.",
+        next_action="End this invocation; a later invocation must authorize intent against the new ref state.",
+        artifact_policy="Retain drift evidence without recovery, plan, or replay state.",
+        evidence=["expected and observed OIDs differ", "no same-invocation recapture or rebase"],
     ),
     WorkflowStateDefinition(
         name=WorkflowState.CONFLICT,

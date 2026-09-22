@@ -58,7 +58,9 @@ def test_workflow_state_source_includes_every_reviewed_state() -> None:
     assert all(state.condition and state.next_action and state.artifact_policy for state in definitions.values())
     assert definitions[WorkflowState.PLAN_INVALID].kind is StateKind.TERMINAL
     assert "End this invocation" in definitions[WorkflowState.PLAN_INVALID].next_action
-    assert "Retain the stale plan" in definitions[WorkflowState.REPLAN_REF_DRIFT].artifact_policy
+    assert definitions[WorkflowState.REPLAN_REF_DRIFT].kind is StateKind.TERMINAL
+    assert "without recovery, plan, or replay" in definitions[WorkflowState.REPLAN_REF_DRIFT].artifact_policy
+    assert "later invocation" in definitions[WorkflowState.REPLAN_REF_DRIFT].next_action
 
 
 def test_validation_failure_freezes_history_until_a_new_authorized_plan() -> None:

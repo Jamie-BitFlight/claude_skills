@@ -28,6 +28,7 @@ class ActionEvent(BaseModel):
     kind: ActionKind
     operation: str = Field(min_length=1)
     exit_code: int | None = None
+    resulting_terminal: WorkflowState | None = None
 
 
 class EvalCase(BaseModel):
@@ -185,6 +186,19 @@ def evaluate_terminal_trace(case: ActivationCaseResult, evaluation: EvalCase) ->
             failures.append(f"actions observed after terminal: {key}")
         if terminal_action.operation != case.final_terminal:
             failures.append(f"terminal event differs from final terminal: {key}")
+    producing_positions = [index for index, action in enumerate(case.actions) if action.resulting_terminal is not None]
+    if len(producing_positions) > 1:
+        failures.append(f"multiple terminal-producing results: {key}")
+    elif producing_positions:
+        producer_position = producing_positions[0]
+        producer = case.actions[producer_position]
+        later_tool_actions = [
+            action for action in case.actions[producer_position + 1 :] if action.kind is not ActionKind.TERMINAL
+        ]
+        if later_tool_actions:
+            failures.append(f"tool action observed after terminal-producing result: {key}")
+        if producer.resulting_terminal is None or producer.resulting_terminal.value != case.final_terminal:
+            failures.append(f"terminal-producing result differs from final terminal: {key}")
     if evaluation.exact_action_order and [action.operation for action in case.actions] != evaluation.exact_action_order:
         failures.append(f"action-order contract mismatch: {key}")
     return failures

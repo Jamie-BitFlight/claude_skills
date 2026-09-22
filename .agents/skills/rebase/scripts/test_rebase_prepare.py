@@ -137,6 +137,12 @@ def live_plan_data(
 
 def run_execute(repository: Path, plan_path: Path, expected_hash: str) -> subprocess.CompletedProcess[str]:
     """Run the single-use replay executor through the process-group owner."""
+    managed_root = Path(run_git(repository, "rev-parse", "--git-path", "rebase-skill").stdout.strip())
+    if not managed_root.is_absolute():
+        managed_root = repository / managed_root
+    managed_plan = managed_root / "plans" / f"{plan_path.stem}.json"
+    managed_plan.parent.mkdir(parents=True, exist_ok=True)
+    managed_plan.write_bytes(plan_path.read_bytes())
     return subprocess.run(
         [
             str(BOUNDED_RUNNER),
@@ -145,7 +151,7 @@ def run_execute(repository: Path, plan_path: Path, expected_hash: str) -> subpro
             "--",
             str(VALIDATOR_PATH),
             "execute",
-            str(plan_path),
+            str(managed_plan),
             "--expected-sha256",
             expected_hash,
         ],

@@ -1,107 +1,84 @@
 # Start a rebase
 
-Enter only for an explicit request to replay a named local branch or ref. Run
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" states` for the canonical state meanings,
-next actions, artifact policies, and evidence contracts.
+Enter only for an explicit request to replay a named local branch or ref. Bind `<skill-dir>` to
+the loaded skill directory. Routine work uses only the managed operations below; they own Git
+evidence, artifact paths, recovery, replay argv, and terminal states.
 
-## 1. Bind immutable repository evidence
+## 1. Capture invocation intent
 
-Search every repository instruction location and record each candidate path as present or absent;
-load every present source. An all-absent result is valid; an omitted search is not. Bind the
-repository root, exact `refs/heads/<branch>`, immutable branch, target, and merge-base OIDs,
-current branch, complete porcelain status, worktree ownership,
-configured upstream, remote refs containing the old tip, and all operation-marker evidence. Capture
-every command as complete argv, exit code, stdout, and stderr in the typed `repository_state`,
-`repository_instruction_search`, `repository_instruction_sources`, repository-preflight,
-publication, and `execution_mode` fields.
+Run:
 
-After instruction search, run `git rev-parse --show-toplevel` alone, then run
-`git show-ref --verify refs/heads/<branch>` alone. Do not batch or parallelize either with later
-preflight work. A branch failure is the last action and `BLOCKED_INVALID_REF`. Only after success,
-resolve the target alone; its failure has the same terminal boundary. Route unrelated histories,
-other preflight failures, dirty/active Git state, and same-OID refs through the canonical states;
-same-OID refs reach `NO_CHANGE` with no recovery ref.
-Rebase metadata directories establish an active rebase; `REBASE_HEAD` alone does not. Detached
-`HEAD` is valid only on the active route.
+```text
+uv run --script "<skill-dir>/scripts/rebase_plan.py" capture --branch "<branch>" --target "<target>" [--expected-target-oid "<invocation-bound-oid>"]
+```
 
-If another worktree owns the branch or execution would transfer it, read only
-[worktree ownership and branch transfer](./rebase-edge-cases.md#worktree-ownership-and-branch-transfer).
-Require session ownership and every repository transfer gate. After authorized transfer, change to
-that worktree and recapture all evidence there; otherwise emit `BLOCKED_WORKTREE_IN_USE` without
-changing either worktree.
+Pass the expected target OID whenever the invocation supplies one. Never replace an expected OID
+with a newly observed value. `capture` performs ordered ref, repository, publication, graph,
+candidate, and path capture and stores immutable evidence under Git metadata without dirtying the
+worktree.
 
-Completion criterion: `READY_TO_ANALYZE` binds immutable OIDs, an authorized clean worktree,
-absent operations, observed publication signals, and successful repository checks.
+Every result with `terminal=true` ends the invocation. It is the final tool result: emit that
+state immediately, with no bookkeeping, repair, recapture, retry, or other tool call. In particular:
 
-## 2. Account for every candidate and path
+- `BLOCKED_INVALID_REF` ends without managed state or mutation.
+- `REPLAN_REF_DRIFT` ends without recovery, plan, or replay; new target intent requires a later
+  invocation.
+- `NEEDS_USER_DECISION` for publication impact retains only the capture. A later invocation must
+  carry explicit user-approval evidence bound to its repository, branch, old tip, target, capture,
+  and operation.
 
-Capture the ordered parent graph and an exact candidate/path cover. Account for intermediate
-net-zero changes, rename/copy pairs, cross-file dependencies, target interaction, merges, clean
-cherry-picks, start-empty commits, and commits that can become empty; endpoint diffs cannot replace
-the graph. Give every candidate and path intent, evidence, dependencies, verification surfaces, and
-one disposition: `RETAIN`, `ADAPT`, `MANUAL_MERGE`, `REDUNDANT_DROP`, or `PRESERVE_EMPTY`.
+Completion criterion: a nonterminal `READY_TO_ANALYZE` result returns a capture ID and semantic
+template; or one canonical terminal is the invocation's last action.
 
-No disposition authorizes whole-file side selection. `REDUNDANT_DROP` requires observable target
-equivalence or explicit approval. A start-empty candidate uses no paths and `PRESERVE_EMPTY`.
-For merge, clean-cherry-pick, or either empty class, read only
-[merge topology and commits Git can drop](./rebase-edge-cases.md#merge-topology-and-commits-git-can-drop).
-Bind the topology policy and installed-help-validated merge/empty options; unavailable safety
-options block execution.
+## 2. Supply semantic judgment
 
-Completion criterion: the inventory exactly covers every ordered source-only candidate and affected
-path, including every candidate Git could silently omit.
+Review the captured candidates and affected paths returned by `capture`. Fill only the returned
+`semantic_template`: candidate intent, evidence-backed disposition, verification surfaces,
+expected conflicts and equivalence; path interaction, dependencies, evidence and verification;
+merge policy, repository checks, unknowns, and decision requests.
 
-## 3. Bind recovery and validate the plan
+The semantic input cannot alter refs, OIDs, parents, paths, publication evidence, worktree state,
+recovery, or replay argv. Agent-authored `approved` booleans have no authority. Destructive,
+topology, semantic, or publication approvals require externally supplied receipts.
 
-Create a unique durable local recovery ref at the captured old tip and verify that exact OID before
-readiness. Cleanup and remote backup are outside this workflow.
+Completion criterion: every captured candidate and path has one evidence-backed semantic judgment,
+`unknowns` is empty, and every approval-requiring decision is explicit.
 
-For routine execution, use only the maintained artifact contract from
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" schema`; the bundled example belongs only to
-the tutorial route. Persist the complete evidence and decisions, then run
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" validate <plan.json>`.
-Only exit zero with `status=VALID`, `state=READY_TO_REBASE`, and a retained SHA-256 passes.
-`PLAN_INVALID` is terminal and retains structured errors.
+## 3. Finalize the managed plan
 
-Use `NEEDS_USER_DECISION` for unapproved discard, topology flattening, semantic change, publication
-impact, or reconstruction ambiguity. Preserve the artifact without mutation until every decision is
-approved and `unknowns` is empty.
+Run in a later invocation when a prior terminal required approval:
 
-Completion criterion: a persisted schema-valid exact-cover plan binds successful preflight and
-recovery evidence and returns `READY_TO_REBASE` plus its SHA-256.
+```text
+uv run --script "<skill-dir>/scripts/rebase_plan.py" finalize "<capture-id>" --semantics-json '<filled-template>' [--approval-receipt "<external-read-only-receipt>"]...
+```
 
-## 4. Reject drift immediately before mutation
+`finalize` accepts semantic fields only, validates exact coverage and externally bound receipts,
+then creates recovery and the plan under Git metadata. Files in the repository or its Git directory
+are not external approval authority. The portable receipt contract records provenance but cannot
+cryptographically prove which actor created it; when the harness cannot supply trustworthy
+human-gate evidence, fail closed at `NEEDS_USER_DECISION`.
 
-Run
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" execute <plan.json> --expected-sha256 <validated-sha256>`.
-This single-use operation revalidates the artifact, rechecks live refs, authorized worktree
-ownership, clean state, operation absence, and recovery, derives replay argv from typed policy, then
-persists a consumed receipt before running that argv. Any response without a receipt and replay
-result blocks mutation; ref drift requires recapture from Step 1 through `REPLAN_REF_DRIFT`, and
-artifact/hash drift returns to Step 3.
+A terminal finalize result is the invocation's final tool result. Do not edit `.git/info/exclude`,
+write workflow artifacts into the worktree, or repair and retry in the same invocation.
+`PLAN_INVALID` retains its structured errors for a later invocation.
 
-Completion criterion: every live binding matches the unchanged plan and one durable receipt binds
-the plan hash to its canonical replay result.
+Completion criterion: `READY_TO_REBASE` returns a managed plan ID and SHA-256, with verified
+recovery at the captured old tip and a clean worktree.
 
-## 5. Execute only validated intent
+## 4. Execute once
 
-Treat the consumed plan hash as single-use. No other initial replay form is authorized; an `--onto`
-range requires a future typed schema that binds every boundary. Retain the receipt, rewritten
-branch, and recovery ref through the terminal. Route every conflict, empty stop, command failure, or
-requested abort through
-[active rebase](./active-rebase.md) before another mutation.
+Run only:
 
-Completion criterion: execution either has no active rebase metadata or ends at one canonical
-blocked, decision, aborted, or failure terminal with command, output, status, and recovery evidence.
+```text
+uv run --script "<skill-dir>/scripts/rebase_plan.py" execute "<managed-plan-id>" --expected-sha256 "<finalized-sha256>"
+```
 
-## 6. Prove completion
+`execute` rejects unmanaged worktree plans, revalidates live refs, worktree ownership, clean
+state, operation absence and recovery, derives canonical replay argv, atomically consumes the plan
+hash, then runs that argv once. Any blocked or decision result ends the invocation; recovery or
+retry requires a later invocation and a newly authorized managed flow.
 
-Verify planned branch identity and target ancestry, every old candidate disposition and old-to-new
-mapping, repository checks, clean worktree, no unmerged paths or active operation, and the recovery
-ref. Preserved merge topology also requires planned parent/tree evidence. Any failed oracle emits
-`REBASE_COMPLETE_VALIDATION_FAILED`, freezes rewritten and recovery refs, and stops mutation.
-Another history mutation requires an explicit recovery decision and a newly validated plan.
-
-Only a complete pass emits `REBASE_COMPLETE_VERIFIED`. Report immutable branch/target/old/new OIDs,
-dispositions, repository-check evidence, clean state, recovery ref, and `not published`. Make that
-terminal the last action.
+When replay stops in an active operation, route a later invocation through
+[active rebase](./active-rebase.md). After successful replay, verify the accounted candidate intent,
+target ancestry, repository checks, clean state, absent operation markers, and recovery ref. Only a
+complete pass emits `REBASE_COMPLETE_VERIFIED` and `not published`.

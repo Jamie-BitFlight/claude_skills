@@ -3,9 +3,9 @@
   "skill_name": "rebase",
   "observed_on": "2026-09-22",
   "content_sha256": {
-    "SKILL.md": "6840875489b7c5bb95b3de082b23dfef6103f0fc06bc18159c5f7bca978006e7",
+    "SKILL.md": "caf58ad5d7909fc05a4bf07dabd98b221229954907757cc8031d22008153574d",
     "references/active-rebase.md": "dcf11d64ecd7119a6cf4e3d4c5a92ae6a7d0f3a33726d2444963a63ce0bec3fe",
-    "references/start-rebase.md": "54750dbef0dc548747a55dbed15e1fa90d3fea53e68f5ba5462e70816a32a3a6"
+    "references/start-rebase.md": "0a00807d3b5633fc0334ae4230ea5a2ad4114b88988f3c074348681661fe348e"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },
@@ -21,7 +21,7 @@
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f37024a28ffeI1s1HNnKGRQLEC",
+      "session_id": "ses_f36ab7aebffe8f1gY7n6Uk0B7S",
       "eval_id": 1,
       "prompt": "Rebase feature/a onto main.",
       "observed_activation": true,
@@ -29,19 +29,18 @@
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
         { "kind": "read", "operation": "load start-rebase reference" },
-        { "kind": "read", "operation": "search repository instruction locations", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --show-toplevel", "exit_code": 0 },
         {
           "kind": "command",
-          "operation": "git show-ref --verify refs/heads/feature/a",
-          "exit_code": 128
+          "operation": "rebase_plan.py capture --branch feature/a --target main",
+          "exit_code": 1,
+          "resulting_terminal": "BLOCKED_INVALID_REF"
         },
         { "kind": "terminal", "operation": "BLOCKED_INVALID_REF" }
       ],
       "state_transitions": ["BLOCKED_INVALID_REF"],
       "final_terminal": "BLOCKED_INVALID_REF",
-      "repository_head_before": "4099d2d617421767570fdec01655615deb1cdf4a",
-      "repository_head_after": "4099d2d617421767570fdec01655615deb1cdf4a",
+      "repository_head_before": "cd24aa1a7bf3716663ac11c54af7216cfdd095dc",
+      "repository_head_after": "cd24aa1a7bf3716663ac11c54af7216cfdd095dc",
       "repository_status_before": "?? .agents/\n",
       "repository_status_after": "?? .agents/\n"
     },

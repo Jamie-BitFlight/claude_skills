@@ -143,6 +143,8 @@ def derive_replay_argv(request: PrepareRequest) -> list[str]:
         Canonical replay argument vector.
     """
     argv = ["git", "rebase", "--reapply-cherry-picks", f"--empty={request.becomes_empty_option}"]
+    if request.keep_empty:
+        argv.append("--keep-empty")
     if request.merge_policy is MergePolicy.PRESERVE_TOPOLOGY:
         argv.append("--rebase-merges")
     argv.append(request.target_oid)

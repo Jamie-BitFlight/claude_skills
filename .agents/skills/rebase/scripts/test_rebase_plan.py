@@ -106,10 +106,7 @@ def valid_plan_data() -> dict[str, object]:
         "status_porcelain": "",
         "active_operations": [],
         "repository_state": valid_repository_state_data(
-            old_tip=old_tip,
-            target_oid=target_oid,
-            merge_base_oid="4" * 40,
-            configured_upstream="refs/remotes/origin/feature/parser",
+            old_tip=old_tip, target_oid=target_oid, merge_base_oid="4" * 40, configured_upstream=None
         ),
         "repository_instruction_search": [
             {"path": "AGENTS.md", "present": True},
@@ -126,14 +123,14 @@ def valid_plan_data() -> dict[str, object]:
             }
         ],
         "publication": {
-            "configured_upstream": "refs/remotes/origin/feature/parser",
-            "remote_refs_containing_old_tip": ["refs/remotes/origin/feature/parser"],
+            "configured_upstream": None,
+            "remote_refs_containing_old_tip": [],
             "evidence_commands": [
                 {
                     "source": "local-git",
                     "argv": ["git", "for-each-ref", "--format=%(refname)", "--contains", old_tip, "refs/remotes"],
                     "exit_code": 0,
-                    "stdout": "refs/remotes/origin/feature/parser\n",
+                    "stdout": "",
                     "stderr": "",
                 }
             ],
@@ -324,7 +321,9 @@ def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
     if mutation == "unknown":
         data["unknowns"] = ["Whether target behavior supersedes the candidate."]
     elif mutation == "unapproved-decision":
-        data["user_decisions"] = [{"decision_id": "flatten", "question": "Flatten merge topology?", "approved": False}]
+        data["user_decisions"] = [
+            {"decision_id": "flatten", "question": "Flatten merge topology?", "operation": "FLATTEN_TOPOLOGY"}
+        ]
     elif mutation == "missing-path-membership":
         affected_paths = data["affected_paths"]
         assert isinstance(affected_paths, list)
@@ -361,6 +360,43 @@ def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
         RebasePlan.model_validate(data)
 
 
+def test_publication_receipt_cannot_authorize_a_redundant_drop() -> None:
+    """Keep every external approval bound to its declared destructive operation."""
+    data = valid_plan_data()
+    candidates = data["candidates"]
+    branch = data["branch"]
+    target = data["target"]
+    assert isinstance(candidates, list)
+    assert isinstance(branch, dict)
+    assert isinstance(target, dict)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    candidate["disposition"] = "REDUNDANT_DROP"
+    candidate["equivalence_evidence"] = []
+    candidate["drop_approval_decision_id"] = "shared-decision"
+    data["capture_id"] = "a" * 32
+    data["capture_sha256"] = "b" * 64
+    data["approval_receipts"] = [
+        {
+            "schema_version": 1,
+            "source": "harness-human-gate",
+            "capture_id": data["capture_id"],
+            "capture_sha256": data["capture_sha256"],
+            "repository_root": data["execution_worktree"],
+            "branch_ref": branch["ref"],
+            "old_tip_oid": branch["oid"],
+            "target_ref": target["ref"],
+            "target_oid": target["oid"],
+            "operation": "REBASE_PUBLISHED_HISTORY",
+            "decision_id": "shared-decision",
+            "approved": True,
+        }
+    ]
+
+    with pytest.raises(ValidationError, match="redundant drop"):
+        RebasePlan.model_validate(data)
+
+
 @pytest.mark.parametrize(
     ("field_path", "replacement"),
     [
@@ -370,7 +406,7 @@ def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
             f"worktree /work/foreign\nHEAD {'1' * 40}\nbranch refs/heads/feature/parser\n",
         ),
         (("repository_state", "merge_head", "present"), True),
-        (("publication", "remote_refs_containing_old_tip"), []),
+        (("publication", "remote_refs_containing_old_tip"), ["refs/remotes/origin/unexpected"]),
     ],
 )
 def test_contradictory_universal_evidence_cannot_reach_ready(field_path: tuple[str, ...], replacement: object) -> None:
