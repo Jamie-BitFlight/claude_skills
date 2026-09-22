@@ -6,12 +6,14 @@ import os
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 
 import pytest
 from scripts import run_bounded
 
 RUNNER = Path(__file__).parents[1] / "scripts" / "run_bounded.py"
+PYPROJECT = Path(__file__).parents[1] / "pyproject.toml"
 
 
 def run_runner(*arguments: str) -> subprocess.CompletedProcess[str]:
@@ -26,6 +28,14 @@ def test_runner_relays_a_successful_childs_output_and_status() -> None:
     assert result.returncode == 0
     assert result.stdout == "bounded-success\n"
     assert result.stderr == ""
+
+
+def test_coverage_core_is_selected_by_the_python_runtime() -> None:
+    """Subprocess coverage retains patching without forcing a version-incompatible measurement core."""
+    coverage_run = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["tool"]["coverage"]["run"]
+
+    assert coverage_run["patch"] == ["subprocess"]
+    assert "core" not in coverage_run
 
 
 def test_runner_times_out_and_returns_the_timeout_status() -> None:

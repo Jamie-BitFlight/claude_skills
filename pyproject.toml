@@ -128,7 +128,6 @@ exclude_lines = [
 ]
 
 [tool.coverage.run]
-core = "sysmon"
 omit = [
     "tests/*",
     "*/tests/*",
