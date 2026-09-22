@@ -55,7 +55,18 @@ ContentRecords: TypeAlias = list[ContentRecord]
 
 
 class _GitHubContentIntegrityError(ContentUnavailableError):
-    pass
+    """GitHub answered, and what it returned is not usable content.
+
+    A truncated discovery tree, a path that is a directory, a blob that is
+    missing or invalid: GitHub was reached every time, so the trip did not
+    fail. The identical request returns the identical remote state, which is
+    why this states a final verdict rather than inheriting its base's
+    "the provider could not be reached".
+    """
+
+    def __init__(self, *args: object) -> None:
+        """Initialize with the usual exception args and a final verdict."""
+        super().__init__(*args, retryable=False)
 
 
 # PyGithub (>=2.9.0) is PEP 561-compliant and ships real, correctly-typed

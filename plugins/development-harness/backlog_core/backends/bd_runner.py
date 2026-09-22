@@ -18,13 +18,14 @@ Each exception carries :pep:`678` notes with ``argv``, ``returncode``,
 
 from __future__ import annotations
 
+import enum
 import json
 import logging
 import os
 import shutil
 import subprocess
 import time
-from typing import TYPE_CHECKING, Final, TypeAlias, Union
+from typing import TYPE_CHECKING, Final, Literal, TypeAlias, Union
 
 from backlog_core.models import BackendUnavailableError
 
@@ -70,21 +71,54 @@ def _bd_env() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+#: ``returncode`` recorded when ``bd`` never ran to completion -- it timed out, or the spawn
+#: itself failed. The code alone does not separate those two, so a raise site that knows which it
+#: is states its own verdict rather than leaving the derivation below to answer for it.
+_DID_NOT_COMPLETE = -1
+
+
+class _Unstated(enum.Enum):
+    """Sentinel for "this raise site stated no verdict", which ``None`` cannot mean here."""
+
+    TOKEN = enum.auto()
+
+
+#: Default for ``BdInvocationError``'s ``retryable``: derive the verdict from ``returncode``.
+#: Distinct from ``None``, which a raise site passes to mean "no verdict is knowable here".
+_UNSTATED: Final = _Unstated.TOKEN
+
+
 class BdNotInstalledError(BackendUnavailableError):
     """``bd`` binary is not on ``PATH``.
 
     Callers catching this exception should surface installation guidance
     (e.g. ``https://beads.sh/docs/install``) rather than a generic error.
+    Never retryable: the binary does not appear on ``PATH`` because someone
+    installs it, not because a caller tries again.
     """
+
+    def __init__(self, *args: object) -> None:
+        """Initialize with the usual exception args and a final verdict."""
+        super().__init__(*args, retryable=False)
 
 
 class BdInvocationError(BackendUnavailableError):
     """``bd`` returned a non-zero exit code, timed out, or failed to start.
 
+    Which of the three it is fixes whether another attempt is worth making, and
+    only the instance knows: a run that never finished may finish next time, a
+    run that finished and exited non-zero rejected what it was asked for and
+    rejects it again. ``returncode`` answers that for every caller that does
+    not say otherwise; a raise site that knows something the code does not --
+    that the spawn failed, where nothing separates a permission bit from
+    momentary resource pressure -- passes its own verdict, including ``None``
+    for "not knowable here".
+
     Attributes:
         argv: Full argv list passed to ``bd``, including the resolved binary
             path as the first element.
-        returncode: Exit code from the process.  ``-1`` indicates a timeout.
+        returncode: Exit code from the process.  ``-1`` indicates ``bd`` never
+            ran to completion -- it either timed out or could not be spawned.
         stdout: Captured standard output (may be empty).
         stderr: Captured standard error (may be empty).
 
@@ -92,25 +126,41 @@ class BdInvocationError(BackendUnavailableError):
     compatibility.
     """
 
-    def __init__(self, message: str, argv: list[str], returncode: int, stdout: str, stderr: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        argv: list[str],
+        returncode: int,
+        stdout: str,
+        stderr: str,
+        *,
+        retryable: bool | Literal[_Unstated.TOKEN] | None = _UNSTATED,
+    ) -> None:
         """Initialise with structured invocation details.
 
         Args:
             message: Human-readable summary.
             argv: Full argv (binary + subcommands + flags).
-            returncode: ``bd`` exit code (``-1`` for timeout).
+            returncode: ``bd`` exit code (``-1`` when ``bd`` never ran to completion).
             stdout: Captured stdout text.
             stderr: Captured stderr text.
+            retryable: Whether a later identical call may succeed. Left unset, it is derived
+                from ``returncode``; pass it to state what the code cannot say, ``None``
+                included.
         """
         self.argv = argv
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
-        super().__init__(message)
+        verdict = returncode == _DID_NOT_COMPLETE if retryable is _UNSTATED else retryable
+        super().__init__(message, retryable=verdict)
 
 
 class BdJsonDecodeError(BackendUnavailableError):
     """``bd`` stdout could not be parsed as JSON.
+
+    Never retryable: ``bd`` ran and answered, and the identical invocation
+    writes the identical unparseable stdout until the installed ``bd`` changes.
 
     Attributes:
         raw_output: Raw stdout text that failed JSON parsing.  Useful for
@@ -128,7 +178,7 @@ class BdJsonDecodeError(BackendUnavailableError):
             raw_output: The stdout string that failed ``json.loads``.
         """
         self.raw_output = raw_output
-        super().__init__(message)
+        super().__init__(message, retryable=False)
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +400,7 @@ class BdRunner:
                 f"bd timed out after {self._timeout_seconds}s: {argv!r}",
                 argv=full_cmd,
                 returncode=-1,
+                retryable=True,
                 stdout=stdout_text,
                 stderr=stderr_text,
             )
@@ -359,8 +410,11 @@ class BdRunner:
             raise err from exc
         except (OSError, subprocess.SubprocessError) as exc:
             elapsed_ms = int((time.monotonic() - t0) * 1000)
+            # No verdict: the spawn failed before bd ran, and nothing here separates a
+            # permission bit from momentary resource pressure. The boundary drops the key
+            # rather than guess, so the caller reads "not known" instead of a wrong answer.
             start_err = BdInvocationError(
-                f"bd failed to start: {exc!r}", argv=full_cmd, returncode=-1, stdout="", stderr=""
+                f"bd failed to start: {exc!r}", argv=full_cmd, returncode=-1, stdout="", stderr="", retryable=None
             )
             start_err.add_note(f"argv: {full_cmd!r}")
             start_err.add_note(f"elapsed_ms: {elapsed_ms}")

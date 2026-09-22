@@ -70,6 +70,7 @@ from .models import (
     ContentConflictError,
     ContentKind,
     ContentNotFoundError,
+    ContentProviderError,
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
@@ -78,7 +79,6 @@ from .models import (
     DispatchWaveSummary as _DispatchWaveSummary,
     DuplicateItemError,
     EntryNotFoundError,
-    GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
     ReferenceCollisionError,
@@ -237,19 +237,16 @@ def _respond(
 
 #: Failures that describe the call itself, not the trip to the backend: a selector that matched
 #: nothing or matched several, a value that did not validate, a record that is already there, an
-#: ordinal the item does not hold, a capability the backend does not implement, an environment
-#: that refuses GraphQL outright. Repeating the identical call repeats the identical outcome, so
-#: these are never retryable.
+#: ordinal the item does not hold, a capability the backend does not implement. Repeating the
+#: identical call repeats the identical outcome, so these are never retryable.
 _NEVER_RETRYABLE: tuple[type[BaseException], ...] = (
     AmbiguousSelectorError,
     BranchConflictError,
     CacheStateCorruptError,
     ContentConflictError,
-    ContentNotFoundError,
     DisclosureParamError,
     DuplicateItemError,
     EntryNotFoundError,
-    GraphQLUnavailableError,
     ItemNotFoundError,
     OrdinalNotFoundError,
     ReferenceCollisionError,
@@ -260,15 +257,20 @@ _NEVER_RETRYABLE: tuple[type[BaseException], ...] = (
 
 #: Failures of the trip rather than of the call: the request never reached a backend that could
 #: answer it. A dropped connection, a timeout, a backend whose credentials or transport are
-#: unreachable, content the provider could not be asked for. Checked after ``_NEVER_RETRYABLE``,
-#: because the final answers above include subclasses of these -- ``ContentNotFoundError`` is an
-#: answer from a provider that was reached, and ``GraphQLUnavailableError`` is an environment-wide
-#: refusal that the next attempt meets identically.
-_TRANSPORT_FAILED: tuple[type[BaseException], ...] = (
-    BackendUnavailableError,
-    ContentUnavailableError,
-    *RETRYABLE_TRANSIENT_EXCEPTIONS,
-)
+#: unreachable, content the provider could not be asked for.
+#:
+#: These two answer for themselves only. A subclass narrows its base to one condition -- ``bd``
+#: absent from ``PATH``, a provider that was reached and said the path is a directory -- and
+#: several of those conditions repeat identically, so inheriting "retry this" from the base is
+#: how a subclass ships a wrong verdict the moment it is declared. ``_retryable`` therefore
+#: reports nothing for a subclass that states none, and
+#: ``tests/test_retryable_classification.py`` fails until it states one.
+_TRANSPORT_BASES: tuple[type[BaseException], ...] = (BackendUnavailableError, ContentUnavailableError)
+
+#: Failures of the trip rather than of the call: the request never reached a backend that could
+#: answer it. A dropped connection, a timeout, a backend whose credentials or transport are
+#: unreachable, content the provider could not be asked for.
+_TRANSPORT_FAILED: tuple[type[BaseException], ...] = (*_TRANSPORT_BASES, *RETRYABLE_TRANSIENT_EXCEPTIONS)
 
 
 def _retryable(exc: BaseException) -> bool | None:
@@ -276,12 +278,16 @@ def _retryable(exc: BaseException) -> bool | None:
 
     Answers in four steps, emitting a verdict only where one is supported:
 
-    1. A verdict the raise site stated on the exception wins. The condition that raised it fixes
-       the answer, and the author who knows that condition is the one who can say so.
+    1. A verdict the raise site or the exception class stated wins, on either error tree. The
+       condition that raised it fixes the answer, and the author who knows that condition is the
+       one who can say so.
     2. A class in ``_NEVER_RETRYABLE`` describes the call, so the answer is ``False``.
     3. A class in ``_TRANSPORT_FAILED``, or a ``GithubException`` whose status says the server
        asked for another attempt (a rate limit, a 5xx, a 403 carrying ``Retry-After``), describes
-       the trip, so the answer is ``True``.
+       the trip, so the answer is ``True``. ``_TRANSPORT_BASES`` answers for those two classes
+       themselves and not for their subclasses: a subclass narrows its base to one condition, so
+       only it knows, and one that says nothing in step 1 gets nothing reported rather than its
+       base's answer.
     4. Anything else reports nothing.
 
     ``classify_sync_error`` is deliberately not the general answer here, though it is reused for
@@ -301,10 +307,12 @@ def _retryable(exc: BaseException) -> bool | None:
         ``True`` when a later attempt may succeed, ``False`` when it cannot, ``None`` when no
         verdict is supported.
     """
-    if isinstance(exc, BacklogError) and exc.retryable is not None:
+    if isinstance(exc, BacklogError | ContentProviderError) and exc.retryable is not None:
         return exc.retryable
     if isinstance(exc, _NEVER_RETRYABLE):
         return False
+    if isinstance(exc, _TRANSPORT_BASES) and type(exc) not in _TRANSPORT_BASES:
+        return None
     if isinstance(exc, _TRANSPORT_FAILED):
         return True
     if isinstance(exc, _GithubException) and classify_sync_error(exc) is SyncErrorKind.RETRYABLE:
@@ -1121,6 +1129,9 @@ def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Out
         "error": f"Section not found: {filter_expr!r}",
         "valid_sections": valid_names,
         "section_filter_miss": True,
+        # The item holds the sections it holds; asking for an absent one again asks the same
+        # question of the same inventory.
+        "retryable": False,
         **out.to_dict(),
     }
     unresolved_names = [name for name in valid_names if name.startswith("unknown__")]
@@ -4166,6 +4177,8 @@ async def dispatch_create_plan(
                     f"Milestone number mismatch: parameter is {milestone_number} "
                     f"but plan.milestone.number is {plan.milestone.number}"
                 ),
+                # Two arguments that disagree disagree identically on the next call.
+                "retryable": False,
                 "milestone_number": milestone_number,
                 **out.to_dict(),
             },
@@ -4181,7 +4194,14 @@ async def dispatch_create_plan(
         if not overwrite:
             return _respond(
                 DispatchCreatePlanResponse,
-                {"error": "Dispatch plan already exists. Pass overwrite=True to replace it.", **out.to_dict()},
+                {
+                    "error": "Dispatch plan already exists. Pass overwrite=True to replace it.",
+                    # The identical call meets the identical stored plan; the message names the
+                    # parameter that lifts the refusal, which is what makes it final rather than
+                    # transient.
+                    "retryable": False,
+                    **out.to_dict(),
+                },
             )
         write = ContentWrite(
             reference=_dispatch_reference(milestone_number),
