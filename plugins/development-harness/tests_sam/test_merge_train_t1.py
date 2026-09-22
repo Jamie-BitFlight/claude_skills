@@ -9,10 +9,11 @@ import sqlite3
 import subprocess
 import sys
 import types
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
+from threading import get_ident
 from typing import Any, Generic, TypeVar
 
 import pytest
@@ -44,6 +45,28 @@ from dh_core.merge_train import (
 from pydantic import ValidationError
 
 T = TypeVar("T")
+
+
+@pytest.fixture(autouse=True)
+def close_test_ledgers(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keep every test ledger alive until teardown, then close it explicitly."""
+    owner_thread = get_ident()
+    opened: list[tuple[int, sqlite3.Connection]] = []
+    open_ledger = store.open_ledger
+
+    def tracked_open_ledger(*args: Any, **kwargs: Any) -> sqlite3.Connection:
+        connection = open_ledger(*args, **kwargs)
+        opened.append((get_ident(), connection))
+        return connection
+
+    def close_all() -> None:
+        for thread_id, connection in reversed(opened):
+            if thread_id == owner_thread:
+                connection.close()
+
+    monkeypatch.setattr(store, "open_ledger", tracked_open_ledger)
+    yield
+    close_all()
 
 
 class Reader(Generic[T]):
@@ -435,7 +458,10 @@ def test_t1_history_returns_complete_envelopes_with_caller_pagination(tmp_path: 
     assert page.total == 3
 
 
-def test_f03_raw_cli_dispatch_refuses_registered_member_without_mutation() -> None:
+def test_f03_raw_cli_dispatch_refuses_registered_member_without_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("DH_STATE_HOME", str(tmp_path / "state"))
     connection = store.open_ledger()
     transitions.create(
         connection,

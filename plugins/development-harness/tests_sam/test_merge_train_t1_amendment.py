@@ -8,7 +8,10 @@ import json
 import sqlite3
 import sys
 import types
+from collections.abc import Iterator
 from pathlib import Path
+from threading import get_ident
+from typing import Any
 
 import pytest
 
@@ -37,6 +40,28 @@ from dh_core.merge_train import (
     SourceGraphSnapshot,
 )
 from pydantic import BaseModel, TypeAdapter, ValidationError
+
+
+@pytest.fixture(autouse=True)
+def close_test_ledgers(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keep every test ledger alive until teardown, then close it explicitly."""
+    owner_thread = get_ident()
+    opened: list[tuple[int, sqlite3.Connection]] = []
+    open_ledger = store.open_ledger
+
+    def tracked_open_ledger(*args: Any, **kwargs: Any) -> sqlite3.Connection:
+        connection = open_ledger(*args, **kwargs)
+        opened.append((get_ident(), connection))
+        return connection
+
+    def close_all() -> None:
+        for thread_id, connection in reversed(opened):
+            if thread_id == owner_thread:
+                connection.close()
+
+    monkeypatch.setattr(store, "open_ledger", tracked_open_ledger)
+    yield
+    close_all()
 
 
 class DispatchPlans:
