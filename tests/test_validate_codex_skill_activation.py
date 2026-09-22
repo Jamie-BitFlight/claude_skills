@@ -245,6 +245,58 @@ def test_run_silent_terminates_the_full_process_tree_on_timeout(tmp_path: Path) 
         )
 
 
+def test_run_silent_reaps_when_tree_terminator_returns_before_process_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-waiting platform tree terminator cannot leave the owned child alive or block draining pipes."""
+
+    class FakeStream:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeProcess:
+        stdout = FakeStream()
+        stderr = FakeStream()
+        returncode: int | None = None
+        communicate_calls = 0
+        killed = False
+        waited = False
+
+        def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                assert timeout is not None
+                raise subprocess.TimeoutExpired(["stalled"], timeout)
+            raise AssertionError("timeout cleanup must not enter an unbounded pipe drain")
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def kill(self) -> None:
+            self.killed = True
+            self.returncode = -9
+
+        def wait(self, timeout: float | None = None) -> int:
+            del timeout
+            self.waited = True
+            assert self.returncode is not None
+            return self.returncode
+
+    process = FakeProcess()
+    monkeypatch.setattr(activation.subprocess, "Popen", lambda *_args, **_kwargs: process)
+    monkeypatch.setattr(activation.isolated, "terminate_process_tree", lambda _process: None)
+
+    with pytest.raises(activation.HarnessError, match="timed out after"):
+        activation.run_silent(["stalled"], cwd=tmp_path, env={}, label="stalled", timeout_seconds=0.1)
+
+    assert process.killed is True
+    assert process.waited is True
+    assert process.stdout.closed is True
+    assert process.stderr.closed is True
+
+
 def test_run_app_server_isolates_and_tree_terminates_the_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -473,6 +473,23 @@ def run_app_server(
         isolated.terminate_process_tree(process)
 
 
+def terminate_owned_process(process: subprocess.Popen[str], timeout_seconds: float) -> None:
+    """Terminate the process tree and boundedly reap the owned direct child.
+
+    Raises:
+        HarnessError: If the direct child remains alive after the kill fallback.
+    """
+    isolated.terminate_process_tree(process)
+    if process.poll() is not None:
+        return
+    process.kill()
+    reap_timeout = max(0.1, min(timeout_seconds, 1.0))
+    try:
+        process.wait(timeout=reap_timeout)
+    except subprocess.TimeoutExpired as error:
+        raise HarnessError(f"Could not reap subprocess within {reap_timeout:g} seconds") from error
+
+
 def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str, timeout_seconds: float) -> None:
     """Run a setup command without exposing its output or ambient credentials.
 
@@ -490,8 +507,17 @@ def run_silent(argv: list[str], *, cwd: Path, env: dict[str, str], label: str, t
     try:
         _stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
-        isolated.terminate_process_tree(process)
+        terminate_owned_process(process, timeout_seconds)
         raise HarnessError(f"{label} timed out after {timeout_seconds:g} seconds") from exc
+    finally:
+        try:
+            if process.poll() is None:
+                terminate_owned_process(process, timeout_seconds)
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
     if process.returncode != 0:
         stderr_log = cwd / f"{label.replace(' ', '_')}.stderr.log"
         stderr_log.write_text(stderr, encoding="utf-8")
