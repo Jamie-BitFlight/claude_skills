@@ -1,0 +1,78 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^release-playbook-v/'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+stages:
+  - validate
+  - tag
+  - build
+  - publish
+  - release
+
+validate_release_config:
+  stage: validate
+  image: node:24.10.0-alpine
+  script:
+    - node -e 'JSON.parse(require("fs").readFileSync(".releaserc.json"))'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+semantic_version_tag:
+  stage: tag
+  image: node:24.10.0-alpine
+  variables:
+    GIT_DEPTH: "0"
+    GL_TOKEN: $RELEASE_PUSH_TOKEN
+  before_script:
+    - apk add --no-cache git
+  script:
+    - npx --yes semantic-release@25
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+build_release_asset:
+  stage: build
+  image: alpine:3.22
+  script:
+    - mkdir -p dist
+    - printf 'tag=%s\ncommit=%s\n' "$CI_COMMIT_TAG" "$CI_COMMIT_SHA" > dist/release-playbook.txt
+    - printf '# Release %s\n\nValidated automated tag and release lifecycle for commit `%s`.\n' "$CI_COMMIT_TAG" "$CI_COMMIT_SHA" > dist/release-notes.md
+  artifacts:
+    paths:
+      - dist/
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^release-playbook-v/'
+
+publish_generic_asset:
+  stage: publish
+  image:
+    name: curlimages/curl:8.16.0
+    entrypoint: [""]
+  script:
+    - >-
+      curl --fail-with-body --location
+      --header "JOB-TOKEN: ${CI_JOB_TOKEN}"
+      --upload-file dist/release-playbook.txt
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/release-playbook/${CI_COMMIT_TAG}/release-playbook.txt"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^release-playbook-v/'
+
+create_gitlab_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:v1.58.0
+  script:
+    - echo "Creating GitLab Release after package publication"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: Release $CI_COMMIT_TAG
+    description: ./dist/release-notes.md
+    assets:
+      links:
+        - name: release-playbook.txt
+          url: $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/release-playbook/$CI_COMMIT_TAG/release-playbook.txt
+          link_type: package
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ /^release-playbook-v/'

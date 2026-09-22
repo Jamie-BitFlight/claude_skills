@@ -1,7 +1,7 @@
 {
   "name": "gitlab-skill",
-  "version": "2.0.0",
-  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
+  "version": "2.1.0",
+  "description": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
@@ -9,8 +9,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "GitLab Skill",
-    "shortDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
-    "longDescription": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
+    "shortDescription": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
+    "longDescription": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
     "capabilities": [
@@ -18,7 +18,7 @@
       "Read"
     ],
     "defaultPrompt": [
-      "Apply documented GitLab CI/CD, components, inputs, Functions, GLFM, and gitlab-ci-local guidance."
+      "Apply documented GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance."
     ]
   }
 }

@@ -1,0 +1,16 @@
+# DERIVED + CI-LINT-VERIFIED release-notes adapter.
+include:
+  - local: '/.gitlab/release/base.gitlab-ci.yml'
+
+variables:
+  RELEASE_DESCRIPTION_PATH: '__RELEASE_DESCRIPTION_PATH__'
+
+generate_release_notes:
+  extends: .release_notes
+  image: '__NOTES_IMAGE__@sha256:__NOTES_IMAGE_DIGEST__'
+  script:
+    - '__RELEASE_NOTES_COMMAND__'
+    - test -s "$RELEASE_DESCRIPTION_PATH"
+  artifacts:
+    paths:
+      - $RELEASE_DESCRIPTION_PATH
