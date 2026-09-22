@@ -4,6 +4,11 @@
 # dependencies = [
 #   "pydantic>=2.0",
 #   "pytest",
+#   "pytest-asyncio",
+#   "pytest-cov",
+#   "pytest-mock",
+#   "pytest-xdist",
+#   "typer",
 # ]
 # [tool.ty.environment]
 # root = ["."]
@@ -13,14 +18,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from typer.testing import CliRunner
 
 import pr_review_threads
-from pr_review_gh import GitHubProvider
+from pr_review_gh import RESOLVE_THREAD_MUTATION
+from pr_review_github_provider import GitHubProvider, upgrade_legacy_snapshot
 from pr_review_models import (
     ChangeRequestTarget,
     FetchResult,
@@ -28,13 +33,12 @@ from pr_review_models import (
     RepositoryTarget,
     ResolveAction,
     Reviewability,
-    ReviewAction,
     ReviewActionResult,
     ReviewSnapshot,
-    ThreadRef,
     TopLevelCommentAction,
 )
 from pr_review_provider import ProviderResponseError, ReviewProvider
+from pr_review_state_models import AuthorizedReviewAction, ReviewActor, ReviewCapabilities, ReviewInput
 from pr_review_threads import app
 
 if TYPE_CHECKING:
@@ -65,15 +69,61 @@ def legacy_snapshot() -> FetchResult:
     )
 
 
+def provider(mocker: MockerFixture, *, command_result: str = "{}") -> GitHubProvider:
+    """Return a GitHub provider with injected test transports."""
+    return GitHubProvider(
+        snapshot_loader=mocker.Mock(return_value=legacy_snapshot()),
+        command_runner=mocker.Mock(return_value=command_result),
+        resolve_query=RESOLVE_THREAD_MUTATION,
+    )
+
+
+def authorized(action: ReplyAction | ResolveAction | TopLevelCommentAction) -> AuthorizedReviewAction:
+    """Bind one action to a valid inline GitHub input fixture."""
+    item = ReviewInput(
+        input_id="github:review-comment:42",
+        provider="github",
+        provider_ids={"thread_id": "T1", "opening_comment_id": "42"},
+        source_kind="review_comment",
+        kinds={"comment"},
+        location="inline",
+        direction="inbound",
+        actor=ReviewActor(actor_id="reviewer", login="reviewer", classification="human", role="reviewer"),
+        body="finding",
+        stable_reference="https://github.com/acme/widgets/pull/17#discussion_r42",
+        created_at=None,
+        updated_at=None,
+        revision_relation="current",
+        path="x.py",
+        line=1,
+        provider_state="open",
+        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, unavailable=[]),
+        thread_id="T1",
+        parent_id=None,
+    )
+    return AuthorizedReviewAction(
+        target=target(),
+        snapshot_fingerprint="fingerprint",
+        revision="abc123",
+        review_input=item,
+        cluster_id="cluster-1",
+        disposition="accepted_change",
+        communication_plan="reply",
+        action=action,
+    )
+
+
 def test_github_provider_satisfies_review_provider_and_returns_complete_single_transport_snapshot(
     mocker: MockerFixture,
 ) -> None:
     loader = mocker.Mock(return_value=legacy_snapshot())
-    provider = GitHubProvider(snapshot_loader=loader, command_runner=mocker.Mock())
+    provider_value = GitHubProvider(
+        snapshot_loader=loader, command_runner=mocker.Mock(), resolve_query=RESOLVE_THREAD_MUTATION
+    )
 
-    assert isinstance(provider, ReviewProvider)
+    assert isinstance(provider_value, ReviewProvider)
 
-    result = provider.snapshot(target(), deadline=123.0, command_timeout=9.0)
+    result = provider_value.snapshot(target(), deadline=123.0, command_timeout=9.0)
 
     assert isinstance(result, ReviewSnapshot)
     assert result.provider == "github"
@@ -81,15 +131,17 @@ def test_github_provider_satisfies_review_provider_and_returns_complete_single_t
     assert result.snapshot_complete is True
     assert result.transport == "github_cli"
     assert result.codex_approved is False
-    loader.assert_called_once_with("acme", "widgets", 17, deadline=123.0, gh_timeout=9.0)
+    loader.assert_called_once_with("acme", "widgets", 17, deadline=123.0, gh_timeout=9.0, target=target())
 
 
 def test_github_provider_validates_reply_response(mocker: MockerFixture) -> None:
     command_runner = mocker.Mock(return_value=json.dumps({"id": 991, "html_url": "https://github.com/x"}))
-    provider = GitHubProvider(snapshot_loader=mocker.Mock(), command_runner=command_runner)
-    action = ReplyAction(thread=ThreadRef(thread_id="T1", opening_comment_id=42), body="Addressed in abc123.")
+    provider_value = GitHubProvider(
+        snapshot_loader=mocker.Mock(), command_runner=command_runner, resolve_query=RESOLVE_THREAD_MUTATION
+    )
+    action = authorized(ReplyAction(body="Addressed in abc123."))
 
-    result = provider.act(target(), action, command_timeout=8.0)
+    result = provider_value.act(target(), action, command_timeout=8.0)
 
     assert result.success is True
     assert result.provider_object_id == "991"
@@ -102,22 +154,22 @@ def test_github_provider_validates_reply_response(mocker: MockerFixture) -> None
 
 @pytest.mark.parametrize("raw", ["{}", '{"id": null}', "[]", "not-json"])
 def test_github_provider_rejects_invalid_reply_response(raw: str, mocker: MockerFixture) -> None:
-    provider = GitHubProvider(snapshot_loader=mocker.Mock(), command_runner=mocker.Mock(return_value=raw))
-    action = ReplyAction(thread=ThreadRef(thread_id="T1", opening_comment_id=42), body="Addressed.")
+    provider_value = provider(mocker, command_result=raw)
+    action = authorized(ReplyAction(body="Addressed."))
 
     with pytest.raises(ProviderResponseError):
-        provider.act(target(), action, command_timeout=None)
+        provider_value.act(target(), action, command_timeout=None)
 
 
 def test_github_provider_requires_resolved_thread_confirmation(mocker: MockerFixture) -> None:
     command_runner = mocker.Mock(
         return_value=json.dumps({"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}})
     )
-    provider = GitHubProvider(snapshot_loader=mocker.Mock(), command_runner=command_runner)
-
-    result = provider.act(
-        target(), ResolveAction(thread=ThreadRef(thread_id="T1", opening_comment_id=42)), command_timeout=5.0
+    provider_value = GitHubProvider(
+        snapshot_loader=mocker.Mock(), command_runner=command_runner, resolve_query=RESOLVE_THREAD_MUTATION
     )
+
+    result = provider_value.act(target(), authorized(ResolveAction()), command_timeout=5.0)
 
     assert result.success is True
     assert result.resolved is True
@@ -133,24 +185,22 @@ def test_github_provider_requires_resolved_thread_confirmation(mocker: MockerFix
     ],
 )
 def test_github_provider_rejects_unconfirmed_resolution(payload: dict[str, object], mocker: MockerFixture) -> None:
-    provider = GitHubProvider(
-        snapshot_loader=mocker.Mock(), command_runner=mocker.Mock(return_value=json.dumps(payload))
-    )
+    provider_value = provider(mocker, command_result=json.dumps(payload))
 
     with pytest.raises(ProviderResponseError):
-        provider.act(
-            target(), ResolveAction(thread=ThreadRef(thread_id="T1", opening_comment_id=42)), command_timeout=None
-        )
+        provider_value.act(target(), authorized(ResolveAction()), command_timeout=None)
 
 
 def test_github_provider_posts_top_level_comment_with_exact_references(mocker: MockerFixture) -> None:
     command_runner = mocker.Mock(return_value=json.dumps({"id": 77, "html_url": "https://github.com/comment"}))
-    provider = GitHubProvider(snapshot_loader=mocker.Mock(), command_runner=command_runner)
+    provider_value = GitHubProvider(
+        snapshot_loader=mocker.Mock(), command_runner=command_runner, resolve_query=RESOLVE_THREAD_MUTATION
+    )
     review_url = "https://github.com/acme/widgets/pull/17#pullrequestreview-5"
 
-    result = provider.act(
+    result = provider_value.act(
         target(),
-        TopLevelCommentAction(body="Addressed together in abc123.", references=[review_url]),
+        authorized(TopLevelCommentAction(body="Addressed together in abc123.", references=[review_url])),
         command_timeout=None,
     )
 
@@ -165,7 +215,7 @@ class FakeProvider:
     def __init__(self) -> None:
         """Initialize recorded snapshot targets and actions."""
         self.snapshot_targets: list[ChangeRequestTarget] = []
-        self.actions: list[ReviewAction] = []
+        self.actions: list[AuthorizedReviewAction] = []
 
     def snapshot(
         self, change_request: ChangeRequestTarget, *, deadline: float | None, command_timeout: float | None
@@ -176,16 +226,10 @@ class FakeProvider:
             A complete in-memory snapshot.
         """
         self.snapshot_targets.append(change_request)
-        return ReviewSnapshot.model_validate({
-            **legacy_snapshot().model_dump(),
-            "provider": "github",
-            "target": change_request,
-            "transport": "github_cli",
-            "snapshot_complete": True,
-        })
+        return upgrade_legacy_snapshot(legacy_snapshot(), change_request)
 
     def act(
-        self, change_request: ChangeRequestTarget, action: ReviewAction, *, command_timeout: float | None
+        self, change_request: ChangeRequestTarget, action: AuthorizedReviewAction, *, command_timeout: float | None
     ) -> ReviewActionResult:
         """Record and confirm one in-memory action.
 
@@ -193,7 +237,7 @@ class FakeProvider:
             A successful normalized action result.
         """
         self.actions.append(action)
-        if isinstance(action, ResolveAction):
+        if isinstance(action.action, ResolveAction):
             return ReviewActionResult(
                 provider="github",
                 action_kind="resolve",
@@ -201,15 +245,15 @@ class FakeProvider:
                 resolved=True,
                 raw={"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}},
             )
-        kind = "reply" if isinstance(action, ReplyAction) else "comment"
+        kind = "reply" if isinstance(action.action, ReplyAction) else "comment"
         return ReviewActionResult(
             provider="github", action_kind=kind, success=True, provider_object_id="1", raw={"id": 1}
         )
 
 
-def test_cli_fetch_watch_and_mutations_cross_only_provider_interface(tmp_path: Path, mocker: MockerFixture) -> None:
+def test_cli_fetch_and_watch_cross_only_provider_interface(mocker: MockerFixture) -> None:
     fake = FakeProvider()
-    mocker.patch.object(pr_review_threads, "_provider", return_value=fake)
+    mocker.patch.object(pr_review_threads, "review_provider", return_value=fake)
     legacy_fetch = mocker.patch.object(pr_review_threads, "build_fetch_result")
     legacy_runner = mocker.patch.object(pr_review_threads, "run_gh")
     common_target = ["--github", "acme/widgets"]
@@ -217,39 +261,24 @@ def test_cli_fetch_watch_and_mutations_cross_only_provider_interface(tmp_path: P
     commands = [
         ["fetch", "--pr", "17", *common_target],
         ["watch", "--pr", "17", "--timeout-seconds", "0", *common_target],
-        ["reply", "--pr", "17", "--comment-id", "42", "--body", "done", *common_target],
-        ["resolve", "--thread-id", "T1"],
-        ["comment", "--pr", "17", "--body", "done", "--reference", "https://example/review/1", *common_target],
-        [
-            "reply-and-resolve",
-            "--pr",
-            "17",
-            "--thread-id",
-            "T2",
-            "--comment-id",
-            "43",
-            "--body",
-            "done",
-            *common_target,
-        ],
     ]
-    batch_file = tmp_path / "batch.json"
-    batch_file.write_text(json.dumps([{"thread_id": "T3", "comment_id": 44, "body": "done"}]))
-    commands.append(["reply-and-resolve-batch", "--pr", "17", "--input-file", str(batch_file), *common_target])
 
     for command in commands:
         result = runner.invoke(app, command)
         assert result.exit_code == 0, result.output
 
     assert len(fake.snapshot_targets) == 2
-    assert [action.kind for action in fake.actions] == [
-        "reply",
-        "resolve",
-        "comment",
-        "reply",
-        "resolve",
-        "reply",
-        "resolve",
-    ]
+    assert fake.actions == []
     legacy_fetch.assert_not_called()
     legacy_runner.assert_not_called()
+
+
+def test_github_provider_rejects_raw_action(mocker: MockerFixture) -> None:
+    provider_value = provider(mocker, command_result=json.dumps({"id": 1}))
+
+    with pytest.raises(TypeError, match="AuthorizedReviewAction"):
+        provider_value.act(target(), cast("Any", ReplyAction(body="raw")), command_timeout=None)
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

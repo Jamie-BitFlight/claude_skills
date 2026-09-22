@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from pr_review_models import ChangeRequestTarget, ReviewAction, ReviewActionResult, ReviewSnapshot
+from pr_review_contracts import ChangeRequestTarget, ReviewActionResult
+from pr_review_models import ReviewSnapshot
+from pr_review_state_models import AuthorizedReviewAction
 
 __all__ = ["ProviderResponseError", "ReviewProvider"]
 
@@ -24,7 +26,7 @@ class ReviewProvider(Protocol):
         ...
 
     def act(
-        self, target: ChangeRequestTarget, action: ReviewAction, *, command_timeout: float | None
+        self, target: ChangeRequestTarget, action: AuthorizedReviewAction, *, command_timeout: float | None
     ) -> ReviewActionResult:
         """Perform one action and return only after the response validates success."""
         ...

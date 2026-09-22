@@ -1,0 +1,231 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "pydantic>=2.0",
+#   "pytest",
+#   "pytest-asyncio",
+#   "pytest-cov",
+#   "pytest-mock",
+#   "pytest-xdist",
+#   "typer",
+# ]
+# [tool.ty.environment]
+# root = ["."]
+# ///
+"""Mutation authorization, ordering, validation, and timeout tests."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+from typer.testing import CliRunner
+
+import pr_review_threads
+from pr_review_state_models import ReviewAssessment, ReviewCluster, calculate_snapshot_fingerprint
+from pr_review_threads import app
+from review_test_fixtures import canonical_input, canonical_snapshot, ready_cycle, write_ready_files
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+runner = CliRunner()
+
+
+def resolved_response() -> str:
+    """Return one confirmed resolve mutation payload."""
+    return json.dumps({"data": {"resolveReviewThread": {"thread": {"isResolved": True}}}})
+
+
+def gated_args(snapshot_file: Path, state_file: Path) -> list[str]:
+    """Return shared current-cycle CLI arguments."""
+    return [
+        "--input-id",
+        canonical_input().input_id,
+        "--snapshot-file",
+        str(snapshot_file),
+        "--state-file",
+        str(state_file),
+        "--github",
+        "acme/widgets",
+    ]
+
+
+def test_raw_reply_without_cycle_evidence_is_rejected_before_provider_call(mocker: MockerFixture) -> None:
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(app, ["reply", "--pr", "17", "--input-id", canonical_input().input_id, "--body", "x"])
+
+    assert result.exit_code != 0
+    run_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("command", ["reply", "resolve"], ids=["reply", "resolve"])
+def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    response = json.dumps({"id": 1}) if command == "reply" else resolved_response()
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value=response)
+    argv = [command, "--pr", "17", *gated_args(snapshot_file, state_file), "--gh-timeout-seconds", "7"]
+    if command == "reply":
+        argv.extend(["--body", "Addressed."])
+
+    result = runner.invoke(app, argv)
+
+    assert result.exit_code == 0, result.output
+    assert run_mock.call_args.kwargs["timeout"] == pytest.approx(7)
+
+
+def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value="{}")
+
+    result = runner.invoke(
+        app, ["reply-and-resolve", "--pr", "17", "--body", "Addressed.", *gated_args(snapshot_file, state_file)]
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 1
+
+
+def test_reply_and_resolve_rejects_graphql_errors(tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    run_mock = mocker.patch.object(
+        pr_review_threads,
+        "run_gh",
+        side_effect=[json.dumps({"id": 99}), json.dumps({"errors": [{"message": "denied"}]})],
+    )
+
+    result = runner.invoke(
+        app, ["reply-and-resolve", "--pr", "17", "--body", "Addressed.", *gated_args(snapshot_file, state_file)]
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        [{"input_id": canonical_input().input_id, "body": ""}],
+        [{"input_id": canonical_input().input_id, "body": "   "}],
+        [{"input_id": canonical_input().input_id, "body": "x"}, {"input_id": canonical_input().input_id, "body": "y"}],
+    ],
+    ids=["not-list", "empty-body", "blank-body", "duplicate-input"],
+)
+def test_batch_validates_all_entries_before_first_provider_call(
+    payload: object, tmp_path: Path, mocker: MockerFixture
+) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    input_file = tmp_path / "batch.json"
+    input_file.write_text(json.dumps(payload))
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(
+        app,
+        [
+            "reply-and-resolve-batch",
+            "--pr",
+            "17",
+            "--input-file",
+            str(input_file),
+            "--snapshot-file",
+            str(snapshot_file),
+            "--state-file",
+            str(state_file),
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    run_mock.assert_not_called()
+
+
+def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
+    """Write a complete two-input snapshot and cycle for batch ordering tests."""
+    first = canonical_input()
+    second = first.model_copy(
+        update={
+            "input_id": "github:review-comment:43",
+            "provider_ids": {"thread_id": "T2", "opening_comment_id": "43"},
+            "stable_reference": "https://github.com/acme/widgets/pull/17#discussion_r43",
+            "thread_id": "T2",
+        }
+    )
+    original_snapshot = canonical_snapshot()
+    fingerprint = calculate_snapshot_fingerprint(
+        original_snapshot.target, original_snapshot.head_revision, [first, second], original_snapshot.completeness
+    )
+    snapshot = original_snapshot.model_copy(
+        update={"review_inputs": [first, second], "snapshot_fingerprint": fingerprint}
+    )
+    cycle = ready_cycle()
+    first_assessment = cycle.assessments[0]
+    second_assessment = ReviewAssessment.model_validate({
+        **first_assessment.model_dump(),
+        "input_id": second.input_id,
+        "cluster_id": "cluster-2",
+    })
+    first_cluster = cycle.clusters[0]
+    second_cluster = ReviewCluster.model_validate({
+        **first_cluster.model_dump(),
+        "cluster_id": "cluster-2",
+        "input_ids": [second.input_id],
+    })
+    cycle = cycle.model_copy(
+        update={
+            "snapshot_fingerprint": fingerprint,
+            "input_census": [first.input_id, second.input_id],
+            "assessments": [first_assessment, second_assessment],
+            "clusters": [first_cluster, second_cluster],
+        }
+    )
+    snapshot_path = directory / "snapshot-two.json"
+    state_path = directory / "state-two.json"
+    snapshot_path.write_text(snapshot.model_dump_json())
+    state_path.write_text(cycle.model_dump_json())
+    return snapshot_path, state_path
+
+
+def test_batch_stops_after_first_failed_action(tmp_path: Path, mocker: MockerFixture) -> None:
+    snapshot_file, state_file = write_two_input_cycle(tmp_path)
+    input_file = tmp_path / "batch.json"
+    input_file.write_text(
+        json.dumps([
+            {"input_id": canonical_input().input_id, "body": "first"},
+            {"input_id": "github:review-comment:43", "body": "second"},
+        ])
+    )
+    run_mock = mocker.patch.object(
+        pr_review_threads,
+        "run_gh",
+        side_effect=[json.dumps({"id": 11}), json.dumps({"errors": [{"message": "denied"}]})],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "reply-and-resolve-batch",
+            "--pr",
+            "17",
+            "--input-file",
+            str(input_file),
+            "--snapshot-file",
+            str(snapshot_file),
+            "--state-file",
+            str(state_file),
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert run_mock.call_count == 2
