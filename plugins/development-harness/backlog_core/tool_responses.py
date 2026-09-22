@@ -116,6 +116,11 @@ class FallibleToolResponse(ToolResponse):
     error: str | None = None
     """Error message set when the operation failed; ``None`` on success."""
 
+    retryable: bool | None = None
+    """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
+    Absent on success, and absent on a failure this server could not classify -- a missing
+    value is "not known", never "no"."""
+
 
 # Mixes in RegisterResult's domain fields rather than redeclaring them, so
 # the wire shape and the domain result computed by artifact_register's
@@ -1010,6 +1015,10 @@ class BacklogViewResponse(BaseModel):
 
     # --- error arms ---
     error: str | None = None
+    retryable: bool | None = None
+    """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
+    Absent on success, and absent on a failure this server could not classify -- a missing
+    value is "not known", never "no"."""
     error_type: str | None = None
     """Exception class name (e.g. ``"ItemNotFoundError"``), set only on the
     generic ``BacklogError`` arm of ``_execute_disclosure_or_passthrough`` --
@@ -1038,6 +1047,11 @@ class MilestoneEchoError(BaseModel):
 
     error: str | None = None
     """Error message; ``None`` on success."""
+
+    retryable: bool | None = None
+    """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
+    Absent on success, and absent on a failure this server could not classify -- a missing
+    value is "not known", never "no"."""
 
     unsupported_capability: str | None = None
     """Missing capability flag name, set only on an ``UnsupportedBackendCapabilityError`` arm."""
