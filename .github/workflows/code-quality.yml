@@ -262,7 +262,7 @@ jobs:
 
       - name: Run T1 merge-train tests on Windows
         run: >-
-          uv run -q --locked pytest -W error --no-cov -v
+          uv run -q --locked pytest -W error --no-cov -v --noconftest
           plugins/development-harness/tests_sam/test_merge_train_t1.py
           plugins/development-harness/tests_sam/test_merge_train_t1_amendment.py
 
