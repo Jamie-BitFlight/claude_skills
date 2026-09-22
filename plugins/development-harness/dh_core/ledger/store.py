@@ -354,6 +354,9 @@ def stored_columns() -> dict[str, list[ledger_spec.Column]]:
 TABLES: dict[str, list[ledger_spec.Column]] = stored_columns()
 """Every materialised table the specification declares, with its stored columns."""
 
+SOURCE_TABLES: frozenset[str] = frozenset({"merge_evidence_blobs"})
+"""Immutable source tables retained when event projections are rebuilt."""
+
 
 def admits_integer(candidate: object) -> bool:
     """Report whether one annotation stores as an integer.
