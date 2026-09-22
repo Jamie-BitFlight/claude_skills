@@ -293,19 +293,6 @@ def test_action_view_excludes_non_immediate_inputs(update: dict[str, str], commu
     assert "HISTORICAL" not in rendered
 
 
-def test_action_view_keeps_an_open_stale_input_for_assessment() -> None:
-    """A stale location remains actionable until provider evidence closes or addresses it."""
-    snapshot = canonical_snapshot()
-    stale = snapshot.review_inputs[0].model_copy(update={"revision_relation": "stale", "body": "STALE-OPEN-ACTION"})
-
-    rendered = action_view(snapshot.model_copy(update={"review_inputs": [stale]}), pr=17).model_dump_json()
-
-    data = json.loads(rendered)
-    assert data["dashboard"]["unresolved_code_thread_count"] == 1
-    assert [item["body"] for item in data["actionable_inputs"]] == ["STALE-OPEN-ACTION"]
-    assert data["actionable_inputs"][0]["revision_relation"] == "stale"
-
-
 def test_legacy_python_projection_helpers_remain_available() -> None:
     """Projection changes retain the established helper surface for Python consumers."""
     from pr_review_models import BoardEntry, CommentSummary, ReviewSummary, ThreadSummary
@@ -376,13 +363,11 @@ def test_watch_persists_complete_history_without_rendering_it(tmp_path: Path, mo
     )
 
     assert result.exit_code == 0, result.output
-    assert [item["body"] for item in json.loads(result.output)["actionable_inputs"]] == [
-        "current action",
-        "STALE-OPEN-ACTION",
-    ]
+    assert [item["body"] for item in json.loads(result.output)["actionable_inputs"]] == ["current action"]
     assert "HISTORICAL" not in result.output
-    assert "STALE-OPEN-ACTION" in result.output
+    assert "STALE-OPEN-ACTION" not in result.output
     assert "HISTORICAL" in snapshot_file.read_text(encoding="utf-8")
+    assert "STALE-OPEN-ACTION" in snapshot_file.read_text(encoding="utf-8")
 
 
 def test_summary_help_describes_metadata_boundary_without_body_limit() -> None:
@@ -413,3 +398,13 @@ def test_watch_summary_reports_new_input_signal_without_full_state(mocker: Mocke
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_action_view_excludes_open_stale_inputs() -> None:
+    """Inputs tied to an obsolete revision are history, not immediate action."""
+    snapshot = canonical_snapshot()
+    stale = snapshot.review_inputs[0].model_copy(update={"body": "STALE-OPEN-ACTION", "revision_relation": "stale"})
+
+    view = action_view(snapshot.model_copy(update={"review_inputs": [stale]}), pr=17)
+
+    assert view.actionable_inputs == []

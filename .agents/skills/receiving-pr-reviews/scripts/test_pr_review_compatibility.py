@@ -410,3 +410,18 @@ def test_has_outstanding_work_false_when_all_clear() -> None:
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_fetch_shows_complete_github_provider_stderr_when_target_detection_fails(mocker: MockerFixture) -> None:
+    """A failed GitHub CLI operation exposes its provider diagnostic to the operator."""
+    diagnostic = "PROVIDER: authenticate with gh auth login\nPROVIDER: token rejected"
+    mocker.patch.object(
+        pr_review_threads,
+        "detect_repo_identity",
+        side_effect=subprocess.CalledProcessError(7, ["gh", "repo", "view"], stderr=diagnostic),
+    )
+
+    result = runner.invoke(app, ["fetch", "--pr", "3208"])
+
+    assert result.exit_code != 0
+    assert diagnostic in result.output

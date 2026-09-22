@@ -39,7 +39,6 @@ from pr_review_models import (
     UnresolvedThread,
 )
 from pr_review_state_models import SnapshotCompleteness
-from pr_review_subprocess import DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 RESOLVE_THREAD_MUTATION = transport.RESOLVE_THREAD_MUTATION
 run_gh = transport.run_gh
@@ -99,21 +98,20 @@ def _references_review(comment_body: str, review_url: str) -> bool:
     return references_review(comment_body, review_url)
 
 
-def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float:
+def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float | None:
     """Return the tighter caller timeout or remaining snapshot deadline.
 
     Args:
         deadline: Absolute monotonic deadline for the complete snapshot.
-        gh_timeout: Caller-selected per-command timeout, or the default.
+        gh_timeout: Caller-selected per-command timeout, or no bound.
 
     Returns:
-        The tighter remaining deadline or caller bound, using the 30-second default when omitted.
+        The tighter remaining deadline and caller bound, or no bound when both are omitted.
     """
-    caller_timeout = DEFAULT_COMMAND_TIMEOUT_SECONDS if gh_timeout is None else gh_timeout
     if deadline is None:
-        return caller_timeout
+        return gh_timeout
     remaining = max(0.0, deadline - time.monotonic())
-    return min(remaining, caller_timeout)
+    return remaining if gh_timeout is None else min(remaining, gh_timeout)
 
 
 class GitHubState(BaseModel):

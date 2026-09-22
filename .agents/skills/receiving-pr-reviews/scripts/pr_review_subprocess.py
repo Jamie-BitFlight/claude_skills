@@ -65,24 +65,24 @@ def terminate_process_tree(process: subprocess.Popen[Any]) -> None:
 
 
 def run_capture(command: list[str], *, timeout: float | None = None) -> str:
-    """Run a command with a mandatory bound and capture its complete output.
+    """Run a command and capture its complete output.
 
     Args:
         command: Command argv without shell interpretation.
-        timeout: Positive caller bound; the default is 30 seconds.
+        timeout: Optional positive caller bound. Omit it for no command bound.
 
     Returns:
         Complete standard output.
 
     Raises:
-        ValueError: If the command is empty or the timeout is not positive.
+        ValueError: If the command is empty or a supplied timeout is not positive.
         subprocess.CalledProcessError: If the command exits nonzero.
         subprocess.TimeoutExpired: If the bound expires after process-tree cleanup.
     """
-    timeout_seconds = DEFAULT_COMMAND_TIMEOUT_SECONDS if timeout is None else timeout
+    timeout_seconds = timeout
     if not command:
         raise ValueError("command must not be empty")
-    if timeout_seconds <= 0:
+    if timeout_seconds is not None and timeout_seconds <= 0:
         raise ValueError("command timeout must be greater than zero")
     process = subprocess.Popen(
         command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=os.name == "posix"
@@ -91,6 +91,8 @@ def run_capture(command: list[str], *, timeout: float | None = None) -> str:
         stdout, stderr = process.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         terminate_process_tree(process)
+        if timeout_seconds is None:
+            raise RuntimeError("an unbounded subprocess unexpectedly timed out") from exc
         raise subprocess.TimeoutExpired(command, timeout_seconds, output=exc.output, stderr=exc.stderr) from exc
     if process.returncode:
         raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)

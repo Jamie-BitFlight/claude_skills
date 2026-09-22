@@ -55,7 +55,7 @@ ProviderOption = Annotated[
 RepoOption = Annotated[str | None, typer.Option("--repo", help="Provider repository namespace/path.")]
 HostOption = Annotated[str | None, typer.Option("--host", help="Bare provider hostname; required with GitLab --repo.")]
 ProviderTimeoutOption = Annotated[
-    float,
+    float | None,
     typer.Option(
         "--provider-timeout-seconds",
         "--gh-timeout-seconds",
@@ -65,6 +65,19 @@ ProviderTimeoutOption = Annotated[
     ),
 ]
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = DEFAULT_COMMAND_TIMEOUT_SECONDS
+
+
+def provider_diagnostic(error: BaseException) -> str:
+    """Return complete provider stderr for an actionable CLI error.
+
+    Args:
+        error: Provider process error, including any captured stderr.
+
+    Returns:
+        Empty text when the provider supplied no stderr; otherwise complete decoded stderr.
+    """
+    stderr = getattr(error, "stderr", None)
+    return stderr.decode(errors="replace") if isinstance(stderr, bytes) else stderr or ""
 
 
 def run_git(arguments: list[str], *, timeout: float | None = None) -> str:
@@ -123,9 +136,11 @@ def github_target(
         try:
             owner, repo = detector(gh_timeout=timeout)
         except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValidationError) as exc:
+            diagnostic = provider_diagnostic(exc)
+            provider_detail = f"\n{diagnostic}" if diagnostic else ""
             typer.echo(
                 f"Could not detect this checkout's GitHub repository via gh repo view ({exc}). "
-                "Pass --github owner/repo to specify it explicitly.",
+                f"Pass --github owner/repo to specify it explicitly.{provider_detail}",
                 err=True,
             )
             raise typer.Exit(code=1) from exc
@@ -150,7 +165,16 @@ def gitlab_repo_view(*, timeout: float | None, runner: CommandRunner = run_glab)
     Raises:
         typer.BadParameter: If glab returns an invalid repository identity.
     """
-    raw = runner(["repo", "view", "--output", "json"], timeout=timeout)
+    try:
+        raw = runner(["repo", "view", "--output", "json"], timeout=timeout)
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        diagnostic = provider_diagnostic(exc)
+        provider_detail = f"\n{diagnostic}" if diagnostic else ""
+        raise typer.BadParameter(
+            "Could not detect this checkout's GitLab repository via glab repo view "
+            f"({exc}). Pass --provider gitlab --repo <namespace/project> --host <hostname> to specify it explicitly."
+            f"{provider_detail}"
+        ) from exc
     try:
         payload = json.loads(raw)
         full_name = validate_repository_path(str(payload["path_with_namespace"]))

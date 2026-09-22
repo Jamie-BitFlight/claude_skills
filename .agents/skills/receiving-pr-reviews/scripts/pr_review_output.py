@@ -34,6 +34,7 @@ def review_input_is_actionable(item: ReviewInput, communicated_input_ids: set[st
     """
     return (
         item.direction == "inbound"
+        and item.revision_relation != "stale"
         and item.input_id not in communicated_input_ids
         and item.provider_state.lower() not in TERMINAL_PROVIDER_STATES
     )

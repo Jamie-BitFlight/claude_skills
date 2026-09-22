@@ -358,8 +358,13 @@ def communicated_inputs(inputs: list[ReviewInput]) -> set[str]:
         for item in inputs
         if item.direction == "inbound"
         and any(
-            (item.thread_id is not None and response.thread_id == item.thread_id)
-            or reference_present(response.body, item.stable_reference)
+            response.created_at is not None
+            and item.created_at is not None
+            and response.created_at > item.created_at
+            and (
+                (item.thread_id is not None and response.thread_id == item.thread_id)
+                or reference_present(response.body, item.stable_reference)
+            )
             for response in outbound
         )
     }

@@ -22,20 +22,20 @@ from pydantic import ValidationError
 
 from pr_review_cli_mutations import register_mutation_commands
 from pr_review_cli_target import (
-    DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     GithubOption,
     HostOption,
     ProviderOption,
     ProviderTimeoutOption,
     RepoOption,
     github_target,
+    provider_diagnostic,
     resolve_target,
 )
 from pr_review_contracts import ChangeRequestTarget
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_github_provider import GitHubProvider
 from pr_review_gitlab_provider import GitLabProvider
-from pr_review_models import WatchActionView, WatchSummary
+from pr_review_models import ReviewSnapshot, WatchActionView, WatchSummary
 from pr_review_output import action_view, summarize
 from pr_review_provider import ReviewProvider
 from pr_review_state import load_cycle, load_snapshot, save_snapshot
@@ -136,6 +136,37 @@ def review_provider_for_target(target: ChangeRequestTarget) -> ReviewProvider:
     return GitLabProvider()
 
 
+def snapshot_or_exit(
+    provider: ReviewProvider,
+    target: ChangeRequestTarget,
+    *,
+    deadline: float | None,
+    command_timeout: float | None,
+    operation: str,
+) -> ReviewSnapshot:
+    """Fetch one provider snapshot or emit its complete actionable diagnostic.
+
+    Args:
+        provider: Provider adapter selected for the target.
+        target: Change request to inspect.
+        deadline: Optional watch deadline.
+        command_timeout: Optional caller-selected provider command bound.
+        operation: CLI operation used in the error message.
+
+    Returns:
+        Complete provider snapshot.
+
+    Raises:
+        typer.Exit: If the provider command fails.
+    """
+    try:
+        return provider.snapshot(target, deadline=deadline, command_timeout=command_timeout)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        diagnostic = provider_diagnostic(exc)
+        typer.echo(f"{operation}: provider snapshot failed ({exc}){f': {diagnostic}' if diagnostic else ''}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
 def parse_pr_list(value: str) -> list[int]:
     """Parse positive comma-separated change-request numbers.
 
@@ -195,7 +226,7 @@ def fetch(
     host: HostOption = None,
     summary: SummaryOption = False,
     snapshot_file: SnapshotOutputOption = None,
-    provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+    provider_timeout_seconds: ProviderTimeoutOption = None,
 ) -> None:
     """Fetch review state and print its live action projection.
 
@@ -218,7 +249,9 @@ def fetch(
     selected_provider = review_provider_for_target(first_target)
     for number in numbers:
         target = first_target.model_copy(update={"number": number})
-        result = selected_provider.snapshot(target, deadline=None, command_timeout=provider_timeout_seconds)
+        result = snapshot_or_exit(
+            selected_provider, target, deadline=None, command_timeout=provider_timeout_seconds, operation="fetch"
+        )
         if snapshot_file is not None:
             save_snapshot(snapshot_file, result)
         output = summarize(result, pr=number) if summary else action_view(result, pr=number)
@@ -238,7 +271,7 @@ def watch(
     interval_seconds: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_INTERVAL_SECONDS,
     timeout_seconds: Annotated[int, typer.Option(min=0)] = DEFAULT_WATCH_TIMEOUT_SECONDS,
     max_attempts: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_MAX_ATTEMPTS,
-    provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
+    provider_timeout_seconds: ProviderTimeoutOption = None,
 ) -> None:
     """Sample complete snapshots within one deadline and attempt budget.
 
@@ -259,8 +292,12 @@ def watch(
     deadline = time.monotonic() + timeout_seconds
     target = target_for_request(provider, repo, host, github, pr, command_timeout=provider_timeout_seconds)
     selected_provider = review_provider_for_target(target)
-    current = selected_provider.snapshot(
-        target, deadline=deadline if timeout_seconds > 0 else None, command_timeout=provider_timeout_seconds
+    current = snapshot_or_exit(
+        selected_provider,
+        target,
+        deadline=deadline if timeout_seconds > 0 else None,
+        command_timeout=provider_timeout_seconds,
+        operation="watch",
     )
     baseline = load_snapshot(baseline_snapshot_file) if baseline_snapshot_file is not None else current
     if baseline.target != target:
@@ -285,9 +322,12 @@ def watch(
         try:
             current = selected_provider.snapshot(target, deadline=deadline, command_timeout=provider_timeout_seconds)
             last_poll_ok = True
-        except subprocess.TimeoutExpired:
-            last_poll_ok = time.monotonic() >= deadline
-        except (subprocess.CalledProcessError, ValidationError):
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as exc:
+            diagnostic = provider_diagnostic(exc)
+            if diagnostic:
+                typer.echo(f"watch: provider poll failed ({exc}): {diagnostic}", err=True)
+            last_poll_ok = isinstance(exc, subprocess.TimeoutExpired) and time.monotonic() >= deadline
+        except ValidationError:
             last_poll_ok = False
     if poll_attempts and not last_poll_ok:
         typer.echo(

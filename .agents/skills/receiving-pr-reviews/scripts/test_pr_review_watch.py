@@ -289,7 +289,7 @@ def test_watch_first_fetch_is_not_deadline_bounded(mocker: MockerFixture) -> Non
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["timed_out"] is True
-    assert fetch_mock.call_args.kwargs["gh_timeout"] == pytest.approx(30)
+    assert fetch_mock.call_args.kwargs["gh_timeout"] is None
     assert fetch_mock.call_args.kwargs["target"].number == 3208
     dashboard = json.loads(result.output)["dashboard"]
     assert dashboard["provider"] == "github"
@@ -345,9 +345,9 @@ def test_watch_stops_when_first_snapshot_differs_from_saved_baseline(tmp_path: P
     assert json.loads(result.output)["timed_out"] is False
 
 
-def test_gh_timeout_budget_without_a_deadline_uses_the_callers_bound() -> None:
-    """No deadline uses the caller's timeout or the mandatory default when omitted."""
-    assert pr_review_gh.gh_timeout_budget(None, None) == pytest.approx(30)
+def test_gh_timeout_budget_without_a_deadline_preserves_an_omitted_bound() -> None:
+    """No deadline leaves an omitted provider bound unbounded."""
+    assert pr_review_gh.gh_timeout_budget(None, None) is None
     assert pr_review_gh.gh_timeout_budget(None, 12.5) == pytest.approx(12.5)
 
 

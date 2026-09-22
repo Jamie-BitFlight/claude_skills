@@ -347,6 +347,7 @@ def register_response_commands(
         save_cycle(state_file, cycle)
         typer.echo(json.dumps({"input_id": input_id, "replied": reply_result.success, "resolved": False}))
         resolve_result = selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
+        require_provider_confirmation(resolve_result, "resolution")
         save_cycle(state_file, record_completed_resolution(cycle, input_id))
         typer.echo(
             json.dumps({"input_id": input_id, "replied": reply_result.success, "resolved": resolve_result.success})

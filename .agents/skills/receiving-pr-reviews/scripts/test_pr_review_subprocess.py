@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def test_run_capture_applies_default_bound_and_isolates_process_group(mocker: MockerFixture) -> None:
+def test_run_capture_preserves_an_omitted_bound_and_isolates_process_group(mocker: MockerFixture) -> None:
     process = mocker.Mock(returncode=0)
     process.communicate.return_value = ("output", "")
     popen = mocker.patch.object(pr_review_subprocess.subprocess, "Popen", return_value=process)
@@ -41,7 +41,7 @@ def test_run_capture_applies_default_bound_and_isolates_process_group(mocker: Mo
     result = pr_review_subprocess.run_capture(["gh", "api", "user"])
 
     assert result == "output"
-    process.communicate.assert_called_once_with(timeout=30.0)
+    process.communicate.assert_called_once_with(timeout=None)
     assert popen.call_args.kwargs["start_new_session"] is (os.name == "posix")
 
 
@@ -98,3 +98,22 @@ def test_timeout_removes_a_live_descendant_process_group(tmp_path: Path) -> None
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
+
+
+def test_run_capture_leaves_an_omitted_timeout_unbounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GitHub fetch/watch callers can preserve their unbounded default."""
+    import pr_review_subprocess
+
+    observed_timeouts: list[float | None] = []
+
+    class SuccessfulProcess:
+        returncode = 0
+
+        def communicate(self, *, timeout: float | None) -> tuple[str, str]:
+            observed_timeouts.append(timeout)
+            return "complete output", ""
+
+    monkeypatch.setattr(pr_review_subprocess.subprocess, "Popen", lambda *args, **kwargs: SuccessfulProcess())
+
+    assert pr_review_subprocess.run_capture(["gh", "api", "user"]) == "complete output"
+    assert observed_timeouts == [None]
