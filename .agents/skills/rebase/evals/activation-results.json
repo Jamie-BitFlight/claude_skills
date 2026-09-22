@@ -3,9 +3,9 @@
   "skill_name": "rebase",
   "observed_on": "2026-09-22",
   "content_sha256": {
-    "SKILL.md": "5b840d50b91c134fae13fc8e6cbd9b9a56d381998a00caa3cc2a2f9cad7b59c0",
+    "SKILL.md": "117472b707f33cb89c06ab83177586fbf256746290b190367b0364b9c90f37a8",
     "references/active-rebase.md": "ddb8e0ed44fafeeb78d4aa48ef80e688f7e03a7e177c22bb305e52d511246c2b",
-    "references/start-rebase.md": "6de4fb668eb3f49b33326bf1a4dbf6ec2f06df9ce678e2e786af9791c307ad5d"
+    "references/start-rebase.md": "3fdd9804f72543c4ebc9f4e0cc220d4053c83a167fe015bcca97bfd32e6880d0"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },

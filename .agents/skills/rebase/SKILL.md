@@ -5,20 +5,19 @@ description: "Start a local Git rebase when the user explicitly requests history
 
 # Rebase
 
-Replay every intentionally retained commit and change from an explicitly named local branch onto an
-immutable target commit. Finish only when ancestry, branch intent, repository checks, clean state,
-and recovery information are observable.
+Rewrite local history only: no force-push, remote backup, merge, forge action, or publication.
 
-The executing agent owns every step. This workflow rewrites local history only. A verified local
-rebase authorizes neither force-push nor merge.
+Bind `<skill-dir>` to this loaded `SKILL.md`'s absolute directory.
 
-Bind `<skill-dir>` to the absolute directory containing this loaded `SKILL.md`, using the exact
-injected skill path supplied by the harness. Substitute that absolute path directly in every
-bundled-script command.
+Before mutation, require a named local ref, immutable target OID, authorized clean worktree, typed
+plan, verified recovery ref, and validation hash. Require explicit approval for discard, topology
+flattening, semantic change, publication impact, or ambiguous reconstruction. End with exactly one
+canonical terminal; local success is `REBASE_COMPLETE_VERIFIED` and `not published`.
 
-Choose one route before any mutation and load only its reference:
+Choose one route before mutation and load only its reference:
 
-- To start a named rebase, read [Start a rebase](./references/start-rebase.md) and follow it to a
-  terminal.
-- To continue or abort, read [Active rebase](./references/active-rebase.md) and follow it to a
-  terminal.
+- Start: read [start a rebase](./references/start-rebase.md).
+- Continue or abort: read [active rebase](./references/active-rebase.md).
+
+Only for an explicit tutorial, human walkthrough, or procedure audit, read the optional
+[step-by-step](./references/step-by-step.md).

@@ -37,6 +37,10 @@ from rebase_test_support import (
 SKILL_PATH = SKILL_ROOT / "SKILL.md"
 START_REFERENCE_PATH = SKILL_ROOT / "references" / "start-rebase.md"
 ACTIVE_REFERENCE_PATH = SKILL_ROOT / "references" / "active-rebase.md"
+ACTIVE_OPERATION_REFERENCE_PATH = SKILL_ROOT / "references" / "active-rebase-operation.md"
+EDGE_REFERENCE_PATH = SKILL_ROOT / "references" / "rebase-edge-cases.md"
+STEP_BY_STEP_PATH = SKILL_ROOT / "references" / "step-by-step.md"
+EXAMPLE_PLAN_PATH = SKILL_ROOT / "references" / "example-plan.json"
 EVALS_PATH = SKILL_ROOT / "evals" / "evals.json"
 ACTIVATION_RESULTS_PATH = SKILL_ROOT / "evals" / "activation-results.json"
 
@@ -169,7 +173,7 @@ def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> 
 
 
 def test_invocation_routes_disclose_only_the_selected_workflow() -> None:
-    """Keep start-only planning out of continue and abort context."""
+    """Keep each routine route within its context budget."""
     package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
     cases = {case.id: case for case in package.evals}
 
@@ -178,11 +182,78 @@ def test_invocation_routes_disclose_only_the_selected_workflow() -> None:
     assert cases[3].required_sources == ["SKILL.md", "references/active-rebase.md"]
     assert START_REFERENCE_PATH.is_file()
     assert ACTIVE_REFERENCE_PATH.is_file()
+    assert ACTIVE_OPERATION_REFERENCE_PATH.is_file()
+    assert EDGE_REFERENCE_PATH.is_file()
 
     active_bytes = len(SKILL_PATH.read_bytes()) + len(ACTIVE_REFERENCE_PATH.read_bytes())
+    active_operation_bytes = active_bytes + len(ACTIVE_OPERATION_REFERENCE_PATH.read_bytes())
     start_bytes = len(SKILL_PATH.read_bytes()) + len(START_REFERENCE_PATH.read_bytes())
-    assert len(SKILL_PATH.read_bytes()) < 3_000
-    assert active_bytes < start_bytes
+    assert len(SKILL_PATH.read_bytes()) <= 1_307
+    assert start_bytes <= 8_000
+    assert active_bytes <= 2_240
+    assert active_operation_bytes <= 5_000
+    assert len(EDGE_REFERENCE_PATH.read_bytes()) <= 2_500
+
+
+def test_optional_walkthrough_is_never_a_routine_route_dependency() -> None:
+    """Keep tutorials and the worked artifact outside routine execution context."""
+    package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
+    required_sources = {source for case in package.evals for source in case.required_sources}
+    routine_paths = (START_REFERENCE_PATH, ACTIVE_REFERENCE_PATH, ACTIVE_OPERATION_REFERENCE_PATH, EDGE_REFERENCE_PATH)
+
+    skill_links = {node.dest for node in walk(parse_markdown(SKILL_PATH)) if isinstance(node, Link)}
+    routine_links = {
+        node.dest for path in routine_paths for node in walk(parse_markdown(path)) if isinstance(node, Link)
+    }
+    walkthrough_links = {node.dest for node in walk(parse_markdown(STEP_BY_STEP_PATH)) if isinstance(node, Link)}
+
+    assert STEP_BY_STEP_PATH.is_file()
+    assert EXAMPLE_PLAN_PATH.is_file()
+    assert "./references/step-by-step.md" in skill_links
+    assert "./example-plan.json" in walkthrough_links
+    assert "references/step-by-step.md" not in required_sources
+    assert "references/example-plan.json" not in required_sources
+    assert all("step-by-step.md" not in link and "example-plan.json" not in link for link in routine_links)
+
+
+def test_routine_contract_retains_non_intrinsic_safety_interfaces() -> None:
+    """Pin typed gates and exceptional branches without pinning prose wording."""
+    routine_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            SKILL_PATH,
+            START_REFERENCE_PATH,
+            ACTIVE_REFERENCE_PATH,
+            ACTIVE_OPERATION_REFERENCE_PATH,
+            EDGE_REFERENCE_PATH,
+        )
+    )
+    required_tokens = {
+        "rebase_plan.py",
+        "rebase_active.py",
+        "repository_state",
+        "repository_instruction_search",
+        "CURRENT_BRANCH",
+        "AUTHORIZED_BRANCH_TRANSFER",
+        *(disposition.value for disposition in Disposition),
+        MergePolicy.PRESERVE_TOPOLOGY.value,
+        MergePolicy.APPROVED_FLATTEN.value,
+        "BLOCKED_INVALID_REF",
+        "BLOCKED_WORKTREE_IN_USE",
+        "NO_ACTIVE_REBASE",
+        "PLAN_INVALID",
+        "NEEDS_USER_DECISION",
+        "REPLAN_REF_DRIFT",
+        "EMPTY_COMMIT_DECISION",
+        "REBASE_ABORTED_RESTORED",
+        "BLOCKED_ABORT_FAILED",
+        "BLOCKED_COMMAND_FAILED",
+        "REBASE_COMPLETE_VALIDATION_FAILED",
+        "REBASE_COMPLETE_VERIFIED",
+        "not published",
+    }
+
+    assert required_tokens <= set(re.findall(r"not published|[A-Za-z_][A-Za-z0-9_.-]*", routine_text))
 
 
 def test_observed_activation_results_derive_pass_from_current_sources_and_actions() -> None:
