@@ -21,6 +21,7 @@ import json
 import subprocess
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -28,7 +29,9 @@ import pytest
 import pr_review_gh
 import pr_review_threads
 from pr_review_models import FetchResult
+from pr_review_state_models import calculate_snapshot_fingerprint
 from pr_review_threads import app
+from review_test_fixtures import canonical_input, canonical_snapshot
 from review_test_gh_fixtures import (
     _default_github_detection as _default_github_detection,
     _review,
@@ -303,6 +306,44 @@ def test_watch_first_snapshot_uses_tighter_caller_command_timeout(mocker: Mocker
 
     assert result.exit_code == 0, result.output
     assert fetch_mock.call_args.kwargs["gh_timeout"] == pytest.approx(5)
+
+
+def test_watch_stops_when_first_snapshot_differs_from_saved_baseline(tmp_path: Path, mocker: MockerFixture) -> None:
+    """A change before the first poll still returns to census when the caller supplies its baseline."""
+    baseline = canonical_snapshot().model_copy(update={"unresolved_count": 0, "outstanding_input_count": 0})
+    changed_input = canonical_input().model_copy(update={"provider_state": "resolved"})
+    fingerprint = calculate_snapshot_fingerprint(
+        baseline.target,
+        baseline.head_revision,
+        [changed_input],
+        baseline.completeness,
+        revision_at=baseline.revision_at,
+        reviewability=baseline.reviewability,
+        provider_metadata=baseline.provider_metadata,
+        communicated_input_ids=baseline.communicated_input_ids,
+    )
+    changed = baseline.model_copy(update={"review_inputs": [changed_input], "snapshot_fingerprint": fingerprint})
+    baseline_file = tmp_path / "watch-baseline.json"
+    baseline_file.write_text(baseline.model_dump_json(), encoding="utf-8")
+    mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=changed)
+
+    result = runner.invoke(
+        app,
+        [
+            "watch",
+            "--pr",
+            "17",
+            "--github",
+            "acme/widgets",
+            "--timeout-seconds",
+            "0",
+            "--baseline-snapshot-file",
+            str(baseline_file),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["timed_out"] is False
 
 
 def test_gh_timeout_budget_without_a_deadline_uses_the_callers_bound() -> None:

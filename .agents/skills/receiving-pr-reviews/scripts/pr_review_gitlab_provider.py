@@ -18,7 +18,7 @@ from pr_review_gitlab_normalize import normalize_state
 from pr_review_gitlab_transport import collect_state, project_path, run_glab
 from pr_review_gitlab_wire import GitLabCreatedNote, GitLabDiscussion, GitLabState
 from pr_review_models import ReviewSnapshot
-from pr_review_provider import ProviderResponseError
+from pr_review_provider import ProviderResponseError, dispatch_review_action
 from pr_review_provider_text import render_top_level_body
 from pr_review_state_models import AuthorizedReviewAction
 
@@ -103,73 +103,111 @@ class GitLabProvider:
             raise ProviderResponseError("authorized action target does not match provider target")
         host, full_name = self.coordinates(target)
         base = f"projects/{project_path(full_name)}/merge_requests/{target.number}"
-        if isinstance(action.action, ReplyAction):
-            discussion_id = action.review_input.provider_ids.reply_target_id
-            if not discussion_id:
-                raise ProviderResponseError("GitLab reply input lacks reply_target_id")
-            body = render_top_level_body(action.action.body, [action.review_input.stable_reference])
-            raw = self.command_runner(
-                [
-                    "api",
-                    "--hostname",
-                    host,
-                    "--method",
-                    "POST",
-                    f"{base}/discussions/{discussion_id}/notes",
-                    "--raw-field",
-                    f"body={body}",
-                ],
-                timeout=command_timeout,
-            )
-            note = self.validate_created_note(raw, "reply")
-            return ReviewActionResult(
-                provider="gitlab",
-                action_kind="reply",
-                success=True,
-                provider_object_id=str(note.id),
-                raw=json.loads(raw),
-            )
-        if isinstance(action.action, ResolveAction):
-            discussion_id = action.review_input.provider_ids.resolution_target_id
-            if not discussion_id:
-                raise ProviderResponseError("GitLab resolve input lacks resolution_target_id")
-            raw = self.command_runner(
-                [
-                    "api",
-                    "--hostname",
-                    host,
-                    "--method",
-                    "PUT",
-                    f"{base}/discussions/{discussion_id}",
-                    "--field",
-                    "resolved=true",
-                ],
-                timeout=command_timeout,
-            )
-            discussion = self.validate_resolved_discussion(raw)
-            return ReviewActionResult(
-                provider="gitlab",
-                action_kind="resolve",
-                success=True,
-                resolved=True,
-                provider_object_id=discussion.id,
-                raw=json.loads(raw),
-            )
-        if isinstance(action.action, TopLevelCommentAction):
-            body = render_top_level_body(action.action.body, action.action.references)
-            raw = self.command_runner(
-                ["api", "--hostname", host, "--method", "POST", f"{base}/notes", "--raw-field", f"body={body}"],
-                timeout=command_timeout,
-            )
-            note = self.validate_created_note(raw, "top-level comment")
-            return ReviewActionResult(
-                provider="gitlab",
-                action_kind="comment",
-                success=True,
-                provider_object_id=str(note.id),
-                raw=json.loads(raw),
-            )
-        raise TypeError(f"unsupported GitLab review action: {type(action.action).__name__}")
+        return dispatch_review_action(
+            action,
+            reply=lambda authorized, requested: self._reply(host, base, authorized, requested, command_timeout),
+            resolve=lambda authorized, requested: self._resolve(host, base, authorized, requested, command_timeout),
+            comment=lambda authorized, requested: self._comment(host, base, authorized, requested, command_timeout),
+        )
+
+    def _reply(
+        self,
+        host: str,
+        base: str,
+        authorized: AuthorizedReviewAction,
+        requested: ReplyAction,
+        command_timeout: float | None,
+    ) -> ReviewActionResult:
+        """Execute one GitLab inline reply.
+
+        Returns:
+            Provider-confirmed reply result.
+        """
+        discussion_id = authorized.review_input.provider_ids.reply_target_id
+        if not discussion_id:
+            raise ProviderResponseError("GitLab reply input lacks reply_target_id")
+        body = render_top_level_body(requested.body, [authorized.review_input.stable_reference])
+        raw = self.command_runner(
+            [
+                "api",
+                "--hostname",
+                host,
+                "--method",
+                "POST",
+                f"{base}/discussions/{discussion_id}/notes",
+                "--raw-field",
+                f"body={body}",
+            ],
+            timeout=command_timeout,
+        )
+        note = self.validate_created_note(raw, "reply")
+        return ReviewActionResult(
+            provider="gitlab", action_kind="reply", success=True, provider_object_id=str(note.id), raw=json.loads(raw)
+        )
+
+    def _resolve(
+        self,
+        host: str,
+        base: str,
+        authorized: AuthorizedReviewAction,
+        requested: ResolveAction,
+        command_timeout: float | None,
+    ) -> ReviewActionResult:
+        """Execute one GitLab discussion resolution.
+
+        Returns:
+            Provider-confirmed resolution result.
+        """
+        del requested
+        discussion_id = authorized.review_input.provider_ids.resolution_target_id
+        if not discussion_id:
+            raise ProviderResponseError("GitLab resolve input lacks resolution_target_id")
+        raw = self.command_runner(
+            [
+                "api",
+                "--hostname",
+                host,
+                "--method",
+                "PUT",
+                f"{base}/discussions/{discussion_id}",
+                "--field",
+                "resolved=true",
+            ],
+            timeout=command_timeout,
+        )
+        discussion = self.validate_resolved_discussion(raw)
+        return ReviewActionResult(
+            provider="gitlab",
+            action_kind="resolve",
+            success=True,
+            resolved=True,
+            provider_object_id=discussion.id,
+            raw=json.loads(raw),
+        )
+
+    def _comment(
+        self,
+        host: str,
+        base: str,
+        authorized: AuthorizedReviewAction,
+        requested: TopLevelCommentAction,
+        command_timeout: float | None,
+    ) -> ReviewActionResult:
+        """Execute one GitLab top-level response.
+
+        Returns:
+            Provider-confirmed comment result.
+        """
+        del authorized
+        body = render_top_level_body(requested.body, requested.references)
+        raw = self.command_runner(
+            ["api", "--hostname", host, "--method", "POST", f"{base}/notes", "--raw-field", f"body={body}"],
+            timeout=command_timeout,
+        )
+        note = self.validate_created_note(raw, "top-level comment")
+        return ReviewActionResult(
+            provider="gitlab", action_kind="comment", success=True, provider_object_id=str(note.id), raw=json.loads(raw)
+        )
 
     @staticmethod
     def validate_created_note(raw: str, operation: str) -> GitLabCreatedNote:

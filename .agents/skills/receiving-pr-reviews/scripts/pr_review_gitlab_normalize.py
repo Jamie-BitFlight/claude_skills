@@ -290,14 +290,17 @@ def communicated_inputs(inputs: list[ReviewInput]) -> set[str]:
         Canonical inbound input IDs with provider-observed communication evidence.
     """
     outbound = [item for item in inputs if item.direction == "outbound"]
+
+    def response_follows_input(response: ReviewInput, item: ReviewInput) -> bool:
+        observed_at = item.updated_at or item.created_at
+        return response.created_at is not None and (observed_at is None or response.created_at >= observed_at)
+
     return {
         item.input_id
         for item in inputs
         if item.direction == "inbound"
         and any(
-            response.created_at is not None
-            and (item.created_at is None or response.created_at >= item.created_at)
-            and reference_present(response.body, item.stable_reference)
+            response_follows_input(response, item) and reference_present(response.body, item.stable_reference)
             for response in outbound
         )
     }
@@ -371,8 +374,7 @@ def normalize_state(state: GitLabState, target: ChangeRequestTarget) -> ReviewSn
         ),
         unresolved_count=len(unresolved_threads),
         outstanding_input_count=sum(
-            item.direction == "inbound" and item.provider_state != "resolved" and item.input_id not in communicated
-            for item in inputs
+            item.direction == "inbound" and item.input_id not in communicated for item in inputs
         ),
         codex_approved=None,
         reviewability=reviewability,

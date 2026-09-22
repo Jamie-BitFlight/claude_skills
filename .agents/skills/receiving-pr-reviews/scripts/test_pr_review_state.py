@@ -24,197 +24,24 @@ import pytest
 from pydantic import ValidationError
 
 from pr_review_github_normalize import actor, review_inputs
-from pr_review_models import (
-    Author,
-    ChangeRequestTarget,
-    ReplyAction,
-    RepositoryTarget,
-    ResolveAction,
-    Reviewability,
-    ReviewNode,
-    ReviewSnapshot,
-    TopLevelCommentAction,
-)
+from pr_review_models import Author, ReplyAction, ResolveAction, ReviewNode, ReviewSnapshot, TopLevelCommentAction
 from pr_review_state import ReviewAuthorizationError, authorize_action, evaluate_review_complete
 from pr_review_state_models import (
-    ProviderInputIdentity,
     ReviewActor,
     ReviewAssessment,
     ReviewCapabilities,
     ReviewCluster,
-    ReviewContext,
     ReviewCycleState,
     ReviewInput,
-    SnapshotCompleteness,
     calculate_snapshot_fingerprint,
 )
-
-
-def target() -> ChangeRequestTarget:
-    """Return one stable target fixture."""
-    return ChangeRequestTarget(
-        repository=RepositoryTarget(provider="github", hostname="github.com", full_name="acme/widgets"), number=17
-    )
-
-
-def review_input(input_id: str = "github:review-comment:42") -> ReviewInput:
-    """Return one inbound inline-comment fixture."""
-    return ReviewInput(
-        input_id=input_id,
-        provider="github",
-        provider_ids=ProviderInputIdentity(object_id="42", reply_target_id="42", resolution_target_id="T1"),
-        source_kind="review_comment",
-        kinds={"comment"},
-        location="inline",
-        direction="inbound",
-        actor=ReviewActor(actor_id="reviewer", login="reviewer", classification="human", role="reviewer"),
-        body="Fix the shared invariant.",
-        stable_reference="https://github.com/acme/widgets/pull/17#discussion_r42",
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        updated_at=None,
-        revision_relation="current",
-        path="src/widget.py",
-        line=12,
-        provider_state="open",
-        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, can_comment=True, unavailable=[]),
-        thread_id="T1",
-        parent_id=None,
-    )
-
-
-def snapshot(*, complete: bool = True) -> ReviewSnapshot:
-    """Return a canonical snapshot containing one review input."""
-    item = review_input()
-    completeness = SnapshotCompleteness(
-        transport="github_cli",
-        required_surfaces={"threads", "reviews", "comments", "reactions", "identity", "revision"},
-        completed_surfaces={"threads", "reviews", "comments", "reactions", "identity", "revision"},
-        truncated_input_ids=[] if complete else [item.input_id],
-        unavailable_capabilities=[],
-    )
-    revision_at = datetime(2026, 1, 1, tzinfo=UTC)
-    reviewability = Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[])
-    fingerprint = calculate_snapshot_fingerprint(
-        target(), "abc123", [item], completeness, revision_at=revision_at, reviewability=reviewability
-    )
-    return ReviewSnapshot(
-        provider="github",
-        target=target(),
-        transport="github_cli",
-        snapshot_complete=complete,
-        snapshot_fingerprint=fingerprint,
-        head_revision="abc123",
-        revision_at=revision_at,
-        completeness=completeness,
-        review_inputs=[item],
-        assessments=[],
-        clusters=[],
-        cycle_state="ASSESSMENT_REQUIRED",
-        reviews_count=0,
-        reviews_with_body=[],
-        unresponded_reviews=[],
-        threads_count=1,
-        unresolved=[],
-        unresolved_count=1,
-        codex_approved=False,
-        codex_approval_equivalence="available",
-        reviewability=reviewability,
-    )
-
-
-def ready_cycle() -> ReviewCycleState:
-    """Return a cycle satisfying every complete-set gate."""
-    assessment = ReviewAssessment(
-        input_id=review_input().input_id,
-        validity="valid",
-        relevance="relevant",
-        evidence=["src/widget.py:12 demonstrates the invariant violation"],
-        affected_scope=["src/widget.py"],
-        verification_surface=["pytest tests/test_widget.py"],
-        disposition="accepted_change",
-        kind_assessment="not_applicable",
-        semantic_kinds={"comment"},
-        unknowns=[],
-        cluster_id="cluster-1",
-        communication_plan="Reply with the verified remote revision.",
-    )
-    cluster = ReviewCluster(
-        cluster_id="cluster-1",
-        input_ids=[review_input().input_id],
-        shared_basis=["shared invariant"],
-        explicit_singleton=True,
-        systemic_outcome="Correct the invariant at its owning module.",
-        evidence=["The owning module controls every affected call site."],
-        verification_commands=["pytest tests/test_widget.py"],
-        communication_plan="Reply with the verified remote revision.",
-        resolution_policy="resolve_after_reply",
-    )
-    return ReviewCycleState(
-        context=ReviewContext(
-            repository_instructions="Follow AGENTS.md.",
-            change_request_goal="Correct review handling.",
-            changed_scope=["src/widget.py"],
-            target=target(),
-            remote_head="abc123",
-            revision="abc123",
-        ),
-        snapshot_fingerprint=snapshot().snapshot_fingerprint,
-        input_census=[review_input().input_id],
-        assessments=[assessment],
-        clusters=[cluster],
-        unknown_decisions={},
-        implementation_evidence=["Commit abc123 contains the systemic correction."],
-        verification_evidence=["pytest tests/test_widget.py passed at abc123."],
-        inspectable_revision="abc123",
-        recheck_snapshot_fingerprint=snapshot().snapshot_fingerprint,
-        communication_states={review_input().input_id: "pending"},
-        resolution_states={review_input().input_id: "open"},
-        implementation_states={review_input().input_id: "completed"},
-        terminal_annotations={},
-        cycle_terminal="action_pending",
-        cycle_state="READY_FOR_ACTION",
-    )
-
-
-def state_for_input(item: ReviewInput, assessment: ReviewAssessment) -> tuple[ReviewSnapshot, ReviewCycleState]:
-    """Bind a customized input and assessment to current fingerprint evidence."""
-    original = snapshot()
-    fingerprint = calculate_snapshot_fingerprint(
-        original.target,
-        original.head_revision,
-        [item],
-        original.completeness,
-        revision_at=original.revision_at,
-        reviewability=original.reviewability,
-        provider_metadata=original.provider_metadata,
-        communicated_input_ids=original.communicated_input_ids,
-    )
-    snapshot_value = original.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint})
-    cycle_value = ready_cycle().model_copy(
-        update={
-            "snapshot_fingerprint": fingerprint,
-            "recheck_snapshot_fingerprint": fingerprint,
-            "assessments": [assessment],
-        }
-    )
-    return snapshot_value, cycle_value
-
-
-def snapshot_with_communication() -> ReviewSnapshot:
-    """Return a canonically fingerprinted snapshot with provider communication evidence."""
-    original = snapshot()
-    communicated = {review_input().input_id}
-    fingerprint = calculate_snapshot_fingerprint(
-        original.target,
-        original.head_revision,
-        original.review_inputs,
-        original.completeness,
-        revision_at=original.revision_at,
-        reviewability=original.reviewability,
-        provider_metadata=original.provider_metadata,
-        communicated_input_ids=communicated,
-    )
-    return original.model_copy(update={"communicated_input_ids": communicated, "snapshot_fingerprint": fingerprint})
+from review_test_fixtures import (
+    canonical_input as review_input,
+    canonical_snapshot as snapshot,
+    ready_cycle,
+    snapshot_with_communication,
+    state_for_input,
+)
 
 
 def test_shared_reply_action_does_not_require_github_comment_identifier() -> None:
@@ -301,6 +128,7 @@ def test_snapshot_fingerprint_survives_json_round_trip() -> None:
 
 def test_review_complete_requires_provider_backed_per_input_lifecycle() -> None:
     snapshot_value = snapshot_with_communication()
+    snapshot_value = snapshot_value.model_copy(update={"unresolved_count": 0, "outstanding_input_count": 0})
     cycle_value = ready_cycle().model_copy(
         update={
             "snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
@@ -317,7 +145,53 @@ def test_review_complete_requires_provider_backed_per_input_lifecycle() -> None:
     assert completed.cycle_terminal == "review_complete"
 
 
+def test_review_complete_rejects_provider_snapshot_with_outstanding_work() -> None:
+    snapshot_value = snapshot_with_communication()
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "recheck_snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "communication_states": {review_input().input_id: "completed"},
+            "resolution_states": {review_input().input_id: "resolved"},
+            "terminal_annotations": {review_input().input_id: "Caller claims the input is resolved."},
+        }
+    )
+
+    with pytest.raises(ReviewAuthorizationError, match="provider snapshot has outstanding work"):
+        evaluate_review_complete(snapshot_value, cycle_value)
+
+
+def test_review_complete_rejects_input_changed_after_assessment() -> None:
+    original = snapshot_with_communication().model_copy(update={"unresolved_count": 0, "outstanding_input_count": 0})
+    changed = review_input().model_copy(update={"body": "A materially different concern after assessment."})
+    changed_fingerprint = calculate_snapshot_fingerprint(
+        original.target,
+        original.head_revision,
+        [changed],
+        original.completeness,
+        revision_at=original.revision_at,
+        reviewability=original.reviewability,
+        provider_metadata=original.provider_metadata,
+        communicated_input_ids=original.communicated_input_ids,
+    )
+    final_snapshot = original.model_copy(
+        update={"review_inputs": [changed], "snapshot_fingerprint": changed_fingerprint}
+    )
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "recheck_snapshot_fingerprint": changed_fingerprint,
+            "communication_states": {review_input().input_id: "completed"},
+            "resolution_states": {review_input().input_id: "resolved"},
+            "terminal_annotations": {review_input().input_id: "Caller claims the input is unchanged."},
+        }
+    )
+
+    with pytest.raises(ReviewAuthorizationError, match="changed since assessment"):
+        evaluate_review_complete(final_snapshot, cycle_value)
+
+
 def test_review_complete_rejects_caller_only_communication_claim() -> None:
+    snapshot_value = snapshot().model_copy(update={"unresolved_count": 0, "outstanding_input_count": 0})
     cycle_value = ready_cycle().model_copy(
         update={
             "communication_states": {review_input().input_id: "completed"},
@@ -327,11 +201,13 @@ def test_review_complete_rejects_caller_only_communication_claim() -> None:
     )
 
     with pytest.raises(ReviewAuthorizationError, match="provider-backed communication"):
-        evaluate_review_complete(snapshot(), cycle_value)
+        evaluate_review_complete(snapshot_value, cycle_value)
 
 
 def test_review_complete_requires_per_input_implementation_and_annotation() -> None:
-    snapshot_value = snapshot_with_communication()
+    snapshot_value = snapshot_with_communication().model_copy(
+        update={"unresolved_count": 0, "outstanding_input_count": 0}
+    )
     cycle_value = ready_cycle().model_copy(
         update={
             "snapshot_fingerprint": snapshot_value.snapshot_fingerprint,

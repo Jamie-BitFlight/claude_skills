@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import pytest
@@ -31,28 +31,17 @@ from pr_review_contracts import ChangeRequestTarget, ReplyAction, RepositoryTarg
 from pr_review_gitlab_normalize import normalize_state
 from pr_review_gitlab_provider import GitLabProvider
 from pr_review_gitlab_transport import collect_state, parse_ndjson
-from pr_review_gitlab_wire import (
-    GitLabApprovals,
-    GitLabApprovedBy,
-    GitLabAwardEmoji,
-    GitLabDiffVersion,
-    GitLabDiscussion,
-    GitLabMergeRequest,
-    GitLabNote,
-    GitLabPosition,
-    GitLabState,
-    GitLabUser,
-)
+from pr_review_gitlab_wire import GitLabApprovals, GitLabDiscussion
 from pr_review_output import summarize
 from pr_review_provider import ProviderResponseError, ReviewProvider
 from pr_review_state_models import AuthorizedReviewAction
 from pr_review_threads import app
+from review_test_gitlab_fixtures import NOW, note, state, target, user
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-NOW = datetime(2026, 9, 22, tzinfo=UTC)
 RUNNER = CliRunner()
 
 
@@ -107,108 +96,6 @@ def test_auto_target_routes_github_without_calling_glab(mocker: MockerFixture) -
     assert resolved == expected
     github_resolver.assert_called_once_with("acme/widgets", 17)
     glab_runner.assert_not_called()
-
-
-def user(user_id: int, username: str, *, bot: bool = False) -> GitLabUser:
-    """Build one strict GitLab actor."""
-    return GitLabUser(id=user_id, username=username, name=username.title(), bot=bot)
-
-
-def note(
-    note_id: int,
-    author: GitLabUser,
-    body: str,
-    *,
-    system: bool = False,
-    resolvable: bool = False,
-    resolved: bool | None = None,
-    head_sha: str | None = None,
-) -> GitLabNote:
-    """Build one strict note fixture."""
-    position = None
-    if head_sha is not None:
-        position = GitLabPosition(head_sha=head_sha, new_path="src/widget.py", new_line=9)
-    return GitLabNote(
-        id=note_id,
-        body=body,
-        author=author,
-        created_at=NOW + timedelta(seconds=note_id),
-        updated_at=NOW + timedelta(seconds=note_id),
-        system=system,
-        resolvable=resolvable,
-        resolved=resolved,
-        position=position,
-    )
-
-
-def target() -> ChangeRequestTarget:
-    """Return one self-managed nested GitLab target."""
-    return ChangeRequestTarget(
-        repository=RepositoryTarget(
-            provider="gitlab", hostname="gitlab.example.test", full_name="group/subgroup/widgets"
-        ),
-        number=3,
-    )
-
-
-def state() -> GitLabState:
-    """Return a complete state covering every normalized input surface."""
-    author = user(1, "author")
-    reviewer = user(2, "reviewer")
-    bot = user(3, "review-bot", bot=True)
-    current = user(9, "agent")
-    discussion = GitLabDiscussion(
-        id="discussion-1",
-        individual_note=False,
-        notes=[
-            note(10, reviewer, "This invariant is broken", resolvable=True, resolved=False, head_sha="head-1"),
-            note(11, current, "Existing response", resolvable=True, resolved=False, head_sha="head-1"),
-        ],
-    )
-    individual = GitLabDiscussion(
-        id="individual-1", individual_note=True, notes=[note(12, reviewer, "Could this be shared?")]
-    )
-    system = GitLabDiscussion(
-        id="system-1", individual_note=True, notes=[note(13, author, "pushed commits", system=True)]
-    )
-    mr = GitLabMergeRequest(
-        iid=3,
-        sha="head-1",
-        web_url="https://gitlab.example.test/group/subgroup/widgets/-/merge_requests/3",
-        state="opened",
-        draft=False,
-        work_in_progress=False,
-        has_conflicts=False,
-        merge_status="can_be_merged",
-        detailed_merge_status="mergeable",
-        blocking_discussions_resolved=False,
-        author=author,
-    )
-    return GitLabState(
-        merge_request=mr,
-        discussions=[discussion, individual, system],
-        notes=[*discussion.notes, *individual.notes, *system.notes, note(14, bot, "Top-level bot concern")],
-        approvals=GitLabApprovals(
-            approved=True, approvals_required=1, approvals_left=0, approved_by=[GitLabApprovedBy(user=reviewer)]
-        ),
-        awards=[
-            GitLabAwardEmoji(id=20, name="thumbsup", user=reviewer, created_at=NOW, updated_at=NOW),
-            GitLabAwardEmoji(id=21, name="thumbsdown", user=bot, created_at=NOW, updated_at=NOW),
-        ],
-        versions=[
-            GitLabDiffVersion(
-                id=1, head_commit_sha="head-1", base_commit_sha="base", start_commit_sha="start", created_at=NOW
-            ),
-            GitLabDiffVersion(
-                id=2,
-                head_commit_sha="head-1",
-                base_commit_sha="base-2",
-                start_commit_sha="start",
-                created_at=NOW + timedelta(minutes=1),
-            ),
-        ],
-        current_user=current,
-    )
 
 
 def test_gitlab_normalizes_complete_atomic_census_and_unavailable_codex_equivalence() -> None:
@@ -286,6 +173,49 @@ def test_outbound_exact_reference_reconciles_provider_communication() -> None:
     snapshot = normalize_state(fetched, target())
 
     assert snapshot.communicated_input_ids == {"gitlab:note:10"}
+
+
+def test_input_edited_after_exact_reference_response_requires_new_communication() -> None:
+    fetched = state()
+    original = fetched.discussions[0].notes[0]
+    reference = f"{fetched.merge_request.web_url}#note_{original.id}"
+    response = note(99, fetched.current_user, f"Addressed.\n\n{reference}")
+    edited = original.model_copy(
+        update={
+            "body": "This is a materially different concern.",
+            "updated_at": response.created_at + timedelta(seconds=1),
+        }
+    )
+    discussion = fetched.discussions[0].model_copy(update={"notes": [edited, *fetched.discussions[0].notes[1:]]})
+    notes = [edited if item.id == edited.id else item for item in fetched.notes]
+    fetched = fetched.model_copy(
+        update={"discussions": [discussion, *fetched.discussions[1:]], "notes": [*notes, response]}
+    )
+
+    snapshot = normalize_state(fetched, target())
+
+    assert "gitlab:note:10" not in snapshot.communicated_input_ids
+    assert snapshot.outstanding_input_count > 0
+    assert snapshot.has_outstanding_work() is True
+
+
+def test_new_already_resolved_input_still_requires_assessment_and_communication() -> None:
+    reviewer = user(8, "observer")
+    resolved_note = note(80, reviewer, "Resolved before the review cycle observed it", resolvable=True, resolved=True)
+    fetched = state().model_copy(
+        update={
+            "discussions": [GitLabDiscussion(id="resolved-1", individual_note=False, notes=[resolved_note])],
+            "notes": [resolved_note],
+            "approvals": GitLabApprovals(approved=False, approvals_required=0, approvals_left=0, approved_by=[]),
+            "awards": [],
+        }
+    )
+
+    snapshot = normalize_state(fetched, target())
+
+    assert snapshot.unresolved_count == 0
+    assert snapshot.outstanding_input_count == 1
+    assert snapshot.has_outstanding_work() is True
 
 
 def test_top_level_gitlab_inputs_stop_watch() -> None:

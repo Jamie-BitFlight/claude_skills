@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import subprocess
 import time
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -51,6 +52,10 @@ DEFAULT_WATCH_MAX_ATTEMPTS = 4
 def owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, str]:
     """Resolve GitHub coordinates through the compatibility target helper.
 
+    Args:
+        github: Optional explicit ``owner/repository`` target.
+        gh_timeout: Positive GitHub command bound.
+
     Returns:
         The owner and repository name.
     """
@@ -61,6 +66,11 @@ def owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, st
 
 def target_for_github(github: str | None, pr: int, *, gh_timeout: float | None) -> ChangeRequestTarget:
     """Resolve one GitHub pull-request target.
+
+    Args:
+        github: Optional explicit ``owner/repository`` target.
+        pr: Positive pull-request number.
+        gh_timeout: Positive GitHub command bound.
 
     Returns:
         The canonical target.
@@ -78,6 +88,14 @@ def target_for_request(
     command_timeout: float | None,
 ) -> ChangeRequestTarget:
     """Resolve provider-neutral CLI target options.
+
+    Args:
+        provider: Optional explicit forge provider.
+        repo: Optional provider repository path.
+        host: Optional bare provider hostname.
+        github: Legacy explicit GitHub repository.
+        number: Positive change-request number.
+        command_timeout: Positive provider command bound.
 
     Returns:
         The canonical provider target.
@@ -107,6 +125,9 @@ def review_provider() -> ReviewProvider:
 def review_provider_for_target(target: ChangeRequestTarget) -> ReviewProvider:
     """Select the deep adapter after the target is resolved.
 
+    Args:
+        target: Canonical change-request target.
+
     Returns:
         The target's provider adapter.
     """
@@ -118,8 +139,14 @@ def review_provider_for_target(target: ChangeRequestTarget) -> ReviewProvider:
 def parse_pr_list(value: str) -> list[int]:
     """Parse positive comma-separated pull-request numbers.
 
+    Args:
+        value: Comma-separated pull-request numbers.
+
     Returns:
         Validated numbers in input order.
+
+    Raises:
+        typer.BadParameter: If an item is empty, non-numeric, or non-positive.
     """
     parts = [part.strip() for part in value.split(",")]
     if not all(parts):
@@ -139,6 +166,16 @@ def parse_pr_list(value: str) -> list[int]:
 SummaryOption = Annotated[bool, typer.Option("--summary", help="Print canonical compact JSON.")]
 MaxBodyOption = Annotated[
     int | None, typer.Option("--max-body", min=1, help="Visibly truncate compatibility bodies; unlimited by default.")
+]
+BaselineSnapshotOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--baseline-snapshot-file",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        help="Stop when canonical provider state differs from this complete snapshot.",
+    ),
 ]
 
 
@@ -193,6 +230,7 @@ def watch(
     host: HostOption = None,
     summary: SummaryOption = False,
     max_body: MaxBodyOption = None,
+    baseline_snapshot_file: BaselineSnapshotOption = None,
     interval_seconds: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_INTERVAL_SECONDS,
     timeout_seconds: Annotated[int, typer.Option(min=0)] = DEFAULT_WATCH_TIMEOUT_SECONDS,
     max_attempts: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_MAX_ATTEMPTS,
@@ -208,6 +246,7 @@ def watch(
         host: Bare provider hostname.
         summary: Emit compact status output instead of the full snapshot.
         max_body: Optional visible body truncation bound.
+        baseline_snapshot_file: Optional complete snapshot establishing pre-watch provider state.
         interval_seconds: Delay between complete snapshots.
         timeout_seconds: Overall sampling window.
         max_attempts: Maximum complete snapshots in this call.
@@ -219,10 +258,18 @@ def watch(
     current = selected_provider.snapshot(
         target, deadline=deadline if timeout_seconds > 0 else None, command_timeout=provider_timeout_seconds
     )
+    baseline = load_snapshot(baseline_snapshot_file) if baseline_snapshot_file is not None else current
+    if baseline.target != target:
+        raise typer.BadParameter(
+            "baseline snapshot target does not match watch target", param_hint="baseline-snapshot-file"
+        )
+    if not baseline.snapshot_complete or not baseline.completeness.complete:
+        raise typer.BadParameter("baseline snapshot is incomplete", param_hint="baseline-snapshot-file")
+    baseline_fingerprint = baseline.snapshot_fingerprint
     attempts = 1
     poll_attempts = 0
     last_poll_ok = True
-    while not current.has_outstanding_work() and attempts < max_attempts:
+    while not current.has_watch_signal(baseline_fingerprint) and attempts < max_attempts:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
@@ -244,7 +291,7 @@ def watch(
             err=True,
         )
         raise typer.Exit(code=1)
-    timed_out = not current.has_outstanding_work()
+    timed_out = not current.has_watch_signal(baseline_fingerprint)
     exhausted = timed_out and attempts >= max_attempts
     if summary:
         compact = summarize(current, pr=pr, max_body=max_body)

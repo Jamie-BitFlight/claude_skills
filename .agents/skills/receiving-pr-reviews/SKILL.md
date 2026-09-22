@@ -53,6 +53,8 @@ arrival order.
 
    - an exact, duplicate-free inbound `input_census`, one assessment per input, and clusters that
      cover every input exactly once;
+   - `assessed_inputs` mapping every inbound ID to the complete canonical input state that was
+     assessed;
    - concrete assessment scope/evidence/verification surfaces and cluster verification commands;
    - explicit decisions for every assessment unknown, including keys
      `revision_relation:<input-id>`, `actor_classification:<input-id>`, and
@@ -72,7 +74,9 @@ arrival order.
 
    Completion is a zero exit from `validate-cycle`. According to lines 61–192 of
    [pr_review_state.py](./scripts/pr_review_state.py), validation binds completeness, revision,
-   fingerprint, evidence, census, assessments, clusters, unknown decisions, and action state.
+   fingerprint, evidence, census, assessed input state, assessments, clusters, unknown decisions,
+   and action state. The `assessed_inputs` field is defined at lines 257–276 of
+   [pr_review_state_models.py](./scripts/pr_review_state_models.py).
 
 5. Communicate each disposition before resolving. Every mutation requires the same snapshot and
    cycle evidence:
@@ -118,15 +122,21 @@ arrival order.
 6. Re-check with short bounded calls after current inputs are communicated:
 
    ```bash
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch \
+     --pr <N> --github <owner/repo> > watch-baseline.json
+
    ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py watch \
-     --pr <N> --github <owner/repo>
+     --pr <N> --github <owner/repo> --baseline-snapshot-file watch-baseline.json
    ```
 
-   A call stops on outstanding work or its window/attempt bound. `timed_out: true` means no stop
-   signal appeared in that sampled window; issue another call to cover a longer intended window.
-   Full watch output preserves the canonical snapshot under `state`. Completion is a final complete
-   provider snapshot with no unresolved or newly arrived input. Record the final per-input lifecycle
-   evidence, then evaluate the only successful terminal:
+   Save the complete post-communication snapshot as the watch baseline. A call stops on outstanding
+   work, any canonical provider-state change, or its window/attempt bound. Any change returns the
+   cycle to census and assessment; replace `assessed_inputs` only after assessing the changed
+   canonical inputs. `timed_out: true` means no stop signal appeared in that sampled window; issue
+   another call with the same baseline to cover a longer intended window. Full watch output preserves
+   the canonical snapshot under `state`. Completion is a final complete provider snapshot with no
+   unresolved, outstanding, new, or changed input. Record the final per-input lifecycle evidence,
+   then evaluate the only successful terminal:
 
    ```bash
    ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py complete-cycle \
@@ -134,12 +144,13 @@ arrival order.
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   According to lines 245–307 of [pr_review_state.py](./scripts/pr_review_state.py), completion
-   requires current canonical snapshot identity, exhaustive coverage, terminal per-input
-   implementation/communication/resolution state, provider-backed communication, and terminal
-   annotations. According to lines 219–260 of
-   [pr_review_threads.py](./scripts/pr_review_threads.py), watch reports its attempts, bound
-   exhaustion, timeout state, and final canonical snapshot.
+   According to lines 253–320 of [pr_review_state.py](./scripts/pr_review_state.py), completion
+   requires current canonical snapshot identity, no provider outstanding work, unchanged assessed
+   input state, exhaustive coverage, terminal per-input implementation/communication/resolution
+   state, provider-backed communication, and terminal annotations. According to lines 224–308 of
+   [pr_review_threads.py](./scripts/pr_review_threads.py), watch compares the full canonical
+   fingerprint with its baseline and reports attempts, bound exhaustion, timeout state, and the
+   final canonical snapshot.
 
 ## Command reference
 

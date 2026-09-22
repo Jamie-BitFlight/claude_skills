@@ -8,6 +8,10 @@ import re
 def reference_present(body: str, reference: str) -> bool:
     """Match a stable reference without accepting a longer numeric identifier.
 
+    Args:
+        body: Provider response body to inspect.
+        reference: Exact stable input reference.
+
     Returns:
         Whether the exact reference is present.
     """
@@ -17,6 +21,10 @@ def reference_present(body: str, reference: str) -> bool:
 
 def render_top_level_body(body: str, references: list[str]) -> str:
     """Append each exact missing stable reference once.
+
+    Args:
+        body: Requested response body.
+        references: Stable input references that must be quoted.
 
     Returns:
         The body containing every requested reference.

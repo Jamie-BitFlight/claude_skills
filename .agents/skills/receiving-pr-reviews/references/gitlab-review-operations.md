@@ -13,7 +13,7 @@ Use an explicit self-managed target when it is known:
 ```
 
 Omit `--host` and `--repo` together to let `glab repo view` resolve the current checkout. The
-explicit and detected target paths are implemented at lines 134–184 of
+explicit and detected target paths are implemented at lines 140–190 of
 [`pr_review_cli_target.py`](../scripts/pr_review_cli_target.py).
 
 The adapter uses `glab api --paginate --output ndjson` for list surfaces [1], reads every required
@@ -26,11 +26,12 @@ actor.
 System notes remain provider metadata rather than review inputs. Named approvers and explicit
 positive/negative award signals remain assessed inputs. Zero-required approval state remains
 platform metadata and does not become an actor-backed approval. GitLab emits `codex_approved: null`
-with `codex_approval_equivalence: unavailable`. According to lines 255–377 of
+with `codex_approval_equivalence: unavailable`. According to lines 283–382 of
 [`pr_review_gitlab_normalize.py`](../scripts/pr_review_gitlab_normalize.py), reviewability,
-platform metadata, exact-reference communication evidence, and the complete input census all bind
-the snapshot fingerprint. The approval response fields retained by the adapter are documented by
-GitLab's approvals API [4].
+platform metadata, edit-aware exact-reference communication evidence, and the complete input census
+all bind the snapshot fingerprint. Already-resolved inbound inputs remain outstanding until
+provider-backed communication exists. The approval response fields retained by the adapter are
+documented by GitLab's approvals API [4].
 
 ## Authorized Mutations
 

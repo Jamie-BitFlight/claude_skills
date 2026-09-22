@@ -17,7 +17,7 @@ from pr_review_contracts import (
 )
 from pr_review_gh_models import GitHubCreatedComment, GitHubResolveResponse
 from pr_review_models import FetchResult, ReviewSnapshot
-from pr_review_provider import ProviderResponseError
+from pr_review_provider import ProviderResponseError, dispatch_review_action
 from pr_review_provider_text import render_top_level_body
 from pr_review_state_models import AuthorizedReviewAction, SnapshotCompleteness
 
@@ -141,60 +141,105 @@ class GitHubProvider:
             message = "authorized action target does not match provider target"
             raise ProviderResponseError(message)
         owner, repo = self.owner_repo(target)
-        if isinstance(action.action, ReplyAction):
-            comment_id = self.positive_provider_id(action.review_input.provider_ids.reply_target_id, "reply_target_id")
-            raw = self.command_runner(
-                [
-                    "api",
-                    "-X",
-                    "POST",
-                    f"repos/{owner}/{repo}/pulls/{target.number}/comments/{comment_id}/replies",
-                    "-f",
-                    f"body={action.action.body}",
-                ],
-                timeout=command_timeout,
-            )
-            response = self.validate_created_comment(raw, operation="reply")
-            return ReviewActionResult(
-                provider="github",
-                action_kind="reply",
-                success=True,
-                provider_object_id=str(response.id),
-                raw=json.loads(raw),
-            )
-        if isinstance(action.action, ResolveAction):
-            thread_id = action.review_input.provider_ids.resolution_target_id
-            if not thread_id:
-                message = "GitHub resolve input lacks resolution_target_id"
-                raise ProviderResponseError(message)
-            raw = self.command_runner(
-                ["api", "graphql", "-f", f"query={self.resolve_query}", "-f", f"threadId={thread_id}"],
-                timeout=command_timeout,
-            )
-            response = self.validate_resolve(raw)
-            return ReviewActionResult(
-                provider="github",
-                action_kind="resolve",
-                success=True,
-                resolved=response.data.resolveReviewThread.thread.isResolved,
-                raw=json.loads(raw),
-            )
-        if isinstance(action.action, TopLevelCommentAction):
-            body = render_top_level_body(action.action.body, action.action.references)
-            raw = self.command_runner(
-                ["api", "-X", "POST", f"repos/{owner}/{repo}/issues/{target.number}/comments", "-f", f"body={body}"],
-                timeout=command_timeout,
-            )
-            response = self.validate_created_comment(raw, operation="top-level comment")
-            return ReviewActionResult(
-                provider="github",
-                action_kind="comment",
-                success=True,
-                provider_object_id=str(response.id),
-                raw=json.loads(raw),
-            )
-        message = f"unsupported GitHub review action: {type(action.action).__name__}"
-        raise TypeError(message)
+        return dispatch_review_action(
+            action,
+            reply=lambda authorized, requested: self._reply(
+                owner, repo, target.number, authorized, requested, command_timeout
+            ),
+            resolve=lambda authorized, requested: self._resolve(authorized, requested, command_timeout),
+            comment=lambda authorized, requested: self._comment(
+                owner, repo, target.number, authorized, requested, command_timeout
+            ),
+        )
+
+    def _reply(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        authorized: AuthorizedReviewAction,
+        requested: ReplyAction,
+        command_timeout: float | None,
+    ) -> ReviewActionResult:
+        """Execute one GitHub inline reply.
+
+        Returns:
+            Provider-confirmed reply result.
+        """
+        comment_id = self.positive_provider_id(authorized.review_input.provider_ids.reply_target_id, "reply_target_id")
+        raw = self.command_runner(
+            [
+                "api",
+                "-X",
+                "POST",
+                f"repos/{owner}/{repo}/pulls/{number}/comments/{comment_id}/replies",
+                "-f",
+                f"body={requested.body}",
+            ],
+            timeout=command_timeout,
+        )
+        response = self.validate_created_comment(raw, operation="reply")
+        return ReviewActionResult(
+            provider="github",
+            action_kind="reply",
+            success=True,
+            provider_object_id=str(response.id),
+            raw=json.loads(raw),
+        )
+
+    def _resolve(
+        self, authorized: AuthorizedReviewAction, requested: ResolveAction, command_timeout: float | None
+    ) -> ReviewActionResult:
+        """Execute one GitHub discussion resolution.
+
+        Returns:
+            Provider-confirmed resolution result.
+        """
+        del requested
+        thread_id = authorized.review_input.provider_ids.resolution_target_id
+        if not thread_id:
+            raise ProviderResponseError("GitHub resolve input lacks resolution_target_id")
+        raw = self.command_runner(
+            ["api", "graphql", "-f", f"query={self.resolve_query}", "-f", f"threadId={thread_id}"],
+            timeout=command_timeout,
+        )
+        response = self.validate_resolve(raw)
+        return ReviewActionResult(
+            provider="github",
+            action_kind="resolve",
+            success=True,
+            resolved=response.data.resolveReviewThread.thread.isResolved,
+            raw=json.loads(raw),
+        )
+
+    def _comment(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        authorized: AuthorizedReviewAction,
+        requested: TopLevelCommentAction,
+        command_timeout: float | None,
+    ) -> ReviewActionResult:
+        """Execute one GitHub top-level response.
+
+        Returns:
+            Provider-confirmed comment result.
+        """
+        del authorized
+        body = render_top_level_body(requested.body, requested.references)
+        raw = self.command_runner(
+            ["api", "-X", "POST", f"repos/{owner}/{repo}/issues/{number}/comments", "-f", f"body={body}"],
+            timeout=command_timeout,
+        )
+        response = self.validate_created_comment(raw, operation="top-level comment")
+        return ReviewActionResult(
+            provider="github",
+            action_kind="comment",
+            success=True,
+            provider_object_id=str(response.id),
+            raw=json.loads(raw),
+        )
 
     @staticmethod
     def positive_provider_id(raw: str | None, name: str) -> int:

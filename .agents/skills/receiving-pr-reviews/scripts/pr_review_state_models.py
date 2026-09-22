@@ -259,6 +259,7 @@ class ReviewCycleState(BaseModel):
 
     context: ReviewContext
     snapshot_fingerprint: str = Field(min_length=1)
+    assessed_inputs: dict[str, ReviewInput]
     input_census: list[str]
     assessments: list[ReviewAssessment]
     clusters: list[ReviewCluster]

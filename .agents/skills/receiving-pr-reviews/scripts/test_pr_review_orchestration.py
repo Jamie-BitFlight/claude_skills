@@ -154,7 +154,14 @@ def test_complete_cycle_refreshes_provider_evidence_and_persists_only_success_te
         provider_metadata=snapshot.provider_metadata,
         communicated_input_ids=communicated,
     )
-    snapshot = snapshot.model_copy(update={"communicated_input_ids": communicated, "snapshot_fingerprint": fingerprint})
+    snapshot = snapshot.model_copy(
+        update={
+            "communicated_input_ids": communicated,
+            "snapshot_fingerprint": fingerprint,
+            "unresolved_count": 0,
+            "outstanding_input_count": 0,
+        }
+    )
     snapshot_file.write_text(snapshot.model_dump_json())
     cycle = pr_review_threads.load_cycle(state_file).model_copy(
         update={
@@ -346,6 +353,7 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
     cycle = cycle.model_copy(
         update={
             "snapshot_fingerprint": fingerprint,
+            "assessed_inputs": {first.input_id: first, second.input_id: second},
             "input_census": [first.input_id, second.input_id],
             "assessments": [first_assessment, second_assessment],
             "clusters": [first_cluster, second_cluster],
@@ -410,7 +418,11 @@ def test_batch_preflights_every_resolution_before_first_reply(tmp_path: Path, mo
         snapshot.model_copy(update={"review_inputs": inputs, "snapshot_fingerprint": fingerprint}).model_dump_json()
     )
     cycle = pr_review_threads.load_cycle(state_file).model_copy(
-        update={"snapshot_fingerprint": fingerprint, "recheck_snapshot_fingerprint": fingerprint}
+        update={
+            "snapshot_fingerprint": fingerprint,
+            "recheck_snapshot_fingerprint": fingerprint,
+            "assessed_inputs": {item.input_id: item for item in inputs},
+        }
     )
     state_file.write_text(cycle.model_dump_json())
     mock_live_snapshot(snapshot_file, mocker)

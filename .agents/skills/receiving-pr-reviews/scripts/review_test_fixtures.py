@@ -131,6 +131,7 @@ def ready_cycle() -> ReviewCycleState:
             revision="abc123",
         ),
         snapshot_fingerprint=canonical_snapshot().snapshot_fingerprint,
+        assessed_inputs={item.input_id: item},
         input_census=[item.input_id],
         assessments=[assessment],
         clusters=[cluster],
@@ -146,6 +147,56 @@ def ready_cycle() -> ReviewCycleState:
         cycle_terminal="action_pending",
         cycle_state="READY_FOR_ACTION",
     )
+
+
+def state_for_input(item: ReviewInput, assessment: ReviewAssessment) -> tuple[ReviewSnapshot, ReviewCycleState]:
+    """Bind a customized input and assessment to current fingerprint evidence.
+
+    Args:
+        item: Customized canonical input.
+        assessment: Assessment corresponding to the input.
+
+    Returns:
+        Matching snapshot and cycle fixtures.
+    """
+    original = canonical_snapshot()
+    fingerprint = calculate_snapshot_fingerprint(
+        original.target,
+        original.head_revision,
+        [item],
+        original.completeness,
+        revision_at=original.revision_at,
+        reviewability=original.reviewability,
+        provider_metadata=original.provider_metadata,
+        communicated_input_ids=original.communicated_input_ids,
+    )
+    snapshot_value = original.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint})
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "snapshot_fingerprint": fingerprint,
+            "recheck_snapshot_fingerprint": fingerprint,
+            "assessed_inputs": {item.input_id: item},
+            "assessments": [assessment],
+        }
+    )
+    return snapshot_value, cycle_value
+
+
+def snapshot_with_communication() -> ReviewSnapshot:
+    """Return a canonically fingerprinted snapshot with provider communication evidence."""
+    original = canonical_snapshot()
+    communicated = {canonical_input().input_id}
+    fingerprint = calculate_snapshot_fingerprint(
+        original.target,
+        original.head_revision,
+        original.review_inputs,
+        original.completeness,
+        revision_at=original.revision_at,
+        reviewability=original.reviewability,
+        provider_metadata=original.provider_metadata,
+        communicated_input_ids=communicated,
+    )
+    return original.model_copy(update={"communicated_input_ids": communicated, "snapshot_fingerprint": fingerprint})
 
 
 def write_ready_files(directory: Path) -> tuple[Path, Path]:

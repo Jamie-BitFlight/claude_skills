@@ -123,6 +123,10 @@ def validate_cycle_coverage(
         and set(cycle.input_census) == inbound_set,
         "input census does not exactly cover inbound review inputs",
     )
+    require_authorization(
+        set(cycle.assessed_inputs) == inbound_set,
+        "assessed input evidence does not exactly cover inbound review inputs",
+    )
     assessment_ids = [assessment.input_id for assessment in cycle.assessments]
     require_authorization(
         len(assessment_ids) == len(set(assessment_ids)) and set(assessment_ids) == inbound_set,
@@ -159,6 +163,9 @@ def validate_cycle_coverage(
     assessment_by_id = {assessment.input_id: assessment for assessment in cycle.assessments}
     for input_id in inbound_ids:
         review_input = input_by_id[input_id]
+        require_authorization(
+            cycle.assessed_inputs[input_id] == review_input, f"input {input_id!r} changed since assessment"
+        )
         assessment = assessment_by_id[input_id]
         required_fact_decisions = set()
         if review_input.revision_relation == "unknown":
@@ -280,6 +287,12 @@ def evaluate_review_complete(snapshot: ReviewSnapshot, cycle: ReviewCycleState) 
     require_authorization(
         cycle.recheck_snapshot_fingerprint == snapshot.snapshot_fingerprint,
         "recheck snapshot fingerprint does not match current snapshot",
+    )
+    require_authorization(
+        snapshot.unresolved_count == 0
+        and snapshot.outstanding_input_count == 0
+        and not snapshot.has_outstanding_work(),
+        "provider snapshot has outstanding work",
     )
     validate_cycle_coverage(snapshot, cycle)
     inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}

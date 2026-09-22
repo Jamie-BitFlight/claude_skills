@@ -201,6 +201,17 @@ class ReviewSnapshot(BaseModel):
             or self.codex_approved is True
         )
 
+    def has_watch_signal(self, baseline_fingerprint: str) -> bool:
+        """Return whether work is outstanding or canonical provider state changed.
+
+        Args:
+            baseline_fingerprint: Complete canonical snapshot identity at the start of the watch window.
+
+        Returns:
+            True when the current state requires a new census or action.
+        """
+        return self.has_outstanding_work() or self.snapshot_fingerprint != baseline_fingerprint
+
 
 class WatchResult(BaseModel):
     """Final canonical watch snapshot and bounded polling outcome."""
