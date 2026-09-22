@@ -161,7 +161,7 @@ def test_parser_rejects_positional_address_removed_format_and_unknown_option() -
     _assert_rejected("get", "--unknown", message="--unknown")
 
 
-@pytest.mark.parametrize(("backend_name", "expected"), [("nope", "Unknown backend"), ("github", "pending #3455")])
+@pytest.mark.parametrize(("backend_name", "expected"), [("nope", "Unknown backend"), ("github", "not available")])
 def test_bad_backend_reports_clean_error(monkeypatch, backend_name: str, expected: str) -> None:
     """A misconfigured CONTEXTBACKEND exits cleanly, not with a raw traceback."""
     monkeypatch.setenv("CONTEXTBACKEND", backend_name)
@@ -173,3 +173,8 @@ def test_bad_backend_reports_clean_error(monkeypatch, backend_name: str, expecte
     assert result.stdout == ""
     assert expected in result.stderr
     assert "Traceback" not in result.stderr
+    # The message reaches a consumer of this plugin, who cannot open its tracker or read
+    # its source. Assert the absence of what must not leak, so a rewrite is free to change
+    # the wording but not free to put an internal name back.
+    for leaked in ("#", ".py", "IssueBackend", "DocumentBackend", "dh_config", "NotImplementedError"):
+        assert leaked not in result.stderr, f"message names something behind the surface: {leaked!r}"

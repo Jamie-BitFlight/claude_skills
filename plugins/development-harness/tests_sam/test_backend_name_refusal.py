@@ -72,16 +72,24 @@ def test_context_backend_refusal_reaches_the_tool_as_a_tool_error(monkeypatch: p
 
 
 def test_github_context_backend_reaches_the_tool_as_a_tool_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The existing but factory-disabled GitHub backend refuses through ``ToolError``.
+    """The unavailable GitHub backend refuses through ``ToolError``.
 
     ``create_context_backend`` refuses it with ``NotImplementedError``, not ``SamError``, and the
     name appears in the "Valid options" list the sibling refusal prints -- so a user who follows
     that message reaches this one. It has to report as the same ``ToolError``.
+
+    The assertion names what must not leak rather than the wording. The message reaches a
+    consumer of this plugin, who cannot open its tracker or read its source, so a rewrite may
+    change the words but may not put an internal name back.
     """
     monkeypatch.setenv("CONTEXTBACKEND", "github")
     reset_context_config()
     try:
-        with pytest.raises(ToolError, match="#3455"):
+        with pytest.raises(ToolError, match="not available") as caught:
             sam_active_task_impl(GetActiveTaskConfig(), "sess-1")
     finally:
         reset_context_config()
+
+    reported = str(caught.value)
+    for leaked in ("#", ".py", "dh_config", "NotImplementedError", "factory"):
+        assert leaked not in reported, f"message names something behind the surface: {leaked!r}"

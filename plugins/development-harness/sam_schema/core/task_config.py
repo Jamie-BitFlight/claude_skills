@@ -159,7 +159,7 @@ def create_task_backend(name: str | None = None) -> TaskBackend:
         return BeadsTaskProvider()
 
     if resolved == "github":
-        msg = "GitHub backend requires IssueBackend + DocumentBackend (see #984). Use 'local' or 'memory' instead."
+        msg = "The github task backend is not available. Set the task backend to 'local' or 'memory'."
         raise NotImplementedError(msg)
 
     msg = f"Unknown backend {resolved!r}. Valid options: {', '.join(sorted(_VALID_BACKENDS))}"
