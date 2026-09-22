@@ -148,6 +148,10 @@
       "stderr": ""
     }
   },
+  "repository_instruction_search": [
+    { "path": "AGENTS.md", "present": true },
+    { "path": ".claude/CLAUDE.md", "present": false }
+  ],
   "repository_instruction_sources": ["AGENTS.md"],
   "repository_preflights": [
     {

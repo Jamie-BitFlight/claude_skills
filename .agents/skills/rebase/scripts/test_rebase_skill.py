@@ -20,8 +20,8 @@ from pathlib import Path
 import marko
 from marko.block import FencedCode
 from marko.inline import Link
-from pydantic import BaseModel
 
+from rebase_activation import ActivationResults, EvalPackage, evaluate_activation_results
 from rebase_evidence import ExecutionMode
 from rebase_plan import Disposition, MergePolicy
 from rebase_states import workflow_state_definitions
@@ -38,55 +38,6 @@ SKILL_PATH = SKILL_ROOT / "SKILL.md"
 REFERENCE_PATH = SKILL_ROOT / "references" / "rebase-edge-cases.md"
 EVALS_PATH = SKILL_ROOT / "evals" / "evals.json"
 ACTIVATION_RESULTS_PATH = SKILL_ROOT / "evals" / "activation-results.json"
-
-
-class EvalCase(BaseModel):
-    """One activation evaluation."""
-
-    id: int
-    prompt: str
-    expected_output: str
-    files: list[str]
-    expectations: list[str]
-
-
-class EvalPackage(BaseModel):
-    """Validated activation-evaluation package."""
-
-    skill_name: str
-    evals: list[EvalCase]
-
-
-class ActivationCaseResult(BaseModel):
-    """One observed harness activation decision."""
-
-    harness: str
-    model: str
-    proxy: str
-    session_id: str
-    eval_id: int
-    prompt: str
-    expected_activation: bool
-    observed_activation: bool
-    loaded_skill_path: str | None
-    read_references: list[str]
-    filesystem_action_events: list[str]
-    provider_action_events: list[str]
-    state_transitions: list[str]
-    final_terminal: str
-    status: str
-
-
-class ActivationResults(BaseModel):
-    """Persisted activation evidence for the evaluation package."""
-
-    schema_version: int
-    skill_name: str
-    repository_head_before: str
-    repository_head_after: str
-    repository_status_before: str
-    repository_status_after: str
-    cases: list[ActivationCaseResult]
 
 
 def walk(element: object) -> Iterator[object]:
@@ -153,7 +104,11 @@ def test_canonical_package_has_relative_claude_alias() -> None:
 def test_every_bundled_markdown_link_resolves() -> None:
     """Keep progressive-disclosure resources reachable from the canonical skill."""
     document = parse_markdown(SKILL_PATH)
-    local_links = [node.dest for node in walk(document) if isinstance(node, Link) and not node.dest.startswith("http")]
+    local_links = [
+        node.dest.split("#", maxsplit=1)[0]
+        for node in walk(document)
+        if isinstance(node, Link) and not node.dest.startswith("http")
+    ]
 
     assert local_links
     assert all((SKILL_ROOT / destination).is_file() for destination in local_links)
@@ -200,53 +155,20 @@ def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> 
     package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
 
     assert package.skill_name == "rebase"
+    assert package.schema_version == 2
     assert len(package.evals) == 6
     assert len({case.id for case in package.evals}) == len(package.evals)
     assert all(case.expectations for case in package.evals)
-    assert [case.expected_output.startswith("ACTIVATE") for case in package.evals] == [
-        True,
-        True,
-        True,
-        False,
-        False,
-        False,
-    ]
+    assert [case.expected_activation for case in package.evals] == [True, True, True, False, False, False]
 
 
-def test_observed_activation_results_cover_every_opencode_eval_and_codex_positive() -> None:
-    """Require observed harness decisions and the exact injected canonical path."""
+def test_observed_activation_results_derive_pass_from_current_sources_and_actions() -> None:
+    """Reject stale, incomplete, unsafe, or self-attested activation evidence."""
     eval_package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
     results = ActivationResults.model_validate_json(ACTIVATION_RESULTS_PATH.read_text(encoding="utf-8"))
-    opencode_cases = {case.eval_id: case for case in results.cases if case.harness == "opencode"}
-    codex_cases = [case for case in results.cases if case.harness == "codex"]
 
-    assert results.schema_version == 2
-    assert results.skill_name == eval_package.skill_name
-    assert results.repository_head_before == results.repository_head_after
-    assert results.repository_status_before == results.repository_status_after == ""
-    assert set(opencode_cases) == {case.id for case in eval_package.evals}
-    assert codex_cases
-    assert all(case.observed_activation for case in codex_cases)
-    assert all(case.status == "PASSED" for case in results.cases)
-    for evaluation in eval_package.evals:
-        observed = opencode_cases[evaluation.id]
-        expected_activation = evaluation.expected_output.startswith("ACTIVATE")
-        assert observed.expected_activation is expected_activation
-        assert observed.observed_activation is expected_activation
-        assert observed.prompt == evaluation.prompt
-        assert observed.model
-        assert observed.proxy == "portkey"
-        assert observed.state_transitions
-        assert observed.final_terminal
-        assert (observed.loaded_skill_path is not None) is expected_activation
-        if expected_activation:
-            assert any(event.startswith("read:") for event in observed.filesystem_action_events)
-            assert not any(event.startswith(("write:", "delete:")) for event in observed.filesystem_action_events)
-            assert observed.provider_action_events == []
-            if evaluation.id in {2, 3}:
-                assert observed.read_references
-        else:
-            assert observed.final_terminal == "DO_NOT_ACTIVATE"
+    assert results.schema_version == 3
+    assert evaluate_activation_results(SKILL_ROOT, eval_package, results) == []
 
 
 def test_git_inventory_keeps_net_zero_commits_and_rename_pairs(tmp_path: Path) -> None:

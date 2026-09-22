@@ -16,7 +16,8 @@ Parse `git worktree list --porcelain` as records. Match `branch refs/heads/<bran
 
 - If the match names another worktree, establish from session context that this session owns that
   worktree. If ownership is absent or unknown, emit `BLOCKED_WORKTREE_IN_USE`; leave its branch,
-  HEAD, index, tracked files, and untracked files unchanged.
+  HEAD, index, tracked files, and untracked files unchanged. If ownership is established, enter that
+  worktree and restart all Step 1 evidence capture there before testing cleanliness or planning.
 - If the branch is unowned and positional rebase would check it out in the current worktree, run
   every repository-defined branch-transfer preflight before the plan gate and bind
   `execution_mode` to `AUTHORIZED_BRANCH_TRANSFER`. Continue only on the preflight's explicit pass
@@ -61,10 +62,10 @@ Git documents the default merge-commit drop, `--rebase-merges`, clean-cherry-pic
 
 ## Rebase stops, continuation, and recovery
 
-For an explicit continue or abort request, first inspect the active operation, current branch,
-status, rebase metadata, `REBASE_HEAD`, and recorded recovery ref. Start no new rebase. If the prior
-plan is unavailable, reconstruct the old tip, target, current candidate, remaining candidates, and
-affected paths from Git metadata and history. Emit `NEEDS_USER_DECISION` before continuing when that
+Enter this section only after the entry route in `SKILL.md` proves an active rebase. Bind the current
+branch, status, rebase metadata, `REBASE_HEAD`, and recorded recovery ref. If the prior plan is
+unavailable, reconstruct the old tip, target, current candidate, remaining candidates, and affected
+paths from Git metadata and history. Emit `NEEDS_USER_DECISION` before continuing when that
 reconstruction leaves an unknown. If no durable recovery ref exists, create a uniquely named local
 recovery branch at the reconstructed old tip and verify it before continuing or aborting.
 
@@ -117,8 +118,8 @@ both rewritten and recovery refs intact for an explicit recovery decision.
 Read the canonical state names, transition/terminal classification, and required evidence from the
 bundled typed source instead of maintaining a second prose roster:
 
-According to lines 9–137 of [the typed state source](../scripts/rebase_states.py), that source defines
-every state name, classification, and evidence contract in one typed collection.
+[The typed state source](../scripts/rebase_states.py) defines every state name, entry condition,
+classification, next action, artifact policy, and evidence contract in one typed collection.
 
 ```bash
 uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" states

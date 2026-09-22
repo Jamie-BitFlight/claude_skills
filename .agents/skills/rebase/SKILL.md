@@ -1,6 +1,6 @@
 ---
 name: rebase
-description: "Run, continue, or abort a local Git rebase when the user explicitly requests history replay for a named branch or ref. Use for conflict-aware rebases that require an accounted plan and verified recovery. Do not use for merge-based branch updates, forge merge-method settings, pull-request or merge-request merging, or publishing rewritten history."
+description: "Start a local Git rebase when the user explicitly requests history replay for a named branch or ref, or continue or abort an active local rebase. Use for conflict-aware replay that requires an accounted plan and verified recovery. Do not use for merge-based branch updates, forge merge-method settings, pull-request or merge-request merging, or publishing rewritten history."
 ---
 
 # Rebase
@@ -16,15 +16,44 @@ Bind `REBASE_SKILL_DIR` to the absolute directory containing this loaded `SKILL.
 injected skill path supplied by the harness. Keep that binding for every bundled-script command;
 never resolve a bundled script from the consuming repository's working directory.
 
-Use Steps 1–6 for a new rebase. If a rebase is already active, start at Step 5 and follow its
-condition-bearing reference; never start a second rebase.
+Choose the invocation route before any mutation:
+
+- A request to start a named rebase uses Steps 1–6.
+- A request to continue or abort uses **Active rebase continuation and abort** below. It never enters
+  the new-rebase execution step.
+
+## Active rebase continuation and abort
+
+For an explicit continue or abort request, inspect the repository root, both resolved rebase-state
+paths and their existence, `REBASE_HEAD`, current branch, and complete status before any rebase
+mutation. A failed inspection command enters `BLOCKED_PREFLIGHT_FAILED`.
+
+```bash
+git rev-parse --show-toplevel
+git rev-parse --git-path rebase-merge
+git rev-parse --git-path rebase-apply
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" path-state <resolved-rebase-merge-path>
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" path-state <resolved-rebase-apply-path>
+git rev-parse --verify --quiet REBASE_HEAD
+git symbolic-ref --quiet --short HEAD
+git status --porcelain=v1 --branch --untracked-files=all
+```
+
+When both state paths and `REBASE_HEAD` are absent, emit `NO_ACTIVE_REBASE` and end without running
+`git rebase --continue`, `git rebase --abort`, or a new rebase. When an active rebase is observed,
+read [Rebase stops, continuation, and recovery](./references/rebase-edge-cases.md#rebase-stops-continuation-and-recovery)
+and follow that branch.
+
+Completion criterion: the inspection either proves no active rebase and reaches `NO_ACTIVE_REBASE`
+with no mutation, or binds the active operation and its recovery evidence before the requested
+continue or abort action.
 
 ## 1. Bind refs and repository state
 
-Read repository instructions and resolve the repository root, the named local branch, the target,
-and their full commit OIDs. Use `refs/heads/<branch>` to bind a local branch exactly.[1] Route a
-nonzero branch lookup, target lookup, or merge-base command, and identical ref names, to
-`BLOCKED_INVALID_REF`; report the exact failing command and leave refs unchanged.
+Search the repository's instruction locations and record every candidate path plus whether it is
+present. Load every present source. An explicit search with no present sources is valid; an omitted
+search is not. Resolve the repository root, named local branch, target, and their full commit OIDs.
+Use `refs/heads/<branch>` to bind a local branch exactly.[1]
 
 ```bash
 git rev-parse --show-toplevel
@@ -55,19 +84,30 @@ Record the old branch OID, target OID, merge-base OID, current branch, complete 
 operation-marker existence, owning worktree, configured upstream, and every remote ref containing
 the old tip.[6] Report these observable local publication signals without claiming knowledge of
 downstream consumers. Record every repository instruction source examined and every required
-preflight as complete argv, exit code, stdout, and stderr. Store the universal command records and
-marker observations in the plan's required `repository_state` object. Bind the plan's top-level
+preflight as complete argv, exit code, stdout, and stderr. Store the instruction observations in
+`repository_instruction_search`, the present paths in `repository_instruction_sources`, and the
+universal command records and marker observations in `repository_state`. Bind the plan's top-level
 `execution_mode` to `CURRENT_BRANCH` or `AUTHORIZED_BRANCH_TRANSFER`;
 [the evidence model](./scripts/rebase_evidence.py) defines their binding checks.
 
-Enter `BLOCKED_GIT_STATE` when tracked or untracked changes exist or another Git operation is active.
-Do not create a stash. Enter `NO_CHANGE` when distinct branch and target refs resolve to the same OID
-and report zero replay candidates without creating a recovery ref.
+Bind every preflight result through the canonical state contract returned by
+`rebase_plan.py states`:
+
+- A failed branch or target lookup, or identical ref names, enters `BLOCKED_INVALID_REF`.
+- Merge-base exit one after both refs resolve enters `BLOCKED_UNRELATED_HISTORIES`; another
+  merge-base failure enters `BLOCKED_PREFLIGHT_FAILED`.
+- A failed repository-root, worktree-list, status, current-branch, Git-path, path-state, upstream,
+  publication, or repository-required preflight enters `BLOCKED_PREFLIGHT_FAILED`.
+- A successful status with tracked or untracked changes, or an observed Git operation, enters
+  `BLOCKED_GIT_STATE`. Preserve the worktree as observed.
+- Distinct ref names resolving to one OID enter `NO_CHANGE` with zero candidates and no recovery ref.
 
 When the branch is owned by another worktree or execution would switch branches, read
 [rebase edge cases](./references/rebase-edge-cases.md) before proceeding. Enter
 `BLOCKED_WORKTREE_IN_USE` unless the current session owns the mutation path and every repository
-branch-transfer gate passes.[3]
+branch-transfer gate passes.[3] After selecting a different authorized execution worktree, change
+the command working directory to that worktree and restart this entire immutable evidence capture;
+only evidence captured there may satisfy `READY_TO_ANALYZE`.
 
 Completion criterion: `READY_TO_ANALYZE` contains immutable branch, target, and merge-base OIDs; an
 authorized clean worktree; false/absent results for every operation marker; exact local publication
@@ -142,15 +182,14 @@ command output; the validator imposes no display truncation. Validate before any
 uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" validate <plan.json>
 ```
 
-According to lines 105–308 of [the validator source](./scripts/rebase_plan.py), the model requires
-the typed repository-state bundle, complete plan inputs, captured `rev-list` graph, verified
-recovery ref, and rejects failed or contradictory evidence, unresolved decisions, incomplete path
-coverage, unsupported drops, and unbound merge policy. Lines 335–364 define the validator's
-structured result and plan SHA-256.
+The maintained `schema` output defines the typed repository-state bundle, instruction-search
+evidence, complete plan inputs, captured `rev-list` graph, and verified recovery ref. The `validate`
+result is authoritative for failed or contradictory evidence, unresolved decisions, incomplete path
+coverage, unsupported drops, unbound merge policy, and the plan SHA-256.
 
 Only exit code zero with compact JSON `status=VALID`, `state=READY_TO_REBASE`, and a plan SHA-256
-passes the gate. `PLAN_INVALID` is terminal for the current attempt: retain its complete structured
-errors, revise evidence or decisions, and rerun validation from the plan file.
+passes the gate. `PLAN_INVALID` ends the current invocation: retain the plan and its complete
+structured errors. A later invocation may correct the retained artifact and validate it again.
 
 Enter `NEEDS_USER_DECISION` for an unapproved discard, topology flattening, intent change,
 published-branch impact, or semantic ambiguity. Ask one concrete question for each decision and
@@ -165,7 +204,7 @@ plus the artifact SHA-256.
 ## 4. Recheck immutable refs and recovery
 
 Resolve the branch and target names again. If either differs from the plan, enter
-`REPLAN_REF_DRIFT`, discard the stale plan, and return to Step 1 without rebasing. Reconfirm the
+`REPLAN_REF_DRIFT`, retain and mark the plan stale, and return to Step 1 without rebasing. Reconfirm the
 authorized worktree, clean state, branch-transfer gate, and absence of a Git operation.
 
 Rerun `uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" validate <plan.json>` on the
@@ -189,8 +228,8 @@ Include `--rebase-merges` only for a preserve-topology plan. Use the positional 
 plan authorizes the resulting checkout; otherwise require the current branch to equal the planned
 branch.[4]
 
-When continuing or aborting an active rebase, or when execution stops on a conflict, unexpected
-conflict, empty commit, command failure, or requested abort, read
+When this new rebase stops on a conflict, unexpected conflict, empty commit, command failure, or
+requested abort, read
 [rebase edge cases](./references/rebase-edge-cases.md) before the next mutation. Follow its observable
 loop for `CONFLICT`, `UNEXPECTED_CONFLICT`, `EMPTY_COMMIT_DECISION`, abort, and non-interactive
 continuation.
@@ -237,10 +276,10 @@ evidence, clean state, recovery ref, and `not published`.
 
 ## Correct execution example
 
-According to lines 1–119 of the bundled [valid example](./references/example-plan.json), it adapts a
-parser change through a target API change, accounts for the captured candidate and both affected
-paths, records local publication, repository-preflight, and recovery evidence, and carries no
-unknown. The validator must return `READY_TO_REBASE` and its SHA-256 before rebase execution.
+The bundled [valid example](./references/example-plan.json) uses `candidates`, `affected_paths`,
+`publication`, `repository_instruction_search`, `repository_preflights`, and
+`recovery_verification` to adapt a parser change through a target API change with no unknown. The
+validator must return `READY_TO_REBASE` and its SHA-256 before rebase execution.
 
 ## Failure example
 

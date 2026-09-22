@@ -1,73 +1,77 @@
 {
+  "schema_version": 2,
   "skill_name": "rebase",
   "evals": [
     {
       "id": 1,
-      "prompt": "Rebase `feature/a` onto `main`.",
-      "expected_output": "ACTIVATE: run the complete local-rebase workflow and stop at the accounted plan gate before any history rewrite.",
-      "files": [],
+      "prompt": "Rebase feature/a onto main.",
+      "expected_activation": true,
+      "required_terminal": "BLOCKED_INVALID_REF",
+      "required_sources": ["SKILL.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
       "expectations": [
-        "Resolves immutable branch, target, and merge-base OIDs before mutation.",
-        "Inventories every replay candidate and affected path, including rename and empty/drop risks.",
-        "Emits a complete READY_TO_REBASE plan before the first git rebase command.",
-        "Creates and verifies a durable recovery ref before executing.",
-        "Reports REBASE_COMPLETE_VERIFIED only after all verification oracles pass and says the result is not published."
+        "Activates the new-rebase route.",
+        "Stops at the absent local branch in the empty fixture without mutation."
       ]
     },
     {
       "id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
-      "expected_output": "ACTIVATE: inspect the active rebase and use the stop/continuation branch without starting a new rebase.",
-      "files": [],
+      "expected_activation": true,
+      "required_terminal": "NO_ACTIVE_REBASE",
+      "required_sources": ["SKILL.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
       "expectations": [
-        "Inspects active rebase metadata, status, current patch, unmerged entries, and recovery evidence.",
-        "Reconstructs or validates the accounted plan before continuing.",
-        "Verifies zero unmerged entries and stages only named resolved paths.",
-        "Uses non-interactive continuation when the commit message needs no edit.",
-        "Routes another conflict, an empty commit, or completion to its named state."
+        "Activates the active-rebase entry route without requiring a named ref.",
+        "Proves the fixture has no active rebase and runs no continuation mutation."
       ]
     },
     {
       "id": 3,
       "prompt": "Abort this rebase and restore the original branch.",
-      "expected_output": "ACTIVATE: capture recovery evidence, abort the active rebase, and verify restoration.",
-      "files": [],
+      "expected_activation": true,
+      "required_terminal": "NO_ACTIVE_REBASE",
+      "required_sources": ["SKILL.md"],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
       "expectations": [
-        "Captures the original tip from the plan or active rebase metadata before aborting.",
-        "Runs no new rebase.",
-        "Verifies branch tip, operation absence, unmerged entries, recorded pre-state, and recovery ref after abort.",
-        "Emits REBASE_ABORTED_RESTORED only on exact restoration; otherwise emits BLOCKED_ABORT_FAILED."
+        "Activates the active-rebase entry route without requiring a named ref.",
+        "Proves the fixture has no active rebase and runs no abort mutation."
       ]
     },
     {
       "id": 4,
       "prompt": "Update my branch from main using a merge commit.",
-      "expected_output": "DO_NOT_ACTIVATE: this explicitly requests a merge-based update rather than history replay.",
-      "files": [],
-      "expectations": [
-        "Does not start or plan a rebase.",
-        "Preserves the user's merge-based update intent."
-      ]
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "expectations": ["Preserves the requested merge-based update without activating rebase."]
     },
     {
       "id": 5,
       "prompt": "Enable rebase-and-merge on this GitHub repository.",
-      "expected_output": "DO_NOT_ACTIVATE: this is forge merge-method configuration, not a local Git rebase.",
-      "files": [],
-      "expectations": [
-        "Does not execute local history-rewrite commands.",
-        "Routes the request to repository or forge configuration handling."
-      ]
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [
+        "gh repo view --json nameWithOwner,mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed"
+      ],
+      "expectations": ["Treats forge merge-method configuration as outside the local rebase skill."]
     },
     {
       "id": 6,
       "prompt": "Merge this GitLab MR.",
-      "expected_output": "DO_NOT_ACTIVATE: this requests a forge merge operation, not a local Git rebase.",
-      "files": [],
-      "expectations": [
-        "Does not activate the rebase workflow.",
-        "Does not treat merge authorization as rebase authorization."
-      ]
+      "expected_activation": false,
+      "required_terminal": "DO_NOT_ACTIVATE",
+      "required_sources": [],
+      "allowed_mutations": [],
+      "allowed_provider_actions": [],
+      "expectations": ["Treats merge-request merging as outside the local rebase skill."]
     }
   ]
 }

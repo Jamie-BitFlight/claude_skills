@@ -43,6 +43,13 @@ class PublicationEvidence(BaseModel):
     evidence_commands: Annotated[list[CommandEvidence], Field(min_length=1)]
 
 
+class InstructionSourceObservation(BaseModel):
+    """One repository-instruction candidate and whether it exists."""
+
+    path: Annotated[str, Field(min_length=1)]
+    present: bool
+
+
 class Disposition(StrEnum):
     """One accounted outcome for a replay candidate."""
 
@@ -116,7 +123,8 @@ class RebasePlan(BaseModel):
     status_porcelain: str
     active_operations: list[str]
     repository_state: RepositoryStateEvidence
-    repository_instruction_sources: Annotated[list[str], Field(min_length=1)]
+    repository_instruction_search: Annotated[list[InstructionSourceObservation], Field(min_length=1)]
+    repository_instruction_sources: list[str]
     repository_preflights: list[CommandEvidence]
     publication: PublicationEvidence
     replay_inventory: CommandEvidence
@@ -153,6 +161,7 @@ class RebasePlan(BaseModel):
             ValueError: If any exact-cover, evidence, decision, or state invariant fails.
         """
         self.validate_repository_state()
+        self.validate_instruction_discovery()
         approved_decisions = self.validate_decisions_and_preflights()
         self.validate_replay_inventory()
         self.validate_recovery()
@@ -188,6 +197,17 @@ class RebasePlan(BaseModel):
             configured_upstream=self.publication.configured_upstream,
             execution_mode=self.execution_mode,
         )
+
+    def validate_instruction_discovery(self) -> None:
+        """Require searched instruction candidates to bind the loaded source list."""
+        searched_paths = [observation.path for observation in self.repository_instruction_search]
+        if len(set(searched_paths)) != len(searched_paths):
+            raise ValueError("repository instruction search paths must be unique")
+        observed_sources = [
+            observation.path for observation in self.repository_instruction_search if observation.present
+        ]
+        if observed_sources != self.repository_instruction_sources:
+            raise ValueError("repository instruction sources do not match instruction-search evidence")
 
     def validate_decisions_and_preflights(self) -> set[str]:
         """Require successful evidence and collect approved decision IDs.

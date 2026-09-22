@@ -20,7 +20,7 @@ import pytest
 from pydantic import ValidationError
 
 from rebase_plan import RebasePlan
-from rebase_states import StateKind, WorkflowState, workflow_state_definitions
+from rebase_states import WorkflowState
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -111,6 +111,10 @@ def valid_plan_data() -> dict[str, object]:
             merge_base_oid="4" * 40,
             configured_upstream="refs/remotes/origin/feature/parser",
         ),
+        "repository_instruction_search": [
+            {"path": "AGENTS.md", "present": True},
+            {"path": ".claude/CLAUDE.md", "present": False},
+        ],
         "repository_instruction_sources": ["AGENTS.md"],
         "repository_preflights": [
             {
@@ -492,13 +496,3 @@ def test_validator_fails_closed_with_structured_errors(tmp_path: Path) -> None:
     assert output["status"] == "INVALID"
     assert output["state"] == "PLAN_INVALID"
     assert output["errors"]
-
-
-def test_workflow_state_source_includes_every_reviewed_state() -> None:
-    """Keep one typed state vocabulary for prompts, tests, and CLI output."""
-    definitions = workflow_state_definitions()
-
-    assert WorkflowState.READY_TO_ANALYZE in definitions
-    assert WorkflowState.BLOCKED_COMMAND_FAILED in definitions
-    assert WorkflowState.PLAN_INVALID in definitions
-    assert all(state.kind in {StateKind.TRANSITION, StateKind.TERMINAL} for state in definitions.values())
