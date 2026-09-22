@@ -13,28 +13,37 @@ loop that cannot terminate.
 
 from __future__ import annotations
 
+import importlib
+import pkgutil
+import subprocess
 from typing import TYPE_CHECKING
 
+import backlog_core
 import pytest
 from backlog_core import operations as _ops
+from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
+from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.dispatch_state import DispatchStateManager
 from backlog_core.models import (
     AmbiguousSelectorError,
+    BackendUnavailableError,
     BacklogError,
     BranchConflictError,
     CacheStateCorruptError,
     ContentConflictError,
     ContentNotFoundError,
+    ContentProviderError,
     ContentUnavailableError,
     EntryNotFoundError,
     GitHubUnavailableError,
     GraphQLUnavailableError,
     ItemNotFoundError,
+    Output,
     UnsupportedBackendCapabilityError,
     UnsupportedCapabilityError,
     ValidationError,
 )
-from backlog_core.server import _require_artifact_entries, _retryable, mcp
+from backlog_core.server import _build_section_miss_error, _require_artifact_entries, _retryable, mcp
 from backlog_core.sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
 from backlog_core.tool_responses import DispatchStaleCheckResponse, FallibleToolResponse
 from fastmcp.client import Client
@@ -203,4 +212,140 @@ async def test_an_unknown_dispatch_item_is_final() -> None:
 async def test_an_invalid_dispatch_status_is_final() -> None:
     await _call("dispatch_wave_start", {"milestone": 10, "wave_num": 1, "items": [{"issue": 101, "title": "A"}]})
     result = await _call("dispatch_item_status", {"milestone": 10, "issue": 101, "status": "half done"})
+    assert result["retryable"] is False
+
+
+# ---------------------------------------------------------------------------
+# Subclasses of the two bases the transport list names
+# ---------------------------------------------------------------------------
+
+
+def _subclasses_of(base: type) -> set[type]:
+    """Return every loaded subclass of ``base``, however deep.
+
+    Imports the whole package first, so a subclass declared in a module no test happens to import
+    is still discovered -- an undiscovered subclass is exactly the one that would ship with an
+    unexamined verdict.
+
+    Args:
+        base: The exception class whose descendants to collect.
+
+    Returns:
+        Every strict subclass of ``base``.
+    """
+    for module in pkgutil.walk_packages(backlog_core.__path__, "backlog_core."):
+        if ".tests" not in module.name:
+            importlib.import_module(module.name)
+
+    found: set[type] = set()
+    pending = [base]
+    while pending:
+        for sub in pending.pop().__subclasses__():
+            if sub not in found:
+                found.add(sub)
+                pending.append(sub)
+    return found
+
+
+#: One instance per subclass of ``BackendUnavailableError`` or ``ContentUnavailableError``. Each
+#: is built the way its raise site builds it, because the verdict of the mixed ones is fixed by
+#: what they are built with.
+_TRANSPORT_SUBCLASS_SAMPLES: dict[type, BacklogError | ContentProviderError] = {
+    GitHubUnavailableError: GitHubUnavailableError("credentials are unavailable"),
+    GraphQLUnavailableError: GraphQLUnavailableError("the environment refuses GraphQL"),
+    BdNotInstalledError: BdNotInstalledError("bd is not installed; see https://beads.sh/docs/install"),
+    BdInvocationError: BdInvocationError("bd exited 2", ["bd", "list"], 2, "", ""),
+    BdJsonDecodeError: BdJsonDecodeError("stdout is not JSON", "not json"),
+    ContentNotFoundError: ContentNotFoundError("no such record"),
+    _GitHubContentIntegrityError: _GitHubContentIntegrityError("GitHub content path is not a file: docs/"),
+}
+
+
+def test_every_subclass_of_a_transport_base_is_sampled() -> None:
+    """A new subclass fails here until someone decides what it answers.
+
+    Both bases sit in ``_TRANSPORT_FAILED``, so a subclass that states nothing inherits "retry
+    this" from the base -- silently, at the moment it is declared. This list is the gate: adding a
+    subclass without adding it here fails, and adding it here forces the verdict test below.
+    """
+    declared = _subclasses_of(BackendUnavailableError) | _subclasses_of(ContentUnavailableError)
+    assert declared == set(_TRANSPORT_SUBCLASS_SAMPLES), (
+        f"unsampled subclasses: {sorted(c.__name__ for c in declared - set(_TRANSPORT_SUBCLASS_SAMPLES))}; "
+        f"sampled but no longer declared: "
+        f"{sorted(c.__name__ for c in set(_TRANSPORT_SUBCLASS_SAMPLES) - declared)}"
+    )
+
+
+@pytest.mark.parametrize("exc", _TRANSPORT_SUBCLASS_SAMPLES.values(), ids=lambda e: type(e).__name__)
+def test_a_transport_subclass_states_its_own_verdict(exc: BacklogError | ContentProviderError) -> None:
+    """The subclass narrows its base to one condition, so it, not the base, knows the answer.
+
+    ``BackendUnavailableError`` and ``ContentUnavailableError`` are listed as trips that failed.
+    Their subclasses are not all trips: a binary that is not installed, stdout that is not JSON,
+    and a path that is a directory are all conditions the next identical call meets identically.
+    """
+    assert exc.retryable is not None, (
+        f"{type(exc).__name__} states no verdict of its own, so it reports whatever its base "
+        f"reports -- 'retry this' -- for a condition it may repeat identically forever."
+    )
+    assert _retryable(exc) is exc.retryable
+
+
+def test_bd_answers_a_timeout_and_a_refusal_differently() -> None:
+    """One class, two conditions: the instance carries which, and the exit code names it."""
+    timed_out = BdInvocationError("bd timed out after 30s", ["bd", "list"], -1, "", "")
+    exited_nonzero = BdInvocationError("bd exited 2", ["bd", "list"], 2, "", "usage: bd")
+    assert _retryable(timed_out) is True
+    assert _retryable(exited_nonzero) is False
+
+
+def test_bd_answers_a_timeout_and_a_failed_spawn_differently(mocker: MockerFixture) -> None:
+    """Both carry ``returncode == -1``, and only one of them is worth attempting again.
+
+    The exit code records that ``bd`` never ran to completion; it does not record why. A timeout
+    may clear. A spawn that failed may have failed on a permission bit or on momentary resource
+    pressure, and nothing at that raise site separates the two -- so it states no verdict rather
+    than pick one, and the boundary leaves the key off the wire.
+    """
+    mocker.patch("backlog_core.backends.bd_runner.shutil.which", return_value="/usr/local/bin/bd")
+
+    mocker.patch(
+        "backlog_core.backends.bd_runner.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd=["bd"], timeout=30)
+    )
+    with pytest.raises(BdInvocationError) as timed_out:
+        BdRunner().run_json(["show", "bd-a3f8"])
+
+    mocker.patch("backlog_core.backends.bd_runner.subprocess.run", side_effect=OSError("Permission denied"))
+    with pytest.raises(BdInvocationError) as never_started:
+        BdRunner().run_json(["show", "bd-a3f8"])
+
+    assert timed_out.value.returncode == never_started.value.returncode == -1
+    assert _retryable(timed_out.value) is True
+    assert _retryable(never_started.value) is None
+
+
+def test_a_section_the_item_does_not_hold_is_final() -> None:
+    """The filter is matched against the item's own inventory, which the next call re-reads the same."""
+    miss = _build_section_miss_error("Nonexistent", ["Description", "Plan"], Output())
+    assert miss["retryable"] is False
+
+
+async def test_a_plan_that_disagrees_with_its_milestone_is_final() -> None:
+    """Two arguments that contradict each other contradict each other identically next time."""
+    plan = {
+        "milestone": {"number": 11, "title": "Provider plan", "integration-branch": "main"},
+        "waves": [{"wave": 1, "items": [{"title": "Issue", "issue": 101, "priority": "P1"}]}],
+    }
+    assert (await _call("dispatch_create_plan", {"milestone_number": 10, "plan": plan}))["retryable"] is False
+
+
+async def test_a_plan_that_already_exists_is_final(mocker: MockerFixture) -> None:
+    """The refusal names the parameter that lifts it, which is what makes it final and not transient."""
+    provider = mocker.patch("backlog_core.server._get_artifact_provider").return_value
+    provider.get_content.return_value = mocker.Mock(revision="rev1")
+    plan = {
+        "milestone": {"number": 10, "title": "Provider plan", "integration-branch": "main"},
+        "waves": [{"wave": 1, "items": [{"title": "Issue", "issue": 101, "priority": "P1"}]}],
+    }
+    result = await _call("dispatch_create_plan", {"milestone_number": 10, "plan": plan, "overwrite": False})
     assert result["retryable"] is False

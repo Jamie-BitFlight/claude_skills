@@ -511,7 +511,22 @@ class CacheStateCorruptError(BacklogError):
 
 
 class ContentProviderError(Exception):
-    """Base error for logical content capability failures."""
+    """Base error for logical content capability failures.
+
+    Carries the same keyword-only ``retryable`` verdict as :class:`BacklogError`, and for the same
+    reason: this tree mixes a provider that could not be reached with a provider that answered and
+    refused, and only the raise site knows which it raised. Left unset, the tool boundary reports
+    no verdict at all.
+
+    Attributes:
+        retryable: ``True`` when a later identical attempt may succeed, ``False`` when it cannot,
+            ``None`` when this raise site does not state a verdict.
+    """
+
+    def __init__(self, *args: object, retryable: bool | None = None) -> None:
+        """Initialize with the usual exception args plus an optional retry verdict."""
+        super().__init__(*args)
+        self.retryable = retryable
 
 
 class ContentUnavailableError(ContentProviderError):
@@ -526,7 +541,15 @@ class ContentUnavailableError(ContentProviderError):
 
 
 class ContentNotFoundError(ContentUnavailableError):
-    """Raised when an authoritative provider confirms requested content is absent."""
+    """Raised when an authoritative provider confirms requested content is absent.
+
+    Absence is an answer, not a failed trip: the provider was reached and said there is nothing
+    there, so the identical request is answered identically.
+    """
+
+    def __init__(self, *args: object) -> None:
+        """Initialize with the usual exception args and a final verdict."""
+        super().__init__(*args, retryable=False)
 
 
 class ContentConflictError(ContentProviderError):
@@ -636,7 +659,15 @@ class BackendUnavailableError(BacklogError):
 
 
 class GitHubUnavailableError(BackendUnavailableError):
-    """Raised when GitHub credentials, API access, or transport are unavailable."""
+    """Raised when GitHub credentials, API access, or transport are unavailable.
+
+    The request did not reach a GitHub that could answer it, so the identical call is worth making
+    once the credentials or the network are there.
+    """
+
+    def __init__(self, *args: object) -> None:
+        """Initialize with the usual exception args and a retryable verdict."""
+        super().__init__(*args, retryable=True)
 
 
 class GraphQLUnavailableError(BackendUnavailableError):
@@ -651,6 +682,13 @@ class GraphQLUnavailableError(BackendUnavailableError):
     about whether the requested item exists, and reporting one as the other tells the
     caller something false.
     """
+
+    def __init__(self, *args: object) -> None:
+        """Initialize with the usual exception args and a final verdict.
+
+        The refusal is environment-wide, so the next identical GraphQL request meets it too.
+        """
+        super().__init__(*args, retryable=False)
 
 
 # Maps a capability flag name to the runtime_checkable Protocol it gates, for use in
