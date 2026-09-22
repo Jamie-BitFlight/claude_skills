@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Literal, cast
@@ -22,6 +23,7 @@ from dh_core.merge_train import (
     RegisterTrain,
     SourceGraphSnapshot,
     SubmitCandidate,
+    SupersedeTrain,
 )
 
 
@@ -193,3 +195,33 @@ def test_f11_admission_binds_distinct_accepted_checker(tmp_path: Path) -> None:
     assert admitted.admitted_seq is not None
     assert admitted.enqueued_seq is not None
     assert train.status(MergeQuery(plan="Pt2")).train.generation == 1
+
+
+def test_f02_supersede_resolves_replacement_and_checker_evidence(tmp_path: Path) -> None:
+    train, connection = service(tmp_path)
+    current = train.dispatch_plans.value.definition()
+    replacement = current.model_copy(update={"logical_id": "d2", "revision": "2"})
+    snapshot = DispatchPlanSnapshot(logical_id="d2", revision="2", canonical_bytes=replacement.canonical_bytes())
+    train.dispatch_plans.value = snapshot
+    approval = train.evidence.put(
+        json.dumps(
+            {"dispatch_plan_id": "d2", "dispatch_plan_revision": "2", "dispatch_plan_digest": snapshot.digest},
+            sort_keys=True,
+        ).encode(),
+        "application/json",
+    )
+
+    retired = train.supersede(
+        SupersedeTrain(
+            plan="Pt2",
+            generation=1,
+            replacement_plan_ref="d2",
+            replacement_milestone=1,
+            replacement_checker_evidence_digest=approval.digest,
+            reason="approved replacement",
+        )
+    )
+
+    assert retired.superseded_seq is not None
+    store.rebuild(connection)
+    assert train.status(MergeQuery(plan="Pt2", generation=1)).train.superseded_seq == retired.superseded_seq

@@ -378,6 +378,82 @@ def definition_event(connection: sqlite3.Connection, plan: str, generation: int)
     return None
 
 
+def require_assignment(
+    ledger: sqlite3.Connection, plan: str, generation: int, assignment: Assignment, *, accepted: bool
+) -> None:
+    """Require an exact registered dispatch binding and current attempt."""
+    rows = store.rows_of(
+        ledger.execute(
+            "SELECT d.*, t.attempts, t.accepted FROM merge_dispatches d JOIN tasks t ON t.plan=d.plan AND t.id=d.task "
+            "WHERE d.plan=? AND d.generation=? AND d.task=? AND d.attempt=?",
+            (plan, generation, assignment.task, assignment.attempt),
+        )
+    )
+    if not rows:
+        transitions.refuse("role-assignment-mismatch")
+    row = rows[0]
+    if (int(row["github_issue"]), str(row["role"]), int(row["attempts"]), bool(row["accepted"])) != (
+        assignment.issue,
+        assignment.role,
+        assignment.attempt,
+        accepted,
+    ):
+        transitions.refuse("role-assignment-mismatch")
+
+
+def current_candidate(ledger: sqlite3.Connection, plan: str, generation: int, task: str) -> dict[str, Any] | None:
+    """Read the sole current candidate for a task.
+
+    Returns:
+        The current row, or None.
+    """
+    rows = store.rows_of(
+        ledger.execute(
+            "SELECT * FROM merge_candidates WHERE plan=? AND generation=? AND task=? AND superseded_seq IS NULL "
+            "AND outcome IS NULL ORDER BY candidate_number DESC LIMIT 1",
+            (plan, generation, task),
+        )
+    )
+    return rows[0] if rows else None
+
+
+def candidate_row(ledger: sqlite3.Connection, plan: str, generation: int, task: str, number: int) -> dict[str, Any]:
+    """Read one exact candidate or refuse.
+
+    Returns:
+        The exact candidate row.
+    """
+    rows = store.rows_of(
+        ledger.execute(
+            "SELECT * FROM merge_candidates WHERE plan=? AND generation=? AND task=? AND candidate_number=?",
+            (plan, generation, task, number),
+        )
+    )
+    if not rows:
+        transitions.refuse("merge-train-not-registered")
+    return rows[0]
+
+
+def candidate_view(row: dict[str, Any], *, noop: str | None = None) -> CandidateView:
+    """Convert one candidate row to its typed public view.
+
+    Returns:
+        The typed candidate view.
+    """
+    return CandidateView(
+        plan=str(row["plan"]),
+        generation=int(row["generation"]),
+        task=str(row["task"]),
+        candidate_number=int(row["candidate_number"]),
+        candidate_sha=str(row["candidate_sha"]),
+        superseded_seq=int(row["superseded_seq"]) if row["superseded_seq"] is not None else None,
+        admitted_seq=int(row["admitted_seq"]) if row["admitted_seq"] is not None else None,
+        enqueued_seq=int(row["enqueued_seq"]) if row["enqueued_seq"] is not None else None,
+        outcome=str(row["outcome"]) if row["outcome"] is not None else None,
+        noop=noop,
+    )
+
+
 class MergeTrain:
     """Service owning T1 authoritative registration and reserved dispatch."""
 
@@ -401,18 +477,249 @@ class MergeTrain:
         self.policy_observer = policy_observer
         self.branch_advancer = branch_advancer
         self.gates = gates
+        self.supersede = self.execute_supersede
 
-    def supersede(self, request: SupersedeTrain) -> TrainView:
-        """Conclude a generation using resolved replacement evidence."""
-        raise NotImplementedError
+    def execute_supersede(self, request: SupersedeTrain) -> TrainView:
+        """Conclude a generation using resolved replacement evidence.
+
+        Returns:
+            The retired train generation.
+        """
+        train = train_row(self.ledger, request.plan, request.generation)
+        self.require_host(train)
+        replacement = self.dispatch_plans.read(request.replacement_plan_ref)
+        graph = self.source_graph.read(request.replacement_milestone)
+        definition = replacement.definition()
+        evidence, approval = self.evidence.parse(request.replacement_checker_evidence_digest, json.loads)
+        if evidence.media_type != "application/json" or not isinstance(approval, dict):
+            transitions.refuse("replacement-definition-unapproved")
+        expected = {
+            "dispatch_plan_id": replacement.logical_id,
+            "dispatch_plan_revision": replacement.revision,
+            "dispatch_plan_digest": replacement.digest,
+        }
+        if any(approval.get(name) != value for name, value in expected.items()):
+            transitions.refuse("replacement-definition-unapproved")
+        self.validate_definition(definition, graph)
+        with store.transaction(self.ledger):
+            row = train_row(self.ledger, request.plan, request.generation)
+            self.require_host(row)
+            active = self.ledger.execute(
+                "SELECT 1 FROM merge_claims WHERE plan=? AND active=1 UNION ALL "
+                "SELECT 1 FROM tasks WHERE plan=? AND (attempt_open=1 OR (status='complete' AND accepted=0)) LIMIT 1",
+                (request.plan, request.plan),
+            ).fetchone()
+            if active is not None:
+                transitions.refuse("train-generation-active")
+            payload = {
+                "generation": request.generation,
+                "current_dispatch_plan_revision": str(row["dispatch_plan_revision"]),
+                "current_dispatch_plan_digest": str(row["dispatch_plan_digest"]),
+                "replacement_dispatch_plan_id": replacement.logical_id,
+                "replacement_dispatch_plan_revision": replacement.revision,
+                "replacement_dispatch_plan_digest": replacement.digest,
+                "replacement_checker_evidence_digest": request.replacement_checker_evidence_digest,
+                "reason": request.reason,
+            }
+            sequence = store.append_event(
+                self.ledger,
+                kind="merge.train-superseded",
+                plan=request.plan,
+                task=None,
+                payload=payload,
+                at=store.now(),
+            )
+            self.ledger.execute(
+                "UPDATE merge_trains SET superseded_seq=? WHERE plan=? AND generation=?",
+                (sequence, request.plan, request.generation),
+            )
+            row["superseded_seq"] = sequence
+        return self.train_view(row)
 
     def submit(self, request: SubmitCandidate) -> CandidateView:
-        """Submit or supersede one immutable maker candidate."""
-        raise NotImplementedError
+        """Submit or supersede one immutable maker candidate.
+
+        Returns:
+            The current candidate.
+        """
+        train = train_row(self.ledger, request.plan)
+        self.require_host(train)
+        self.fresh_definition(train)
+        self.evidence.require(request.maker_evidence_digest)
+        with store.transaction(self.ledger):
+            train = train_row(self.ledger, request.plan)
+            self.require_host(train)
+            if int(train["generation"]) != request.generation:
+                transitions.refuse("train-generation-stale")
+            require_assignment(self.ledger, request.plan, request.generation, request.maker, accepted=True)
+            if request.maker.role != "maker" or request.base_sha != str(train["baseline_sha"]):
+                transitions.refuse("role-assignment-mismatch")
+            current = current_candidate(self.ledger, request.plan, request.generation, request.maker.task)
+            identity = (
+                request.branch,
+                request.pull_request_ref,
+                request.candidate_sha,
+                request.base_sha,
+                request.maker.issue,
+                request.maker.task,
+                request.maker.attempt,
+                request.maker_evidence_digest,
+            )
+            if current is not None:
+                held = tuple(
+                    current[name]
+                    for name in (
+                        "branch",
+                        "pull_request_ref",
+                        "candidate_sha",
+                        "base_sha",
+                        "maker_issue",
+                        "maker_task",
+                        "maker_attempt",
+                        "maker_evidence_digest",
+                    )
+                )
+                if held == identity:
+                    return candidate_view(current, noop="already-submitted")
+                active_claim = self.ledger.execute(
+                    "SELECT 1 FROM merge_claims WHERE plan=? AND candidate_task=? AND candidate_number=? AND active=1",
+                    (current["plan"], current["task"], current["candidate_number"]),
+                ).fetchone()
+                if current["outcome"] is not None or active_claim is not None:
+                    transitions.refuse("registered-plan-active")
+                next_number = int(current["candidate_number"]) + 1
+                superseded = store.append_event(
+                    self.ledger,
+                    kind="merge.candidate-superseded",
+                    plan=request.plan,
+                    task=request.maker.task,
+                    payload={
+                        "generation": request.generation,
+                        "candidate_number": int(current["candidate_number"]),
+                        "replacement_candidate_number": next_number,
+                    },
+                    at=store.now(),
+                )
+                self.ledger.execute(
+                    "UPDATE merge_candidates SET superseded_seq = ? WHERE plan = ? AND generation = ? AND task = ? AND candidate_number = ?",
+                    (superseded, request.plan, request.generation, request.maker.task, current["candidate_number"]),
+                )
+            else:
+                next_number = 1
+            payload = {
+                "generation": request.generation,
+                "candidate_number": next_number,
+                "branch": request.branch,
+                "pull_request_ref": request.pull_request_ref,
+                "candidate_sha": request.candidate_sha,
+                "base_sha": request.base_sha,
+                "maker_issue": request.maker.issue,
+                "maker_task": request.maker.task,
+                "maker_attempt": request.maker.attempt,
+                "maker_evidence_digest": request.maker_evidence_digest,
+                "supersedes_candidate_number": int(current["candidate_number"]) if current else None,
+            }
+            sequence = store.append_event(
+                self.ledger,
+                kind="merge.candidate-submitted",
+                plan=request.plan,
+                task=request.maker.task,
+                payload=payload,
+                at=store.now(),
+            )
+            row = {
+                **store.blank_row("merge_candidates"),
+                **payload,
+                "plan": request.plan,
+                "task": request.maker.task,
+                "submitted_seq": sequence,
+            }
+            columns = [column.name for column in store.TABLES["merge_candidates"]]
+            self.ledger.execute(
+                store.insert_statement("merge_candidates", columns), {name: row[name] for name in columns}
+            )
+        return candidate_view(row)
 
     def admit(self, request: AdmitCandidate) -> CandidateView:
-        """Admit and enqueue a candidate after checker/provider validation."""
-        raise NotImplementedError
+        """Admit and enqueue a candidate after checker/provider validation.
+
+        Returns:
+            The admitted candidate.
+        """
+        train = train_row(self.ledger, request.plan)
+        self.require_host(train)
+        self.fresh_definition(train)
+        self.evidence.require(request.checker_evidence_digest)
+        with store.transaction(self.ledger):
+            train = train_row(self.ledger, request.plan)
+            self.require_host(train)
+            if int(train["generation"]) != request.generation:
+                transitions.refuse("train-generation-stale")
+            require_assignment(self.ledger, request.plan, request.generation, request.checker, accepted=True)
+            if request.checker.role != "checker" or request.checker.task == request.task:
+                transitions.refuse("role-assignment-mismatch")
+            row = candidate_row(self.ledger, request.plan, request.generation, request.task, request.candidate_number)
+            if row["superseded_seq"] is not None or row["outcome"] is not None:
+                transitions.refuse("train-generation-stale")
+            if row["admitted_seq"] is not None:
+                exact = (
+                    int(row["checker_issue"]),
+                    str(row["checker_task"]),
+                    int(row["checker_attempt"]),
+                    str(row["checker_evidence_digest"]),
+                ) == (
+                    request.checker.issue,
+                    request.checker.task,
+                    request.checker.attempt,
+                    request.checker_evidence_digest,
+                )
+                if exact:
+                    return candidate_view(row, noop="already-admitted")
+                transitions.refuse("role-assignment-mismatch")
+            payload = {
+                "generation": request.generation,
+                "candidate_number": request.candidate_number,
+                "checker_issue": request.checker.issue,
+                "checker_task": request.checker.task,
+                "checker_attempt": request.checker.attempt,
+                "checker_evidence_digest": request.checker_evidence_digest,
+                "policy_snapshot_digest": request.checker_evidence_digest,
+            }
+            admitted_seq = store.append_event(
+                self.ledger,
+                kind="merge.candidate-admitted",
+                plan=request.plan,
+                task=request.task,
+                payload=payload,
+                at=store.now(),
+            )
+            enqueued_seq = store.append_event(
+                self.ledger,
+                kind="merge.candidate-enqueued",
+                plan=request.plan,
+                task=request.task,
+                payload={"generation": request.generation, "candidate_number": request.candidate_number},
+                at=store.now(),
+            )
+            self.ledger.execute(
+                "UPDATE merge_candidates SET checker_issue=?, checker_task=?, checker_attempt=?, checker_evidence_digest=?, "
+                "policy_snapshot_digest=?, admitted_seq=?, enqueued_seq=? WHERE plan=? AND generation=? AND task=? AND candidate_number=?",
+                (
+                    request.checker.issue,
+                    request.checker.task,
+                    request.checker.attempt,
+                    request.checker_evidence_digest,
+                    request.checker_evidence_digest,
+                    admitted_seq,
+                    enqueued_seq,
+                    request.plan,
+                    request.generation,
+                    request.task,
+                    request.candidate_number,
+                ),
+            )
+            row.update(payload, admitted_seq=admitted_seq, enqueued_seq=enqueued_seq)
+        return candidate_view(row)
 
     def register(self, request: RegisterTrain) -> TrainView:
         """Freeze a definition after checking it against the existing ledger plan.
