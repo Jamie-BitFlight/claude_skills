@@ -1,0 +1,73 @@
+{
+  "skill_name": "rebase",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Rebase `feature/a` onto `main`.",
+      "expected_output": "ACTIVATE: run the complete local-rebase workflow and stop at the accounted plan gate before any history rewrite.",
+      "files": [],
+      "expectations": [
+        "Resolves immutable branch, target, and merge-base OIDs before mutation.",
+        "Inventories every replay candidate and affected path, including rename and empty/drop risks.",
+        "Emits a complete READY_TO_REBASE plan before the first git rebase command.",
+        "Creates and verifies a durable recovery ref before executing.",
+        "Reports REBASE_COMPLETE_VERIFIED only after all verification oracles pass and says the result is not published."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Continue the rebase after I fixed this conflict.",
+      "expected_output": "ACTIVATE: inspect the active rebase and use the stop/continuation branch without starting a new rebase.",
+      "files": [],
+      "expectations": [
+        "Inspects active rebase metadata, status, current patch, unmerged entries, and recovery evidence.",
+        "Reconstructs or validates the accounted plan before continuing.",
+        "Verifies zero unmerged entries and stages only named resolved paths.",
+        "Uses non-interactive continuation when the commit message needs no edit.",
+        "Routes another conflict, an empty commit, or completion to its named state."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Abort this rebase and restore the original branch.",
+      "expected_output": "ACTIVATE: capture recovery evidence, abort the active rebase, and verify restoration.",
+      "files": [],
+      "expectations": [
+        "Captures the original tip from the plan or active rebase metadata before aborting.",
+        "Runs no new rebase.",
+        "Verifies branch tip, operation absence, unmerged entries, recorded pre-state, and recovery ref after abort.",
+        "Emits REBASE_ABORTED_RESTORED only on exact restoration; otherwise emits BLOCKED_ABORT_FAILED."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Update my branch from main using a merge commit.",
+      "expected_output": "DO_NOT_ACTIVATE: this explicitly requests a merge-based update rather than history replay.",
+      "files": [],
+      "expectations": [
+        "Does not start or plan a rebase.",
+        "Preserves the user's merge-based update intent."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Enable rebase-and-merge on this GitHub repository.",
+      "expected_output": "DO_NOT_ACTIVATE: this is forge merge-method configuration, not a local Git rebase.",
+      "files": [],
+      "expectations": [
+        "Does not execute local history-rewrite commands.",
+        "Routes the request to repository or forge configuration handling."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Merge this GitLab MR.",
+      "expected_output": "DO_NOT_ACTIVATE: this requests a forge merge operation, not a local Git rebase.",
+      "files": [],
+      "expectations": [
+        "Does not activate the rebase workflow.",
+        "Does not treat merge authorization as rebase authorization."
+      ]
+    }
+  ]
+}
