@@ -474,7 +474,9 @@ def test_f03_raw_cli_dispatch_refuses_registered_member_without_mutation() -> No
     arguments = ["plan", "dispatch", "--address", "Pcli/T1"]
     if sys.platform == "win32":
         script = windows_fcntl_bootstrap() + (
-            f"import runpy; sys.argv = {[str(cli), *arguments]!r}; runpy.run_path({str(cli)!r}, run_name='__main__')"
+            "from typer.testing import CliRunner; from sam_schema.cli import app; "
+            f"result = CliRunner().invoke(app, {arguments!r}); "
+            "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); raise SystemExit(result.exit_code)"
         )
         command = [sys.executable, "-c", script]
     else:
