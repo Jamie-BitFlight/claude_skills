@@ -109,25 +109,14 @@ class TopLevelCommentAction(BaseModel):
         return value
 
 
-class ApprovalStateAction(BaseModel):
-    """Set the authenticated actor's approval state where the provider exposes it."""
-
-    model_config = ConfigDict(strict=True)
-
-    kind: Literal["approval_state"] = "approval_state"
-    approved: bool
-
-
-ReviewAction = Annotated[
-    ReplyAction | ResolveAction | TopLevelCommentAction | ApprovalStateAction, Field(discriminator="kind")
-]
+ReviewAction = Annotated[ReplyAction | ResolveAction | TopLevelCommentAction, Field(discriminator="kind")]
 
 
 class ReviewActionResult(BaseModel):
     """Validated provider result for one mutation."""
 
     provider: ProviderName
-    action_kind: Literal["reply", "resolve", "comment", "approval_state"]
+    action_kind: Literal["reply", "resolve", "comment"]
     success: bool
     provider_object_id: str | None = None
     resolved: bool | None = None

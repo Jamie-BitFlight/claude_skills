@@ -40,7 +40,7 @@ arrival order.
    actor/revision unknowns instead of guessing them. A comment may be classified as a question
    during assessment while retaining its normalized comment kind. Completion is one assessment per
    inbound input and cluster membership covering that same set exactly once. According to lines
-   98–184 of [pr_review_state.py](./scripts/pr_review_state.py), the gate enforces that coverage,
+   106–192 of [pr_review_state.py](./scripts/pr_review_state.py), the gate enforces that coverage,
    unknown decisions, and semantic classification.
 
 3. Implement warranted clusters at their owning design seam. Verify the complete affected surface,
@@ -57,9 +57,10 @@ arrival order.
    - explicit decisions for every assessment unknown, including keys
      `revision_relation:<input-id>`, `actor_classification:<input-id>`, and
      `actor_role:<input-id>` when those provider facts are unknown;
-   - implementation and verification evidence, the inspectable remote revision, and the recheck
-     snapshot fingerprint;
+   - implementation and verification evidence, the inspectable remote revision, the recheck
+     snapshot fingerprint, and exact per-input implementation states;
    - exact per-input communication and resolution states; and
+   - one terminal annotation per input before completion; and
    - `cycle_state: READY_FOR_ACTION` with `cycle_terminal: action_pending`.
 
    Validate without mutating:
@@ -69,7 +70,7 @@ arrival order.
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   Completion is a zero exit from `validate-cycle`. According to lines 61–184 of
+   Completion is a zero exit from `validate-cycle`. According to lines 61–192 of
    [pr_review_state.py](./scripts/pr_review_state.py), validation binds completeness, revision,
    fingerprint, evidence, census, assessments, clusters, unknown decisions, and action state.
 
@@ -96,10 +97,11 @@ arrival order.
    policy must authorize the requested action. Successful commands atomically advance the local
    communication/resolution state; a failed resolution retains completed communication for safe
    resolve-only recovery. Combined and batch actions pre-authorize every reply and resolution
-   before their first provider call. According to lines 187–235 of
+   before their first provider call. According to lines 195–242 of
    [pr_review_state.py](./scripts/pr_review_state.py), action authorization checks capabilities,
-   communication, resolution, policy, and stable references; lines 341–509 of
-   [pr_review_threads.py](./scripts/pr_review_threads.py) persist only provider-confirmed progress.
+   communication, resolution, policy, and stable references; lines 148–316 and 330–382 of
+   [pr_review_cli_mutations.py](./scripts/pr_review_cli_mutations.py) refresh remote state before
+   acting and persist only provider-confirmed progress.
 
    Batch combined actions use complete canonical input IDs and stop at the first failed action:
 
@@ -109,9 +111,9 @@ arrival order.
      --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   `actions.json` is `[{"input_id": "...", "body": "..."}, ...]`. Completion is every inbound
-   input in communication state `completed` or `not_required`, with each resolvable input either
-   resolved or deliberately left open for clarification.
+   `actions.json` is `[{"input_id": "...", "body": "..."}, ...]`. Completion requires provider-backed
+   communication state `completed` for every inbound input, with each resolvable input resolved;
+   clarification-required input keeps the cycle non-terminal.
 
 6. Re-check with short bounded calls after current inputs are communicated:
 
@@ -123,7 +125,19 @@ arrival order.
    A call stops on outstanding work or its window/attempt bound. `timed_out: true` means no stop
    signal appeared in that sampled window; issue another call to cover a longer intended window.
    Full watch output preserves the canonical snapshot under `state`. Completion is a final complete
-   provider snapshot with no unresolved or newly arrived input. According to lines 242–310 of
+   provider snapshot with no unresolved or newly arrived input. Record the final per-input lifecycle
+   evidence, then evaluate the only successful terminal:
+
+   ```bash
+   ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py complete-cycle \
+     --pr <N> --github <owner/repo> \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
+   ```
+
+   According to lines 245–307 of [pr_review_state.py](./scripts/pr_review_state.py), completion
+   requires current canonical snapshot identity, exhaustive coverage, terminal per-input
+   implementation/communication/resolution state, provider-backed communication, and terminal
+   annotations. According to lines 219–260 of
    [pr_review_threads.py](./scripts/pr_review_threads.py), watch reports its attempts, bound
    exhaustion, timeout state, and final canonical snapshot.
 
@@ -132,6 +146,6 @@ arrival order.
 Run `./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py <command> --help` for the
 current provider, target, operation, and timeout options. Use full output for action evidence; use
 `--summary` only for status
-inspection. According to lines 67–94 of
+inspection. According to lines 67–97 of
 [pr_review_subprocess.py](./scripts/pr_review_subprocess.py), every provider subprocess has a
 mandatory positive bound and process-tree cleanup before a timeout is raised.

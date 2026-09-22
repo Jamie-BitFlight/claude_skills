@@ -30,7 +30,14 @@ def state_for_snapshot(snapshot_value: ReviewSnapshot) -> tuple[ReviewSnapshot, 
     """Bind a customized snapshot to matching cycle and fingerprint evidence."""
     item = snapshot_value.review_inputs[0]
     fingerprint = calculate_snapshot_fingerprint(
-        snapshot_value.target, snapshot_value.head_revision, snapshot_value.review_inputs, snapshot_value.completeness
+        snapshot_value.target,
+        snapshot_value.head_revision,
+        snapshot_value.review_inputs,
+        snapshot_value.completeness,
+        revision_at=snapshot_value.revision_at,
+        reviewability=snapshot_value.reviewability,
+        provider_metadata=snapshot_value.provider_metadata,
+        communicated_input_ids=snapshot_value.communicated_input_ids,
     )
     snapshot_value = snapshot_value.model_copy(update={"snapshot_fingerprint": fingerprint})
     original_cycle = ready_cycle()
@@ -106,6 +113,15 @@ def test_authorization_rejects_cross_provider_snapshot_evidence(snapshot_value: 
         authorize_action(
             snapshot_value, cycle_value, snapshot_value.review_inputs[0].input_id, ReplyAction(body="Done.")
         )
+
+
+def test_github_watch_keeps_legacy_signals_when_canonical_history_exists() -> None:
+    snapshot_value = canonical_snapshot().model_copy(
+        update={"unresolved_count": 0, "unresponded_reviews": [], "codex_approved": False}
+    )
+
+    assert snapshot_value.review_inputs
+    assert snapshot_value.has_outstanding_work() is False
 
 
 if __name__ == "__main__":

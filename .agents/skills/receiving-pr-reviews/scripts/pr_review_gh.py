@@ -18,7 +18,14 @@ from pr_review_github_logic import (
     reviewability as _reviewability,
     unresponded_reviews as _unresponded_reviews,
 )
-from pr_review_github_normalize import approval_inputs, fingerprint, inline_inputs, issue_comment_inputs, review_inputs
+from pr_review_github_normalize import (
+    approval_inputs,
+    communicated_inputs,
+    fingerprint,
+    inline_inputs,
+    issue_comment_inputs,
+    review_inputs,
+)
 from pr_review_models import (
     FetchResult,
     IssueComment,
@@ -211,13 +218,22 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
         truncated_input_ids=[item.input_id for item in canonical_inputs if item.thread_id in truncated_threads],
         unavailable_capabilities=[],
     )
+    communicated_input_ids = communicated_inputs(canonical_inputs)
     return ReviewSnapshot.model_validate({
         **legacy.model_dump(),
         "provider": "github",
         "target": target,
         "transport": "github_cli",
         "snapshot_complete": completeness.complete,
-        "snapshot_fingerprint": fingerprint(target, head_revision, canonical_inputs, completeness),
+        "snapshot_fingerprint": fingerprint(
+            target,
+            head_revision,
+            canonical_inputs,
+            completeness,
+            revision_at=revision_at,
+            reviewability=legacy.reviewability,
+            communicated_input_ids=communicated_input_ids,
+        ),
         "head_revision": head_revision,
         "revision_at": revision_at,
         "completeness": completeness,
@@ -226,6 +242,7 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
         "clusters": [],
         "cycle_state": "ASSESSMENT_REQUIRED" if completeness.complete else "SNAPSHOT_INCOMPLETE",
         "codex_approval_equivalence": "available",
+        "communicated_input_ids": communicated_input_ids,
     })
 
 

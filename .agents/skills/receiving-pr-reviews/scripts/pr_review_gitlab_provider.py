@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable
 
 from pydantic import ValidationError
 
 from pr_review_contracts import (
-    ApprovalStateAction,
     ChangeRequestTarget,
     ReplyAction,
     ResolveAction,
@@ -18,7 +16,7 @@ from pr_review_contracts import (
 )
 from pr_review_gitlab_normalize import normalize_state
 from pr_review_gitlab_transport import collect_state, project_path, run_glab
-from pr_review_gitlab_wire import GitLabApprovals, GitLabCreatedNote, GitLabDiscussion, GitLabState, GitLabUser
+from pr_review_gitlab_wire import GitLabCreatedNote, GitLabDiscussion, GitLabState
 from pr_review_models import ReviewSnapshot
 from pr_review_provider import ProviderResponseError
 from pr_review_provider_text import render_top_level_body
@@ -32,7 +30,12 @@ class GitLabProvider:
     """GitLab adapter satisfying the two-method review-provider interface."""
 
     def __init__(self, *, state_loader: StateLoader = collect_state, command_runner: CommandRunner = run_glab) -> None:
-        """Bind complete-state and bounded-command transports."""
+        """Bind complete-state and bounded-command transports.
+
+        Args:
+            state_loader: Stable complete-state collector.
+            command_runner: Bounded glab command transport.
+        """
         self.state_loader = state_loader
         self.command_runner = command_runner
 
@@ -40,8 +43,14 @@ class GitLabProvider:
     def coordinates(target: ChangeRequestTarget) -> tuple[str, str]:
         """Validate GitLab host/project coordinates.
 
+        Args:
+            target: Provider-neutral target expected to identify GitLab.
+
         Returns:
             The bare host and nested project path.
+
+        Raises:
+            ValueError: If the target belongs to another provider.
         """
         if target.repository.provider != "gitlab":
             raise ValueError(f"GitLabProvider cannot operate on provider {target.repository.provider!r}")
@@ -52,15 +61,23 @@ class GitLabProvider:
     ) -> ReviewSnapshot:
         """Fetch and normalize one complete GitLab CLI snapshot.
 
+        Args:
+            target: Canonical merge-request target.
+            deadline: Absolute deadline for the complete stable snapshot.
+            command_timeout: Positive caller-selected per-command bound.
+
         Returns:
             A canonical provider-neutral snapshot.
         """
         host, full_name = self.coordinates(target)
-        timeout = command_timeout
-        if deadline is not None:
-            remaining = max(0.0, deadline - time.monotonic())
-            timeout = remaining if timeout is None else min(timeout, remaining)
-        state = self.state_loader(host, full_name, target.number, timeout=timeout, runner=self.command_runner)
+        state = self.state_loader(
+            host,
+            full_name,
+            target.number,
+            deadline=deadline,
+            command_timeout=command_timeout,
+            runner=self.command_runner,
+        )
         return normalize_state(state, target)
 
     def act(
@@ -68,8 +85,17 @@ class GitLabProvider:
     ) -> ReviewActionResult:
         """Perform one cycle-authorized GitLab mutation.
 
+        Args:
+            target: Canonical merge-request target.
+            action: Mutation bound to current complete-cycle evidence.
+            command_timeout: Positive caller-selected per-command bound.
+
         Returns:
             A provider-neutral confirmed action result.
+
+        Raises:
+            ProviderResponseError: If target evidence or the provider response is invalid.
+            TypeError: If the action is not authorized or supported.
         """
         if not isinstance(action, AuthorizedReviewAction):
             raise TypeError("GitLabProvider.act requires AuthorizedReviewAction")
@@ -81,6 +107,7 @@ class GitLabProvider:
             discussion_id = action.review_input.provider_ids.reply_target_id
             if not discussion_id:
                 raise ProviderResponseError("GitLab reply input lacks reply_target_id")
+            body = render_top_level_body(action.action.body, [action.review_input.stable_reference])
             raw = self.command_runner(
                 [
                     "api",
@@ -90,7 +117,7 @@ class GitLabProvider:
                     "POST",
                     f"{base}/discussions/{discussion_id}/notes",
                     "--raw-field",
-                    f"body={action.action.body}",
+                    f"body={body}",
                 ],
                 timeout=command_timeout,
             )
@@ -142,57 +169,21 @@ class GitLabProvider:
                 provider_object_id=str(note.id),
                 raw=json.loads(raw),
             )
-        if isinstance(action.action, ApprovalStateAction):
-            return self.set_approval_state(
-                host=host, base=base, action=action, approved=action.action.approved, command_timeout=command_timeout
-            )
         raise TypeError(f"unsupported GitLab review action: {type(action.action).__name__}")
-
-    def set_approval_state(
-        self, *, host: str, base: str, action: AuthorizedReviewAction, approved: bool, command_timeout: float | None
-    ) -> ReviewActionResult:
-        """Mutate and read back the authenticated actor's approval state.
-
-        Returns:
-            A provider-neutral confirmed approval-state result.
-        """
-        operation = "approve" if approved else "unapprove"
-        arguments = ["api", "--hostname", host, "--method", "POST", f"{base}/{operation}"]
-        if approved:
-            arguments.extend(["--raw-field", f"sha={action.revision}"])
-        raw = self.command_runner(arguments, timeout=command_timeout)
-        try:
-            mutation = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ProviderResponseError(f"GitLab {operation} response was not valid JSON: {exc}") from exc
-        if not isinstance(mutation, dict):
-            raise ProviderResponseError(f"GitLab {operation} response must be a JSON object")
-        try:
-            current_user = GitLabUser.model_validate_json(
-                self.command_runner(["api", "--hostname", host, "user"], timeout=command_timeout)
-            )
-            approval_raw = self.command_runner(
-                ["api", "--hostname", host, f"{base}/approvals"], timeout=command_timeout
-            )
-            approvals = GitLabApprovals.model_validate_json(approval_raw)
-        except ValidationError as exc:
-            raise ProviderResponseError(f"GitLab {operation} verification failed validation: {exc}") from exc
-        actor_is_approved = any(item.user.id == current_user.id for item in approvals.approved_by)
-        if actor_is_approved != approved:
-            raise ProviderResponseError(f"GitLab {operation} verification did not confirm requested state")
-        return ReviewActionResult(
-            provider="gitlab",
-            action_kind="approval_state",
-            success=True,
-            raw={"mutation": mutation, "verification": json.loads(approval_raw)},
-        )
 
     @staticmethod
     def validate_created_note(raw: str, operation: str) -> GitLabCreatedNote:
         """Require GitLab to return the created note identity.
 
+        Args:
+            raw: Complete mutation response.
+            operation: Operation label used in diagnostics.
+
         Returns:
             The confirmed created note.
+
+        Raises:
+            ProviderResponseError: If the response lacks a created-note identity.
         """
         try:
             return GitLabCreatedNote.model_validate_json(raw)
@@ -203,8 +194,14 @@ class GitLabProvider:
     def validate_resolved_discussion(raw: str) -> GitLabDiscussion:
         """Require GitLab to return a resolved discussion.
 
+        Args:
+            raw: Complete discussion mutation response.
+
         Returns:
             The confirmed resolved discussion.
+
+        Raises:
+            ProviderResponseError: If the response does not prove resolution.
         """
         try:
             discussion = GitLabDiscussion.model_validate_json(raw)

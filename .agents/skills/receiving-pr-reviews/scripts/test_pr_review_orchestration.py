@@ -25,10 +25,15 @@ import pytest
 from typer.testing import CliRunner
 
 import pr_review_threads
+from pr_review_cli_actions import authorized_action
+from pr_review_contracts import ReplyAction
+from pr_review_models import ReviewSnapshot
+from pr_review_provider import ProviderResponseError
 from pr_review_state_models import (
     ProviderInputIdentity,
     ReviewAssessment,
     ReviewCluster,
+    ReviewInput,
     calculate_snapshot_fingerprint,
 )
 from pr_review_threads import app
@@ -38,6 +43,20 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 runner = CliRunner()
+
+
+def fingerprint_for(snapshot: ReviewSnapshot, inputs: list[ReviewInput]) -> str:
+    """Recalculate a customized snapshot with every authorization field."""
+    return calculate_snapshot_fingerprint(
+        snapshot.target,
+        snapshot.head_revision,
+        inputs,
+        snapshot.completeness,
+        revision_at=snapshot.revision_at,
+        reviewability=snapshot.reviewability,
+        provider_metadata=snapshot.provider_metadata,
+        communicated_input_ids=snapshot.communicated_input_ids,
+    )
 
 
 def resolved_response() -> str:
@@ -59,6 +78,13 @@ def gated_args(snapshot_file: Path, state_file: Path) -> list[str]:
     ]
 
 
+def mock_live_snapshot(snapshot_file: Path, mocker: MockerFixture) -> None:
+    """Make the mandatory provider refresh return the saved current snapshot."""
+    mocker.patch.object(
+        pr_review_threads, "build_fetch_result", return_value=pr_review_threads.load_snapshot(snapshot_file)
+    )
+
+
 def test_raw_reply_without_cycle_evidence_is_rejected_before_provider_call(mocker: MockerFixture) -> None:
     run_mock = mocker.patch.object(pr_review_threads, "run_gh")
 
@@ -66,6 +92,28 @@ def test_raw_reply_without_cycle_evidence_is_rejected_before_provider_call(mocke
 
     assert result.exit_code != 0
     run_mock.assert_not_called()
+
+
+def test_authorized_action_rejects_saved_snapshot_when_live_state_changed(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    live = canonical_snapshot().model_copy(update={"head_revision": "new-head"})
+    provider = mocker.Mock()
+    provider.snapshot.return_value = live
+
+    with pytest.raises(ProviderResponseError, match="no longer current"):
+        authorized_action(
+            canonical_snapshot().target,
+            snapshot_file,
+            state_file,
+            canonical_input().input_id,
+            ReplyAction(body="Addressed."),
+            provider=provider,
+            command_timeout=7.0,
+        )
+
+    provider.snapshot.assert_called_once_with(canonical_snapshot().target, deadline=None, command_timeout=7.0)
 
 
 def test_validate_cycle_checks_complete_evidence_without_provider_mutation(
@@ -90,9 +138,62 @@ def test_validate_cycle_checks_complete_evidence_without_provider_mutation(
     run_mock.assert_not_called()
 
 
+def test_complete_cycle_refreshes_provider_evidence_and_persists_only_success_terminal(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    snapshot = pr_review_threads.load_snapshot(snapshot_file)
+    communicated = {canonical_input().input_id}
+    fingerprint = calculate_snapshot_fingerprint(
+        snapshot.target,
+        snapshot.head_revision,
+        snapshot.review_inputs,
+        snapshot.completeness,
+        revision_at=snapshot.revision_at,
+        reviewability=snapshot.reviewability,
+        provider_metadata=snapshot.provider_metadata,
+        communicated_input_ids=communicated,
+    )
+    snapshot = snapshot.model_copy(update={"communicated_input_ids": communicated, "snapshot_fingerprint": fingerprint})
+    snapshot_file.write_text(snapshot.model_dump_json())
+    cycle = pr_review_threads.load_cycle(state_file).model_copy(
+        update={
+            "snapshot_fingerprint": fingerprint,
+            "recheck_snapshot_fingerprint": fingerprint,
+            "communication_states": {canonical_input().input_id: "completed"},
+            "resolution_states": {canonical_input().input_id: "resolved"},
+            "implementation_states": {canonical_input().input_id: "completed"},
+            "terminal_annotations": {canonical_input().input_id: "Verified provider-backed completion."},
+        }
+    )
+    state_file.write_text(cycle.model_dump_json())
+    mock_live_snapshot(snapshot_file, mocker)
+
+    result = runner.invoke(
+        app,
+        [
+            "complete-cycle",
+            "--pr",
+            "17",
+            "--snapshot-file",
+            str(snapshot_file),
+            "--state-file",
+            str(state_file),
+            "--github",
+            "acme/widgets",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    persisted = pr_review_threads.load_cycle(state_file)
+    assert persisted.cycle_state == "REVIEW_COMPLETE"
+    assert persisted.cycle_terminal == "review_complete"
+
+
 @pytest.mark.parametrize("command", ["reply", "resolve"], ids=["reply", "resolve"])
 def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, mocker: MockerFixture) -> None:
     snapshot_file, state_file = write_ready_files(tmp_path)
+    mock_live_snapshot(snapshot_file, mocker)
     if command == "resolve":
         completed_cycle = ready_cycle().model_copy(
             update={"communication_states": {canonical_input().input_id: "completed"}}
@@ -117,6 +218,7 @@ def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, m
 
 def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, mocker: MockerFixture) -> None:
     snapshot_file, state_file = write_ready_files(tmp_path)
+    mock_live_snapshot(snapshot_file, mocker)
     run_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value="{}")
 
     result = runner.invoke(
@@ -130,6 +232,7 @@ def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, 
 
 def test_reply_and_resolve_rejects_graphql_errors(tmp_path: Path, mocker: MockerFixture) -> None:
     snapshot_file, state_file = write_ready_files(tmp_path)
+    mock_live_snapshot(snapshot_file, mocker)
     run_mock = mocker.patch.object(
         pr_review_threads,
         "run_gh",
@@ -153,7 +256,7 @@ def test_reply_and_resolve_preflights_resolution_before_reply(tmp_path: Path, mo
     item = snapshot.review_inputs[0].model_copy(
         update={"capabilities": snapshot.review_inputs[0].capabilities.model_copy(update={"can_resolve": False})}
     )
-    fingerprint = calculate_snapshot_fingerprint(snapshot.target, snapshot.head_revision, [item], snapshot.completeness)
+    fingerprint = fingerprint_for(snapshot, [item])
     snapshot_file.write_text(
         snapshot.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint}).model_dump_json()
     )
@@ -161,6 +264,7 @@ def test_reply_and_resolve_preflights_resolution_before_reply(tmp_path: Path, mo
         update={"snapshot_fingerprint": fingerprint, "recheck_snapshot_fingerprint": fingerprint}
     )
     state_file.write_text(cycle.model_dump_json())
+    mock_live_snapshot(snapshot_file, mocker)
     run_mock = mocker.patch.object(pr_review_threads, "run_gh")
 
     result = runner.invoke(
@@ -222,9 +326,7 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
         }
     )
     original_snapshot = canonical_snapshot()
-    fingerprint = calculate_snapshot_fingerprint(
-        original_snapshot.target, original_snapshot.head_revision, [first, second], original_snapshot.completeness
-    )
+    fingerprint = fingerprint_for(original_snapshot, [first, second])
     snapshot = original_snapshot.model_copy(
         update={"review_inputs": [first, second], "snapshot_fingerprint": fingerprint}
     )
@@ -261,6 +363,7 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
 
 def test_batch_stops_after_first_failed_action(tmp_path: Path, mocker: MockerFixture) -> None:
     snapshot_file, state_file = write_two_input_cycle(tmp_path)
+    mock_live_snapshot(snapshot_file, mocker)
     input_file = tmp_path / "batch.json"
     input_file.write_text(
         json.dumps([
@@ -302,7 +405,7 @@ def test_batch_preflights_every_resolution_before_first_reply(tmp_path: Path, mo
         update={"capabilities": snapshot.review_inputs[1].capabilities.model_copy(update={"can_resolve": False})}
     )
     inputs = [snapshot.review_inputs[0], second]
-    fingerprint = calculate_snapshot_fingerprint(snapshot.target, snapshot.head_revision, inputs, snapshot.completeness)
+    fingerprint = fingerprint_for(snapshot, inputs)
     snapshot_file.write_text(
         snapshot.model_copy(update={"review_inputs": inputs, "snapshot_fingerprint": fingerprint}).model_dump_json()
     )
@@ -310,6 +413,7 @@ def test_batch_preflights_every_resolution_before_first_reply(tmp_path: Path, mo
         update={"snapshot_fingerprint": fingerprint, "recheck_snapshot_fingerprint": fingerprint}
     )
     state_file.write_text(cycle.model_dump_json())
+    mock_live_snapshot(snapshot_file, mocker)
     input_file = tmp_path / "batch-preflight.json"
     input_file.write_text(
         json.dumps([

@@ -8,7 +8,6 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from pr_review_contracts import (
-    ApprovalStateAction,
     BatchReviewAction,
     BatchReviewActions,
     ChangeRequestTarget,
@@ -40,7 +39,6 @@ from pr_review_gh_wire import (
 from pr_review_state_models import ReviewAssessment, ReviewCluster, ReviewInput, SnapshotCompleteness
 
 __all__ = [
-    "ApprovalStateAction",
     "Author",
     "BatchReviewAction",
     "BatchReviewActions",
@@ -56,6 +54,8 @@ __all__ = [
     "HeadCommitNode",
     "IssueComment",
     "PageInfo",
+    "ProviderApprovalState",
+    "ProviderSystemEvent",
     "PullRequestHeadState",
     "Reaction",
     "ReplyAction",
@@ -65,6 +65,7 @@ __all__ = [
     "ReviewAction",
     "ReviewActionResult",
     "ReviewNode",
+    "ReviewProviderMetadata",
     "ReviewSnapshot",
     "ReviewSummary",
     "ReviewThreadsConnection",
@@ -94,6 +95,31 @@ class Reviewability(BaseModel):
     mergeable: str
     merge_state_status: str
     blockers: list[str]
+
+
+class ProviderSystemEvent(BaseModel):
+    """One provider-generated event retained outside the review-input census."""
+
+    id: str
+    body: str
+    created_at: datetime
+
+
+class ProviderApprovalState(BaseModel):
+    """Provider platform approval configuration without inventing an actor approval."""
+
+    approved: bool
+    approvals_required: int
+    approvals_left: int
+    approval_rules_left: list[object]
+
+
+class ReviewProviderMetadata(BaseModel):
+    """Observable provider state that is not an independently assessable input."""
+
+    system_notes: list[ProviderSystemEvent] = Field(default_factory=list)
+    approval_state: ProviderApprovalState | None = None
+    blocking_discussions_resolved: bool | None = None
 
 
 class FetchResult(BaseModel):
@@ -135,8 +161,11 @@ class ReviewSnapshot(BaseModel):
     threads_count: int = 0
     unresolved: list[UnresolvedThread] = Field(default_factory=list)
     unresolved_count: int = 0
+    outstanding_input_count: int = 0
     codex_approved: bool | None = None
     reviewability: Reviewability | None = None
+    provider_metadata: ReviewProviderMetadata = Field(default_factory=ReviewProviderMetadata)
+    communicated_input_ids: set[str] = Field(default_factory=set)
 
     def provider_consistency_error(self) -> str | None:
         """Return the first cross-provider boundary violation, if any."""
@@ -165,7 +194,12 @@ class ReviewSnapshot(BaseModel):
 
     def has_outstanding_work(self) -> bool:
         """Return whether the sampled snapshot contains a watch stop signal."""
-        return self.unresolved_count > 0 or bool(self.unresponded_reviews) or self.codex_approved is True
+        return (
+            self.outstanding_input_count > 0
+            or self.unresolved_count > 0
+            or bool(self.unresponded_reviews)
+            or self.codex_approved is True
+        )
 
 
 class WatchResult(BaseModel):
@@ -227,9 +261,12 @@ class FetchSummary(BaseModel):
     reviews_count: int
     threads_count: int
     unresolved_count: int
+    outstanding_input_count: int
     unresponded_count: int
     codex_approved: bool | None
     blockers: list[str]
+    provider_metadata: ReviewProviderMetadata
+    communicated_input_ids: set[str]
     unresolved: list[ThreadSummary]
     unresponded_reviews: list[ReviewSummary]
 

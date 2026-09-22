@@ -117,9 +117,12 @@ def summarize(result: ReviewSnapshot, *, pr: int, max_body: int | None) -> Fetch
         reviews_count=result.reviews_count,
         threads_count=result.threads_count,
         unresolved_count=result.unresolved_count,
+        outstanding_input_count=result.outstanding_input_count,
         unresponded_count=len(result.unresponded_reviews),
         codex_approved=result.codex_approved,
         blockers=result.reviewability.blockers if result.reviewability is not None else [],
+        provider_metadata=result.provider_metadata,
+        communicated_input_ids=result.communicated_input_ids,
         unresolved=[summarize_thread(thread, max_body=max_body) for thread in result.unresolved],
         unresponded_reviews=[summarize_review(review, max_body=max_body) for review in result.unresponded_reviews],
     )

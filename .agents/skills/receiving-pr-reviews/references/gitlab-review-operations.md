@@ -13,39 +13,39 @@ Use an explicit self-managed target when it is known:
 ```
 
 Omit `--host` and `--repo` together to let `glab repo view` resolve the current checkout. The
-provider operation is the authentication check; an environment token can work when persisted
-`glab auth status` does not.
+explicit and detected target paths are implemented at lines 134–184 of
+[`pr_review_cli_target.py`](../scripts/pr_review_cli_target.py).
 
-The adapter completely paginates discussions, notes, award emoji, and diff versions, and also reads
-merge-request detail, approvals, and the current actor. System notes stay out of `review_inputs[]`.
-Named approvers and positive/negative award signals remain assessed inputs. GitLab emits
-`codex_approved: null` with `codex_approval_equivalence: unavailable`; zero required approvals never
-becomes an actor-backed approval.
+The adapter uses `glab api --paginate --output ndjson` for list surfaces [1], reads every required
+surface twice, and rejects the snapshot when the observations differ. It recomputes the remaining
+absolute-deadline bound before each command. According to lines 100–234 of
+[`pr_review_gitlab_transport.py`](../scripts/pr_review_gitlab_transport.py), this applies to
+discussions, notes, award emoji, diff versions, merge-request detail, approvals, and the current
+actor.
+
+System notes remain provider metadata rather than review inputs. Named approvers and explicit
+positive/negative award signals remain assessed inputs. Zero-required approval state remains
+platform metadata and does not become an actor-backed approval. GitLab emits `codex_approved: null`
+with `codex_approval_equivalence: unavailable`. According to lines 255–377 of
+[`pr_review_gitlab_normalize.py`](../scripts/pr_review_gitlab_normalize.py), reviewability,
+platform metadata, exact-reference communication evidence, and the complete input census all bind
+the snapshot fingerprint. The approval response fields retained by the adapter are documented by
+GitLab's approvals API [4].
 
 ## Authorized Mutations
 
 Every mutation takes the same complete snapshot and `READY_FOR_ACTION` cycle files as the GitHub
 forms. Replace `--github` with the explicit GitLab target options above. Inline replies use the
-discussion ID, resolution updates that discussion, and top-level communication creates an MR note.
-The adapter validates the created note or resolved discussion before advancing local cycle state.
+discussion ID and quotes the exact stable input reference, resolution updates that discussion [2],
+and top-level communication creates an MR note [3]. According to lines 83–210 of
+[`pr_review_gitlab_provider.py`](../scripts/pr_review_gitlab_provider.py), the adapter validates the
+created note or resolved discussion before returning success. Before any mutation, lines 20–47 of
+[`pr_review_cli_actions.py`](../scripts/pr_review_cli_actions.py) fetch current provider state and
+reject a saved revision or fingerprint that no longer matches.
 
-GitLab also exposes authenticated-actor approval state:
+## References
 
-```bash
-./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py approval-state \
-  --provider gitlab --host <hostname> --repo <namespace/project> --pr <IID> \
-  --input-id <canonical-input-id> --approved \
-  --snapshot-file review-snapshot.json --state-file review-cycle.json
-```
-
-Use `--unapproved` to withdraw approval. Approval uses the authorized snapshot revision as GitLab's
-SHA guard, then reads the approval state back and succeeds only when the authenticated actor's state
-matches the request. Approval changes neither assessment nor communication completion.
-
-Sources:
-
-- <https://docs.gitlab.com/api/discussions/> (accessed 2026-09-22)
-- <https://docs.gitlab.com/api/merge_request_approvals/> (accessed 2026-09-22)
-- <https://docs.gitlab.com/api/merge_requests/> (accessed 2026-09-22)
-- <https://docs.gitlab.com/cli/api/> (accessed 2026-09-22)
-
+1. [glab api](https://docs.gitlab.com/cli/api/) (accessed 2026-09-22)
+2. [Discussions API](https://docs.gitlab.com/api/discussions/) (accessed 2026-09-22)
+3. [Notes API](https://docs.gitlab.com/api/notes/) (accessed 2026-09-22)
+4. [Merge request approvals API](https://docs.gitlab.com/api/merge_request_approvals/) (accessed 2026-09-22)

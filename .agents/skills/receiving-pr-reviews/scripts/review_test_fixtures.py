@@ -63,7 +63,11 @@ def canonical_snapshot(*, complete: bool = True) -> ReviewSnapshot:
         truncated_input_ids=[] if complete else [item.input_id],
         unavailable_capabilities=[],
     )
-    fingerprint = calculate_snapshot_fingerprint(review_target(), "abc123", [item], completeness)
+    revision_at = datetime(2026, 1, 1, tzinfo=UTC)
+    reviewability = Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[])
+    fingerprint = calculate_snapshot_fingerprint(
+        review_target(), "abc123", [item], completeness, revision_at=revision_at, reviewability=reviewability
+    )
     return ReviewSnapshot(
         provider="github",
         target=review_target(),
@@ -71,7 +75,7 @@ def canonical_snapshot(*, complete: bool = True) -> ReviewSnapshot:
         snapshot_complete=complete,
         snapshot_fingerprint=fingerprint,
         head_revision="abc123",
-        revision_at=datetime(2026, 1, 1, tzinfo=UTC),
+        revision_at=revision_at,
         completeness=completeness,
         review_inputs=[item],
         assessments=[],
@@ -85,7 +89,7 @@ def canonical_snapshot(*, complete: bool = True) -> ReviewSnapshot:
         unresolved_count=1,
         codex_approved=False,
         codex_approval_equivalence="available",
-        reviewability=Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[]),
+        reviewability=reviewability,
     )
 
 
@@ -137,6 +141,8 @@ def ready_cycle() -> ReviewCycleState:
         recheck_snapshot_fingerprint=canonical_snapshot().snapshot_fingerprint,
         communication_states={item.input_id: "pending"},
         resolution_states={item.input_id: "open"},
+        implementation_states={item.input_id: "completed"},
+        terminal_annotations={},
         cycle_terminal="action_pending",
         cycle_state="READY_FOR_ACTION",
     )

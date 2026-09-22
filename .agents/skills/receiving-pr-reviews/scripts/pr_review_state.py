@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pr_review_contracts import ApprovalStateAction, ReplyAction, ResolveAction, ReviewAction, TopLevelCommentAction
+from pr_review_contracts import ReplyAction, ResolveAction, ReviewAction, TopLevelCommentAction
 from pr_review_models import ReviewSnapshot
 from pr_review_state_models import (
     AuthorizedReviewAction,
@@ -88,7 +88,14 @@ def validate_snapshot_context(snapshot: ReviewSnapshot, cycle: ReviewCycleState)
         "recheck snapshot fingerprint does not match current snapshot",
     )
     calculated_fingerprint = calculate_snapshot_fingerprint(
-        snapshot.target, snapshot.head_revision, snapshot.review_inputs, snapshot.completeness
+        snapshot.target,
+        snapshot.head_revision,
+        snapshot.review_inputs,
+        snapshot.completeness,
+        revision_at=snapshot.revision_at,
+        reviewability=snapshot.reviewability,
+        provider_metadata=snapshot.provider_metadata,
+        communicated_input_ids=snapshot.communicated_input_ids,
     )
     require_authorization(
         calculated_fingerprint == snapshot.snapshot_fingerprint,
@@ -233,11 +240,71 @@ def validate_action_state(
         require_authorization(
             assessment.disposition != "clarification_required", "clarification-required input must remain open"
         )
-    elif isinstance(action, ApprovalStateAction):
-        capability = (
-            review_input.capabilities.can_approve if action.approved else review_input.capabilities.can_unapprove
-        )
-        require_authorization(capability, "input provider does not expose the requested approval-state operation")
+
+
+def evaluate_review_complete(snapshot: ReviewSnapshot, cycle: ReviewCycleState) -> ReviewCycleState:
+    """Evaluate the only successful review-cycle terminal from current provider evidence.
+
+    Args:
+        snapshot: Fresh complete provider snapshot after implementation and communication.
+        cycle: Exhaustive assessment and per-input lifecycle evidence.
+
+    Returns:
+        A copied cycle carrying the validated REVIEW_COMPLETE terminal.
+
+    Raises:
+        ReviewAuthorizationError: If any completion condition remains unproved.
+    """
+    require_authorization(snapshot.provider_consistency_error() is None, snapshot.provider_consistency_error() or "")
+    require_authorization(snapshot.snapshot_complete and snapshot.completeness.complete, "snapshot is incomplete")
+    calculated_fingerprint = calculate_snapshot_fingerprint(
+        snapshot.target,
+        snapshot.head_revision,
+        snapshot.review_inputs,
+        snapshot.completeness,
+        revision_at=snapshot.revision_at,
+        reviewability=snapshot.reviewability,
+        provider_metadata=snapshot.provider_metadata,
+        communicated_input_ids=snapshot.communicated_input_ids,
+    )
+    require_authorization(
+        calculated_fingerprint == snapshot.snapshot_fingerprint,
+        "snapshot fingerprint does not match canonical snapshot content",
+    )
+    require_authorization(cycle.context.target == snapshot.target, "cycle target does not match snapshot target")
+    require_authorization(
+        cycle.context.revision == snapshot.head_revision and cycle.context.remote_head == snapshot.head_revision,
+        "cycle revision does not match snapshot revision",
+    )
+    require_authorization(cycle.inspectable_revision == snapshot.head_revision, "inspectable revision is not current")
+    require_authorization(
+        cycle.recheck_snapshot_fingerprint == snapshot.snapshot_fingerprint,
+        "recheck snapshot fingerprint does not match current snapshot",
+    )
+    validate_cycle_coverage(snapshot, cycle)
+    inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
+    require_authorization(
+        set(cycle.implementation_states) == inbound_ids
+        and all(value in {"completed", "not_required"} for value in cycle.implementation_states.values()),
+        "per-input implementation state is incomplete",
+    )
+    require_authorization(set(cycle.terminal_annotations) == inbound_ids, "every input requires a terminal annotation")
+    completed_communications = {
+        input_id for input_id, value in cycle.communication_states.items() if value == "completed"
+    }
+    require_authorization(
+        all(value == "completed" for value in cycle.communication_states.values()),
+        "every inbound input requires completed communication",
+    )
+    require_authorization(
+        completed_communications.issubset(snapshot.communicated_input_ids),
+        "completed inputs require provider-backed communication evidence",
+    )
+    require_authorization(
+        all(value in {"resolved", "unavailable"} for value in cycle.resolution_states.values()),
+        "every input requires a terminal resolution state",
+    )
+    return cycle.model_copy(update={"cycle_terminal": "review_complete", "cycle_state": "REVIEW_COMPLETE"})
 
 
 def record_completed_communication(cycle: ReviewCycleState, input_id: str) -> ReviewCycleState:

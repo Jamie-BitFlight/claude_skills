@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pr_review_contracts import ChangeRequestTarget, ReplyAction, ResolveAction, ReviewAction
 from pr_review_models import ReviewSnapshot
-from pr_review_provider import ProviderResponseError
+from pr_review_provider import ProviderResponseError, ReviewProvider
 from pr_review_state import (
     authorize_action,
     load_cycle,
@@ -17,8 +17,45 @@ from pr_review_state import (
 from pr_review_state_models import AuthorizedReviewAction, ReviewCycleState
 
 
+def load_current_snapshot(
+    target: ChangeRequestTarget, snapshot_file: Path, *, provider: ReviewProvider, command_timeout: float | None
+) -> ReviewSnapshot:
+    """Refresh provider state and reject a stale caller-supplied snapshot.
+
+    Args:
+        target: Canonical command target.
+        snapshot_file: Previously saved canonical snapshot JSON.
+        provider: Selected provider used for the mandatory refresh.
+        command_timeout: Positive caller-selected provider command bound.
+
+    Returns:
+        Fresh provider snapshot identical to the saved authorization identity.
+
+    Raises:
+        ProviderResponseError: If the saved target or snapshot identity is stale.
+    """
+    saved_snapshot = load_snapshot(snapshot_file)
+    if saved_snapshot.target != target:
+        raise ProviderResponseError("snapshot target does not match command target")
+    snapshot = provider.snapshot(target, deadline=None, command_timeout=command_timeout)
+    if (
+        snapshot.target != saved_snapshot.target
+        or snapshot.head_revision != saved_snapshot.head_revision
+        or snapshot.snapshot_fingerprint != saved_snapshot.snapshot_fingerprint
+    ):
+        raise ProviderResponseError("saved review snapshot is no longer current")
+    return snapshot
+
+
 def authorized_action(
-    target: ChangeRequestTarget, snapshot_file: Path, state_file: Path, input_id: str, action: ReviewAction
+    target: ChangeRequestTarget,
+    snapshot_file: Path,
+    state_file: Path,
+    input_id: str,
+    action: ReviewAction,
+    *,
+    provider: ReviewProvider,
+    command_timeout: float | None,
 ) -> tuple[AuthorizedReviewAction, ReviewCycleState]:
     """Load and validate one current pre-action gate.
 
@@ -28,14 +65,14 @@ def authorized_action(
         state_file: Complete review-cycle JSON.
         input_id: Canonical inbound input selected for mutation.
         action: Provider-neutral mutation to authorize.
+        provider: Selected provider used to refresh remote state before authorization.
+        command_timeout: Positive caller-selected provider command bound.
 
     Returns:
         The action bound to validated evidence and the loaded cycle to update after success.
     """
-    snapshot = load_snapshot(snapshot_file)
     cycle = load_cycle(state_file)
-    if snapshot.target != target:
-        raise ProviderResponseError("snapshot target does not match command target")
+    snapshot = load_current_snapshot(target, snapshot_file, provider=provider, command_timeout=command_timeout)
     return authorize_action(snapshot, cycle, input_id, action), cycle
 
 

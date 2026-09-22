@@ -9,7 +9,8 @@ from typing import Literal
 
 from pr_review_contracts import ChangeRequestTarget
 from pr_review_gh_wire import ReviewThreadNode
-from pr_review_models import Author, IssueComment, Reaction, ReviewNode
+from pr_review_models import Author, IssueComment, Reaction, Reviewability, ReviewNode
+from pr_review_provider_text import reference_present
 from pr_review_state_models import (
     ProviderInputIdentity,
     ReviewActor,
@@ -305,7 +306,14 @@ def approval_inputs(
 
 
 def fingerprint(
-    target: ChangeRequestTarget, revision: str, review_inputs: list[ReviewInput], completeness: SnapshotCompleteness
+    target: ChangeRequestTarget,
+    revision: str,
+    review_inputs: list[ReviewInput],
+    completeness: SnapshotCompleteness,
+    *,
+    revision_at: datetime | None = None,
+    reviewability: Reviewability | None = None,
+    communicated_input_ids: set[str] | None = None,
 ) -> str:
     """Hash the complete normalized snapshot identity.
 
@@ -314,8 +322,41 @@ def fingerprint(
         revision: Current sampled remote revision.
         review_inputs: Complete normalized input sequence.
         completeness: Evidence for every required provider surface.
+        revision_at: Provider-observed current-revision timestamp.
+        reviewability: Provider-normalized draft, merge, and blocker state.
+        communicated_input_ids: Inputs with provider-observed response evidence.
 
     Returns:
         A stable SHA-256 fingerprint.
     """
-    return calculate_snapshot_fingerprint(target, revision, review_inputs, completeness)
+    return calculate_snapshot_fingerprint(
+        target,
+        revision,
+        review_inputs,
+        completeness,
+        revision_at=revision_at,
+        reviewability=reviewability,
+        communicated_input_ids=communicated_input_ids,
+    )
+
+
+def communicated_inputs(inputs: list[ReviewInput]) -> set[str]:
+    """Find inbound inputs answered by thread context or an exact stable reference.
+
+    Args:
+        inputs: Complete normalized GitHub input census.
+
+    Returns:
+        Canonical input IDs with provider-observed communication evidence.
+    """
+    outbound = [item for item in inputs if item.direction == "outbound"]
+    return {
+        item.input_id
+        for item in inputs
+        if item.direction == "inbound"
+        and any(
+            (item.thread_id is not None and response.thread_id == item.thread_id)
+            or reference_present(response.body, item.stable_reference)
+            for response in outbound
+        )
+    }

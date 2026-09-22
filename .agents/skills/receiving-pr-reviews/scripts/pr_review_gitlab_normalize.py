@@ -6,7 +6,14 @@ from collections.abc import Iterable
 
 from pr_review_contracts import ChangeRequestTarget
 from pr_review_gitlab_wire import GitLabAwardEmoji, GitLabDiscussion, GitLabNote, GitLabState, GitLabUser
-from pr_review_models import Reviewability, ReviewSnapshot
+from pr_review_models import (
+    ProviderApprovalState,
+    ProviderSystemEvent,
+    Reviewability,
+    ReviewProviderMetadata,
+    ReviewSnapshot,
+)
+from pr_review_provider_text import reference_present
 from pr_review_state_models import (
     InputKind,
     ProviderInputIdentity,
@@ -23,6 +30,11 @@ SURFACES = {"merge_request", "discussions", "notes", "approvals", "award_emoji",
 def actor(user: GitLabUser, state: GitLabState, *, reviewer: bool = False) -> ReviewActor:
     """Map only provider-observable identity and role facts.
 
+    Args:
+        user: Provider-observed GitLab user.
+        state: Complete stable GitLab state.
+        reviewer: Whether the source surface proves a reviewer role.
+
     Returns:
         A provider-neutral actor.
     """
@@ -32,7 +44,7 @@ def actor(user: GitLabUser, state: GitLabState, *, reviewer: bool = False) -> Re
     elif reviewer:
         role = "reviewer"
     else:
-        role = "stakeholder"
+        role = "unknown"
     return ReviewActor(
         actor_id=str(user.id), login=user.username, display_name=user.name, classification=classification, role=role
     )
@@ -40,6 +52,10 @@ def actor(user: GitLabUser, state: GitLabState, *, reviewer: bool = False) -> Re
 
 def note_reference(state: GitLabState, note: GitLabNote) -> str:
     """Build GitLab's stable merge-request note anchor.
+
+    Args:
+        state: Complete stable GitLab state.
+        note: Atomic note whose stable URL is required.
 
     Returns:
         A stable note URL.
@@ -49,6 +65,11 @@ def note_reference(state: GitLabState, note: GitLabNote) -> str:
 
 def note_input(state: GitLabState, note: GitLabNote, *, discussion: GitLabDiscussion | None) -> ReviewInput | None:
     """Normalize one non-system note, preserving discussion mutation targets.
+
+    Args:
+        state: Complete stable GitLab state.
+        note: Atomic provider note.
+        discussion: Owning discussion, when the note was observed there.
 
     Returns:
         One canonical input, or ``None`` for a system note.
@@ -91,8 +112,6 @@ def note_input(state: GitLabState, note: GitLabNote, *, discussion: GitLabDiscus
             can_reply=threaded,
             can_resolve=can_resolve,
             can_comment=True,
-            can_approve=True,
-            can_unapprove=True,
             unavailable=[] if threaded else ["inline_reply", "provider_resolution"],
         ),
         thread_id=discussion_id,
@@ -102,6 +121,9 @@ def note_input(state: GitLabState, note: GitLabNote, *, discussion: GitLabDiscus
 
 def note_inputs(state: GitLabState) -> list[ReviewInput]:
     """Normalize discussions and add any notes missing from that endpoint.
+
+    Args:
+        state: Complete stable GitLab state.
 
     Returns:
         De-duplicated atomic note inputs.
@@ -121,6 +143,9 @@ def note_inputs(state: GitLabState) -> list[ReviewInput]:
 
 def approval_inputs(state: GitLabState) -> list[ReviewInput]:
     """Normalize only actor-backed approvals, never zero-required platform state.
+
+    Args:
+        state: Complete stable GitLab state.
 
     Returns:
         Actor-backed approval inputs.
@@ -150,8 +175,6 @@ def approval_inputs(state: GitLabState) -> list[ReviewInput]:
                     can_reply=False,
                     can_resolve=False,
                     can_comment=True,
-                    can_approve=True,
-                    can_unapprove=True,
                     unavailable=["inline_reply", "provider_resolution", "approval_timestamp"],
                 ),
                 thread_id=None,
@@ -163,6 +186,9 @@ def approval_inputs(state: GitLabState) -> list[ReviewInput]:
 
 def award_kind(award: GitLabAwardEmoji) -> set[InputKind]:
     """Map explicit positive/negative award signals and retain other awards as comments.
+
+    Args:
+        award: Provider award emoji to classify.
 
     Returns:
         The canonical semantic kind set.
@@ -176,6 +202,9 @@ def award_kind(award: GitLabAwardEmoji) -> set[InputKind]:
 
 def award_inputs(state: GitLabState) -> list[ReviewInput]:
     """Normalize merge-request award signals as independently assessable inputs.
+
+    Args:
+        state: Complete stable GitLab state.
 
     Returns:
         Atomic award inputs.
@@ -202,8 +231,6 @@ def award_inputs(state: GitLabState) -> list[ReviewInput]:
                 can_reply=False,
                 can_resolve=False,
                 can_comment=True,
-                can_approve=True,
-                can_unapprove=True,
                 unavailable=["inline_reply", "provider_resolution"],
             ),
             thread_id=None,
@@ -214,12 +241,74 @@ def award_inputs(state: GitLabState) -> list[ReviewInput]:
 
 
 def ordered(inputs: Iterable[ReviewInput]) -> list[ReviewInput]:
-    """Return a deterministic provider-independent sequence."""
+    """Return a deterministic provider-independent sequence.
+
+    Args:
+        inputs: Normalized provider inputs.
+
+    Returns:
+        Inputs ordered by provider timestamp and canonical identity.
+    """
     return sorted(inputs, key=lambda item: (item.created_at is None, item.created_at, item.input_id))
+
+
+def provider_metadata(state: GitLabState) -> ReviewProviderMetadata:
+    """Retain observable platform state outside the review-input census.
+
+    Args:
+        state: Complete stable GitLab state.
+
+    Returns:
+        Provider metadata for system events, approvals, and blocking discussions.
+    """
+    system_notes: dict[int, GitLabNote] = {}
+    for discussion in state.discussions:
+        system_notes.update({note.id: note for note in discussion.notes if note.system})
+    system_notes.update({note.id: note for note in state.notes if note.system})
+    return ReviewProviderMetadata(
+        system_notes=[
+            ProviderSystemEvent(id=str(note.id), body=note.body, created_at=note.created_at)
+            for note in sorted(system_notes.values(), key=lambda value: (value.created_at, value.id))
+        ],
+        approval_state=ProviderApprovalState(
+            approved=state.approvals.approved,
+            approvals_required=state.approvals.approvals_required,
+            approvals_left=state.approvals.approvals_left,
+            approval_rules_left=state.approvals.approval_rules_left,
+        ),
+        blocking_discussions_resolved=state.merge_request.blocking_discussions_resolved,
+    )
+
+
+def communicated_inputs(inputs: list[ReviewInput]) -> set[str]:
+    """Find inbound inputs quoted exactly by a later authenticated-actor note.
+
+    Args:
+        inputs: Complete normalized input census in stable order.
+
+    Returns:
+        Canonical inbound input IDs with provider-observed communication evidence.
+    """
+    outbound = [item for item in inputs if item.direction == "outbound"]
+    return {
+        item.input_id
+        for item in inputs
+        if item.direction == "inbound"
+        and any(
+            response.created_at is not None
+            and (item.created_at is None or response.created_at >= item.created_at)
+            and reference_present(response.body, item.stable_reference)
+            for response in outbound
+        )
+    }
 
 
 def normalize_state(state: GitLabState, target: ChangeRequestTarget) -> ReviewSnapshot:
     """Build one complete canonical GitLab snapshot.
+
+    Args:
+        state: Complete stable GitLab state.
+        target: Canonical merge-request target.
 
     Returns:
         A complete provider-neutral review snapshot.
@@ -249,12 +338,24 @@ def normalize_state(state: GitLabState, target: ChangeRequestTarget) -> ReviewSn
         merge_state_status=state.merge_request.detailed_merge_status,
         blockers=blockers,
     )
+    metadata = provider_metadata(state)
+    communicated = communicated_inputs(inputs)
+    snapshot_fingerprint = calculate_snapshot_fingerprint(
+        target,
+        state.merge_request.sha,
+        inputs,
+        completeness,
+        revision_at=revision_at,
+        reviewability=reviewability,
+        provider_metadata=metadata,
+        communicated_input_ids=communicated,
+    )
     return ReviewSnapshot(
         provider="gitlab",
         target=target,
         transport="gitlab_cli",
         snapshot_complete=True,
-        snapshot_fingerprint=calculate_snapshot_fingerprint(target, state.merge_request.sha, inputs, completeness),
+        snapshot_fingerprint=snapshot_fingerprint,
         head_revision=state.merge_request.sha,
         revision_at=revision_at,
         completeness=completeness,
@@ -269,6 +370,12 @@ def normalize_state(state: GitLabState, target: ChangeRequestTarget) -> ReviewSn
             for discussion in state.discussions
         ),
         unresolved_count=len(unresolved_threads),
+        outstanding_input_count=sum(
+            item.direction == "inbound" and item.provider_state != "resolved" and item.input_id not in communicated
+            for item in inputs
+        ),
         codex_approved=None,
         reviewability=reviewability,
+        provider_metadata=metadata,
+        communicated_input_ids=communicated,
     )

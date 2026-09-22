@@ -25,7 +25,6 @@ from pydantic import ValidationError
 
 from pr_review_github_normalize import actor, review_inputs
 from pr_review_models import (
-    ApprovalStateAction,
     Author,
     ChangeRequestTarget,
     ReplyAction,
@@ -36,7 +35,7 @@ from pr_review_models import (
     ReviewSnapshot,
     TopLevelCommentAction,
 )
-from pr_review_state import ReviewAuthorizationError, authorize_action
+from pr_review_state import ReviewAuthorizationError, authorize_action, evaluate_review_complete
 from pr_review_state_models import (
     ProviderInputIdentity,
     ReviewActor,
@@ -93,7 +92,11 @@ def snapshot(*, complete: bool = True) -> ReviewSnapshot:
         truncated_input_ids=[] if complete else [item.input_id],
         unavailable_capabilities=[],
     )
-    fingerprint = calculate_snapshot_fingerprint(target(), "abc123", [item], completeness)
+    revision_at = datetime(2026, 1, 1, tzinfo=UTC)
+    reviewability = Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[])
+    fingerprint = calculate_snapshot_fingerprint(
+        target(), "abc123", [item], completeness, revision_at=revision_at, reviewability=reviewability
+    )
     return ReviewSnapshot(
         provider="github",
         target=target(),
@@ -101,7 +104,7 @@ def snapshot(*, complete: bool = True) -> ReviewSnapshot:
         snapshot_complete=complete,
         snapshot_fingerprint=fingerprint,
         head_revision="abc123",
-        revision_at=datetime(2026, 1, 1, tzinfo=UTC),
+        revision_at=revision_at,
         completeness=completeness,
         review_inputs=[item],
         assessments=[],
@@ -115,7 +118,7 @@ def snapshot(*, complete: bool = True) -> ReviewSnapshot:
         unresolved_count=1,
         codex_approved=False,
         codex_approval_equivalence="available",
-        reviewability=Reviewability(is_draft=False, mergeable="MERGEABLE", merge_state_status="CLEAN", blockers=[]),
+        reviewability=reviewability,
     )
 
 
@@ -166,6 +169,8 @@ def ready_cycle() -> ReviewCycleState:
         recheck_snapshot_fingerprint=snapshot().snapshot_fingerprint,
         communication_states={review_input().input_id: "pending"},
         resolution_states={review_input().input_id: "open"},
+        implementation_states={review_input().input_id: "completed"},
+        terminal_annotations={},
         cycle_terminal="action_pending",
         cycle_state="READY_FOR_ACTION",
     )
@@ -174,7 +179,16 @@ def ready_cycle() -> ReviewCycleState:
 def state_for_input(item: ReviewInput, assessment: ReviewAssessment) -> tuple[ReviewSnapshot, ReviewCycleState]:
     """Bind a customized input and assessment to current fingerprint evidence."""
     original = snapshot()
-    fingerprint = calculate_snapshot_fingerprint(original.target, original.head_revision, [item], original.completeness)
+    fingerprint = calculate_snapshot_fingerprint(
+        original.target,
+        original.head_revision,
+        [item],
+        original.completeness,
+        revision_at=original.revision_at,
+        reviewability=original.reviewability,
+        provider_metadata=original.provider_metadata,
+        communicated_input_ids=original.communicated_input_ids,
+    )
     snapshot_value = original.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint})
     cycle_value = ready_cycle().model_copy(
         update={
@@ -184,6 +198,23 @@ def state_for_input(item: ReviewInput, assessment: ReviewAssessment) -> tuple[Re
         }
     )
     return snapshot_value, cycle_value
+
+
+def snapshot_with_communication() -> ReviewSnapshot:
+    """Return a canonically fingerprinted snapshot with provider communication evidence."""
+    original = snapshot()
+    communicated = {review_input().input_id}
+    fingerprint = calculate_snapshot_fingerprint(
+        original.target,
+        original.head_revision,
+        original.review_inputs,
+        original.completeness,
+        revision_at=original.revision_at,
+        reviewability=original.reviewability,
+        provider_metadata=original.provider_metadata,
+        communicated_input_ids=communicated,
+    )
+    return original.model_copy(update={"communicated_input_ids": communicated, "snapshot_fingerprint": fingerprint})
 
 
 def test_shared_reply_action_does_not_require_github_comment_identifier() -> None:
@@ -217,21 +248,6 @@ def test_authorize_action_binds_complete_current_cycle() -> None:
     assert authorized.cycle_state == "READY_FOR_ACTION"
     assert authorized.review_input.input_id == review_input().input_id
     assert authorized.snapshot_fingerprint == snapshot().snapshot_fingerprint
-
-
-def test_approval_state_requires_explicit_provider_capability() -> None:
-    with pytest.raises(ReviewAuthorizationError, match="does not expose"):
-        authorize_action(snapshot(), ready_cycle(), review_input().input_id, ApprovalStateAction(approved=True))
-
-    capable = review_input().model_copy(
-        update={"capabilities": review_input().capabilities.model_copy(update={"can_approve": True})}
-    )
-    assessment = ready_cycle().assessments[0]
-    snapshot_value, cycle_value = state_for_input(capable, assessment)
-
-    authorized = authorize_action(snapshot_value, cycle_value, capable.input_id, ApprovalStateAction(approved=True))
-
-    assert isinstance(authorized.action, ApprovalStateAction)
 
 
 @pytest.mark.parametrize(
@@ -272,8 +288,63 @@ def test_snapshot_fingerprint_survives_json_round_trip() -> None:
     restored = ReviewSnapshot.model_validate_json(original.model_dump_json())
 
     assert restored.snapshot_fingerprint == calculate_snapshot_fingerprint(
-        restored.target, restored.head_revision, restored.review_inputs, restored.completeness
+        restored.target,
+        restored.head_revision,
+        restored.review_inputs,
+        restored.completeness,
+        revision_at=restored.revision_at,
+        reviewability=restored.reviewability,
+        provider_metadata=restored.provider_metadata,
+        communicated_input_ids=restored.communicated_input_ids,
     )
+
+
+def test_review_complete_requires_provider_backed_per_input_lifecycle() -> None:
+    snapshot_value = snapshot_with_communication()
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "recheck_snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "communication_states": {review_input().input_id: "completed"},
+            "resolution_states": {review_input().input_id: "resolved"},
+            "terminal_annotations": {review_input().input_id: "Implemented, verified, communicated, and resolved."},
+        }
+    )
+
+    completed = evaluate_review_complete(snapshot_value, cycle_value)
+
+    assert completed.cycle_state == "REVIEW_COMPLETE"
+    assert completed.cycle_terminal == "review_complete"
+
+
+def test_review_complete_rejects_caller_only_communication_claim() -> None:
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "communication_states": {review_input().input_id: "completed"},
+            "resolution_states": {review_input().input_id: "resolved"},
+            "terminal_annotations": {review_input().input_id: "Claimed complete."},
+        }
+    )
+
+    with pytest.raises(ReviewAuthorizationError, match="provider-backed communication"):
+        evaluate_review_complete(snapshot(), cycle_value)
+
+
+def test_review_complete_requires_per_input_implementation_and_annotation() -> None:
+    snapshot_value = snapshot_with_communication()
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "recheck_snapshot_fingerprint": snapshot_value.snapshot_fingerprint,
+            "communication_states": {review_input().input_id: "completed"},
+            "resolution_states": {review_input().input_id: "resolved"},
+            "implementation_states": {review_input().input_id: "pending"},
+            "terminal_annotations": {},
+        }
+    )
+
+    with pytest.raises(ReviewAuthorizationError, match="implementation state"):
+        evaluate_review_complete(snapshot_value, cycle_value)
 
 
 def test_authorization_requires_explicit_decisions_for_unknown_provider_facts() -> None:

@@ -24,8 +24,14 @@ MIN_REPOSITORY_SEGMENTS = 2
 def validate_github_option(value: str | None) -> str | None:
     """Validate an explicit GitHub owner/repository value.
 
+    Args:
+        value: Candidate owner/repository option or ``None`` for detection.
+
     Returns:
         The validated option, or ``None`` when detection is requested.
+
+    Raises:
+        typer.BadParameter: If the value is not exactly owner/repository.
     """
     if value is None:
         return None
@@ -64,8 +70,16 @@ DEFAULT_PROVIDER_TIMEOUT_SECONDS = DEFAULT_COMMAND_TIMEOUT_SECONDS
 def run_git(arguments: list[str], *, timeout: float | None = None) -> str:
     """Run one bounded read-only Git command.
 
+    Args:
+        arguments: Complete Git argument vector after the executable.
+        timeout: Positive subprocess bound in seconds.
+
     Returns:
         Complete standard output.
+
+    Raises:
+        subprocess.CalledProcessError: If Git exits non-zero.
+        subprocess.TimeoutExpired: If Git exceeds the bound.
     """
     return run_capture(["git", *arguments], timeout=timeout)
 
@@ -73,8 +87,14 @@ def run_git(arguments: list[str], *, timeout: float | None = None) -> str:
 def validate_repository_path(value: str) -> str:
     """Validate a nested namespace/repository path.
 
+    Args:
+        value: Candidate provider namespace and repository path.
+
     Returns:
         The unchanged valid path.
+
+    Raises:
+        typer.BadParameter: If any required path segment is empty.
     """
     segments = value.split("/")
     if len(segments) < MIN_REPOSITORY_SEGMENTS or any(not segment for segment in segments):
@@ -87,8 +107,17 @@ def github_target(
 ) -> ChangeRequestTarget:
     """Resolve the legacy GitHub option with its established diagnostics.
 
+    Args:
+        github: Explicit owner/repository path, or ``None`` for detection.
+        number: Positive pull-request number.
+        timeout: Positive provider-command bound.
+        detector: GitHub repository identity detector.
+
     Returns:
         A canonical GitHub pull-request target.
+
+    Raises:
+        typer.Exit: If repository detection fails.
     """
     if github is None:
         try:
@@ -111,8 +140,15 @@ def github_target(
 def gitlab_repo_view(*, timeout: float | None, runner: CommandRunner = run_glab) -> tuple[str, str]:
     """Detect a GitLab host and nested project path through the configured remote.
 
+    Args:
+        timeout: Positive provider-command bound.
+        runner: Bounded glab command transport.
+
     Returns:
         The detected bare host and nested project path.
+
+    Raises:
+        typer.BadParameter: If glab returns an invalid repository identity.
     """
     raw = runner(["repo", "view", "--output", "json"], timeout=timeout)
     try:
@@ -131,8 +167,18 @@ def gitlab_target(
 ) -> ChangeRequestTarget:
     """Resolve an explicit or remote-detected GitLab merge-request target.
 
+    Args:
+        repo: Explicit nested project path, or ``None`` for detection.
+        host: Explicit bare GitLab hostname, or ``None`` for detection.
+        number: Positive merge-request number.
+        timeout: Positive provider-command bound.
+        runner: Bounded glab command transport.
+
     Returns:
         A canonical GitLab merge-request target.
+
+    Raises:
+        typer.BadParameter: If target options are incomplete or invalid.
     """
     if (repo is None) != (host is None):
         raise typer.BadParameter("GitLab target requires --repo and --host together, or neither for detection")
@@ -147,8 +193,14 @@ def gitlab_target(
 def remote_identity(remote: str) -> tuple[str, str]:
     """Parse SSH or HTTPS remote coordinates without classifying the forge.
 
+    Args:
+        remote: Complete SSH or HTTPS remote URL.
+
     Returns:
         The lower-case host and nested repository path.
+
+    Raises:
+        typer.BadParameter: If the remote is not a supported URL.
     """
     value = remote.strip()
     if "://" in value:
@@ -173,8 +225,18 @@ def auto_target(
 ) -> ChangeRequestTarget:
     """Resolve the forge from the current origin and verify custom GitLab identity.
 
+    Args:
+        number: Positive change-request number.
+        timeout: Positive provider-command bound.
+        github_resolver: GitHub target resolver.
+        git_runner: Bounded read-only Git command transport.
+        glab_runner: Bounded glab command transport.
+
     Returns:
         A canonical GitHub or GitLab target.
+
+    Raises:
+        typer.BadParameter: If the remote and provider identity disagree.
     """
     host, repo = remote_identity(git_runner(["remote", "get-url", "origin"], timeout=timeout))
     if host == "github.com":
@@ -199,8 +261,20 @@ def resolve_target(
 ) -> ChangeRequestTarget:
     """Select exactly one provider without mixing legacy and generic options.
 
+    Args:
+        provider: Explicit provider name or automatic selection mode.
+        repo: Explicit provider repository path.
+        host: Explicit provider hostname.
+        github: Legacy GitHub owner/repository option.
+        number: Positive change-request number.
+        timeout: Positive provider-command bound.
+        github_resolver: GitHub target resolver.
+
     Returns:
         The canonical target selected from non-conflicting options.
+
+    Raises:
+        typer.BadParameter: If the target options conflict or are invalid.
     """
     if github is not None and (provider not in {None, "github"} or repo is not None or host is not None):
         raise typer.BadParameter("--github cannot be combined with GitLab or generic target options")

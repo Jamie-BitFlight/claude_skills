@@ -45,8 +45,6 @@ class ReviewCapabilities(BaseModel):
     can_reply: bool
     can_resolve: bool
     can_comment: bool
-    can_approve: bool = False
-    can_unapprove: bool = False
     unavailable: list[str]
 
 
@@ -143,7 +141,15 @@ class SnapshotCompleteness(BaseModel):
 
 
 def calculate_snapshot_fingerprint(
-    target: ChangeRequestTarget, revision: str, review_inputs: list[ReviewInput], completeness: SnapshotCompleteness
+    target: ChangeRequestTarget,
+    revision: str,
+    review_inputs: list[ReviewInput],
+    completeness: SnapshotCompleteness,
+    *,
+    revision_at: datetime | None = None,
+    reviewability: BaseModel | dict[str, object] | None = None,
+    provider_metadata: BaseModel | dict[str, object] | None = None,
+    communicated_input_ids: set[str] | None = None,
 ) -> str:
     """Hash canonical snapshot identity and completeness evidence.
 
@@ -152,6 +158,10 @@ def calculate_snapshot_fingerprint(
         revision: Exact sampled remote revision.
         review_inputs: Complete normalized provider input sequence.
         completeness: Evidence for every required provider surface.
+        revision_at: Provider-observed revision timestamp.
+        reviewability: Provider-normalized draft, merge, and blocker state.
+        provider_metadata: Provider facts retained outside the review-input census.
+        communicated_input_ids: Inputs with provider-observed exact-reference responses.
 
     Returns:
         A stable SHA-256 fingerprint.
@@ -161,6 +171,16 @@ def calculate_snapshot_fingerprint(
         "revision": revision,
         "review_inputs": [item.model_dump(mode="json") for item in review_inputs],
         "completeness": completeness.model_dump(mode="json"),
+        "revision_at": revision_at.isoformat() if revision_at is not None else None,
+        "reviewability": reviewability.model_dump(mode="json")
+        if isinstance(reviewability, BaseModel)
+        else reviewability,
+        "provider_metadata": (
+            provider_metadata.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+            if isinstance(provider_metadata, BaseModel)
+            else provider_metadata or {}
+        ),
+        "communicated_input_ids": sorted(communicated_input_ids or set()),
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -249,8 +269,26 @@ class ReviewCycleState(BaseModel):
     recheck_snapshot_fingerprint: NonBlankText
     communication_states: dict[str, Literal["pending", "completed", "not_required"]]
     resolution_states: dict[str, Literal["open", "resolved", "unavailable"]]
+    implementation_states: dict[str, Literal["pending", "completed", "not_required"]] = Field(default_factory=dict)
+    terminal_annotations: dict[str, NonBlankText] = Field(default_factory=dict)
     cycle_terminal: Literal["action_pending", "review_complete", "blocked"]
     cycle_state: CycleState
+
+    @model_validator(mode="after")
+    def validate_terminal_pair(self) -> ReviewCycleState:
+        """Reject terminal labels that contradict the lifecycle state.
+
+        Returns:
+            The cycle after terminal-state consistency validation.
+
+        Raises:
+            ValueError: If review completion is asserted by only one terminal field.
+        """
+        completed = self.cycle_terminal == "review_complete"
+        if completed != (self.cycle_state == "REVIEW_COMPLETE"):
+            message = "review_complete terminal and REVIEW_COMPLETE state must be set together"
+            raise ValueError(message)
+        return self
 
 
 class AuthorizedReviewAction(BaseModel):
