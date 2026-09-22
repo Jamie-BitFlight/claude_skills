@@ -4,9 +4,9 @@
     {
       "id": 1,
       "tags": ["github-activation", "ordering"],
-      "prompt": "I pushed a commit. Check and address every review on the GitHub PR.",
+      "prompt": "I pushed a commit. Read attached file evals/files/behavioral-fixtures.json and use case 1 to trace how you check and address every review on the GitHub PR. Treat its transitions as observed fixture evidence, not live operations.",
       "expected_output": "The skill activates, loads the contract after a complete GitHub snapshot, and finishes the evidence-bound cycle without premature mutation.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The transcript loads receiving-pr-reviews automatically.",
         "A complete GitHub snapshot precedes census and assessment.",
@@ -17,9 +17,9 @@
     {
       "id": 2,
       "tags": ["gitlab-activation", "provider-route"],
-      "prompt": "Check and address all feedback on this GitLab MR.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 2 to trace how you check and address all feedback on this GitLab MR. Treat its transitions as observed fixture evidence, not live operations.",
       "expected_output": "The skill and GitLab branch activate while the shared gates remain provider-neutral.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The transcript loads receiving-pr-reviews and gitlab-review-operations.md.",
         "The selected provider is GitLab and the target is an MR.",
@@ -41,9 +41,9 @@
     {
       "id": 4,
       "tags": ["mixed-census", "exact-cover"],
-      "prompt": "Process a complete review snapshot containing an inline human comment, a stakeholder question, an approval, a change request, and a bot summary.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 4 to author the cycle projection for its complete mixed-input snapshot without performing provider operations.",
       "expected_output": "Every atomic inbound object appears exactly once in the census, assessment set, and cluster cover.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "All five input classes have unique canonical IDs in input_census.",
         "Each input has exactly one assessment and one cluster membership.",
@@ -53,9 +53,9 @@
     {
       "id": 5,
       "tags": ["question", "clarification"],
-      "prompt": "A valid review comment asks an ambiguous design question that the repository evidence cannot answer. Handle the cycle.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 5 to handle the ambiguous design question and author its exact assessment and focused clarification without performing provider operations.",
       "expected_output": "The comment retains its comment kind, gains question semantics, and follows the clarification route.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The assessment preserves comment and adds question semantics.",
         "One missing fact and one focused question are recorded.",
@@ -65,9 +65,9 @@
     {
       "id": 6,
       "tags": ["approval-only", "completion"],
-      "prompt": "The only current GitHub review input is a Codex approval. Complete the review cycle correctly.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 6 to trace the only current GitHub input through its complete approval lifecycle. Treat provider transitions as observed fixture evidence, not live operations.",
       "expected_output": "Approval follows the full lifecycle and never shortcuts the terminal gate.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The approval is assessed and communicated as an inbound input.",
         "A complete recheck occurs after communication.",
@@ -77,9 +77,9 @@
     {
       "id": 7,
       "tags": ["rejection", "change-request"],
-      "prompt": "Handle one empty-body rejection and one body-bearing change request in the same review cycle.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 7 to trace the empty-body rejection and body-bearing change request through one systemic review cycle. Treat transitions as observed fixture evidence.",
       "expected_output": "Both rejection forms remain explicit inputs and receive systemic dispositions.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "Both inputs remain in the census despite one empty body.",
         "Both use rejection_assessed and receive cluster assignments.",
@@ -89,9 +89,9 @@
     {
       "id": 8,
       "tags": ["bot-summary", "no-change"],
-      "prompt": "A bot posts an activity summary with no independent finding. Process it with the rest of the review.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 8 to process the bot activity summary with no independent finding through its full permitted lifecycle. Treat transitions as observed fixture evidence.",
       "expected_output": "The bot summary remains fingerprinted and receives an evidence-backed disposition.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The bot input remains in the census and canonical fingerprint.",
         "An evidence-backed no_change or coherent cluster disposition is recorded.",
@@ -148,9 +148,9 @@
     {
       "id": 13,
       "tags": ["unavailable-capability", "truthful-state"],
-      "prompt": "A top-level approval can be answered but the provider cannot resolve it. Finish its permitted lifecycle.",
+      "prompt": "Read attached file evals/files/behavioral-fixtures.json and use case 13 to finish the permitted lifecycle for the top-level approval that can be answered but not resolved. Treat transitions as observed fixture evidence.",
       "expected_output": "Communication is provider-backed and resolution is truthfully unavailable.",
-      "files": [],
+      "files": ["evals/files/behavioral-fixtures.json"],
       "expectations": [
         "The stable-reference communication is confirmed by the provider.",
         "Resolution is recorded as unavailable, never resolved.",

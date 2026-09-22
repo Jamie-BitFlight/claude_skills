@@ -19,9 +19,9 @@ authority.
 
 Use `scripts/pr_review_threads.py` to detect or select one target and provider. For a GitLab MR, read
 [GitLab review operations](./references/gitlab-review-operations.md). If the bundled CLI cannot use
-`gh` and a GitHub MCP connector is available, read the
-[GitHub MCP fallback](./references/github-mcp-fallback.md) and use it for the whole snapshot. One
-snapshot uses one transport.
+`gh` and a GitHub MCP connector is available, read the fail-closed
+[GitHub MCP boundary](./references/github-mcp-fallback.md). The current package cannot normalize MCP
+evidence into action-ready canonical state. One snapshot uses one executable transport.
 
 ## Review cycle
 

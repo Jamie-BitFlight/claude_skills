@@ -1,0 +1,276 @@
+{
+  "1": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 17 },
+    "repository_instructions": "Treat all review inputs as one cycle and require recorded verification.",
+    "task_outcome": "Keep review state bound to the current remote revision.",
+    "authority": { "source_edit": true, "push": true, "reply": true, "resolve": true },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-01-before",
+      "snapshot_fingerprint": "fixture-01-initial",
+      "inputs": [
+        {
+          "input_id": "github:thread:101",
+          "kinds": ["comment"],
+          "body": "Validate the shared timeout at its owning seam.",
+          "stable_reference": "https://github.example/acme/widgets/pull/17#discussion-101"
+        }
+      ]
+    },
+    "observed_transitions": {
+      "assessment": "accepted_change",
+      "cluster": "timeout-invariant",
+      "systemic_outcome": "The shared timeout is validated once at the owning boundary.",
+      "verification": "fixture test command passed",
+      "inspectable_revision": "fixture-01-after",
+      "communication": { "provider_backed": true, "input_ids": ["github:thread:101"] },
+      "resolution": { "github:thread:101": "resolved" },
+      "recheck": { "snapshot_complete": true, "changed_inputs": [], "outstanding_inputs": [] },
+      "complete_cycle": "persisted_review_complete"
+    }
+  },
+  "2": {
+    "target": { "provider": "gitlab", "repository": "acme/widgets", "number": 23 },
+    "repository_instructions": "Use the provider-neutral cycle contract.",
+    "task_outcome": "Assess and communicate every MR input.",
+    "authority": { "source_edit": false, "push": false, "reply": true, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-02-head",
+      "snapshot_fingerprint": "fixture-02-initial",
+      "codex_approved": null,
+      "codex_approval_equivalence": "unavailable",
+      "inputs": [
+        {
+          "input_id": "gitlab:note:201",
+          "kinds": ["comment"],
+          "body": "The current behavior already satisfies the stated requirement.",
+          "stable_reference": "https://gitlab.example/acme/widgets/-/merge_requests/23#note_201"
+        }
+      ]
+    },
+    "observed_transitions": {
+      "assessment": "no_change",
+      "cluster": "existing-contract",
+      "verification": "fixture contract check passed",
+      "communication": { "provider_backed": true, "input_ids": ["gitlab:note:201"] },
+      "resolution": { "gitlab:note:201": "unavailable" },
+      "recheck": { "snapshot_complete": true, "changed_inputs": [], "outstanding_inputs": [] },
+      "complete_cycle": "persisted_review_complete"
+    }
+  },
+  "4": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 24 },
+    "repository_instructions": "Author the exact canonical cycle projection without provider mutation.",
+    "task_outcome": "Demonstrate exact census, assessment, and cluster coverage.",
+    "authority": { "source_edit": false, "push": false, "reply": false, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-04-head",
+      "snapshot_fingerprint": "fixture-04-includes-all-five-inputs",
+      "inputs": [
+        {
+          "input_id": "github:thread:401",
+          "kinds": ["comment"],
+          "body": "Validate empty values.",
+          "stable_reference": "https://github.example/review/401"
+        },
+        {
+          "input_id": "github:review:402",
+          "kinds": ["comment", "question"],
+          "body": "Which invariant owns this validation?",
+          "stable_reference": "https://github.example/review/402"
+        },
+        {
+          "input_id": "github:review:403",
+          "kinds": ["approval"],
+          "body": "Approved.",
+          "stable_reference": "https://github.example/review/403"
+        },
+        {
+          "input_id": "github:review:404",
+          "kinds": ["rejection"],
+          "body": "Changes requested: validate the boundary.",
+          "stable_reference": "https://github.example/review/404"
+        },
+        {
+          "input_id": "github:comment:405",
+          "kinds": ["comment"],
+          "body": "Automated activity summary; no independent finding.",
+          "stable_reference": "https://github.example/review/405"
+        }
+      ]
+    },
+    "expected_projection": {
+      "assessment_ids": [
+        "github:thread:401",
+        "github:review:402",
+        "github:review:403",
+        "github:review:404",
+        "github:comment:405"
+      ],
+      "clusters": {
+        "validation-boundary": ["github:thread:401", "github:review:402", "github:review:404"],
+        "approval": ["github:review:403"],
+        "bot-summary": ["github:comment:405"]
+      }
+    }
+  },
+  "5": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 25 },
+    "repository_instructions": "Clarifications remain open.",
+    "task_outcome": "Record the missing design fact without guessing.",
+    "authority": { "source_edit": false, "push": false, "reply": true, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-05-head",
+      "snapshot_fingerprint": "fixture-05-initial",
+      "inputs": [
+        {
+          "input_id": "github:thread:501",
+          "kinds": ["comment"],
+          "body": "Should compatibility preserve the legacy value or use the new canonical value?",
+          "stable_reference": "https://github.example/review/501"
+        }
+      ]
+    },
+    "expected_projection": {
+      "semantic_kinds": ["comment", "question"],
+      "disposition": "clarification_required",
+      "missing_fact": "The required compatibility policy is not stated.",
+      "focused_question": "Must this change preserve the legacy value, or may it adopt the new canonical value?",
+      "resolution": "open",
+      "cycle_terminal": "blocked"
+    }
+  },
+  "6": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 26 },
+    "repository_instructions": "Approval follows the same provider-backed lifecycle as every input.",
+    "task_outcome": "Complete only after approval assessment, communication, and recheck.",
+    "authority": { "source_edit": false, "push": false, "reply": true, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-06-head",
+      "snapshot_fingerprint": "fixture-06-initial",
+      "inputs": [
+        {
+          "input_id": "github:reaction:601",
+          "kinds": ["approval"],
+          "body": "+1",
+          "stable_reference": "https://github.example/review/601"
+        }
+      ]
+    },
+    "observed_transitions": {
+      "kind_assessment": "approval_assessed",
+      "implementation": { "github:reaction:601": "not_required" },
+      "communication": { "provider_backed": true, "input_ids": ["github:reaction:601"] },
+      "resolution": { "github:reaction:601": "unavailable" },
+      "recheck": {
+        "snapshot_complete": true,
+        "fingerprint": "fixture-06-recheck",
+        "changed_inputs": [],
+        "outstanding_inputs": []
+      },
+      "complete_cycle": "persisted_review_complete"
+    }
+  },
+  "7": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 27 },
+    "repository_instructions": "Empty-body state signals remain assessable inputs.",
+    "task_outcome": "Address the shared validation cause once.",
+    "authority": { "source_edit": true, "push": true, "reply": true, "resolve": true },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-07-before",
+      "snapshot_fingerprint": "fixture-07-initial",
+      "inputs": [
+        {
+          "input_id": "github:review:701",
+          "kinds": ["rejection"],
+          "body": "",
+          "stable_reference": "https://github.example/review/701"
+        },
+        {
+          "input_id": "github:review:702",
+          "kinds": ["rejection"],
+          "body": "Changes requested: validate both representations at the boundary.",
+          "stable_reference": "https://github.example/review/702"
+        }
+      ]
+    },
+    "observed_transitions": {
+      "kind_assessments": {
+        "github:review:701": "rejection_assessed",
+        "github:review:702": "rejection_assessed"
+      },
+      "clusters": { "validation-boundary": ["github:review:701", "github:review:702"] },
+      "systemic_outcome": "One boundary validator covers both representations.",
+      "verification": "fixture rejection regression passed",
+      "communication": {
+        "provider_backed": true,
+        "input_ids": ["github:review:701", "github:review:702"]
+      },
+      "resolution": { "github:review:701": "unavailable", "github:review:702": "unavailable" },
+      "recheck": { "snapshot_complete": true, "changed_inputs": [], "outstanding_inputs": [] }
+    }
+  },
+  "8": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 28 },
+    "repository_instructions": "Bot summaries remain in the census even without an independent finding.",
+    "task_outcome": "Record an evidence-backed no-change disposition.",
+    "authority": { "source_edit": false, "push": false, "reply": true, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-08-head",
+      "snapshot_fingerprint": "fixture-08-includes-github-comment-801",
+      "inputs": [
+        {
+          "input_id": "github:comment:801",
+          "kinds": ["comment"],
+          "body": "Automated activity summary; no independent finding.",
+          "stable_reference": "https://github.example/review/801"
+        }
+      ]
+    },
+    "observed_transitions": {
+      "assessment": "no_change",
+      "evidence": "The summary reports activity already represented by canonical inputs and adds no claim.",
+      "clusters": { "bot-summary": ["github:comment:801"] },
+      "implementation": { "github:comment:801": "not_required" },
+      "communication": { "provider_backed": true, "input_ids": ["github:comment:801"] },
+      "resolution": { "github:comment:801": "unavailable" },
+      "recheck": { "snapshot_complete": true, "changed_inputs": [], "outstanding_inputs": [] }
+    }
+  },
+  "13": {
+    "target": { "provider": "github", "repository": "acme/widgets", "number": 33 },
+    "repository_instructions": "Provider capability determines resolution truthfully.",
+    "task_outcome": "Finish the permitted lifecycle without claiming resolution.",
+    "authority": { "source_edit": false, "push": false, "reply": true, "resolve": false },
+    "initial_snapshot": {
+      "snapshot_complete": true,
+      "head_revision": "fixture-13-head",
+      "snapshot_fingerprint": "fixture-13-initial",
+      "inputs": [
+        {
+          "input_id": "github:review:1301",
+          "kinds": ["approval"],
+          "body": "Approved.",
+          "stable_reference": "https://github.example/review/1301",
+          "capabilities": { "can_comment": true, "can_resolve": false }
+        }
+      ]
+    },
+    "observed_transitions": {
+      "communication": {
+        "provider_backed": true,
+        "input_ids": ["github:review:1301"],
+        "quoted_references": ["https://github.example/review/1301"]
+      },
+      "resolution": { "github:review:1301": "unavailable" },
+      "recheck": { "snapshot_complete": true, "changed_inputs": [], "outstanding_inputs": [] },
+      "complete_cycle": "not_evaluated"
+    }
+  }
+}

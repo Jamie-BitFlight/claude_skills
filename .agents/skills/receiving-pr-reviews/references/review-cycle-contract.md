@@ -99,8 +99,8 @@ unresolved, outstanding, new, changed, or unresponded input; exact assessed-inpu
 census and cluster coverage; terminal implementation, communication, and resolution states;
 provider-backed communication; and one terminal annotation per input.
 
-A current GitHub Codex approval remains an assessed input and can coexist with completion only after
-its full lifecycle is recorded. GitLab's absent equivalence remains unavailable and null. Approval,
-rejection/change request, a clear initial snapshot, an elapsed quiet window, local communication
-without provider evidence, or resolution without recheck never completes a cycle. Only a successful
-persisted `complete-cycle` result emits `REVIEW_COMPLETE`.
+Any actor-backed approval in the normalized snapshot remains an assessed input and can coexist with
+completion only after its full lifecycle is recorded. The selected adapter owns approval availability
+and equivalence mapping. Approval, rejection/change request, a clear initial snapshot, an elapsed quiet
+window, local communication without provider evidence, or resolution without recheck never completes
+a cycle. Only a successful persisted `complete-cycle` result emits `REVIEW_COMPLETE`.

@@ -1,42 +1,33 @@
-# GitHub MCP fallback
+# GitHub MCP boundary
 
 Use this branch only when the bundled CLI cannot use `gh` and a GitHub MCP connector is available.
-The shared review-cycle contract remains authoritative. Use the connector for the entire snapshot;
-fresh and stale partial results never form one snapshot.
+MCP can supply read-only diagnostic evidence, but this package exposes no executable ingress that
+turns connector responses into a validated canonical `ReviewSnapshot`. The boundary therefore fails
+closed: MCP evidence cannot authorize source action, provider mutation, watch state, or completion.
 
-## Complete equivalent snapshot
+## Canonical source
 
-Collect PR identity and exact head revision, every page of review threads and nested comments, every
-submitted review, PR-level comments, reactions, force-push timeline events, and authenticated actor
-identity. Preserve resolved history. Missing fields, pagination gaps, permission failures, rate limits,
-or partial concurrent results produce `SNAPSHOT_INCOMPLETE` or `ERROR`, never an empty or clean state.
+The exact GitHub predicates live only in `scripts/pr_review_github_logic.py`:
 
-Normalize the collected objects into the same models used by `fetch`. Required counts and blocker
-state derive from the complete normalized snapshot, not from a single endpoint. A response to a
-top-level review counts only when the authenticated actor's later PR comment quotes that review's
-exact stable permalink; unavailable permalinks or effective timestamps are errors.
+- `CODEX_REACTOR_LOGINS` owns accepted actor identities;
+- `CODEX_EMPTY_REVIEW_BODY` and `is_codex_empty_review` own no-findings classification;
+- `is_codex_thumbs_up` owns approval-signal classification;
+- `latest_revision_at` owns the head-commit/force-push revision boundary;
+- `references_review` and `review_effective_timestamp` own provider-backed response matching.
 
-## GitHub Codex input
+Treat those symbols and the bundled GitHub adapter as the source of truth. Do not copy their values or
+manually reproduce their outcomes from MCP responses.
 
-Retain the bundled GitHub adapter's exact bot-identity, no-findings-wrapper, and current-revision
-rules. A Codex `+1` is current only when its observed timestamp is not older than the later of the
-head commit timestamp and latest force-push event. The reaction is an approval input in the census;
-it requires assessment and communication like every other input. Its presence neither completes nor
-blocks an otherwise fully processed cycle.
+## Read-only diagnostic collection
 
-## Authorized actions
+When useful for reporting, collect PR identity, exact head revision, every page of review threads and
+nested comments, submitted reviews, PR-level comments, reactions, force-push events, and authenticated
+actor identity through one connector. A missing field, page, permission, or stable reference makes the
+diagnostic collection incomplete. Report only observed provider facts and identify the missing
+surface.
 
-After the shared validation and authority gates pass:
-
-- reply to an inline thread through its opening comment target;
-- resolve it through its thread target only after communication succeeds;
-- answer a top-level review through a PR comment containing its exact permalink.
-
-Use the connector operation with equivalent semantics if its prefix differs. Scope every operation to
-the bound repository and PR. Re-fetch through MCP before the first mutation and reject changed target,
-revision, fingerprint, or input state. Apply the shared reply-before-resolve, clarification, recovery,
-and partial-failure rules.
-
-For rechecks and bounded watch samples, repeat the same complete MCP collection. Any canonical change
-returns to the full census. Completion still comes only from the shared terminal contract, never from
-an approval or elapsed sample alone.
+The cycle remains `SNAPSHOT_INCOMPLETE` because connector output has not crossed the canonical ingress.
+Do not author `review-cycle.json`, infer clean state, combine CLI and MCP evidence, reply, resolve,
+comment, watch, or run `complete-cycle` from this collection. If the bundled CLI remains unavailable,
+report `BLOCKED` with the unavailable executable transport. Resume the shared workflow only after
+`fetch` produces one complete canonical snapshot.
