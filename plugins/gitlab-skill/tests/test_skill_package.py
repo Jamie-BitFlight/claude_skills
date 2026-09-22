@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import subprocess
 import tomllib
 from pathlib import Path
+from types import ModuleType
 
 import marko
+import pytest
+import yaml
 from marko.inline import Link
 
 PLUGIN_ROOT = Path(__file__).parents[1]
@@ -133,10 +138,50 @@ def test_release_credential_branch_encodes_default_branch_path() -> None:
     ).stdout.strip()
 
     assert encoded == "release%2F1.x"
+    assert 'PROJECT_JSON="$(glab api --hostname "$HOST" "projects/$PROJECT_SELECTOR")"' in reference
+    assert all(field in reference for field in (".id", ".path_with_namespace", ".default_branch", ".ssh_url_to_repo"))
+    assert 'VARIABLE_KEY="${VARIABLE_KEY:-RELEASE_PUSH_TOKEN}"' in reference
     assert 'case "$PROJECT_ID"' in reference
     assert 'DEFAULT_BRANCH_PATH="$(printf \'%s\' "$DEFAULT_BRANCH" | jq -sRr @uri)"' in reference
     assert "projects/$PROJECT_ID/protected_branches/$DEFAULT_BRANCH_PATH" in reference
     assert 'protected_branches/$DEFAULT_BRANCH"' not in reference
+
+
+def test_cold_run_operational_contracts_are_explicit() -> None:
+    """Candidate lint, notes tools, forecast, observed IDs, transport, and evidence stay authoritative."""
+    references = SKILL_ROOT / "references"
+    ci = references.joinpath("glab-ci-inspection.md").read_text(encoding="utf-8")
+    transport = references.joinpath("glab-api-and-repository.md").read_text(encoding="utf-8")
+    forecast = references.joinpath("release-version-semantic-release.md").read_text(encoding="utf-8")
+    lifecycle = references.joinpath("automatic-tag-and-release.md").read_text(encoding="utf-8")
+    notes = SKILL_ROOT.joinpath("assets/release-playbook/release-notes.gitlab-ci.yml").read_text(encoding="utf-8")
+
+    assert "validate_release_candidate.py" in ci
+    assert "static content request" in ci
+    assert "Never infer, increment, or guess an" in ci
+    assert "ci get --with-job-details` is the sole source" in ci
+    assert "Monolithic local file with no local includes" in ci
+    assert "Unpushed split local includes" in ci
+    assert "never try remote local-include resolution first" in ci
+    assert "Static pre-merge candidate lint has no branch/tag event context" in ci
+    assert 'git fetch origin "$TARGET_REF"' in transport
+    assert 'git cat-file -e "$SHA^{commit}"' in transport
+    assert "docs-only setup commit does not imply no-release" in forecast
+    assert "candidate-branch dry run is not equivalent" in forecast
+    assert "no-release version-job trace" in lifecycle
+    assert "nonmatching tag" in lifecycle
+    assert "secret scan" in lifecycle
+    assert (
+        notes.index("apk add --no-cache git") < notes.index("command -v git") < notes.index("__RELEASE_NOTES_COMMAND__")
+    )
+    assert "NOTES_REQUIRED_EXECUTABLES" in notes
+
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    pipeline = references.joinpath("pipeline-optimization.md").read_text(encoding="utf-8")
+    assert "CI Lint behavior" not in skill
+    assert "glab CLI](./references/glab-cli.md) - Load for CI Lint validation decisions" in skill
+    assert "pipeline simulation runs as a Git `push` event on the default branch" not in pipeline
+    assert "[glab CI Read-Only Inspection](./glab-ci-inspection.md)" in pipeline
 
 
 def test_release_evals_select_one_adapter_without_loading_siblings() -> None:
@@ -184,8 +229,8 @@ def test_release_playbook_assets_exist() -> None:
         "release-notes.gitlab-ci.yml",
         "release-build.gitlab-ci.yml",
         "gitlab-release.gitlab-ci.yml",
-        ".releaserc.json",
-        "pyproject-semantic-release.toml",
+        ".releaserc.cjs",
+        "materialize_psr_config.py",
         "live-verified",
     }
     expected_live = {
@@ -194,7 +239,7 @@ def test_release_playbook_assets_exist() -> None:
         ".releaserc.json",
         "pyproject.toml",
     }
-    assert {path.name for path in assets.iterdir()} == expected_root
+    assert {path.name for path in assets.iterdir() if path.name != "__pycache__"} == expected_root
     assert {path.name for path in assets.joinpath("live-verified").iterdir()} == expected_live
 
 
@@ -262,18 +307,103 @@ def test_derived_adapters_include_and_extend_one_base() -> None:
         assert "DERIVED + CI-LINT-VERIFIED" in content
 
 
-def test_version_configs_require_project_branch_and_tag_substitution() -> None:
-    """Both version tools expose detectable branch and tag markers."""
+def test_version_configs_derive_branch_and_neutral_tag_policy() -> None:
+    """All consumers use base tag environment and fail when it is absent."""
     assets = SKILL_ROOT / "assets" / "release-playbook"
-    node = assets.joinpath(".releaserc.json").read_text(encoding="utf-8")
-    psr = assets.joinpath("pyproject-semantic-release.toml").read_text(encoding="utf-8")
+    base = yaml.safe_load((assets / "base.gitlab-ci.yml").read_text(encoding="utf-8"))
+    base_prefix = base["variables"]["RELEASE_TAG_PREFIX"]
+    node = assets.joinpath(".releaserc.cjs").read_text(encoding="utf-8")
+    psr_path = assets / "materialize_psr_config.py"
+    spec = importlib.util.spec_from_file_location("materialize_psr_config", psr_path)
+    assert spec
+    assert spec.loader
+    module: ModuleType = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rendered = module.render_config("release/1.x", base_prefix)
+    psr = tomllib.loads(rendered)["semantic_release"]
 
-    assert "__DEFAULT_BRANCH__" in node
-    assert "__RELEASE_TAG_FORMAT__" in node
-    assert "__DEFAULT_BRANCH_REGEX__" in psr
-    assert "__RELEASE_TAG_FORMAT__" in psr
-    assert '"main"' not in node
-    assert 'match = "^main$"' not in psr
+    assert "process.env.CI_DEFAULT_BRANCH" in node
+    assert "const tagPrefix = process.env.RELEASE_TAG_PREFIX;" in node
+    assert "main" not in node
+    node_result = subprocess.run(
+        [
+            "node",
+            "-e",
+            f"const c=require({json.dumps(str(assets / '.releaserc.cjs'))}); console.log(JSON.stringify(c))",
+        ],
+        env={**os.environ, "CI_DEFAULT_BRANCH": "release/1.x", "RELEASE_TAG_PREFIX": base_prefix},
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    node_config = json.loads(node_result.stdout)
+    assert node_config["branches"] == ["release/1.x"]
+    assert node_config["tagFormat"] == f"{base_prefix}${{version}}"
+    assert psr["tag_format"] == f"{base_prefix}{{version}}"
+    assert psr["branches"]["release"]["match"] == r"^release/1\.x$"
+    psr_job = assets.joinpath("python-semantic-release.gitlab-ci.yml").read_text(encoding="utf-8")
+    assert 'semantic-release --config "$PSR_RUNTIME_CONFIG" version' in psr_job
+    assert 'git checkout -B "$CI_DEFAULT_BRANCH" "$CI_COMMIT_SHA"' in psr_job
+
+    missing_prefix_env = {key: value for key, value in os.environ.items() if key != "RELEASE_TAG_PREFIX"}
+    missing_prefix_env["CI_DEFAULT_BRANCH"] = "release/1.x"
+    node_missing = subprocess.run(
+        ["node", "-e", f"require({json.dumps(str(assets / '.releaserc.cjs'))})"],
+        env=missing_prefix_env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert node_missing.returncode != 0
+    assert "RELEASE_TAG_PREFIX is required" in node_missing.stderr
+    with pytest.raises(ValueError, match="RELEASE_TAG_PREFIX"):
+        module.render_config("release/1.x", "")
+
+    credential = (SKILL_ROOT / "references" / "glab-release-credentials.md").read_text(encoding="utf-8")
+    assert 'TAG_PATTERN="${RELEASE_TAG_PREFIX}*"' in credential
+    assert 'TAG_PATTERN="${TAG_PATTERN:-' not in credential
+
+
+def test_generalized_assets_use_predefined_identity_and_no_sandbox_literals() -> None:
+    """Generalized assets derive identity while evidence-only files retain observed literals."""
+    assets = SKILL_ROOT / "assets" / "release-playbook"
+    source_suffixes = {".cjs", ".json", ".py", ".toml", ".yaml", ".yml"}
+    generalized = [
+        path
+        for path in assets.rglob("*")
+        if path.is_file() and "live-verified" not in path.parts and path.suffix in source_suffixes
+    ]
+    content = "\n".join(path.read_text(encoding="utf-8") for path in generalized)
+
+    for variable in (
+        "CI_PROJECT_ID",
+        "CI_PROJECT_NAME",
+        "CI_PROJECT_PATH",
+        "CI_DEFAULT_BRANCH",
+        "CI_COMMIT_SHA",
+        "CI_COMMIT_TAG",
+        "CI_API_V4_URL",
+    ):
+        assert variable in content
+    assert "RELEASE_TAG_PREFIX: 'v'" in content
+    assert "RELEASE_TAG_WILDCARD: 'v*'" in content
+    assert "GENERIC_PACKAGE_NAME: '$CI_PROJECT_NAME'" in content
+    assert all(
+        literal not in content
+        for literal in ("jira-ai-evaluation", "jamie.nelson", "projects/529", "release-playbook-v")
+    )
+    assert '"main"' not in content
+    assert "^main$" not in content
+
+    references = SKILL_ROOT / "references"
+    generalized_docs = [path for path in references.glob("*.md") if path.name != "release-live-evidence.md"]
+    docs_and_runtime = "\n".join(path.read_text(encoding="utf-8") for path in generalized_docs)
+    docs_and_runtime += (SKILL_ROOT / "evals" / "evals.json").read_text(encoding="utf-8")
+    docs_and_runtime += (SKILL_ROOT / "scripts" / "validate_release_candidate.py").read_text(encoding="utf-8")
+    assert all(
+        literal not in docs_and_runtime
+        for literal in ("jira-ai-evaluation", "jamie.nelson", "projects/529", "release-playbook-v1")
+    )
 
 
 def test_tag_contracts_require_the_release_regex() -> None:

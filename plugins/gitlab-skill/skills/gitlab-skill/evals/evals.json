@@ -289,6 +289,39 @@
       "prompt": "Which glab branch should I use for this self-managed GitLab API task?",
       "expected_output": "Runs common preflight and selects one glab branch.",
       "expectations": ["Routes to references/glab-cli.md"]
+    },
+    {
+      "id": 29,
+      "should_activate": true,
+      "reference": "references/release-version-semantic-release.md",
+      "prompt": "Forecast whether our first semantic-release main push will publish when the setup commit is docs-only.",
+      "expected_output": "Inspects the latest matching tag and complete analyzed range before forecasting.",
+      "expectations": [
+        "Routes to references/release-version-semantic-release.md",
+        "Does not infer no-release from the docs-only setup commit"
+      ]
+    },
+    {
+      "id": 30,
+      "should_activate": true,
+      "reference": "references/glab-ci-inspection.md",
+      "prompt": "Validate this unmerged GitLab CI candidate whose root file has project-local includes.",
+      "expected_output": "Uses the bundled include-resolving static candidate helper and defers remote context simulation.",
+      "expectations": [
+        "Routes to references/glab-ci-inspection.md",
+        "Uses validate_release_candidate.py exactly once"
+      ]
+    },
+    {
+      "id": 31,
+      "should_activate": true,
+      "reference": "references/glab-ci-inspection.md",
+      "prompt": "Trace the failed job from pipeline 5748 using the observed pipeline response.",
+      "expected_output": "Gets job details and traces only the returned job ID.",
+      "expectations": [
+        "Routes to references/glab-ci-inspection.md",
+        "Never guesses or increments a job ID"
+      ]
     }
   ]
 }

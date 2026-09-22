@@ -1,0 +1,10 @@
+include:
+  - local: '/ci/nested.yml'
+
+variables:
+  FIRST: included
+  SHARED: first
+
+ordered_job:
+  stage: first
+  script: ["first"]

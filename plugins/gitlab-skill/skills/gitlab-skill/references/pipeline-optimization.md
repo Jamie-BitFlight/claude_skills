@@ -27,6 +27,8 @@ SOURCE: <https://docs.gitlab.com/ci/yaml/expressions/> (accessed 2026-09-21)
 
 ## CI Lint
 
-CI Lint checks configuration syntax and logic. Its pipeline simulation runs as a Git `push` event on the default branch.
+When configuration validation is requested, load [glab CI Read-Only Inspection](./glab-ci-inspection.md)
+and follow its decision table. This configuration-semantics reference does not define CI Lint
+commands, include-resolution strategy, event context, or proof boundaries.
 
 SOURCE: <https://docs.gitlab.com/ci/yaml/lint/> (accessed 2026-09-21)

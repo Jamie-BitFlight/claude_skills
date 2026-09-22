@@ -1,5 +1,0 @@
-{
-  "branches": ["__DEFAULT_BRANCH__"],
-  "tagFormat": "__RELEASE_TAG_FORMAT__",
-  "plugins": ["@semantic-release/commit-analyzer"]
-}

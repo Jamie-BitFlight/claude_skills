@@ -2,11 +2,6 @@
 include:
   - local: '/.gitlab/release/base.gitlab-ci.yml'
 
-variables:
-  GENERIC_PACKAGE_NAME: '__GENERIC_PACKAGE_NAME__'
-  GENERIC_ASSET_PATH: '__GENERIC_ASSET_PATH__'
-  GENERIC_ASSET_NAME: '__GENERIC_ASSET_NAME__'
-
 publish_generic:
   extends: .release_publish
   image:
@@ -16,5 +11,5 @@ publish_generic:
     - >-
       curl --location --fail-with-body
       --header "JOB-TOKEN: ${CI_JOB_TOKEN}"
-      --upload-file "${GENERIC_ASSET_PATH}"
-      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${GENERIC_ASSET_NAME}"
+      --upload-file "${RELEASE_ASSET_PATH}"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${RELEASE_ASSET_NAME}"

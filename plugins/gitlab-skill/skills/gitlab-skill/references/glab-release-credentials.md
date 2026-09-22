@@ -3,6 +3,25 @@
 Evidence: **LIVE-VERIFIED** project-access-token adapter with `glab 1.118.0`. The universal lifecycle
 allows another credential implementation satisfying the same interface.
 
+Start from a user-supplied numeric ID or URL-encoded namespaced project selector and read canonical
+identity before setup:
+
+```bash
+PROJECT_JSON="$(glab api --hostname "$HOST" "projects/$PROJECT_SELECTOR")"
+PROJECT_ID="$(printf '%s' "$PROJECT_JSON" | jq -er '.id')"
+PROJECT_PATH="$(printf '%s' "$PROJECT_JSON" | jq -er '.path_with_namespace')"
+DEFAULT_BRANCH="$(printf '%s' "$PROJECT_JSON" | jq -er '.default_branch')"
+REPO="$(printf '%s' "$PROJECT_JSON" | jq -er '.ssh_url_to_repo')"
+VARIABLE_KEY="${VARIABLE_KEY:-RELEASE_PUSH_TOKEN}"
+: "${RELEASE_TAG_PREFIX:?RELEASE_TAG_PREFIX must come from the resolved base tag contract}"
+TAG_PATTERN="${RELEASE_TAG_PREFIX}*"
+unset PROJECT_JSON
+```
+
+`RELEASE_PUSH_TOKEN` is an overrideable variable-key policy default, not project identity. The
+protected wildcard derives from the required resolved prefix. Supply token name, role, duration,
+branch/tag access levels, and variable scope explicitly.
+
 Resolve numeric project ID, repository, default branch, tag wildcard, minimum access levels, token
 role/scope/expiry, variable key, and environment scope. Encode the branch path segment before
 inspection:
