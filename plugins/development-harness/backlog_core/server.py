@@ -1248,8 +1248,8 @@ mcp = FastMCP(
         "Backlog management server. The configured backend is the source of truth; backends that "
         "support offline queuing keep a local cache that syncs with it, others read and write it "
         "directly. Always use these tools for backlog CRUD (add, list, view, update, groom, close, "
-        "resolve, sync) — never read or edit backlog files directly, even if a tool call fails; "
-        "report the failure instead."
+        "resolve, sync). Reach the backlog only through these tools; on a failed call, report "
+        "the failure and stop."
     ),
     version="0.1.0",
     lifespan=_backlog_lifespan,
@@ -1270,14 +1270,7 @@ mcp.add_extension(TasksExtension())
     )
 )
 async def sync_status() -> SyncStatusResponse:
-    """Return the current background sync state.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.SyncStatusResponse` with
-        status, started_at, completed_at, items_done, items_total,
-        last_error, last_success_at, retry_count, offline_reason, percent,
-        pending_mutations, and rejected_mutations.
-    """
+    """Return the current background sync state."""
     # No exclude_none here (unlike every other tool in this module): every
     # field is unconditionally present in SyncState.to_dict() -- some
     # legitimately null (e.g. started_at before any sync has run) -- and
@@ -1317,14 +1310,6 @@ async def sync_now(
     GITHUB_TOKEN, or a filesystem/config error) or ERROR (a retryable failure —
     network blocked, rate limited, or a GitHub server error — that exhausted
     all retries), clears the state and attempts a fresh sync.
-
-    Args:
-        full_refresh: When True, ignore the provider checkpoint and perform a
-            full reconciliation.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.SyncNowResponse` with
-        triggered, sync_state (same fields as sync_status()), and messages.
     """
     state = get_sync_state()
     if not isinstance(_get_config().backend, SyncProvider):
@@ -1410,15 +1395,11 @@ async def backlog_add(
     the same description template below plus item-type classification. Duplicate
     detection here runs unless force=True.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogAddResponse` with
-        file_path, title, priority, item_ref, and output messages/warnings/errors.
-        file_path is for reference only — use backlog_update or backlog_groom
-        for all modifications. On error, ``error`` is set. On an integer-ID
-        backend, a non-empty ``errors`` list with the item otherwise stored
-        (``reference``/``file_path`` present) means GitHub issue creation
-        itself failed after a client was obtained — non-fatal, ``item_ref``
-        is simply empty for that reason.
+    ``file_path`` is for reference only. Change the item with ``backlog_update`` or
+    ``backlog_groom``.
+
+    The item can be stored while ``errors`` is non-empty and ``item_ref`` is empty: the
+    item saved, but no issue was created for it.
     """
     out = Output()
     try:
@@ -1878,36 +1859,17 @@ async def backlog_list(
     token-based pagination of match output; when match_pages.paginated=true, use
     page=2..N to retrieve subsequent pages.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListResponse` with items
-        list, count, pagination object, and output messages/warnings.
-        Each item includes status (workflow status from status:* labels).
-        pagination contains offset, limit, total, and has_more. When has_more=true,
-        next_call provides the suggested follow-up call string.
-        When match_context=True, match_pages contains current_page, total_pages,
-        tokens_per_page, total_match_tokens, and paginated flag.
-        When count_only=True, the response carries count plus from_cache/
-        has_pending_writes (backlog #3546 task A4/Codex review PR #3576
-        finding 2) -- a warm cache holding unconfirmed local writes must not
-        be handed back as an unqualified count. warnings/errors are added when
-        the operations layer recorded a genuine degradation; routine
-        operational info is omitted. When a background sync is running,
-        sync_state/warnings are also added.
-        When a provider-private cache listing cannot be confirmed complete and
-        allow_cached=False (default), items and count are both null and
-        from_cache/has_pending_writes name the provenance instead (backlog
-        #3546 task A4) — pass allow_cached=True to see the best-effort cached
-        list anyway.
-        status_source ("live", "cache", "mixed", or "unavailable") reports where the
-        listing's status data came from; unavailable_capabilities names any
-        capability (e.g. "live_status") that could not be read live this
-        call; filters_evaluated_against_unavailable_data names any active
-        filter (e.g. "status") that could not be honestly evaluated against
-        live data. On count_only=True, these three appear only when they
-        signal a genuine degradation (never on a healthy call).
-        On error, ``error`` is set.
-        Items are deduplicated by issue number — if the cache contained duplicate
-        entries, only the first occurrence of each issue number is returned.
+    When ``has_more`` is true, ``next_call`` carries the follow-up call string to page
+    with. Items are deduplicated by issue number.
+
+    ``status_source`` reports where the status data came from,
+    ``unavailable_capabilities`` names what could not be read live this call, and
+    ``filters_evaluated_against_unavailable_data`` names any filter that ran against
+    data that was not live. Treat a filtered listing as incomplete when the filter is
+    named there.
+
+    ``items`` and ``count`` are both absent when a cached listing cannot be confirmed
+    complete. Pass ``allow_cached=True`` to take the cached listing anyway.
     """
     out = Output()
     try:
@@ -2429,28 +2391,22 @@ async def backlog_view(
     To page through large content: navigate=<ordinal>, head=4000, then repeat with
     skip_tokens set from the returned next_call hint until truncated=False.
 
-    Returns:
-        When map=True: dict with map_text (ordinal structure), selector,
-        total_sections, total_est_tokens, over_budget flag, and struck_ordinals (every
-        struck/retracted ordinal in the map).
-        When navigate=<ordinal> (no head): dict with ordinal, title, content,
-        total_tokens, truncated=False, struck, and entry_id.
-        When navigate=<ordinal> + head=N: dict with ordinal, title, content, total_tokens,
-        returned_tokens, truncated, next_call hint when truncated=True, struck, and entry_id.
-        struck/entry_id reflect the addressed entry (or its descendant); False/"" for
-        level-1 section ordinals, which have no single-entry identity.
-        When summary=True (default, no disclosure params): compact dict with issue_number,
-        title, labels, status, plan_address, sections_index, _summary, _full_chars, and _hint.
-        When summary=False: dict with title, priority, issue, plan, file_path, body,
-        sections metadata, and output messages/warnings. file_path is for reference
-        only — use backlog_update or backlog_groom for all modifications.
-        Both summary=True and summary=False shapes carry status_source ("live",
-        "cache", or "unavailable"), reporting where this item's live-enrichment
-        data came from, and unavailable_capabilities, naming any capability
-        (e.g. "live_enrichment") that could not be read live this call.
-        When navigate targets an ordinal that does not exist in the item: dict with
-        error, requested_ordinal, and valid_ordinals (every ordinal actually present).
-        On error, dict contains an error key.
+    ``map=True`` returns the ordinal structure. ``navigate=<ordinal>`` returns that
+    entry, and adding ``head=N`` windows it — page on with ``skip_tokens`` from the
+    returned ``next_call``. ``summary=True`` (the default) returns the compact shape;
+    ``summary=False`` returns the whole item.
+
+    ``file_path`` is for reference only. Change the item with ``backlog_update`` or
+    ``backlog_groom``.
+
+    ``status_source`` reports where this item's live-enrichment data came from, and
+    ``unavailable_capabilities`` names what could not be read live this call.
+
+    ``struck`` and ``entry_id`` describe the addressed entry. They are ``False`` and
+    empty for a level-1 section ordinal, which is not a single entry.
+
+    Navigating to an ordinal the item does not hold returns ``valid_ordinals``, every
+    ordinal it does hold.
     """
     # ---- Progressive disclosure routing (architect spec §4.6) -----------------
     # Single early-return gate: MAP/NAVIGATE/EXTRACT → return dict; PASSTHROUGH → fall through.
@@ -2598,11 +2554,6 @@ async def backlog_sync(
     """Sync backlog items with the configured backend: create missing work items and push groomed content.
 
     Use dry_run=true to preview changes without modifying anything.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogSyncResponse` with
-        created and pushed counts, dry_run, and output messages/warnings.
-        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2640,11 +2591,6 @@ async def backlog_link_followup(
 
     Records the origin's logical ID on the item's ``followup_to`` metadata
     field so the relationship is queryable via ``backlog_list_followups``.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogLinkFollowupResponse`
-        with title, followup_to, and output messages/warnings. On error,
-        ``error`` is set.
     """
     out = Output()
     try:
@@ -2680,11 +2626,6 @@ async def backlog_list_followups(
 
     Returns all items whose ``metadata.followup_to`` exactly matches the
     given logical ID.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListFollowupsResponse`
-        with items (each with title, section, issue, followup_to), count,
-        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2727,11 +2668,6 @@ async def backlog_close(
 
     Use for items that are duplicates, out of scope, superseded, wontfix,
     or permanently blocked. For completed work, use backlog_resolve instead.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogCloseResponse` with the
-        closed item's title, either ``already_closed`` or ``closed``/``reason``,
-        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -2784,12 +2720,6 @@ async def backlog_resolve(
     reason) or discard these fields — they are not persisted to local item state.
     Only summary is required — for trivial items a one-liner suffices.
     For dismissals (duplicate, out of scope, etc.), use backlog_close instead.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogResolveResponse` with the
-        resolved item's title, either ``already_resolved`` or
-        ``resolved``/``summary``, and output messages/warnings. On error,
-        ``error`` is set.
     """
     out = Output()
     try:
@@ -2887,14 +2817,6 @@ async def backlog_update(
     """Update a backlog item: attach a plan, set status, or write groomed content.
 
     Groomed content is synced to the linked work item when the item has one.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogUpdateResponse` with the
-        updated item's title and whichever change fields apply (renamed_to,
-        description_updated, plan, issue_num, status, verified, changes on
-        the non-groomed path; groomed_updated, sections_written on the
-        groomed path), plus output messages/warnings. On error, or on a
-        non-fatal per-field failure, ``error`` is set.
     """
     out = Output()
     try:
@@ -3000,14 +2922,9 @@ async def backlog_groom(
     When the item has a GitHub issue, the groomed content is synced there
     automatically.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogGroomResponse` with the
-        groomed item's ``title``, ``groomed_updated`` (true when content was
-        written), and output messages/warnings. On error, ``error`` is set.
-        When mark_groomed=True and the post-write item re-lookup fails to resolve the
-        selector, the status advance is skipped and the response additionally has
-        mark_groomed_skipped=True and mark_groomed_skip_reason (str) explaining why —
-        callers checking mark_groomed's effect should test for this field.
+    With ``mark_groomed=True``, the status advance is skipped when the item cannot be
+    resolved again after the write, and ``mark_groomed_skipped`` says so. Test that
+    field rather than assuming the status moved.
     """
     out = Output()
     if sections is not None and any((section, content, entry_id, replace_section, reason, append)):
@@ -3046,13 +2963,7 @@ async def backlog_normalize(
     ctx: Context,
     dry_run: Annotated[bool, Field(description="Preview normalization changes without modifying files")] = False,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogNormalizeResponse)]:
-    """Normalize all work items through the configured backend.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogNormalizeResponse` with
-        the count of normalized files and output messages/warnings. On
-        error, ``error`` is set.
-    """
+    """Normalize all work items through the configured backend."""
     out = Output()
     try:
         result = await asyncio.to_thread(operations.normalize_items, dry_run=dry_run, output=out)
@@ -3092,10 +3003,7 @@ async def backlog_pull(
     Auto-migrates P0/P1 items lacking GitHub Issues by creating them.
     Merges by section using entry-aware merge (keeps longer entries, preserves strikes).
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogPullResponse` with count
-        of pulled items (bulk path) or file_path (single-selector path), and
-        output messages/warnings. On error, ``error`` is set.
+    ``count`` is set when pulling in bulk, ``file_path`` when pulling one selector.
     """
     out = Output()
     try:
@@ -3141,10 +3049,7 @@ async def backlog_create_sam_task(
 ) -> Annotated[dict[str, object], _wire_schema(BacklogCreateSamTaskResponse)]:
     """Create a GitHub sub-issue for a SAM task under a parent story issue.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogCreateSamTaskResponse`
-        with issue_number, title, url (always empty), and output messages.
-        On error, ``error`` is set.
+    ``url`` is always empty.
     """
     out = Output()
     try:
@@ -3213,11 +3118,6 @@ async def backlog_update_sam_task_status(
     """Update the status field in a SAM task sub-issue.
 
     Patches the sam:task YAML block in the issue body. No-op if status already matches.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogUpdateSamTaskStatusResponse`
-        with updated (bool), issue_number, new_status, and output messages.
-        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3337,15 +3237,8 @@ async def artifact_register(
     artifact_id already exists it is updated in-place (status, agent, timestamp).
     If only the type matches but the artifact_id differs, a new row is added.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.ArtifactRegisterResponse` with
-        registered (bool), artifact_count (int), action (str), content_stored
-        (bool), and output messages/warnings.
-
-    A response with only ``error`` and the output triad set is returned for a
-    ``BacklogError``. A ``ContentUnavailableError`` or ``ContentConflictError``
-    (the backend could not store the artifact or its manifest) is not caught
-    here and surfaces as a tool call error, not a response.
+    When the configured backend cannot store the artifact or its manifest, the call
+    fails with a tool error instead of returning a response.
     """
     out = Output()
     try:
@@ -3395,15 +3288,8 @@ async def artifact_list(
 
     Returns an empty list when no manifest section exists yet — this is not an error.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
-        artifacts, count (int), and output messages/warnings.
-
-    Raises:
-        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
-        ContentUnavailableError: The selected backend could not resolve the
-            manifest. Not caught here — surfaces as a tool call error, not
-            the documented error dict.
+    An unrecognised ``artifact_type``, or a configured backend that cannot reach the
+    manifest, fails with a tool error instead of returning a response.
     """
     out = Output()
     try:
@@ -3452,18 +3338,11 @@ async def artifact_get(
     Omitting ``artifact_id`` returns every entry of the type (e.g. multiple
     codebase-analysis files). Supplying it returns the single addressed entry.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.ArtifactsListResponse` with
-        artifacts, count (int), and output messages/warnings. ``error`` is
-        set when the type is not found, or when a supplied ``artifact_id``
-        matches no entry of that type — an absent artifact is data, not a
-        failed call.
+    An absent artifact is data, not a failed call: ``error`` is set when the type is
+    not found, or when ``artifact_id`` matches no entry of that type.
 
-    Raises:
-        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
-        ContentUnavailableError: The selected backend could not resolve the
-            manifest. Not caught here — surfaces as a tool call error, not
-            the documented error dict.
+    An unrecognised ``artifact_type``, or a configured backend that cannot reach the
+    manifest, fails with a tool error instead of returning a response.
     """
     out = Output()
     try:
@@ -3518,17 +3397,11 @@ async def artifact_read(
     Omitting ``artifact_id`` returns the most recently registered entry of the type.
     Supplying it addresses one specific entry.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.ArtifactReadResponse` with
-        artifact_type, path, content, status, and output messages/warnings.
-        ``error`` is set on type-not-found or when the selected provider has
-        no matching content — an absent artifact is data, not a failed call.
+    An absent artifact is data, not a failed call: ``error`` is set when the type is
+    not found, or when the selected provider holds no matching content.
 
-    Raises:
-        ToolError: ``artifact_type`` is not an ``ArtifactType`` member.
-        ContentUnavailableError: The selected backend could not resolve the
-            manifest. Not caught here — surfaces as a tool call error, not
-            the documented error dict.
+    An unrecognised ``artifact_type``, or a configured backend that cannot reach the
+    manifest, fails with a tool error instead of returning a response.
     """
     out = Output()
     try:
@@ -3579,13 +3452,7 @@ async def artifact_read(
 async def backlog_get_ready_sam_tasks(
     parent_issue_number: Annotated[int, Field(description="Parent story issue number (native reference)")],
 ) -> Annotated[dict[str, object], _wire_schema(BacklogGetReadySamTasksResponse)]:
-    """Return SAM tasks whose status is not-started and all dependencies are terminal.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogGetReadySamTasksResponse`
-        with feature (slug), ready_tasks (list), count. Each ready_task dict
-        contains id, name, agent, skills, issue_number.
-    """
+    """Return SAM tasks whose status is not-started and all dependencies are terminal."""
     out = Output()
     try:
         result = await asyncio.to_thread(
@@ -3628,11 +3495,6 @@ async def backlog_strike_entry(
     Wraps the entry in a collapsed details block with the reason,
     preserving the original content for audit. Syncs to the linked work item
     if the item has one.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogStrikeEntryResponse`
-        with title, entry_id, struck, and output messages/warnings. On
-        error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3657,11 +3519,6 @@ async def backlog_list_labels(
     Returns all labels defined on the repository, up to ``limit``. There is no
     separate label-mutation tool; labels change as a side effect of ``backlog_update``,
     ``backlog_groom``, ``backlog_resolve``, or ``backlog_close`` changing an item's status.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListLabelsResponse` with
-        ``labels`` (each with ``name``, ``color``, ``description``), ``count``,
-        and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3694,12 +3551,6 @@ async def backlog_list_merged_prs(
     Only PRs that were actually merged (not just closed) are returned.
     Use ``search`` to filter by issue reference (e.g. ``'#42'``) or any
     keyword present in the PR title or body.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListMergedPrsResponse`
-        with ``pull_requests`` (each with ``number``, ``title``, ``merged_at``,
-        ``author``, ``url``, ``head_branch``), ``count``, and output
-        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3721,12 +3572,6 @@ async def backlog_list_milestones(
 
     Requires a backend with milestone support — errors otherwise. Returns
     milestones with their issue counts and optional due dates.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListMilestonesResponse`
-        with ``milestones`` (each with ``number``, ``title``, ``state``,
-        ``description``, ``due_on``, ``open_issues``, ``closed_issues``),
-        ``count``, and output messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3764,11 +3609,7 @@ async def backlog_get_soonest_milestone() -> Annotated[
     lack a due date, the first one by the backend's default ordering is
     returned with a warning.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogGetSoonestMilestoneResponse`
-        with ``milestone`` (or ``None``) and output messages/warnings.
-        ``milestone`` is ``None`` when no open milestones exist.
-        On error, ``error`` is set.
+    ``milestone`` is absent when no open milestone exists.
     """
     out = Output()
     try:
@@ -3805,11 +3646,6 @@ async def backlog_create_milestone(
     """Create a new milestone on the repository.
 
     Requires a backend with milestone support — errors otherwise.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogCreateMilestoneResponse`
-        with ``milestone`` and output messages/warnings.
-        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3844,11 +3680,6 @@ async def backlog_assign_item_to_milestone(
     """Assign a backlog item to a milestone.
 
     Requires a backend with milestone support — errors otherwise.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogAssignItemToMilestoneResponse`
-        with ``issue_number``, ``milestone_number``, and output
-        messages/warnings. On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -3878,13 +3709,7 @@ async def backlog_list_issues(
     state: Annotated[str, Field(description="Issue state: open, closed, or all")] = "open",
     limit: Annotated[int, Field(description="Maximum issues to return")] = 30,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogListIssuesResponse)]:
-    """List GitHub issues with optional milestone, label, and state filters.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListIssuesResponse` with
-        issues list, count, and output messages/warnings. On error, ``error``
-        is set.
-    """
+    """List GitHub issues with optional milestone, label, and state filters."""
     out = Output()
     try:
         result = await asyncio.to_thread(
@@ -3919,13 +3744,9 @@ async def backlog_comment_issue(
 ) -> Annotated[dict[str, object], _wire_schema(BacklogCommentIssueResponse)]:
     """Add a comment to a GitHub issue.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogCommentIssueResponse` with
-        issue_number, comment_id (a GraphQL node ID — not usable as
-        backlog_read_comment's comment_id), database_id (the REST integer ID
-        backlog_read_comment's comment_id requires; ``None`` when GitHub did
-        not report one), comment_url (always empty), and output
-        messages/warnings. On error, ``error`` is set.
+    ``database_id`` is the id ``backlog_read_comment`` takes as its ``comment_id``; it
+    is absent when GitHub reports no integer id. The ``comment_id`` returned here is a
+    GraphQL node id and does not work there. ``comment_url`` is always empty.
     """
     out = Output()
     try:
@@ -3951,13 +3772,8 @@ async def backlog_list_comments(
 ) -> Annotated[dict[str, object], _wire_schema(BacklogListCommentsResponse)]:
     """List comments on a GitHub issue.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListCommentsResponse`
-        with comments (each with id, database_id, author, created_at,
-        updated_at, preview), count, has_more, and output messages/warnings.
-        ``database_id`` is the REST integer ID to pass as
-        ``backlog_read_comment``'s ``comment_id``; ``id`` is a GraphQL node ID
-        and will not work there. On error, ``error`` is set.
+    ``database_id`` is the id to pass as ``backlog_read_comment``'s ``comment_id``.
+    ``id`` is a GraphQL node id and does not work there.
     """
     out = Output()
     try:
@@ -3995,11 +3811,7 @@ async def backlog_read_comment(
 ) -> Annotated[dict[str, object], _wire_schema(BacklogReadCommentResponse)]:
     """Read the full body of a single comment on a GitHub issue.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogReadCommentResponse` with
-        id (GraphQL node ID), author, created_at, updated_at, body (full
-        Markdown — no truncation), and output messages/warnings. On error,
-        ``error`` is set.
+    ``body`` is the full Markdown, never truncated.
     """
     out = Output()
     try:
@@ -4020,13 +3832,7 @@ async def backlog_list_projects(
     owner: Annotated[str | None, Field(description="GitHub owner (org or user). Defaults to repo owner")] = None,
     limit: Annotated[int, Field(description="Maximum projects to return")] = 20,
 ) -> Annotated[dict[str, object], _wire_schema(BacklogListProjectsResponse)]:
-    """List Projects V2 for the repository owner via GraphQL.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogListProjectsResponse`
-        with projects list, count, and output messages/warnings. On error,
-        ``error`` is set.
-    """
+    """List Projects V2 for the repository owner via GraphQL."""
     out = Output()
     try:
         result = await asyncio.to_thread(operations.list_projects, owner=owner, limit=limit, output=out)
@@ -4051,11 +3857,6 @@ async def backlog_create_project(
     """Create a Projects V2 project under the repository owner.
 
     Resolves the owner node ID then runs the createProjectV2 GraphQL mutation.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.BacklogCreateProjectResponse` with
-        project_id, title, url, number, and output messages/warnings.
-        On error, ``error`` is set.
     """
     out = Output()
     try:
@@ -4118,11 +3919,6 @@ async def dispatch_read(
 
     Returns an error response if no plan is stored for this milestone or it
     fails schema validation.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchReadResponse` with
-        ``milestone_number`` and ``plan`` (the full dispatch plan), or
-        ``error`` on failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
@@ -4152,11 +3948,6 @@ async def dispatch_validate(
     Reads the plan file then runs five structural checks: duplicate issues,
     conflict group references, depends_on existence, wave ordering, and
     conflict group wave placement.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchValidateResponse` with
-        ``is_valid``, ``errors``, and ``warnings``, or ``error`` on
-        file/parse failure.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
@@ -4186,13 +3977,8 @@ async def dispatch_stale_check(
     numbers against those in the plan, and returns a stale/fresh indicator
     with added/removed issue lists.
 
-    Delegates to ``dh_core.operations.dispatch_stale_check`` — the MCP tool and
-    the CLI-facing function share one implementation.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchStaleCheckResponse`
-        with ``is_stale``, ``added_issues``, ``removed_issues``, and
-        ``message``. Returns ``error`` on file/parse or GitHub failure.
+    The ``dispatch stale-check`` CLI command runs the
+    same implementation and returns the same result.
     """
     result = await asyncio.to_thread(operations.dispatch_stale_check, milestone_number, repo)
     return _respond(DispatchStaleCheckResponse, result)
@@ -4245,12 +4031,8 @@ async def dispatch_create_plan(
     after writing. On the GitHub backend, writing a genuinely new plan (not
     byte-identical to what's stored) is unsupported and returns an error.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchCreatePlanResponse`
-        with ``milestone_number``, ``wave_count``, ``item_count``,
-        ``is_valid``, and output messages/warnings/errors (the latter two
-        holding validation results, not Output's). On error, ``error`` is
-        set; ``milestone_number`` is absent on the already-exists path.
+    ``errors`` and ``warnings`` carry the plan's validation results, not this call's
+    own output. ``milestone_number`` is absent when the plan already exists.
     """
     out = Output()
     # Verify plan.milestone.number matches the milestone_number parameter
@@ -4346,14 +4128,8 @@ async def dispatch_conflicts(
     agent-managed body, extracts its Impact Radius section, then finds items that
     share canonical system identifiers or legacy paths.
 
-    Delegates to ``dh_core.operations.dispatch_conflicts`` — the MCP tool and
-    the CLI-facing function share one implementation.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchConflictsResponse`
-        with ``conflict_groups`` (each with group_id, reason, and items),
-        ``count``, and ``milestone_number``. Returns ``error`` on GitHub
-        failure.
+    The ``dispatch conflicts`` CLI command runs the
+    same implementation and returns the same result.
     """
     result = await asyncio.to_thread(operations.dispatch_conflicts, milestone_number, repo)
     return _respond(DispatchConflictsResponse, result)
@@ -4424,11 +4200,7 @@ async def dispatch_wave_start(
     initialised with status ``pending``. Call this before spawning
     processes for a wave.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchWaveStartResponse`
-        with ``milestone``, ``wave_num``, ``items_count``, ``status``, and
-        ``messages``/``warnings``/``errors``. Returns ``error`` if the wave
-        already exists or if an item entry is malformed.
+    ``error`` is set when the wave already exists, or when an item entry is malformed.
     """
     try:
         item_records = [
@@ -4491,11 +4263,7 @@ async def dispatch_item_status(
     Looks up the item by milestone + issue across all waves. Updates
     status, result/error data, and completion timestamp.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchItemStatusResponse`
-        with ``milestone``, ``issue``, ``wave_num``, ``status``, and
-        ``messages``/``warnings``/``errors``. Returns ``error`` if the item
-        was not found or ``status`` is not one of complete/failed/skipped.
+    ``status`` must be ``complete``, ``failed``, or ``skipped``.
     """
     mgr = _dispatch_state_manager()
 
@@ -4562,10 +4330,7 @@ async def dispatch_wave_status(
     other than the one requested; only stale items in the requested wave are
     reported in the returned warnings.
 
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchWaveStatusResponse` with
-        wave-status fields, or ``error`` if wave not found. accumulated_usage
-        is currently always zero (not yet wired up).
+    ``accumulated_usage`` is always zero. It is not wired up yet.
     """
     mgr = _dispatch_state_manager()
     warnings: list[str] = []
@@ -4864,23 +4629,7 @@ async def dispatch_spawn(
        PIDs, reads result files, and reports progress via
        ``ctx.report_progress()``.
     5. On item failure: marks failed, continues with remaining items.
-    6. Returns a :class:`~backlog_core.models.DispatchSpawnSummary` when all
-       waves complete.
-
-    Args:
-        milestone: GitHub milestone number.
-        wave_num: Starting wave number (1-based); all subsequent waves run too.
-        ctx: FastMCP context (injected automatically).
-        max_concurrent: Maximum number of sessions running in parallel.
-        model: Model identifier forwarded to each spawned session.
-        phase: ``'work'`` adds ``--worktree``; ``'groom'`` omits it.
-        effort: Effort level forwarded to spawn.py as ``--effort``. Accepts
-            ``low``, ``medium``, ``high``, or ``max``. ``None`` (default)
-            omits the flag and lets the model default apply.
-
-    Returns:
-        :class:`~backlog_core.tool_responses.DispatchSpawnResponse` with
-        dispatch-run fields on completion, or ``error`` on failure.
+    6. Reports the run summary once every wave completes.
     """
     try:
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone)

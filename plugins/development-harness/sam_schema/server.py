@@ -61,19 +61,11 @@ from sam_schema.server_task_ops import sam_task_impl
 mcp: FastMCP = FastMCP(
     "sam",
     instructions=(
-        "SAM (Structured Agent-Managed) task plan server. "
-        "Use sam_task to read, claim, update state, or update fields of a specific task — "
-        "set config.action to: read | claim | state | update. "
-        "Use sam_plan to read a plan, create a plan, list all plans, get progress status, "
-        "or list ready-to-dispatch tasks — "
-        "set config.action to: read | create | list | status | ready | update | append_task | finalize. "
-        "Once a plan has been imported into the work ledger, every action here but sam_task's claim "
-        "and sam_plan's list reads and writes the ledger instead of the plan's original content record. "
-        "Use sam_active_task to park and retrieve the task currently being worked on "
-        "within an agent session — "
-        "set config.action to: get | set | update | clear. "
-        "Use sam_known_failure_types to read the shared vocabulary of work-failure types an agent names "
-        "when work could not proceed — it returns the whole table by default."
+        "SAM task plans. Once a plan is imported into the work ledger, every action but "
+        "sam_task's claim and sam_plan's list reads and writes the ledger instead of the "
+        "plan's original record, so the two can report different content for the same plan. "
+        "sam_active_task is scoped to one session: what it parks is invisible to every "
+        "other session."
     ),
 )
 
@@ -133,24 +125,13 @@ def sam_plan(
     - ``status``: Return plan-level progress summary (task counts, completion %).
     - ``ready``: List tasks ready for dispatch (not-started, all deps resolved).
     - ``update``: Set plan-level context and/or patch plan fields.
-    - ``append_task``: Append a single task to an existing plan (incremental build; see #1770).
-    - ``finalize``: Transition a plan from drafting state to ready state (see #1770).
+    - ``append_task``: Append a single task to an existing plan, one task per call.
+    - ``finalize``: Move a plan from drafting to ready.
 
     Actions that do not use ``plan``:
 
     - ``create``: Create a new plan from a typed list of task definitions.
     - ``list``: List all plans with optional search and auto-pagination.
-
-    Args:
-        config: Discriminated union config. The ``action`` field selects the operation.
-        plan_dir: Path to the directory containing plan files.
-        plan: Plan address component. Required for read, status, ready, update, append_task, finalize actions.
-
-    Returns:
-        Response model whose shape depends on the action (see individual action docs).
-
-    Raises:
-        ToolError: When ``plan`` is None for an action that requires it.
     """
     return sam_plan_impl(config, plan_dir, plan)
 
@@ -174,18 +155,8 @@ def sam_task(
 ) -> TaskAssignment | ClaimResult | StateResult | UpdateTaskResult | TransitionResult:
     """Read, claim, update state, or update fields for a specific task.
 
-    Once the ledger holds the task's plan, every action but ``claim`` reads or writes the ledger
-    the way the CLI's ledger-backed commands do (``sam_plan.py``); ``claim`` stays on the content
-    path, because it is retired everywhere except there until a later slice removes it too.
-
-    Args:
-        plan: Plan address component (numeric index or slug).
-        task: Task ID component (e.g., ``T3``).
-        config: Discriminated union selecting the action and its parameters.
-        plan_dir: Path to the directory containing plan files.
-
-    Returns:
-        Action-specific Pydantic model. See individual action descriptions.
+    Once the ledger holds the task's plan, every action but ``claim`` reads and writes the
+    ledger. ``claim`` still reads the plan's original record.
     """
     return sam_task_impl(plan, task, config, plan_dir)
 
@@ -226,24 +197,12 @@ def sam_active_task(
     - ``update``: Update fields on the active task without repeating its address.
     - ``clear``: Remove the active task context for this session.
 
-    Args:
-        config: Discriminated union selecting the action and its parameters.
-        session_id: Caller-specific session identifier. Required.
+    ``action="update"`` fails when no task has been set for this session. Set one first.
 
-    Returns:
-        Action-specific Pydantic model. See individual action descriptions.
-
-    Raises:
-        ToolError: When ``session_id`` is missing, empty, or the reserved
-            ``"_default"`` sentinel. Also when ``action="update"`` and no
-            active task has been set, and when the configured context backend
-            cannot be built -- the resolved name is not a recognised backend, or
-            the existing GitHub backend remains factory-disabled pending #3455.
-            ``dh_config.DHConfig.get_backend`` resolves that name, so the input to
-            correct is whichever of these is in force: the ``CONTEXTBACKEND``
-            environment variable, ``context.backend`` or the global
-            ``backend.name`` in ``.dh/config.yaml``, or the ``.beads/dh-backend``
-            marker file, which selects ``"beads"``.
+    The call also fails when the configured context backend cannot be built. Correct
+    whichever of these names it: the ``CONTEXTBACKEND`` environment variable,
+    ``context.backend`` or ``backend.name`` in ``.dh/config.yaml``, or a
+    ``.beads/dh-backend`` marker file, which selects ``beads``.
     """
     return sam_active_task_impl(config, session_id)
 
@@ -271,26 +230,16 @@ def sam_known_failure_types(
 ) -> KnownFailureTypesPage:
     """Return the shared vocabulary of work-failure types, as data.
 
-    A Worker names one of these codes when work could not proceed, so the reason is routable rather
-    than reinvented as prose in each status report. The table is
-    ``dh_core.known_failure_types.KNOWN_FAILURE_TYPES``; the ``sam known-failure-types`` CLI command
-    returns the same rows from the same source.
+    Name one of these codes when work could not proceed, so the reason is routable rather than
+    reinvented as prose in each status report. The ``sam known-failure-types`` CLI command
+    returns the same rows.
 
-    This vocabulary is deliberately separate from the ledger's own reason codes
-    (``dh_core.ledger_spec.REASONS``, why a command refused) and from ``reclaim --reason`` (what the
-    Orchestrator says when it sends a task back). If the ledger already refuses a condition with a
-    ``REASONS`` code, name that code instead of a failure type.
+    These codes are separate from the reason a ledger command gives for refusing a call, and
+    from what ``reclaim --reason`` records when a task is sent back. When a ledger command
+    already refuses the condition with its own code, name that code instead.
 
-    Args:
-        offset: How many rows to skip before the window starts.
-        limit: How many rows the window holds at most; omitted returns every remaining row.
-
-    Returns:
-        :class:`~dh_core.known_failure_types.KnownFailureTypesPage` — the window, plus ``total`` so
-        a caller reading a window knows how much it did not read.
-
-    Raises:
-        ToolError: When ``offset`` or ``limit`` is negative.
+    ``total`` reports the size of the whole table, so a caller reading one window knows how
+    much it did not read.
     """
     try:
         return known_failure_types_page(offset=offset, limit=limit)
