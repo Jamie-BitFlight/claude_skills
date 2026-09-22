@@ -1,0 +1,218 @@
+{
+  "provider": "github",
+  "target": {
+    "repository": {
+      "provider": "github",
+      "hostname": "github.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 24
+  },
+  "transport": "github_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "2c0cf2d07b1f7733d19366f45d6cb9f6b6721ceef9e0d43e1c2523c94d652cc2",
+  "head_revision": "4444444444444444444444444444444444444444",
+  "revision_at": "2026-09-22T01:04:00Z",
+  "completeness": {
+    "transport": "github_cli",
+    "required_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "completed_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": []
+  },
+  "review_inputs": [
+    {
+      "input_id": "github:thread:401",
+      "provider": "github",
+      "provider_ids": {
+        "object_id": "401",
+        "reply_target_id": "401",
+        "resolution_target_id": "thread-401"
+      },
+      "source_kind": "review_comment",
+      "kinds": ["comment"],
+      "location": "inline",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-4",
+        "login": "reviewer-four",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Validate empty values at the shared request boundary.",
+      "stable_reference": "https://github.example/acme/widgets/pull/24#discussion-401",
+      "created_at": "2026-09-22T01:04:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": "src/validation.py",
+      "line": 18,
+      "provider_state": "open",
+      "capabilities": {
+        "can_reply": true,
+        "can_resolve": true,
+        "can_comment": true,
+        "unavailable": []
+      },
+      "thread_id": "thread-401",
+      "parent_id": null
+    },
+    {
+      "input_id": "github:review:402",
+      "provider": "github",
+      "provider_ids": { "object_id": "402", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "review",
+      "kinds": ["comment", "question"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-4",
+        "login": "reviewer-four",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Which invariant owns empty-value validation?",
+      "stable_reference": "https://github.example/acme/widgets/pull/24#pullrequestreview-402",
+      "created_at": "2026-09-22T01:04:01Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "COMMENTED",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    },
+    {
+      "input_id": "github:review:403",
+      "provider": "github",
+      "provider_ids": { "object_id": "403", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "review",
+      "kinds": ["approval"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-5",
+        "login": "reviewer-five",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Approved.",
+      "stable_reference": "https://github.example/acme/widgets/pull/24#pullrequestreview-403",
+      "created_at": "2026-09-22T01:04:02Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "APPROVED",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    },
+    {
+      "input_id": "github:review:404",
+      "provider": "github",
+      "provider_ids": { "object_id": "404", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "review",
+      "kinds": ["rejection"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-6",
+        "login": "reviewer-six",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Changes requested: validate empty values at the shared request boundary.",
+      "stable_reference": "https://github.example/acme/widgets/pull/24#pullrequestreview-404",
+      "created_at": "2026-09-22T01:04:03Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "CHANGES_REQUESTED",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    },
+    {
+      "input_id": "github:comment:405",
+      "provider": "github",
+      "provider_ids": { "object_id": "405", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "issue_comment",
+      "kinds": ["comment"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "bot-4",
+        "login": "activity-bot",
+        "display_name": null,
+        "classification": "bot",
+        "role": "stakeholder"
+      },
+      "body": "Automated summary: the latest commit changed src/validation.py and the unit-test job passed.",
+      "stable_reference": "https://github.example/acme/widgets/pull/24#issuecomment-405",
+      "created_at": "2026-09-22T01:04:04Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "active",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "available",
+  "unresolved_count": 1,
+  "outstanding_input_count": 5,
+  "codex_approved": false,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "CLEAN",
+    "blockers": []
+  }
+}

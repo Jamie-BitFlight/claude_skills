@@ -1,0 +1,85 @@
+{
+  "provider": "github",
+  "target": {
+    "repository": {
+      "provider": "github",
+      "hostname": "github.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 26
+  },
+  "transport": "github_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "f0732e4f4a48071d3acb0c4c71ec46bf8b1e0e364a037f6842f52096dcc687a8",
+  "head_revision": "6666666666666666666666666666666666666666",
+  "revision_at": "2026-09-22T01:06:00Z",
+  "completeness": {
+    "transport": "github_cli",
+    "required_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "completed_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": []
+  },
+  "review_inputs": [
+    {
+      "input_id": "github:reaction:601",
+      "provider": "github",
+      "provider_ids": { "object_id": "601", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "reaction",
+      "kinds": ["approval"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-6",
+        "login": "reviewer-six",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "+1",
+      "stable_reference": "https://github.example/acme/widgets/pull/26#issuecomment-601",
+      "created_at": "2026-09-22T01:06:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "THUMBS_UP",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "available",
+  "outstanding_input_count": 1,
+  "codex_approved": false,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "CLEAN",
+    "blockers": []
+  }
+}
