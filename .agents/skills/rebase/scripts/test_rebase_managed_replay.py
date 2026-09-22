@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from rebase_test_support import commit_file, initialize_repository, run_git
@@ -196,3 +197,36 @@ def test_managed_flow_preserves_merge_topology(tmp_path: Path) -> None:
         repository, "rev-list", "--count", "--min-parents=2", f"{target_oid}..refs/heads/feature"
     ).stdout.strip()
     assert merge_count == "1"
+
+
+def test_finalize_rejects_arbitrary_instruction_preflight_programs(tmp_path: Path) -> None:
+    """Do not execute caller-selected programs before recovery and plan creation."""
+    repository = tmp_path / "repository"
+    initialize_repository(repository)
+    (repository / "AGENTS.md").write_text("# Repository policy\n", encoding="utf-8")
+    run_git(repository, "add", "AGENTS.md")
+    run_git(repository, "commit", "-m", "add instructions")
+    run_git(repository, "switch", "-c", "feature")
+    commit_file(repository, "feature.txt", "feature\n", "feature")
+    run_git(repository, "switch", "main")
+    target_oid = commit_file(repository, "target.txt", "target\n", "target")
+    run_git(repository, "switch", "feature")
+    captured = run_plan(
+        repository, "capture", "--branch", "feature", "--target", "main", "--expected-target-oid", target_oid
+    )
+    assert captured.returncode == 0, captured.stdout
+    output = json.loads(captured.stdout)
+    semantics = semantic_input(output)
+    acknowledgements = semantics["instruction_acknowledgements"]
+    assert isinstance(acknowledgements, list)
+    marker = repository / "arbitrary-preflight-ran"
+    acknowledgements[0]["required_preflight_argv"] = [
+        [sys.executable, "-c", "from pathlib import Path; Path('arbitrary-preflight-ran').write_text('ran')"]
+    ]
+
+    finalized = run_plan(repository, "finalize", output["capture_id"], "--semantics-json", json.dumps(semantics))
+
+    assert finalized.returncode != 0
+    assert not marker.exists()
+    recovery_ref = f"refs/heads/rebase-backup/{output['capture_id']}"
+    assert run_git(repository, "show-ref", "--verify", recovery_ref, check=False).returncode != 0

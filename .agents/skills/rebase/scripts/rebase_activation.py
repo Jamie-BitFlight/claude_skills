@@ -22,6 +22,28 @@ class ActionKind(StrEnum):
     TERMINAL = "terminal"
 
 
+class CapturedExecution(BaseModel):
+    """Complete command trace captured from the copied consumer skill."""
+
+    argv: list[str] = Field(min_length=1)
+    cwd: str = Field(min_length=1)
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
+class ConsumerInstallation(BaseModel):
+    """Identity of one copied-skill consumer used for activation evidence."""
+
+    method: Literal["copied-skill-directory"]
+    source_package_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    installed_package_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    installed_skill_directory: str = Field(min_length=1)
+    fixture_directory: str | None = None
+    runner: Literal["isolated-no-repository-agent"]
+    source_repository_accessed: Literal[False]
+
+
 class ActionEvent(BaseModel):
     """One structured action observed in a harness transcript."""
 
@@ -30,6 +52,7 @@ class ActionEvent(BaseModel):
     script_path: str | None = None
     exit_code: int | None = None
     resulting_terminal: WorkflowState | None = None
+    execution: CapturedExecution | None = None
 
 
 class EvalCase(BaseModel):
@@ -72,6 +95,7 @@ class ActivationCaseResult(BaseModel):
     prompt: str
     observed_activation: bool
     skill_directory: str | None = None
+    consumer_installation: ConsumerInstallation | None = None
     loaded_sources: list[str]
     actions: list[ActionEvent]
     state_transitions: list[WorkflowState]
@@ -100,6 +124,25 @@ def content_digest(path: Path) -> str:
         Hexadecimal SHA-256 digest.
     """
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def package_digest(skill_root: Path) -> str:
+    """Hash copied package content while excluding self-referential result evidence.
+
+    Returns:
+        Content digest for the installable skill directory.
+    """
+    digest = hashlib.sha256()
+    excluded = skill_root / "evals" / "activation-results.json"
+    paths = sorted(path for path in skill_root.rglob("*") if path.is_file() and path != excluded)
+    for path in paths:
+        if "__pycache__" in path.parts or path.suffix == ".pyc" or path.name.startswith("test_"):
+            continue
+        digest.update(path.relative_to(skill_root).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def evaluate_package_shape(package: EvalPackage, results: ActivationResults) -> list[str]:
@@ -179,7 +222,7 @@ def evaluate_skill_directory(case: ActivationCaseResult) -> list[str]:
     """
     key = (case.harness, case.eval_id)
     if not case.observed_activation or case.final_terminal == WorkflowState.BLOCKED_SKILL_DIR_UNAVAILABLE:
-        return []
+        return evaluate_consumer_installation(case)
     if case.skill_directory is None or not Path(case.skill_directory).is_absolute():
         return [f"absolute skill directory unavailable: {key}"]
     skill_directory = Path(case.skill_directory)
@@ -190,6 +233,40 @@ def evaluate_skill_directory(case: ActivationCaseResult) -> list[str]:
         script_path = Path(action.script_path)
         if not script_path.is_absolute() or not script_path.is_relative_to(skill_directory):
             failures.append(f"command script escapes skill directory: {key}")
+    failures.extend(evaluate_consumer_installation(case))
+    return failures
+
+
+def evaluate_consumer_installation(case: ActivationCaseResult) -> list[str]:
+    """Validate copied-package identity and captured command execution.
+
+    Returns:
+        Every missing or contradictory consumer-execution failure.
+    """
+    key = (case.harness, case.eval_id)
+    installation = case.consumer_installation
+    if not case.observed_activation:
+        return []
+    if installation is None:
+        return [f"consumer installation evidence missing: {key}"]
+    failures: list[str] = []
+    installed_directory = Path(installation.installed_skill_directory)
+    if (
+        not installed_directory.is_absolute()
+        or installation.source_package_sha256 != installation.installed_package_sha256
+    ):
+        failures.append(f"copied consumer package identity mismatch: {key}")
+    for action in case.actions:
+        if action.kind is not ActionKind.COMMAND:
+            continue
+        execution = action.execution
+        if execution is None:
+            failures.append(f"captured command execution missing: {key}")
+            continue
+        if action.exit_code != execution.exit_code or action.script_path not in execution.argv:
+            failures.append(f"captured command execution mismatch: {key}")
+        if not Path(execution.cwd).is_absolute() or Path(execution.cwd).is_relative_to(installed_directory):
+            failures.append(f"consumer command did not run from an external fixture: {key}")
     return failures
 
 
@@ -237,6 +314,11 @@ def evaluate_activation_results(skill_root: Path, package: EvalPackage, results:
     """
     failures = evaluate_package_shape(package, results)
     failures.extend(evaluate_content_hashes(skill_root, results))
+    current_package_sha256 = package_digest(skill_root)
+    for case in results.cases:
+        installation = case.consumer_installation
+        if installation is not None and installation.source_package_sha256 != current_package_sha256:
+            failures.append(f"consumer copy differs from current package: {(case.harness, case.eval_id)}")
     evaluations = {evaluation.id: evaluation for evaluation in package.evals}
     for case in results.cases:
         evaluation = evaluations.get(case.eval_id)

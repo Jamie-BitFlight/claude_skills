@@ -4,7 +4,8 @@ Load only the section selected by a condition-bearing runtime pointer.
 
 ## Worktree ownership and branch transfer
 
-Parse worktree records and match the exact `branch refs/heads/<branch>` owner.
+Parse worktree records and match the exact `branch refs/heads/<branch>` owner
+([runtime evidence](./runtime-evidence.json#worktree-record-owner)).
 
 - Another worktree: require observable current-session ownership. Without it, emit
   `BLOCKED_WORKTREE_IN_USE` and leave its branch, HEAD, index, tracked files, and untracked files

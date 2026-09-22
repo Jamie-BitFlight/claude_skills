@@ -137,6 +137,7 @@ omit = [
     "tests_backlog/*",
     "*/tests_backlog/*",
 ]
+patch = ["subprocess"]
 source = ["**/scripts"]
 
 [tool.ty.environment]

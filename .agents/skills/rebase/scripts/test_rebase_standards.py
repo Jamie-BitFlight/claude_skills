@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -46,6 +47,8 @@ class RuntimeClaim(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: str = Field(min_length=1)
+    document: str = Field(min_length=1)
+    statement: str = Field(min_length=1)
     source_path: str = Field(min_length=1)
     source_symbol: str = Field(min_length=1)
     source_lines: tuple[int, int]
@@ -116,6 +119,15 @@ def test_installed_skill_directory_evidence_is_absolute_and_missing_metadata_fai
                 assert Path(action.script_path).is_relative_to(skill_directory)
 
 
+def test_active_route_uses_the_portable_skill_directory_contract() -> None:
+    """Keep the active route compatible with both supported harness metadata shapes."""
+    text = (SKILL_ROOT / "references" / "active-rebase.md").read_text(encoding="utf-8")
+
+    assert "skill_root" in text
+    assert "Base directory for this skill" in text
+    assert "BLOCKED_SKILL_DIR_UNAVAILABLE" in text
+
+
 def test_runtime_claim_citations_resolve_to_current_symbols_and_observed_tests() -> None:
     """Keep each routine claim bound to current source and executable evidence."""
     assert EVIDENCE_PATH.is_file()
@@ -134,10 +146,14 @@ def test_runtime_claim_citations_resolve_to_current_symbols_and_observed_tests()
 
     for claim in claims.values():
         source = SKILL_ROOT / claim.source_path
+        document = SKILL_ROOT / claim.document
         test_path_text, _, test_name = claim.observed_by.partition("::")
         assert source.is_file()
         assert function_lines(source)[claim.source_symbol] == claim.source_lines
         assert test_name in function_lines(SKILL_ROOT / test_path_text)
+        target = f"runtime-evidence.json#{claim.id}"
+        blocks = [" ".join(block.split()) for block in re.split(r"\n\s*\n", document.read_text(encoding="utf-8"))]
+        assert any(claim.statement in block and target in block for block in blocks), claim.id
 
 
 def test_every_executable_pep723_script_stays_below_the_split_boundary() -> None:
@@ -187,10 +203,15 @@ def test_cli_json_boundary_rejects_untyped_mappings(capsys: pytest.CaptureFixtur
     assert capsys.readouterr().out == ""
 
 
-def test_managed_response_functions_do_not_advertise_mapping_contracts() -> None:
-    """Keep public managed response annotations model-based rather than dict-based."""
+def test_cli_response_functions_do_not_advertise_mapping_contracts() -> None:
+    """Keep every public rebase CLI response model-based rather than dict-based."""
     violations: list[str] = []
-    for path in (SCRIPTS / "rebase_capture.py", SCRIPTS / "rebase_cli.py", SCRIPTS / "rebase_finalize.py"):
+    for path in (
+        SCRIPTS / "rebase_active.py",
+        SCRIPTS / "rebase_capture.py",
+        SCRIPTS / "rebase_cli.py",
+        SCRIPTS / "rebase_finalize.py",
+    ):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         violations.extend(
             f"{path.name}:{node.name}"

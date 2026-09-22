@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -221,6 +222,7 @@ def test_bundled_validator_runs_from_unrelated_consuming_directory(tmp_path: Pat
             "--timeout-seconds",
             str(TEST_COMMAND_TIMEOUT_SECONDS),
             "--",
+            sys.executable,
             str(VALIDATOR_PATH),
             "schema",
         ],

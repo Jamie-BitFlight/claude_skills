@@ -11,7 +11,8 @@ Emit `NEEDS_USER_DECISION` for any unknown. Before continuing or aborting, creat
 local recovery ref at the reconstructed old tip when none exists.
 
 During conflicts, `ours` is the accumulated series on the target and `theirs` is the replayed branch
-commit. Resolve by planned intent and hunk evidence; no side label authorizes whole-file replacement.
+commit ([runtime evidence](./runtime-evidence.json#conflict-side-semantics)). Resolve by planned intent
+and hunk evidence; no side label authorizes whole-file replacement.
 Stage only named resolved paths. Require no unmerged paths, successful diff checks, and relevant
 repository checks before continuing.
 

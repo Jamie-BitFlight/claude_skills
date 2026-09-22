@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -38,6 +39,7 @@ def run_plan(repository: Path, *arguments: str) -> subprocess.CompletedProcess[s
             "--timeout-seconds",
             str(TEST_COMMAND_TIMEOUT_SECONDS),
             "--",
+            sys.executable,
             str(VALIDATOR_PATH),
             *arguments,
         ],

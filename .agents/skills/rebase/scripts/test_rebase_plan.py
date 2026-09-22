@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -253,6 +254,7 @@ def run_validator(plan_path: Path) -> subprocess.CompletedProcess[str]:
             "--timeout-seconds",
             str(TEST_COMMAND_TIMEOUT_SECONDS),
             "--",
+            sys.executable,
             str(VALIDATOR_PATH),
             "validate",
             str(plan_path),

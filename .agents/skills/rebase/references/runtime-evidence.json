@@ -3,6 +3,8 @@
   "claims": [
     {
       "id": "managed-capture",
+      "document": "references/start-rebase.md",
+      "statement": "`capture` performs ordered ref, repository, publication, graph, candidate, and path capture and stores immutable evidence under Git metadata without dirtying the worktree",
       "source_path": "scripts/rebase_capture.py",
       "source_symbol": "capture_rebase",
       "source_lines": [377, 419],
@@ -10,13 +12,17 @@
     },
     {
       "id": "active-inspection",
+      "document": "references/active-rebase.md",
+      "statement": "The inspector derives active state from Git-backed operation metadata",
       "source_path": "scripts/rebase_active.py",
       "source_symbol": "inspect_active_rebase",
-      "source_lines": [77, 119],
+      "source_lines": [121, 163],
       "observed_by": "scripts/test_rebase_active.py::test_repository_without_rebase_routes_to_no_active_terminal"
     },
     {
       "id": "single-use-execution",
+      "document": "SKILL.md",
+      "statement": "Replay authorization is consumed before execution",
       "source_path": "scripts/rebase_prepare.py",
       "source_symbol": "consume_replay_authorization",
       "source_lines": [200, 213],
@@ -24,6 +30,8 @@
     },
     {
       "id": "plan-evidence-validation",
+      "document": "references/active-rebase-operation.md",
+      "statement": "Validate operation-marker paths against their command-backed state",
       "source_path": "scripts/rebase_evidence.py",
       "source_symbol": "validate_path_marker",
       "source_lines": [160, 190],
@@ -31,6 +39,8 @@
     },
     {
       "id": "merge-policy-replay",
+      "document": "references/rebase-edge-cases.md",
+      "statement": "`PRESERVE_TOPOLOGY`: account for the merge and resolution, then use the validated merge-preserving mode",
       "source_path": "scripts/rebase_prepare.py",
       "source_symbol": "derive_replay_argv",
       "source_lines": [149, 163],
@@ -38,6 +48,8 @@
     },
     {
       "id": "managed-finalization",
+      "document": "references/start-rebase.md",
+      "statement": "`finalize` accepts semantic fields only, validates exact coverage and externally bound receipts, then creates recovery and the plan under Git metadata.",
       "source_path": "scripts/rebase_finalize.py",
       "source_symbol": "build_managed_plan",
       "source_lines": [279, 325],
@@ -45,10 +57,39 @@
     },
     {
       "id": "managed-execution",
+      "document": "references/start-rebase.md",
+      "statement": "`execute` rejects unmanaged worktree plans, revalidates live refs, worktree ownership, clean state, operation absence and recovery, derives canonical replay argv, atomically consumes the plan hash, then runs that argv once.",
       "source_path": "scripts/rebase_cli.py",
       "source_symbol": "execute_plan",
       "source_lines": [217, 248],
       "observed_by": "scripts/test_rebase_prepare.py::test_execute_uses_only_the_canonical_current_branch_replay_argv"
+    },
+    {
+      "id": "active-detached-head",
+      "document": "references/active-rebase.md",
+      "statement": "`active`: detached `HEAD` is expected",
+      "source_path": "scripts/rebase_active.py",
+      "source_symbol": "inspect_active_rebase",
+      "source_lines": [121, 163],
+      "observed_by": "scripts/test_rebase_active.py::test_stopped_rebase_with_detached_head_routes_as_active"
+    },
+    {
+      "id": "conflict-side-semantics",
+      "document": "references/active-rebase-operation.md",
+      "statement": "During conflicts, `ours` is the accumulated series on the target and `theirs` is the replayed branch commit",
+      "source_path": "scripts/test_rebase_scenarios.py",
+      "source_symbol": "test_planned_conflict_resolves_combined_intent_before_continue",
+      "source_lines": [395, 440],
+      "observed_by": "scripts/test_rebase_scenarios.py::test_planned_conflict_resolves_combined_intent_before_continue"
+    },
+    {
+      "id": "worktree-record-owner",
+      "document": "references/rebase-edge-cases.md",
+      "statement": "Parse worktree records and match the exact `branch refs/heads/<branch>` owner",
+      "source_path": "scripts/rebase_evidence.py",
+      "source_symbol": "worktree_branch_owners",
+      "source_lines": [201, 208],
+      "observed_by": "scripts/test_rebase_safety_scenarios.py::test_foreign_worktree_owner_blocks_without_mutating_owner"
     }
   ]
 }

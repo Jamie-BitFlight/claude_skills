@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 from rebase_test_support import BOUNDED_RUNNER, SKILL_ROOT, VALIDATOR_PATH, commit_file, initialize_repository, run_git
@@ -23,7 +24,7 @@ ACTIVE_ROUTE = SKILL_ROOT / "scripts" / "rebase_active.py"
 def run_active_route(repository: Path) -> subprocess.CompletedProcess[str]:
     """Run the active-operation inspector through the bounded process owner."""
     return subprocess.run(
-        [str(BOUNDED_RUNNER), "--timeout-seconds", "20", "--", "uv", "run", "--script", str(ACTIVE_ROUTE)],
+        [str(BOUNDED_RUNNER), "--timeout-seconds", "20", "--", sys.executable, str(ACTIVE_ROUTE)],
         cwd=repository,
         check=False,
         capture_output=True,
@@ -107,7 +108,7 @@ def test_completed_rebase_with_stale_rebase_head_routes_to_no_active_terminal(tm
     assert observation["status"] == "## feature\n"
 
     states_result = subprocess.run(
-        [str(BOUNDED_RUNNER), "--timeout-seconds", "20", "--", str(VALIDATOR_PATH), "states"],
+        [str(BOUNDED_RUNNER), "--timeout-seconds", "20", "--", sys.executable, str(VALIDATOR_PATH), "states"],
         cwd=repository,
         check=False,
         capture_output=True,

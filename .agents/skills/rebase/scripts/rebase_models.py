@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
 ObjectId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")]
 PlanSha256 = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
@@ -13,6 +13,27 @@ LocalBranchRef = Annotated[str, StringConstraints(pattern=r"^refs/heads/.+")]
 RecoveryRef = Annotated[str, StringConstraints(pattern=r"^refs/heads/rebase-backup/[a-z0-9][a-z0-9-]*$")]
 ArgumentVector = Annotated[list[str], Field(min_length=1)]
 CaptureId = Annotated[str, StringConstraints(pattern=r"^[a-f0-9]{32}$")]
+READ_ONLY_PREFLIGHT_LENGTH = 4
+
+
+def validate_read_only_preflight(argv: list[str]) -> list[str]:
+    """Accept only an exact-ref existence check with no caller-selected executable.
+
+    Returns:
+        The validated Git argument vector.
+    """
+    if (
+        len(argv) == READ_ONLY_PREFLIGHT_LENGTH
+        and argv[:3] == ["git", "show-ref", "--verify"]
+        and argv[3].startswith("refs/")
+    ):
+        return argv
+    raise ValueError("required preflight must be: git show-ref --verify refs/<exact-ref>")
+
+
+ReadOnlyPreflightArgv = Annotated[
+    list[str], Field(min_length=4, max_length=4), AfterValidator(validate_read_only_preflight)
+]
 
 
 class ExecutionMode(StrEnum):
@@ -140,7 +161,7 @@ class InstructionAcknowledgement(BaseModel):
     path: Annotated[str, Field(min_length=1)]
     source_sha256: PlanSha256
     applied_requirements_summary: Annotated[str, Field(min_length=1)]
-    required_preflight_argv: list[ArgumentVector]
+    required_preflight_argv: list[ReadOnlyPreflightArgv]
 
 
 class FinalizeSemantics(BaseModel):
