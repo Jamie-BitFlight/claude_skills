@@ -6,11 +6,13 @@ import hashlib
 import json
 import operator
 import sqlite3
-from datetime import datetime
-from typing import Any, Literal, Protocol
+from collections.abc import Mapping
+from datetime import datetime, timedelta
+from typing import Any, Literal, Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from dh_core.integration_branch import ExpectedHeadAdvanceResult, PreparedAdvance
 from dh_core.ledger import store, transitions
 from dh_core.ledger.transitions import _dispatch_registered as dispatch_registered
 from dh_core.merge_evidence import MergeEvidenceStore
@@ -245,6 +247,65 @@ class CandidateView(BaseModel):
     noop: str | None = None
 
 
+class MergeNext(Request):
+    """Claim and process the oldest admitted candidate."""
+
+    plan: str
+    generation: int = Field(ge=1)
+    integrator: Assignment
+
+
+class ReconcileClaim(Request):
+    """Observe and resolve one durable unresolved claim without CAS."""
+
+    plan: str
+    claim_number: int = Field(ge=1)
+    permanent_reason: str | None = None
+
+
+class MergeResult(BaseModel):
+    """Typed claim phase or terminal outcome."""
+
+    plan: str
+    claim_number: int
+    phase: str
+    outcome: str | None = None
+    result_sha: str | None = None
+    noop: str | None = None
+
+
+class PolicyStatusPort(Protocol):
+    """Observe complete PR, review, check, and capability policy state."""
+
+    def observe(self, candidate_sha: str, pull_request_ref: str) -> PolicySnapshot:
+        """Return one complete immutable snapshot."""
+        ...
+
+
+class GateRunnerPort(Protocol):
+    """Run all frozen quality gates against one immutable subject."""
+
+    def run(self, commands: tuple[str, ...], subject_sha: str) -> tuple[str, ...]:
+        """Return immutable evidence digests for successful gates."""
+        ...
+
+
+class BranchPreparationPort(Protocol):
+    """Prepare and observe one branch-bound immutable result."""
+
+    def prepare(self, candidate_sha: str) -> PreparedAdvance:
+        """Return durable exact operands without mutating the target."""
+        ...
+
+    def advance(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult:
+        """Attempt the sole exact-old target CAS."""
+        ...
+
+    def reconcile(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult:
+        """Observe the durable prepared result without invoking CAS."""
+        ...
+
+
 class MergeQuery(Request):
     """Select one registered plan, optionally at a historical generation."""
 
@@ -454,6 +515,323 @@ def candidate_view(row: dict[str, Any], *, noop: str | None = None) -> Candidate
     )
 
 
+def observe_policy(
+    service: MergeTrain, candidate: dict[str, Any], *, require_acceptable: bool = True
+) -> PolicySnapshot:
+    """Observe and validate complete acceptable provider state.
+
+    Returns:
+        The complete snapshot.
+    """
+    observer = cast("PolicyStatusPort", service.policy_observer)
+    snapshot = observer.observe(str(candidate["candidate_sha"]), str(candidate["pull_request_ref"]))
+    if (require_acceptable and not policy_acceptable(snapshot)) or snapshot.candidate_sha != candidate["candidate_sha"]:
+        transitions.refuse("source-graph-stale")
+    return snapshot
+
+
+def policy_acceptable(snapshot: PolicySnapshot) -> bool:
+    """Return whether every complete policy fact permits progress."""
+    return (
+        snapshot.available
+        and snapshot.complete
+        and not snapshot.unresolved_thread_ids
+        and not snapshot.unresponded_thread_ids
+        and not snapshot.blocking_reviews
+        and all(
+            subject == snapshot.candidate_sha and conclusion == "success"
+            for _, subject, conclusion in snapshot.required_checks
+        )
+    )
+
+
+def claim_row(ledger: sqlite3.Connection, plan: str, number: int) -> dict[str, Any]:
+    """Read one exact claim.
+
+    Returns:
+        The persisted claim row.
+    """
+    rows = store.rows_of(ledger.execute("SELECT * FROM merge_claims WHERE plan=? AND claim_number=?", (plan, number)))
+    if not rows:
+        transitions.refuse("merge-train-not-registered")
+    return rows[0]
+
+
+def update_claim(ledger: sqlite3.Connection, plan: str, number: int, values: Mapping[str, object]) -> None:
+    """Apply declared claim fields after appending their event."""
+    ledger.execute(
+        "UPDATE merge_claims SET phase=COALESCE(:phase,phase), expires=COALESCE(:expires,expires), "
+        "expected_target_sha=COALESCE(:expected_target_sha,expected_target_sha), "
+        "expected_candidate_sha=COALESCE(:expected_candidate_sha,expected_candidate_sha), "
+        "policy_snapshot_digest=COALESCE(:policy_snapshot_digest,policy_snapshot_digest), "
+        "result_sha=COALESCE(:result_sha,result_sha), prepared_identity_digest=COALESCE(:prepared_identity_digest,prepared_identity_digest), "
+        "prepared_json=COALESCE(:prepared_json,prepared_json), gate_evidence_refs=COALESCE(:gate_evidence_refs,gate_evidence_refs) "
+        "WHERE plan=:plan AND claim_number=:claim_number",
+        {
+            "phase": values.get("phase"),
+            "expires": values.get("expires"),
+            "expected_target_sha": values.get("expected_target_sha"),
+            "expected_candidate_sha": values.get("expected_candidate_sha"),
+            "policy_snapshot_digest": values.get("policy_snapshot_digest"),
+            "result_sha": values.get("result_sha"),
+            "prepared_identity_digest": values.get("prepared_identity_digest"),
+            "prepared_json": values.get("prepared_json"),
+            "gate_evidence_refs": values.get("gate_evidence_refs"),
+            "plan": plan,
+            "claim_number": number,
+        },
+    )
+
+
+def prepared_from_claim(claim: dict[str, Any]) -> PreparedAdvance:
+    """Reconstruct only the durable prepared identity.
+
+    Returns:
+        The exact persisted prepared operands.
+    """
+    value = json.loads(str(claim["prepared_json"]))
+    value["ordered_parent_oids"] = tuple(value["ordered_parent_oids"])
+    return PreparedAdvance(**value)
+
+
+def recheck_claim(
+    service: MergeTrain, request: MergeNext, candidate: dict[str, Any], claim_number: int, phase: str
+) -> None:
+    """Recheck authority after external work and before a phase commit."""
+    train = train_row(service.ledger, request.plan)
+    service.require_host(train)
+    require_assignment(service.ledger, request.plan, request.generation, request.integrator, accepted=False)
+    claim = claim_row(service.ledger, request.plan, claim_number)
+    current = current_candidate(service.ledger, request.plan, request.generation, str(candidate["task"]))
+    if (
+        claim["phase"] != phase
+        or not int(claim["active"])
+        or current is None
+        or current["candidate_number"] != candidate["candidate_number"]
+    ):
+        transitions.refuse("train-generation-stale")
+
+
+def open_claim(
+    service: MergeTrain, request: MergeNext, definition: DispatchPlanDefinition
+) -> tuple[dict[str, Any], int, DispatchPlanDefinition]:
+    """Create the sole active unbound claim.
+
+    Returns:
+        Candidate row, claim number, and frozen definition.
+    """
+    with store.transaction(service.ledger):
+        if service.ledger.execute("SELECT 1 FROM merge_claims WHERE plan=? AND active=1", (request.plan,)).fetchone():
+            transitions.refuse("registered-plan-active")
+        rows = store.rows_of(
+            service.ledger.execute(
+                "SELECT * FROM merge_candidates WHERE plan=? AND generation=? AND superseded_seq IS NULL "
+                "AND admitted_seq IS NOT NULL AND enqueued_seq IS NOT NULL AND outcome IS NULL ORDER BY enqueued_seq, task LIMIT 1",
+                (request.plan, request.generation),
+            )
+        )
+        if not rows:
+            transitions.refuse("merge-train-not-registered")
+        candidate = rows[0]
+        number = int(
+            service.ledger.execute(
+                "SELECT COALESCE(MAX(claim_number), 0) + 1 FROM merge_claims WHERE plan=?", (request.plan,)
+            ).fetchone()[0]
+        )
+        payload = {
+            "claim_number": number,
+            "candidate_task": candidate["task"],
+            "candidate_number": candidate["candidate_number"],
+            "integrator_issue": request.integrator.issue,
+            "integrator_task": request.integrator.task,
+            "integrator_attempt": request.integrator.attempt,
+            "phase": "UNBOUND",
+            "expires": store.timestamp(store.now() + timedelta(seconds=300)),
+        }
+        store.append_event(
+            service.ledger,
+            kind="merge.claimed",
+            plan=request.plan,
+            task=str(candidate["task"]),
+            payload=payload,
+            at=store.now(),
+        )
+        row = {**store.blank_row("merge_claims"), **payload, "plan": request.plan, "active": 1}
+        columns = [column.name for column in store.TABLES["merge_claims"]]
+        service.ledger.execute(store.insert_statement("merge_claims", columns), {name: row[name] for name in columns})
+    return candidate, number, definition
+
+
+def bind_claim(
+    service: MergeTrain, request: MergeNext, candidate: dict[str, Any], number: int
+) -> tuple[PreparedAdvance, PolicySnapshot]:
+    """Observe immutable heads and persist a bound claim.
+
+    Returns:
+        Prepared operands and bound policy snapshot.
+    """
+    snapshot = observe_policy(service, candidate)
+    advancer = cast("BranchPreparationPort", service.branch_advancer)
+    prepared = advancer.prepare(str(candidate["candidate_sha"]))
+    if prepared.candidate_oid != candidate["candidate_sha"]:
+        transitions.refuse("role-assignment-mismatch")
+    blob = service.evidence.put(snapshot.model_dump_json().encode(), "application/json")
+    payload = {
+        "claim_number": number,
+        "phase": "BOUND",
+        "expires": store.timestamp(store.now() + timedelta(seconds=300)),
+        "expected_target_sha": prepared.expected_target_oid,
+        "expected_candidate_sha": prepared.candidate_oid,
+        "policy_snapshot_digest": blob.digest,
+    }
+    with store.transaction(service.ledger):
+        recheck_claim(service, request, candidate, number, "UNBOUND")
+        store.append_event(
+            service.ledger,
+            kind="merge.claim-bound",
+            plan=request.plan,
+            task=str(candidate["task"]),
+            payload=payload,
+            at=store.now(),
+        )
+        update_claim(service.ledger, request.plan, number, payload)
+    return prepared, snapshot
+
+
+def prepare_claim(
+    service: MergeTrain,
+    request: MergeNext,
+    candidate: dict[str, Any],
+    number: int,
+    prepared: PreparedAdvance,
+    definition: DispatchPlanDefinition,
+) -> PolicySnapshot:
+    """Run gates, refresh policy, and persist durable prepared identity.
+
+    Returns:
+        The final pre-CAS policy snapshot.
+    """
+    gates = cast("GateRunnerPort", service.gates)
+    gate_refs = gates.run(definition.quality_gates, prepared.prepared_result_oid)
+    snapshot = observe_policy(service, candidate)
+    blob = service.evidence.put(snapshot.model_dump_json().encode(), "application/json")
+    payload = {
+        "claim_number": number,
+        "phase": "PREPARED",
+        "expires": store.timestamp(store.now() + timedelta(seconds=300)),
+        "result_sha": prepared.prepared_result_oid,
+        "prepared_identity_digest": prepared.prepared_identity_digest,
+        "prepared_json": json.dumps(prepared.__dict__, sort_keys=True),
+        "gate_evidence_refs": json.dumps(list(gate_refs)),
+        "policy_snapshot_digest": blob.digest,
+    }
+    with store.transaction(service.ledger):
+        recheck_claim(service, request, candidate, number, "BOUND")
+        store.append_event(
+            service.ledger,
+            kind="merge.claim-prepared",
+            plan=request.plan,
+            task=str(candidate["task"]),
+            payload=payload,
+            at=store.now(),
+        )
+        update_claim(service.ledger, request.plan, number, payload)
+    return snapshot
+
+
+def finish_claim(
+    service: MergeTrain,
+    plan: str,
+    candidate: dict[str, Any],
+    claim_number: int,
+    prepared: PreparedAdvance,
+    policy_digest: str,
+    kind: str,
+    conclusion: str,
+) -> MergeResult:
+    """Atomically terminalize one exact prepared claim and candidate.
+
+    Returns:
+        The terminal merge result.
+    """
+    with store.transaction(service.ledger):
+        claim = claim_row(service.ledger, plan, claim_number)
+        if claim["prepared_identity_digest"] != prepared.prepared_identity_digest or not int(claim["active"]):
+            transitions.refuse("train-generation-stale")
+        payload = {
+            "generation": candidate["generation"],
+            "candidate_number": candidate["candidate_number"],
+            "claim_number": claim_number,
+            "result_sha": prepared.prepared_result_oid,
+            "conclusion": conclusion,
+            "policy_snapshot_digest": policy_digest,
+        }
+        sequence = store.append_event(
+            service.ledger, kind=kind, plan=plan, task=str(candidate["task"]), payload=payload, at=store.now()
+        )
+        service.ledger.execute(
+            "UPDATE merge_claims SET active=0, conclusion=?, concluded_seq=? WHERE plan=? AND claim_number=?",
+            (conclusion, sequence, plan, claim_number),
+        )
+        service.ledger.execute(
+            "UPDATE merge_candidates SET outcome=?, result_sha=?, finished_seq=? WHERE plan=? AND generation=? AND task=? AND candidate_number=?",
+            (
+                conclusion,
+                prepared.prepared_result_oid,
+                sequence,
+                plan,
+                candidate["generation"],
+                candidate["task"],
+                candidate["candidate_number"],
+            ),
+        )
+    return MergeResult(
+        plan=plan,
+        claim_number=claim_number,
+        phase="TERMINAL",
+        outcome=conclusion,
+        result_sha=prepared.prepared_result_oid,
+    )
+
+
+def require_reconciliation(
+    service: MergeTrain,
+    plan: str,
+    candidate: dict[str, Any],
+    claim_number: int,
+    prepared: PreparedAdvance,
+    policy_digest: str,
+) -> MergeResult:
+    """Persist an active nonterminal reconciliation-required phase.
+
+    Returns:
+        The unresolved claim result.
+    """
+    payload = {
+        "claim_number": claim_number,
+        "phase": "RECONCILIATION_REQUIRED",
+        "result_sha": prepared.prepared_result_oid,
+        "prepared_identity_digest": prepared.prepared_identity_digest,
+        "policy_snapshot_digest": policy_digest,
+    }
+    with store.transaction(service.ledger):
+        claim = claim_row(service.ledger, plan, claim_number)
+        if claim["phase"] != "PREPARED" or not int(claim["active"]):
+            transitions.refuse("train-generation-stale")
+        store.append_event(
+            service.ledger,
+            kind="merge.reconciliation-required",
+            plan=plan,
+            task=str(candidate["task"]),
+            payload=payload,
+            at=store.now(),
+        )
+        update_claim(service.ledger, plan, claim_number, payload)
+    return MergeResult(
+        plan=plan, claim_number=claim_number, phase="RECONCILIATION_REQUIRED", result_sha=prepared.prepared_result_oid
+    )
+
+
 class MergeTrain:
     """Service owning T1 authoritative registration and reserved dispatch."""
 
@@ -464,9 +842,9 @@ class MergeTrain:
         source_graph: SourceGraphReader,
         host_authority: HostAuthority,
         evidence: MergeEvidenceStore | None = None,
-        policy_observer: object | None = None,
-        branch_advancer: object | None = None,
-        gates: object | None = None,
+        policy_observer: PolicyStatusPort | None = None,
+        branch_advancer: BranchPreparationPort | None = None,
+        gates: GateRunnerPort | None = None,
     ) -> None:
         """Bind the service to one existing ledger and configured host marker."""
         self.ledger = ledger
@@ -720,6 +1098,95 @@ class MergeTrain:
             )
             row.update(payload, admitted_seq=admitted_seq, enqueued_seq=enqueued_seq)
         return candidate_view(row)
+
+    def merge_next(self, request: MergeNext) -> MergeResult:
+        """Persist unbound, bound, and prepared phases before one exact CAS.
+
+        Returns:
+            The terminal or reconciliation-required result.
+        """
+        train = train_row(self.ledger, request.plan)
+        self.require_host(train)
+        definition = self.fresh_definition(train)
+        if int(train["generation"]) != request.generation or request.integrator.role != "integrator":
+            transitions.refuse("role-assignment-mismatch")
+        require_assignment(self.ledger, request.plan, request.generation, request.integrator, accepted=False)
+        if self.policy_observer is None or self.branch_advancer is None or self.gates is None:
+            transitions.refuse("expected-head-unsupported")
+        candidate, claim_number, definition = open_claim(self, request, definition)
+        prepared, _bound_policy = bind_claim(self, request, candidate, claim_number)
+        final_policy = prepare_claim(self, request, candidate, claim_number, prepared, definition)
+        advance = self.branch_advancer.advance(prepared)
+        post_policy = observe_policy(self, candidate, require_acceptable=False)
+        post_blob = self.evidence.put(post_policy.model_dump_json().encode(), "application/json")
+        successful_ref = advance.outcome in {"advanced", "advanced-after-reconciliation"}
+        fresh = post_policy.semantic_projection() == final_policy.semantic_projection() and policy_acceptable(
+            post_policy
+        )
+        if successful_ref and fresh:
+            return finish_claim(
+                self, request.plan, candidate, claim_number, prepared, post_blob.digest, "merge.finished", "ADVANCED"
+            )
+        return require_reconciliation(self, request.plan, candidate, claim_number, prepared, post_blob.digest)
+
+    def reconcile(self, request: ReconcileClaim) -> MergeResult:
+        """Resolve one claim through observations only, never a second CAS.
+
+        Returns:
+            The still-unresolved or terminal reconciliation result.
+        """
+        claim = claim_row(self.ledger, request.plan, request.claim_number)
+        train = train_row(self.ledger, request.plan)
+        self.require_host(train)
+        if claim["phase"] != "RECONCILIATION_REQUIRED" or not int(claim["active"]):
+            return MergeResult(
+                plan=request.plan,
+                claim_number=request.claim_number,
+                phase=str(claim["phase"]),
+                outcome=str(claim["conclusion"]),
+                noop="already-reconciliation-resolved",
+            )
+        if self.branch_advancer is None or self.policy_observer is None:
+            transitions.refuse("expected-head-unsupported")
+        prepared = prepared_from_claim(claim)
+        observation = self.branch_advancer.reconcile(prepared)
+        candidate = candidate_row(
+            self.ledger,
+            request.plan,
+            int(train["generation"]),
+            str(claim["candidate_task"]),
+            int(claim["candidate_number"]),
+        )
+        policy = observe_policy(self, candidate, require_acceptable=False)
+        evidence = self.evidence.put(policy.model_dump_json().encode(), "application/json")
+        if observation.outcome in {"advanced", "advanced-after-reconciliation"} and policy_acceptable(policy):
+            return finish_claim(
+                self,
+                request.plan,
+                candidate,
+                request.claim_number,
+                prepared,
+                evidence.digest,
+                "merge.reconciled",
+                "RECONCILED",
+            )
+        if observation.outcome == "target-stale" and request.permanent_reason:
+            return finish_claim(
+                self,
+                request.plan,
+                candidate,
+                request.claim_number,
+                prepared,
+                evidence.digest,
+                "merge.reconciliation-resolved",
+                "PERMANENT_AMBIGUOUS",
+            )
+        return MergeResult(
+            plan=request.plan,
+            claim_number=request.claim_number,
+            phase="RECONCILIATION_REQUIRED",
+            noop="reconciliation-still-required",
+        )
 
     def register(self, request: RegisterTrain) -> TrainView:
         """Freeze a definition after checking it against the existing ledger plan.

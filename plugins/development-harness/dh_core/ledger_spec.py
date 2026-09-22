@@ -480,6 +480,7 @@ COLUMNS: list[Column] = [
         policy_snapshot_digest="text|null",
         result_sha="text|null",
         prepared_identity_digest="text|null",
+        prepared_json="text|null",
         gate_evidence_refs="text|null",
         active="int",
         conclusion="text|null",
