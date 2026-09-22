@@ -1,0 +1,47 @@
+# DERIVED + CI-LINT-VERIFIED universal contract.
+# Neutral defaults use v<semver>. Override the resolved prefix/regex/wildcard together.
+variables:
+  RELEASE_TAG_PREFIX: 'v'
+  RELEASE_TAG_REGEX: '/^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$/'
+  RELEASE_TAG_WILDCARD: 'v*'
+  GENERIC_PACKAGE_NAME: '$CI_PROJECT_NAME'
+  RELEASE_ASSET_PATH: '__RELEASE_ASSET_PATH__'
+  RELEASE_ASSET_NAME: '__RELEASE_ASSET_NAME__'
+  RELEASE_DESCRIPTION_PATH: '__RELEASE_DESCRIPTION_PATH__'
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+stages:
+  - release-version
+  - release-notes
+  - release-build
+  - release-publish
+  - release-create
+
+.release_version:
+  stage: release-version
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+.release_notes:
+  stage: release-notes
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+.release_build:
+  stage: release-build
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+.release_publish:
+  stage: release-publish
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'
+
+.release_create:
+  stage: release-create
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG =~ $RELEASE_TAG_REGEX'

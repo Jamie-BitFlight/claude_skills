@@ -1,0 +1,15 @@
+# DERIVED + CI-LINT-VERIFIED GitLab Generic publication-only adapter.
+include:
+  - local: '/.gitlab/release/base.gitlab-ci.yml'
+
+publish_generic:
+  extends: .release_publish
+  image:
+    name: 'curlimages/curl:__CURL_VERSION__@sha256:__CURL_IMAGE_DIGEST__'
+    entrypoint: [""]
+  script:
+    - >-
+      curl --location --fail-with-body
+      --header "JOB-TOKEN: ${CI_JOB_TOKEN}"
+      --upload-file "${RELEASE_ASSET_PATH}"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${GENERIC_PACKAGE_NAME}/${CI_COMMIT_TAG}/${RELEASE_ASSET_NAME}"

@@ -345,3 +345,4 @@ The repository includes sample prompts for AI assistants:
 | Entry | Category | Relationship |
 |-------|----------|--------------|
 | [empirica](../agent-infrastructure/empirica.md) | agent-infrastructure | referenced by empirica (agent-infrastructure) |
+| [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |

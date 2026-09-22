@@ -1,0 +1,12 @@
+include:
+  - local: '/ci/first.yml'
+  - local: '/ci/second.yml'
+
+variables:
+  SHARED: root
+
+stages: [second, verify]
+
+root_job:
+  stage: verify
+  script: ["true"]

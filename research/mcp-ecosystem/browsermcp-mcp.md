@@ -198,3 +198,4 @@ The Chrome extension must be installed separately from the Chrome Web Store. Aft
 | [open-pencil](../ai-design-tools/open-pencil.md) | ai-design-tools | referenced by open-pencil (ai-design-tools) |
 | [scrapling-skill](../developer-tools/scrapling-skill.md) | developer-tools | referenced by scrapling-skill (developer-tools) |
 | [screenpipe](./screenpipe.md) | mcp-ecosystem | referenced by screenpipe (mcp-ecosystem) |
+| [wigolo](./wigolo.md) | mcp-ecosystem | referenced by wigolo (mcp-ecosystem) |
