@@ -127,6 +127,74 @@ def merge_snapshot(connection: sqlite3.Connection) -> dict[str, list[dict[str, o
     }
 
 
+def replacement_source(*, route: str) -> port.PlanSource:
+    if route == "import":
+        return port.PlanSource(
+            plan_id="P3798",
+            milestone=7,
+            source="fixture",
+            revision="replace-judge-pending",
+            tasks=[port.TaskSource(fields={"id": "T1", "title": "replacement", "github_issue": 101})],
+        )
+    return port.milestone_source(
+        milestone_number=7,
+        integration_branch="integration/runtime-integrity",
+        base_sha="a" * 40,
+        items=[port.MilestoneItem(issue=101, title="replacement", task_id="T1")],
+        quality_gates=["uv run pytest"],
+        plan_id="P3798",
+    )
+
+
+def corrupt_dispatch_authority(
+    connection: sqlite3.Connection, *, field: str, event_value: object, row_value: object
+) -> None:
+    event = store.events_of(connection, "P3798", kind="merge.dispatch-bound")[0]
+    if field == "task":
+        connection.execute(
+            "UPDATE events SET task = :value WHERE seq = :seq", {"value": event_value, "seq": event["seq"]}
+        )
+    else:
+        payload = dict(event["payload"])
+        payload[field] = event_value
+        connection.execute(
+            "UPDATE events SET payload = :payload WHERE seq = :seq",
+            {"payload": json.dumps(payload), "seq": event["seq"]},
+        )
+    connection.execute(f"UPDATE merge_dispatches SET {field} = :value", {"value": row_value})
+
+
+def independent_dispatch_authority_findings(connection: sqlite3.Connection) -> list[str]:
+    """Check binding events against literal retained definitions without production fold helpers."""
+    registrations: dict[tuple[str, int], dict[str, tuple[object, ...]]] = {}
+    attempts: dict[tuple[str, str], int] = {}
+    findings: list[str] = []
+    for event in store.all_events(connection):
+        payload = event["payload"]
+        assert isinstance(payload, dict)
+        if event["kind"] == "task.dispatched":
+            attempts[str(event["plan"]), str(event["task"])] = int(payload["attempt"])
+        if event["kind"] == "merge.train-registered":
+            definition_value = payload["definition"]
+            assert isinstance(definition_value, dict)
+            members = definition_value["members"]
+            assert isinstance(members, list)
+            registrations[str(event["plan"]), int(payload["generation"])] = {
+                str(member["task"]): (int(member["issue"]), str(member["role"]), member.get("conflict_group"))
+                for member in members
+                if isinstance(member, dict)
+            }
+        if event["kind"] != "merge.dispatch-bound":
+            continue
+        members = registrations.get((str(event["plan"]), int(payload["generation"])), {})
+        expected = members.get(str(event["task"]))
+        actual = (int(payload["github_issue"]), str(payload["role"]), payload.get("conflict_group"))
+        attempt = attempts.get((str(event["plan"]), str(event["task"])))
+        if expected != actual or attempt != int(payload["attempt"]):
+            findings.append("dispatch-binding-authority-mismatch")
+    return findings
+
+
 def test_f01_registration_reads_authoritative_sources_and_records_identities(tmp_path: Path) -> None:
     train, connection, _, _ = service(tmp_path)
 
@@ -329,6 +397,106 @@ def test_f02_replace_refuses_active_registered_attempt(tmp_path: Path) -> None:
 
     with pytest.raises(store.Refusal, match="registered-plan-active"):
         port.import_plan(connection, source, replace=True)
+
+
+@pytest.mark.parametrize("route", ["import", "from-milestone"])
+@pytest.mark.parametrize("retaining_state", ["returned", "complete-unaccepted"])
+def test_f02_no_group_judge_pending_work_blocks_every_replacement_route(
+    tmp_path: Path, route: str, retaining_state: str
+) -> None:
+    train, connection, _, _ = service(tmp_path, no_group=True)
+    register(train)
+    dispatched = train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    if retaining_state == "returned":
+        transitions.settle(connection, "P3798", "T1", attempt=dispatched.attempt, return_text="judge me")
+    else:
+        transitions.state(connection, "P3798", "T1", new_status="complete", reason="judge me", force=True)
+    before = merge_snapshot(connection)
+    source = replacement_source(route=route)
+    replace = port.import_plan if route == "import" else port.from_milestone
+
+    with pytest.raises(store.Refusal, match="registered-plan-active"):
+        replace(connection, source, replace=True)
+
+    assert merge_snapshot(connection) == before
+
+
+@pytest.mark.parametrize("disposition", ["accepted", "reclaimed", "failed"])
+def test_f02_no_group_replacement_waits_for_final_disposition(tmp_path: Path, disposition: str) -> None:
+    train, connection, _, _ = service(tmp_path, no_group=True)
+    register(train)
+    dispatched = train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    if disposition == "accepted":
+        transitions.state(connection, "P3798", "T1", new_status="complete", reason="done", force=True)
+        transitions.accept(connection, "P3798", "T1", force=True)
+    elif disposition == "reclaimed":
+        transitions.settle(connection, "P3798", "T1", attempt=dispatched.attempt, return_text="judge me")
+        transitions.reclaim(connection, "P3798", "T1", reason="retry")
+    else:
+        transitions.state(connection, "P3798", "T1", new_status="failed", reason="terminal", force=True)
+
+    port.import_plan(connection, replacement_source(route="import"), replace=True)
+
+    train_row = store.rows_of(connection.execute("SELECT invalidated_seq FROM merge_trains"))[0]
+    assert train_row["invalidated_seq"] is not None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("role", "checker"), ("github_issue", 999), ("generation", 2), ("attempt", 2), ("conflict_group", "copied-group")],
+)
+def test_f08_cross_copied_event_and_projection_reject_against_frozen_member(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    train, connection, _, _ = service(tmp_path, no_group=True)
+    register(train)
+    train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    corrupt_dispatch_authority(connection, field=field, event_value=value, row_value=value)
+
+    assert independent_dispatch_authority_findings(connection) == ["dispatch-binding-authority-mismatch"]
+    assert not train.validate(MergeQuery(plan="P3798")).valid
+    with pytest.raises(LookupError, match="dispatch binding"):
+        port.import_plan(connection, replacement_source(route="import"), replace=True)
+    with pytest.raises(LookupError, match="dispatch binding"):
+        store.rebuild(connection)
+    with pytest.raises(store.Refusal, match="dispatch-binding-missing"):
+        train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+
+
+def test_f08_fold_rejects_cross_task_binding_event(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path, no_group=True)
+    register(train)
+    train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    events = store.all_events(connection)
+    binding = next(event for event in events if event["kind"] == "merge.dispatch-bound")
+    binding["task"] = "T2"
+
+    with pytest.raises(LookupError, match="dispatch binding"):
+        store.fold_events(events)
+
+
+def test_f25_mutation_subprocess_contract_is_bounded_and_classifies_timeout() -> None:
+    runner_path = Path(__file__).with_name("run_merge_train_t1_mutations.py")
+    tree = ast.parse(runner_path.read_text(encoding="utf-8"))
+    run_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "subprocess"
+    ]
+    assert len(run_calls) == 1
+    command = ast.unparse(run_calls[0].args[0])
+    assert "BOUNDED_RUNNER" in command
+    assert "--timeout-seconds" in command
+    source = runner_path.read_text(encoding="utf-8")
+    assert '"run_bounded.py"' in source
+    assert "TIMEOUT_EXIT_CODE" in source
+    assert "TIMEOUT" in source
+    assert "completed.stdout" in source
+    assert "completed.stderr" in source
 
 
 @pytest.mark.parametrize(

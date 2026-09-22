@@ -12,12 +12,17 @@ from itertools import starmap
 from pathlib import Path
 
 PLUGIN = Path(__file__).parents[1]
+BOUNDED_RUNNER = PLUGIN.parents[1] / "scripts" / "run_bounded.py"
+MUTANT_TIMEOUT_SECONDS = 120
+TIMEOUT_EXIT_CODE = 124
 TEST = "tests_sam/test_merge_train_t1.py"
 AMENDMENT_TEST = "tests_sam/test_merge_train_t1_amendment.py"
 AMENDMENT_CASES = {
     "test_f02_replace_refuses_active_registered_attempt",
     "test_f02_import_replace_invalidates_inactive_registration",
     "test_f03_f08_deleted_binding_cannot_authorize_open_attempt",
+    "test_f08_cross_copied_event_and_projection_reject_against_frozen_member",
+    "test_f02_no_group_judge_pending_work_blocks_every_replacement_route",
     "test_s1_active_registration_refuses_dispatch_revision_only_drift",
 }
 
@@ -172,7 +177,7 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
         "F02-remove-registered-replacement-active-check",
         "dh_core/ledger/port.py",
         ReplaceIfTest("train is not None and", False),
-        "test_f02_replace_refuses_active_registered_attempt",
+        "test_f02_no_group_judge_pending_work_blocks_every_replacement_route",
     ),
     (
         "F02-remove-invalidation-effect",
@@ -229,6 +234,12 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
         "test_f18_rebuild_matches_independent_reservation_fold",
     ),
     (
+        "F08-skip-frozen-member-binding-check",
+        "dh_core/ledger/store.py",
+        ReplaceIfTest("expected != actual", False),
+        "test_f08_cross_copied_event_and_projection_reject_against_frozen_member",
+    ),
+    (
         "F24-remove-host-marker-check",
         "dh_core/ledger/transitions.py",
         ReplaceIfTest("str(train['authority_host_id']) != authority_host_id", False),
@@ -265,6 +276,11 @@ def run_mutant(name: str, relative: str, transformer: ast.NodeTransformer, test_
         completed = subprocess.run(
             [
                 sys.executable,
+                str(BOUNDED_RUNNER),
+                "--timeout-seconds",
+                str(MUTANT_TIMEOUT_SECONDS),
+                "--",
+                sys.executable,
                 "-m",
                 "pytest",
                 "-c",
@@ -282,10 +298,13 @@ def run_mutant(name: str, relative: str, transformer: ast.NodeTransformer, test_
             text=True,
             check=False,
         )
-        print(f"MUTANT {name}: {'KILLED' if completed.returncode else 'SURVIVED'}")
+        outcome = (
+            "TIMEOUT" if completed.returncode == TIMEOUT_EXIT_CODE else "KILLED" if completed.returncode else "SURVIVED"
+        )
+        print(f"MUTANT {name}: {outcome}")
         print(completed.stdout, end="")
         print(completed.stderr, end="", file=sys.stderr)
-        return completed.returncode != 0
+        return completed.returncode not in {0, TIMEOUT_EXIT_CODE}
 
 
 def main() -> int:

@@ -305,8 +305,39 @@ def replace_checks(conn: sqlite3.Connection, existing: Mapping[str, Any] | None,
         transitions.refuse("exists")
     plan = str(existing["plan_id"])
     train = transitions.active_train(conn, plan)
+    if conn.execute("SELECT 1 FROM merge_trains WHERE plan = :plan", {"plan": plan}).fetchone() is not None:
+        folded = store.fold_events(store.events_of(conn, plan))
+        projection_queries = {
+            "merge_trains": "SELECT * FROM merge_trains WHERE plan = :plan ORDER BY plan, generation",
+            "merge_dispatches": (
+                "SELECT * FROM merge_dispatches WHERE plan = :plan ORDER BY plan, generation, task, attempt"
+            ),
+            "merge_reservations": (
+                "SELECT * FROM merge_reservations WHERE plan = :plan "
+                "ORDER BY plan, generation, conflict_group, task, attempt"
+            ),
+        }
+        for table, query in projection_queries.items():
+            current = store.rows_of(conn.execute(query, {"plan": plan}))
+            if current != folded[table]:
+                msg = f"registered {table} projection does not match immutable events"
+                raise LookupError(msg)
     if train is not None and (
         any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(conn, plan))
+        or conn.execute(
+            "SELECT 1 FROM merge_dispatches AS dispatch "
+            "JOIN tasks AS task ON task.plan = dispatch.plan AND task.id = dispatch.task "
+            "WHERE dispatch.plan = :plan AND dispatch.generation = :generation "
+            "AND dispatch.attempt = task.attempts AND task.accepted = 0 "
+            "AND ((task.status = :in_progress AND task.settled = 1) OR task.status = :complete)",
+            {
+                "plan": plan,
+                "generation": train["generation"],
+                "in_progress": store.IN_PROGRESS,
+                "complete": store.COMPLETE,
+            },
+        ).fetchone()
+        is not None
         or conn.execute(
             "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation AND active = 1",
             {"plan": plan, "generation": train["generation"]},

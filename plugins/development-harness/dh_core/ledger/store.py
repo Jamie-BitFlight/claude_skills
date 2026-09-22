@@ -1324,6 +1324,7 @@ def fold_merge_train_registered(tables: Folded, event: Mapping[str, Any]) -> Non
         msg = f"event {event['seq']} duplicates registered generation {key}"
         raise LookupError(msg)
     tables["merge_trains"][key] = row
+    tables["merge_authority"][key] = event["payload"]["definition"]
 
 
 def fold_merge_train_superseded(tables: Folded, event: Mapping[str, Any]) -> None:
@@ -1350,6 +1351,27 @@ def fold_merge_train_invalidated(tables: Folded, event: Mapping[str, Any]) -> No
 def fold_merge_dispatch_bound(tables: Folded, event: Mapping[str, Any]) -> None:
     """Materialize one immutable assignment-to-attempt relation."""
     payload = event["payload"]
+    train_key = (str(event["plan"]), int(payload["generation"]))
+    definition = tables["merge_authority"].get(train_key)
+    if isinstance(definition, str):
+        definition = json.loads(definition)
+    members = definition.get("members") if isinstance(definition, dict) else None
+    member = (
+        next((item for item in members if isinstance(item, dict) and item.get("task") == event["task"]), None)
+        if isinstance(members, list)
+        else None
+    )
+    expected = (int(member["issue"]), str(member["role"]), member.get("conflict_group")) if member is not None else None
+    actual = (int(payload["github_issue"]), str(payload["role"]), payload.get("conflict_group"))
+    task = tables["tasks"].get((str(event["plan"]), str(event["task"])))
+    if (
+        expected != actual
+        or task is None
+        or int(task["attempts"] or 0) != int(payload["attempt"])
+        or int(task["attempt_open"] or 0) != 1
+    ):
+        msg = f"event {event['seq']} carries dispatch binding outside registered authority {train_key}"
+        raise LookupError(msg)
     row = blank_row("merge_dispatches")
     row.update(
         carried("merge_dispatches", payload),
@@ -1463,6 +1485,7 @@ def fold_events(events: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str,
         ValueError: When an event carries a kind ``ledger_spec.EVENTS`` does not declare.
     """
     tables: Folded = {table: {} for table in TABLES}
+    tables["merge_authority"] = {}
     for event in events:
         kind = str(event["kind"])
         handler = HANDLERS.get(kind)
@@ -1470,7 +1493,7 @@ def fold_events(events: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str,
             msg = f"event {event['seq']} carries kind {kind}, which ledger_spec.EVENTS does not declare"
             raise ValueError(msg)
         handler(tables, event)
-    return {table: [rows[key] for key in sorted(rows)] for table, rows in tables.items()}
+    return {table: [tables[table][key] for key in sorted(tables[table])] for table in TABLES}
 
 
 def rebuild(conn: sqlite3.Connection) -> None:

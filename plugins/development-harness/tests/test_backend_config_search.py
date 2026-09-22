@@ -34,13 +34,15 @@ class _BackendSearchModule(Protocol):
 def _write_yaml_config(path: Path, backend_name: str) -> None:
     """Write a .dh/config.yaml with global backend.name set."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    _yaml.dump({"backend": {"name": backend_name}}, path.open("w", encoding="utf-8"))
+    with path.open("w", encoding="utf-8") as stream:
+        _yaml.dump({"backend": {"name": backend_name}}, stream)
 
 
 def _write_yaml_config_subsystem(path: Path, subsystem: str, backend_name: str) -> None:
     """Write a .dh/config.yaml with a subsystem-specific backend override."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    _yaml.dump({subsystem: {"backend": backend_name}}, path.open("w", encoding="utf-8"))
+    with path.open("w", encoding="utf-8") as stream:
+        _yaml.dump({subsystem: {"backend": backend_name}}, stream)
 
 
 _make_dh_paths_mock = make_dh_paths_mock
