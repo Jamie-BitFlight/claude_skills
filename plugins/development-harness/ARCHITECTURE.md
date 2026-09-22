@@ -474,6 +474,53 @@ and its event kinds are rows appended to a log that is read, not delivered. Sear
 both describing those appended rows, and no push surface. A fact no return carries is therefore a
 fact nobody will tell the Orchestrator.
 
+### Registered dispatch authority
+
+A merge train is an opt-in generation registered against an existing ledger plan. Callers supply
+only logical plan references. `DispatchPlanReader` returns the immutable canonical parser output and
+`SourceGraphReader` returns the GitHub/source-graph projection; registration computes both digests,
+requires their shared facts and current ledger members to agree, and freezes their revisions,
+member issue/task/dependency/resource and role mappings, integration target, baseline, quality gates,
+and the configured `merge_train.authority_host_id`. Every registered mutation re-reads both sources
+and refuses changed or disagreeing authority before writing. The host value is an opaque
+configuration-mismatch marker. It is not machine authentication and does not prove that another
+host cannot copy the value; the operating contract permits mutations only on the configured
+authority host.
+
+`dh_core.merge_train.MergeTrain` owns T1 registration, reserved dispatch, status, history, and
+validation. T1 declares supersession event/schema prerequisites but exposes no callable supersession;
+evidence-resolving supersession belongs to T2. Its authority tuples contain the frozen role, GitHub issue, ledger
+plan, ledger task, and existing attempt number. They prove assignment separation, not that distinct
+humans, processes, sessions, or model instances acted.
+
+For a member of an active generation, the existing raw `ledger.transitions.dispatch` refuses with
+`merge-dispatch-required`. `MergeTrain.dispatch` enters a private primitive in that same transition
+module, which opens the existing attempt and appends one generation-specific
+`merge.dispatch-bound` relation in one `BEGIN IMMEDIATE` transaction. Every registered attempt,
+including a no-group attempt, requires that exact binding; grouped attempts also reserve the frozen
+conflict group. A competing group owner receives `conflict-group-reserved`; a retry returns the
+existing attempt only when its binding and optional reservation match. Pre-registration and imported
+open attempts cannot acquire authority. Unregistered plans and tasks retain raw dispatch behavior
+unchanged.
+
+Reservation conclusion is part of the existing task transaction. Acceptance, reclaim, terminal
+non-success, and plan archive append `merge.reservation-released` while applying the corresponding
+task or plan event. Materialized train and reservation tables remain folds of the existing event
+log; rebuild deletes and recreates those projections from events rather than treating them as a
+second authority. Replacing a registered plan through import or milestone reconstruction refuses
+while registered work is active; otherwise it records `merge.train-invalidated` before replacing
+rows, and dispatch remains unavailable until checked re-registration.
+
+Reservation ownership survives returned settlement, successful completion, and explicit movement
+to complete until judge acceptance or reclaim. Every registered dispatch has a generation-specific
+binding; only grouped dispatch additionally has a reservation.
+
+An omitted generation in a train query selects only the active generation. An explicit generation
+selects that exact immutable generation, including retired history. Current validation re-reads both
+authority sources and the current ledger projection; explicit historical validation uses retained
+registration and lifecycle events without consulting mutable providers or replacement rows. Status
+exposes invalidation sequence, reason, replacement source, and replacement revision.
+
 ### The loop nests, and that is what a wave is
 
 At the inner level the loop's concurrent unit is one Worker's attempt at one task: the Orchestrator

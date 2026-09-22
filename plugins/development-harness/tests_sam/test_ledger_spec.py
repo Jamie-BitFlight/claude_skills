@@ -16,6 +16,7 @@ from dh_core import ledger_spec as spec
 TASK_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.TASK]
 PLAN_COMMANDS = [c for c in spec.COMMANDS if c.scope == spec.Scope.PLAN]
 COMMAND_NAMES = {c.name for c in spec.COMMANDS}
+OPERATION_NAMES = COMMAND_NAMES | set(spec.SERVICE_OPERATIONS)
 EVENT_KINDS = {e.kind for e in spec.EVENTS}
 REASONS_BY_CODE = {r.code: r for r in spec.REASONS}
 COLUMN_NAMES = {c.name for c in spec.COLUMNS}
@@ -35,7 +36,7 @@ def test_every_event_column_names_declared_events() -> None:
 
 def test_every_event_sets_a_column_and_is_emitted_by_a_transition() -> None:
     set_by = {k for c in spec.COLUMNS for k in c.set_by}
-    emitted = {k for t in spec.TRANSITIONS for k in t.events}
+    emitted = {k for t in spec.ALL_TRANSITIONS for k in (*t.events, *t.conditional_events)}
     for e in spec.EVENTS:
         assert e.kind in set_by, f"{e.kind} sets no column"
         assert e.kind in emitted, f"{e.kind} is emitted by no transition"
@@ -44,9 +45,9 @@ def test_every_event_sets_a_column_and_is_emitted_by_a_transition() -> None:
 
 def test_event_written_by_matches_transitions() -> None:
     for e in spec.EVENTS:
-        unknown = set(e.written_by) - COMMAND_NAMES
+        unknown = set(e.written_by) - OPERATION_NAMES
         assert not unknown, f"{e.kind} written by unknown commands {unknown}"
-        emitters = {t.command for t in spec.TRANSITIONS if e.kind in t.events}
+        emitters = {t.command for t in spec.ALL_TRANSITIONS if e.kind in t.events or e.kind in t.conditional_events}
         assert emitters == set(e.written_by), (
             f"{e.kind}: written_by {sorted(e.written_by)} but transitions emit from {sorted(emitters)}"
         )
@@ -54,7 +55,7 @@ def test_event_written_by_matches_transitions() -> None:
 
 def test_every_check_reason_is_declared_and_every_reason_is_used() -> None:
     used: Counter[str] = Counter()
-    for t in spec.TRANSITIONS:
+    for t in spec.ALL_TRANSITIONS:
         for check in t.checks:
             reason = REASONS_BY_CODE.get(check.reason)
             assert reason is not None, f"{t.command}/{t.from_status} checks undeclared reason {check.reason}"
@@ -64,9 +65,9 @@ def test_every_check_reason_is_declared_and_every_reason_is_used() -> None:
             assert REASONS_BY_CODE[t.noop].kind is spec.ReasonKind.NOOP
             used[t.noop] += 1
     outcome_text = (
-        " ".join(e.value for t in spec.TRANSITIONS for e in t.effects)
+        " ".join(e.value for t in spec.ALL_TRANSITIONS for e in t.effects)
         + " "
-        + " ".join(t.note for t in spec.TRANSITIONS)
+        + " ".join(t.note for t in spec.ALL_TRANSITIONS)
     )
     for r in spec.REASONS:
         if r.kind is spec.ReasonKind.OUTCOME:
@@ -101,13 +102,13 @@ def test_plan_commands_have_one_transition_or_are_reads() -> None:
 
 
 def test_transition_commands_exist() -> None:
-    for t in spec.TRANSITIONS:
-        assert t.command in COMMAND_NAMES, f"transition names unknown command {t.command}"
+    for t in spec.ALL_TRANSITIONS:
+        assert t.command in OPERATION_NAMES, f"transition names unknown operation {t.command}"
 
 
 def test_effects_name_columns_or_tables() -> None:
     compound = {"sections", "task model fields", "plans, tasks, sections", "export_cursors", "plans", "tasks"}
-    for t in spec.TRANSITIONS:
+    for t in spec.ALL_TRANSITIONS:
         for e in t.effects:
             assert e.column in COLUMN_NAMES or e.column in TABLE_NAMES or e.column in compound, (
                 f"{t.command}/{t.from_status} sets unknown column {e.column}"

@@ -852,6 +852,49 @@ implementation rather than two that must be kept in step.
 """
 
 
+def active_train(conn: sqlite3.Connection, plan: str) -> dict[str, Any] | None:
+    """Return a plan's active registered generation, if one exists."""
+    found = rows_of(
+        conn.execute(
+            "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL AND invalidated_seq IS NULL",
+            {"plan": plan},
+        )
+    )
+    return found[0] if found else None
+
+
+def registered_definition(conn: sqlite3.Connection, plan: str, generation: int) -> dict[str, Any]:
+    """Read one immutable registration definition from the append-only event.
+
+    Returns:
+        The complete frozen definition.
+    """
+    for event in store.events_of(conn, plan, kind="merge.train-registered"):
+        payload = event["payload"]
+        if isinstance(payload, dict) and int(payload.get("generation", 0)) == generation:
+            definition = payload.get("definition")
+            if isinstance(definition, dict):
+                return definition
+    refuse("dispatch-plan-stale")
+
+
+def registered_member(conn: sqlite3.Connection, plan: str, generation: int, task: str) -> dict[str, Any] | None:
+    """Return the frozen member assignment for one task."""
+    members = registered_definition(conn, plan, generation).get("members")
+    if not isinstance(members, list):
+        refuse("dispatch-plan-stale")
+    return next((member for member in members if isinstance(member, dict) and member.get("task") == task), None)
+
+
+def require_raw_dispatch_allowed(conn: sqlite3.Connection, plan: str, task: str) -> None:
+    """Refuse ordinary dispatch for a member of an active registered generation."""
+    train = active_train(conn, plan)
+    if train is None:
+        return
+    if registered_member(conn, plan, int(train["generation"]), task) is not None:
+        refuse("merge-dispatch-required")
+
+
 def attribute_dispatch_refusal(conn: sqlite3.Connection, plan: str, task: str) -> NoReturn:
     """Name the first ``dispatch`` check that the conditional UPDATE failed.
 
@@ -889,6 +932,7 @@ def dispatch(
     ttl = DEFAULT_TTL_SECONDS if ttl_seconds is None else ttl_seconds
     with store.transaction(conn):
         moment = now()
+        require_raw_dispatch_allowed(conn, plan, task)
         found = rows_of(
             conn.execute(
                 DISPATCH_SQL,
@@ -917,6 +961,255 @@ def dispatch(
     return TransitionResult(
         command="dispatch", plan=plan, task=task, status=IN_PROGRESS, attempt=attempt, events=["task.dispatched"]
     )
+
+
+def registered_dispatch_retry(
+    conn: sqlite3.Connection,
+    row: Mapping[str, Any],
+    *,
+    plan: str,
+    task: str,
+    generation: int,
+    role: str,
+    github_issue: int,
+    conflict_group: str | None,
+) -> TransitionResult | None:
+    """Return an exact registered-dispatch retry or refuse an unbound open attempt."""
+    if int(row["attempt_open"] or 0) != 1:
+        return None
+    bindings = rows_of(
+        conn.execute(
+            "SELECT * FROM merge_dispatches WHERE plan = :plan AND generation = :generation "
+            "AND task = :task AND attempt = :attempt",
+            {"plan": plan, "generation": generation, "task": task, "attempt": row["attempts"]},
+        )
+    )
+    exact = bool(bindings) and all(
+        binding["role"] == role
+        and int(binding["github_issue"]) == github_issue
+        and binding["conflict_group"] == conflict_group
+        for binding in bindings
+    )
+    reservation = conflict_group is None or bool(
+        conn.execute(
+            "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
+            "AND task = :task AND attempt = :attempt AND conflict_group = :conflict_group AND active = 1",
+            {
+                "plan": plan,
+                "generation": generation,
+                "task": task,
+                "attempt": row["attempts"],
+                "conflict_group": conflict_group,
+            },
+        ).fetchone()
+    )
+    if not (exact and reservation):
+        refuse("dispatch-binding-missing")
+    result = declined("merge-dispatch", "already-dispatched", plan, task)
+    result.attempt = int(row["attempts"])
+    return result
+
+
+def _dispatch_registered(
+    conn: sqlite3.Connection,
+    plan: str,
+    task: str,
+    *,
+    generation: int,
+    authority_host_id: str,
+    dispatch_plan_digest: str,
+    source_graph_revision: str,
+    source_graph_digest: str,
+    role: str,
+    github_issue: int,
+    dependencies: tuple[str, ...],
+    conflict_group: str | None,
+    ttl_seconds: int | None = None,
+    worktree: str | None = None,
+) -> TransitionResult:
+    """Privately dispatch and reserve one checked assignment in one transaction.
+
+    Returns:
+        The opened attempt or idempotent no-op.
+    """
+    ttl = DEFAULT_TTL_SECONDS if ttl_seconds is None else ttl_seconds
+    with store.transaction(conn):
+        moment = now()
+        train = active_train(conn, plan)
+        if train is None:
+            refuse("merge-train-not-registered")
+        if str(train["authority_host_id"]) != authority_host_id:
+            refuse("wrong-authority-host")
+        if int(train["generation"]) != generation:
+            refuse("train-generation-stale")
+        if str(train["dispatch_plan_digest"]) != dispatch_plan_digest:
+            refuse("dispatch-plan-stale")
+        if (
+            str(train["source_graph_revision"]) != source_graph_revision
+            or str(train["source_graph_digest"]) != source_graph_digest
+        ):
+            refuse("source-graph-stale")
+        member = registered_member(conn, plan, generation, task)
+        if member is None or (
+            str(member.get("role")) != role
+            or int(member.get("issue", 0)) != github_issue
+            or member.get("conflict_group") != conflict_group
+        ):
+            refuse("role-assignment-mismatch")
+        row = fetch_task(conn, plan, task)
+        held_group = str(row["conflict_group"]) if row["conflict_group"] is not None else None
+        if (
+            int(row["github_issue"] or 0) != github_issue
+            or tuple(json_list(row["dependencies"])) != dependencies
+            or held_group != conflict_group
+        ):
+            refuse("dispatch-plan-disagreement")
+        retry = registered_dispatch_retry(
+            conn,
+            row,
+            plan=plan,
+            task=task,
+            generation=generation,
+            role=role,
+            github_issue=github_issue,
+            conflict_group=conflict_group,
+        )
+        if retry is not None:
+            return retry
+        occupied = conn.execute(
+            "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
+            "AND conflict_group = :conflict_group AND active = 1",
+            {"plan": plan, "generation": generation, "conflict_group": conflict_group},
+        ).fetchone()
+        if occupied is not None:
+            refuse("conflict-group-reserved")
+        found = rows_of(
+            conn.execute(
+                DISPATCH_SQL,
+                {
+                    **derive.ready_parameters(),
+                    "ttl": ttl,
+                    "worktree": worktree,
+                    "expires": timestamp(moment + timedelta(seconds=ttl)),
+                    "now": timestamp(moment),
+                    "plan": plan,
+                    "task": task,
+                },
+            )
+        )
+        if not found:
+            attribute_dispatch_refusal(conn, plan, task)
+        attempt = int(found[0]["attempts"])
+        append(
+            conn,
+            kind="task.dispatched",
+            plan=plan,
+            task=task,
+            payload={"attempt": attempt, "ttl_seconds": ttl, "worktree": worktree},
+            at=moment,
+        )
+        sequence = store.append_event(
+            conn,
+            kind="merge.dispatch-bound",
+            plan=plan,
+            task=task,
+            payload={
+                "generation": generation,
+                "github_issue": github_issue,
+                "attempt": attempt,
+                "role": role,
+                "conflict_group": conflict_group,
+            },
+            at=moment,
+        )
+        conn.execute(
+            "INSERT INTO merge_dispatches "
+            "(plan, generation, task, attempt, role, github_issue, conflict_group, dispatch_seq) "
+            "VALUES (:plan, :generation, :task, :attempt, :role, :github_issue, :conflict_group, :dispatch_seq)",
+            {
+                "plan": plan,
+                "generation": generation,
+                "task": task,
+                "attempt": attempt,
+                "role": role,
+                "github_issue": github_issue,
+                "conflict_group": conflict_group,
+                "dispatch_seq": sequence,
+            },
+        )
+        events = ["task.dispatched", "merge.dispatch-bound"]
+        if conflict_group is not None:
+            sequence = store.append_event(
+                conn,
+                kind="merge.reserved",
+                plan=plan,
+                task=task,
+                payload={
+                    "generation": generation,
+                    "conflict_group": conflict_group,
+                    "github_issue": github_issue,
+                    "attempt": attempt,
+                    "role": role,
+                },
+                at=moment,
+            )
+            conn.execute(
+                "INSERT INTO merge_reservations "
+                "(plan, generation, conflict_group, task, attempt, role, github_issue, active, reserved_seq, conclusion, concluded_seq) "
+                "VALUES (:plan, :generation, :conflict_group, :task, :attempt, :role, :github_issue, 1, :seq, NULL, NULL)",
+                {
+                    "plan": plan,
+                    "generation": generation,
+                    "conflict_group": conflict_group,
+                    "task": task,
+                    "attempt": attempt,
+                    "role": role,
+                    "github_issue": github_issue,
+                    "seq": sequence,
+                },
+            )
+            events.append("merge.reserved")
+    return TransitionResult(
+        command="merge-dispatch", plan=plan, task=task, status=IN_PROGRESS, attempt=attempt, events=events
+    )
+
+
+def release_reservations(
+    conn: sqlite3.Connection, plan: str, task: str, moment: datetime, *, conclusion: str
+) -> list[str]:
+    """Conclude active reservations for one task inside its lifecycle transaction.
+
+    Returns:
+        The release event name when a reservation was concluded.
+    """
+    rows = rows_of(
+        conn.execute(
+            "SELECT generation, conflict_group, attempt FROM merge_reservations "
+            "WHERE plan = :plan AND task = :task AND active = 1 ORDER BY reserved_seq",
+            {"plan": plan, "task": task},
+        )
+    )
+    for row in rows:
+        sequence = store.append_event(
+            conn,
+            kind="merge.reservation-released",
+            plan=plan,
+            task=task,
+            payload={
+                "generation": row["generation"],
+                "conflict_group": row["conflict_group"],
+                "attempt": row["attempt"],
+                "conclusion": conclusion,
+            },
+            at=moment,
+        )
+        conn.execute(
+            "UPDATE merge_reservations SET active = 0, conclusion = :conclusion, concluded_seq = :seq "
+            "WHERE plan = :plan AND generation = :generation AND conflict_group = :conflict_group "
+            "AND task = :task AND attempt = :attempt AND active = 1",
+            {**row, "plan": plan, "task": task, "conclusion": conclusion, "seq": sequence},
+        )
+    return ["merge.reservation-released"] if rows else []
 
 
 # ---------------------------------------------------------------------------
@@ -1392,6 +1685,11 @@ def finish(
             payload={"attempt": attempt, "result": result, "note": note},
             at=moment,
         )
+        released = (
+            release_reservations(conn, plan, task, moment, conclusion=f"finish:{new_status}")
+            if result != COMPLETE
+            else []
+        )
         if new_status == FAILED:
             cascaded = cascade(conn, plan, task, moment)
     return TransitionResult(
@@ -1401,7 +1699,7 @@ def finish(
         attempt=attempt,
         status=new_status,
         cascaded=cascaded,
-        events=["task.finished", *(["task.state"] if cascaded else [])],
+        events=["task.finished", *released, *(["task.state"] if cascaded else [])],
     )
 
 
@@ -1513,7 +1811,8 @@ def accept(
                 "UPDATE tasks SET accepted = 1 WHERE plan = :plan AND id = :task", {"plan": plan, "task": task}
             )
             append(conn, kind="task.accepted", plan=plan, task=task, payload={"note": note}, at=moment)
-            return TransitionResult(command="accept", plan=plan, task=task, events=["task.accepted"])
+            released = release_reservations(conn, plan, task, moment, conclusion="accepted")
+            return TransitionResult(command="accept", plan=plan, task=task, events=["task.accepted", *released])
         if status != IN_PROGRESS:
             refuse("not-complete")
         if not derive.returned(conn, plan, task):
@@ -1538,8 +1837,9 @@ def accept(
             at=moment,
         )
         append(conn, kind="task.accepted", plan=plan, task=task, payload={"note": note}, at=moment)
+        released = release_reservations(conn, plan, task, moment, conclusion="accepted")
     return TransitionResult(
-        command="accept", plan=plan, task=task, status=COMPLETE, events=["task.state", "task.accepted"]
+        command="accept", plan=plan, task=task, status=COMPLETE, events=["task.state", "task.accepted", *released]
     )
 
 
@@ -1635,6 +1935,7 @@ def reclaim(
             payload={"from_status": from_status, "reason": reason, "response": response, "attempts_allowed": allowed},
             at=moment,
         )
+        released = release_reservations(conn, plan, task, moment, conclusion="reclaimed")
         if from_status == FAILED:
             restored = reverse_cascade(conn, plan, task, moment)
     return TransitionResult(
@@ -1644,7 +1945,7 @@ def reclaim(
         status=NOT_STARTED,
         reversed_tasks=restored,
         changed={"attempts_allowed": allowed},
-        events=["task.reclaimed", *(["task.state"] if restored else [])],
+        events=["task.reclaimed", *released, *(["task.state"] if restored else [])],
     )
 
 
@@ -1717,10 +2018,15 @@ def state(
             },
             at=moment,
         )
+        released = (
+            release_reservations(conn, plan, task, moment, conclusion=f"state:{new_status}")
+            if new_status != COMPLETE
+            else []
+        )
         if new_status == FAILED:
             cascaded = cascade(conn, plan, task, moment)
     return TransitionResult(
-        command="state", plan=plan, task=task, status=new_status, cascaded=cascaded, events=["task.state"]
+        command="state", plan=plan, task=task, status=new_status, cascaded=cascaded, events=["task.state", *released]
     )
 
 
@@ -1961,4 +2267,17 @@ def archive(conn: sqlite3.Connection, plan: str, *, reason: str) -> TransitionRe
         )
         conn.execute("UPDATE tasks SET attempt_open = 0 WHERE plan = :plan", {"plan": plan})
         append(conn, kind="plan.archived", plan=plan, task=None, payload={"reason": reason}, at=moment)
-    return TransitionResult(command="archive", plan=plan, events=["plan.archived"], changed={"archived": True})
+        released: list[str] = []
+        active = rows_of(
+            conn.execute(
+                "SELECT DISTINCT task FROM merge_reservations WHERE plan = :plan AND active = 1 ORDER BY task",
+                {"plan": plan},
+            )
+        )
+        for reservation in active:
+            released.extend(
+                release_reservations(conn, plan, str(reservation["task"]), moment, conclusion="plan-archived")
+            )
+    return TransitionResult(
+        command="archive", plan=plan, events=["plan.archived", *released], changed={"archived": True}
+    )

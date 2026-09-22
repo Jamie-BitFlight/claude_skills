@@ -248,6 +248,24 @@ jobs:
       - name: Run pytest
         run: uv run -q --locked pytest
 
+  test-t1-windows:
+    name: Python / T1 Windows evidence
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-python
+
+      - name: Run T1 merge-train tests on Windows
+        run: >-
+          uv run -q --locked pytest -W error --no-cov -v --noconftest
+          plugins/development-harness/tests_sam/test_merge_train_t1.py
+          plugins/development-harness/tests_sam/test_merge_train_t1_amendment.py
+
   # =============================================================================
   # Python: Cross-backend protocol compliance tests
   # Matrix runs InMemoryBackend and SQLiteBackend via pytest parametrization.
@@ -348,6 +366,7 @@ jobs:
       - manifest-sync
       - file-hygiene
       - test-python
+      - test-t1-windows
       - test-cross-backend
       - test-integration
     runs-on: ubuntu-latest

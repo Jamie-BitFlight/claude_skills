@@ -31,6 +31,16 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from dh_core import ledger_spec as spec
 from dh_core.ledger import port, store, transitions
+from dh_core.merge_train import (
+    DispatchMember,
+    DispatchPlanDefinition,
+    DispatchPlanSnapshot,
+    DispatchReserved,
+    HostAuthority,
+    MergeTrain,
+    RegisterTrain,
+    SourceGraphSnapshot,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import sqlite3
@@ -331,11 +341,108 @@ def from_milestone(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint =
     return plan
 
 
+def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint = nothing) -> str:
+    """Register, reserve, and release one train generation."""
+    del tmp_path
+    plan = str(
+        transitions.create(
+            conn,
+            slug="registered",
+            goal="exercise merge folds",
+            plan_id="Ptrain",
+            base_sha="1" * 40,
+            quality_gates=["uv run pytest"],
+            tasks=[{"id": "T1", "title": "maker", "github_issue": 41, "conflict_group": "source"}],
+        ).plan
+    )
+    definition = DispatchPlanDefinition(
+        logical_id="dispatch-41",
+        revision="one",
+        milestone=41,
+        plan=plan,
+        integration_branch="integration/41",
+        baseline_sha="1" * 40,
+        quality_gates=("uv run pytest",),
+        members=(DispatchMember(issue=41, task="T1", role="maker", conflict_group="source"),),
+    )
+
+    class DispatchReader:
+        def read(self, _key: str) -> DispatchPlanSnapshot:
+            return DispatchPlanSnapshot(
+                logical_id="dispatch-41", revision="one", canonical_bytes=definition.canonical_bytes()
+            )
+
+    class GraphReader:
+        def read(self, _key: int) -> SourceGraphSnapshot:
+            return SourceGraphSnapshot(
+                revision="github-41",
+                milestone=41,
+                integration_branch="integration/41",
+                baseline_sha="1" * 40,
+                members=definition.members,
+            )
+
+    service = MergeTrain(conn, DispatchReader(), GraphReader(), HostAuthority(authority_host_id="fold-host"))
+    service.register(RegisterTrain(plan_ref="dispatch-41", milestone=41, plan=plan))
+    check()
+    service.dispatch(DispatchReserved(plan=plan, generation=1, task="T1"))
+    check()
+    transitions.state(conn, plan, "T1", new_status=spec.Status.BLOCKED.value, reason="fold", force=True)
+    check()
+    with store.transaction(conn):
+        moment = store.now()
+        invalidated = store.append_event(
+            conn,
+            kind="merge.train-invalidated",
+            plan=plan,
+            task=None,
+            payload={
+                "generation": 1,
+                "replacement_source": "fixture",
+                "replacement_revision": "two",
+                "reason": "import:fixture:two",
+            },
+            at=moment,
+        )
+        conn.execute(
+            "UPDATE merge_trains SET invalidated_seq = :invalidated, "
+            "invalidation_reason = 'import:fixture:two' WHERE plan = :plan AND generation = 1",
+            {"invalidated": invalidated, "plan": plan},
+        )
+        registration = store.events_of(conn, plan, kind="merge.train-registered")[0]["payload"]
+        registration = {**registration, "generation": 2}
+        registered = store.append_event(
+            conn, kind="merge.train-registered", plan=plan, task=None, payload=registration, at=moment
+        )
+        prior = store.rows_of(conn.execute("SELECT * FROM merge_trains WHERE plan = :plan", {"plan": plan}))[0]
+        replacement = {
+            **prior,
+            **registration,
+            "generation": 2,
+            "registered_seq": registered,
+            "superseded_seq": None,
+            "invalidated_seq": None,
+            "invalidation_reason": None,
+        }
+        columns = [column.name for column in store.TABLES["merge_trains"]]
+        conn.execute(store.insert_statement("merge_trains", columns), {name: replacement[name] for name in columns})
+        superseded = store.append_event(
+            conn, kind="merge.train-superseded", plan=plan, task=None, payload={"generation": 2}, at=moment
+        )
+        conn.execute(
+            "UPDATE merge_trains SET superseded_seq = :superseded WHERE plan = :plan AND generation = 2",
+            {"superseded": superseded, "plan": plan},
+        )
+    check()
+    return plan
+
+
 SCENARIOS: dict[str, Scenario] = {
     "journey": journey,
     "forced-state": forced,
     "import-replace": imported,
     "from-milestone-replace": from_milestone,
+    "registered-train": registered_train,
 }
 """Each scenario builds one plan and returns its id; every one must fold to itself throughout."""
 

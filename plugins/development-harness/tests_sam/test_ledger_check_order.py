@@ -64,6 +64,16 @@ from typing import Any
 
 import pytest
 from dh_core import ledger, ledger_spec as spec
+from dh_core.merge_train import (
+    DispatchMember,
+    DispatchPlanDefinition,
+    DispatchPlanSnapshot,
+    DispatchReserved,
+    HostAuthority,
+    MergeTrain,
+    RegisterTrain,
+    SourceGraphSnapshot,
+)
 from pydantic import BaseModel, ConfigDict
 
 # ---------------------------------------------------------------------------
@@ -480,6 +490,124 @@ def dispatch_leased_and_unready(tmp_path: Path) -> Arranged:
     plan = plan_with(conn, ONE_TASK)
     dispatch_task(conn, plan)
     return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+def register_dispatch_train(conn: sqlite3.Connection, plan: str, members: tuple[DispatchMember, ...]) -> MergeTrain:
+    """Register a minimal checked definition for dispatch ordering tests."""
+    definition = DispatchPlanDefinition(
+        logical_id="order-plan",
+        revision="one",
+        milestone=7,
+        plan=plan,
+        integration_branch="integration/order",
+        baseline_sha="1" * 40,
+        quality_gates=(),
+        members=members,
+    )
+
+    class DispatchReader:
+        def read(self, _key: str) -> DispatchPlanSnapshot:
+            return DispatchPlanSnapshot(
+                logical_id="order-plan", revision="one", canonical_bytes=definition.canonical_bytes()
+            )
+
+    class GraphReader:
+        def read(self, _key: int) -> SourceGraphSnapshot:
+            return SourceGraphSnapshot(
+                revision="github-order",
+                milestone=7,
+                integration_branch="integration/order",
+                baseline_sha="1" * 40,
+                members=members,
+            )
+
+    service = MergeTrain(conn, DispatchReader(), GraphReader(), HostAuthority(authority_host_id="order-host"))
+    service.register(RegisterTrain(plan_ref="order-plan", milestone=7, plan=plan))
+    return service
+
+
+@register("dispatch", NOT_STARTED, ("merge-dispatch-required", "archived"))
+def dispatch_registered_and_archived(tmp_path: Path) -> Arranged:
+    """Dispatch a registered member after its plan was archived."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, [{"id": "T1", "title": "first", "github_issue": 1}])
+    register_dispatch_train(conn, plan, (DispatchMember(issue=1, task="T1", role="maker"),))
+    ledger.archive(conn, plan, reason="closed")
+    return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+@register("dispatch", IN_PROGRESS, ("merge-dispatch-required", "leased"))
+def dispatch_registered_and_leased(tmp_path: Path) -> Arranged:
+    """Dispatch a member that was registered after its legacy attempt opened."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, [{"id": "T1", "title": "first", "github_issue": 1}])
+    service = register_dispatch_train(conn, plan, (DispatchMember(issue=1, task="T1", role="maker"),))
+    service.dispatch(DispatchReserved(plan=plan, generation=1, task="T1"))
+    return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+@register("dispatch", NOT_STARTED, ("merge-dispatch-required", "not-ready"))
+def dispatch_registered_and_not_ready(tmp_path: Path) -> Arranged:
+    """Dispatch a registered dependent before its predecessor completes."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(
+        conn,
+        [
+            {"id": "T1", "title": "first", "github_issue": 1},
+            {"id": "T2", "title": "second", "github_issue": 2, "dependencies": ["T1"]},
+        ],
+    )
+    register_dispatch_train(
+        conn,
+        plan,
+        (
+            DispatchMember(issue=1, task="T1", role="maker"),
+            DispatchMember(issue=2, task="T2", role="checker", dependencies=("T1",)),
+        ),
+    )
+    return Arranged(conn=conn, plan=plan, task="T2", run=lambda: ledger.dispatch(conn, plan, "T2", ttl_seconds=TTL))
+
+
+def active_registered_replace(tmp_path: Path, command: str, *, replace: bool) -> Arranged:
+    """Arrange an existing registered plan whose exact bound attempt is open."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, [{"id": "T1", "title": "first", "github_issue": 1}])
+    service = register_dispatch_train(conn, plan, (DispatchMember(issue=1, task="T1", role="maker"),))
+    service.dispatch(DispatchReserved(plan=plan, generation=1, task="T1"))
+    source = ledger.PlanSource(
+        plan_id=plan,
+        milestone=7 if command == "from-milestone" else None,
+        source="milestone" if command == "from-milestone" else "content",
+        revision="r2",
+        tasks=[ledger.TaskSource(fields={"id": "T1", "title": "replacement", "github_issue": 1})],
+    )
+
+    def run() -> object:
+        if command == "from-milestone":
+            return ledger.from_milestone(conn, source, replace=replace)
+        return ledger.import_plan(conn, source, replace=replace)
+
+    return Arranged(conn=conn, plan=plan, task="", run=run)
+
+
+@register("import", spec.ANY, ("exists", "registered-plan-active"))
+def import_existing_and_registered_active(tmp_path: Path) -> Arranged:
+    return active_registered_replace(tmp_path, "import", replace=False)
+
+
+@register("import", spec.ANY, ("registered-plan-active", "leased"))
+def import_replace_registered_active_and_leased(tmp_path: Path) -> Arranged:
+    return active_registered_replace(tmp_path, "import", replace=True)
+
+
+@register("from-milestone", spec.ANY, ("exists", "registered-plan-active"))
+def milestone_existing_and_registered_active(tmp_path: Path) -> Arranged:
+    return active_registered_replace(tmp_path, "from-milestone", replace=False)
+
+
+@register("from-milestone", spec.ANY, ("registered-plan-active", "leased"))
+def milestone_replace_registered_active_and_leased(tmp_path: Path) -> Arranged:
+    return active_registered_replace(tmp_path, "from-milestone", replace=True)
 
 
 # ---------------------------------------------------------------------------
