@@ -249,7 +249,7 @@ jobs:
         run: uv run -q --locked pytest
 
   test-t1-windows:
-    name: Python / T1 Windows evidence
+    name: Python / T1-T2 Windows evidence
     runs-on: windows-2025
     timeout-minutes: 15
     permissions:
@@ -260,11 +260,20 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-python
 
-      - name: Run T1 merge-train tests on Windows
+      - name: Run T1-T2 merge-train tests on Windows
         run: >-
           uv run -q --locked pytest -W error --no-cov -v --noconftest
           plugins/development-harness/tests_sam/test_merge_train_t1.py
           plugins/development-harness/tests_sam/test_merge_train_t1_amendment.py
+          plugins/development-harness/tests_sam/test_merge_evidence.py
+          plugins/development-harness/tests_sam/test_integration_branch_advancer.py
+          plugins/development-harness/tests_sam/test_merge_train_t2_candidates.py
+          plugins/development-harness/tests_sam/test_merge_train_t2_claims.py
+          plugins/development-harness/tests_sam/test_merge_train_t2_provider.py
+          plugins/development-harness/tests_sam/test_merge_train_t2_rebuild.py
+
+      - name: Run T2 bounded mutation gate on Windows
+        run: uv run -q --locked python plugins/development-harness/tests_sam/run_merge_train_t2_mutations.py
 
   # =============================================================================
   # Python: Cross-backend protocol compliance tests
