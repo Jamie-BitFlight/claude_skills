@@ -3,144 +3,100 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Show GitLab's documented procedures to create and test a CI/CD component, publish it to the Catalog, and consume a version with typed component inputs.",
-      "expected_output": "Keeps GitLab's documented sections distinct: project layout, current-SHA testing, Catalog enablement and semantic-tag release, then include:component consumption; preserves test-before-release as a recommendation.",
+      "should_activate": true,
+      "reference": "references/pipeline-optimization.md",
+      "prompt": "Review this GitLab pipeline's include merge order and job dependencies.",
+      "expected_output": "The gitlab-skill activates and routes to the pipeline configuration reference.",
       "expectations": [
-        "Requires a root README.md and top-level templates/ directory",
-        "Tests the current project component at $CI_COMMIT_SHA",
-        "Requires the project to be enabled as a Catalog project before publication",
-        "Uses a tag-triggered release job with the release keyword and recommends component tests before the release job",
-        "Requires a semantic-version tag and states that successful release publishes the Catalog version",
-        "Uses include:component with a fully qualified component reference",
-        "Uses spec:inputs and $[[ inputs.* ]] with a document separator before jobs",
-        "Does not turn the separate documented procedures into an invented command workflow"
+        "The gitlab-skill activates",
+        "Routes to references/pipeline-optimization.md"
       ]
     },
     {
       "id": 2,
-      "prompt": "Explain when this GitLab pipeline should use inputs, pipeline variables, or an external secrets manager.",
-      "expected_output": "Uses typed inputs for parameters, notes the GitLab 17.7 recommendation and variable disabling guidance, and reserves external secret management for secrets.",
-      "expectations": [
-        "States that inputs validate at pipeline creation time",
-        "States that a pipeline accepts up to 20 inputs",
-        "Recommends inputs over pipeline variables in GitLab 17.7 and later",
-        "Recommends disabling pipeline variables when using inputs",
-        "Uses an external secrets manager for sensitive secrets"
-      ]
-    },
-    {
-      "id": 3,
-      "prompt": "Author a GitLab Function with typed input and output, invoke it from a job, and migrate the equivalent old Step names.",
-      "expected_output": "Uses current func.yml, exec or run, job-level run, typed inputs and outputs, Moa expressions, and obsolete names only in the migration mapping.",
-      "expectations": [
-        "Marks Functions as experimental and not ready for production use",
-        "Defines a two-document func.yml with spec and exec or run separated by ---",
-        "Invokes the function from a job-level run list with func:",
-        "Declares typed inputs and outputs and writes outputs as newline-delimited JSON to ${{ output_file }}",
-        "Maps step: to func: and step.yml to func.yml",
-        "Maps ${{ step_dir }} to ${{ func_dir }}",
-        "Maps ${{ job.* }} to ${{ vars.* }}"
-      ]
-    },
-    {
-      "id": 4,
-      "prompt": "Explain what GitLab CI Lint checks and how pipeline simulation is modeled.",
-      "expected_output": "Uses documented CI Lint syntax and logic checks and identifies simulation as a push event on the default branch without inventing a generic fix loop.",
-      "expectations": [
-        "States that CI Lint checks syntax and logic",
-        "States that CI Lint can simulate pipeline creation",
-        "Identifies simulation as a Git push event on the default branch",
-        "Does not prescribe an invented validate-fix-revalidate sequence"
-      ]
-    },
-    {
-      "id": 5,
-      "prompt": "Modernize deprecated GitLab CI YAML and secure its component, image, and remote include references.",
-      "expected_output": "Applies the documented deprecations and secures component, image, and remote-include references as specified in the expectations.",
-      "expectations": [
-        "Moves deprecated global job defaults under default",
-        "Replaces only/except with rules",
-        "Uses pages and pages.publish for Pages publication",
-        "Prefers strategy: mirror when downstream status must match",
-        "Pins images by digest; pins components to a commit SHA where possible, otherwise a release version tag; and uses include:integrity for remote includes"
-      ]
-    },
-    {
-      "id": 6,
-      "prompt": "Which gitlab-ci-local options skip an incompatible input type check and refresh external includes?",
-      "expected_output": "Uses only verified gitlab-ci-local behavior: local shell or Docker execution, --skip-input-validation, cached external includes, and --fetch-includes.",
-      "expectations": [
-        "Uses --skip-input-validation for the incompatible input type",
-        "Notes that required inputs and interpolation keys remain validated",
-        "Uses --fetch-includes to refresh external includes",
-        "Does not invent other flags, precedence, requirements, or paths"
-      ]
-    },
-    {
-      "id": 7,
+      "should_activate": true,
+      "reference": "references/ci-cd-components-and-inputs.md",
       "prompt": "Design a reusable GitLab CI/CD component with typed component inputs.",
       "expected_output": "The gitlab-skill activates and routes to the components and inputs reference.",
       "expectations": [
         "The gitlab-skill activates",
-        "Routes to references/ci-cd-components-and-inputs.md",
-        "Keeps component inputs distinct from pipeline inputs"
+        "Routes to references/ci-cd-components-and-inputs.md"
       ]
     },
     {
-      "id": 8,
+      "id": 3,
+      "should_activate": true,
+      "reference": "references/gitlab-functions.md",
       "prompt": "Write a GitLab Function and migrate my old Step syntax.",
       "expected_output": "The gitlab-skill activates and routes to the GitLab Functions reference.",
+      "expectations": ["The gitlab-skill activates", "Routes to references/gitlab-functions.md"]
+    },
+    {
+      "id": 4,
+      "should_activate": true,
+      "reference": "references/security-and-deprecations.md",
+      "prompt": "Review this GitLab CI configuration for unsafe references and deprecated syntax.",
+      "expected_output": "The gitlab-skill activates and routes to the security and deprecations reference.",
       "expectations": [
         "The gitlab-skill activates",
-        "Routes to references/gitlab-functions.md",
-        "Uses current Function authoring syntax and confines obsolete syntax to migration mapping"
+        "Routes to references/security-and-deprecations.md"
       ]
     },
     {
-      "id": 9,
-      "prompt": "Use GitLab Flavored Markdown for this project wiki page.",
-      "expected_output": "The gitlab-skill activates and routes to the GLFM reference.",
-      "expectations": [
-        "The gitlab-skill activates",
-        "Routes to references/glfm-syntax.md",
-        "Uses only documented GLFM syntax and rendering constraints"
-      ]
-    },
-    {
-      "id": 10,
-      "prompt": "Check my .gitlab-ci.yml syntax locally with gitlab-ci-local.",
-      "expected_output": "The gitlab-skill activates and routes to verified local CI behavior.",
+      "id": 5,
+      "should_activate": true,
+      "reference": "references/gitlab-ci-local-guide.md",
+      "prompt": "Check my GitLab CI configuration locally.",
+      "expected_output": "The gitlab-skill activates and routes to the local CI reference.",
       "expectations": [
         "The gitlab-skill activates",
         "Routes to references/gitlab-ci-local-guide.md"
       ]
     },
     {
-      "id": 11,
+      "id": 6,
+      "should_activate": true,
+      "reference": "references/glfm-syntax.md",
+      "prompt": "Use GitLab Flavored Markdown for this project wiki page.",
+      "expected_output": "The gitlab-skill activates and routes to the GLFM reference.",
+      "expectations": ["The gitlab-skill activates", "Routes to references/glfm-syntax.md"]
+    },
+    {
+      "id": 7,
+      "should_activate": false,
+      "reference": null,
       "prompt": "Retry the failed production pipeline and inspect its job logs.",
       "expected_output": "The gitlab-skill does not activate for pipeline operations.",
       "expectations": ["The gitlab-skill does not activate"]
     },
     {
-      "id": 12,
+      "id": 8,
+      "should_activate": false,
+      "reference": null,
       "prompt": "Optimize this GitHub Actions workflow.",
       "expected_output": "The gitlab-skill does not activate for a non-GitLab CI system.",
       "expectations": ["The gitlab-skill does not activate"]
     },
     {
-      "id": 13,
+      "id": 9,
+      "should_activate": false,
+      "reference": null,
       "prompt": "Configure SAML and SCIM for our GitLab group.",
       "expected_output": "The gitlab-skill does not activate for general GitLab administration.",
       "expectations": ["The gitlab-skill does not activate"]
     },
     {
-      "id": 14,
+      "id": 10,
+      "should_activate": false,
+      "reference": null,
       "prompt": "Close stale GitLab issues and update their labels.",
       "expected_output": "The gitlab-skill does not activate for issue administration.",
       "expectations": ["The gitlab-skill does not activate"]
     },
     {
-      "id": 15,
+      "id": 11,
+      "should_activate": false,
+      "reference": null,
       "prompt": "Reformat this ordinary Markdown file for GitHub.",
       "expected_output": "The gitlab-skill does not activate for ordinary non-GLFM Markdown.",
       "expectations": ["The gitlab-skill does not activate"]

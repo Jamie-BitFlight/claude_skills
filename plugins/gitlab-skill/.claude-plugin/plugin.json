@@ -1,7 +1,7 @@
 {
   "name": "gitlab-skill",
-  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. Includes a Claude Code-only fallback command for project access-token setup.",
-  "version": "1.7.3",
+  "description": "Source-backed guidance for documented GitLab CI/CD semantics, components and inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior.",
+  "version": "2.0.0",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
