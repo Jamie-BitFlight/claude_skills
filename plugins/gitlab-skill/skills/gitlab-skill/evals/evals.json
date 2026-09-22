@@ -127,6 +127,11 @@
         "Routes to references/automatic-tag-and-release.md",
         "Distinguishes required lifecycle invariants from replaceable adapters",
         "Does not require semantic-release or python-semantic-release"
+      ],
+      "loads": [
+        "references/release-version-adapters.md",
+        "references/release-notes-adapters.md",
+        "references/release-publication-adapters.md"
       ]
     },
     {
@@ -194,11 +199,11 @@
       "should_activate": true,
       "reference": "references/automatic-tag-and-release.md",
       "prompt": "Report every checkpoint needed to prove this GitLab automatic release completed.",
-      "expected_output": "Reports intake, substitution, CI Lint, credential, main pipeline, tag pipeline, destination, Release, and verifier checkpoints with completion criteria.",
+      "expected_output": "Reports component structure, consumer composition, credential, main pipeline, tag pipeline, destination, and Release checkpoints with completion criteria.",
       "expectations": [
         "Routes to references/automatic-tag-and-release.md",
         "Reports both no-release and release completion criteria",
-        "Separates Generic helper scope from external-destination verification"
+        "Checks component structure separately from consumer orchestration"
       ]
     },
     {
@@ -245,7 +250,8 @@
       "expectations": [
         "Routes to references/automatic-tag-and-release.md",
         "Loads references/release-version-semantic-release.md"
-      ]
+      ],
+      "loads": ["references/release-version-semantic-release.md"]
     },
     {
       "id": 24,
@@ -256,7 +262,8 @@
       "expectations": [
         "Routes to references/automatic-tag-and-release.md",
         "Loads references/release-version-python-semantic-release.md"
-      ]
+      ],
+      "loads": ["references/release-version-python-semantic-release.md"]
     },
     {
       "id": 25,
@@ -267,7 +274,8 @@
       "expectations": [
         "Routes to references/automatic-tag-and-release.md",
         "Loads references/release-publication-generic.md"
-      ]
+      ],
+      "loads": ["references/release-publication-generic.md"]
     },
     {
       "id": 26,
@@ -302,17 +310,6 @@
       "expectations": [
         "Routes to references/release-version-semantic-release.md",
         "Does not infer no-release from the docs-only setup commit"
-      ]
-    },
-    {
-      "id": 30,
-      "should_activate": true,
-      "reference": "references/glab-ci-candidate-validation.md",
-      "prompt": "Validate this unmerged local GitLab CI candidate, whether its root is monolithic or has project-local includes.",
-      "expected_output": "Uses the bundled complete-content candidate helper and defers remote context simulation.",
-      "expectations": [
-        "Routes to references/glab-ci-candidate-validation.md",
-        "Uses validate_release_candidate.py exactly once"
       ]
     },
     {

@@ -2,8 +2,8 @@
 
 Select one branch for each destination:
 
-- [GitLab Generic](./release-publication-generic.md) - Load for Generic package files and the
-  LIVE-VERIFIED Generic-only verifier.
+- [GitLab Generic](./release-publication-generic.md) - Load for Generic package publication and
+  read-back.
 - [GitLab PyPI](./release-publication-gitlab-pypi.md) - Load for project PyPI publication with
   `CI_JOB_TOKEN`.
 - [GitLab npm](./release-publication-gitlab-npm.md) - Load for project npm publication with a runtime

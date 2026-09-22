@@ -13,6 +13,7 @@ python -m pip index versions "__PACKAGE_NAME__" --index-url https://pypi.org/sim
 
 Define any Release link separately.
 
-Validation gate: apply **Gates G2, G3, G6, and G7**. This destination is outside G8.
+Apply the composition, tag, and per-destination read-back
+[validation gates](./automatic-tag-and-release.md#validation-gates).
 
 SOURCE: <https://docs.pypi.org/trusted-publishers/using-a-publisher/> (accessed 2026-09-22; documentation-verified, not live-tested)
