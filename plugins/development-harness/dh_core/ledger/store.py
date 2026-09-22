@@ -144,6 +144,8 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "tasks": ("plan", "id"),
     "sections": ("plan", "task", "seq"),
     "export_cursors": ("plan", "target"),
+    "merge_trains": ("plan", "generation"),
+    "merge_reservations": ("plan", "generation", "conflict_group", "task", "attempt"),
 }
 """The identity of a row in each materialised table.
 
@@ -156,6 +158,8 @@ INDEXES: dict[str, tuple[tuple[str, ...], ...]] = {
     "tasks": (("plan",), ("plan", "status")),
     "sections": (("plan", "task", "attempt"),),
     "events": (("plan", "task", "kind"), ("plan", "seq")),
+    "merge_trains": (("plan", "superseded_seq"),),
+    "merge_reservations": (("plan", "generation", "active"),),
 }
 """Non-unique indexes over the columns the package's own queries filter on."""
 
@@ -540,6 +544,16 @@ def schema_statements() -> list[str]:
     statements = [table_ddl(table) for table in TABLES]
     statements.append(EVENTS_DDL)
     statements.extend(index_ddl(table, columns) for table, group in INDEXES.items() for columns in group)
+    statements.extend((
+        (
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_trains_active "
+            "ON merge_trains (plan) WHERE superseded_seq IS NULL"
+        ),
+        (
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_reservations_active_group "
+            "ON merge_reservations (plan, generation, conflict_group) WHERE active = 1"
+        ),
+    ))
     return statements
 
 
@@ -958,7 +972,14 @@ COLUMN_NAMES: dict[str, frozenset[str]] = {
 }
 """The stored column names of each materialised table, for sieving a payload down to them."""
 
-PLAN_OF: dict[str, str] = {"plans": "plan_id", "tasks": "plan", "sections": "plan", "export_cursors": "plan"}
+PLAN_OF: dict[str, str] = {
+    "plans": "plan_id",
+    "tasks": "plan",
+    "sections": "plan",
+    "export_cursors": "plan",
+    "merge_trains": "plan",
+    "merge_reservations": "plan",
+}
 """The column of each materialised table that names the plan its row belongs to."""
 
 Folded = dict[str, dict[tuple[Any, ...], dict[str, Any]]]
@@ -1284,6 +1305,57 @@ def fold_task_state(tables: Folded, event: Mapping[str, Any]) -> None:
         row["completed"] = str(event["at"])
 
 
+def fold_merge_train_registered(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Install the immutable registered train generation carried by an event."""
+    row = blank_row("merge_trains")
+    row.update(carried("merge_trains", event["payload"]))
+    row.update(plan=str(event["plan"]), registered_seq=int(event["seq"]), superseded_seq=None)
+    tables["merge_trains"][key_of("merge_trains", row)] = row
+
+
+def fold_merge_train_superseded(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Conclude one registered generation without deleting its history."""
+    key = (str(event["plan"]), int(event["payload"]["generation"]))
+    row = tables["merge_trains"].get(key)
+    if row is None:
+        msg = f"event {event['seq']} supersedes generation {key}, which no earlier event registered"
+        raise LookupError(msg)
+    row["superseded_seq"] = int(event["seq"])
+
+
+def fold_merge_reserved(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Materialize active ownership of a registered conflict group."""
+    payload = event["payload"]
+    row = blank_row("merge_reservations")
+    row.update(carried("merge_reservations", payload))
+    row.update(
+        plan=str(event["plan"]),
+        task=str(event["task"]),
+        active=1,
+        reserved_seq=int(event["seq"]),
+        conclusion=None,
+        concluded_seq=None,
+    )
+    tables["merge_reservations"][key_of("merge_reservations", row)] = row
+
+
+def fold_merge_reservation_released(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Conclude exactly the reservation attempt named by a lifecycle event."""
+    payload = event["payload"]
+    key = (
+        str(event["plan"]),
+        int(payload["generation"]),
+        str(payload["conflict_group"]),
+        str(event["task"]),
+        int(payload["attempt"]),
+    )
+    row = tables["merge_reservations"].get(key)
+    if row is None:
+        msg = f"event {event['seq']} releases reservation {key}, which no earlier event created"
+        raise LookupError(msg)
+    row.update(active=0, conclusion=str(payload["conclusion"]), concluded_seq=int(event["seq"]))
+
+
 HANDLERS: dict[str, Any] = {
     "plan.created": fold_plan_created,
     "plan.replaced": fold_plan_replaced,
@@ -1302,6 +1374,10 @@ HANDLERS: dict[str, Any] = {
     "task.accepted": fold_task_accepted,
     "task.reclaimed": fold_task_reclaimed,
     "task.state": fold_task_state,
+    "merge.train-registered": fold_merge_train_registered,
+    "merge.train-superseded": fold_merge_train_superseded,
+    "merge.reserved": fold_merge_reserved,
+    "merge.reservation-released": fold_merge_reservation_released,
 }
 """One handler per ``ledger_spec.EVENTS`` kind; :func:`check_handlers` runs at import."""
 

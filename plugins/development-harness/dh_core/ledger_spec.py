@@ -349,6 +349,47 @@ COLUMNS: list[Column] = [
         revision="text|null",
         projection_hash="text|null",
     ),
+    *_cols(
+        "merge_trains",
+        Provenance.EVENT,
+        ["merge.train-registered"],
+        plan="text",
+        generation="int",
+        milestone="int",
+        dispatch_plan_id="text",
+        dispatch_plan_revision="text",
+        dispatch_plan_digest="text",
+        member_set_digest="text",
+        role_map_digest="text",
+        conflict_map_digest="text",
+        integration_branch="text",
+        baseline_sha="text",
+        quality_gates_digest="text",
+        authority_host_id="text",
+        registered_seq="int",
+    ),
+    *_cols("merge_trains", Provenance.EVENT, ["merge.train-superseded"], superseded_seq="int|null"),
+    *_cols(
+        "merge_reservations",
+        Provenance.EVENT,
+        ["merge.reserved"],
+        plan="text",
+        generation="int",
+        conflict_group="text",
+        task="text",
+        attempt="int",
+        role="text",
+        github_issue="int",
+        active="int",
+        reserved_seq="int",
+    ),
+    *_cols(
+        "merge_reservations",
+        Provenance.EVENT,
+        ["merge.reservation-released"],
+        conclusion="text|null",
+        concluded_seq="int|null",
+    ),
 ]
 
 REPORT_SECTIONS: tuple[str, ...] = ("Completion Report", "Verification Results")
@@ -479,7 +520,11 @@ EVENTS: list[EventKind] = [
     ),
     EventKind(kind="task.fields", payload=["changed"], written_by=["update"]),
     EventKind(kind="task.section", payload=["name", "attempt", "content"], written_by=["update"]),
-    EventKind(kind="task.dispatched", payload=["attempt", "ttl_seconds", "worktree"], written_by=["dispatch"]),
+    EventKind(
+        kind="task.dispatched",
+        payload=["attempt", "ttl_seconds", "worktree"],
+        written_by=["dispatch", "merge-dispatch"],
+    ),
     EventKind(kind="lease.renewed", payload=["attempt", "via"], written_by=["read", "update", "renew"]),
     EventKind(kind="task.finished", payload=["attempt", "result", "note"], written_by=["finish"]),
     EventKind(kind="task.settled", payload=["attempt", "return_text", "via"], written_by=["settle"]),
@@ -491,6 +536,49 @@ EVENTS: list[EventKind] = [
         kind="task.state",
         payload=["status", "reason", "accepted", "attempt_open"],
         written_by=["state", "finish", "reclaim", "accept"],
+    ),
+    EventKind(
+        kind="merge.train-registered",
+        payload=[
+            "generation",
+            "milestone",
+            "dispatch_plan_id",
+            "dispatch_plan_revision",
+            "dispatch_plan_digest",
+            "member_set_digest",
+            "role_map_digest",
+            "conflict_map_digest",
+            "integration_branch",
+            "baseline_sha",
+            "quality_gates_digest",
+            "authority_host_id",
+            "definition",
+        ],
+        written_by=["merge-register"],
+    ),
+    EventKind(
+        kind="merge.train-superseded",
+        payload=[
+            "generation",
+            "current_dispatch_plan_revision",
+            "current_dispatch_plan_digest",
+            "replacement_dispatch_plan_id",
+            "replacement_dispatch_plan_revision",
+            "replacement_dispatch_plan_digest",
+            "replacement_checker_evidence_digest",
+            "reason",
+        ],
+        written_by=["merge-supersede"],
+    ),
+    EventKind(
+        kind="merge.reserved",
+        payload=["generation", "conflict_group", "github_issue", "attempt", "role"],
+        written_by=["merge-dispatch"],
+    ),
+    EventKind(
+        kind="merge.reservation-released",
+        payload=["generation", "conflict_group", "attempt", "conclusion"],
+        written_by=["finish", "accept", "reclaim", "state", "archive"],
     ),
     # ``accepted`` and ``attempt_open`` are the values the row holds once the transition is done.
     # ``state --force`` clears acceptance and every ``state`` closes the attempt, but the same kind
@@ -593,6 +681,76 @@ REASONS: list[Reason] = [
     Reason(code="already-settled", kind=ReasonKind.NOOP, condition="settled is 1 for the named attempt"),
     Reason(code="already-accepted", kind=ReasonKind.NOOP, condition="accepted is 1"),
     Reason(code="already-open", kind=ReasonKind.NOOP, condition="status is not-started"),
+    Reason(
+        code="already-registered",
+        kind=ReasonKind.NOOP,
+        condition="the active generation has the same canonical dispatch-plan definition",
+    ),
+    Reason(
+        code="already-dispatched",
+        kind=ReasonKind.NOOP,
+        condition="the registered task already has an open reserved attempt",
+    ),
+    Reason(
+        code="already-superseded",
+        kind=ReasonKind.NOOP,
+        condition="the generation was concluded by the same replacement and reason",
+    ),
+    Reason(
+        code="merge-train-not-registered",
+        kind=ReasonKind.REFUSAL,
+        condition="the plan has no active registered merge-train generation",
+    ),
+    Reason(
+        code="merge-dispatch-required",
+        kind=ReasonKind.REFUSAL,
+        condition="ordinary dispatch addresses a member of an active registered generation",
+    ),
+    Reason(
+        code="wrong-authority-host",
+        kind=ReasonKind.REFUSAL,
+        condition="the configured authority host differs from the registered marker",
+    ),
+    Reason(
+        code="dispatch-plan-disagreement",
+        kind=ReasonKind.REFUSAL,
+        condition="the checked dispatch definition disagrees with the ledger plan or task resources",
+    ),
+    Reason(
+        code="dispatch-plan-stale",
+        kind=ReasonKind.REFUSAL,
+        condition="the supplied dispatch revision or digest differs from the registered definition",
+    ),
+    Reason(
+        code="train-generation-stale",
+        kind=ReasonKind.REFUSAL,
+        condition="the supplied generation is not the active generation",
+    ),
+    Reason(
+        code="train-generation-active",
+        kind=ReasonKind.REFUSAL,
+        condition="the generation has open work and cannot be superseded",
+    ),
+    Reason(
+        code="train-generation-superseded",
+        kind=ReasonKind.REFUSAL,
+        condition="the generation is concluded by a different replacement identity, evidence, or reason",
+    ),
+    Reason(
+        code="replacement-definition-unapproved",
+        kind=ReasonKind.REFUSAL,
+        condition="replacement checker evidence or exact replacement identity is absent",
+    ),
+    Reason(
+        code="conflict-group-reserved",
+        kind=ReasonKind.REFUSAL,
+        condition="another active reservation owns the registered conflict group",
+    ),
+    Reason(
+        code="role-assignment-mismatch",
+        kind=ReasonKind.REFUSAL,
+        condition="the frozen role, issue, plan, task, or attempt tuple does not match",
+    ),
     Reason(
         code="unchanged",
         kind=ReasonKind.NOOP,
@@ -825,6 +983,9 @@ COMMANDS: list[Command] = [
     ),
 ]
 
+SERVICE_OPERATIONS: tuple[str, ...] = ("merge-register", "merge-supersede", "merge-dispatch")
+"""MergeTrain mutations specified here before T3 mounts their CLI and MCP adapters."""
+
 RETIRED_COMMANDS: tuple[str, ...] = (
     "claim",
     "sam-task-create",
@@ -865,6 +1026,8 @@ class Transition(BaseModel):
     checks: list[Check] = Field(default_factory=list)
     effects: list[Effect] = Field(default_factory=list)
     events: list[str] = Field(default_factory=list)
+    conditional_events: list[str] = Field(default_factory=list)
+    """Events emitted only when matching merge-train state exists."""
     to_status: str = ""
     """Resulting status; empty when unchanged."""
     noop: str = ""
@@ -923,7 +1086,12 @@ TRANSITIONS: list[Transition] = [
     Transition(
         command="dispatch",
         from_status=Status.NOT_STARTED,
-        checks=[Check(reason="archived"), Check(reason="leased"), Check(reason="not-ready")],
+        checks=[
+            Check(reason="merge-dispatch-required"),
+            Check(reason="archived"),
+            Check(reason="leased"),
+            Check(reason="not-ready"),
+        ],
         effects=[
             Effect(column="attempts", value="attempts + 1"),
             Effect(column="attempt_open", value="1"),
@@ -943,7 +1111,12 @@ TRANSITIONS: list[Transition] = [
         Transition(
             command="dispatch",
             from_status=s,
-            checks=[Check(reason="archived"), Check(reason="leased"), Check(reason="not-ready")],
+            checks=[
+                Check(reason="merge-dispatch-required"),
+                Check(reason="archived"),
+                Check(reason="leased"),
+                Check(reason="not-ready"),
+            ],
         )
         for s in OPEN_STATUSES
         if s != Status.NOT_STARTED
@@ -1041,6 +1214,7 @@ TRANSITIONS: list[Transition] = [
             CASCADE,
         ],
         events=["task.finished", "task.state"],
+        conditional_events=["merge.reservation-released"],
         to_status="complete when --result complete; failed when failed; blocked when blocked or needs-input",
         note="task.state rows only for the cascade; expires keeps its value",
     ),
@@ -1088,6 +1262,7 @@ TRANSITIONS: list[Transition] = [
         checks=[Check(reason="already-accepted"), Check(reason="not-complete", unless="attempt_open is 0")],
         effects=[Effect(column="accepted", value="1")],
         events=["task.accepted"],
+        conditional_events=["merge.reservation-released"],
     ),
     Transition(
         command="accept",
@@ -1099,6 +1274,7 @@ TRANSITIONS: list[Transition] = [
         ],
         effects=[Effect(column="completed", value="now"), Effect(column="accepted", value="1")],
         events=["task.state", "task.accepted"],
+        conditional_events=["merge.reservation-released"],
         to_status=Status.COMPLETE,
         note="task.state reason returned-complete",
     ),
@@ -1136,6 +1312,7 @@ TRANSITIONS: list[Transition] = [
                 REVERSAL,
             ],
             events=["task.reclaimed", "task.state"],
+            conditional_events=["merge.reservation-released"],
             to_status=Status.NOT_STARTED,
             note="task.state rows only for the reversal, which applies when from_status is failed; sections keep their attempt tag and read renders older attempts under '<name> (attempt N)'",
         )
@@ -1161,6 +1338,7 @@ TRANSITIONS: list[Transition] = [
                 CASCADE,
             ],
             events=["task.state"],
+            conditional_events=["merge.reservation-released"],
             to_status="--new-status",
             note=(
                 "CASCADE applies when entering failed. Leaving failed by state keeps the cascade: the "
@@ -1206,6 +1384,7 @@ TRANSITIONS: list[Transition] = [
         checks=[Check(reason="archived")],
         effects=[Effect(column="archived", value="now"), Effect(column="attempt_open", value="0 on every task")],
         events=["plan.archived"],
+        conditional_events=["merge.reservation-released"],
     ),
     Transition(
         command="import",
@@ -1248,7 +1427,56 @@ TRANSITIONS: list[Transition] = [
         ],
         events=["plan.created", "plan.replaced", "task.added"],
     ),
+    Transition(
+        command="merge-register",
+        from_status=ANY,
+        checks=[Check(reason="already-registered"), Check(reason="dispatch-plan-disagreement")],
+        effects=[Effect(column="merge_trains", value="one immutable checked generation")],
+        events=["merge.train-registered"],
+        noop="already-registered",
+    ),
+    Transition(
+        command="merge-supersede",
+        from_status=ANY,
+        checks=[
+            Check(reason="wrong-authority-host"),
+            Check(reason="train-generation-stale"),
+            Check(reason="replacement-definition-unapproved"),
+            Check(reason="train-generation-active"),
+            Check(reason="train-generation-superseded"),
+            Check(reason="already-superseded"),
+        ],
+        effects=[Effect(column="superseded_seq", value="event sequence")],
+        events=["merge.train-superseded"],
+        noop="already-superseded",
+    ),
+    Transition(
+        command="merge-dispatch",
+        from_status=ANY,
+        checks=[
+            Check(reason="merge-train-not-registered"),
+            Check(reason="wrong-authority-host"),
+            Check(reason="train-generation-stale"),
+            Check(reason="dispatch-plan-stale"),
+            Check(reason="role-assignment-mismatch"),
+            Check(reason="conflict-group-reserved"),
+            Check(reason="already-dispatched"),
+        ],
+        effects=[
+            Effect(column="tasks", value="existing dispatch effects"),
+            Effect(column="merge_reservations", value="active group ownership"),
+        ],
+        events=["task.dispatched", "merge.reserved"],
+        noop="already-dispatched",
+    ),
 ]
+
+SERVICE_TRANSITIONS: list[Transition] = [
+    transition for transition in TRANSITIONS if transition.command in SERVICE_OPERATIONS
+]
+TRANSITIONS = [transition for transition in TRANSITIONS if transition.command not in SERVICE_OPERATIONS]
+ALL_TRANSITIONS: list[Transition] = [*TRANSITIONS, *SERVICE_TRANSITIONS]
+"""Transport commands followed by service-only merge-train transitions for closure checks."""
 
 
 class Config(BaseModel):
