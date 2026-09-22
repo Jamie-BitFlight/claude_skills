@@ -511,6 +511,16 @@ second authority. Replacing a registered plan through import or milestone recons
 while registered work is active; otherwise it records `merge.train-invalidated` before replacing
 rows, and dispatch remains unavailable until checked re-registration.
 
+Reservation ownership survives returned settlement, successful completion, and explicit movement
+to complete until judge acceptance or reclaim. Every registered dispatch has a generation-specific
+binding; only grouped dispatch additionally has a reservation.
+
+An omitted generation in a train query selects only the active generation. An explicit generation
+selects that exact immutable generation, including retired history. Current validation re-reads both
+authority sources and the current ledger projection; explicit historical validation uses retained
+registration and lifecycle events without consulting mutable providers or replacement rows. Status
+exposes invalidation sequence, reason, replacement source, and replacement revision.
+
 ### The loop nests, and that is what a wave is
 
 At the inner level the loop's concurrent unit is one Worker's attempt at one task: the Orchestrator

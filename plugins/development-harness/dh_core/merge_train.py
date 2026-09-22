@@ -183,6 +183,10 @@ class TrainView(BaseModel):
     authority_host_id: str
     registered_seq: int
     superseded_seq: int | None = None
+    invalidated_seq: int | None = None
+    invalidation_reason: str | None = None
+    replacement_source: str | None = None
+    replacement_revision: str | None = None
     noop: str | None = None
 
 
@@ -315,8 +319,6 @@ class MergeTrain:
         definition_digest = dispatch_snapshot.digest
         with store.transaction(self.ledger):
             self.validate_definition(definition, graph_snapshot)
-            if any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(self.ledger, definition.plan)):
-                transitions.refuse("preexisting-open-attempt")
             active = store.rows_of(
                 self.ledger.execute(
                     "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL AND invalidated_seq IS NULL",
@@ -325,8 +327,10 @@ class MergeTrain:
             )
             if active:
                 row = active[0]
+                self.require_host(row)
                 if (
-                    str(row["dispatch_plan_revision"]) == dispatch_snapshot.revision
+                    str(row["dispatch_plan_id"]) == dispatch_snapshot.logical_id
+                    and str(row["dispatch_plan_revision"]) == dispatch_snapshot.revision
                     and str(row["dispatch_plan_digest"]) == definition_digest
                     and str(row["source_graph_revision"]) == graph_snapshot.revision
                     and str(row["source_graph_digest"]) == graph_snapshot.digest
@@ -338,6 +342,8 @@ class MergeTrain:
                 ):
                     transitions.refuse("source-graph-stale")
                 transitions.refuse("dispatch-plan-stale")
+            if any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(self.ledger, definition.plan)):
+                transitions.refuse("preexisting-open-attempt")
             generation = int(
                 self.ledger.execute(
                     "SELECT COALESCE(MAX(generation), 0) + 1 FROM merge_trains WHERE plan = :plan",
@@ -416,6 +422,12 @@ class MergeTrain:
         if set(tasks) != set(members):
             transitions.refuse("dispatch-plan-disagreement")
         if plan["milestone"] is not None and int(plan["milestone"]) != definition.milestone:
+            transitions.refuse("dispatch-plan-disagreement")
+        if plan["integration_branch"] is not None and str(plan["integration_branch"]) != definition.integration_branch:
+            transitions.refuse("dispatch-plan-disagreement")
+        if plan["base_sha"] is not None and str(plan["base_sha"]) != definition.baseline_sha:
+            transitions.refuse("dispatch-plan-disagreement")
+        if tuple(store.json_list(plan["quality_gates"])) != definition.quality_gates:
             transitions.refuse("dispatch-plan-disagreement")
         for task_id, row in tasks.items():
             member = members[task_id]
@@ -530,62 +542,161 @@ class MergeTrain:
         """
         findings: list[str] = []
         try:
-            folded = store.fold_events(store.all_events(self.ledger))
-            projection_queries = {
-                "merge_trains": "SELECT * FROM merge_trains ORDER BY plan, generation",
-                "merge_dispatches": "SELECT * FROM merge_dispatches ORDER BY plan, generation, task, attempt",
-                "merge_reservations": (
-                    "SELECT * FROM merge_reservations ORDER BY plan, generation, conflict_group, task, attempt"
-                ),
-            }
-            for table, statement in projection_queries.items():
-                current = store.rows_of(self.ledger.execute(statement))
-                if current != folded[table]:
-                    findings.append(f"{table}-projection-drift")
+            findings.extend(self.projection_findings())
             page = self.status(query)
             train = train_row(self.ledger, query.plan, query.generation)
+            findings.extend(self.registration_findings(page.train))
+            if query.generation is not None:
+                return ValidationResult(valid=not findings, findings=findings)
             self.fresh_definition(train)
-            payload = definition_event(self.ledger, query.plan, page.train.generation)
-            encoded = json.dumps(payload["definition"], sort_keys=True, separators=(",", ":")).encode()
-            if digest(encoded) != page.train.dispatch_plan_digest:
-                findings.append("dispatch-plan-digest-mismatch")
-            for reservation in page.reservations:
-                task = store.fetch_task(self.ledger, reservation.plan, reservation.task)
-                if reservation.attempt > int(task["attempts"]):
-                    findings.append("reservation-attempt-invalid")
-                if reservation.active and int(task["attempt_open"]) != 1:
-                    findings.append("reservation-orphaned")
-            for task in store.plan_tasks(self.ledger, query.plan):
-                if int(task["attempt_open"] or 0) != 1:
-                    continue
-                count = self.ledger.execute(
-                    "SELECT COUNT(*) FROM merge_dispatches WHERE plan = :plan AND generation = :generation "
-                    "AND task = :task AND attempt = :attempt",
-                    {
-                        "plan": query.plan,
-                        "generation": page.train.generation,
-                        "task": task["id"],
-                        "attempt": task["attempts"],
-                    },
-                ).fetchone()[0]
-                if count != 1:
-                    findings.append("dispatch-binding-missing")
+            findings.extend(self.reservation_findings(page))
         except (KeyError, LookupError, ValueError, store.Refusal):
             findings.append("merge-event-stream-invalid")
         return ValidationResult(valid=not findings, findings=findings)
+
+    def projection_findings(self) -> list[str]:
+        """Compare merge projections with their event fold.
+
+        Returns:
+            Stable projection-drift findings.
+        """
+        folded = store.fold_events(store.all_events(self.ledger))
+        findings: list[str] = []
+        queries = {
+            "merge_trains": "SELECT * FROM merge_trains ORDER BY plan, generation",
+            "merge_dispatches": "SELECT * FROM merge_dispatches ORDER BY plan, generation, task, attempt",
+            "merge_reservations": (
+                "SELECT * FROM merge_reservations ORDER BY plan, generation, conflict_group, task, attempt"
+            ),
+        }
+        for table, query in queries.items():
+            current = store.rows_of(self.ledger.execute(query))
+            if current != folded[table]:
+                findings.append(f"{table}-projection-drift")
+        return findings
+
+    def registration_findings(self, train: TrainView) -> list[str]:
+        """Validate one generation solely from immutable registration evidence.
+
+        Returns:
+            Stable immutable-integrity findings.
+        """
+        payload = definition_event(self.ledger, train.plan, train.generation)
+        definition = DispatchPlanDefinition.model_validate_json(json.dumps(payload["definition"]))
+        findings = (
+            []
+            if digest(definition.canonical_bytes()) == train.dispatch_plan_digest
+            else ["dispatch-plan-digest-mismatch"]
+        )
+        registrations = [
+            event
+            for event in store.events_of(self.ledger, train.plan, kind="merge.train-registered")
+            if isinstance(event["payload"], dict) and int(event["payload"].get("generation", 0)) == train.generation
+        ]
+        if len(registrations) != 1 or int(registrations[0]["seq"]) != train.registered_seq:
+            findings.append("registration-event-mismatch")
+        members = [member.model_dump(mode="json") for member in definition.members]
+        retained = {
+            "member_set_digest": canonical_digest(sorted((member["issue"], member["task"]) for member in members)),
+            "role_map_digest": canonical_digest(sorted((member["task"], member["role"]) for member in members)),
+            "conflict_map_digest": canonical_digest(
+                sorted((member["task"], member["conflict_group"]) for member in members)
+            ),
+            "quality_gates_digest": canonical_digest(definition.quality_gates),
+        }
+        if any(str(payload[name]) != expected for name, expected in retained.items()):
+            findings.append("registration-definition-mismatch")
+        return findings
+
+    @staticmethod
+    def reservation_retained(task: dict[str, Any]) -> bool:
+        """Report whether task lifecycle state retains an acquired reservation.
+
+        Returns:
+            True for open, returned, and complete-unaccepted judge intervals.
+        """
+        return (
+            str(task["status"]) == store.IN_PROGRESS
+            and (int(task["attempt_open"] or 0) == 1 or int(task["settled"] or 0) == 1)
+        ) or (str(task["status"]) == store.COMPLETE and int(task["accepted"] or 0) == 0)
+
+    def reservation_findings(self, page: MergePage) -> list[str]:
+        """Validate active reservations and their grouped-binding converse.
+
+        Returns:
+            Stable orphan and missing-reservation findings.
+        """
+        findings: list[str] = []
+        tasks = {str(task["id"]): task for task in store.plan_tasks(self.ledger, page.train.plan)}
+        dispatches = store.rows_of(
+            self.ledger.execute(
+                "SELECT * FROM merge_dispatches WHERE plan = :plan AND generation = :generation",
+                {"plan": page.train.plan, "generation": page.train.generation},
+            )
+        )
+        for reservation in (item for item in page.reservations if item.active):
+            task = tasks.get(reservation.task)
+            binding = next(
+                (
+                    row
+                    for row in dispatches
+                    if row["task"] == reservation.task
+                    and int(row["attempt"]) == reservation.attempt
+                    and row["role"] == reservation.role
+                    and int(row["github_issue"]) == reservation.github_issue
+                    and row["conflict_group"] == reservation.conflict_group
+                ),
+                None,
+            )
+            if (
+                task is None
+                or binding is None
+                or reservation.attempt != int(task["attempts"])
+                or not self.reservation_retained(task)
+            ):
+                findings.append("reservation-orphaned")
+        for dispatch in dispatches:
+            task = tasks.get(str(dispatch["task"]))
+            if task is None:
+                findings.append("dispatch-binding-orphaned")
+                continue
+            current = int(task["attempts"] or 0) == int(dispatch["attempt"])
+            if current and self.reservation_retained(task) and dispatch["conflict_group"] is not None:
+                exact = any(
+                    item.active
+                    and item.task == dispatch["task"]
+                    and item.attempt == int(dispatch["attempt"])
+                    and item.conflict_group == dispatch["conflict_group"]
+                    for item in page.reservations
+                )
+                if not exact:
+                    findings.append("reservation-missing")
+        return findings
 
     def require_host(self, row: dict[str, object]) -> None:
         """Refuse a local marker mismatch without claiming host authentication."""
         if str(row["authority_host_id"]) != self.host_authority.authority_host_id:
             transitions.refuse("wrong-authority-host")
 
-    @staticmethod
-    def train_view(row: dict[str, Any], *, noop: str | None = None) -> TrainView:
+    def train_view(self, row: dict[str, Any], *, noop: str | None = None) -> TrainView:
         """Convert a materialized row to the public train view.
 
         Returns:
             The typed public view.
         """
+        replacement_source = None
+        replacement_revision = None
+        if row["invalidated_seq"] is not None:
+            terminal = next(
+                (
+                    event["payload"]
+                    for event in store.events_of(self.ledger, str(row["plan"]), kind="merge.train-invalidated")
+                    if int(event["seq"]) == int(row["invalidated_seq"])
+                ),
+                {},
+            )
+            replacement_source = terminal.get("replacement_source")
+            replacement_revision = terminal.get("replacement_revision")
         return TrainView(
             plan=str(row["plan"]),
             generation=int(row["generation"]),
@@ -597,5 +708,9 @@ class MergeTrain:
             authority_host_id=str(row["authority_host_id"]),
             registered_seq=int(row["registered_seq"]),
             superseded_seq=int(row["superseded_seq"]) if row["superseded_seq"] is not None else None,
+            invalidated_seq=int(row["invalidated_seq"]) if row["invalidated_seq"] is not None else None,
+            invalidation_reason=str(row["invalidation_reason"]) if row["invalidation_reason"] is not None else None,
+            replacement_source=str(replacement_source) if replacement_source is not None else None,
+            replacement_revision=str(replacement_revision) if replacement_revision is not None else None,
             noop=noop,
         )

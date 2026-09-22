@@ -76,6 +76,8 @@ def service(tmp_path: Path, *, host: str = "host-a") -> tuple[MergeTrain, sqlite
         slug="3798",
         goal="test",
         plan_id="P3798",
+        base_sha="a" * 40,
+        quality_gates=["uv run pytest"],
         tasks=[
             {"id": "T1", "title": "T1", "github_issue": 101, "conflict_group": "shared"},
             {"id": "T2", "title": "T2", "github_issue": 102, "conflict_group": "shared"},
@@ -200,7 +202,7 @@ def test_f01_active_registration_rejects_changed_revision(tmp_path: Path) -> Non
     )
     merge_train.source_graph.value = merge_train.source_graph.value.model_copy(update={"baseline_sha": "b" * 40})
 
-    with pytest.raises(store.Refusal, match="source-graph-stale"):
+    with pytest.raises(store.Refusal, match="dispatch-plan-disagreement"):
         merge_train.register(request())
 
     assert len(store.events_of(connection, "P3798", kind="merge.train-registered")) == 1
@@ -311,7 +313,7 @@ def test_f05_validate_reports_materialized_reservation_drift(tmp_path: Path) -> 
     result = merge_train.validate(MergeQuery(plan="P3798"))
 
     assert not result.valid
-    assert result.findings == ["merge_reservations-projection-drift"]
+    assert result.findings == ["merge_reservations-projection-drift", "reservation-orphaned"]
 
 
 def test_f03_concurrent_dispatch_has_one_linearized_winner(tmp_path: Path) -> None:

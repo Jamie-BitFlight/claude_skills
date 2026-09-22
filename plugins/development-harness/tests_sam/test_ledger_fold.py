@@ -391,23 +391,6 @@ def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint
     check()
     with store.transaction(conn):
         moment = store.now()
-        superseded = store.append_event(
-            conn,
-            kind="merge.train-superseded",
-            plan=plan,
-            task=None,
-            payload={
-                "generation": 1,
-                "current_dispatch_plan_revision": "one",
-                "current_dispatch_plan_digest": "sha256:" + "1" * 64,
-                "replacement_dispatch_plan_id": "dispatch-42",
-                "replacement_dispatch_plan_revision": "two",
-                "replacement_dispatch_plan_digest": "sha256:" + "2" * 64,
-                "replacement_checker_evidence_digest": "sha256:" + "3" * 64,
-                "reason": "schema prerequisite",
-            },
-            at=moment,
-        )
         invalidated = store.append_event(
             conn,
             kind="merge.train-invalidated",
@@ -422,9 +405,33 @@ def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint
             at=moment,
         )
         conn.execute(
-            "UPDATE merge_trains SET superseded_seq = :superseded, invalidated_seq = :invalidated, "
+            "UPDATE merge_trains SET invalidated_seq = :invalidated, "
             "invalidation_reason = 'import:fixture:two' WHERE plan = :plan AND generation = 1",
-            {"superseded": superseded, "invalidated": invalidated, "plan": plan},
+            {"invalidated": invalidated, "plan": plan},
+        )
+        registration = store.events_of(conn, plan, kind="merge.train-registered")[0]["payload"]
+        registration = {**registration, "generation": 2}
+        registered = store.append_event(
+            conn, kind="merge.train-registered", plan=plan, task=None, payload=registration, at=moment
+        )
+        prior = store.rows_of(conn.execute("SELECT * FROM merge_trains WHERE plan = :plan", {"plan": plan}))[0]
+        replacement = {
+            **prior,
+            **registration,
+            "generation": 2,
+            "registered_seq": registered,
+            "superseded_seq": None,
+            "invalidated_seq": None,
+            "invalidation_reason": None,
+        }
+        columns = [column.name for column in store.TABLES["merge_trains"]]
+        conn.execute(store.insert_statement("merge_trains", columns), {name: replacement[name] for name in columns})
+        superseded = store.append_event(
+            conn, kind="merge.train-superseded", plan=plan, task=None, payload={"generation": 2}, at=moment
+        )
+        conn.execute(
+            "UPDATE merge_trains SET superseded_seq = :superseded WHERE plan = :plan AND generation = 2",
+            {"superseded": superseded, "plan": plan},
         )
     check()
     return plan

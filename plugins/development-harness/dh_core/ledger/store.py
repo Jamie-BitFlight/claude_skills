@@ -1319,14 +1319,18 @@ def fold_merge_train_registered(tables: Folded, event: Mapping[str, Any]) -> Non
         invalidated_seq=None,
         invalidation_reason=None,
     )
-    tables["merge_trains"][key_of("merge_trains", row)] = row
+    key = key_of("merge_trains", row)
+    if key in tables["merge_trains"]:
+        msg = f"event {event['seq']} duplicates registered generation {key}"
+        raise LookupError(msg)
+    tables["merge_trains"][key] = row
 
 
 def fold_merge_train_superseded(tables: Folded, event: Mapping[str, Any]) -> None:
     """Conclude one registered generation without deleting its history."""
     key = (str(event["plan"]), int(event["payload"]["generation"]))
     row = tables["merge_trains"].get(key)
-    if row is None:
+    if row is None or row["superseded_seq"] is not None or row["invalidated_seq"] is not None:
         msg = f"event {event['seq']} supersedes generation {key}, which no earlier event registered"
         raise LookupError(msg)
     row["superseded_seq"] = int(event["seq"])
@@ -1337,8 +1341,8 @@ def fold_merge_train_invalidated(tables: Folded, event: Mapping[str, Any]) -> No
     payload = event["payload"]
     key = (str(event["plan"]), int(payload["generation"]))
     row = tables["merge_trains"].get(key)
-    if row is None or row["invalidated_seq"] is not None:
-        msg = f"event {event['seq']} invalidates unavailable generation {key}"
+    if row is None or row["invalidated_seq"] is not None or row["superseded_seq"] is not None:
+        msg = f"event {event['seq']} invalidates terminal generation {key}"
         raise LookupError(msg)
     row.update(invalidated_seq=int(event["seq"]), invalidation_reason=str(payload["reason"]))
 
@@ -1373,7 +1377,11 @@ def fold_merge_reserved(tables: Folded, event: Mapping[str, Any]) -> None:
         conclusion=None,
         concluded_seq=None,
     )
-    tables["merge_reservations"][key_of("merge_reservations", row)] = row
+    key = key_of("merge_reservations", row)
+    if key in tables["merge_reservations"]:
+        msg = f"event {event['seq']} duplicates reservation {key}"
+        raise LookupError(msg)
+    tables["merge_reservations"][key] = row
 
 
 def fold_merge_reservation_released(tables: Folded, event: Mapping[str, Any]) -> None:
@@ -1387,7 +1395,7 @@ def fold_merge_reservation_released(tables: Folded, event: Mapping[str, Any]) ->
         int(payload["attempt"]),
     )
     row = tables["merge_reservations"].get(key)
-    if row is None:
+    if row is None or int(row["active"] or 0) != 1:
         msg = f"event {event['seq']} releases reservation {key}, which no earlier event created"
         raise LookupError(msg)
     row.update(active=0, conclusion=str(payload["conclusion"]), concluded_seq=int(event["seq"]))
@@ -1462,7 +1470,7 @@ def fold_events(events: Sequence[Mapping[str, Any]]) -> dict[str, list[dict[str,
             msg = f"event {event['seq']} carries kind {kind}, which ledger_spec.EVENTS does not declare"
             raise ValueError(msg)
         handler(tables, event)
-    return {table: [rows[key] for key in sorted(rows, key=str)] for table, rows in tables.items()}
+    return {table: [rows[key] for key in sorted(rows)] for table, rows in tables.items()}
 
 
 def rebuild(conn: sqlite3.Connection) -> None:

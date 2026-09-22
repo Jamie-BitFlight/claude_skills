@@ -18,6 +18,7 @@ AMENDMENT_CASES = {
     "test_f02_replace_refuses_active_registered_attempt",
     "test_f02_import_replace_invalidates_inactive_registration",
     "test_f03_f08_deleted_binding_cannot_authorize_open_attempt",
+    "test_s1_active_registration_refuses_dispatch_revision_only_drift",
 }
 
 
@@ -159,7 +160,7 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
         "F01-remove-definition-equality",
         "dh_core/merge_train.py",
         ReplaceIfTest("str(row['dispatch_plan_digest']) == definition_digest", True),
-        "test_f01_active_registration_rejects_changed_revision",
+        "test_s1_active_registration_refuses_dispatch_revision_only_drift",
     ),
     (
         "F01-remove-ledger-disagreement-check",

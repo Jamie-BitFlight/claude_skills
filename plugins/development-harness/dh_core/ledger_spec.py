@@ -1537,7 +1537,8 @@ TRANSITIONS: list[Transition] = [
             Effect(column="merge_dispatches", value="exact generation-specific assignment binding"),
             Effect(column="merge_reservations", value="active group ownership when grouped"),
         ],
-        events=["task.dispatched", "merge.dispatch-bound", "merge.reserved"],
+        events=["task.dispatched", "merge.dispatch-bound"],
+        conditional_events=["merge.reserved"],
         noop="already-dispatched",
     ),
 ]

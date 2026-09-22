@@ -23,6 +23,7 @@ if sys.platform == "win32":
     fcntl.flock = unsupported_flock
     sys.modules.setdefault("fcntl", fcntl)
 
+from dh_core import ledger_spec
 from dh_core.ledger import port, store, transitions
 from dh_core.merge_train import (
     DispatchMember,
@@ -30,6 +31,7 @@ from dh_core.merge_train import (
     DispatchPlanSnapshot,
     DispatchReserved,
     HostAuthority,
+    MergeQuery,
     MergeTrain,
     RegisterTrain,
     SourceGraphSnapshot,
@@ -53,6 +55,16 @@ class SourceGraph:
     def read(self, milestone: int) -> SourceGraphSnapshot:
         assert milestone == 7
         return self.snapshot
+
+
+class UnavailableDispatchPlans:
+    def read(self, _plan_ref: str) -> DispatchPlanSnapshot:
+        raise AssertionError("historical query read the dispatch-plan provider")
+
+
+class UnavailableSourceGraph:
+    def read(self, _milestone: int) -> SourceGraphSnapshot:
+        raise AssertionError("historical query read the source-graph provider")
 
 
 def definition(*, no_group: bool = False) -> DispatchPlanDefinition:
@@ -108,6 +120,13 @@ def register(train: MergeTrain) -> None:
     train.register(RegisterTrain(plan_ref="dispatch-7", milestone=7, plan="P3798"))
 
 
+def merge_snapshot(connection: sqlite3.Connection) -> dict[str, list[dict[str, object]]]:
+    return {
+        table: store.rows_of(connection.execute(f"SELECT * FROM {table}"))
+        for table in ("events", "merge_trains", "merge_dispatches", "merge_reservations")
+    }
+
+
 def test_f01_registration_reads_authoritative_sources_and_records_identities(tmp_path: Path) -> None:
     train, connection, _, _ = service(tmp_path)
 
@@ -142,6 +161,68 @@ def test_f01_registration_refuses_dispatch_and_source_graph_disagreement(tmp_pat
         register(train)
 
     assert store.events_of(connection, "P3798", kind="merge.train-registered") == []
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("integration_branch", "integration/drift"),
+        ("base_sha", "b" * 40),
+        ("quality_gates", json.dumps(["uv run ty check"])),
+    ],
+)
+def test_s1_registration_refuses_complete_ledger_plan_disagreement_without_mutation(
+    tmp_path: Path, column: str, value: str
+) -> None:
+    train, connection, _, _ = service(tmp_path)
+    connection.execute(f"UPDATE plans SET {column} = :value WHERE plan_id = 'P3798'", {"value": value})
+    before = merge_snapshot(connection)
+
+    with pytest.raises(store.Refusal, match="dispatch-plan-disagreement"):
+        register(train)
+
+    assert merge_snapshot(connection) == before
+
+
+def test_s1_identical_registration_retry_after_dispatch_is_noop(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    first = train.register(RegisterTrain(plan_ref="dispatch-7", milestone=7, plan="P3798"))
+    train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    before = merge_snapshot(connection)
+
+    repeated = train.register(RegisterTrain(plan_ref="dispatch-7", milestone=7, plan="P3798"))
+
+    assert repeated.generation == first.generation
+    assert repeated.registered_seq == first.registered_seq
+    assert repeated.noop == "already-registered"
+    assert merge_snapshot(connection) == before
+
+
+def test_s1_identical_registration_retry_requires_original_host(tmp_path: Path) -> None:
+    train, connection, plans, graph = service(tmp_path)
+    register(train)
+    other = MergeTrain(connection, plans, graph, HostAuthority(authority_host_id="host-b"))
+    before = merge_snapshot(connection)
+
+    with pytest.raises(store.Refusal, match="wrong-authority-host"):
+        register(other)
+
+    assert merge_snapshot(connection) == before
+
+
+def test_s1_active_registration_refuses_dispatch_revision_only_drift(tmp_path: Path) -> None:
+    train, connection, plans, _ = service(tmp_path)
+    register(train)
+    changed = definition().model_copy(update={"revision": "rev-2"})
+    plans.snapshot = DispatchPlanSnapshot(
+        logical_id=changed.logical_id, revision=changed.revision, canonical_bytes=changed.canonical_bytes()
+    )
+    before = merge_snapshot(connection)
+
+    with pytest.raises(store.Refusal, match="dispatch-plan-stale"):
+        register(train)
+
+    assert merge_snapshot(connection) == before
 
 
 def test_f03_f08_no_group_attempt_gets_exact_dispatch_binding(tmp_path: Path) -> None:
@@ -182,6 +263,39 @@ def test_f03_f08_deleted_binding_cannot_authorize_open_attempt(tmp_path: Path) -
 
     with pytest.raises(store.Refusal, match="dispatch-binding-missing"):
         train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+
+
+@pytest.mark.parametrize("retaining_state", ["returned", "complete"])
+def test_s2_reservation_retains_through_judge_intervals(tmp_path: Path, retaining_state: str) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    dispatched = train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    if retaining_state == "returned":
+        transitions.settle(connection, "P3798", "T1", attempt=dispatched.attempt, return_text="done")
+    else:
+        transitions.state(connection, "P3798", "T1", new_status="complete", reason="review", force=True)
+
+    result = train.validate(MergeQuery(plan="P3798"))
+
+    assert result.valid, result.findings
+    assert store.rows_of(connection.execute("SELECT active FROM merge_reservations")) == [{"active": 1}]
+
+
+def test_s2_validate_reports_missing_group_reservation(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    connection.execute("DELETE FROM merge_reservations")
+
+    result = train.validate(MergeQuery(plan="P3798"))
+
+    assert "reservation-missing" in result.findings
+
+
+def test_s2_merge_reserved_is_conditional_in_transition_spec() -> None:
+    transition = next(item for item in ledger_spec.ALL_TRANSITIONS if item.command == "merge-dispatch")
+    assert "merge.reserved" not in transition.events
+    assert "merge.reserved" in transition.conditional_events
 
 
 def test_f02_import_replace_invalidates_inactive_registration(tmp_path: Path) -> None:
@@ -293,3 +407,70 @@ def test_f18_independent_fold_reconstructs_registration_invalidation_and_binding
     assert folded == {"trains": [("P3798", 1, "github:fixture-1")], "dispatches": [("P3798", 1, "T1", 1, "maker")]}
     assert connection.execute("SELECT COUNT(*) FROM merge_trains").fetchone()[0] == 1
     assert connection.execute("SELECT COUNT(*) FROM merge_dispatches").fetchone()[0] == 1
+
+
+def test_s3_fold_uses_typed_primary_key_order_for_generations(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    event = store.events_of(connection, "P3798", kind="merge.train-registered")[0]
+    events = []
+    for sequence, generation in enumerate((10, 2, 1), start=100):
+        copied = {**event, "seq": sequence, "payload": {**event["payload"], "generation": generation}}
+        events.append(copied)
+
+    folded = store.fold_events(events)
+
+    assert [row["generation"] for row in folded["merge_trains"]] == [1, 2, 10]
+
+
+def test_s3_fold_rejects_duplicate_registration_and_dual_terminal(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    registered = store.events_of(connection, "P3798", kind="merge.train-registered")[0]
+    duplicate = {**registered, "seq": int(registered["seq"]) + 1}
+    with pytest.raises(LookupError, match="duplicates registered generation"):
+        store.fold_events([registered, duplicate])
+
+    superseded = {
+        **registered,
+        "seq": int(registered["seq"]) + 1,
+        "kind": "merge.train-superseded",
+        "payload": {"generation": 1},
+    }
+    invalidated = {
+        **registered,
+        "seq": int(registered["seq"]) + 2,
+        "kind": "merge.train-invalidated",
+        "payload": {"generation": 1, "reason": "replace", "replacement_source": "fixture", "replacement_revision": "2"},
+    }
+    with pytest.raises(LookupError, match="terminal generation"):
+        store.fold_events([registered, superseded, invalidated])
+
+
+def test_s4_explicit_history_is_provider_free_and_exposes_invalidation(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    source = port.PlanSource(
+        plan_id="P3798",
+        milestone=7,
+        integration_branch="integration/runtime-integrity",
+        base_sha="a" * 40,
+        quality_gates=["uv run pytest"],
+        source="fixture",
+        revision="replace-2",
+        tasks=[port.TaskSource(fields={"id": "T1", "title": "replacement", "github_issue": 101})],
+    )
+    port.import_plan(connection, source, replace=True)
+
+    train = MergeTrain(
+        connection, UnavailableDispatchPlans(), UnavailableSourceGraph(), HostAuthority(authority_host_id="host-a")
+    )
+
+    page = train.status(MergeQuery(plan="P3798", generation=1))
+    result = train.validate(MergeQuery(plan="P3798", generation=1))
+
+    assert result.valid, result.findings
+    assert page.train.invalidated_seq is not None
+    assert page.train.invalidation_reason == "import:fixture:replace-2"
+    assert page.train.replacement_source == "fixture"
+    assert page.train.replacement_revision == "replace-2"
