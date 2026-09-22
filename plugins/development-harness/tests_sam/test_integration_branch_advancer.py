@@ -88,6 +88,12 @@ def test_f21_default_capability_false_returns_expected_head_unsupported() -> Non
     assert port.pushes == []
 
 
+def test_f21_capability_default_is_unsupported() -> None:
+    value = capability().model_dump()
+    value.pop("supports_expected_head_advance")
+    assert not GitPushCapability.model_validate(value).supports_expected_head_advance
+
+
 def test_f14_direct_fast_forward_requires_result_equals_candidate() -> None:
     port = PushSpy()
     advancer = IntegrationBranchAdvancer(
@@ -118,6 +124,22 @@ def test_f14_atomic_store_rejects_stale_expected_target() -> None:
     result = advancer.advance(prepared())
 
     assert result.outcome == "target-stale"
+    assert port.pushes == []
+
+
+def test_f14_moved_candidate_cannot_substitute_content() -> None:
+    port = PushSpy()
+    port.refs["refs/heads/candidate"] = "d" * 40
+    advancer = IntegrationBranchAdvancer(
+        port,
+        capability(),
+        remote_identity=capability().remote_identity,
+        target_ref="refs/heads/integration/runtime-integrity",
+    )
+
+    result = advancer.advance(prepared())
+
+    assert result.outcome == "candidate-mismatch"
     assert port.pushes == []
 
 

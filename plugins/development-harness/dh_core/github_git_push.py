@@ -8,9 +8,52 @@ import tempfile
 from pathlib import Path
 
 from backlog_core.github_client import resolve_token
+from pydantic import BaseModel, ConfigDict
 
 from dh_core.git_push import LocalBareGitPushPort, ProcessResult, run_bounded
-from dh_core.integration_branch import RepositoryIdentityObservation
+from dh_core.integration_branch import GitPushCapability, RepositoryIdentityObservation
+
+
+class GitHubCapabilityObservation(BaseModel):
+    """Exact runtime facts compared with one production admission."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    hostname: str
+    repository_id: int
+    repository: str
+    target_ref: str
+    actor: str
+    actor_permissions_snapshot_digest: str
+    rules_snapshot_digest: str
+    git_version: str
+    configuration_digest: str
+    evidence_digest: str
+    result_shape: str
+    atomic_review_guard: bool
+
+
+class GitHubCapabilityAdmission(BaseModel):
+    """Human-admitted runtime identity and proof binding."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    observation: GitHubCapabilityObservation
+    capability: GitPushCapability
+
+    def evaluate(self, observed: GitHubCapabilityObservation) -> GitPushCapability:
+        """Fail closed unless every semantic runtime fact matches.
+
+        Returns:
+            The admitted capability, with support disabled on any drift.
+        """
+        supported = (
+            observed == self.observation
+            and observed.target_ref != "refs/heads/main"
+            and observed.result_shape == "DIRECT_FAST_FORWARD"
+            and not observed.atomic_review_guard
+        )
+        return self.capability.model_copy(update={"supports_expected_head_advance": supported})
 
 
 class GitHubGitPushPort(LocalBareGitPushPort):

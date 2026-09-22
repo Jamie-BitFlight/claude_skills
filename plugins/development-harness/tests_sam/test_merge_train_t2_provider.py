@@ -13,7 +13,8 @@ import time
 from pathlib import Path
 
 import pytest
-from dh_core.git_push import GateRunner, LocalBareGitPushPort
+from dh_core.git_push import GateRunner, LocalBareGitPushPort, ProcessResult
+from dh_core.github_git_push import GitHubCapabilityAdmission, GitHubCapabilityObservation
 from dh_core.integration_branch import GitPushCapability, IntegrationBranchAdvancer
 from dh_core.ledger import store
 from dh_core.merge_evidence import MergeEvidenceStore
@@ -58,6 +59,48 @@ def capability(remote: Path) -> GitPushCapability:
     )
 
 
+def production_observation(**changes: object) -> GitHubCapabilityObservation:
+    values = {
+        "hostname": "github.com",
+        "repository_id": 1080600074,
+        "repository": "Jamie-BitFlight/claude_skills",
+        "target_ref": "refs/heads/integration/runtime-integrity",
+        "actor": "Jamie-BitFlight",
+        "actor_permissions_snapshot_digest": "sha256:" + "1" * 64,
+        "rules_snapshot_digest": "sha256:" + "2" * 64,
+        "git_version": "2.55.0",
+        "configuration_digest": "sha256:" + "3" * 64,
+        "evidence_digest": "sha256:" + "4" * 64,
+        "result_shape": "DIRECT_FAST_FORWARD",
+        "atomic_review_guard": False,
+    }
+    values.update(changes)
+    return GitHubCapabilityObservation.model_validate(values)
+
+
+def test_f21_github_capability_requires_exact_runtime_admission(tmp_path: Path) -> None:
+    admitted = capability(tmp_path).model_copy(
+        update={
+            "remote_identity": "github.com/Jamie-BitFlight/claude_skills",
+            "target_ref_pattern": "refs/heads/integration/runtime-integrity",
+        }
+    )
+    observation = production_observation()
+    admission = GitHubCapabilityAdmission(observation=observation, capability=admitted)
+
+    assert admission.evaluate(observation).supports_expected_head_advance
+    for drift in (
+        {"repository_id": 1},
+        {"actor": "other"},
+        {"rules_snapshot_digest": "sha256:" + "9" * 64},
+        {"git_version": "2.54.0"},
+        {"evidence_digest": "sha256:" + "8" * 64},
+        {"target_ref": "refs/heads/main"},
+        {"atomic_review_guard": True},
+    ):
+        assert not admission.evaluate(production_observation(**drift)).supports_expected_head_advance
+
+
 def test_f14_local_bare_push_uses_exact_old_and_prepared_result(tmp_path: Path) -> None:
     work, remote, base, candidate = repository(tmp_path)
     port = LocalBareGitPushPort(
@@ -80,15 +123,41 @@ def test_f14_local_bare_push_uses_exact_old_and_prepared_result(tmp_path: Path) 
 
 
 def test_f14_workdir_guard_refuses_before_git_mutation(tmp_path: Path) -> None:
-    work, remote, _base, candidate = repository(tmp_path)
+    _work, remote, _base, candidate = repository(tmp_path)
     port = LocalBareGitPushPort(
-        workdir=work / "missing", remote="origin", remote_identity=str(remote), target_ref="refs/heads/integration/t2"
+        workdir=tmp_path, remote="origin", remote_identity=str(remote), target_ref="refs/heads/integration/t2"
     )
 
     attempt = port.push_exact(expected_target_oid="a" * 40, prepared_result_oid=candidate)
 
     assert not attempt.transmitted
     assert attempt.stdout == b""
+    missing = LocalBareGitPushPort(
+        workdir=tmp_path / "missing",
+        remote="origin",
+        remote_identity=str(remote),
+        target_ref="refs/heads/integration/t2",
+    ).push_exact(expected_target_oid="a" * 40, prepared_result_oid=candidate)
+    assert not missing.transmitted
+
+
+def test_f14_push_argv_has_explicit_lease_and_no_force(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    port = LocalBareGitPushPort(
+        workdir=tmp_path, remote="origin", remote_identity="local/test", target_ref="refs/heads/integration/t2"
+    )
+    observed: tuple[str, ...] = ()
+
+    def capture(*args: str) -> ProcessResult:
+        nonlocal observed
+        observed = args
+        return ProcessResult(argv=("git", *args), returncode=0, stdout=b"ok", stderr=b"")
+
+    monkeypatch.setattr(port, "git", capture)
+    port.push_exact(expected_target_oid="a" * 40, prepared_result_oid="b" * 40)
+
+    assert f"--force-with-lease=refs/heads/integration/t2:{'a' * 40}" in observed
+    assert "--force" not in observed
+    assert not any(value.startswith("+") for value in observed)
 
 
 def test_f15_gate_runner_retains_complete_binary_stdout_stderr(tmp_path: Path) -> None:
@@ -133,7 +202,7 @@ def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path:
     connection = store.open_ledger(tmp_path / "dh.db")
     evidence = MergeEvidenceStore(connection)
     runner = GateRunner(evidence, workdir=tmp_path, timeout_seconds=0.5)
-    child = "import os,time; print(os.getpid(),flush=True); time.sleep(60)"
+    child = "import os,time; print(os.getpid(),flush=True); os.close(1); os.close(2); time.sleep(60)"
     parent = (
         "import os,subprocess,sys,time; print(os.getpid(),flush=True); "
         f"subprocess.Popen([sys.executable,'-c',{child!r}]); "

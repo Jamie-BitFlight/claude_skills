@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, cast
 
+import pytest
 from dh_core.integration_branch import ExpectedHeadAdvanceResult, PreparedAdvance, prepared_identity_digest
 from dh_core.ledger import store
 from dh_core.merge_train import (
@@ -46,15 +47,18 @@ class Policies:
 
 
 class Gates:
-    def __init__(self, digest: str, connection=None) -> None:
+    def __init__(self, digest: str, connection=None, after=None) -> None:
         self.digest = digest
         self.connection = connection
+        self.after = after
         self.calls = 0
 
     def run(self, commands: tuple[str, ...], subject_sha: str) -> tuple[str, ...]:
         if self.connection is not None:
             assert not self.connection.in_transaction
         self.calls += 1
+        if self.after is not None:
+            self.after()
         return (self.digest,)
 
 
@@ -208,3 +212,28 @@ def test_f17_permanent_ambiguity_is_terminal_blocked_not_success(tmp_path: Path)
 
     assert result.outcome == "PERMANENT_AMBIGUOUS"
     assert result.outcome not in {"ADVANCED", "RECONCILED"}
+
+
+def test_f12_prepare_rechecks_authority_after_blocked_gate(tmp_path: Path) -> None:
+    train, connection, integrator, _policies, gates, branch = admitted(tmp_path)
+    gates.after = lambda: connection.execute("UPDATE tasks SET attempts=2 WHERE plan='Pt2' AND id='T3'")
+
+    with pytest.raises(store.Refusal, match="role-assignment-mismatch"):
+        train.merge_next(MergeNext(plan="Pt2", generation=1, integrator=integrator))
+
+    assert branch.advances == 0
+
+
+def test_f17_conflicting_terminal_resolution_refuses(tmp_path: Path) -> None:
+    train, _connection, integrator, policies, _gates, branch = admitted(tmp_path, drift=True)
+    unresolved = train.merge_next(MergeNext(plan="Pt2", generation=1, integrator=integrator))
+    policies.drift = False
+    branch.outcome = "advanced-after-reconciliation"
+    train.reconcile(ReconcileClaim(plan="Pt2", claim_number=unresolved.claim_number))
+
+    with pytest.raises(store.Refusal, match="train-generation-stale"):
+        train.reconcile(
+            ReconcileClaim(
+                plan="Pt2", claim_number=unresolved.claim_number, permanent_reason="conflicting blocked resolution"
+            )
+        )

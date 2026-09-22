@@ -1192,6 +1192,8 @@ class MergeTrain:
         train = train_row(self.ledger, request.plan)
         self.require_host(train)
         if claim["phase"] != "RECONCILIATION_REQUIRED" or not int(claim["active"]):
+            if request.permanent_reason is not None and claim["conclusion"] != "PERMANENT_AMBIGUOUS":
+                transitions.refuse("train-generation-stale")
             return MergeResult(
                 plan=request.plan,
                 claim_number=request.claim_number,
