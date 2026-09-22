@@ -9,8 +9,10 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+import pytest
 from dh_core.git_push import GateRunner, LocalBareGitPushPort
 from dh_core.integration_branch import GitPushCapability, IntegrationBranchAdvancer
 from dh_core.ledger import store
@@ -125,3 +127,30 @@ def test_f22_installed_plugin_imports_t2_from_unrelated_workdir(tmp_path: Path) 
 
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout.strip() == "installed-t2-ok"
+
+
+def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path: Path) -> None:
+    connection = store.open_ledger(tmp_path / "dh.db")
+    evidence = MergeEvidenceStore(connection)
+    runner = GateRunner(evidence, workdir=tmp_path, timeout_seconds=0.5)
+    child = "import os,time; print(os.getpid(),flush=True); time.sleep(60)"
+    parent = (
+        "import os,subprocess,sys,time; print(os.getpid(),flush=True); "
+        f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
+        "sys.stderr.write('before-timeout\\n'); sys.stderr.flush(); time.sleep(60)"
+    )
+
+    with pytest.raises(RuntimeError, match="quality-gate-failed"):
+        runner.run((shlex.join((sys.executable, "-c", parent)),), "b" * 40)
+
+    row = connection.execute(
+        "SELECT content FROM merge_evidence_blobs WHERE media_type='application/vnd.dh.gate+json'"
+    ).fetchone()
+    record = json.loads(row[0])
+    pids = [int(value) for value in base64.b64decode(record["stdout_base64"]).splitlines()]
+    assert record["timed_out"] is True
+    assert b"before-timeout" in base64.b64decode(record["stderr_base64"])
+    time.sleep(0.1)
+    for pid in pids:
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
