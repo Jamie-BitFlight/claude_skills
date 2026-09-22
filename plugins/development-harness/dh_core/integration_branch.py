@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Literal, Protocol
 
 
@@ -124,13 +124,20 @@ class IntegrationBranchAdvancer:
     """Prove immutable operands before invoking a branch-bound push."""
 
     def __init__(
-        self, port: GitPushPort, capability: GitPushCapability, *, remote_identity: str, target_ref: str
+        self,
+        port: GitPushPort,
+        capability: GitPushCapability,
+        *,
+        remote_identity: str,
+        target_ref: str,
+        candidate_ref: str = "",
     ) -> None:
         """Bind one port and capability to one repository target."""
         self.port = port
         self.push_capability = capability
         self.remote_identity = remote_identity
         self.target_ref = target_ref
+        self.candidate_ref = candidate_ref
 
     def capability(self) -> GitPushCapability:
         """Return the exact capability record checked by this advancer."""
@@ -150,6 +157,46 @@ class IntegrationBranchAdvancer:
             expected_target_oid=prepared.expected_target_oid, prepared_result_oid=prepared.prepared_result_oid
         )
         return self.classify_attempt(prepared, attempt)
+
+    def prepare(self, candidate_sha: str) -> PreparedAdvance:
+        """Prepare direct-fast-forward operands from exact named refs.
+
+        Returns:
+            The immutable prepared identity.
+        """
+        target = self.port.observe_ref(ref=self.target_ref)
+        candidate = self.port.observe_ref(ref=self.candidate_ref)
+        if not target.available or target.oid is None or candidate.oid != candidate_sha:
+            raise ValueError("candidate-or-target-mismatch")
+        facts = {fact.oid: fact for fact in self.port.object_facts(oids=(target.oid, candidate_sha))}
+        candidate_facts = facts[candidate_sha]
+        if candidate_facts.object_type != "commit" or candidate_facts.tree_oid is None:
+            raise ValueError("candidate-object-invalid")
+        value = PreparedAdvance(
+            remote_identity=self.remote_identity,
+            target_ref=self.target_ref,
+            candidate_ref=self.candidate_ref,
+            expected_target_oid=target.oid,
+            candidate_oid=candidate_sha,
+            prepared_result_oid=candidate_sha,
+            prepared_tree_oid=candidate_facts.tree_oid,
+            ordered_parent_oids=candidate_facts.parent_oids,
+            prepared_identity_digest="sha256:" + "0" * 64,
+        )
+        return replace(value, prepared_identity_digest=prepared_identity_digest(value))
+
+    def reconcile(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult:
+        """Observe target state without invoking push.
+
+        Returns:
+            Exact-result success, unchanged failure, or unresolved state.
+        """
+        observed = self.port.observe_ref(ref=self.target_ref)
+        if observed.available and observed.oid == prepared.prepared_result_oid:
+            return ExpectedHeadAdvanceResult("advanced-after-reconciliation")
+        if observed.available:
+            return ExpectedHeadAdvanceResult("target-stale")
+        return ExpectedHeadAdvanceResult("reconciliation-required")
 
     def validate_inputs(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
         """Validate capability, binding, shape, and durable identity.
