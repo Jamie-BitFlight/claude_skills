@@ -1,0 +1,90 @@
+{
+  "provider": "github",
+  "target": {
+    "repository": {
+      "provider": "github",
+      "hostname": "github.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 25
+  },
+  "transport": "github_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "e983e26951870a3c57818a379511938ded0d0466351437558e2ef6b18dab3353",
+  "head_revision": "5555555555555555555555555555555555555555",
+  "revision_at": "2026-09-22T01:05:00Z",
+  "completeness": {
+    "transport": "github_cli",
+    "required_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "completed_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": []
+  },
+  "review_inputs": [
+    {
+      "input_id": "github:thread:501",
+      "provider": "github",
+      "provider_ids": {
+        "object_id": "501",
+        "reply_target_id": "501",
+        "resolution_target_id": "thread-501"
+      },
+      "source_kind": "review_comment",
+      "kinds": ["comment"],
+      "location": "inline",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-5",
+        "login": "reviewer-five",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Should compatibility preserve the legacy value or use the new canonical value?",
+      "stable_reference": "https://github.example/acme/widgets/pull/25#discussion-501",
+      "created_at": "2026-09-22T01:05:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": "src/compatibility.py",
+      "line": 27,
+      "provider_state": "open",
+      "capabilities": {
+        "can_reply": true,
+        "can_resolve": true,
+        "can_comment": true,
+        "unavailable": []
+      },
+      "thread_id": "thread-501",
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "available",
+  "unresolved_count": 1,
+  "outstanding_input_count": 1,
+  "codex_approved": false,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "CLEAN",
+    "blockers": []
+  }
+}

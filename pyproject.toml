@@ -56,6 +56,7 @@ addopts = [
     "--cov=scripts",
     "--cov=plugins",
     "--cov=.agents/skills/rebase/scripts",
+    "--cov=.agents/skills/receiving-pr-reviews/scripts",
     "--strict-config",
     "--strict-markers",
     "--tb=short",

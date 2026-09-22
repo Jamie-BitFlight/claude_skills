@@ -1,0 +1,95 @@
+spec:
+  inputs:
+    job-name:
+      description: Unique version-evaluation job name.
+    stage:
+      description: Consumer-owned stage for version evaluation.
+    rules:
+      description: Consumer-owned admission policy for the version job.
+      type: array
+    image:
+      description: Digest-pinned Node image containing npm.
+    semantic-release-version:
+      description: Exact semantic-release package version.
+      type: string
+      regex: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+    git-remote-name:
+      description: Existing Git remote selected for release transport.
+    repository-url:
+      description: Explicit credential-free HTTPS Git repository URL passed to semantic-release.
+    environment:
+      description: Environment name whose exact scope exposes the selected credential to this job.
+    credential-variable:
+      description: Name of the protected runtime variable containing the release credential.
+      default: RELEASE_PUSH_TOKEN
+    tag-prefix:
+      description: Prefix added before the semantic version.
+      default: v
+---
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  rules: $[[ inputs.rules ]]
+  environment:
+    name: $[[ inputs.environment ]]
+    action: verify
+  variables:
+    GIT_DEPTH: "0"
+    RELEASE_TAG_PREFIX: "$[[ inputs.tag-prefix ]]"
+    RELEASE_GIT_REMOTE_NAME: "$[[ inputs.git-remote-name ]]"
+    RELEASE_REPOSITORY_URL: "$[[ inputs.repository-url ]]"
+    RELEASE_CREDENTIAL_VARIABLE: "$[[ inputs.credential-variable ]]"
+    RELEASE_CREDENTIAL_DIGEST_VARIABLE: "$[[ inputs.credential-variable ]]_SHA256"
+    SEMANTIC_RELEASE_VERSION: "$[[ inputs.semantic-release-version ]]"
+  before_script:
+    - apk add --no-cache git
+    - test -n "$CI_DEFAULT_BRANCH"
+    - |
+      set -eu
+      case "$RELEASE_CREDENTIAL_VARIABLE" in
+        ''|[0-9]*|*[!A-Za-z0-9_]*) printf 'invalid credential variable name\n' >&2; exit 1 ;;
+      esac
+      release_credential="$(printenv "$RELEASE_CREDENTIAL_VARIABLE" || true)"
+      test -n "$release_credential"
+      expected_digest="$(printenv "$RELEASE_CREDENTIAL_DIGEST_VARIABLE" || true)"
+      test -n "$expected_digest"
+      actual_digest="$(printf '%s' "$release_credential" | sha256sum | cut -d ' ' -f 1)"
+      test "$actual_digest" = "$expected_digest"
+      printf 'release credential digest verified\n'
+      unset release_credential expected_digest actual_digest
+    - test "$CI_PIPELINE_SOURCE" = "push"
+    - test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+    - test -z "${CI_COMMIT_TAG:-}"
+    - test "$CI_COMMIT_REF_PROTECTED" = "true"
+    - git remote get-url "$RELEASE_GIT_REMOTE_NAME" >/dev/null
+    - 'case "$RELEASE_REPOSITORY_URL" in https://*) ;; *) printf ''repository URL must use HTTPS\n'' >&2; exit 1 ;; esac'
+    - 'case "${RELEASE_REPOSITORY_URL#*://}" in *@*) printf ''repository URL must not contain credentials\n'' >&2; exit 1 ;; esac'
+    - git remote set-url "$RELEASE_GIT_REMOTE_NAME" "$RELEASE_REPOSITORY_URL"
+  script:
+    - |
+      cat >.releaserc.cjs <<'EOF'
+      const branch = process.env.CI_DEFAULT_BRANCH;
+      const prefix = process.env.RELEASE_TAG_PREFIX;
+      const repositoryUrl = process.env.RELEASE_REPOSITORY_URL;
+      if (!branch || !prefix || !repositoryUrl) throw new Error('release configuration is incomplete');
+      module.exports = {
+        branches: [branch],
+        repositoryUrl,
+        tagFormat: `${prefix}\${version}`,
+        plugins: ['@semantic-release/commit-analyzer'],
+      };
+      EOF
+    - |
+      set -eu
+      release_credential="$(printenv "$RELEASE_CREDENTIAL_VARIABLE" || true)"
+      test -n "$release_credential"
+      release_authorization="$(printf 'oauth2:%s' "$release_credential" | base64 | tr -d '\n')"
+      test -n "$release_authorization"
+      release_http_url="$(git remote get-url "$RELEASE_GIT_REMOTE_NAME")"
+      case "$release_http_url" in https://*) ;; *) exit 1 ;; esac
+      unset "$RELEASE_CREDENTIAL_VARIABLE"
+      GIT_TERMINAL_PROMPT=0 \
+      GIT_CONFIG_COUNT=1 \
+      GIT_CONFIG_KEY_0="http.${release_http_url}.extraHeader" \
+      GIT_CONFIG_VALUE_0="Authorization: Basic ${release_authorization}" \
+      npx --yes "semantic-release@${SEMANTIC_RELEASE_VERSION}"
