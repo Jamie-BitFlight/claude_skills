@@ -1,72 +1,113 @@
 ---
 name: receiving-pr-reviews
-description: Work through every unresolved review thread on a PR to completion — validate, fix if warranted, reply, resolve, then re-check on a bounded schedule. Use after pushing a commit to a PR, or when asked to check or address PR reviews.
+description: Assess every PR review input as a complete set, implement systemic warranted changes, communicate dispositions, resolve eligible threads, and re-check on a bounded schedule. Use after pushing a commit to a PR, or when asked to check or address PR reviews.
 ---
 
 # Receiving PR Reviews
 
-<workflow>
+Treat a review cycle as one evidence-bound system change. Comments, questions, approvals,
+rejections, and bot signals are inputs to assess together—not isolated instructions to patch in
+arrival order.
 
-1. Fetch every unresolved thread, every unresponded review, and Codex's approval state. Prefer `--summary` — it already carries every id step 4/5 needs; drop it only when you need `reviews_with_body`'s full list or a thread's complete comment history:
+## Workflow
+
+1. Fetch one full snapshot and preserve it as the mutation evidence:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch --pr <N> --summary
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py fetch \
+     --pr <N> --github <owner/repo> > review-snapshot.json
    ```
 
-   If the helper cannot use `gh` and GitHub MCP tools are available, use the lightweight [GitHub MCP fallback](./references/github-mcp-fallback.md) for this workflow instead. Do not install or reconfigure `gh` merely to avoid the fallback, and do not run both paths for the same snapshot.
+   Use the full form for action work. It contains all normalized `review_inputs`, including
+   resolved history used for pattern analysis, plus target, revision, fingerprint, completeness,
+   capabilities, and stable references. A false `snapshot_complete` stops the cycle: fetch the
+   truncated/unavailable surface before assessing or acting.
 
-   Read `reviews_count`, `threads_count`, `unresolved_count`, `unresponded_count`, and `blockers` together — never treat an empty `unresolved` array on its own as "nothing to do". A `threads_count` of 0 means no *inline* thread landed, not that no review landed. A non-empty `blockers` means the empty result set is expected and the fix is on the PR itself — undraft it, resolve the conflicts — not in the review queue. (Dropping `--summary` gets the same fields under `reviewability.blockers` instead of top-level `blockers`, plus the full `reviews_with_body` and each thread's complete `comments` list — a thread's `comments_truncated: true` there means it has passed 100 comments; page its `comments` connection directly before concluding anything about it. `unresponded_count` itself only exists on `--summary` output — the full form has no matching field, use `len(unresponded_reviews)` there instead.)
+   If `gh` is unavailable and GitHub MCP tools are available, use the
+   [GitHub MCP fallback](./references/github-mcp-fallback.md) for the entire snapshot. One snapshot
+   uses one transport.
 
-   `unresolved`/`unresponded_reviews` entries are this run's actionable input; treat every one as something to address. For `codex_approved`, see step 7. Checking several PRs at once: `--pr 41,42,44` prints one line (or, with `--summary`, one JSON block) per PR instead of one call each.
+2. Assess the complete inbound census before editing. Validate each claim against the change goal,
+   repository instructions, current code, and other review inputs. Cluster repeated symptoms by
+   shared cause; make a singleton explicit when an input has no related input. Record observed
+   actor/revision unknowns instead of guessing them.
 
-2. For each unresolved thread or unresponded review: read it, validate the claim locally, assess against the change goal and repository instructions.
-3. Implement, commit, and push a fix only when it improves the product — push before replying, so the SHA named in the reply is inspectable and resolving the thread never outruns what is actually on the remote.
-4. Reply on that thread with the disposition — conclusion, evidence, commit SHA, or why no change was warranted:
+3. Implement warranted clusters at their owning design seam. Verify the complete affected surface,
+   then push an inspectable revision. Fetch a new full snapshot at that remote revision; this is
+   the recheck snapshot that actions bind to.
+
+4. Write `review-cycle.json` as `ReviewCycleState` from `pr_review_state_models.py`. Completion
+   requires:
+
+   - an exact, duplicate-free inbound `input_census`, one assessment per input, and clusters that
+     cover every input exactly once;
+   - concrete assessment scope/evidence/verification surfaces and cluster verification commands;
+   - explicit decisions for every assessment unknown, including keys
+     `revision_relation:<input-id>`, `actor_classification:<input-id>`, and
+     `actor_role:<input-id>` when those provider facts are unknown;
+   - implementation and verification evidence, the inspectable remote revision, and the recheck
+     snapshot fingerprint;
+   - exact per-input communication and resolution states; and
+   - `cycle_state: READY_FOR_ACTION` with `cycle_terminal: action_pending`.
+
+   Validate without mutating:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply --pr <N> --comment-id <databaseId> --body '...'
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py validate-cycle \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
-5. Resolve the thread:
+
+5. Communicate each disposition before resolving. Every mutation requires the same snapshot and
+   cycle evidence:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py resolve --thread-id <id>
-   ```
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply \
+     --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
 
-   Steps 4 and 5 combined — one thread or many in one process:
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py comment \
+     --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
+     --reference '<stable-reference>' \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
 
-   ```bash
    uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve \
-     --pr <N> --thread-id <id> --comment-id <databaseId> --body '...'
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve-batch \
-     --pr <N> --input-file threads.json   # [{thread_id, comment_id, body}, ...]
+     --pr <N> --github <owner/repo> --input-id <input-id> --body '<evidence and disposition>' \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   The batch form stops at the first failure and prints one JSON line per thread.
-6. A decision spanning threads (PR sequencing, rebase disposition), or a response to a `reviews_with_body`/`unresponded_reviews` entry, goes on the PR itself via `gh pr comment <N> -R <owner>/<repo>` — the same owner/repo this run used in step 1 — before the work it governs. When answering a specific entry, quote that review's own `url` field from step 1's output in the comment body. That quoted `url`, postdating the review, is what clears the review out of `unresponded_reviews` on the next check; chronological order alone does not.
-7. Once all current threads and reviews are addressed, re-check with `watch`, looping short calls rather than one long block:
+   `resolve` alone is recovery for communication already recorded as `completed` in the cycle.
+   Clarification-required inputs remain open. Provider capabilities and the cluster resolution
+   policy must authorize the requested action. Successful commands atomically advance the local
+   communication/resolution state; a failed resolution retains completed communication for safe
+   resolve-only recovery.
+
+   Batch combined actions use complete canonical input IDs and stop at the first failed action:
 
    ```bash
-   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py watch --pr <N>
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py reply-and-resolve-batch \
+     --pr <N> --github <owner/repo> --input-file actions.json \
+     --snapshot-file review-snapshot.json --state-file review-cycle.json
    ```
 
-   Block on it inline when there is no other work to advance. With other work queued, background the call using whatever mechanism the harness provides and continue that work — then poll the backgrounded call for its own result before reporting back or finishing, because it produces no completion notification.
+   `actions.json` is `[{"input_id": "...", "body": "..."}, ...]`.
 
-   `timed_out: false` means `state.unresolved_count > 0`, `state.unresponded_reviews` is non-empty, or `state.codex_approved` is `true` — restart this skill from step 1 against whichever is true. `timed_out: true` means none of the three were true inside that one call's window, not that watching is done — issue another `watch` immediately to keep covering the window you intend to watch. Stop once one of the three conditions is met, or once the intended window is covered. `codex_approved: true` on its own, with `unresolved_count: 0` and `unresponded_reviews: []`, is a completion signal — do not re-enter step 1 for it.
+6. Re-check with short bounded calls after current inputs are communicated:
 
-</workflow>
+   ```bash
+   uv run ./.agents/skills/receiving-pr-reviews/scripts/pr_review_threads.py watch \
+     --pr <N> --github <owner/repo>
+   ```
 
-<gotchas>
+   A call stops on outstanding work or its window/attempt bound. `timed_out: true` means no stop
+   signal appeared in that sampled window; issue another call to cover a longer intended window.
+   Full watch output preserves the canonical snapshot under `state`.
 
-- `fetch`/`watch`/`reply` detect this checkout's own repository via `gh repo view`; pass `--github owner/repo` to target a different one, or when detection fails.
-- `--gh-timeout-seconds` is unbounded by default on `fetch` and `watch`. One snapshot is seven sequential `gh api` calls, some of them paginating a large PR, so choose a bound against your own network. Inside `watch` it applies to the first fetch only; each poll is bounded by the time left before `--timeout-seconds`.
-- `reply`'s `--comment-id` is a comment's `databaseId` and `resolve`'s `--thread-id` is a thread's `id` — both come straight from step 1's output. When a thread already has more than one comment, pass the *first* comment's `databaseId`: `comments` is in creation order, and GitHub rejects a reply targeted at another reply.
-- A `reviews_with_body`/`unresponded_reviews` entry is not a thread, so it cannot be replied to or resolved through this script. Address it and post the response on the PR itself per step 6.
-- `watch`'s defaults — a 90-second poll interval, a 270-second timeout per call — stay under the 5-minute prompt-cache TTL floor that applies in every Claude billing mode. Cover a longer window by looping calls, not by raising `--timeout-seconds`.
-- `watch` stops polling once less than one interval remains before its deadline, so its last observed state can be up to one interval stale. The next call's own first fetch covers that stretch.
-- Every check inside `watch` is a fresh `gh` snapshot with no baseline, so a call whose first fetch already has outstanding work returns immediately. Calling `watch` right after a `resolve` or a plain `fetch` is safe.
-- `reviewability` is read fresh on every poll, so a `timed_out: true` result carries it too — check `state.reviewability.blockers` before issuing another `watch` rather than waiting out a window for reviews that cannot arrive. `mergeable: "UNKNOWN"` is never a blocker: GitHub computes mergeability in a background job, and it resolves on a later check.
-- `watch` exits non-zero with nothing on stdout when the last re-poll of a window failed. Retry the call rather than reading it as "nothing new."
-- `--summary` (step 1) also works on `watch`; `timed_out` sits alongside the summary fields there instead of nested under `state`. Add `--max-body N` to cut long bodies, visibly marked when cut; unlimited by default. Step 7's `state.X` field names (`state.unresolved_count`, `state.unresponded_reviews`, `state.codex_approved`, `state.reviewability.blockers`) describe the full (non-`--summary`) form only — with `--summary`, read the same signals without the `state.` prefix, and read `blockers` at the top level rather than under `reviewability`.
-- Comma-separated `--pr` is `fetch`-only — `watch` polls one PR at a time.
+## Operational bounds
 
-</gotchas>
+- Every `gh` subprocess has a 30-second default process-tree bound. Set `--gh-timeout-seconds` to a
+  smaller positive bound when needed; watch uses the tighter caller bound or remaining deadline.
+- `watch` defaults to a 90-second interval, 270-second window, and four complete snapshots.
+- `--summary` is for status inspection, not action evidence. `--max-body` visibly truncates only
+  when the caller requests it.
+- Comma-separated `--pr` is fetch-only and emits lightweight board entries; action cycles use one
+  target and revision.

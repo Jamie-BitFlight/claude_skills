@@ -34,8 +34,18 @@ from pr_review_github_provider import GitHubProvider
 from pr_review_models import WatchResult, WatchSummary
 from pr_review_output import board_entry, summarize
 from pr_review_provider import ProviderResponseError, ReviewProvider
-from pr_review_state import authorize_action, load_cycle, load_snapshot
-from pr_review_state_models import AuthorizedReviewAction
+from pr_review_state import (
+    authorize_action,
+    load_cycle,
+    load_snapshot,
+    record_completed_communication,
+    record_completed_resolution,
+    save_cycle,
+    validate_cycle_coverage,
+    validate_snapshot_context,
+)
+from pr_review_state_models import AuthorizedReviewAction, ReviewCycleState
+from pr_review_subprocess import DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 app = typer.Typer(help="Review-state operations through a validated provider interface.")
 
@@ -46,6 +56,9 @@ DEFAULT_WATCH_MAX_ATTEMPTS = 4
 
 def validate_github_option(value: str | None) -> str | None:
     """Validate an explicit GitHub owner/repository value.
+
+    Args:
+        value: Optional ``owner/repo`` CLI value.
 
     Returns:
         The validated option, or ``None`` when detection is requested.
@@ -71,6 +84,10 @@ GithubOption = Annotated[
 def owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, str]:
     """Resolve an explicit or detected GitHub repository.
 
+    Args:
+        github: Explicit ``owner/repo`` value, or ``None`` for detection.
+        gh_timeout: Positive bound for repository detection.
+
     Returns:
         The repository owner and name.
     """
@@ -90,6 +107,11 @@ def owner_repo(github: str | None, *, gh_timeout: float | None) -> tuple[str, st
 
 def target_for_github(github: str | None, pr: int, *, gh_timeout: float | None) -> ChangeRequestTarget:
     """Resolve one GitHub pull-request target.
+
+    Args:
+        github: Explicit ``owner/repo`` value, or ``None`` for detection.
+        pr: Pull-request number.
+        gh_timeout: Positive bound for repository detection.
 
     Returns:
         The provider-neutral target identity.
@@ -117,20 +139,31 @@ def authorized_action(
     state_file: Path,
     input_id: str,
     action: ReplyAction | ResolveAction | TopLevelCommentAction,
-) -> AuthorizedReviewAction:
+) -> tuple[AuthorizedReviewAction, ReviewCycleState]:
     """Load and validate one current pre-action gate.
 
+    Args:
+        target: Canonical command target.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Complete review-cycle JSON.
+        input_id: Canonical inbound input selected for mutation.
+        action: Provider-neutral mutation to authorize.
+
     Returns:
-        The action bound to validated snapshot and cycle evidence.
+        The action bound to validated evidence and the loaded cycle to update after success.
     """
     snapshot = load_snapshot(snapshot_file)
+    cycle = load_cycle(state_file)
     if snapshot.target != target:
         raise ProviderResponseError("snapshot target does not match command target")
-    return authorize_action(snapshot, load_cycle(state_file), input_id, action)
+    return authorize_action(snapshot, cycle, input_id, action), cycle
 
 
 def parse_pr_list(value: str) -> list[int]:
     """Parse positive comma-separated pull-request numbers.
+
+    Args:
+        value: Comma-separated CLI value.
 
     Returns:
         The validated pull-request numbers in input order.
@@ -162,9 +195,17 @@ def fetch(
     github: GithubOption = None,
     summary: SummaryOption = False,
     max_body: MaxBodyOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Fetch complete canonical review snapshots."""
+    """Fetch complete canonical review snapshots.
+
+    Args:
+        pr: One or more comma-separated pull-request numbers.
+        github: Explicit repository identity, or detection when omitted.
+        summary: Emit compact status output instead of full action evidence.
+        max_body: Optional visible body truncation bound.
+        gh_timeout_seconds: Positive bound for every GitHub subprocess.
+    """
     numbers = parse_pr_list(pr)
     first_target = target_for_github(github, numbers[0], gh_timeout=gh_timeout_seconds)
     provider = review_provider()
@@ -187,9 +228,20 @@ def watch(
     interval_seconds: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_INTERVAL_SECONDS,
     timeout_seconds: Annotated[int, typer.Option(min=0)] = DEFAULT_WATCH_TIMEOUT_SECONDS,
     max_attempts: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_MAX_ATTEMPTS,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Sample complete snapshots within one deadline and attempt budget."""
+    """Sample complete snapshots within one deadline and attempt budget.
+
+    Args:
+        pr: Pull-request number.
+        github: Explicit repository identity, or detection when omitted.
+        summary: Emit compact status output instead of the full snapshot.
+        max_body: Optional visible body truncation bound.
+        interval_seconds: Delay between complete snapshots.
+        timeout_seconds: Overall sampling window.
+        max_attempts: Maximum complete snapshots in this call.
+        gh_timeout_seconds: Positive bound for every GitHub subprocess.
+    """
     deadline = time.monotonic() + timeout_seconds
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
     provider = review_provider()
@@ -242,6 +294,30 @@ SnapshotFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 StateFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 
 
+@app.command(name="validate-cycle")
+def validate_cycle(snapshot_file: SnapshotFile, state_file: StateFile) -> None:
+    """Validate complete-set cycle evidence without performing a mutation.
+
+    Args:
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Assessment and implementation cycle JSON.
+    """
+    snapshot = load_snapshot(snapshot_file)
+    cycle = load_cycle(state_file)
+    validate_snapshot_context(snapshot, cycle)
+    inputs, assessments, clusters = validate_cycle_coverage(snapshot, cycle)
+    typer.echo(
+        json.dumps({
+            "snapshot_fingerprint": snapshot.snapshot_fingerprint,
+            "inputs": len(inputs),
+            "assessments": len(assessments),
+            "clusters": len(clusters),
+            "cycle_state": cycle.cycle_state,
+            "cycle_terminal": cycle.cycle_terminal,
+        })
+    )
+
+
 @app.command()
 def reply(
     pr: Annotated[int, typer.Option()],
@@ -250,12 +326,24 @@ def reply(
     snapshot_file: SnapshotFile,
     state_file: StateFile,
     github: GithubOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Post one authorized inline reply."""
+    """Post one authorized inline reply.
+
+    Args:
+        pr: Pull-request number.
+        input_id: Canonical inbound input to answer.
+        body: Evidence-bearing disposition.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Complete review-cycle JSON.
+        github: Explicit repository identity, or detection when omitted.
+        gh_timeout_seconds: Positive bound for the GitHub subprocess.
+    """
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
-    action = authorized_action(target, snapshot_file, state_file, input_id, ReplyAction(body=body))
-    typer.echo(json.dumps(review_provider().act(target, action, command_timeout=gh_timeout_seconds).raw))
+    action, cycle = authorized_action(target, snapshot_file, state_file, input_id, ReplyAction(body=body))
+    result = review_provider().act(target, action, command_timeout=gh_timeout_seconds)
+    save_cycle(state_file, record_completed_communication(cycle, input_id))
+    typer.echo(json.dumps(result.raw))
 
 
 @app.command()
@@ -265,12 +353,23 @@ def resolve(
     snapshot_file: SnapshotFile,
     state_file: StateFile,
     github: GithubOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Resolve one authorized input."""
+    """Resolve one authorized input.
+
+    Args:
+        pr: Pull-request number.
+        input_id: Canonical inbound input to resolve.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Cycle JSON recording completed communication.
+        github: Explicit repository identity, or detection when omitted.
+        gh_timeout_seconds: Positive bound for the GitHub subprocess.
+    """
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
-    action = authorized_action(target, snapshot_file, state_file, input_id, ResolveAction())
-    typer.echo(json.dumps(review_provider().act(target, action, command_timeout=gh_timeout_seconds).raw))
+    action, cycle = authorized_action(target, snapshot_file, state_file, input_id, ResolveAction())
+    result = review_provider().act(target, action, command_timeout=gh_timeout_seconds)
+    save_cycle(state_file, record_completed_resolution(cycle, input_id))
+    typer.echo(json.dumps(result.raw))
 
 
 @app.command(name="comment")
@@ -282,14 +381,27 @@ def comment(
     state_file: StateFile,
     reference: Annotated[list[str] | None, typer.Option("--reference")] = None,
     github: GithubOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Post one authorized top-level response."""
+    """Post one authorized top-level response.
+
+    Args:
+        pr: Pull-request number.
+        input_id: Canonical inbound input to answer.
+        body: Evidence-bearing disposition.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Complete review-cycle JSON.
+        reference: Stable provider references to include exactly once.
+        github: Explicit repository identity, or detection when omitted.
+        gh_timeout_seconds: Positive bound for the GitHub subprocess.
+    """
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
-    action = authorized_action(
+    action, cycle = authorized_action(
         target, snapshot_file, state_file, input_id, TopLevelCommentAction(body=body, references=reference or [])
     )
-    typer.echo(json.dumps(review_provider().act(target, action, command_timeout=gh_timeout_seconds).raw))
+    result = review_provider().act(target, action, command_timeout=gh_timeout_seconds)
+    save_cycle(state_file, record_completed_communication(cycle, input_id))
+    typer.echo(json.dumps(result.raw))
 
 
 @app.command(name="reply-and-resolve")
@@ -300,17 +412,33 @@ def reply_and_resolve(
     snapshot_file: SnapshotFile,
     state_file: StateFile,
     github: GithubOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Reply successfully before resolving the same authorized input."""
+    """Reply successfully before resolving the same authorized input.
+
+    Args:
+        pr: Pull-request number.
+        input_id: Canonical inbound inline input.
+        body: Evidence-bearing disposition.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Complete review-cycle JSON with communication pending.
+        github: Explicit repository identity, or detection when omitted.
+        gh_timeout_seconds: Positive bound for each GitHub subprocess.
+    """
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
     snapshot = load_snapshot(snapshot_file)
     cycle = load_cycle(state_file)
+    if snapshot.target != target:
+        raise ProviderResponseError("snapshot target does not match command target")
     reply_action = authorize_action(snapshot, cycle, input_id, ReplyAction(body=body))
-    resolve_action = authorize_action(snapshot, cycle, input_id, ResolveAction())
     provider = review_provider()
     typer.echo(json.dumps(provider.act(target, reply_action, command_timeout=gh_timeout_seconds).raw))
+    cycle = record_completed_communication(cycle, input_id)
+    save_cycle(state_file, cycle)
+    resolve_action = authorize_action(snapshot, cycle, input_id, ResolveAction())
     typer.echo(json.dumps(provider.act(target, resolve_action, command_timeout=gh_timeout_seconds).raw))
+    cycle = record_completed_resolution(cycle, input_id)
+    save_cycle(state_file, cycle)
 
 
 @app.command(name="reply-and-resolve-batch")
@@ -320,28 +448,40 @@ def reply_and_resolve_batch(
     snapshot_file: SnapshotFile,
     state_file: StateFile,
     github: GithubOption = None,
-    gh_timeout_seconds: Annotated[float | None, typer.Option(min=0)] = None,
+    gh_timeout_seconds: Annotated[float, typer.Option(min=0.001)] = DEFAULT_COMMAND_TIMEOUT_SECONDS,
 ) -> None:
-    """Validate the whole batch, then stop on its first failed action."""
+    """Validate the whole batch, then stop on its first failed action.
+
+    Args:
+        pr: Pull-request number.
+        input_file: Complete batch of canonical input IDs and reply bodies.
+        snapshot_file: Complete canonical snapshot JSON.
+        state_file: Complete review-cycle JSON with communication pending.
+        github: Explicit repository identity, or detection when omitted.
+        gh_timeout_seconds: Positive bound for each GitHub subprocess.
+    """
     entries = BatchReviewActions.model_validate(json.loads(input_file.read_text())).root
     target = target_for_github(github, pr, gh_timeout=gh_timeout_seconds)
     snapshot = load_snapshot(snapshot_file)
     cycle = load_cycle(state_file)
+    if snapshot.target != target:
+        raise ProviderResponseError("snapshot target does not match command target")
     planned = [
-        (
-            entry.input_id,
-            authorize_action(snapshot, cycle, entry.input_id, ReplyAction(body=entry.body)),
-            authorize_action(snapshot, cycle, entry.input_id, ResolveAction()),
-        )
+        (entry.input_id, authorize_action(snapshot, cycle, entry.input_id, ReplyAction(body=entry.body)))
         for entry in entries
     ]
     provider = review_provider()
-    for input_id, reply_action, resolve_action in planned:
+    for input_id, reply_action in planned:
         replied = False
         try:
             provider.act(target, reply_action, command_timeout=gh_timeout_seconds)
             replied = True
+            cycle = record_completed_communication(cycle, input_id)
+            save_cycle(state_file, cycle)
+            resolve_action = authorize_action(snapshot, cycle, input_id, ResolveAction())
             provider.act(target, resolve_action, command_timeout=gh_timeout_seconds)
+            cycle = record_completed_resolution(cycle, input_id)
+            save_cycle(state_file, cycle)
         except (ProviderResponseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             typer.echo(json.dumps({"input_id": input_id, "replied": replied, "resolved": False, "error": str(exc)}))
             raise typer.Exit(code=1) from exc

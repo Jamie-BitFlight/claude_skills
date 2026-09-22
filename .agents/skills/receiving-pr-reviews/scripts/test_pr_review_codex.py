@@ -345,13 +345,13 @@ def test_is_codex_thumbs_up_true_regardless_of_bot_suffix() -> None:
         )
         is True
     )
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
     assert (
         _is_codex_thumbs_up(
             Reaction(content="+1", user=Author(login="chatgpt-codex-connector[bot]"), created_at=_OLD_COMMIT_DATE)
         )
         is True
     )
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

@@ -22,11 +22,29 @@ class ReviewProvider(Protocol):
     def snapshot(
         self, target: ChangeRequestTarget, *, deadline: float | None, command_timeout: float | None
     ) -> ReviewSnapshot:
-        """Return one complete snapshot produced through exactly one transport."""
+        """Return one complete snapshot produced through exactly one transport.
+
+        Args:
+            target: Canonical change-request target.
+            deadline: Absolute monotonic deadline for the complete snapshot.
+            command_timeout: Positive per-command transport bound.
+
+        Returns:
+            Complete canonical provider snapshot.
+        """
         ...
 
     def act(
         self, target: ChangeRequestTarget, action: AuthorizedReviewAction, *, command_timeout: float | None
     ) -> ReviewActionResult:
-        """Perform one action and return only after the response validates success."""
+        """Perform one action and return only after the response validates success.
+
+        Args:
+            target: Canonical change-request target.
+            action: Mutation bound to complete current-cycle evidence.
+            command_timeout: Positive per-command transport bound.
+
+        Returns:
+            Provider-neutral confirmed action result.
+        """
         ...

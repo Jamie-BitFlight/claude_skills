@@ -28,13 +28,24 @@ CODEX_EMPTY_REVIEW_BODY = re.compile(
 
 
 def latest_revision_at(head_state: PullRequestHeadState, force_push_at: datetime | None) -> datetime:
-    """Return the later head-commit or force-push timestamp."""
+    """Return the later head-commit or force-push timestamp.
+
+    Args:
+        head_state: Current pull-request head state.
+        force_push_at: Latest observed force-push timestamp.
+
+    Returns:
+        Timestamp establishing the current revision boundary.
+    """
     head_date = head_state.commits.nodes[-1].commit.committedDate
     return max(head_date, force_push_at or head_date)
 
 
 def reviewability(head_state: PullRequestHeadState) -> Reviewability:
     """Map GitHub draft/conflict state to established blockers.
+
+    Args:
+        head_state: Current pull-request head state.
 
     Returns:
         The normalized reviewability state.
@@ -53,7 +64,14 @@ def reviewability(head_state: PullRequestHeadState) -> Reviewability:
 
 
 def review_effective_timestamp(review: ReviewNode) -> datetime:
-    """Return the newest submitted or edited review timestamp."""
+    """Return the newest submitted or edited review timestamp.
+
+    Args:
+        review: Submitted review carrying provider timestamps.
+
+    Returns:
+        The review's latest effective timestamp.
+    """
     if review.submittedAt is None:
         raise TypeError("review_effective_timestamp requires a submitted review")
     return max(review.submittedAt, review.lastEditedAt or review.submittedAt)
@@ -62,6 +80,10 @@ def review_effective_timestamp(review: ReviewNode) -> datetime:
 def references_review(comment_body: str, review_url: str) -> bool:
     """Match the exact review URL without accepting a longer numeric id.
 
+    Args:
+        comment_body: Candidate response body.
+        review_url: Exact stable review URL.
+
     Returns:
         Whether the comment references the exact review URL.
     """
@@ -69,7 +91,14 @@ def references_review(comment_body: str, review_url: str) -> bool:
 
 
 def is_codex_empty_review(review: ReviewNode) -> bool:
-    """Return whether a review is exactly Codex's fixed no-findings wrapper."""
+    """Return whether a review is exactly Codex's fixed no-findings wrapper.
+
+    Args:
+        review: Submitted review to classify.
+
+    Returns:
+        Whether the entire body matches the exact supported wrapper.
+    """
     return (
         review.author is not None
         and review.author.login.lower() in CODEX_REACTOR_LOGINS
@@ -78,7 +107,15 @@ def is_codex_empty_review(review: ReviewNode) -> bool:
 
 
 def unresponded_reviews(reviews: list[ReviewNode], own_comments: list[IssueComment]) -> list[ReviewNode]:
-    """Return submitted, substantive reviews lacking a later exact-reference response."""
+    """Return submitted, substantive reviews lacking a later exact-reference response.
+
+    Args:
+        reviews: Submitted reviews with substantive bodies or state signals.
+        own_comments: Authenticated actor's top-level comments.
+
+    Returns:
+        Reviews without a postdating exact-reference response.
+    """
     return [
         review
         for review in reviews
@@ -92,7 +129,14 @@ def unresponded_reviews(reviews: list[ReviewNode], own_comments: list[IssueComme
 
 
 def is_codex_thumbs_up(reaction: Reaction) -> bool:
-    """Return whether the reaction is exact Codex +1 evidence."""
+    """Return whether the reaction is exact Codex +1 evidence.
+
+    Args:
+        reaction: Pull-request reaction to classify.
+
+    Returns:
+        Whether the signal is the exact supported Codex approval equivalent.
+    """
     return (
         reaction.content == "+1" and reaction.user is not None and reaction.user.login.lower() in CODEX_REACTOR_LOGINS
     )

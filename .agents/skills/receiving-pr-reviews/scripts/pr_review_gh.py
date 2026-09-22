@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime
+
+from pydantic import BaseModel
 
 import pr_review_github_transport as transport
 from pr_review_contracts import ChangeRequestTarget, RepositoryTarget
@@ -29,6 +30,7 @@ from pr_review_models import (
     UnresolvedThread,
 )
 from pr_review_state_models import SnapshotCompleteness
+from pr_review_subprocess import DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 RESOLVE_THREAD_MUTATION = transport.RESOLVE_THREAD_MUTATION
 run_gh = transport.run_gh
@@ -36,6 +38,9 @@ run_gh = transport.run_gh
 
 def detect_repo_identity(*, gh_timeout: float | None = None) -> tuple[str, str]:
     """Detect this checkout's GitHub owner and repository.
+
+    Args:
+        gh_timeout: Positive bound for repository detection.
 
     Returns:
         The repository owner and name.
@@ -75,20 +80,26 @@ def _references_review(comment_body: str, review_url: str) -> bool:
     return references_review(comment_body, review_url)
 
 
-def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float | None:
+def gh_timeout_budget(deadline: float | None, gh_timeout: float | None) -> float:
     """Return the tighter caller timeout or remaining snapshot deadline.
+
+    Args:
+        deadline: Absolute monotonic deadline for the complete snapshot.
+        gh_timeout: Caller-selected per-command timeout, or the default.
 
     Returns:
         The effective timeout, or no bound when neither input supplies one.
     """
+    caller_timeout = DEFAULT_COMMAND_TIMEOUT_SECONDS if gh_timeout is None else gh_timeout
     if deadline is None:
-        return gh_timeout
+        return caller_timeout
     remaining = max(0.0, deadline - time.monotonic())
-    return min(remaining, gh_timeout) if gh_timeout is not None else remaining
+    return min(remaining, caller_timeout)
 
 
-@dataclass(frozen=True)
-class _GitHubState:
+class GitHubState(BaseModel):
+    """Complete raw GitHub surfaces used to build one canonical snapshot."""
+
     thread_pages: list[ReviewThreadsConnection]
     review_pages: list[ReviewsConnection]
     issue_comments: list[IssueComment]
@@ -98,8 +109,19 @@ class _GitHubState:
     force_push_at: datetime | None
 
 
-def _collect_state(owner: str, repo: str, pr: int, timeout: Callable[[], float | None]) -> _GitHubState:
-    return _GitHubState(
+def collect_state(owner: str, repo: str, pr: int, timeout: Callable[[], float | None]) -> GitHubState:
+    """Fetch every required GitHub review surface through one timeout policy.
+
+    Args:
+        owner: GitHub repository owner.
+        repo: GitHub repository name.
+        pr: Pull-request number.
+        timeout: Callable returning the current per-command timeout budget.
+
+    Returns:
+        Validated raw provider state.
+    """
+    return GitHubState(
         thread_pages=_fetch_pages(owner, repo, pr, gh_timeout=timeout()),
         review_pages=_fetch_review_pages(owner, repo, pr, gh_timeout=timeout()),
         issue_comments=_fetch_issue_comments(owner, repo, pr, gh_timeout=timeout()),
@@ -110,7 +132,16 @@ def _collect_state(owner: str, repo: str, pr: int, timeout: Callable[[], float |
     )
 
 
-def _normalize_state(fetched: _GitHubState, target: ChangeRequestTarget) -> ReviewSnapshot:
+def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> ReviewSnapshot:
+    """Normalize complete GitHub state without discarding resolved history.
+
+    Args:
+        fetched: Every required raw provider surface.
+        target: Canonical pull-request identity.
+
+    Returns:
+        A complete canonical snapshot with GitHub compatibility fields.
+    """
     all_threads = [node for page in fetched.thread_pages for node in page.nodes]
     all_reviews = [node for page in fetched.review_pages for node in page.nodes]
     unresolved = [
@@ -123,6 +154,9 @@ def _normalize_state(fetched: _GitHubState, target: ChangeRequestTarget) -> Revi
         for node in all_threads
         if not node.isResolved
     ]
+    head_commit = fetched.head_state.commits.nodes[-1].commit
+    head_revision = head_commit.oid or head_commit.committedDate.isoformat()
+    pull_author_login = fetched.head_state.author.login if fetched.head_state.author is not None else None
     reviews_with_body = [review for review in all_reviews if review.body.strip()]
     own_comments = [
         comment
@@ -143,12 +177,32 @@ def _normalize_state(fetched: _GitHubState, target: ChangeRequestTarget) -> Revi
         reviewability=_reviewability(fetched.head_state),
     )
     canonical_inputs = [
-        *inline_inputs(target, unresolved, own_login=fetched.authenticated_login),
-        *review_inputs(all_reviews, own_login=fetched.authenticated_login, is_empty_codex=_is_codex_empty_review),
-        *issue_comment_inputs(target, fetched.issue_comments, own_login=fetched.authenticated_login),
-        *approval_inputs(target, fetched.reactions, revision_at=revision_at, is_codex_approval=_is_codex_thumbs_up),
+        *inline_inputs(
+            target,
+            all_threads,
+            own_login=fetched.authenticated_login,
+            pull_author_login=pull_author_login,
+            head_revision=head_revision,
+        ),
+        *review_inputs(
+            all_reviews,
+            own_login=fetched.authenticated_login,
+            pull_author_login=pull_author_login,
+            head_revision=head_revision,
+            is_empty_codex=_is_codex_empty_review,
+        ),
+        *issue_comment_inputs(
+            target, fetched.issue_comments, own_login=fetched.authenticated_login, pull_author_login=pull_author_login
+        ),
+        *approval_inputs(
+            target,
+            fetched.reactions,
+            revision_at=revision_at,
+            pull_author_login=pull_author_login,
+            is_codex_approval=_is_codex_thumbs_up,
+        ),
     ]
-    truncated_threads = {thread.id for thread in unresolved if thread.comments_truncated}
+    truncated_threads = {thread.id for thread in all_threads if thread.comments.pageInfo.hasNextPage}
     surface_names = {"threads", "reviews", "issue_comments", "reactions", "identity", "head_state", "force_push"}
     completeness = SnapshotCompleteness(
         transport="github_cli",
@@ -157,8 +211,6 @@ def _normalize_state(fetched: _GitHubState, target: ChangeRequestTarget) -> Revi
         truncated_input_ids=[item.input_id for item in canonical_inputs if item.thread_id in truncated_threads],
         unavailable_capabilities=[],
     )
-    head_commit = fetched.head_state.commits.nodes[-1].commit
-    head_revision = head_commit.oid or head_commit.committedDate.isoformat()
     return ReviewSnapshot.model_validate({
         **legacy.model_dump(),
         "provider": "github",
@@ -188,6 +240,14 @@ def build_fetch_result(
 ) -> ReviewSnapshot:
     """Fetch, normalize, and fingerprint one GitHub review snapshot.
 
+    Args:
+        owner: GitHub repository owner.
+        repo: GitHub repository name.
+        pr: Pull-request number.
+        deadline: Absolute monotonic deadline for the complete snapshot.
+        gh_timeout: Caller-selected per-command timeout.
+        target: Pre-resolved canonical target, when the caller has one.
+
     Returns:
         The canonical provider snapshot with legacy compatibility fields.
     """
@@ -198,4 +258,4 @@ def build_fetch_result(
     resolved_target = target or ChangeRequestTarget(
         repository=RepositoryTarget(provider="github", hostname="github.com", full_name=f"{owner}/{repo}"), number=pr
     )
-    return _normalize_state(_collect_state(owner, repo, pr, timeout), resolved_target)
+    return normalize_state(collect_state(owner, repo, pr, timeout), resolved_target)

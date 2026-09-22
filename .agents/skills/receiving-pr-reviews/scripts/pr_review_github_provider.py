@@ -21,12 +21,16 @@ from pr_review_models import FetchResult, ReviewSnapshot
 from pr_review_provider import ProviderResponseError
 from pr_review_state_models import AuthorizedReviewAction, ReviewInput, SnapshotCompleteness
 
-SnapshotLoader = Callable[..., FetchResult]
+SnapshotLoader = Callable[..., FetchResult | ReviewSnapshot]
 CommandRunner = Callable[..., str]
 
 
 def reference_present(body: str, reference: str) -> bool:
     """Match a stable reference without accepting a longer numeric identifier.
+
+    Args:
+        body: Existing response body.
+        reference: Stable provider reference to find exactly.
 
     Returns:
         True when the exact reference is already present.
@@ -37,6 +41,10 @@ def reference_present(body: str, reference: str) -> bool:
 
 def render_top_level_body(body: str, references: list[str]) -> str:
     """Append each exact missing stable reference once.
+
+    Args:
+        body: Human-readable disposition and evidence.
+        references: Stable references that must appear exactly once.
 
     Returns:
         The response body containing all requested references.
@@ -50,6 +58,10 @@ def render_top_level_body(body: str, references: list[str]) -> str:
 
 def upgrade_legacy_snapshot(legacy: FetchResult, target: ChangeRequestTarget) -> ReviewSnapshot:
     """Upgrade an injected legacy fixture without fabricating review inputs.
+
+    Args:
+        legacy: Pre-seam compatibility snapshot used by a test double.
+        target: Canonical target supplied to the provider.
 
     Returns:
         A canonical wrapper used only by compatibility tests.
@@ -88,7 +100,13 @@ class GitHubProvider:
     """GitHub adapter satisfying the two-method review-provider interface."""
 
     def __init__(self, *, snapshot_loader: SnapshotLoader, command_runner: CommandRunner, resolve_query: str) -> None:
-        """Bind transport functions and the versioned GraphQL mutation."""
+        """Bind transport functions and the versioned GraphQL mutation.
+
+        Args:
+            snapshot_loader: Function that fetches a complete GitHub snapshot.
+            command_runner: Bounded GitHub command transport.
+            resolve_query: Versioned GraphQL review-thread mutation.
+        """
         self.snapshot_loader = snapshot_loader
         self.command_runner = command_runner
         self.resolve_query = resolve_query
@@ -96,6 +114,9 @@ class GitHubProvider:
     @staticmethod
     def owner_repo(target: ChangeRequestTarget) -> tuple[str, str]:
         """Validate a GitHub target.
+
+        Args:
+            target: Provider-neutral target expected to identify GitHub.
 
         Returns:
             The repository owner and name.
@@ -114,6 +135,11 @@ class GitHubProvider:
     ) -> ReviewSnapshot:
         """Fetch one complete GitHub CLI snapshot.
 
+        Args:
+            target: Canonical pull-request target.
+            deadline: Absolute monotonic deadline for the complete snapshot.
+            command_timeout: Caller bound for each GitHub command.
+
         Returns:
             The canonical snapshot.
         """
@@ -130,6 +156,11 @@ class GitHubProvider:
         self, target: ChangeRequestTarget, action: AuthorizedReviewAction, *, command_timeout: float | None
     ) -> ReviewActionResult:
         """Perform one authorized GitHub mutation.
+
+        Args:
+            target: Canonical pull-request target.
+            action: Mutation bound to complete current-cycle evidence.
+            command_timeout: Caller bound for the GitHub command.
 
         Returns:
             A normalized result after GitHub confirms success.
@@ -200,6 +231,10 @@ class GitHubProvider:
     def positive_provider_id(review_input: ReviewInput, name: str) -> int:
         """Read one positive integer identifier owned by the GitHub adapter.
 
+        Args:
+            review_input: Normalized input carrying provider-owned identifiers.
+            name: Identifier key required by the operation.
+
         Returns:
             The parsed identifier.
         """
@@ -218,6 +253,10 @@ class GitHubProvider:
     def validate_created_comment(raw: str, *, operation: str) -> GitHubCreatedComment:
         """Validate a created-comment response.
 
+        Args:
+            raw: Complete GitHub response body.
+            operation: Operation name used in validation errors.
+
         Returns:
             The validated comment.
         """
@@ -230,6 +269,9 @@ class GitHubProvider:
     @staticmethod
     def validate_resolve(raw: str) -> GitHubResolveResponse:
         """Validate a confirmed GraphQL resolution.
+
+        Args:
+            raw: Complete GitHub GraphQL response body.
 
         Returns:
             The validated response.

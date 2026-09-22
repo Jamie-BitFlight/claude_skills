@@ -46,7 +46,7 @@ def canonical_input(input_id: str = "github:review-comment:42") -> ReviewInput:
         path="src/widget.py",
         line=12,
         provider_state="open",
-        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, unavailable=[]),
+        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, can_comment=True, unavailable=[]),
         thread_id="T1",
         parent_id=None,
     )
@@ -130,6 +130,13 @@ def ready_cycle() -> ReviewCycleState:
         assessments=[assessment],
         clusters=[cluster],
         unknown_decisions={},
+        implementation_evidence=["Commit abc123 contains the systemic correction."],
+        verification_evidence=["pytest tests/test_widget.py passed at abc123."],
+        inspectable_revision="abc123",
+        recheck_snapshot_fingerprint=canonical_snapshot().snapshot_fingerprint,
+        communication_states={item.input_id: "pending"},
+        resolution_states={item.input_id: "open"},
+        cycle_terminal="action_pending",
         cycle_state="READY_FOR_ACTION",
     )
 

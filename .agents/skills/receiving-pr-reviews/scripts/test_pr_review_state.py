@@ -17,16 +17,19 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
 
-from pr_review_github_normalize import review_inputs
+from pr_review_github_normalize import actor, review_inputs
 from pr_review_models import (
     Author,
     ChangeRequestTarget,
     ReplyAction,
     RepositoryTarget,
+    ResolveAction,
     Reviewability,
     ReviewNode,
     ReviewSnapshot,
@@ -71,7 +74,7 @@ def review_input(input_id: str = "github:review-comment:42") -> ReviewInput:
         path="src/widget.py",
         line=12,
         provider_state="open",
-        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, unavailable=[]),
+        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, can_comment=True, unavailable=[]),
         thread_id="T1",
         parent_id=None,
     )
@@ -154,14 +157,46 @@ def ready_cycle() -> ReviewCycleState:
         assessments=[assessment],
         clusters=[cluster],
         unknown_decisions={},
+        implementation_evidence=["Commit abc123 contains the systemic correction."],
+        verification_evidence=["pytest tests/test_widget.py passed at abc123."],
+        inspectable_revision="abc123",
+        recheck_snapshot_fingerprint=snapshot().snapshot_fingerprint,
+        communication_states={review_input().input_id: "pending"},
+        resolution_states={review_input().input_id: "open"},
+        cycle_terminal="action_pending",
         cycle_state="READY_FOR_ACTION",
     )
+
+
+def state_for_input(item: ReviewInput, assessment: ReviewAssessment) -> tuple[ReviewSnapshot, ReviewCycleState]:
+    """Bind a customized input and assessment to current fingerprint evidence."""
+    original = snapshot()
+    fingerprint = calculate_snapshot_fingerprint(original.target, original.head_revision, [item], original.completeness)
+    snapshot_value = original.model_copy(update={"review_inputs": [item], "snapshot_fingerprint": fingerprint})
+    cycle_value = ready_cycle().model_copy(
+        update={
+            "snapshot_fingerprint": fingerprint,
+            "recheck_snapshot_fingerprint": fingerprint,
+            "assessments": [assessment],
+        }
+    )
+    return snapshot_value, cycle_value
 
 
 def test_shared_reply_action_does_not_require_github_comment_identifier() -> None:
     action = ReplyAction(body="Addressed systemically.")
 
     assert action.body == "Addressed systemically."
+
+
+def test_actor_classification_uses_provider_type_instead_of_login_guessing() -> None:
+    untyped = actor(Author(login="service-bot"), pull_author_login=None, observed_role=None)
+    typed = actor(
+        Author.model_validate({"login": "service", "__typename": "Bot"}), pull_author_login=None, observed_role=None
+    )
+
+    assert untyped.classification == "unknown"
+    assert typed.classification == "bot"
 
 
 def test_authorize_action_binds_complete_current_cycle() -> None:
@@ -180,6 +215,13 @@ def test_authorize_action_binds_complete_current_cycle() -> None:
         (snapshot(), ready_cycle().model_copy(update={"assessments": []}), "assessment census"),
         (snapshot(), ready_cycle().model_copy(update={"clusters": []}), "cluster membership"),
         (snapshot(), ready_cycle().model_copy(update={"unknown_decisions": {"unknown-1": ""}}), "unknown decision"),
+        (
+            snapshot(),
+            ready_cycle().model_copy(update={"input_census": [review_input().input_id, review_input().input_id]}),
+            "input census",
+        ),
+        (snapshot(), ready_cycle().model_copy(update={"implementation_evidence": []}), "implementation evidence"),
+        (snapshot(), ready_cycle().model_copy(update={"verification_evidence": []}), "verification evidence"),
     ],
 )
 def test_authorize_action_rejects_incomplete_cycle(
@@ -196,6 +238,107 @@ def test_numeric_superset_reference_does_not_count_as_exact_review_reference() -
     existing = "Addressed https://github.com/acme/widgets/pull/17#pullrequestreview-50"
 
     assert render_top_level_body(existing, [requested]) == f"{existing}\n\n{requested}"
+
+
+def test_snapshot_fingerprint_survives_json_round_trip() -> None:
+    original = snapshot()
+    restored = ReviewSnapshot.model_validate_json(original.model_dump_json())
+
+    assert restored.snapshot_fingerprint == calculate_snapshot_fingerprint(
+        restored.target, restored.head_revision, restored.review_inputs, restored.completeness
+    )
+
+
+def test_authorization_requires_explicit_decisions_for_unknown_provider_facts() -> None:
+    item = review_input().model_copy(
+        update={
+            "actor": ReviewActor(actor_id="reviewer", login="reviewer", classification="unknown", role="unknown"),
+            "revision_relation": "unknown",
+        }
+    )
+    assessment = ready_cycle().assessments[0].model_copy(update={"unknowns": []})
+    snapshot_value, cycle_value = state_for_input(item, assessment)
+
+    with pytest.raises(ReviewAuthorizationError, match="unknown provider fact"):
+        authorize_action(snapshot_value, cycle_value, item.input_id, ReplyAction(body="Done."))
+
+
+def test_authorization_requires_kind_assessment_to_match_approval_signal() -> None:
+    item = review_input().model_copy(update={"kinds": {"approval"}})
+    assessment = (
+        ready_cycle()
+        .assessments[0]
+        .model_copy(update={"semantic_kinds": {"approval"}, "kind_assessment": "not_applicable"})
+    )
+    snapshot_value, cycle_value = state_for_input(item, assessment)
+
+    with pytest.raises(ReviewAuthorizationError, match="approval/rejection semantics"):
+        authorize_action(snapshot_value, cycle_value, item.input_id, ReplyAction(body="Done."))
+
+
+def test_resolution_requires_capability_and_completed_communication() -> None:
+    item = review_input().model_copy(
+        update={
+            "capabilities": ReviewCapabilities(
+                can_reply=True, can_resolve=False, can_comment=True, unavailable=["resolve"]
+            )
+        }
+    )
+    snapshot_value, cycle_value = state_for_input(item, ready_cycle().assessments[0])
+    cycle_value = cycle_value.model_copy(update={"communication_states": {item.input_id: "completed"}})
+
+    with pytest.raises(ReviewAuthorizationError, match="does not support resolution"):
+        authorize_action(snapshot_value, cycle_value, item.input_id, ResolveAction())
+
+
+@pytest.mark.parametrize(("field", "value"), [("affected_scope", []), ("verification_surface", [])])
+def test_assessment_rejects_empty_required_evidence_surfaces(field: str, value: list[str]) -> None:
+    payload = ready_cycle().assessments[0].model_dump()
+    payload[field] = value
+
+    with pytest.raises(ValidationError):
+        ReviewAssessment.model_validate(payload)
+
+
+def test_cluster_rejects_empty_verification_commands() -> None:
+    payload = ready_cycle().clusters[0].model_dump()
+    payload["verification_commands"] = []
+
+    with pytest.raises(ValidationError):
+        ReviewCluster.model_validate(payload)
+
+
+def test_gitlab_snapshot_accepts_unavailable_codex_equivalence_without_github_projection() -> None:
+    original = snapshot()
+    payload = {
+        key: value
+        for key, value in json.loads(original.model_dump_json()).items()
+        if key
+        not in {
+            "reviews_count",
+            "reviews_with_body",
+            "unresponded_reviews",
+            "threads_count",
+            "unresolved",
+            "unresolved_count",
+            "reviewability",
+        }
+    }
+    payload.update({
+        "provider": "gitlab",
+        "target": {
+            "repository": {"provider": "gitlab", "hostname": "gitlab.example", "full_name": "acme/widgets"},
+            "number": 17,
+        },
+        "transport": "gitlab_cli",
+        "codex_approved": None,
+        "codex_approval_equivalence": "unavailable",
+    })
+
+    parsed = ReviewSnapshot.model_validate_json(json.dumps(payload))
+
+    assert parsed.codex_approved is None
+    assert parsed.reviewability is None
 
 
 def test_empty_body_approval_and_rejection_are_normalized_inputs() -> None:
@@ -220,7 +363,13 @@ def test_empty_body_approval_and_rejection_are_normalized_inputs() -> None:
         ),
     ]
 
-    normalized = review_inputs(reviews, own_login="agent", is_empty_codex=lambda _review: False)
+    normalized = review_inputs(
+        reviews,
+        own_login="agent",
+        pull_author_login="author",
+        head_revision="abc123",
+        is_empty_codex=lambda _review: False,
+    )
 
     assert normalized[0].kinds == {"approval"}
     assert normalized[1].kinds == {"rejection"}

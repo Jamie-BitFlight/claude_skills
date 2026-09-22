@@ -21,6 +21,14 @@ class Author(GitHubResponseModel):
     """GitHub account identity."""
 
     login: str
+    type: str | None = None
+    node_type: str | None = Field(default=None, alias="__typename")
+
+
+class CommitIdentity(GitHubResponseModel):
+    """GitHub commit identity attached to a review object."""
+
+    oid: str
 
 
 class RepoIdentity(GitHubResponseModel):
@@ -41,6 +49,7 @@ class CommentNode(GitHubResponseModel):
     createdAt: GitHubTimestamp | None = None
     updatedAt: GitHubTimestamp | None = None
     url: str | None = None
+    commit: CommitIdentity | None = None
 
 
 class PageInfo(GitHubResponseModel):
@@ -83,6 +92,7 @@ class ReviewNode(GitHubResponseModel):
     submittedAt: GitHubTimestamp | None
     lastEditedAt: GitHubTimestamp | None
     url: str
+    commit: CommitIdentity | None = None
 
 
 class ReviewsConnection(GitHubResponseModel):
@@ -138,6 +148,7 @@ class PullRequestHeadState(GitHubResponseModel):
     mergeable: str
     mergeStateStatus: str
     commits: HeadCommitsConnection
+    author: Author | None = None
 
 
 class ForcePushEvent(GitHubResponseModel):

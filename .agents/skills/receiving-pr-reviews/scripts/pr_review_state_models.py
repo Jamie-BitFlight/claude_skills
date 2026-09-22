@@ -7,9 +7,9 @@ import json
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
-from pr_review_contracts import ChangeRequestTarget, ProviderName, ReviewAction, ReviewTransport
+from pr_review_contracts import ChangeRequestTarget, NonBlankText, ProviderName, ReviewAction, ReviewTransport
 
 InputKind = Literal["comment", "question", "approval", "rejection"]
 CycleState = Literal[
@@ -44,6 +44,7 @@ class ReviewCapabilities(BaseModel):
 
     can_reply: bool
     can_resolve: bool
+    can_comment: bool
     unavailable: list[str]
 
 
@@ -72,6 +73,18 @@ class ReviewInput(BaseModel):
     thread_id: str | None
     parent_id: str | None
 
+    @field_serializer("kinds")
+    def serialize_kinds(self, value: set[InputKind]) -> list[InputKind]:
+        """Serialize semantic kinds deterministically.
+
+        Args:
+            value: Input kinds to serialize.
+
+        Returns:
+            Kinds sorted by their stable string value.
+        """
+        return sorted(value)
+
 
 class SnapshotCompleteness(BaseModel):
     """Auditable proof that every required surface used one transport."""
@@ -81,6 +94,18 @@ class SnapshotCompleteness(BaseModel):
     completed_surfaces: set[str]
     truncated_input_ids: list[str]
     unavailable_capabilities: list[str]
+
+    @field_serializer("required_surfaces", "completed_surfaces")
+    def serialize_surfaces(self, value: set[str]) -> list[str]:
+        """Serialize surface evidence deterministically.
+
+        Args:
+            value: Surface names to serialize.
+
+        Returns:
+            Surface names in stable lexical order.
+        """
+        return sorted(value)
 
     @property
     def complete(self) -> bool:
@@ -96,6 +121,12 @@ def calculate_snapshot_fingerprint(
     target: ChangeRequestTarget, revision: str, review_inputs: list[ReviewInput], completeness: SnapshotCompleteness
 ) -> str:
     """Hash canonical snapshot identity and completeness evidence.
+
+    Args:
+        target: Change request whose review state was sampled.
+        revision: Exact sampled remote revision.
+        review_inputs: Complete normalized provider input sequence.
+        completeness: Evidence for every required provider surface.
 
     Returns:
         A stable SHA-256 fingerprint.
@@ -115,28 +146,40 @@ class ReviewAssessment(BaseModel):
     input_id: str
     validity: Literal["valid", "invalid", "unknown"]
     relevance: Literal["relevant", "irrelevant", "unknown"]
-    evidence: list[str] = Field(min_length=1)
-    affected_scope: list[str]
-    verification_surface: list[str]
+    evidence: list[NonBlankText] = Field(min_length=1)
+    affected_scope: list[NonBlankText] = Field(min_length=1)
+    verification_surface: list[NonBlankText] = Field(min_length=1)
     disposition: Literal["accepted_change", "no_change", "clarification_required", "superseded"]
     kind_assessment: Literal["not_applicable", "approval_assessed", "rejection_assessed"]
     semantic_kinds: set[InputKind] = Field(min_length=1)
-    unknowns: list[str]
-    cluster_id: str
-    communication_plan: str = Field(min_length=1)
+    unknowns: list[NonBlankText]
+    cluster_id: NonBlankText
+    communication_plan: NonBlankText
+
+    @field_serializer("semantic_kinds")
+    def serialize_semantic_kinds(self, value: set[InputKind]) -> list[InputKind]:
+        """Serialize assessed kinds deterministically.
+
+        Args:
+            value: Assessed semantic kinds.
+
+        Returns:
+            Kinds sorted by their stable string value.
+        """
+        return sorted(value)
 
 
 class ReviewCluster(BaseModel):
     """One systemic plan covering related assessments or an explicit singleton."""
 
-    cluster_id: str
-    input_ids: list[str] = Field(min_length=1)
-    shared_basis: list[str] = Field(min_length=1)
+    cluster_id: NonBlankText
+    input_ids: list[NonBlankText] = Field(min_length=1)
+    shared_basis: list[NonBlankText] = Field(min_length=1)
     explicit_singleton: bool
-    systemic_outcome: str = Field(min_length=1)
-    evidence: list[str] = Field(min_length=1)
-    verification_commands: list[str]
-    communication_plan: str = Field(min_length=1)
+    systemic_outcome: NonBlankText
+    evidence: list[NonBlankText] = Field(min_length=1)
+    verification_commands: list[NonBlankText] = Field(min_length=1)
+    communication_plan: NonBlankText
     resolution_policy: Literal["resolve_after_reply", "leave_open", "unavailable"]
 
     @model_validator(mode="after")
@@ -174,7 +217,14 @@ class ReviewCycleState(BaseModel):
     input_census: list[str]
     assessments: list[ReviewAssessment]
     clusters: list[ReviewCluster]
-    unknown_decisions: dict[str, str]
+    unknown_decisions: dict[str, NonBlankText]
+    implementation_evidence: list[NonBlankText] = Field(min_length=1)
+    verification_evidence: list[NonBlankText] = Field(min_length=1)
+    inspectable_revision: NonBlankText
+    recheck_snapshot_fingerprint: NonBlankText
+    communication_states: dict[str, Literal["pending", "completed", "not_required"]]
+    resolution_states: dict[str, Literal["open", "resolved", "unavailable"]]
+    cycle_terminal: Literal["action_pending", "review_complete", "blocked"]
     cycle_state: CycleState
 
 
@@ -188,5 +238,8 @@ class AuthorizedReviewAction(BaseModel):
     cluster_id: str
     disposition: Literal["accepted_change", "no_change", "clarification_required", "superseded"]
     communication_plan: str
+    inspectable_revision: str
+    implementation_evidence: list[str]
+    verification_evidence: list[str]
     cycle_state: Literal["READY_FOR_ACTION"] = "READY_FOR_ACTION"
     action: ReviewAction

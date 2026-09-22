@@ -111,8 +111,8 @@ class FetchResult(BaseModel):
         return self.unresolved_count > 0 or bool(self.unresponded_reviews) or self.codex_approved
 
 
-class ReviewSnapshot(FetchResult):
-    """Canonical provider snapshot plus legacy GitHub projections."""
+class ReviewSnapshot(BaseModel):
+    """Canonical provider snapshot with optional legacy compatibility projections."""
 
     provider: ProviderName
     target: ChangeRequestTarget
@@ -127,6 +127,18 @@ class ReviewSnapshot(FetchResult):
     clusters: list[ReviewCluster]
     cycle_state: Literal["SNAPSHOT_INCOMPLETE", "ASSESSMENT_REQUIRED"]
     codex_approval_equivalence: Literal["available", "unavailable"]
+    reviews_count: int = 0
+    reviews_with_body: list[ReviewNode] = Field(default_factory=list)
+    unresponded_reviews: list[ReviewNode] = Field(default_factory=list)
+    threads_count: int = 0
+    unresolved: list[UnresolvedThread] = Field(default_factory=list)
+    unresolved_count: int = 0
+    codex_approved: bool | None = None
+    reviewability: Reviewability | None = None
+
+    def has_outstanding_work(self) -> bool:
+        """Return whether the sampled snapshot contains a watch stop signal."""
+        return self.unresolved_count > 0 or bool(self.unresponded_reviews) or self.codex_approved is True
 
 
 class WatchResult(BaseModel):
@@ -189,7 +201,7 @@ class FetchSummary(BaseModel):
     threads_count: int
     unresolved_count: int
     unresponded_count: int
-    codex_approved: bool
+    codex_approved: bool | None
     blockers: list[str]
     unresolved: list[ThreadSummary]
     unresponded_reviews: list[ReviewSummary]
@@ -209,7 +221,7 @@ class BoardEntry(BaseModel):
     pr: int
     unresolved: int
     unresponded: int
-    codex_approved: bool
+    codex_approved: bool | None
     mergeable: str
     merge_state_status: str
     blockers: list[str]

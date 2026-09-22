@@ -97,7 +97,7 @@ def authorized(action: ReplyAction | ResolveAction | TopLevelCommentAction) -> A
         path="x.py",
         line=1,
         provider_state="open",
-        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, unavailable=[]),
+        capabilities=ReviewCapabilities(can_reply=True, can_resolve=True, can_comment=True, unavailable=[]),
         thread_id="T1",
         parent_id=None,
     )
@@ -109,6 +109,9 @@ def authorized(action: ReplyAction | ResolveAction | TopLevelCommentAction) -> A
         cluster_id="cluster-1",
         disposition="accepted_change",
         communication_plan="reply",
+        inspectable_revision="abc123",
+        implementation_evidence=["Commit abc123 contains the correction."],
+        verification_evidence=["pytest passed at abc123."],
         action=action,
     )
 

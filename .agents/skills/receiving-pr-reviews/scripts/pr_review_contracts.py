@@ -13,6 +13,9 @@ ReviewTransport = Literal["github_cli", "github_mcp", "gitlab_cli"]
 def validate_non_blank(value: str) -> str:
     """Validate shared action text once.
 
+    Args:
+        value: Candidate user-authored action text.
+
     Returns:
         The original non-blank value.
     """
@@ -38,6 +41,9 @@ class RepositoryTarget(BaseModel):
     @classmethod
     def validate_full_name(cls, value: str) -> str:
         """Require unambiguous namespace and repository segments.
+
+        Args:
+            value: Candidate provider repository full name.
 
         Returns:
             The validated repository full name.
@@ -87,6 +93,9 @@ class TopLevelCommentAction(BaseModel):
     @classmethod
     def validate_references(cls, value: list[str]) -> list[str]:
         """Reject empty or duplicate references before provider mutation.
+
+        Args:
+            value: Stable provider references requested in a response.
 
         Returns:
             The validated stable references.

@@ -236,10 +236,6 @@ def test_fetch_summary_max_body_truncates_and_marks_it_visibly(mocker: MockerFix
     assert body == "0123...[truncated, showing 4/10 chars]"
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
-
-
 def test_fetch_summary_max_body_leaves_short_bodies_untouched(mocker: MockerFixture) -> None:
     """A body at or under `--max-body` is printed unchanged, with no truncation marker."""
     state = _fetch_result(unresolved=[_thread_with_comment(body="short")])
@@ -288,3 +284,7 @@ def test_watch_summary_honors_max_body(mocker: MockerFixture) -> None:
     assert result.exit_code == 0, result.output
     body = json.loads(result.output)["unresolved"][0]["body"]
     assert body == "0123...[truncated, showing 4/10 chars]"
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

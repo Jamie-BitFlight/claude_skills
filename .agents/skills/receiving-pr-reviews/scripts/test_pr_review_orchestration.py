@@ -63,9 +63,36 @@ def test_raw_reply_without_cycle_evidence_is_rejected_before_provider_call(mocke
     run_mock.assert_not_called()
 
 
+def test_validate_cycle_checks_complete_evidence_without_provider_mutation(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    run_mock = mocker.patch.object(pr_review_threads, "run_gh")
+
+    result = runner.invoke(
+        app, ["validate-cycle", "--snapshot-file", str(snapshot_file), "--state-file", str(state_file)]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == {
+        "snapshot_fingerprint": canonical_snapshot().snapshot_fingerprint,
+        "inputs": 1,
+        "assessments": 1,
+        "clusters": 1,
+        "cycle_state": "READY_FOR_ACTION",
+        "cycle_terminal": "action_pending",
+    }
+    run_mock.assert_not_called()
+
+
 @pytest.mark.parametrize("command", ["reply", "resolve"], ids=["reply", "resolve"])
 def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, mocker: MockerFixture) -> None:
     snapshot_file, state_file = write_ready_files(tmp_path)
+    if command == "resolve":
+        completed_cycle = ready_cycle().model_copy(
+            update={"communication_states": {canonical_input().input_id: "completed"}}
+        )
+        state_file.write_text(completed_cycle.model_dump_json())
     response = json.dumps({"id": 1}) if command == "reply" else resolved_response()
     run_mock = mocker.patch.object(pr_review_threads, "run_gh", return_value=response)
     argv = [command, "--pr", "17", *gated_args(snapshot_file, state_file), "--gh-timeout-seconds", "7"]
@@ -76,6 +103,11 @@ def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, m
 
     assert result.exit_code == 0, result.output
     assert run_mock.call_args.kwargs["timeout"] == pytest.approx(7)
+    persisted = pr_review_threads.load_cycle(state_file)
+    if command == "reply":
+        assert persisted.communication_states[canonical_input().input_id] == "completed"
+    else:
+        assert persisted.resolution_states[canonical_input().input_id] == "resolved"
 
 
 def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -88,6 +120,7 @@ def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, 
 
     assert result.exit_code != 0
     assert run_mock.call_count == 1
+    assert pr_review_threads.load_cycle(state_file).communication_states[canonical_input().input_id] == "pending"
 
 
 def test_reply_and_resolve_rejects_graphql_errors(tmp_path: Path, mocker: MockerFixture) -> None:
@@ -104,10 +137,9 @@ def test_reply_and_resolve_rejects_graphql_errors(tmp_path: Path, mocker: Mocker
 
     assert result.exit_code != 0
     assert run_mock.call_count == 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
+    persisted = pr_review_threads.load_cycle(state_file)
+    assert persisted.communication_states[canonical_input().input_id] == "completed"
+    assert persisted.resolution_states[canonical_input().input_id] == "open"
 
 
 @pytest.mark.parametrize(
@@ -186,6 +218,9 @@ def write_two_input_cycle(directory: Path) -> tuple[Path, Path]:
             "input_census": [first.input_id, second.input_id],
             "assessments": [first_assessment, second_assessment],
             "clusters": [first_cluster, second_cluster],
+            "recheck_snapshot_fingerprint": fingerprint,
+            "communication_states": {first.input_id: "pending", second.input_id: "pending"},
+            "resolution_states": {first.input_id: "open", second.input_id: "open"},
         }
     )
     snapshot_path = directory / "snapshot-two.json"
@@ -229,3 +264,7 @@ def test_batch_stops_after_first_failed_action(tmp_path: Path, mocker: MockerFix
 
     assert result.exit_code != 0
     assert run_mock.call_count == 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))

@@ -40,8 +40,8 @@ if TYPE_CHECKING:
 # --- fetch: full JSON-in/JSON-out pipeline -----------------------------------------------------
 
 
-def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: MockerFixture) -> None:
-    """`fetch` flattens multi-page thread results, dropping resolved threads and counting right,
+def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(mocker: MockerFixture) -> None:
+    """`fetch` keeps resolved history in the census while projecting only unresolved threads,
     and derives `unresponded_reviews` and `codex_approved` from the issue-comments, reactions,
     authenticated-identity, and head-commit-date calls in the same pipeline.
 
@@ -75,8 +75,8 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
                     "isResolved": True,
                     "path": "b.py",
                     "comments": {
-                        "totalCount": 1,
-                        "pageInfo": {"hasNextPage": False},
+                        "totalCount": 101,
+                        "pageInfo": {"hasNextPage": True},
                         "nodes": [
                             {
                                 "databaseId": 2,
@@ -99,8 +99,8 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
                     "isResolved": False,
                     "path": "c.py",
                     "comments": {
-                        "totalCount": 101,
-                        "pageInfo": {"hasNextPage": True},
+                        "totalCount": 1,
+                        "pageInfo": {"hasNextPage": False},
                         # A comment left by a since-deleted account — `author` is null.
                         "nodes": [
                             {"databaseId": 3, "body": "flagged", "line": None, "originalLine": 10, "author": None}
@@ -183,7 +183,7 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
     unresolved_ids = {thread["id"] for thread in data["unresolved"]}
     assert unresolved_ids == {"T1", "T3"}
     truncated_by_id = {thread["id"]: thread["comments_truncated"] for thread in data["unresolved"]}
-    assert truncated_by_id == {"T1": False, "T3": True}
+    assert truncated_by_id == {"T1": False, "T3": False}
     assert data["reviews_count"] == 2
     assert len(data["reviews_with_body"]) == 1
     assert data["reviews_with_body"][0]["author"]["login"] == "codex"
@@ -200,8 +200,10 @@ def test_fetch_flattens_pages_filters_resolved_and_derives_new_fields(mocker: Mo
     }
     assert data["snapshot_complete"] is False
     assert data["cycle_state"] == "SNAPSHOT_INCOMPLETE"
-    assert data["completeness"]["truncated_input_ids"] == ["github:review-comment:3"]
+    assert data["completeness"]["truncated_input_ids"] == ["github:review-comment:2"]
     normalized = {item["input_id"]: item for item in data["review_inputs"]}
+    assert normalized["github:review-comment:2"]["provider_state"] == "resolved"
+    assert normalized["github:review-comment:2"]["capabilities"]["can_resolve"] is False
     assert set(normalized["github:review:R2"]["kinds"]) == {"approval"}
     assert normalized["github:review:R2"]["body"] == ""
     assert set(normalized["github:review:R1"]["kinds"]) == {"comment"}

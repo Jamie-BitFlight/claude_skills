@@ -20,6 +20,10 @@ from pr_review_models import (
 def truncate_body(body: str, max_body: int | None) -> str:
     """Apply caller-controlled visible truncation.
 
+    Args:
+        body: Complete provider body.
+        max_body: Caller-selected character bound, or no truncation.
+
     Returns:
         Full or visibly truncated body text.
     """
@@ -30,6 +34,10 @@ def truncate_body(body: str, max_body: int | None) -> str:
 
 def summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> ThreadSummary:
     """Reduce one legacy unresolved thread without dropping replies.
+
+    Args:
+        thread: Complete unresolved-thread compatibility projection.
+        max_body: Caller-selected character bound, or no truncation.
 
     Returns:
         The compatibility summary.
@@ -65,6 +73,10 @@ def summarize_thread(thread: UnresolvedThread, *, max_body: int | None) -> Threa
 def summarize_review(review: ReviewNode, *, max_body: int | None) -> ReviewSummary:
     """Reduce one unresponded top-level review.
 
+    Args:
+        review: Submitted review requiring a response.
+        max_body: Caller-selected character bound, or no truncation.
+
     Returns:
         The compatibility summary.
     """
@@ -78,6 +90,11 @@ def summarize_review(review: ReviewNode, *, max_body: int | None) -> ReviewSumma
 
 def summarize(result: ReviewSnapshot, *, pr: int, max_body: int | None) -> FetchSummary:
     """Build canonical compact output plus legacy action fields.
+
+    Args:
+        result: Complete canonical snapshot.
+        pr: Pull-request number included in compact output.
+        max_body: Caller-selected character bound, or no truncation.
 
     Returns:
         The complete compact snapshot.
@@ -102,24 +119,32 @@ def summarize(result: ReviewSnapshot, *, pr: int, max_body: int | None) -> Fetch
         unresolved_count=result.unresolved_count,
         unresponded_count=len(result.unresponded_reviews),
         codex_approved=result.codex_approved,
-        blockers=result.reviewability.blockers,
+        blockers=result.reviewability.blockers if result.reviewability is not None else [],
         unresolved=[summarize_thread(thread, max_body=max_body) for thread in result.unresolved],
         unresponded_reviews=[summarize_review(review, max_body=max_body) for review in result.unresponded_reviews],
     )
 
 
-def board_entry(pr: int, result: FetchResult) -> BoardEntry:
+def board_entry(pr: int, result: FetchResult | ReviewSnapshot) -> BoardEntry:
     """Build one lightweight multi-PR compatibility entry.
+
+    Args:
+        pr: Pull-request number included in the board entry.
+        result: GitHub compatibility snapshot.
 
     Returns:
         The compact board entry.
     """
+    reviewability = result.reviewability
+    if reviewability is None:
+        message = "board output requires provider reviewability compatibility data"
+        raise ValueError(message)
     return BoardEntry(
         pr=pr,
         unresolved=result.unresolved_count,
         unresponded=len(result.unresponded_reviews),
         codex_approved=result.codex_approved,
-        mergeable=result.reviewability.mergeable,
-        merge_state_status=result.reviewability.merge_state_status,
-        blockers=result.reviewability.blockers,
+        mergeable=reviewability.mergeable,
+        merge_state_status=reviewability.merge_state_status,
+        blockers=reviewability.blockers,
     )

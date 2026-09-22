@@ -176,10 +176,6 @@ def test_watch_fails_loudly_on_a_validation_error_at_the_deadline(mocker: Mocker
         json.loads(result.output)
 
 
-if __name__ == "__main__":
-    raise SystemExit(pytest.main([__file__]))
-
-
 def test_watch_fails_loudly_when_every_poll_fails(mocker: MockerFixture) -> None:
     """`watch` exits non-zero, printing nothing to stdout, when every re-poll attempted this
     window fails.
@@ -290,13 +286,28 @@ def test_watch_first_fetch_is_not_deadline_bounded(mocker: MockerFixture) -> Non
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["timed_out"] is True
-    assert fetch_mock.call_args.kwargs["gh_timeout"] is None
+    assert fetch_mock.call_args.kwargs["gh_timeout"] == pytest.approx(30)
     assert fetch_mock.call_args.kwargs["target"].number == 3208
+    state = json.loads(result.output)["state"]
+    assert state["provider"] == "github"
+    assert state["target"]["number"] == 3208
+    assert state["transport"] == "github_cli"
+    assert state["snapshot_complete"] is True
+
+
+def test_watch_first_snapshot_uses_tighter_caller_command_timeout(mocker: MockerFixture) -> None:
+    """The first snapshot honors a caller timeout smaller than the watch deadline."""
+    fetch_mock = mocker.patch.object(pr_review_threads, "build_fetch_result", return_value=_state(unresolved_count=1))
+
+    result = runner.invoke(app, ["watch", "--pr", "3208", "--timeout-seconds", "270", "--gh-timeout-seconds", "5"])
+
+    assert result.exit_code == 0, result.output
+    assert fetch_mock.call_args.kwargs["gh_timeout"] == pytest.approx(5)
 
 
 def test_gh_timeout_budget_without_a_deadline_uses_the_callers_bound() -> None:
     """No deadline means the caller's `--gh-timeout-seconds` applies unchanged, `None` included."""
-    assert pr_review_gh.gh_timeout_budget(None, None) is None
+    assert pr_review_gh.gh_timeout_budget(None, None) == pytest.approx(30)
     assert pr_review_gh.gh_timeout_budget(None, 12.5) == pytest.approx(12.5)
 
 
@@ -336,3 +347,7 @@ def test_watch_fails_loudly_when_only_final_poll_fails(mocker: MockerFixture) ->
     assert "the last of 2 poll(s) this window failed" in result.output
     with pytest.raises(json.JSONDecodeError):
         json.loads(result.output)
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__]))
