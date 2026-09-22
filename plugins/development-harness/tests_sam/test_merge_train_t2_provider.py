@@ -202,7 +202,11 @@ def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path:
     connection = store.open_ledger(tmp_path / "dh.db")
     evidence = MergeEvidenceStore(connection)
     runner = GateRunner(evidence, workdir=tmp_path, timeout_seconds=0.5)
-    child = "import os,time; print(os.getpid(),flush=True); os.close(1); os.close(2); time.sleep(60)"
+    sentinel = tmp_path / "child-survived"
+    child = (
+        "import os,time; from pathlib import Path; print(os.getpid(),flush=True); "
+        f"os.close(1); os.close(2); time.sleep(1); Path({str(sentinel)!r}).write_text('alive'); time.sleep(60)"
+    )
     parent = (
         "import os,subprocess,sys,time; print(os.getpid(),flush=True); "
         f"subprocess.Popen([sys.executable,'-c',{child!r}]); "
@@ -219,7 +223,8 @@ def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path:
     pids = [int(value) for value in base64.b64decode(record["stdout_base64"]).splitlines()]
     assert record["timed_out"] is True
     assert b"before-timeout" in base64.b64decode(record["stderr_base64"])
-    time.sleep(0.1)
+    time.sleep(1.3)
+    assert not sentinel.exists()
     for pid in pids:
         if sys.platform == "win32":
             tasklist = subprocess.run(
