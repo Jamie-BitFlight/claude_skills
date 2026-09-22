@@ -151,12 +151,23 @@ def fetch_thread_pages(
             if thread.comments.pageInfo.hasNextPage:
                 comment_pages = fetch_thread_comment_pages(runner, thread.id, timeout=timeout)
                 comment_nodes = [comment for comment_page in comment_pages for comment in comment_page.nodes]
-                if comment_pages[-1].pageInfo.hasNextPage or len(comment_nodes) != comment_pages[0].totalCount:
+                authoritative_total = thread.comments.totalCount
+                page_totals_agree = all(page.totalCount == authoritative_total for page in comment_pages)
+                page_sequence_complete = all(page.pageInfo.hasNextPage for page in comment_pages[:-1]) and not (
+                    comment_pages[-1].pageInfo.hasNextPage
+                )
+                unique_comment_count = len({comment.databaseId for comment in comment_nodes})
+                if (
+                    not page_totals_agree
+                    or not page_sequence_complete
+                    or len(comment_nodes) != authoritative_total
+                    or unique_comment_count != authoritative_total
+                ):
                     message = f"GitHub nested comment pagination for thread {thread.id!r} was incomplete"
                     raise ValueError(message)
                 comments = thread.comments.model_copy(
                     update={
-                        "totalCount": comment_pages[0].totalCount,
+                        "totalCount": authoritative_total,
                         "nodes": comment_nodes,
                         "pageInfo": comment_pages[-1].pageInfo,
                     }

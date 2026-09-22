@@ -409,6 +409,9 @@ def test_gitlab_snapshot_accepts_unavailable_codex_equivalence_without_github_pr
         "codex_approved": None,
         "codex_approval_equivalence": "unavailable",
     })
+    payload["completeness"]["transport"] = "gitlab_cli"
+    payload["review_inputs"][0]["provider"] = "gitlab"
+    payload["review_inputs"][0]["input_id"] = "gitlab:note:42"
 
     parsed = ReviewSnapshot.model_validate_json(json.dumps(payload))
 

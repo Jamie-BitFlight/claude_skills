@@ -65,6 +65,7 @@ def validate_snapshot_context(snapshot: ReviewSnapshot, cycle: ReviewCycleState)
         snapshot: Current complete provider snapshot.
         cycle: Serialized assessment and implementation evidence.
     """
+    require_authorization(snapshot.provider_consistency_error() is None, snapshot.provider_consistency_error() or "")
     require_authorization(snapshot.snapshot_complete and snapshot.completeness.complete, "snapshot is incomplete")
     require_authorization(cycle.cycle_state == "READY_FOR_ACTION", "cycle state must be READY_FOR_ACTION")
     require_authorization(cycle.cycle_terminal == "action_pending", "cycle terminal must be action_pending")

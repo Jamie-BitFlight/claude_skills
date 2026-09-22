@@ -21,6 +21,7 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
+from pr_review_cli_actions import authorize_reply_and_resolve, authorized_action
 from pr_review_contracts import (
     BatchReviewActions,
     ChangeRequestTarget,
@@ -31,11 +32,10 @@ from pr_review_contracts import (
 )
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_github_provider import GitHubProvider
-from pr_review_models import ReviewSnapshot, WatchResult, WatchSummary
+from pr_review_models import WatchResult, WatchSummary
 from pr_review_output import board_entry, summarize
 from pr_review_provider import ProviderResponseError, ReviewProvider
 from pr_review_state import (
-    authorize_action,
     load_cycle,
     load_snapshot,
     record_completed_communication,
@@ -44,7 +44,7 @@ from pr_review_state import (
     validate_cycle_coverage,
     validate_snapshot_context,
 )
-from pr_review_state_models import AuthorizedReviewAction, ReviewCycleState
+from pr_review_state_models import AuthorizedReviewAction
 from pr_review_subprocess import DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 app = typer.Typer(help="Review-state operations through a validated provider interface.")
@@ -131,52 +131,6 @@ def review_provider() -> ReviewProvider:
     return GitHubProvider(
         snapshot_loader=build_fetch_result, command_runner=run_gh, resolve_query=RESOLVE_THREAD_MUTATION
     )
-
-
-def authorized_action(
-    target: ChangeRequestTarget,
-    snapshot_file: Path,
-    state_file: Path,
-    input_id: str,
-    action: ReplyAction | ResolveAction | TopLevelCommentAction,
-) -> tuple[AuthorizedReviewAction, ReviewCycleState]:
-    """Load and validate one current pre-action gate.
-
-    Args:
-        target: Canonical command target.
-        snapshot_file: Complete canonical snapshot JSON.
-        state_file: Complete review-cycle JSON.
-        input_id: Canonical inbound input selected for mutation.
-        action: Provider-neutral mutation to authorize.
-
-    Returns:
-        The action bound to validated evidence and the loaded cycle to update after success.
-    """
-    snapshot = load_snapshot(snapshot_file)
-    cycle = load_cycle(state_file)
-    if snapshot.target != target:
-        raise ProviderResponseError("snapshot target does not match command target")
-    return authorize_action(snapshot, cycle, input_id, action), cycle
-
-
-def authorize_reply_and_resolve(
-    snapshot: ReviewSnapshot, cycle: ReviewCycleState, input_id: str, body: str
-) -> tuple[AuthorizedReviewAction, AuthorizedReviewAction, ReviewCycleState]:
-    """Preflight both halves of a combined mutation without provider calls.
-
-    Args:
-        snapshot: Current complete provider snapshot.
-        cycle: Current complete review cycle.
-        input_id: Canonical inline input selected for both actions.
-        body: Evidence-bearing reply body.
-
-    Returns:
-        Authorized reply, authorized resolution, and simulated completed state.
-    """
-    reply_action = authorize_action(snapshot, cycle, input_id, ReplyAction(body=body))
-    simulated = record_completed_communication(cycle, input_id)
-    resolve_action = authorize_action(snapshot, simulated, input_id, ResolveAction())
-    return reply_action, resolve_action, record_completed_resolution(simulated, input_id)
 
 
 def parse_pr_list(value: str) -> list[int]:

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 import pr_review_gh
+from pr_review_github_transport import fetch_thread_pages
 from pr_review_threads import app
 from review_test_gh_fixtures import (
     _AGENT_LOGIN,
@@ -75,7 +76,7 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
                     "isResolved": True,
                     "path": "b.py",
                     "comments": {
-                        "totalCount": 101,
+                        "totalCount": 2,
                         "pageInfo": {"hasNextPage": True},
                         "nodes": [
                             {
@@ -250,6 +251,85 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
     assert normalized["github:review:R2"]["body"] == ""
     assert set(normalized["github:review:R1"]["kinds"]) == {"comment"}
     assert set(normalized["github:reaction:1767398400-0"]["kinds"]) == {"approval"}
+
+
+@pytest.mark.parametrize(
+    ("outer_total", "page_totals", "database_ids"), [(101, [2, 2], [2, 22]), (2, [2, 3], [2, 22]), (2, [2, 2], [2, 2])]
+)
+def test_nested_comment_census_rejects_conflicting_or_duplicate_evidence(
+    outer_total: int, page_totals: list[int], database_ids: list[int]
+) -> None:
+    """A nested refetch cannot replace or overstate the outer authoritative census."""
+    outer = [
+        _thread_page(
+            total_count=1,
+            has_next_page=False,
+            nodes=[
+                {
+                    "id": "T2",
+                    "isResolved": True,
+                    "path": "b.py",
+                    "comments": {
+                        "totalCount": outer_total,
+                        "pageInfo": {"hasNextPage": True},
+                        "nodes": [
+                            {
+                                "databaseId": database_ids[0],
+                                "body": "first",
+                                "line": 1,
+                                "originalLine": 1,
+                                "author": {"login": "codex"},
+                            }
+                        ],
+                    },
+                }
+            ],
+        )
+    ]
+    nested = [
+        {
+            "data": {
+                "node": {
+                    "comments": {
+                        "totalCount": page_totals[0],
+                        "pageInfo": {"hasNextPage": True, "endCursor": "c1"},
+                        "nodes": [
+                            {
+                                "databaseId": database_ids[0],
+                                "body": "first",
+                                "line": 1,
+                                "originalLine": 1,
+                                "author": {"login": "codex"},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+        {
+            "data": {
+                "node": {
+                    "comments": {
+                        "totalCount": page_totals[1],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "databaseId": database_ids[1],
+                                "body": "second",
+                                "line": 1,
+                                "originalLine": 1,
+                                "author": {"login": "reviewer"},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    ]
+    responses = iter([json.dumps(outer), json.dumps(nested)])
+
+    with pytest.raises(ValueError, match=r"nested comment pagination.*incomplete"):
+        fetch_thread_pages(lambda _args, timeout=None: next(responses), "acme", "widgets", 17, timeout=30)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from pr_review_contracts import (
     BatchReviewAction,
@@ -135,6 +135,31 @@ class ReviewSnapshot(BaseModel):
     unresolved_count: int = 0
     codex_approved: bool | None = None
     reviewability: Reviewability | None = None
+
+    def provider_consistency_error(self) -> str | None:
+        """Return the first cross-provider boundary violation, if any."""
+        if self.provider != self.target.repository.provider:
+            return "snapshot provider does not match target provider"
+        if self.transport != self.completeness.transport:
+            return "snapshot transport does not match completeness transport"
+        if not self.transport.startswith(f"{self.provider}_"):
+            return "snapshot transport does not belong to snapshot provider"
+        if any(item.provider != self.provider for item in self.review_inputs):
+            return "review input provider does not match snapshot provider"
+        if any(not item.input_id.startswith(f"{self.provider}:") for item in self.review_inputs):
+            return "canonical input id is outside the snapshot provider namespace"
+        return None
+
+    @model_validator(mode="after")
+    def validate_provider_consistency(self) -> ReviewSnapshot:
+        """Reject snapshots assembled from mixed provider evidence.
+
+        Returns:
+            This snapshot after its provider boundary is validated.
+        """
+        if message := self.provider_consistency_error():
+            raise ValueError(message)
+        return self
 
     def has_outstanding_work(self) -> bool:
         """Return whether the sampled snapshot contains a watch stop signal."""
