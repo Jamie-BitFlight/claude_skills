@@ -31,6 +31,15 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from dh_core import ledger_spec as spec
 from dh_core.ledger import port, store, transitions
+from dh_core.merge_train import (
+    DispatchMember,
+    DispatchPlanDefinition,
+    DispatchReserved,
+    HostAuthority,
+    MergeTrain,
+    RegisterTrain,
+    SupersedeTrain,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import sqlite3
@@ -331,11 +340,59 @@ def from_milestone(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint =
     return plan
 
 
+def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint = nothing) -> str:
+    """Register, reserve, release, supersede, and replace one train generation."""
+    del tmp_path
+    plan = str(
+        transitions.create(
+            conn,
+            slug="registered",
+            goal="exercise merge folds",
+            plan_id="Ptrain",
+            tasks=[{"id": "T1", "title": "maker", "github_issue": 41, "conflict_group": "source"}],
+        ).plan
+    )
+    definition = DispatchPlanDefinition(
+        logical_id="dispatch-41",
+        revision="one",
+        milestone=41,
+        plan=plan,
+        integration_branch="integration/41",
+        baseline_sha="1" * 40,
+        quality_gates=("uv run pytest",),
+        members=(DispatchMember(issue=41, task="T1", role="maker", conflict_group="source"),),
+    )
+    service = MergeTrain(conn, HostAuthority(authority_host_id="fold-host"))
+    registered = service.register(RegisterTrain(definition=definition))
+    check()
+    service.dispatch(DispatchReserved(plan=plan, generation=1, task="T1"))
+    check()
+    transitions.state(conn, plan, "T1", new_status=spec.Status.BLOCKED.value, reason="fold", force=True)
+    check()
+    replacement = definition.model_copy(update={"revision": "two"})
+    service.supersede(
+        SupersedeTrain(
+            plan=plan,
+            generation=1,
+            current_dispatch_plan_revision="one",
+            current_dispatch_plan_digest=registered.dispatch_plan_digest,
+            replacement=replacement,
+            replacement_checker_evidence_digest="sha256:" + "2" * 64,
+            reason="fold replacement",
+        )
+    )
+    check()
+    service.register(RegisterTrain(definition=replacement))
+    check()
+    return plan
+
+
 SCENARIOS: dict[str, Scenario] = {
     "journey": journey,
     "forced-state": forced,
     "import-replace": imported,
     "from-milestone-replace": from_milestone,
+    "registered-train": registered_train,
 }
 """Each scenario builds one plan and returns its id; every one must fold to itself throughout."""
 

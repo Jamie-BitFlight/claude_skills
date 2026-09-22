@@ -418,7 +418,7 @@ def write_previous_version(database: Path, *, version: int) -> None:
     """
     connection = sqlite3.connect(database)
     try:
-        for table in store.TABLES:
+        for table in LEGACY_ABSENT:
             connection.execute(legacy_table_ddl(table))
         connection.execute(f"ALTER TABLE plans ADD COLUMN {LEGACY_ONLY_COLUMN} TEXT")
         connection.execute(store.EVENTS_DDL)

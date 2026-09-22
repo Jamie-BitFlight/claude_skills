@@ -64,6 +64,7 @@ from typing import Any
 
 import pytest
 from dh_core import ledger, ledger_spec as spec
+from dh_core.merge_train import DispatchMember, DispatchPlanDefinition, HostAuthority, MergeTrain, RegisterTrain
 from pydantic import BaseModel, ConfigDict
 
 # ---------------------------------------------------------------------------
@@ -480,6 +481,66 @@ def dispatch_leased_and_unready(tmp_path: Path) -> Arranged:
     plan = plan_with(conn, ONE_TASK)
     dispatch_task(conn, plan)
     return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+def register_dispatch_train(conn: sqlite3.Connection, plan: str, members: tuple[DispatchMember, ...]) -> None:
+    """Register a minimal checked definition for dispatch ordering tests."""
+    MergeTrain(conn, HostAuthority(authority_host_id="order-host")).register(
+        RegisterTrain(
+            definition=DispatchPlanDefinition(
+                logical_id="order-plan",
+                revision="one",
+                milestone=7,
+                plan=plan,
+                integration_branch="integration/order",
+                baseline_sha="1" * 40,
+                quality_gates=(),
+                members=members,
+            )
+        )
+    )
+
+
+@register("dispatch", NOT_STARTED, ("merge-dispatch-required", "archived"))
+def dispatch_registered_and_archived(tmp_path: Path) -> Arranged:
+    """Dispatch a registered member after its plan was archived."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, [{"id": "T1", "title": "first", "github_issue": 1}])
+    register_dispatch_train(conn, plan, (DispatchMember(issue=1, task="T1", role="maker"),))
+    ledger.archive(conn, plan, reason="closed")
+    return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+@register("dispatch", IN_PROGRESS, ("merge-dispatch-required", "leased"))
+def dispatch_registered_and_leased(tmp_path: Path) -> Arranged:
+    """Dispatch a member that was registered after its legacy attempt opened."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(conn, [{"id": "T1", "title": "first", "github_issue": 1}])
+    dispatch_task(conn, plan)
+    register_dispatch_train(conn, plan, (DispatchMember(issue=1, task="T1", role="maker"),))
+    return Arranged(conn=conn, plan=plan, task="T1", run=lambda: ledger.dispatch(conn, plan, "T1", ttl_seconds=TTL))
+
+
+@register("dispatch", NOT_STARTED, ("merge-dispatch-required", "not-ready"))
+def dispatch_registered_and_not_ready(tmp_path: Path) -> Arranged:
+    """Dispatch a registered dependent before its predecessor completes."""
+    conn = new_ledger(tmp_path)
+    plan = plan_with(
+        conn,
+        [
+            {"id": "T1", "title": "first", "github_issue": 1},
+            {"id": "T2", "title": "second", "github_issue": 2, "dependencies": ["T1"]},
+        ],
+    )
+    register_dispatch_train(
+        conn,
+        plan,
+        (
+            DispatchMember(issue=1, task="T1", role="maker"),
+            DispatchMember(issue=2, task="T2", role="checker", dependencies=("T1",)),
+        ),
+    )
+    return Arranged(conn=conn, plan=plan, task="T2", run=lambda: ledger.dispatch(conn, plan, "T2", ttl_seconds=TTL))
 
 
 # ---------------------------------------------------------------------------
