@@ -147,6 +147,8 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "merge_trains": ("plan", "generation"),
     "merge_dispatches": ("plan", "generation", "task", "attempt"),
     "merge_reservations": ("plan", "generation", "conflict_group", "task", "attempt"),
+    "merge_candidates": ("plan", "generation", "task", "candidate_number"),
+    "merge_claims": ("plan", "claim_number"),
 }
 """The identity of a row in each materialised table.
 
@@ -162,6 +164,8 @@ INDEXES: dict[str, tuple[tuple[str, ...], ...]] = {
     "merge_trains": (("plan", "superseded_seq"),),
     "merge_dispatches": (("plan", "generation", "task"),),
     "merge_reservations": (("plan", "generation", "active"),),
+    "merge_candidates": (("plan", "generation", "task"),),
+    "merge_claims": (("plan", "active"),),
 }
 """Non-unique indexes over the columns the package's own queries filter on."""
 
@@ -572,6 +576,11 @@ def schema_statements() -> list[str]:
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_reservations_active_group "
             "ON merge_reservations (plan, generation, conflict_group) WHERE active = 1"
         ),
+        (
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_candidates_current ON merge_candidates "
+            "(plan, generation, task) WHERE superseded_seq IS NULL AND outcome IS NULL"
+        ),
+        "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_claims_active ON merge_claims (plan) WHERE active = 1",
     ))
     return statements
 
@@ -999,6 +1008,8 @@ PLAN_OF: dict[str, str] = {
     "merge_trains": "plan",
     "merge_dispatches": "plan",
     "merge_reservations": "plan",
+    "merge_candidates": "plan",
+    "merge_claims": "plan",
 }
 """The column of each materialised table that names the plan its row belongs to."""
 
@@ -1467,6 +1478,81 @@ def fold_merge_reservation_released(tables: Folded, event: Mapping[str, Any]) ->
     row.update(active=0, conclusion=str(payload["conclusion"]), concluded_seq=int(event["seq"]))
 
 
+def fold_candidate_submitted(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Insert one immutable numbered candidate."""
+    row = blank_row("merge_candidates")
+    row.update(carried("merge_candidates", event["payload"]), plan=str(event["plan"]), task=str(event["task"]))
+    row.update(submitted_seq=int(event["seq"]), superseded_seq=None, admitted_seq=None, enqueued_seq=None)
+    tables["merge_candidates"][key_of("merge_candidates", row)] = row
+
+
+def candidate_of(tables: Folded, event: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve the candidate addressed by one event.
+
+    Returns:
+        The existing candidate row.
+    """
+    payload = event["payload"]
+    key = (str(event["plan"]), int(payload["generation"]), str(event["task"]), int(payload["candidate_number"]))
+    row = tables["merge_candidates"].get(key)
+    if row is None:
+        raise LookupError(f"event {event['seq']} addresses missing candidate {key}")
+    return row
+
+
+def fold_candidate_superseded(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Conclude a candidate replaced by a later immutable submission."""
+    candidate_of(tables, event)["superseded_seq"] = int(event["seq"])
+
+
+def fold_candidate_admitted(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Bind checker authority and policy evidence to a candidate."""
+    row = candidate_of(tables, event)
+    row.update(carried("merge_candidates", event["payload"]), admitted_seq=int(event["seq"]))
+
+
+def fold_candidate_enqueued(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Assign stable queue order to an admitted candidate."""
+    candidate_of(tables, event)["enqueued_seq"] = int(event["seq"])
+
+
+def fold_claimed(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Insert one active unbound merge claim."""
+    row = blank_row("merge_claims")
+    row.update(carried("merge_claims", event["payload"]), plan=str(event["plan"]), active=1)
+    tables["merge_claims"][key_of("merge_claims", row)] = row
+
+
+def claim_of(tables: Folded, event: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve the claim addressed by one event.
+
+    Returns:
+        The existing claim row.
+    """
+    key = (str(event["plan"]), int(event["payload"]["claim_number"]))
+    row = tables["merge_claims"].get(key)
+    if row is None:
+        raise LookupError(f"event {event['seq']} addresses missing claim {key}")
+    return row
+
+
+def fold_claim_changed(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Apply one legal nonterminal claim phase update."""
+    claim_of(tables, event).update(carried("merge_claims", event["payload"]))
+
+
+def fold_merge_terminal(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Conclude one claim and its candidate with the same outcome."""
+    claim = claim_of(tables, event)
+    claim.update(active=0, conclusion=str(event["payload"]["conclusion"]), concluded_seq=int(event["seq"]))
+    candidate = candidate_of(tables, event)
+    candidate.update(
+        outcome=str(event["payload"]["conclusion"]),
+        result_sha=event["payload"].get("result_sha"),
+        finished_seq=int(event["seq"]),
+    )
+
+
 HANDLERS: dict[str, Any] = {
     "plan.created": fold_plan_created,
     "plan.replaced": fold_plan_replaced,
@@ -1491,6 +1577,20 @@ HANDLERS: dict[str, Any] = {
     "merge.dispatch-bound": fold_merge_dispatch_bound,
     "merge.reserved": fold_merge_reserved,
     "merge.reservation-released": fold_merge_reservation_released,
+    "merge.candidate-submitted": fold_candidate_submitted,
+    "merge.candidate-superseded": fold_candidate_superseded,
+    "merge.candidate-admitted": fold_candidate_admitted,
+    "merge.candidate-enqueued": fold_candidate_enqueued,
+    "merge.claimed": fold_claimed,
+    "merge.claim-bound": fold_claim_changed,
+    "merge.claim-prepared": fold_claim_changed,
+    "merge.claim-renewed": fold_claim_changed,
+    "merge.claim-recovered": fold_claim_changed,
+    "merge.reconciliation-required": fold_claim_changed,
+    "merge.finished": fold_merge_terminal,
+    "merge.blocked": fold_merge_terminal,
+    "merge.reconciled": fold_merge_terminal,
+    "merge.reconciliation-resolved": fold_merge_terminal,
 }
 """One handler per ``ledger_spec.EVENTS`` kind; :func:`check_handlers` runs at import."""
 

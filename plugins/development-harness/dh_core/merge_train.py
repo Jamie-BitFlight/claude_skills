@@ -6,12 +6,14 @@ import hashlib
 import json
 import operator
 import sqlite3
+from datetime import datetime
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from dh_core.ledger import store, transitions
 from dh_core.ledger.transitions import _dispatch_registered as dispatch_registered
+from dh_core.merge_evidence import MergeEvidenceStore
 
 
 class Request(BaseModel):
@@ -153,6 +155,94 @@ class DispatchReserved(Request):
     task: str
     ttl_seconds: int | None = Field(default=None, ge=1)
     worktree: str | None = None
+
+
+class Assignment(Request):
+    """Frozen role assignment consumed by one merge decision."""
+
+    issue: int = Field(ge=1)
+    task: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    role: Literal["maker", "checker", "integrator"]
+
+
+class SubmitCandidate(Request):
+    """Submit one immutable maker candidate."""
+
+    plan: str
+    generation: int = Field(ge=1)
+    branch: str
+    pull_request_ref: str
+    candidate_sha: str = Field(pattern=r"^[0-9a-f]{40,64}$")
+    base_sha: str = Field(pattern=r"^[0-9a-f]{40,64}$")
+    maker: Assignment
+    maker_evidence_digest: str
+
+
+class PolicySnapshot(Request):
+    """Complete policy-relevant provider observation."""
+
+    candidate_sha: str
+    pull_request_ref: str
+    required_checks: tuple[tuple[str, str, str], ...]
+    unresolved_thread_ids: tuple[str, ...] = ()
+    unresponded_thread_ids: tuple[str, ...] = ()
+    blocking_reviews: tuple[tuple[str, str], ...] = ()
+    capability_identity: str
+    complete: bool
+    available: bool
+    freshness_token: str
+    observed_at: datetime
+
+    def semantic_projection(self) -> tuple[object, ...]:
+        """Return policy fields without provenance-only values."""
+        return (
+            self.candidate_sha,
+            tuple(sorted(self.required_checks)),
+            tuple(sorted(self.unresolved_thread_ids)),
+            tuple(sorted(self.unresponded_thread_ids)),
+            tuple(sorted(self.blocking_reviews)),
+            self.capability_identity,
+            self.complete,
+            self.available,
+        )
+
+
+class AdmitCandidate(Request):
+    """Bind checker authority and complete provider policy evidence."""
+
+    plan: str
+    generation: int = Field(ge=1)
+    task: str
+    candidate_number: int = Field(ge=1)
+    checker: Assignment
+    checker_evidence_digest: str
+
+
+class SupersedeTrain(Request):
+    """Checker-approved replacement definition request."""
+
+    plan: str
+    generation: int = Field(ge=1)
+    replacement_plan_ref: str
+    replacement_milestone: int = Field(ge=1)
+    replacement_checker_evidence_digest: str
+    reason: str = Field(min_length=1)
+
+
+class CandidateView(BaseModel):
+    """Stored immutable candidate and admission state."""
+
+    plan: str
+    generation: int
+    task: str
+    candidate_number: int
+    candidate_sha: str
+    superseded_seq: int | None = None
+    admitted_seq: int | None = None
+    enqueued_seq: int | None = None
+    outcome: str | None = None
+    noop: str | None = None
 
 
 class MergeQuery(Request):
@@ -297,12 +387,32 @@ class MergeTrain:
         dispatch_plans: DispatchPlanReader,
         source_graph: SourceGraphReader,
         host_authority: HostAuthority,
+        evidence: MergeEvidenceStore | None = None,
+        policy_observer: object | None = None,
+        branch_advancer: object | None = None,
+        gates: object | None = None,
     ) -> None:
         """Bind the service to one existing ledger and configured host marker."""
         self.ledger = ledger
         self.dispatch_plans: Any = dispatch_plans
         self.source_graph: Any = source_graph
         self.host_authority = host_authority
+        self.evidence = evidence or MergeEvidenceStore(ledger)
+        self.policy_observer = policy_observer
+        self.branch_advancer = branch_advancer
+        self.gates = gates
+
+    def supersede(self, request: SupersedeTrain) -> TrainView:
+        """Conclude a generation using resolved replacement evidence."""
+        raise NotImplementedError
+
+    def submit(self, request: SubmitCandidate) -> CandidateView:
+        """Submit or supersede one immutable maker candidate."""
+        raise NotImplementedError
+
+    def admit(self, request: AdmitCandidate) -> CandidateView:
+        """Admit and enqueue a candidate after checker/provider validation."""
+        raise NotImplementedError
 
     def register(self, request: RegisterTrain) -> TrainView:
         """Freeze a definition after checking it against the existing ledger plan.
