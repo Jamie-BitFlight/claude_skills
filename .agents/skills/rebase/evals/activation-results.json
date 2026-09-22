@@ -3,9 +3,9 @@
   "skill_name": "rebase",
   "observed_on": "2026-09-22",
   "content_sha256": {
-    "SKILL.md": "117472b707f33cb89c06ab83177586fbf256746290b190367b0364b9c90f37a8",
-    "references/active-rebase.md": "ddb8e0ed44fafeeb78d4aa48ef80e688f7e03a7e177c22bb305e52d511246c2b",
-    "references/start-rebase.md": "3fdd9804f72543c4ebc9f4e0cc220d4053c83a167fe015bcca97bfd32e6880d0"
+    "SKILL.md": "6840875489b7c5bb95b3de082b23dfef6103f0fc06bc18159c5f7bca978006e7",
+    "references/active-rebase.md": "dcf11d64ecd7119a6cf4e3d4c5a92ae6a7d0f3a33726d2444963a63ce0bec3fe",
+    "references/start-rebase.md": "a243ad1b7237f38acb9db009df712991af63e3eef7da61c46df57f78aec69c02"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },
@@ -21,7 +21,7 @@
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f380b3ffbffebMhwBMmRCk8WFD",
+      "session_id": "ses_f37534afcffeW8b3wrcLAMrL22",
       "eval_id": 1,
       "prompt": "Rebase feature/a onto main.",
       "observed_activation": true,
@@ -40,16 +40,16 @@
       ],
       "state_transitions": ["BLOCKED_INVALID_REF"],
       "final_terminal": "BLOCKED_INVALID_REF",
-      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_status_before": "?? .agents/skills/rebase\n",
-      "repository_status_after": "?? .agents/skills/rebase\n"
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f380a25f6ffeaGx6QrYri9Z1AP",
+      "session_id": "ses_f374f252bffeug053w1PY48asD",
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
@@ -62,16 +62,16 @@
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_status_before": "?? .agents/skills/rebase\n",
-      "repository_status_after": "?? .agents/skills/rebase\n"
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3808f3fdffes41zLK4ooKizr4",
+      "session_id": "ses_f374f2529ffe4rLxPc007ZxM9G",
       "eval_id": 3,
       "prompt": "Abort this rebase and restore the original branch.",
       "observed_activation": true,
@@ -84,116 +84,120 @@
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_status_before": "?? .agents/skills/rebase\n",
-      "repository_status_after": "?? .agents/skills/rebase\n"
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3821d220ffe6fZChIedp19DYL",
+      "session_id": "ses_f376a0901ffedmBqdorbSPzUel",
       "eval_id": 4,
       "prompt": "Update my branch from main using a merge commit.",
       "observed_activation": false,
       "loaded_sources": [],
       "actions": [
         { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "command", "operation": "git remote -v", "exit_code": 0 },
         {
           "kind": "command",
-          "operation": "git branch/current-ref and remote inspection",
+          "operation": "git branch --show-current and git log --oneline -5",
           "exit_code": 0
         },
-        { "kind": "command", "operation": "git log --oneline -5", "exit_code": 0 },
+        { "kind": "command", "operation": "git show-ref", "exit_code": 0 },
         { "kind": "command", "operation": "git branch -a -vv", "exit_code": 0 },
         {
           "kind": "command",
           "operation": "git status --porcelain=v1 --untracked-files=all",
           "exit_code": 0
         },
-        { "kind": "command", "operation": "git show-ref", "exit_code": 0 },
         { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3821d209ffeGx4RkOod9m9Bpz",
+      "session_id": "ses_f3769a64cffeAqIOvPtMfKVCcU",
       "eval_id": 5,
       "prompt": "Enable rebase-and-merge on this GitHub repository.",
       "observed_activation": false,
       "loaded_sources": [],
       "actions": [
         { "kind": "command", "operation": "git remote -v", "exit_code": 0 },
-        { "kind": "command", "operation": "git branch --show-current", "exit_code": 0 },
-        { "kind": "command", "operation": "git remote configuration inspection", "exit_code": 1 },
+        { "kind": "provider", "operation": "gh auth status", "exit_code": 0 },
+        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "command", "operation": "git config remote inspection", "exit_code": 1 },
         {
           "kind": "provider",
-          "operation": "gh repo view --json nameWithOwner,mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed",
+          "operation": "gh repo view --json nameWithOwner,url",
           "exit_code": 1
         },
-        { "kind": "command", "operation": "git last-commit inspection", "exit_code": 0 },
-        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "read", "operation": "glob fixture files" },
+        { "kind": "read", "operation": "read .git/config" },
+        { "kind": "read", "operation": "read base.txt" },
         { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3821d1d2ffe2pUk4D8K0jLXUo",
+      "session_id": "ses_f376933cdffek4qfRvMQsSsLvx",
       "eval_id": 6,
       "prompt": "Merge this GitLab MR.",
       "observed_activation": false,
       "loaded_sources": [],
       "actions": [
-        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "read", "operation": "load pr-lifecycle skill" },
         { "kind": "command", "operation": "git remote -v", "exit_code": 0 },
+        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "command", "operation": "git branch -vv", "exit_code": 0 },
         { "kind": "command", "operation": "git log --oneline --decorate -10", "exit_code": 0 },
+        { "kind": "read", "operation": "glob fixture files" },
+        { "kind": "read", "operation": "read .git/config" },
+        { "kind": "command", "operation": "git show --stat --oneline HEAD", "exit_code": 0 },
+        { "kind": "command", "operation": "git show-ref", "exit_code": 0 },
+        { "kind": "command", "operation": "inspect GitLab environment", "exit_code": 0 },
         {
-          "kind": "command",
-          "operation": "git branch --all --verbose --no-abbrev",
-          "exit_code": 0
-        },
-        {
-          "kind": "command",
-          "operation": "git remote/branch/GitLab configuration inspection",
+          "kind": "provider",
+          "operation": "glab mr list --repo $GITLAB_PROJECT_PATH --state opened",
           "exit_code": 1
         },
-        { "kind": "command", "operation": "command -v glab and gh", "exit_code": 0 },
+        { "kind": "command", "operation": "glab mr list --help", "exit_code": 0 },
         {
-          "kind": "command",
-          "operation": "git show --stat --oneline --decorate HEAD",
-          "exit_code": 0
+          "kind": "provider",
+          "operation": "glab mr list --repo $GITLAB_PROJECT_PATH --output json",
+          "exit_code": 1
         },
         { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     },
     {
       "harness": "codex",
       "model": "gpt-5.6-sol",
       "proxy": "portkey",
-      "session_id": "01a0c7f7-49b8-79e0-b70a-5cc29ee8977a",
+      "session_id": "01a0c8b1-40de-7882-8512-fcf45ee9185f",
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
@@ -206,10 +210,10 @@
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
-      "repository_status_before": "?? .agents/skills/rebase\n",
-      "repository_status_after": "?? .agents/skills/rebase\n"
+      "repository_head_before": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
+      "repository_status_before": "?? .agents/\n",
+      "repository_status_after": "?? .agents/\n"
     }
   ]
 }

@@ -14,10 +14,10 @@ plan, verified recovery ref, and validation hash. Require explicit approval for 
 flattening, semantic change, publication impact, or ambiguous reconstruction. End with exactly one
 canonical terminal; local success is `REBASE_COMPLETE_VERIFIED` and `not published`.
 
-Choose one route before mutation and load only its reference:
+Before any Git command, choose one route and load only its reference:
 
 - Start: read [start a rebase](./references/start-rebase.md).
 - Continue or abort: read [active rebase](./references/active-rebase.md).
 
-Only for an explicit tutorial, human walkthrough, or procedure audit, read the optional
-[step-by-step](./references/step-by-step.md).
+Tutorial, walkthrough, audit only: read [step-by-step](./references/step-by-step.md) and its
+example; routine routes read neither.

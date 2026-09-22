@@ -66,9 +66,7 @@
       "required_terminal": "DO_NOT_ACTIVATE",
       "required_sources": [],
       "allowed_mutations": [],
-      "allowed_provider_actions": [
-        "gh repo view --json nameWithOwner,mergeCommitAllowed,rebaseMergeAllowed,squashMergeAllowed"
-      ],
+      "allowed_provider_actions": ["gh auth status", "gh repo view --json nameWithOwner,url"],
       "expectations": ["Treats forge merge-method configuration as outside the local rebase skill."]
     },
     {
@@ -78,7 +76,10 @@
       "required_terminal": "DO_NOT_ACTIVATE",
       "required_sources": [],
       "allowed_mutations": [],
-      "allowed_provider_actions": [],
+      "allowed_provider_actions": [
+        "glab mr list --repo $GITLAB_PROJECT_PATH --state opened",
+        "glab mr list --repo $GITLAB_PROJECT_PATH --output json"
+      ],
       "expectations": ["Treats merge-request merging as outside the local rebase skill."]
     }
   ]

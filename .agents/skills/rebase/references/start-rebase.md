@@ -15,9 +15,12 @@ every command as complete argv, exit code, stdout, and stderr in the typed `repo
 `repository_instruction_search`, `repository_instruction_sources`, repository-preflight,
 publication, and `execution_mode` fields.
 
-Resolve branch then target in that order. The first failed lookup is the last action and
-`BLOCKED_INVALID_REF`. Route unrelated histories, other preflight failures, dirty/active Git state,
-and same-OID refs through the canonical states; same-OID refs reach `NO_CHANGE` with no recovery ref.
+After instruction search, run `git rev-parse --show-toplevel` alone, then run
+`git show-ref --verify refs/heads/<branch>` alone. Do not batch or parallelize either with later
+preflight work. A branch failure is the last action and `BLOCKED_INVALID_REF`. Only after success,
+resolve the target alone; its failure has the same terminal boundary. Route unrelated histories,
+other preflight failures, dirty/active Git state, and same-OID refs through the canonical states;
+same-OID refs reach `NO_CHANGE` with no recovery ref.
 Rebase metadata directories establish an active rebase; `REBASE_HEAD` alone does not. Detached
 `HEAD` is valid only on the active route.
 
@@ -53,9 +56,10 @@ path, including every candidate Git could silently omit.
 Create a unique durable local recovery ref at the captured old tip and verify that exact OID before
 readiness. Cleanup and remote backup are outside this workflow.
 
-Obtain the maintained artifact contract from
-`uv run --script "<skill-dir>/scripts/rebase_plan.py" schema`; persist the complete evidence and
-decisions, then run `uv run --script "<skill-dir>/scripts/rebase_plan.py" validate <plan.json>`.
+For routine execution, use only the maintained artifact contract from
+`uv run --script "<skill-dir>/scripts/rebase_plan.py" schema`; the bundled example belongs only to
+the tutorial route. Persist the complete evidence and decisions, then run
+`uv run --script "<skill-dir>/scripts/rebase_plan.py" validate <plan.json>`.
 Only exit zero with `status=VALID`, `state=READY_TO_REBASE`, and a retained SHA-256 passes.
 `PLAN_INVALID` is terminal and retains structured errors.
 

@@ -13,8 +13,7 @@ uv run --script "<skill-dir>/scripts/rebase_active.py"
 Treat the inspector result as an immediate route:
 
 - `BLOCKED_PREFLIGHT_FAILED`: end without mutation.
-- `NO_ACTIVE_REBASE`: end without running `git rebase --continue`, `git rebase --abort`, or a new
-  rebase.
+- `NO_ACTIVE_REBASE`: make this inspector terminal last; run no rebase or completion check.
 - `active`: detached `HEAD` is expected. Bind the complete inspector evidence, then read
   [active rebase operation](./active-rebase-operation.md) and follow it to a terminal.
 
