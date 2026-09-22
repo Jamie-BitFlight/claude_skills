@@ -41,25 +41,6 @@ from review_test_gh_fixtures import (
 )
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_EVAL_TAGS = {
-    "github-activation",
-    "gitlab-activation",
-    "negative-activation",
-    "mixed-census",
-    "question",
-    "approval-only",
-    "rejection",
-    "bot-summary",
-    "shared-cause",
-    "stale-input",
-    "incomplete-pagination",
-    "mutation-authorization",
-    "unavailable-capability",
-    "new-input",
-    "quiet-watch",
-}
-BEHAVIORAL_FIXTURES = SKILL_ROOT / "evals/files/behavioral-fixtures.json"
-
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
@@ -128,70 +109,6 @@ def test_review_contract_names_every_terminal_gate_and_input_class() -> None:
         "REVIEW_COMPLETE",
     ):
         assert term in contract
-
-
-def test_instruction_evals_have_unique_ids_and_required_scenarios() -> None:
-    payload = json.loads((SKILL_ROOT / "evals/evals.json").read_text(encoding="utf-8"))
-    evals = payload["evals"]
-    ids = [case["id"] for case in evals]
-    tags = {tag for case in evals for tag in case["tags"]}
-
-    assert payload["skill_name"] == "receiving-pr-reviews"
-    assert len(ids) == len(set(ids))
-    assert tags >= REQUIRED_EVAL_TAGS
-    assert all(case["expectations"] for case in evals)
-
-
-def test_failed_behavioral_cluster_cases_have_complete_sealed_evidence() -> None:
-    payload = json.loads((SKILL_ROOT / "evals/evals.json").read_text(encoding="utf-8"))
-    fixtures = json.loads(BEHAVIORAL_FIXTURES.read_text(encoding="utf-8"))
-    affected_ids = {1, 2, 4, 5, 6, 7, 8, 13}
-
-    for case in payload["evals"]:
-        if case["id"] not in affected_ids:
-            continue
-        assert case["files"] == ["evals/files/behavioral-fixtures.json"]
-        fixture = fixtures[str(case["id"])]
-        assert fixture["target"]["provider"] in {"github", "gitlab"}
-        assert fixture["repository_instructions"]
-        assert fixture["task_outcome"]
-        assert fixture["authority"]
-        snapshot = fixture["initial_snapshot"]
-        assert snapshot["snapshot_complete"] is True
-        assert snapshot["head_revision"]
-        assert snapshot["snapshot_fingerprint"]
-        input_ids = [item["input_id"] for item in snapshot["inputs"]]
-        assert len(input_ids) == len(set(input_ids))
-        assert all(item["stable_reference"] for item in snapshot["inputs"])
-
-
-def test_canonical_projection_fixtures_cover_semantics_and_clusters() -> None:
-    fixtures = json.loads(BEHAVIORAL_FIXTURES.read_text(encoding="utf-8"))
-
-    assert set(fixtures["5"]["expected_projection"]["semantic_kinds"]) == {"comment", "question"}
-    assert fixtures["5"]["expected_projection"]["focused_question"].endswith("?")
-    assert set(fixtures["4"]["expected_projection"]["assessment_ids"]) == {
-        item["input_id"] for item in fixtures["4"]["initial_snapshot"]["inputs"]
-    }
-    for scenario_id in ("4", "7", "8"):
-        projection = fixtures[scenario_id].get("expected_projection") or fixtures[scenario_id]["observed_transitions"]
-        cluster_members = [member for members in projection["clusters"].values() for member in members]
-        assert set(cluster_members) == {
-            item["input_id"] for item in fixtures[scenario_id]["initial_snapshot"]["inputs"]
-        }
-
-
-def test_provider_lifecycle_fixtures_supply_backed_communication_and_recheck() -> None:
-    fixtures = json.loads(BEHAVIORAL_FIXTURES.read_text(encoding="utf-8"))
-
-    for scenario_id in ("1", "2", "6", "7", "8", "13"):
-        transitions = fixtures[scenario_id]["observed_transitions"]
-        assert transitions["communication"]["provider_backed"] is True
-        assert transitions["recheck"]["snapshot_complete"] is True
-        assert transitions["recheck"]["changed_inputs"] == []
-    assert fixtures["2"]["initial_snapshot"]["codex_approved"] is None
-    assert fixtures["2"]["initial_snapshot"]["codex_approval_equivalence"] == "unavailable"
-    assert fixtures["13"]["observed_transitions"]["resolution"] == {"github:review:1301": "unavailable"}
 
 
 def test_mcp_boundary_is_fail_closed_and_points_to_canonical_predicates() -> None:

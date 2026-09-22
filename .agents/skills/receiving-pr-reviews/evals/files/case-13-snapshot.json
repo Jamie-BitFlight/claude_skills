@@ -1,0 +1,89 @@
+{
+  "provider": "github",
+  "target": {
+    "repository": {
+      "provider": "github",
+      "hostname": "github.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 33
+  },
+  "transport": "github_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "07be8ddd5f4f594a8f9e882e90b082cec91d620e66c97b4ffd9b6eac9c6ba3b7",
+  "head_revision": "dddddddddddddddddddddddddddddddddddddddd",
+  "revision_at": "2026-09-22T01:13:00Z",
+  "completeness": {
+    "transport": "github_cli",
+    "required_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "completed_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": []
+  },
+  "review_inputs": [
+    {
+      "input_id": "github:review:1301",
+      "provider": "github",
+      "provider_ids": {
+        "object_id": "1301",
+        "reply_target_id": null,
+        "resolution_target_id": null
+      },
+      "source_kind": "review",
+      "kinds": ["approval"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-13",
+        "login": "reviewer-thirteen",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Approved.",
+      "stable_reference": "https://github.example/acme/widgets/pull/33#pullrequestreview-1301",
+      "created_at": "2026-09-22T01:13:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "APPROVED",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "available",
+  "outstanding_input_count": 1,
+  "codex_approved": false,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "CLEAN",
+    "blockers": []
+  }
+}

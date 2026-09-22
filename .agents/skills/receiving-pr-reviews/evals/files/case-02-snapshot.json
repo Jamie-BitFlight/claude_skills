@@ -1,0 +1,85 @@
+{
+  "provider": "gitlab",
+  "target": {
+    "repository": {
+      "provider": "gitlab",
+      "hostname": "gitlab.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 23
+  },
+  "transport": "gitlab_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "e3090df5395917de949f75a2233e9686539430b652074b32f37ca6d21da583b6",
+  "head_revision": "2222222222222222222222222222222222222222",
+  "revision_at": "2026-09-22T01:02:00Z",
+  "completeness": {
+    "transport": "gitlab_cli",
+    "required_surfaces": [
+      "approvals",
+      "award_emoji",
+      "discussions",
+      "identity",
+      "merge_request",
+      "notes",
+      "versions"
+    ],
+    "completed_surfaces": [
+      "approvals",
+      "award_emoji",
+      "discussions",
+      "identity",
+      "merge_request",
+      "notes",
+      "versions"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": ["codex_approval_equivalence", "explicit_change_request_state"]
+  },
+  "review_inputs": [
+    {
+      "input_id": "gitlab:note:201",
+      "provider": "gitlab",
+      "provider_ids": { "object_id": "201", "reply_target_id": null, "resolution_target_id": null },
+      "source_kind": "note",
+      "kinds": ["comment"],
+      "location": "top_level",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "22",
+        "login": "reviewer-two",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "The current behavior already satisfies the stated requirement; compare it with config/review-policy.json before changing source.",
+      "stable_reference": "https://gitlab.example/acme/widgets/-/merge_requests/23#note_201",
+      "created_at": "2026-09-22T01:02:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": null,
+      "line": null,
+      "provider_state": "active",
+      "capabilities": {
+        "can_reply": false,
+        "can_resolve": false,
+        "can_comment": true,
+        "unavailable": ["inline_reply", "resolution"]
+      },
+      "thread_id": null,
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "unavailable",
+  "outstanding_input_count": 1,
+  "codex_approved": null,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "can_be_merged",
+    "merge_state_status": "mergeable",
+    "blockers": []
+  }
+}

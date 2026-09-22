@@ -1,0 +1,90 @@
+{
+  "provider": "github",
+  "target": {
+    "repository": {
+      "provider": "github",
+      "hostname": "github.example",
+      "full_name": "acme/widgets"
+    },
+    "number": 17
+  },
+  "transport": "github_cli",
+  "snapshot_complete": true,
+  "snapshot_fingerprint": "e1df5efdccfff9e0cd2e3267989d09854d7bfbd0c64194c7fbd0c51b41b8b660",
+  "head_revision": "1111111111111111111111111111111111111111",
+  "revision_at": "2026-09-22T01:01:00Z",
+  "completeness": {
+    "transport": "github_cli",
+    "required_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "completed_surfaces": [
+      "force_push",
+      "head_state",
+      "identity",
+      "issue_comments",
+      "reactions",
+      "reviews",
+      "threads"
+    ],
+    "truncated_input_ids": [],
+    "unavailable_capabilities": []
+  },
+  "review_inputs": [
+    {
+      "input_id": "github:thread:101",
+      "provider": "github",
+      "provider_ids": {
+        "object_id": "101",
+        "reply_target_id": "101",
+        "resolution_target_id": "thread-101"
+      },
+      "source_kind": "review_comment",
+      "kinds": ["comment"],
+      "location": "inline",
+      "direction": "inbound",
+      "actor": {
+        "actor_id": "reviewer-1",
+        "login": "reviewer-one",
+        "display_name": null,
+        "classification": "human",
+        "role": "reviewer"
+      },
+      "body": "Validate the shared timeout at its owning seam.",
+      "stable_reference": "https://github.example/acme/widgets/pull/17#discussion-101",
+      "created_at": "2026-09-22T01:01:00Z",
+      "updated_at": null,
+      "revision_relation": "current",
+      "path": "src/timeouts.py",
+      "line": 41,
+      "provider_state": "open",
+      "capabilities": {
+        "can_reply": true,
+        "can_resolve": true,
+        "can_comment": true,
+        "unavailable": []
+      },
+      "thread_id": "thread-101",
+      "parent_id": null
+    }
+  ],
+  "assessments": [],
+  "clusters": [],
+  "cycle_state": "ASSESSMENT_REQUIRED",
+  "codex_approval_equivalence": "available",
+  "unresolved_count": 1,
+  "outstanding_input_count": 1,
+  "codex_approved": false,
+  "reviewability": {
+    "is_draft": false,
+    "mergeable": "MERGEABLE",
+    "merge_state_status": "CLEAN",
+    "blockers": []
+  }
+}
