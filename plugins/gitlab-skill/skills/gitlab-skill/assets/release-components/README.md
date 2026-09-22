@@ -78,9 +78,9 @@ publication, require observable evidence that:
 The root component-project credential job validates process-scoped Git configuration without making
 an HTTP request. The repository pytest fixture validates both generated shell wrappers and their
 process-scoped Git transport against local HTTPS; it does not execute either release tool. The
-semantic-release adapter additionally has live GitLab proof. The Python wrapper is locally verified,
-but python-semantic-release has not completed a post-refactor live lifecycle. Before a production
-component release, run the version, package, and GitLab Release components in an isolated GitLab
+semantic-release adapter additionally has live GitLab proof. The hardened project `595` rerun also
+live-verified python-semantic-release through its initiating, release-commit, and tag pipelines.
+Before a production component release, run the version, package, and GitLab Release components in an isolated GitLab
 sandbox with disposable protected refs, a scoped credential, and disposable package names. Require
 no-release, release, destination read-back, and release-last evidence; do not run those mutating
 checks against a production project.

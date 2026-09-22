@@ -77,8 +77,53 @@ private project, while public project `628` was resolvable by the project-token-
 Five preceding cold-run jobs showed generic credential helpers did not displace Runner's
 host-specific job-token authentication; only process-scoped `http.extraHeader` produced the selected
 release identity.
-The current Python adapter's equivalent transport is executable-fixture and documentation verified,
-not live-verified by cold run 4.
+Cold run 4 itself covered semantic-release transport; the Python adapter was subsequently verified
+by the hardened rerun below.
+
+## Hardened Transport Component Evidence
+
+Exact product commit `a0aceafbc2ceeb9be688cd70122deabc9b745882` ran in retained private
+[project 595](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610)
+with every component template byte-identical to the product blob and zero operational failures.
+The observed version outcomes were the semantic-release release branch, the Python release branch,
+and the Python release-commit no-release branch.
+
+semantic-release completed [main pipeline 5967](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/pipelines/5967)
+through [version job 7404](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7404),
+creating protected tag `v1.0.2` at `90772629b7ec3dee30e85d8aac6b2f49dfe24055` and
+[tag pipeline 5968](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/pipelines/5968).
+Jobs [7406](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7406)
+through [7409](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7409)
+ran notes, build, [Generic Package 265](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/packages/265), and
+[GitLab Release v1.0.2](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/releases/v1.0.2)
+in order. Build and package
+read-backs matched SHA-256 `b9114053adff22b6c3e7f2a99c2cb8c35a35075983e53c3c8a2e8ed77b3a0d6c`.
+
+python-semantic-release completed in
+[pipeline 5969](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/pipelines/5969)
+and [version job 7411](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7411),
+creating release commit `a71030af9990889931f5538194c994d62b57e45b` and protected tag `v1.1.0`.
+[Release-commit pipeline 5970](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/pipelines/5970)
+and [job 7413](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7413)
+completed the no-release branch without another commit or tag. The tag started
+[pipeline 5971](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/pipelines/5971);
+jobs [7415](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7415)
+through [7418](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/jobs/7418)
+ran notes, build, [Generic Package 298](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/packages/298), and
+[GitLab Release v1.1.0](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/issue-3816-release-components-live-20260922-092610/-/releases/v1.1.0)
+in order. Build and package
+read-backs matched SHA-256 `b708350c0009af403b40ef551b04c8c6783d5cb7987922785ab2c63c5852ca28`.
+
+Both version jobs used credential-free HTTPS remotes and process-only URL-scoped Basic headers;
+repository config, remote URLs, logs, and trees retained no credential or header. All tag jobs
+reported no environment, so the exact `release-version`-scoped credential and digest companion were
+isolated from publication. Job-token repository pushes remained disabled, and both tag pipelines
+were attributed to project-token bot user `760`.
+
+Token `727` changed from unused to `last_used_at=2026-09-22T12:17:50.842Z` during semantic-release.
+The value remained unchanged during a bounded poll after the Python lifecycle. That is a bounded API
+observation, not a lifecycle blocker; bot `760` attribution on the Python release commit, tag
+pipeline, package pipeline, and Release is the identity evidence.
 
 ## Corrected Failures
 
@@ -106,6 +151,11 @@ artifacts, package, and Release; the ignored scratch report is not the durable e
 LIVE-VERIFIED, COLD-RUN-4 SEMANTIC TRANSPORT: process-scoped Basic authorization over Runner
 `insteadOf`, noninteractive, and host-helper configuration for release and no-release execution in
 consumer/component projects `529/628`. This claim does not extend to the Python adapter.
+
+LIVE-VERIFIED, HARDENED COMPONENT-NATIVE: exact product commit `a0aceafbc`, semantic-release release
+branch, Python release branch, Python release-commit no-release branch, HTTPS URL-scoped
+non-persistent transport, environment isolation, ordered publication, matching package read-backs,
+and Release-last behavior in project `595`.
 
 DOCUMENTATION-VERIFIED, NOT LIVE-TESTED: GitLab PyPI, GitLab npm, PyPI.org, and npmjs.com adapters.
 

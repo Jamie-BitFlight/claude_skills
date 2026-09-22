@@ -1,8 +1,8 @@
 # python-semantic-release Version Adapter
 
-Evidence: **DOCUMENTATION-VERIFIED + EXECUTABLE-FIXTURE-VERIFIED** with
-python-semantic-release `10.6.2`. The current component transport has not completed a separate live
-GitLab lifecycle.
+Evidence: **LIVE-VERIFIED + EXECUTABLE-FIXTURE-VERIFIED** with python-semantic-release `10.6.2`.
+See [Hardened Transport Component Evidence](./release-live-evidence.md#hardened-transport-component-evidence)
+for initiating, release-commit, tag, publication, and Release proof.
 
 Include `assets/release-components/templates/python-semantic-release-version.yml` from a dedicated
 component project. Pass a unique job name, the consumer's version stage and rules, a digest-pinned

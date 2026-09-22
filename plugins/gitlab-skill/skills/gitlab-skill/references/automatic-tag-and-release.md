@@ -56,9 +56,8 @@ Select exactly one implementation from [Version Adapter Index](./release-version
 Apply the component invocation and credential contract through the component-project README pointer
 below rather than redefining it here.
 
-The semantic-release process-scoped transport is live-verified. The Python shell, generated config,
-and local HTTP transport boundary are executable-fixture verified; python-semantic-release `10.6.2`
-has not completed a post-refactor live lifecycle.
+Both version adapters are component-native live-verified in the hardened project `595` rerun. Local
+fixtures independently cover their generated shell/config and HTTPS process-transport boundaries.
 
 Select one implementation from [Release Notes Adapter Index](./release-notes-adapters.md). Preserve
 the description artifact interface when substituting a project-owned notes component.
