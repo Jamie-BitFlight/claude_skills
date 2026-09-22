@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import types
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -15,6 +16,18 @@ from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 import pytest
+
+if sys.platform == "win32":
+    fcntl = types.ModuleType("fcntl")
+    fcntl.LOCK_EX = 2
+    fcntl.LOCK_NB = 4
+
+    def unsupported_flock(*_args: object) -> None:
+        raise OSError("fcntl.flock is unavailable on Windows")
+
+    fcntl.flock = unsupported_flock
+    sys.modules.setdefault("fcntl", fcntl)
+
 from dh_core.ledger import store, transitions
 from dh_core.merge_train import (
     DispatchMember,

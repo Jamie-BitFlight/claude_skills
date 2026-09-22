@@ -6,9 +6,23 @@ import ast
 import inspect
 import json
 import sqlite3
+import sys
+import types
 from pathlib import Path
 
 import pytest
+
+if sys.platform == "win32":
+    fcntl = types.ModuleType("fcntl")
+    fcntl.LOCK_EX = 2
+    fcntl.LOCK_NB = 4
+
+    def unsupported_flock(*_args: object) -> None:
+        raise OSError("fcntl.flock is unavailable on Windows")
+
+    fcntl.flock = unsupported_flock
+    sys.modules.setdefault("fcntl", fcntl)
+
 from dh_core.ledger import port, store, transitions
 from dh_core.merge_train import (
     DispatchMember,
