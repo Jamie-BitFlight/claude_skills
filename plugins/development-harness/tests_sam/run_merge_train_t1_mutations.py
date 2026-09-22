@@ -25,6 +25,7 @@ AMENDMENT_CASES = {
     "test_f08_released_reservation_event_and_projection_cannot_cross_copy_role",
     "test_f02_no_group_judge_pending_work_blocks_every_replacement_route",
     "test_s1_active_registration_refuses_dispatch_revision_only_drift",
+    "test_s1_registration_refuses_complete_ledger_plan_disagreement_without_mutation",
 }
 
 
@@ -66,6 +67,36 @@ class RemoveCallStatement(ast.NodeTransformer):
             self.changed += 1
             return None
         return self.generic_visit(node)
+
+
+class RemoveCallInFunction(RemoveCallStatement):
+    """Remove a matching call only inside one named function."""
+
+    def __init__(self, function: str, fragment: str) -> None:
+        super().__init__(fragment)
+        self.function = function
+        self.inside = False
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> ast.AST:
+        """Visit expressions only in the selected function.
+
+        Returns:
+            The visited function.
+        """
+        previous = self.inside
+        self.inside = node.name == self.function
+        if self.inside:
+            self.generic_visit(node)
+        self.inside = previous
+        return node
+
+    def visit_Expr(self, node: ast.Expr) -> ast.AST | None:
+        """Remove a matching expression only while inside the selected function.
+
+        Returns:
+            None for the selected call, otherwise the original expression.
+        """
+        return super().visit_Expr(node) if self.inside else node
 
 
 class RemoveStateRelease(ast.NodeTransformer):
@@ -171,8 +202,8 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
     (
         "F01-remove-ledger-disagreement-check",
         "dh_core/merge_train.py",
-        RemoveCallStatement("self.validate_definition"),
-        "test_f01_registration_rejects_omitted_or_mismatched_resource",
+        RemoveCallInFunction("register", "self.validate_definition"),
+        "test_s1_registration_refuses_complete_ledger_plan_disagreement_without_mutation",
     ),
     (
         "F02-remove-registered-replacement-active-check",
