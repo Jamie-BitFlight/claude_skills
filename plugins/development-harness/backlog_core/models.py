@@ -484,7 +484,26 @@ def parse_issue_number(ref: str | None) -> int | None:
 
 
 class BacklogError(Exception):
-    """General backlog operation error."""
+    """General backlog operation error.
+
+    Carries an optional ``retryable`` verdict for the MCP tool boundary, which reports whether
+    the same call can succeed on a later attempt. The class alone cannot answer that: the same
+    ``BacklogError`` is raised both for a fetch that never reached the backend and for a call the
+    backend refused on its merits, and nothing but the raise site knows which. Where the raising
+    condition fixes the answer -- a reserved name, an item that holds no such artifact, an open PR
+    that blocks a close -- the author states it once, here, rather than leaving a classifier to
+    infer it from prose. Left unset, the boundary reports no verdict at all, which is what
+    ``None`` means: not known, never "cannot succeed".
+
+    Attributes:
+        retryable: ``True`` when a later identical attempt may succeed, ``False`` when it cannot,
+            ``None`` when this raise site does not state a verdict.
+    """
+
+    def __init__(self, *args: object, retryable: bool | None = None) -> None:
+        """Initialize with the usual exception args plus an optional retry verdict."""
+        super().__init__(*args)
+        self.retryable = retryable
 
 
 class CacheStateCorruptError(BacklogError):
@@ -680,19 +699,25 @@ class UnsupportedBackendCapabilityError(BacklogError):
             msg = f"{backend}: {operation} requires the {capability} capability, which this backend does not support."
         super().__init__(msg)
 
-    def to_response(self, milestone_number: int) -> dict[str, str | int]:
+    def to_response(self, milestone_number: int) -> dict[str, str | int | bool]:
         """Build the dispatch-tool error payload for this capability gap.
 
         Shared by ``dispatch_stale_check``/``dispatch_conflicts`` in both
         ``server.py`` and ``dh_core/operations.py`` so the four call sites
         don't each hand-build the same dict.
 
+        ``retryable`` is stated here rather than left to the tool boundary because this class is
+        the whole error path for both those tools: a backend that does not implement a capability
+        does not start implementing it between two calls, so the answer is fixed and final. The
+        models advertise the field; without this they would advertise it and never fill it.
+
         Returns:
-            Dict with ``error``, ``unsupported_capability``, ``backend``, and
+            Dict with ``error``, ``retryable``, ``unsupported_capability``, ``backend``, and
             ``milestone_number`` fields for the caller to return directly.
         """
         return {
             "error": str(self),
+            "retryable": False,
             "unsupported_capability": self.capability,
             "backend": self.backend,
             "milestone_number": milestone_number,

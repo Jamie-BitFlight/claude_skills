@@ -1132,6 +1132,10 @@ class DispatchItemStatusResponse(BaseModel):
     error: str | None = None
     """Error message; ``None`` on success."""
 
+    retryable: bool | None = None
+    """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
+    Absent on success, and absent on a failure this server could not classify."""
+
 
 # plan is measured over the single-tool schema token budget (697 tokens vs
 # the 600 cap) when nested as dispatch_schema.core.models.DispatchPlan --
@@ -1189,6 +1193,10 @@ class WaveEchoError(BaseModel):
 
     error: str | None = None
     """Error message; ``None`` on success."""
+
+    retryable: bool | None = None
+    """``True`` when the same call can succeed on a later attempt, ``False`` when it cannot.
+    Absent on success, and absent on a failure this server could not classify."""
 
 
 class DispatchWaveStartResponse(WaveEchoError):

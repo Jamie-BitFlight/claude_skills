@@ -41,6 +41,10 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # text could say without becoming prose. Shrinking it to a plain ``bool`` would fit the old
 # number and lose the difference between "cannot succeed" and "not known" -- the same
 # information loss an untested cap forced the last time, recorded above.
+# Total moved 13,813 -> 13,865 when ``dispatch_wave_start`` and ``dispatch_item_status`` gained
+# the same field: both refuse calls that repeat identically (a wave already recorded, a status
+# outside the three accepted, an issue no wave holds) and had no way to say so. The cap is
+# unchanged; 26 tokens per tool is the measured cost of each further tool that gains it.
 _MAX_TOTAL_SCHEMA_TOKENS = 14000
 _MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
 

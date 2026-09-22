@@ -63,6 +63,7 @@ from .models import (
     ArtifactType,
     BackendAvailability as _BackendAvailability,
     BackendStatus as _BackendStatus,
+    BackendUnavailableError,
     BacklogError,
     BranchConflictError,
     CacheStateCorruptError,
@@ -77,6 +78,7 @@ from .models import (
     DispatchWaveSummary as _DispatchWaveSummary,
     DuplicateItemError,
     EntryNotFoundError,
+    GraphQLUnavailableError,
     ItemNotFoundError,
     Output,
     ReferenceCollisionError,
@@ -100,7 +102,14 @@ from .search import (
     apply_search_filter as _apply_search_filter,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._apply_search_filter test imports
     tokenize_search as _tokenize_search,
 )
-from .sync_state import SyncErrorKind, SyncState as _SyncState, SyncStatus, classify_sync_error, get_sync_state
+from .sync_state import (
+    RETRYABLE_TRANSIENT_EXCEPTIONS,
+    SyncErrorKind,
+    SyncState as _SyncState,
+    SyncStatus,
+    classify_sync_error,
+    get_sync_state,
+)
 from .tool_responses import (
     AccumulatedUsage,
     ArtifactReadResponse,
@@ -228,51 +237,79 @@ def _respond(
 
 #: Failures that describe the call itself, not the trip to the backend: a selector that matched
 #: nothing or matched several, a value that did not validate, a record that is already there, an
-#: ordinal the item does not hold. Repeating the identical call repeats the identical outcome, so
-#: these are never retryable. They are listed because ``classify_sync_error`` was written for the
-#: background sync engine, where every ``BacklogError`` means a fetch failed and is worth another
-#: attempt -- a default that is right there and wrong here.
+#: ordinal the item does not hold, a capability the backend does not implement, an environment
+#: that refuses GraphQL outright. Repeating the identical call repeats the identical outcome, so
+#: these are never retryable.
 _NEVER_RETRYABLE: tuple[type[BaseException], ...] = (
     AmbiguousSelectorError,
     BranchConflictError,
     CacheStateCorruptError,
     ContentConflictError,
+    ContentNotFoundError,
     DisclosureParamError,
     DuplicateItemError,
     EntryNotFoundError,
+    GraphQLUnavailableError,
     ItemNotFoundError,
     OrdinalNotFoundError,
     ReferenceCollisionError,
     UnsupportedBackendCapabilityError,
+    UnsupportedCapabilityError,
     ValidationError,
+)
+
+#: Failures of the trip rather than of the call: the request never reached a backend that could
+#: answer it. A dropped connection, a timeout, a backend whose credentials or transport are
+#: unreachable, content the provider could not be asked for. Checked after ``_NEVER_RETRYABLE``,
+#: because the final answers above include subclasses of these -- ``ContentNotFoundError`` is an
+#: answer from a provider that was reached, and ``GraphQLUnavailableError`` is an environment-wide
+#: refusal that the next attempt meets identically.
+_TRANSPORT_FAILED: tuple[type[BaseException], ...] = (
+    BackendUnavailableError,
+    ContentUnavailableError,
+    *RETRYABLE_TRANSIENT_EXCEPTIONS,
 )
 
 
 def _retryable(exc: BaseException) -> bool | None:
     """Return whether the call that raised ``exc`` can succeed on a later attempt.
 
-    Answers in two steps. A failure in ``_NEVER_RETRYABLE`` is about the call, so the answer is
-    fixed and needs no inspection. Anything else is a question about reaching the backend, which
-    ``classify_sync_error`` already answers by exception family, GitHub status code and wrapped
-    cause -- it is named for the sync engine but is not specific to it.
+    Answers in four steps, emitting a verdict only where one is supported:
 
-    An unclassified exception returns ``None`` rather than ``False``, because the caller must be
-    able to tell "cannot succeed" from "not known". ``exclude_none=True`` then drops the key
-    instead of asserting a verdict this server does not have.
+    1. A verdict the raise site stated on the exception wins. The condition that raised it fixes
+       the answer, and the author who knows that condition is the one who can say so.
+    2. A class in ``_NEVER_RETRYABLE`` describes the call, so the answer is ``False``.
+    3. A class in ``_TRANSPORT_FAILED``, or a ``GithubException`` whose status says the server
+       asked for another attempt (a rate limit, a 5xx, a 403 carrying ``Retry-After``), describes
+       the trip, so the answer is ``True``.
+    4. Anything else reports nothing.
+
+    ``classify_sync_error`` is deliberately not the general answer here, though it is reused for
+    the GitHub status codes in step 3. It answers a different question -- whether the sync engine
+    should keep spending its retry budget -- so its ``NON_RETRYABLE`` means "stop now", not
+    "impossible", and its ``BacklogError`` default means "a fetch failed", which at this boundary
+    is wrong for every call-shaped refusal raised as a bare ``BacklogError``.
+
+    A bare ``BacklogError`` with no stated verdict therefore reports ``None`` rather than a guess.
+    The caller must be able to tell "cannot succeed" from "not known", and ``exclude_none=True``
+    drops the key rather than asserting a verdict this server does not have.
 
     Args:
         exc: The exception the tool's except arm caught.
 
     Returns:
-        ``True`` when a later attempt may succeed, ``False`` when it cannot, ``None`` when the
-        exception did not classify.
+        ``True`` when a later attempt may succeed, ``False`` when it cannot, ``None`` when no
+        verdict is supported.
     """
+    if isinstance(exc, BacklogError) and exc.retryable is not None:
+        return exc.retryable
     if isinstance(exc, _NEVER_RETRYABLE):
         return False
-    kind = classify_sync_error(exc)
-    if kind is SyncErrorKind.UNKNOWN:
-        return None
-    return kind is SyncErrorKind.RETRYABLE
+    if isinstance(exc, _TRANSPORT_FAILED):
+        return True
+    if isinstance(exc, _GithubException) and classify_sync_error(exc) is SyncErrorKind.RETRYABLE:
+        return True
+    return None
 
 
 # Module-level logger for done-callback exception reporting.
@@ -1488,7 +1525,8 @@ def _assert_config() -> None:
     try:
         _models.get_config()
     except RuntimeError as exc:
-        raise BacklogError(str(exc)) from exc
+        # No project root and no env vars: the next identical call discovers the same nothing.
+        raise BacklogError(str(exc), retryable=False) from exc
 
 
 def _probe_backend_status() -> _BackendStatus:
@@ -3220,7 +3258,8 @@ def _require_artifact_entries(entries: list, label: str) -> None:
         BacklogError: When ``entries`` is empty.
     """
     if not entries:
-        raise BacklogError(label)
+        # The item holds no artifact matching the selector; repeating the lookup finds none either.
+        raise BacklogError(label, retryable=False)
 
 
 def _get_artifact_provider() -> ContentProvider:
@@ -4000,7 +4039,8 @@ async def dispatch_read(
         plan = await asyncio.to_thread(_read_dispatch_plan, milestone_number)
     except ContentUnavailableError:
         return _respond(
-            DispatchReadResponse, {"error": "Dispatch plan not found", "milestone_number": milestone_number}
+            DispatchReadResponse,
+            {"error": "Dispatch plan not found", "retryable": False, "milestone_number": milestone_number},
         )
     except ValueError as exc:
         return _respond(
@@ -4295,7 +4335,7 @@ async def dispatch_wave_start(
     except (KeyError, ValueError) as exc:
         return _respond(
             DispatchWaveStartResponse,
-            {"error": f"Malformed item entry: {exc}", "milestone": milestone, "wave_num": wave_num},
+            {"error": f"Malformed item entry: {exc}", "retryable": False, "milestone": milestone, "wave_num": wave_num},
         )
     try:
         wave: _DispatchWaveRecord = await asyncio.to_thread(
@@ -4306,6 +4346,7 @@ async def dispatch_wave_start(
             DispatchWaveStartResponse,
             {
                 "error": f"Wave {wave_num} already exists for milestone {milestone}",
+                "retryable": False,
                 "milestone": milestone,
                 "wave_num": wave_num,
             },
@@ -4370,6 +4411,7 @@ async def dispatch_item_status(
                         case _:
                             return {
                                 "error": f"Invalid status '{status}': must be 'complete', 'failed', or 'skipped'",
+                                "retryable": False,
                                 "milestone": milestone,
                                 "issue": issue,
                             }
@@ -4384,6 +4426,7 @@ async def dispatch_item_status(
                     }
         return {
             "error": f"Item #{issue} not found in any wave for milestone {milestone}",
+            "retryable": False,
             "milestone": milestone,
             "issue": issue,
         }

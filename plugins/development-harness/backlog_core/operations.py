@@ -1107,7 +1107,8 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
             "use update_item(description=...) instead of a section write. Writing "
             "to it as a section produces a permanent, unrenderable orphan key."
         )
-        raise BacklogError(msg)
+        # The name itself is refused, so the identical write is refused identically.
+        raise BacklogError(msg, retryable=False)
     canonical = resolve_section_name(name)
     if canonical is not None:
         return canonical
@@ -1407,7 +1408,8 @@ def _handle_batch_groomed(
     out = output or Output()
     if not item.reference:
         msg = "Item has no backend reference"
-        raise BacklogError(msg)
+        # Nothing about the item changes by calling again; only attaching a reference helps.
+        raise BacklogError(msg, retryable=False)
     added_date = item.added if hasattr(item, "added") and item.added else "0000-00-00"
 
     # Phase 1: Local writes — load once, apply all sections in memory, save once.
@@ -4017,7 +4019,8 @@ def close_item(
             out.warn(f"\nPRs mention issue {issue_ref}.")
             out.warn("Use force=True to close anyway.")
             msg = f"Open PRs reference issue {issue_ref}. Use force=True to close anyway."
-            raise BacklogError(msg)
+            # A refusal on the caller's own terms: the same call without force is refused again.
+            raise BacklogError(msg, retryable=False)
 
     today()
 
@@ -4025,7 +4028,8 @@ def close_item(
     # Unreachable — see BacklogItem class docstring (models.py).
     if not storage_reference:
         msg = "Item has no backend reference"
-        raise BacklogError(msg)
+        # Nothing about the item changes by calling again; only attaching a reference helps.
+        raise BacklogError(msg, retryable=False)
     already_closed = item.status.lower() in {"closed", "done"}
     if already_closed:
         out.info("Item already closed.")
@@ -4104,7 +4108,8 @@ def resolve_item(
             out.warn("\nResolving will close the issue and orphan these PRs.")
             out.warn("Use force=True to resolve anyway.")
             msg = f"Open PRs reference issue {issue_ref}. Use force=True to resolve anyway."
-            raise BacklogError(msg)
+            # A refusal on the caller's own terms: the same call without force is refused again.
+            raise BacklogError(msg, retryable=False)
 
     today()
 
@@ -4112,7 +4117,8 @@ def resolve_item(
     # Unreachable — see BacklogItem class docstring (models.py).
     if not reference:
         msg = "Item has no backend reference"
-        raise BacklogError(msg)
+        # Nothing about the item changes by calling again; only attaching a reference helps.
+        raise BacklogError(msg, retryable=False)
     already_done = item.status.lower() in {"done", "resolved", "completed"}
     if already_done:
         out.info("Item already resolved.")
@@ -4320,7 +4326,8 @@ def _apply_groomed_update(
     # Unreachable — see BacklogItem class docstring (models.py).
     if not item.reference:
         msg = "Item has no backend reference"
-        raise BacklogError(msg)
+        # Nothing about the item changes by calling again; only attaching a reference helps.
+        raise BacklogError(msg, retryable=False)
 
     if sections is not None:
         if sections:
@@ -4583,7 +4590,8 @@ def strike_entry(
     # Unreachable — see BacklogItem class docstring (models.py).
     if not item.reference:
         msg = "Item has no backend reference"
-        raise BacklogError(msg)
+        # Nothing about the item changes by calling again; only attaching a reference helps.
+        raise BacklogError(msg, retryable=False)
 
     struck_at = now_iso()
     target: Entry | None = None
