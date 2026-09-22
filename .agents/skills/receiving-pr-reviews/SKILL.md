@@ -1,6 +1,6 @@
 ---
 name: receiving-pr-reviews
-description: Process every GitHub PR or GitLab MR review input as one evidence-bound cycle. Use after pushing a commit to a PR or MR, or when asked to check or address review feedback.
+description: Process reviewer feedback for GitHub PRs and GitLab MRs. Use after pushing a commit to recheck reviews, or when asked to check or address comments, questions, approvals, change requests, or bot findings.
 ---
 
 # Receiving PR and MR Reviews

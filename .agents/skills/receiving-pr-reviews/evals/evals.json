@@ -23,7 +23,7 @@
       "expectations": [
         "The transcript loads receiving-pr-reviews and gitlab-review-operations.md.",
         "The selected provider is GitLab and the target is an MR.",
-        "Codex approval equivalence remains unavailable and codex_approved remains null.",
+        "Codex approval equivalence remains unavailable, and no GitHub-style Codex approval is inferred.",
         "The contract, assessment, clustering, authorization, and completion gates match the shared workflow."
       ]
     },
@@ -78,11 +78,11 @@
       "id": 7,
       "tags": ["rejection", "change-request"],
       "prompt": "Use the attached sealed canonical snapshot in evals/files/case-07-snapshot.json to trace the empty-body rejection and body-bearing change request through one evidence-bound review cycle. Source edits, push, and top-level responses are authorized when warranted; do not perform live operations.",
-      "expected_output": "Both rejection forms remain explicit typed inputs and receive evidence-bound dispositions.",
+      "expected_output": "Both rejection forms remain explicit inputs and receive evidence-bound dispositions.",
       "files": ["evals/files/case-07-snapshot.json"],
       "expectations": [
         "Both inputs remain in the census despite one empty body.",
-        "Both use rejection_assessed and receive exact cluster assignments; unrelated evidence remains an explicit singleton.",
+        "Both rejections are explicitly assessed and receive exact cluster assignments; unrelated evidence remains an explicit singleton.",
         "The empty-body clarification stays open while the body-bearing rejection receives an evidence-bearing plan whose communication and recheck remain pending."
       ]
     },

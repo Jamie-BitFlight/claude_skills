@@ -55,10 +55,11 @@ def test_model_invoked_description_covers_both_providers_and_trigger_branches() 
     )
 
     assert len(description.split()) <= 35
+    assert description.startswith("Process reviewer feedback")
     assert "GitHub PR" in description
     assert "GitLab MR" in description
-    assert "after pushing" in description
-    assert "asked to check or address review feedback" in description
+    assert "after pushing a commit to recheck reviews" in description
+    assert "asked to check or address comments" in description
     assert "disable-model-invocation" not in skill
 
 
