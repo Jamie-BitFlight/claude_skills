@@ -25,6 +25,7 @@ include:
       git-remote-name: origin
       repository-url: $CI_PROJECT_URL.git
       environment: release-version
+      credential-variable: PROJECT_RELEASE_PUSH_TOKEN
       tag-prefix: v
       rules:
         - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'

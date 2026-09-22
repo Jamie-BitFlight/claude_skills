@@ -15,13 +15,18 @@ They do not define workflow admission, a stage list, global defaults, global var
 ## Consume
 
 Start from `examples/consumer.gitlab-ci.yml`. Replace the component project path, component commit
-SHA, image digests, project commands, and explicit Git remote selection. Keep one version
+SHA, image digests, project commands, and explicit credential-free HTTPS Git remote selection. Keep one version
 component: use either `semantic-release-version` or `python-semantic-release-version`, never both
 in one pipeline. Pass semantic-release both the selected remote name and repository URL.
 
 Pin production component references to a reviewed commit SHA. A trusted immutable release tag is
 also supported, but moving selectors such as a branch, a partial version, and `~latest` do not lock
 the fetched configuration.
+
+Ensure the actor that creates the release tag can fetch every component in the resulting tag
+pipeline. A project-access-token bot cannot be added to another private project. For that release
+identity, host components in a public project, an internal project visible to the bot, or use a
+different release actor with Reporter-or-higher access to the private component project.
 
 The consumer owns:
 
@@ -31,21 +36,24 @@ The consumer owns:
 - one selected version adapter and all `needs` relationships; and
 - digest-pinned runtime images.
 
-Create `RELEASE_PUSH_TOKEN` as a masked, hidden, protected runtime variable with the minimum scope
-needed to push the protected release tag and, for python-semantic-release, its release commit. Set
-its environment scope to exactly the value passed as the version component's `environment` input;
-the example uses `release-version`. The version job declares that environment with the `verify`
-action. Tag publication jobs declare no environment and therefore do not receive the scoped token.
-Protect both the default branch and release-tag pattern. Keep credentials out of component inputs,
-and prefer an explicitly requested external secret where available.
+Pass a collision-free CI variable name through `credential-variable`; the example uses
+`PROJECT_RELEASE_PUSH_TOKEN`. Create that variable as masked, hidden, protected, raw, and scoped
+exactly to the version component's `environment` input. Hidden is creation-only: if an existing key
+is not hidden, create a new key instead of expecting update to hide it. Create a protected, raw,
+non-secret companion named `<credential-variable>_SHA256` with the same environment scope and the
+credential's lowercase SHA-256 digest. Protect both the default branch and release-tag pattern.
 
-The version components replace the selected remote's URL with the credential-free `repository-url`
-input and export command-scoped Git configuration for all child processes. The first helper entry
-resets inherited Runner helpers; the second returns `oauth2` and reads `RELEASE_PUSH_TOKEN` from the
-runtime environment. This works when Runner sets `credential.interactive=never`, and prevents a
-lower-precedence `CI_JOB_TOKEN` helper from winning. The secret value is not written to a file or
-embedded in a repository URL. Generic package publication and GitLab Release creation use the job's
-short-lived `CI_JOB_TOKEN`.
+The version job validates the variable name and digest before changing the selected remote. It then
+binds `Authorization: Basic ...` as command-scoped `http.extraHeader` only to the release process,
+scoped to the selected remote's effective HTTPS URL after Runner `insteadOf` rewriting. This
+overrides host-specific job-token credentials without sending the release header to other HTTPS
+hosts. The secret stays out of component inputs, repository URLs, files, persisted Git config, and logs. The Python adapter uses
+`--no-vcs-release`, supplies no GitLab API token, and keeps `ignore_token_for_push` enabled so Git
+transport remains on the Basic header. Tag publication jobs have no version environment and use
+their short-lived `CI_JOB_TOKEN`.
+
+After changing a component pin, included configuration, variable metadata, credential value, or
+digest companion, start a new pipeline. Retrying a job reuses the prior pipeline configuration.
 
 ## Test And Publish
 
@@ -59,19 +67,23 @@ publication, require observable evidence that:
 - default-branch and protected matching-tag simulations admit the intended jobs while a
   nonmatching tag admits none of the release jobs;
 - a selected version component succeeds for both no-release and release-worthy histories;
-- under the target Runner's noninteractive credential configuration, a child Git process resolves
-  the scoped release credential instead of inherited job-token helpers, while repository config,
-  remote URLs, helper configuration values, and created files contain no release credential;
+- under the target Runner's noninteractive credential, `insteadOf`, and host-helper configuration,
+  both release processes receive the selected Basic header while repository config, remote URLs,
+  files, and logs contain no release credential;
 - a protected matching tag produces notes, one consumer build artifact, the Generic package, and
   the GitLab Release in dependency order; and
 - the Catalog publication job exists only for a semantic-version tag and succeeds after component
   validation.
 
-The root jobs execute only local, side-effect-free credential and Git-history fixtures. Before a
-production component release, run the version, package, and GitLab Release components in an isolated
-GitLab sandbox with disposable protected refs, a scoped credential, and disposable package names.
-Require no-release, release, destination read-back, and release-last evidence; do not run those
-mutating checks against a production project.
+The root component-project credential job validates process-scoped Git configuration without making
+an HTTP request. The repository pytest fixture validates both generated shell wrappers and their
+process-scoped Git transport against local HTTPS; it does not execute either release tool. The
+semantic-release adapter additionally has live GitLab proof. The Python wrapper is locally verified,
+but python-semantic-release has not completed a post-refactor live lifecycle. Before a production
+component release, run the version, package, and GitLab Release components in an isolated GitLab
+sandbox with disposable protected refs, a scoped credential, and disposable package names. Require
+no-release, release, destination read-back, and release-last evidence; do not run those mutating
+checks against a production project.
 
 Before the Catalog job can publish, an Owner must enable the project's CI/CD Catalog setting. The
 project must have a description, and the tagged commit must contain the root `README.md` and at
@@ -88,3 +100,8 @@ SOURCE: <https://docs.gitlab.com/ci/environments/#access-an-environment-for-prep
 SOURCE: <https://docs.gitlab.com/ci/secrets/> (accessed 2026-09-22)
 SOURCE: <https://semver.org/spec/v2.0.0.html> (accessed 2026-09-22)
 SOURCE: <https://docs.gitlab.com/ci/jobs/job_rules/#compare-a-variable-to-a-regular-expression> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/user/project/settings/project_access_tokens/> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/variables/#hide-a-cicd-variable> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/jobs/job_troubleshooting/#a-cicd-job-does-not-use-newer-configuration-when-run-again> (accessed 2026-09-22)
+SOURCE: <https://git-scm.com/docs/git-config#Documentation/git-config.txt-httpextraHeader> (accessed 2026-09-22)
+SOURCE: <https://gitlab.com/gitlab-org/gitlab-runner/-/raw/v18.7.1/shells/abstract.go> (accessed 2026-09-22)

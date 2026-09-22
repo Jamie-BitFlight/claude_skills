@@ -8,6 +8,7 @@ include:
       git-remote-name: origin
       repository-url: $CI_PROJECT_URL.git
       environment: release-version
+      credential-variable: COMPONENT_TEST_RELEASE_TOKEN
       rules:
         - when: never
   - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/python-semantic-release-version@$CI_COMMIT_SHA
@@ -21,6 +22,7 @@ include:
       git-remote-name: origin
       repository-url: $CI_PROJECT_URL.git
       environment: release-version
+      credential-variable: COMPONENT_TEST_RELEASE_TOKEN
       rules:
         - when: never
   - component: $CI_SERVER_FQDN/$CI_PROJECT_PATH/release-notes@$CI_COMMIT_SHA
@@ -66,25 +68,26 @@ validate-component-tree:
       actual = {path.name for path in pathlib.Path("templates").glob("*.yml")};
       assert actual == expected, {"expected": sorted(expected), "actual": sorted(actual)}'
 
-test-release-git-credential:
+test-release-basic-header:
   stage: test
   image: alpine/git:__GIT_VERSION__@sha256:__GIT_IMAGE_DIGEST__
   script:
     - |
-      RELEASE_PUSH_TOKEN=release-credential-sentinel
-      export RELEASE_PUSH_TOKEN
+      set -eu
+      release_credential=release-credential-sentinel
       git config credential.interactive never
-      git config credential.helper '!f() { test "$1" = get || exit 0; printf "username=gitlab-ci-token\npassword=inherited-lower-credential\n"; }; f "$@"'
-      export GIT_TERMINAL_PROMPT=0
-      export GIT_CONFIG_COUNT=2
-      export GIT_CONFIG_KEY_0=credential.helper
-      export GIT_CONFIG_VALUE_0=
-      export GIT_CONFIG_KEY_1=credential.helper
-      export GIT_CONFIG_VALUE_1='!f() { test "$1" = get || exit 0; printf "username=oauth2\npassword=%s\n" "$RELEASE_PUSH_TOKEN"; }; f "$@"'
-      case "$GIT_CONFIG_VALUE_1" in *"$RELEASE_PUSH_TOKEN"*) exit 1 ;; esac
-      fixture_credential="$(sh -c "printf 'protocol=https\\nhost=fixture.invalid\\n\\n' | git credential fill")"
-      printf '%s\n' "$fixture_credential" | grep -Fxq 'username=oauth2'
-      test "$(printf '%s\n' "$fixture_credential" | sed -n 's/^password=//p')" = "$RELEASE_PUSH_TOKEN"
+      git config url.https://gitlab-ci-token:job-token@fixture.invalid/.insteadOf https://fixture.invalid/
+      git config credential.https://fixture.invalid.helper '!f() { test "$1" = get || exit 0; printf "username=gitlab-ci-token\npassword=job-token\n"; }; f "$@"'
+      release_authorization="$(printf 'oauth2:%s' "$release_credential" | base64 | tr -d '\n')"
+      EXPECTED_HEADER="Authorization: Basic ${release_authorization}" \
+      EXPECTED_KEY=http.https://fixture.invalid/repo.git.extraHeader \
+      GIT_TERMINAL_PROMPT=0 \
+      GIT_CONFIG_COUNT=1 \
+      GIT_CONFIG_KEY_0=http.https://fixture.invalid/repo.git.extraHeader \
+      GIT_CONFIG_VALUE_0="Authorization: Basic ${release_authorization}" \
+      sh -c 'test "$(git config --get-all "$EXPECTED_KEY")" = "$EXPECTED_HEADER"'
+      ! git config --get-all http.https://fixture.invalid/repo.git.extraHeader
+      ! grep -Fq "$release_credential" .git/config
 
 test-release-tag-selection:
   stage: test
@@ -106,7 +109,7 @@ publish-component-catalog:
   image: registry.gitlab.com/gitlab-org/cli:__GLAB_VERSION__@sha256:__GLAB_IMAGE_DIGEST__
   needs:
     - validate-component-tree
-    - test-release-git-credential
+    - test-release-basic-header
     - test-release-tag-selection
   script:
     - test "$CI_PIPELINE_SOURCE" = "push"

@@ -51,6 +51,35 @@ that token's bot user. Repository pushes with `CI_JOB_TOKEN` remained disabled. 
 project-token Git transport and release-credential isolation from tag publication jobs without
 exposing credential values.
 
+That command-helper success is bounded to project `595`'s observed credential-free URL and Runner
+configuration. It is not evidence that generic helpers override every Runner credential source.
+
+## Cold Run 4 Semantic Component Evidence
+
+[Consumer project 529](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation)
+pinned [component project 628](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/cold-run-4-release-components)
+at [component commit `7e83114b`](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/cold-run-4-release-components/-/commit/7e83114b51ba284f215f946c1b4b83183cda6e8d).
+[Main pipeline 5963](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/pipelines/5963)
+and [version job 7393](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7393)
+used the selected environment-scoped credential through process-scoped Basic `http.extraHeader`,
+created `cold-run-4-v0.1.0`, and started bot-attributed
+[tag pipeline 5964](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/pipelines/5964).
+Its ordered evidence is [notes 7395](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7395),
+[build 7396](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7396),
+[publication 7397](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7397), and
+[Release 7398](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7398).
+[No-release pipeline 5966](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/pipelines/5966)
+and [job 7402](https://gitlab-au.aws.hivemindcloud.com/jamie.nelson/jira-ai-evaluation/-/jobs/7402)
+exercised the same transport and completed without another tag.
+
+The run also established the access boundary: a project-access-token bot cannot be added to another
+private project, while public project `628` was resolvable by the project-token-created tag pipeline.
+Five preceding cold-run jobs showed generic credential helpers did not displace Runner's
+host-specific job-token authentication; only process-scoped `http.extraHeader` produced the selected
+release identity.
+The current Python adapter's equivalent transport is executable-fixture and documentation verified,
+not live-verified by cold run 4.
+
 ## Corrected Failures
 
 - Historical job `7065` failed because the Node Alpine image lacked Git; installing Git produced
@@ -74,6 +103,10 @@ Generic publication and matching read-back, and GitLab Release creation last at 
 `c96cb30b4`. Durable evidence is the retained project `595` and its API-visible pipelines, jobs,
 artifacts, package, and Release; the ignored scratch report is not the durable evidence store.
 
+LIVE-VERIFIED, COLD-RUN-4 SEMANTIC TRANSPORT: process-scoped Basic authorization over Runner
+`insteadOf`, noninteractive, and host-helper configuration for release and no-release execution in
+consumer/component projects `529/628`. This claim does not extend to the Python adapter.
+
 DOCUMENTATION-VERIFIED, NOT LIVE-TESTED: GitLab PyPI, GitLab npm, PyPI.org, and npmjs.com adapters.
 
-SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; project 529 claims sourced from preserved fixtures and the prior sandbox ledger; project 595 claims verified through retained GitLab API-visible evidence)
+SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; historical project 529 claims sourced from preserved fixtures and the prior sandbox ledger; project 595 and cold-run projects 529/628 claims verified through their GitLab API-visible evidence)

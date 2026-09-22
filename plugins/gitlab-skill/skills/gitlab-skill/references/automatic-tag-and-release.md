@@ -25,7 +25,8 @@ Read the current project before composing the consumer pipeline: GitLab target a
 default branch, existing workflow admission and jobs, complete stage list, one version adapter,
 release policy and tag format, release-commit behavior, protected credential interface, notes
 artifact, project build command and outputs, publication destinations, Release links, immutable
-runtime images, and validation evidence.
+runtime images, component-project access for both branch and tag-pipeline actors, and validation
+evidence.
 
 For a migration, account for all current workflow sources and jobs. Consult deleted configuration
 only when the owner requests migration or one named uncertainty cannot be resolved from current
@@ -55,6 +56,10 @@ Select exactly one implementation from [Version Adapter Index](./release-version
 Apply the component invocation and credential contract through the component-project README pointer
 below rather than redefining it here.
 
+The semantic-release process-scoped transport is live-verified. The Python shell, generated config,
+and local HTTP transport boundary are executable-fixture verified; python-semantic-release `10.6.2`
+has not completed a post-refactor live lifecycle.
+
 Select one implementation from [Release Notes Adapter Index](./release-notes-adapters.md). Preserve
 the description artifact interface when substituting a project-owned notes component.
 
@@ -76,11 +81,13 @@ and resolve every marker against the target project before validation.
 1. Intake: every intake value comes from the project or its owner, and existing workflow behavior
    remains accounted for.
 2. Structure: the dedicated project has exactly the declared templates; every component is
-   self-contained and its inputs compile at pipeline creation.
+   self-contained and its inputs compile at pipeline creation. Both the branch-pipeline actor and
+   release-tag-pipeline actor can fetch every pinned component.
 3. Composition: the consumer owns admission, all stages, policy, project build, dependencies, and
    exactly one version adapter; no substitution marker or mutable production pin remains.
-4. Credential: protected refs, credential role/scope/state/expiry, and protected variable metadata
-   match the resolved interface.
+4. Credential: protected refs, credential role/scope/state/expiry, collision-free credential key,
+   non-secret digest companion, creation-time hidden state, and exact environment scopes match the
+   resolved interface. Runner fixtures prove process-scoped Basic transport for both version paths.
 5. Main: the version job succeeds and records whether it selected no-release or release.
 6. Tag: the tag-pipeline SHA equals the dereferenced tag commit; notes, consumer build, every
    publication, and Release succeed in dependency order with Release last.
@@ -105,6 +112,9 @@ and resolve every marker against the target project before validation.
   validation passes, and a semantic-version tag pipeline creates the release in a project meeting
   the Catalog prerequisites.
 
+After any component pin, included configuration, variable metadata, credential, or digest change,
+run a new pipeline. Do not treat a retried job's configuration snapshot as evidence of the change.
+
 After refs exist remotely, load
 [Post-Merge and Existing-Ref Inspection](./glab-ci-existing-ref-inspection.md) to inspect the default
 branch, matching tag, nonmatching tag, pipelines, jobs, and traces. Apply only the completion branch
@@ -115,3 +125,4 @@ SOURCE: <https://docs.gitlab.com/ci/inputs/> (accessed 2026-09-22)
 SOURCE: <https://docs.gitlab.com/ci/variables/predefined_variables/> (accessed 2026-09-22)
 SOURCE: <https://docs.gitlab.com/ci/variables/#protect-a-cicd-variable> (accessed 2026-09-22)
 SOURCE: <https://docs.gitlab.com/ci/components/#publish-a-new-release> (accessed 2026-09-22)
+SOURCE: <https://docs.gitlab.com/ci/jobs/job_troubleshooting/#a-cicd-job-does-not-use-newer-configuration-when-run-again> (accessed 2026-09-22)

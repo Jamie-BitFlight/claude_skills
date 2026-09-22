@@ -11,15 +11,20 @@ spec:
       description: Digest-pinned Python image containing pip.
     python-semantic-release-version:
       description: Exact python-semantic-release package version.
+      type: string
+      regex: '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
     tag-prefix:
       description: Prefix added before the semantic version.
       default: v
     git-remote-name:
       description: Existing Git remote used for the release commit and tag.
     repository-url:
-      description: Credential-free Git repository URL assigned to the selected remote.
+      description: Credential-free HTTPS Git repository URL assigned to the selected remote.
     environment:
-      description: Environment name whose exact scope exposes RELEASE_PUSH_TOKEN to this job.
+      description: Environment name whose exact scope exposes the selected credential to this job.
+    credential-variable:
+      description: Name of the protected runtime variable containing the release credential.
+      default: RELEASE_PUSH_TOKEN
     git-author-name:
       description: Author name for the release commit.
     git-author-email:
@@ -37,38 +42,40 @@ spec:
     action: verify
   variables:
     GIT_DEPTH: "0"
-    GITLAB_TOKEN: "$RELEASE_PUSH_TOKEN"
     RELEASE_TAG_PREFIX: "$[[ inputs.tag-prefix ]]"
     RELEASE_GIT_REMOTE_NAME: "$[[ inputs.git-remote-name ]]"
     RELEASE_REPOSITORY_URL: "$[[ inputs.repository-url ]]"
     RELEASE_GIT_AUTHOR_NAME: "$[[ inputs.git-author-name ]]"
     RELEASE_GIT_AUTHOR_EMAIL: "$[[ inputs.git-author-email ]]"
     RELEASE_VERSION_TOML: "$[[ inputs.version-toml ]]"
+    RELEASE_CREDENTIAL_VARIABLE: "$[[ inputs.credential-variable ]]"
+    RELEASE_CREDENTIAL_DIGEST_VARIABLE: "$[[ inputs.credential-variable ]]_SHA256"
+    PYTHON_SEMANTIC_RELEASE_VERSION: "$[[ inputs.python-semantic-release-version ]]"
   before_script:
     - apk add --no-cache git
-    - python -m pip install --no-cache-dir python-semantic-release==$[[ inputs.python-semantic-release-version ]]
+    - python -m pip install --no-cache-dir "python-semantic-release==${PYTHON_SEMANTIC_RELEASE_VERSION}"
     - test -n "$CI_DEFAULT_BRANCH"
-    - test -n "$RELEASE_PUSH_TOKEN"
+    - |
+      set -eu
+      case "$RELEASE_CREDENTIAL_VARIABLE" in
+        ''|[0-9]*|*[!A-Za-z0-9_]*) printf 'invalid credential variable name\n' >&2; exit 1 ;;
+      esac
+      release_credential="$(printenv "$RELEASE_CREDENTIAL_VARIABLE" || true)"
+      test -n "$release_credential"
+      expected_digest="$(printenv "$RELEASE_CREDENTIAL_DIGEST_VARIABLE" || true)"
+      test -n "$expected_digest"
+      actual_digest="$(printf '%s' "$release_credential" | sha256sum | cut -d ' ' -f 1)"
+      test "$actual_digest" = "$expected_digest"
+      printf 'release credential digest verified\n'
+      unset release_credential expected_digest actual_digest
     - test "$CI_PIPELINE_SOURCE" = "push"
     - test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
     - test -z "${CI_COMMIT_TAG:-}"
     - test "$CI_COMMIT_REF_PROTECTED" = "true"
     - git remote get-url "$RELEASE_GIT_REMOTE_NAME" >/dev/null
-    - 'case "$RELEASE_REPOSITORY_URL" in http://*|https://*) ;; *) printf ''repository URL must use HTTP(S)\n'' >&2; exit 1 ;; esac'
+    - 'case "$RELEASE_REPOSITORY_URL" in https://*) ;; *) printf ''repository URL must use HTTPS\n'' >&2; exit 1 ;; esac'
     - 'case "${RELEASE_REPOSITORY_URL#*://}" in *@*) printf ''repository URL must not contain credentials\n'' >&2; exit 1 ;; esac'
     - git remote set-url "$RELEASE_GIT_REMOTE_NAME" "$RELEASE_REPOSITORY_URL"
-    - test "$(git remote get-url "$RELEASE_GIT_REMOTE_NAME")" = "$RELEASE_REPOSITORY_URL"
-    - |
-      export GIT_TERMINAL_PROMPT=0
-      export GIT_CONFIG_COUNT=2
-      export GIT_CONFIG_KEY_0=credential.helper
-      export GIT_CONFIG_VALUE_0=
-      export GIT_CONFIG_KEY_1=credential.helper
-      export GIT_CONFIG_VALUE_1='!f() { test "$1" = get || exit 0; printf "username=oauth2\npassword=%s\n" "$RELEASE_PUSH_TOKEN"; }; f "$@"'
-      case "$GIT_CONFIG_VALUE_1" in *"$RELEASE_PUSH_TOKEN"*) exit 1 ;; esac
-      fixture_credential="$(sh -c "printf 'protocol=https\\nhost=fixture.invalid\\n\\n' | git credential fill")"
-      printf '%s\n' "$fixture_credential" | grep -Fxq 'username=oauth2'
-      test "$(printf '%s\n' "$fixture_credential" | sed -n 's/^password=//p')" = "$RELEASE_PUSH_TOKEN"
   script:
     - |
       python - <<'PY'
@@ -92,7 +99,6 @@ spec:
       [semantic_release.remote]
       name = "{remote}"
       type = "gitlab"
-      token = {{ env = "GITLAB_TOKEN" }}
       ignore_token_for_push = true
       ''')
       PY
@@ -100,4 +106,17 @@ spec:
     - git config user.email "$RELEASE_GIT_AUTHOR_EMAIL"
     - git checkout -B "$CI_DEFAULT_BRANCH" "$CI_COMMIT_SHA"
     - git branch --set-upstream-to="$RELEASE_GIT_REMOTE_NAME/$CI_DEFAULT_BRANCH" "$CI_DEFAULT_BRANCH"
-    - semantic-release --config .release-component.toml version --commit --tag --push --skip-build --no-vcs-release
+    - |
+      set -eu
+      release_credential="$(printenv "$RELEASE_CREDENTIAL_VARIABLE" || true)"
+      test -n "$release_credential"
+      release_authorization="$(printf 'oauth2:%s' "$release_credential" | base64 | tr -d '\n')"
+      test -n "$release_authorization"
+      release_http_url="$(git remote get-url "$RELEASE_GIT_REMOTE_NAME")"
+      case "$release_http_url" in https://*) ;; *) exit 1 ;; esac
+      unset "$RELEASE_CREDENTIAL_VARIABLE"
+      GIT_TERMINAL_PROMPT=0 \
+      GIT_CONFIG_COUNT=1 \
+      GIT_CONFIG_KEY_0="http.${release_http_url}.extraHeader" \
+      GIT_CONFIG_VALUE_0="Authorization: Basic ${release_authorization}" \
+      semantic-release --config .release-component.toml version --commit --tag --push --skip-build --no-vcs-release

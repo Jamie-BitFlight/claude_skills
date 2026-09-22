@@ -1,14 +1,18 @@
 # semantic-release Version Adapter
 
-Evidence: **LIVE-VERIFIED behavior** with semantic-release `25.0.9`; the reusable component is
-derived from that evidence.
+Evidence: **LIVE-VERIFIED** semantic-release `25.0.9` process-scoped Basic transport in consumer
+project `529` with component project `628`; the reusable component generalizes that correction. See
+[Cold Run 4 Semantic Component Evidence](./release-live-evidence.md#cold-run-4-semantic-component-evidence)
+for the retained project, pipeline, and job evidence.
 
 Include `assets/release-components/templates/semantic-release-version.yml` from a dedicated
 component project. Pass a unique job name, the consumer's version stage and rules, a digest-pinned
 Node image, an exact tool version, tag prefix, selected Git remote name, explicit credential-free
-repository URL, and the dedicated version environment. It passes the URL as semantic-release's
+HTTPS repository URL, and the dedicated version environment. It passes the URL as semantic-release's
 `repositoryUrl` and keeps only commit analysis so the tag pipeline owns notes, build, publication,
-and Release creation.
+and Release creation. Pass a collision-free credential variable name; its same-scope `_SHA256`
+companion must match before remote mutation. Basic authorization is process-scoped to the selected
+remote's effective HTTPS URL and does not apply to other hosts.
 
 Requirements:
 
@@ -56,3 +60,5 @@ SOURCE: <https://semantic-release.org/usage/configuration/#repositoryurl> (acces
 SOURCE: <https://semantic-release.org/usage/configuration/#dryrun> (accessed 2026-09-22; dry-run behavior documentation-verified)
 SOURCE: <https://docs.gitlab.com/ci/environments/#limit-the-environment-scope-of-a-cicd-variable> (accessed 2026-09-22)
 SOURCE: <https://docs.gitlab.com/ci/environments/#access-an-environment-for-preparation-or-verification-purposes> (accessed 2026-09-22)
+SOURCE: <https://semantic-release.org/usage/ci-configuration/#authentication> (accessed 2026-09-22; process-scoped Basic transport live verified in projects 529 and 628)
+SOURCE: <https://git-scm.com/docs/git-config#Documentation/git-config.txt-httpextraHeader> (accessed 2026-09-22)
