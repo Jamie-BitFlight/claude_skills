@@ -221,5 +221,11 @@ def test_f15_timeout_kills_descendant_tree_and_retains_complete_output(tmp_path:
     assert b"before-timeout" in base64.b64decode(record["stderr_base64"])
     time.sleep(0.1)
     for pid in pids:
-        with pytest.raises(ProcessLookupError):
-            os.kill(pid, 0)
+        if sys.platform == "win32":
+            tasklist = subprocess.run(
+                ("tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"), capture_output=True, text=True, check=False
+            )
+            assert f'"{pid}"' not in tasklist.stdout
+        else:
+            with pytest.raises(ProcessLookupError):
+                os.kill(pid, 0)

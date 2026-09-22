@@ -22,7 +22,6 @@ in this package.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import sys
@@ -41,6 +40,22 @@ if str(_plugin_root) not in sys.path:
 import contextlib
 
 import dh_paths as _dh_paths
+
+if os.name == "nt":
+    import msvcrt
+
+    def lock_file(file_descriptor: int) -> None:
+        """Acquire a blocking one-byte Windows file lock."""
+        os.lseek(file_descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(file_descriptor, msvcrt.LK_LOCK, 1)
+
+else:
+    import fcntl
+
+    def lock_file(file_descriptor: int) -> None:
+        """Acquire a blocking POSIX advisory file lock."""
+        fcntl.flock(file_descriptor, fcntl.LOCK_EX)
+
 
 if TYPE_CHECKING:
     # Imported for type annotations only.  At runtime this module may be loaded
@@ -150,7 +165,7 @@ class LocalFilesystemArtifactProvider:
         # Open (or create) the lock file in append mode.  Never delete it.
         lock_fd = os.open(str(lock_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
         try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            lock_file(lock_fd)
             tmp_path: str | None = None
             with tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8", dir=str(manifest_path.parent), suffix=".tmp", delete=False
