@@ -27,8 +27,9 @@ SOURCE: <https://docs.gitlab.com/ci/yaml/expressions/> (accessed 2026-09-21)
 
 ## CI Lint
 
-When configuration validation is requested, load [glab CI Read-Only Inspection](./glab-ci-inspection.md)
-and follow its decision table. This configuration-semantics reference does not define CI Lint
-commands, include-resolution strategy, event context, or proof boundaries.
+When configuration validation is requested, load the [glab CI Context Index](./glab-ci-inspection.md)
+and select the branch matching the available repository state. This configuration-semantics
+reference does not define CI Lint commands, include-resolution strategy, event context, or proof
+boundaries.
 
 SOURCE: <https://docs.gitlab.com/ci/yaml/lint/> (accessed 2026-09-21)

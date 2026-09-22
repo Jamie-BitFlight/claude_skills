@@ -36,6 +36,12 @@ def markdown_links(path: Path) -> list[str]:
     return links
 
 
+def bash_blocks(path: Path) -> list[str]:
+    """Return bash fenced blocks from a Markdown document."""
+    parts = path.read_text(encoding="utf-8").split("```bash")
+    return [part.split("```", maxsplit=1)[0] for part in parts[1:]]
+
+
 def load_evals() -> list[dict[str, object]]:
     """Return the GitLab skill's behavioral eval cases."""
     data = json.loads((SKILL_ROOT / "evals" / "evals.json").read_text(encoding="utf-8"))
@@ -52,6 +58,17 @@ def test_routed_references_resolve() -> None:
             continue
         target = (skill_path.parent / destination.split("#", maxsplit=1)[0]).resolve()
         assert target.is_file(), f"missing routed reference: {destination}"
+
+
+def test_reference_links_resolve() -> None:
+    """Every relative link between references resolves inside the package."""
+    references = SKILL_ROOT / "references"
+    for reference in references.glob("*.md"):
+        for destination in markdown_links(reference):
+            if not destination.startswith("./"):
+                continue
+            target = (reference.parent / destination.split("#", maxsplit=1)[0]).resolve()
+            assert target.is_file(), f"{reference.name}: missing reference {destination}"
 
 
 def test_references_include_source_metadata() -> None:
@@ -147,41 +164,149 @@ def test_release_credential_branch_encodes_default_branch_path() -> None:
     assert 'protected_branches/$DEFAULT_BRANCH"' not in reference
 
 
-def test_cold_run_operational_contracts_are_explicit() -> None:
-    """Candidate lint, notes tools, forecast, observed IDs, transport, and evidence stay authoritative."""
+def test_ci_context_references_separate_candidate_and_existing_ref_tools() -> None:
+    """CI context links expose distinct pre-merge and existing-ref command surfaces."""
     references = SKILL_ROOT / "references"
-    ci = references.joinpath("glab-ci-inspection.md").read_text(encoding="utf-8")
-    transport = references.joinpath("glab-api-and-repository.md").read_text(encoding="utf-8")
-    forecast = references.joinpath("release-version-semantic-release.md").read_text(encoding="utf-8")
-    lifecycle = references.joinpath("automatic-tag-and-release.md").read_text(encoding="utf-8")
-    notes = SKILL_ROOT.joinpath("assets/release-playbook/release-notes.gitlab-ci.yml").read_text(encoding="utf-8")
+    index = references.joinpath("glab-ci-inspection.md")
+    candidate = references.joinpath("glab-ci-candidate-validation.md").read_text(encoding="utf-8")
+    existing = references.joinpath("glab-ci-existing-ref-inspection.md").read_text(encoding="utf-8")
 
-    assert "validate_release_candidate.py" in ci
-    assert "static content request" in ci
-    assert "Never infer, increment, or guess an" in ci
-    assert "ci get --with-job-details` is the sole source" in ci
-    assert "Monolithic local file with no local includes" in ci
-    assert "Unpushed split local includes" in ci
-    assert "never try remote local-include resolution first" in ci
-    assert "Static pre-merge candidate lint has no branch/tag event context" in ci
-    assert 'git fetch origin "$TARGET_REF"' in transport
-    assert 'git cat-file -e "$SHA^{commit}"' in transport
-    assert "docs-only setup commit does not imply no-release" in forecast
-    assert "candidate-branch dry run is not equivalent" in forecast
-    assert "no-release version-job trace" in lifecycle
-    assert "nonmatching tag" in lifecycle
-    assert "secret scan" in lifecycle
-    assert (
-        notes.index("apk add --no-cache git") < notes.index("command -v git") < notes.index("__RELEASE_NOTES_COMMAND__")
+    assert set(markdown_links(index)) == {"./glab-ci-candidate-validation.md", "./glab-ci-existing-ref-inspection.md"}
+    assert "validate_release_candidate.py" in candidate
+    assert "glab ci " not in candidate
+    assert "validate_release_candidate.py" not in existing
+    assert all(command in existing for command in ("glab ci list", "glab ci get", "glab ci trace", "glab ci lint"))
+
+
+def test_release_gate_links_both_ci_contexts() -> None:
+    """The lifecycle discloses pre-merge and existing-ref references from its gate."""
+    lifecycle = SKILL_ROOT / "references" / "automatic-tag-and-release.md"
+    destinations = set(markdown_links(lifecycle))
+
+    assert "./glab-ci-candidate-validation.md" in destinations
+    assert "./glab-ci-existing-ref-inspection.md" in destinations
+
+
+@pytest.mark.parametrize(
+    ("glab_status", "glab_output", "expected", "expected_status"),
+    [
+        (0, '{"status":"valid"}', "pipeline", 0),
+        (1, "The pipeline did not run. Review the workflow:rules configuration.", "no-pipeline", 0),
+        (2, "authentication failed", "no-pipeline", 1),
+        (
+            2,
+            "authentication failed: The pipeline did not run. Review the workflow:rules configuration.",
+            "no-pipeline",
+            1,
+        ),
+    ],
+)
+def test_existing_ref_lint_function_preserves_assertion_semantics(
+    glab_status: int, glab_output: str, expected: str, expected_status: int
+) -> None:
+    """Execute the documented function with deterministic glab outcomes."""
+    reference = SKILL_ROOT / "references" / "glab-ci-existing-ref-inspection.md"
+    block = next(block for block in bash_blocks(reference) if "lint_existing_ref()" in block)
+    function = block.split("\n}\n", maxsplit=1)[0] + "\n}\n"
+    script = f"""
+glab() {{
+  printf '%s\\n' "$GLAB_OUTPUT"
+  return "$GLAB_STATUS"
+}}
+{function}
+lint_existing_ref test-ref "$EXPECTED"
+"""
+
+    result = subprocess.run(
+        ["bash", "-c", script],
+        env={
+            **os.environ,
+            "EXPECTED": expected,
+            "GLAB_OUTPUT": glab_output,
+            "GLAB_STATUS": str(glab_status),
+            "REPO": "git@example.test:group/project.git",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
     )
-    assert "NOTES_REQUIRED_EXECUTABLES" in notes
 
-    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    pipeline = references.joinpath("pipeline-optimization.md").read_text(encoding="utf-8")
-    assert "CI Lint behavior" not in skill
-    assert "glab CLI](./references/glab-cli.md) - Load for CI Lint validation decisions" in skill
-    assert "pipeline simulation runs as a Git `push` event on the default branch" not in pipeline
-    assert "[glab CI Read-Only Inspection](./glab-ci-inspection.md)" in pipeline
+    if expected_status == 0:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode != 0
+
+
+@pytest.mark.parametrize(
+    ("credential_mode", "glab_status"), [("environment", 0), ("persisted", 0), ("environment", 23), ("persisted", 24)]
+)
+def test_auth_probe_uses_resolved_credentials_and_preserves_failure(credential_mode: str, glab_status: int) -> None:
+    """Execute the documented auth probe for both glab credential modes."""
+    reference = SKILL_ROOT / "references" / "glab-cli.md"
+    probe = next(block for block in bash_blocks(reference) if "glab api --silent user" in block)
+    script = f"""
+glab() {{
+  return "$GLAB_STATUS"
+}}
+{probe}
+"""
+    environment: dict[str, str] = {**os.environ, "GLAB_STATUS": str(glab_status)}
+    if credential_mode == "environment":
+        environment["GITLAB_TOKEN"] = "redacted-test-token"
+    else:
+        environment.pop("GITLAB_TOKEN", None)
+
+    result = subprocess.run(["bash", "-c", script], env=environment, text=True, capture_output=True, check=False)
+
+    assert result.returncode == glab_status
+    if glab_status:
+        error = result.stderr.casefold()
+        assert "ask the user" in error
+        assert "authenticate" in error or "credential" in error
+
+
+@pytest.mark.parametrize(("mode", "expected_status", "request_errors"), [("transient", 0, 1), ("exhaust", 1, 3)])
+def test_bounded_polling_handles_request_failures(
+    tmp_path: Path, mode: str, expected_status: int, request_errors: int
+) -> None:
+    """Execute polling through transient recovery and bound exhaustion."""
+    reference = SKILL_ROOT / "references" / "glab-ci-existing-ref-inspection.md"
+    block = next(block for block in bash_blocks(reference) if "poll_pipeline()" in block)
+    counter_file = tmp_path / "poll-count"
+    script = f"""
+glab() {{
+  count=0
+  test -f "$COUNTER_FILE" && count="$(<"$COUNTER_FILE")"
+  count=$((count + 1))
+  printf '%s' "$count" >"$COUNTER_FILE"
+  if test "$MODE" = exhaust || test "$count" -eq 1; then
+    return 7
+  fi
+  printf '%s\\n' '{{"status":"success"}}'
+}}
+sleep() {{ :; }}
+{block}
+poll_pipeline 5749
+"""
+    result = subprocess.run(
+        ["bash", "-c", script],
+        env={
+            **os.environ,
+            "COUNTER_FILE": str(counter_file),
+            "MAX_ATTEMPTS": "3",
+            "MODE": mode,
+            "POLL_SECONDS": "0",
+            "REPO": "git@example.test:group/project.git",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == expected_status
+    assert result.stderr.count("request_error") == request_errors
+    if mode == "transient":
+        assert "attempt=2 status=success" in result.stdout
 
 
 def test_release_evals_select_one_adapter_without_loading_siblings() -> None:
@@ -319,7 +444,7 @@ def test_version_configs_derive_branch_and_neutral_tag_policy() -> None:
     assert spec.loader
     module: ModuleType = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    rendered = module.render_config("release/1.x", base_prefix)
+    rendered = module.render_config("release/1.x", base_prefix, "upstream")
     psr = tomllib.loads(rendered)["semantic_release"]
 
     assert "process.env.CI_DEFAULT_BRANCH" in node
@@ -341,9 +466,12 @@ def test_version_configs_derive_branch_and_neutral_tag_policy() -> None:
     assert node_config["tagFormat"] == f"{base_prefix}${{version}}"
     assert psr["tag_format"] == f"{base_prefix}{{version}}"
     assert psr["branches"]["release"]["match"] == r"^release/1\.x$"
+    assert psr["remote"]["name"] == "upstream"
     psr_job = assets.joinpath("python-semantic-release.gitlab-ci.yml").read_text(encoding="utf-8")
     assert 'semantic-release --config "$PSR_RUNTIME_CONFIG" version' in psr_job
     assert 'git checkout -B "$CI_DEFAULT_BRANCH" "$CI_COMMIT_SHA"' in psr_job
+    assert 'git branch --set-upstream-to="$RELEASE_GIT_REMOTE_NAME/$CI_DEFAULT_BRANCH"' in psr_job
+    assert "RELEASE_GIT_REMOTE_NAME: '__RELEASE_GIT_REMOTE_NAME__'" in psr_job
 
     missing_prefix_env = {key: value for key, value in os.environ.items() if key != "RELEASE_TAG_PREFIX"}
     missing_prefix_env["CI_DEFAULT_BRANCH"] = "release/1.x"
@@ -357,7 +485,9 @@ def test_version_configs_derive_branch_and_neutral_tag_policy() -> None:
     assert node_missing.returncode != 0
     assert "RELEASE_TAG_PREFIX is required" in node_missing.stderr
     with pytest.raises(ValueError, match="RELEASE_TAG_PREFIX"):
-        module.render_config("release/1.x", "")
+        module.render_config("release/1.x", "", "upstream")
+    with pytest.raises(ValueError, match="RELEASE_GIT_REMOTE_NAME"):
+        module.render_config("release/1.x", base_prefix, "")
 
     credential = (SKILL_ROOT / "references" / "glab-release-credentials.md").read_text(encoding="utf-8")
     assert 'TAG_PATTERN="${RELEASE_TAG_PREFIX}*"' in credential
