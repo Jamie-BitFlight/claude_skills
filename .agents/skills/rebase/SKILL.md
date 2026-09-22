@@ -41,11 +41,14 @@ git rev-parse --verify --quiet MERGE_HEAD
 git rev-parse --verify --quiet CHERRY_PICK_HEAD
 git for-each-ref --format='%(upstream)' refs/heads/<branch>
 git for-each-ref --format='%(refname)' --contains <old-tip-oid> refs/remotes
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" path-state <resolved-rebase-merge-path>
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" path-state <resolved-rebase-apply-path>
 ```
 
 `git rev-parse --git-path` resolves a path; it does not test that path's existence.[2] Resolve both
-returned rebase paths against the repository and test each with the available filesystem tool. A
-directory at either path means a rebase is active.[7] Treat an absent `MERGE_HEAD` or
+returned rebase paths against the repository, then capture each `path-state` command and its JSON
+result in the matching marker evidence. A directory at either path means a rebase is active.[7]
+Treat an absent `MERGE_HEAD` or
 `CHERRY_PICK_HEAD` as the expected nonzero result; presence means that operation is active.[1]
 
 Record the old branch OID, target OID, merge-base OID, current branch, complete porcelain status,
@@ -53,8 +56,9 @@ operation-marker existence, owning worktree, configured upstream, and every remo
 the old tip.[6] Report these observable local publication signals without claiming knowledge of
 downstream consumers. Record every repository instruction source examined and every required
 preflight as complete argv, exit code, stdout, and stderr. Store the universal command records and
-marker observations in the plan's required `repository_state` object; its maintained fields and
-binding checks are defined at lines 30–101 of [the evidence model](./scripts/rebase_evidence.py).
+marker observations in the plan's required `repository_state` object. Bind the plan's top-level
+`execution_mode` to `CURRENT_BRANCH` or `AUTHORIZED_BRANCH_TRANSFER`;
+[the evidence model](./scripts/rebase_evidence.py) defines their binding checks.
 
 Enter `BLOCKED_GIT_STATE` when tracked or untracked changes exist or another Git operation is active.
 Do not create a stash. Enter `NO_CHANGE` when distinct branch and target refs resolve to the same OID

@@ -41,6 +41,17 @@ def valid_repository_state_data(
     def command(argv: list[str], stdout: str = "", exit_code: int = 0) -> dict[str, object]:
         return {"source": "local-git", "argv": argv, "exit_code": exit_code, "stdout": stdout, "stderr": ""}
 
+    def path_marker(name: str) -> dict[str, object]:
+        resolved_path = f"/work/project/.git/{name}"
+        return {
+            "command": command(["git", "rev-parse", "--git-path", name], f".git/{name}\n"),
+            "existence": command(
+                ["uv", "run", "--script", "/skills/rebase/scripts/rebase_plan.py", "path-state", resolved_path],
+                json.dumps({"path": resolved_path, "present": False}),
+            ),
+            "present": False,
+        }
+
     return {
         "repository_root": command(["git", "rev-parse", "--show-toplevel"], "/work/project\n"),
         "branch_ref": command(
@@ -57,14 +68,8 @@ def valid_repository_state_data(
         ),
         "status": command(["git", "status", "--porcelain=v1", "--untracked-files=all"]),
         "current_branch": command(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], "feature/parser\n"),
-        "rebase_merge": {
-            "command": command(["git", "rev-parse", "--git-path", "rebase-merge"], ".git/rebase-merge\n"),
-            "present": False,
-        },
-        "rebase_apply": {
-            "command": command(["git", "rev-parse", "--git-path", "rebase-apply"], ".git/rebase-apply\n"),
-            "present": False,
-        },
+        "rebase_merge": path_marker("rebase-merge"),
+        "rebase_apply": path_marker("rebase-apply"),
         "merge_head": {
             "command": command(["git", "rev-parse", "--verify", "--quiet", "MERGE_HEAD"], exit_code=1),
             "present": False,
@@ -96,6 +101,7 @@ def valid_plan_data() -> dict[str, object]:
         "target": {"ref": "refs/heads/main", "oid": target_oid},
         "merge_base_oid": "4" * 40,
         "execution_worktree": "/work/project",
+        "execution_mode": "CURRENT_BRANCH",
         "worktree_authorized": True,
         "status_porcelain": "",
         "active_operations": [],
@@ -372,6 +378,48 @@ def test_contradictory_universal_evidence_cannot_reach_ready(field_path: tuple[s
         assert isinstance(nested, dict)
         target = nested
     target[field_path[-1]] = replacement
+
+    with pytest.raises(ValidationError):
+        RebasePlan.model_validate(data)
+
+
+def test_current_branch_must_match_planned_branch_in_current_branch_mode() -> None:
+    """Reject current-branch evidence that names a different branch."""
+    data = valid_plan_data()
+    repository_state = data["repository_state"]
+    assert isinstance(repository_state, dict)
+    current_branch = repository_state["current_branch"]
+    assert isinstance(current_branch, dict)
+    current_branch["stdout"] = "different-branch\n"
+
+    with pytest.raises(ValidationError):
+        RebasePlan.model_validate(data)
+
+
+def test_zero_branch_owners_require_authorized_transfer_mode() -> None:
+    """Reject a current-branch plan whose branch has no owning worktree."""
+    data = valid_plan_data()
+    repository_state = data["repository_state"]
+    assert isinstance(repository_state, dict)
+    worktrees = repository_state["worktrees"]
+    assert isinstance(worktrees, dict)
+    worktrees["stdout"] = f"worktree /work/project\nHEAD {'1' * 40}\ndetached\n"
+
+    with pytest.raises(ValidationError):
+        RebasePlan.model_validate(data)
+
+
+def test_path_marker_present_must_match_command_backed_existence() -> None:
+    """Reject a marker presence value that contradicts its existence evidence."""
+    data = valid_plan_data()
+    repository_state = data["repository_state"]
+    assert isinstance(repository_state, dict)
+    rebase_merge = repository_state["rebase_merge"]
+    assert isinstance(rebase_merge, dict)
+    command = rebase_merge["command"]
+    assert isinstance(command, dict)
+    command["stdout"] = "/tmp/claude-skills-3784-rebase/.git\n"
+    rebase_merge["present"] = False
 
     with pytest.raises(ValidationError):
         RebasePlan.model_validate(data)

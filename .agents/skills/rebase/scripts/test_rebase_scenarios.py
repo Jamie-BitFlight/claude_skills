@@ -210,6 +210,15 @@ def validate_plan_event(repository: Path, data: dict[str, object], evidence: Sce
     data["repository_state"] = repository_state
     data["publication"] = publication
     data["execution_worktree"] = str(repository.resolve())
+    current_branch = repository_state["current_branch"]
+    assert isinstance(current_branch, dict)
+    current_branch_name = current_branch["stdout"]
+    assert isinstance(current_branch_name, str)
+    data["execution_mode"] = (
+        "CURRENT_BRANCH"
+        if current_branch_name.strip() == branch_ref.removeprefix("refs/heads/")
+        else "AUTHORIZED_BRANCH_TRANSFER"
+    )
     help_evidence, empty_option = capture_rebase_help(repository, evidence.commands)
     data["rebase_help"] = help_evidence
     data["becomes_empty_option"] = empty_option

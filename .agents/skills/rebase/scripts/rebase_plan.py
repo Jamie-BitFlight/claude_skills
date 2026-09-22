@@ -21,7 +21,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
-from rebase_evidence import CommandEvidence, RepositoryStateEvidence
+from rebase_evidence import CommandEvidence, ExecutionMode, RepositoryStateEvidence
 from rebase_states import WORKFLOW_STATE_DEFINITIONS, WorkflowState
 
 ObjectId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")]
@@ -111,6 +111,7 @@ class RebasePlan(BaseModel):
     target: RefBinding
     merge_base_oid: ObjectId
     execution_worktree: Annotated[str, Field(min_length=1)]
+    execution_mode: ExecutionMode
     worktree_authorized: bool
     status_porcelain: str
     active_operations: list[str]
@@ -185,6 +186,7 @@ class RebasePlan(BaseModel):
             status_porcelain=self.status_porcelain,
             active_operations=self.active_operations,
             configured_upstream=self.publication.configured_upstream,
+            execution_mode=self.execution_mode,
         )
 
     def validate_decisions_and_preflights(self) -> set[str]:
@@ -320,6 +322,8 @@ def create_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("plan", type=Path)
     subparsers.add_parser("schema", help="Print the complete JSON Schema for a plan artifact.")
     subparsers.add_parser("states", help="Print the canonical workflow-state contract.")
+    path_state_parser = subparsers.add_parser("path-state", help="Observe one resolved Git path.")
+    path_state_parser.add_argument("path", type=Path)
     return parser
 
 
@@ -375,6 +379,9 @@ def main() -> int:
         return validate_plan(args.plan)
     if args.command == "schema":
         emit_json(RebasePlan.model_json_schema())
+        return 0
+    if args.command == "path-state":
+        emit_json({"path": str(args.path), "present": args.path.exists()})
         return 0
     emit_json([definition.model_dump(mode="json") for definition in WORKFLOW_STATE_DEFINITIONS])
     return 0

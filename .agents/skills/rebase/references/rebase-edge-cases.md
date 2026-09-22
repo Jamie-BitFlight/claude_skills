@@ -18,10 +18,11 @@ Parse `git worktree list --porcelain` as records. Match `branch refs/heads/<bran
   worktree. If ownership is absent or unknown, emit `BLOCKED_WORKTREE_IN_USE`; leave its branch,
   HEAD, index, tracked files, and untracked files unchanged.
 - If the branch is unowned and positional rebase would check it out in the current worktree, run
-  every repository-defined branch-transfer preflight before the plan gate. Continue only on the
-  preflight's explicit pass signal.
-- If the current worktree owns the branch, record that path and assert its current branch before
-  execution.
+  every repository-defined branch-transfer preflight before the plan gate and bind
+  `execution_mode` to `AUTHORIZED_BRANCH_TRANSFER`. Continue only on the preflight's explicit pass
+  signal.
+- If the current worktree owns the branch, bind `execution_mode` to `CURRENT_BRANCH`, record that
+  path, and assert its current branch before execution.
 
 Entering, switching, detaching, or cleaning another session's worktree is outside the rebase
 authority. Report the owning path as the observable blocker.

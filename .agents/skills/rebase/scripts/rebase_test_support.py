@@ -8,6 +8,7 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 BOUNDED_RUNNER = REPOSITORY_ROOT / "scripts" / "run_bounded.py"
+VALIDATOR_PATH = SKILL_ROOT / "scripts" / "rebase_plan.py"
 
 # Local Git fixture commands complete in milliseconds. Twenty seconds permits slow CI filesystems
 # while still proving that a hung hook or descendant process is terminated by the bounded runner.
@@ -137,7 +138,25 @@ def capture_path_marker(
         JSON-compatible marker evidence.
     """
     command = capture_command(repository, transcript, "rev-parse", "--git-path", name)
-    return {"command": command, "present": (root / str(command["stdout"]).strip()).exists()}
+    path = Path(str(command["stdout"]).strip())
+    resolved_path = path if path.is_absolute() else root / path
+    existence_argv = ("uv", "run", "--script", str(VALIDATOR_PATH), "path-state", str(resolved_path))
+    transcript.append(existence_argv)
+    existence_result = subprocess.run(
+        [str(BOUNDED_RUNNER), "--timeout-seconds", str(TEST_COMMAND_TIMEOUT_SECONDS), "--", *existence_argv],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    observation = {
+        "source": "local-filesystem",
+        "argv": list(existence_argv),
+        "exit_code": existence_result.returncode,
+        "stdout": existence_result.stdout,
+        "stderr": existence_result.stderr,
+    }
+    return {"command": command, "existence": observation, "present": resolved_path.exists()}
 
 
 def capture_ref_marker(repository: Path, transcript: list[tuple[str, ...]], name: str) -> dict[str, object]:

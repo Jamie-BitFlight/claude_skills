@@ -11,6 +11,7 @@
   },
   "merge_base_oid": "4444444444444444444444444444444444444444",
   "execution_worktree": "/work/project",
+  "execution_mode": "CURRENT_BRANCH",
   "worktree_authorized": true,
   "status_porcelain": "",
   "active_operations": [],
@@ -79,6 +80,20 @@
         "stdout": ".git/rebase-merge\n",
         "stderr": ""
       },
+      "existence": {
+        "source": "local-filesystem",
+        "argv": [
+          "uv",
+          "run",
+          "--script",
+          "/skills/rebase/scripts/rebase_plan.py",
+          "path-state",
+          "/work/project/.git/rebase-merge"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"path\":\"/work/project/.git/rebase-merge\",\"present\":false}\n",
+        "stderr": ""
+      },
       "present": false
     },
     "rebase_apply": {
@@ -87,6 +102,20 @@
         "argv": ["git", "rev-parse", "--git-path", "rebase-apply"],
         "exit_code": 0,
         "stdout": ".git/rebase-apply\n",
+        "stderr": ""
+      },
+      "existence": {
+        "source": "local-filesystem",
+        "argv": [
+          "uv",
+          "run",
+          "--script",
+          "/skills/rebase/scripts/rebase_plan.py",
+          "path-state",
+          "/work/project/.git/rebase-apply"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"path\":\"/work/project/.git/rebase-apply\",\"present\":false}\n",
         "stderr": ""
       },
       "present": false

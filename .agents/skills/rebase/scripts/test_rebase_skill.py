@@ -22,6 +22,7 @@ from marko.block import FencedCode
 from marko.inline import Link
 from pydantic import BaseModel
 
+from rebase_evidence import ExecutionMode
 from rebase_plan import Disposition, MergePolicy
 from rebase_states import workflow_state_definitions
 from rebase_test_support import (
@@ -166,6 +167,7 @@ def test_terminal_state_contract_covers_every_safety_branch() -> None:
     non_state_contract_tokens = {
         *(disposition.value for disposition in Disposition),
         *(policy.value for policy in MergePolicy),
+        *(mode.value for mode in ExecutionMode),
         "CHERRY_PICK_HEAD",
         "MERGE_HEAD",
         "REBASE_HEAD",
