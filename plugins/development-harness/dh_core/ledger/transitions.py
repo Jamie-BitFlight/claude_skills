@@ -855,7 +855,10 @@ implementation rather than two that must be kept in step.
 def active_train(conn: sqlite3.Connection, plan: str) -> dict[str, Any] | None:
     """Return a plan's active registered generation, if one exists."""
     found = rows_of(
-        conn.execute("SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL", {"plan": plan})
+        conn.execute(
+            "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL AND invalidated_seq IS NULL",
+            {"plan": plan},
+        )
     )
     return found[0] if found else None
 
@@ -960,6 +963,53 @@ def dispatch(
     )
 
 
+def registered_dispatch_retry(
+    conn: sqlite3.Connection,
+    row: Mapping[str, Any],
+    *,
+    plan: str,
+    task: str,
+    generation: int,
+    role: str,
+    github_issue: int,
+    conflict_group: str | None,
+) -> TransitionResult | None:
+    """Return an exact registered-dispatch retry or refuse an unbound open attempt."""
+    if int(row["attempt_open"] or 0) != 1:
+        return None
+    bindings = rows_of(
+        conn.execute(
+            "SELECT * FROM merge_dispatches WHERE plan = :plan AND generation = :generation "
+            "AND task = :task AND attempt = :attempt",
+            {"plan": plan, "generation": generation, "task": task, "attempt": row["attempts"]},
+        )
+    )
+    exact = bool(bindings) and all(
+        binding["role"] == role
+        and int(binding["github_issue"]) == github_issue
+        and binding["conflict_group"] == conflict_group
+        for binding in bindings
+    )
+    reservation = conflict_group is None or bool(
+        conn.execute(
+            "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
+            "AND task = :task AND attempt = :attempt AND conflict_group = :conflict_group AND active = 1",
+            {
+                "plan": plan,
+                "generation": generation,
+                "task": task,
+                "attempt": row["attempts"],
+                "conflict_group": conflict_group,
+            },
+        ).fetchone()
+    )
+    if not (exact and reservation):
+        refuse("dispatch-binding-missing")
+    result = declined("merge-dispatch", "already-dispatched", plan, task)
+    result.attempt = int(row["attempts"])
+    return result
+
+
 def _dispatch_registered(
     conn: sqlite3.Connection,
     plan: str,
@@ -968,8 +1018,11 @@ def _dispatch_registered(
     generation: int,
     authority_host_id: str,
     dispatch_plan_digest: str,
+    source_graph_revision: str,
+    source_graph_digest: str,
     role: str,
     github_issue: int,
+    dependencies: tuple[str, ...],
     conflict_group: str | None,
     ttl_seconds: int | None = None,
     worktree: str | None = None,
@@ -991,6 +1044,11 @@ def _dispatch_registered(
             refuse("train-generation-stale")
         if str(train["dispatch_plan_digest"]) != dispatch_plan_digest:
             refuse("dispatch-plan-stale")
+        if (
+            str(train["source_graph_revision"]) != source_graph_revision
+            or str(train["source_graph_digest"]) != source_graph_digest
+        ):
+            refuse("source-graph-stale")
         member = registered_member(conn, plan, generation, task)
         if member is None or (
             str(member.get("role")) != role
@@ -999,26 +1057,32 @@ def _dispatch_registered(
         ):
             refuse("role-assignment-mismatch")
         row = fetch_task(conn, plan, task)
-        if int(row["attempt_open"] or 0) == 1:
-            same = rows_of(
-                conn.execute(
-                    "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
-                    "AND task = :task AND attempt = :attempt AND active = 1",
-                    {"plan": plan, "generation": generation, "task": task, "attempt": row["attempts"]},
-                )
-            )
-            if same or conflict_group is None:
-                result = declined("merge-dispatch", "already-dispatched", plan, task)
-                result.attempt = int(row["attempts"])
-                return result
-        if conflict_group is not None:
-            occupied = conn.execute(
-                "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
-                "AND conflict_group = :conflict_group AND active = 1",
-                {"plan": plan, "generation": generation, "conflict_group": conflict_group},
-            ).fetchone()
-            if occupied is not None:
-                refuse("conflict-group-reserved")
+        held_group = str(row["conflict_group"]) if row["conflict_group"] is not None else None
+        if (
+            int(row["github_issue"] or 0) != github_issue
+            or tuple(json_list(row["dependencies"])) != dependencies
+            or held_group != conflict_group
+        ):
+            refuse("dispatch-plan-disagreement")
+        retry = registered_dispatch_retry(
+            conn,
+            row,
+            plan=plan,
+            task=task,
+            generation=generation,
+            role=role,
+            github_issue=github_issue,
+            conflict_group=conflict_group,
+        )
+        if retry is not None:
+            return retry
+        occupied = conn.execute(
+            "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation "
+            "AND conflict_group = :conflict_group AND active = 1",
+            {"plan": plan, "generation": generation, "conflict_group": conflict_group},
+        ).fetchone()
+        if occupied is not None:
+            refuse("conflict-group-reserved")
         found = rows_of(
             conn.execute(
                 DISPATCH_SQL,
@@ -1044,7 +1108,36 @@ def _dispatch_registered(
             payload={"attempt": attempt, "ttl_seconds": ttl, "worktree": worktree},
             at=moment,
         )
-        events = ["task.dispatched"]
+        sequence = store.append_event(
+            conn,
+            kind="merge.dispatch-bound",
+            plan=plan,
+            task=task,
+            payload={
+                "generation": generation,
+                "github_issue": github_issue,
+                "attempt": attempt,
+                "role": role,
+                "conflict_group": conflict_group,
+            },
+            at=moment,
+        )
+        conn.execute(
+            "INSERT INTO merge_dispatches "
+            "(plan, generation, task, attempt, role, github_issue, conflict_group, dispatch_seq) "
+            "VALUES (:plan, :generation, :task, :attempt, :role, :github_issue, :conflict_group, :dispatch_seq)",
+            {
+                "plan": plan,
+                "generation": generation,
+                "task": task,
+                "attempt": attempt,
+                "role": role,
+                "github_issue": github_issue,
+                "conflict_group": conflict_group,
+                "dispatch_seq": sequence,
+            },
+        )
+        events = ["task.dispatched", "merge.dispatch-bound"]
         if conflict_group is not None:
             sequence = store.append_event(
                 conn,

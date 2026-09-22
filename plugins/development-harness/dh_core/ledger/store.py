@@ -145,6 +145,7 @@ PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "sections": ("plan", "task", "seq"),
     "export_cursors": ("plan", "target"),
     "merge_trains": ("plan", "generation"),
+    "merge_dispatches": ("plan", "generation", "task", "attempt"),
     "merge_reservations": ("plan", "generation", "conflict_group", "task", "attempt"),
 }
 """The identity of a row in each materialised table.
@@ -159,6 +160,7 @@ INDEXES: dict[str, tuple[tuple[str, ...], ...]] = {
     "sections": (("plan", "task", "attempt"),),
     "events": (("plan", "task", "kind"), ("plan", "seq")),
     "merge_trains": (("plan", "superseded_seq"),),
+    "merge_dispatches": (("plan", "generation", "task"),),
     "merge_reservations": (("plan", "generation", "active"),),
 }
 """Non-unique indexes over the columns the package's own queries filter on."""
@@ -547,7 +549,7 @@ def schema_statements() -> list[str]:
     statements.extend((
         (
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_trains_active "
-            "ON merge_trains (plan) WHERE superseded_seq IS NULL"
+            "ON merge_trains (plan) WHERE superseded_seq IS NULL AND invalidated_seq IS NULL"
         ),
         (
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_merge_reservations_active_group "
@@ -978,6 +980,7 @@ PLAN_OF: dict[str, str] = {
     "sections": "plan",
     "export_cursors": "plan",
     "merge_trains": "plan",
+    "merge_dispatches": "plan",
     "merge_reservations": "plan",
 }
 """The column of each materialised table that names the plan its row belongs to."""
@@ -1309,7 +1312,13 @@ def fold_merge_train_registered(tables: Folded, event: Mapping[str, Any]) -> Non
     """Install the immutable registered train generation carried by an event."""
     row = blank_row("merge_trains")
     row.update(carried("merge_trains", event["payload"]))
-    row.update(plan=str(event["plan"]), registered_seq=int(event["seq"]), superseded_seq=None)
+    row.update(
+        plan=str(event["plan"]),
+        registered_seq=int(event["seq"]),
+        superseded_seq=None,
+        invalidated_seq=None,
+        invalidation_reason=None,
+    )
     tables["merge_trains"][key_of("merge_trains", row)] = row
 
 
@@ -1321,6 +1330,34 @@ def fold_merge_train_superseded(tables: Folded, event: Mapping[str, Any]) -> Non
         msg = f"event {event['seq']} supersedes generation {key}, which no earlier event registered"
         raise LookupError(msg)
     row["superseded_seq"] = int(event["seq"])
+
+
+def fold_merge_train_invalidated(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Conclude one generation before its ledger plan is replaced."""
+    payload = event["payload"]
+    key = (str(event["plan"]), int(payload["generation"]))
+    row = tables["merge_trains"].get(key)
+    if row is None or row["invalidated_seq"] is not None:
+        msg = f"event {event['seq']} invalidates unavailable generation {key}"
+        raise LookupError(msg)
+    row.update(invalidated_seq=int(event["seq"]), invalidation_reason=str(payload["reason"]))
+
+
+def fold_merge_dispatch_bound(tables: Folded, event: Mapping[str, Any]) -> None:
+    """Materialize one immutable assignment-to-attempt relation."""
+    payload = event["payload"]
+    row = blank_row("merge_dispatches")
+    row.update(
+        carried("merge_dispatches", payload),
+        plan=str(event["plan"]),
+        task=str(event["task"]),
+        dispatch_seq=int(event["seq"]),
+    )
+    key = key_of("merge_dispatches", row)
+    if key in tables["merge_dispatches"]:
+        msg = f"event {event['seq']} duplicates dispatch binding {key}"
+        raise LookupError(msg)
+    tables["merge_dispatches"][key] = row
 
 
 def fold_merge_reserved(tables: Folded, event: Mapping[str, Any]) -> None:
@@ -1376,6 +1413,8 @@ HANDLERS: dict[str, Any] = {
     "task.state": fold_task_state,
     "merge.train-registered": fold_merge_train_registered,
     "merge.train-superseded": fold_merge_train_superseded,
+    "merge.train-invalidated": fold_merge_train_invalidated,
+    "merge.dispatch-bound": fold_merge_dispatch_bound,
     "merge.reserved": fold_merge_reserved,
     "merge.reservation-released": fold_merge_reservation_released,
 }

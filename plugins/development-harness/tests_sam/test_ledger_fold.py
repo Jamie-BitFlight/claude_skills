@@ -34,11 +34,12 @@ from dh_core.ledger import port, store, transitions
 from dh_core.merge_train import (
     DispatchMember,
     DispatchPlanDefinition,
+    DispatchPlanSnapshot,
     DispatchReserved,
     HostAuthority,
     MergeTrain,
     RegisterTrain,
-    SupersedeTrain,
+    SourceGraphSnapshot,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -341,7 +342,7 @@ def from_milestone(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint =
 
 
 def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint = nothing) -> str:
-    """Register, reserve, release, supersede, and replace one train generation."""
+    """Register, reserve, and release one train generation."""
     del tmp_path
     plan = str(
         transitions.create(
@@ -349,6 +350,8 @@ def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint
             slug="registered",
             goal="exercise merge folds",
             plan_id="Ptrain",
+            base_sha="1" * 40,
+            quality_gates=["uv run pytest"],
             tasks=[{"id": "T1", "title": "maker", "github_issue": 41, "conflict_group": "source"}],
         ).plan
     )
@@ -362,27 +365,67 @@ def registered_train(conn: sqlite3.Connection, tmp_path: Path, check: Checkpoint
         quality_gates=("uv run pytest",),
         members=(DispatchMember(issue=41, task="T1", role="maker", conflict_group="source"),),
     )
-    service = MergeTrain(conn, HostAuthority(authority_host_id="fold-host"))
-    registered = service.register(RegisterTrain(definition=definition))
+
+    class DispatchReader:
+        def read(self, _key: str) -> DispatchPlanSnapshot:
+            return DispatchPlanSnapshot(
+                logical_id="dispatch-41", revision="one", canonical_bytes=definition.canonical_bytes()
+            )
+
+    class GraphReader:
+        def read(self, _key: int) -> SourceGraphSnapshot:
+            return SourceGraphSnapshot(
+                revision="github-41",
+                milestone=41,
+                integration_branch="integration/41",
+                baseline_sha="1" * 40,
+                members=definition.members,
+            )
+
+    service = MergeTrain(conn, DispatchReader(), GraphReader(), HostAuthority(authority_host_id="fold-host"))
+    service.register(RegisterTrain(plan_ref="dispatch-41", milestone=41, plan=plan))
     check()
     service.dispatch(DispatchReserved(plan=plan, generation=1, task="T1"))
     check()
     transitions.state(conn, plan, "T1", new_status=spec.Status.BLOCKED.value, reason="fold", force=True)
     check()
-    replacement = definition.model_copy(update={"revision": "two"})
-    service.supersede(
-        SupersedeTrain(
+    with store.transaction(conn):
+        moment = store.now()
+        superseded = store.append_event(
+            conn,
+            kind="merge.train-superseded",
             plan=plan,
-            generation=1,
-            current_dispatch_plan_revision="one",
-            current_dispatch_plan_digest=registered.dispatch_plan_digest,
-            replacement=replacement,
-            replacement_checker_evidence_digest="sha256:" + "2" * 64,
-            reason="fold replacement",
+            task=None,
+            payload={
+                "generation": 1,
+                "current_dispatch_plan_revision": "one",
+                "current_dispatch_plan_digest": "sha256:" + "1" * 64,
+                "replacement_dispatch_plan_id": "dispatch-42",
+                "replacement_dispatch_plan_revision": "two",
+                "replacement_dispatch_plan_digest": "sha256:" + "2" * 64,
+                "replacement_checker_evidence_digest": "sha256:" + "3" * 64,
+                "reason": "schema prerequisite",
+            },
+            at=moment,
         )
-    )
-    check()
-    service.register(RegisterTrain(definition=replacement))
+        invalidated = store.append_event(
+            conn,
+            kind="merge.train-invalidated",
+            plan=plan,
+            task=None,
+            payload={
+                "generation": 1,
+                "replacement_source": "fixture",
+                "replacement_revision": "two",
+                "reason": "import:fixture:two",
+            },
+            at=moment,
+        )
+        conn.execute(
+            "UPDATE merge_trains SET superseded_seq = :superseded, invalidated_seq = :invalidated, "
+            "invalidation_reason = 'import:fixture:two' WHERE plan = :plan AND generation = 1",
+            {"superseded": superseded, "invalidated": invalidated, "plan": plan},
+        )
     check()
     return plan
 

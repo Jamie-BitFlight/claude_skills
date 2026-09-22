@@ -13,6 +13,12 @@ from pathlib import Path
 
 PLUGIN = Path(__file__).parents[1]
 TEST = "tests_sam/test_merge_train_t1.py"
+AMENDMENT_TEST = "tests_sam/test_merge_train_t1_amendment.py"
+AMENDMENT_CASES = {
+    "test_f02_replace_refuses_active_registered_attempt",
+    "test_f02_import_replace_invalidates_inactive_registration",
+    "test_f03_f08_deleted_binding_cannot_authorize_open_attempt",
+}
 
 
 class ReplaceIfTest(ast.NodeTransformer):
@@ -49,7 +55,7 @@ class RemoveCallStatement(ast.NodeTransformer):
         Returns:
             None for the selected expression, otherwise the visited expression.
         """
-        if self.fragment in ast.unparse(node):
+        if self.changed == 0 and self.fragment in ast.unparse(node):
             self.changed += 1
             return None
         return self.generic_visit(node)
@@ -158,20 +164,26 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
     (
         "F01-remove-ledger-disagreement-check",
         "dh_core/merge_train.py",
-        RemoveCallStatement("self.validate_definition(definition)"),
+        RemoveCallStatement("self.validate_definition"),
         "test_f01_registration_rejects_omitted_or_mismatched_resource",
     ),
     (
-        "F02-remove-active-work-check",
-        "dh_core/merge_train.py",
-        ReplaceIfTest("active is not None", False),
-        "test_f02_supersession_requires_host_and_inactive_generation",
+        "F02-remove-registered-replacement-active-check",
+        "dh_core/ledger/port.py",
+        ReplaceIfTest("train is not None and", False),
+        "test_f02_replace_refuses_active_registered_attempt",
     ),
     (
-        "F02-remove-replacement-identity-check",
-        "dh_core/merge_train.py",
-        ReplaceIfTest("request.replacement.plan != request.plan", False),
-        "test_f02_supersession_rejects_replacement_for_another_plan",
+        "F02-remove-invalidation-effect",
+        "dh_core/ledger/port.py",
+        RemoveCallStatement("invalidate_registered_generation"),
+        "test_f02_import_replace_invalidates_inactive_registration",
+    ),
+    (
+        "F08-accept-open-attempt-without-binding",
+        "dh_core/ledger/transitions.py",
+        ReplaceIfTest("exact and reservation", False),
+        "test_f03_f08_deleted_binding_cannot_authorize_open_attempt",
     ),
     (
         "F03-bypass-raw-dispatch-guard",
@@ -248,6 +260,7 @@ def run_mutant(name: str, relative: str, transformer: ast.NodeTransformer, test_
         mutate(copied / relative, transformer)
         config = copied / "pytest.ini"
         config.write_text("[pytest]\n", encoding="utf-8")
+        test_file = AMENDMENT_TEST if test_name in AMENDMENT_CASES else TEST
         completed = subprocess.run(
             [
                 sys.executable,
@@ -260,7 +273,7 @@ def run_mutant(name: str, relative: str, transformer: ast.NodeTransformer, test_
                 "--strict-config",
                 "-W",
                 "error",
-                f"{copied / TEST}::{test_name}",
+                f"{copied / test_file}::{test_name}",
             ],
             cwd=copied,
             env={**os.environ, "PYTHONPATH": str(copied)},

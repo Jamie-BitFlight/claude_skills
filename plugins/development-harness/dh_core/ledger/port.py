@@ -304,8 +304,44 @@ def replace_checks(conn: sqlite3.Connection, existing: Mapping[str, Any] | None,
     if not replace:
         transitions.refuse("exists")
     plan = str(existing["plan_id"])
+    train = transitions.active_train(conn, plan)
+    if train is not None and (
+        any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(conn, plan))
+        or conn.execute(
+            "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation AND active = 1",
+            {"plan": plan, "generation": train["generation"]},
+        ).fetchone()
+        is not None
+    ):
+        transitions.refuse("registered-plan-active")
     if any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(conn, plan)):
         transitions.refuse("leased")
+
+
+def invalidate_registered_generation(conn: sqlite3.Connection, plan: str, source: PlanSource, moment: datetime) -> None:
+    """Conclude an inactive registered generation before replacing ledger rows."""
+    train = transitions.active_train(conn, plan)
+    if train is None:
+        return
+    reason = f"import:{source.source}:{source.revision}" if source.source else f"import:{source.revision}"
+    sequence = store.append_event(
+        conn,
+        kind="merge.train-invalidated",
+        plan=plan,
+        task=None,
+        payload={
+            "generation": train["generation"],
+            "replacement_source": source.source,
+            "replacement_revision": source.revision,
+            "reason": reason,
+        },
+        at=moment,
+    )
+    conn.execute(
+        "UPDATE merge_trains SET invalidated_seq = :sequence, invalidation_reason = :reason "
+        "WHERE plan = :plan AND generation = :generation",
+        {"sequence": sequence, "reason": reason, "plan": plan, "generation": train["generation"]},
+    )
 
 
 REPLACEABLE_TABLES: frozenset[str] = frozenset({"tasks", "sections", "export_cursors"})
@@ -434,6 +470,7 @@ def import_plan(
         replace_checks(conn, existing, replace=replace)
         row = plan_row(source)
         if existing is not None:
+            invalidate_registered_generation(conn, str(existing["plan_id"]), source, moment)
             clear_plan(conn, str(existing["plan_id"]), tables=IMPORT_CLEARS)
         write_plan_row(conn, row, replacing=None if existing is None else str(existing["plan_id"]))
         if existing is None:
@@ -1215,6 +1252,7 @@ def from_milestone(
             return TransitionResult(command="from-milestone", plan=source.plan_id, changed={"tasks": len(source.tasks)})
         row = plan_row(source)
         if existing is not None:
+            invalidate_registered_generation(conn, str(existing["plan_id"]), source, moment)
             clear_plan(conn, str(existing["plan_id"]), tables=MILESTONE_CLEARS)
         write_plan_row(conn, row, replacing=None if existing is None else str(existing["plan_id"]))
         kind = "plan.replaced" if existing is not None else "plan.created"

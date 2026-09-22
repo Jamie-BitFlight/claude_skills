@@ -359,6 +359,8 @@ COLUMNS: list[Column] = [
         dispatch_plan_id="text",
         dispatch_plan_revision="text",
         dispatch_plan_digest="text",
+        source_graph_revision="text",
+        source_graph_digest="text",
         member_set_digest="text",
         role_map_digest="text",
         conflict_map_digest="text",
@@ -369,6 +371,26 @@ COLUMNS: list[Column] = [
         registered_seq="int",
     ),
     *_cols("merge_trains", Provenance.EVENT, ["merge.train-superseded"], superseded_seq="int|null"),
+    *_cols(
+        "merge_trains",
+        Provenance.EVENT,
+        ["merge.train-invalidated"],
+        invalidated_seq="int|null",
+        invalidation_reason="text|null",
+    ),
+    *_cols(
+        "merge_dispatches",
+        Provenance.EVENT,
+        ["merge.dispatch-bound"],
+        plan="text",
+        generation="int",
+        task="text",
+        attempt="int",
+        role="text",
+        github_issue="int",
+        conflict_group="text|null",
+        dispatch_seq="int",
+    ),
     *_cols(
         "merge_reservations",
         Provenance.EVENT,
@@ -545,6 +567,8 @@ EVENTS: list[EventKind] = [
             "dispatch_plan_id",
             "dispatch_plan_revision",
             "dispatch_plan_digest",
+            "source_graph_revision",
+            "source_graph_digest",
             "member_set_digest",
             "role_map_digest",
             "conflict_map_digest",
@@ -555,6 +579,16 @@ EVENTS: list[EventKind] = [
             "definition",
         ],
         written_by=["merge-register"],
+    ),
+    EventKind(
+        kind="merge.train-invalidated",
+        payload=["generation", "replacement_source", "replacement_revision", "reason"],
+        written_by=["import", "from-milestone"],
+    ),
+    EventKind(
+        kind="merge.dispatch-bound",
+        payload=["generation", "github_issue", "attempt", "role", "conflict_group"],
+        written_by=["merge-dispatch"],
     ),
     EventKind(
         kind="merge.train-superseded",
@@ -720,6 +754,31 @@ REASONS: list[Reason] = [
         code="dispatch-plan-stale",
         kind=ReasonKind.REFUSAL,
         condition="the supplied dispatch revision or digest differs from the registered definition",
+    ),
+    Reason(
+        code="source-graph-stale",
+        kind=ReasonKind.REFUSAL,
+        condition="the current source graph revision or digest differs from the registered graph",
+    ),
+    Reason(
+        code="preexisting-open-attempt",
+        kind=ReasonKind.REFUSAL,
+        condition="registration found an open member attempt without registered dispatch authority",
+    ),
+    Reason(
+        code="dispatch-binding-missing",
+        kind=ReasonKind.REFUSAL,
+        condition="an open registered attempt has no exact generation-specific assignment binding",
+    ),
+    Reason(
+        code="registered-plan-active",
+        kind=ReasonKind.REFUSAL,
+        condition="replacement addresses a registered generation with active work",
+    ),
+    Reason(
+        code="replacement-definition-mismatch",
+        kind=ReasonKind.REFUSAL,
+        condition="a later checked registration differs from the recorded replacement prerequisite",
     ),
     Reason(
         code="train-generation-stale",
@@ -1391,6 +1450,7 @@ TRANSITIONS: list[Transition] = [
         from_status=ANY,
         checks=[
             Check(reason="exists", unless="--replace"),
+            Check(reason="registered-plan-active", unless="no registered work is active"),
             Check(reason="leased", unless="no task of the existing plan has attempt_open 1"),
         ],
         effects=[
@@ -1401,6 +1461,7 @@ TRANSITIONS: list[Transition] = [
             Effect(column="export_cursors", value="target content, revision and projection_hash of the source"),
         ],
         events=["plan.created", "plan.replaced", "task.imported", "plan.imported"],
+        conditional_events=["merge.train-invalidated"],
         note="no cascade runs on import",
     ),
     Transition(
@@ -1416,6 +1477,7 @@ TRANSITIONS: list[Transition] = [
         from_status=ANY,
         checks=[
             Check(reason="exists", unless="--replace"),
+            Check(reason="registered-plan-active", unless="no registered work is active"),
             Check(reason="leased", unless="no task of the existing plan has attempt_open 1"),
         ],
         effects=[
@@ -1426,11 +1488,17 @@ TRANSITIONS: list[Transition] = [
             ),
         ],
         events=["plan.created", "plan.replaced", "task.added"],
+        conditional_events=["merge.train-invalidated"],
     ),
     Transition(
         command="merge-register",
         from_status=ANY,
-        checks=[Check(reason="already-registered"), Check(reason="dispatch-plan-disagreement")],
+        checks=[
+            Check(reason="already-registered"),
+            Check(reason="dispatch-plan-disagreement"),
+            Check(reason="preexisting-open-attempt"),
+            Check(reason="replacement-definition-mismatch"),
+        ],
         effects=[Effect(column="merge_trains", value="one immutable checked generation")],
         events=["merge.train-registered"],
         noop="already-registered",
@@ -1458,15 +1526,18 @@ TRANSITIONS: list[Transition] = [
             Check(reason="wrong-authority-host"),
             Check(reason="train-generation-stale"),
             Check(reason="dispatch-plan-stale"),
+            Check(reason="source-graph-stale"),
             Check(reason="role-assignment-mismatch"),
+            Check(reason="dispatch-binding-missing"),
             Check(reason="conflict-group-reserved"),
             Check(reason="already-dispatched"),
         ],
         effects=[
             Effect(column="tasks", value="existing dispatch effects"),
-            Effect(column="merge_reservations", value="active group ownership"),
+            Effect(column="merge_dispatches", value="exact generation-specific assignment binding"),
+            Effect(column="merge_reservations", value="active group ownership when grouped"),
         ],
-        events=["task.dispatched", "merge.reserved"],
+        events=["task.dispatched", "merge.dispatch-bound", "merge.reserved"],
         noop="already-dispatched",
     ),
 ]

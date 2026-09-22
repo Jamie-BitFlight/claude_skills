@@ -6,7 +6,7 @@ import hashlib
 import json
 import operator
 import sqlite3
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -17,7 +17,7 @@ from dh_core.ledger.transitions import _dispatch_registered as dispatch_register
 class Request(BaseModel):
     """Strict base for merge-train requests and frozen definitions."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
 class DispatchMember(Request):
@@ -74,6 +74,63 @@ class DispatchPlanDefinition(Request):
         return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
+class DispatchPlanSnapshot(Request):
+    """Immutable canonical output returned by the authoritative plan parser."""
+
+    logical_id: str = Field(min_length=1)
+    revision: str = Field(min_length=1)
+    canonical_bytes: bytes = Field(min_length=1)
+
+    @property
+    def digest(self) -> str:
+        """Return the identity of the exact parser output bytes."""
+        return digest(self.canonical_bytes)
+
+    def definition(self) -> DispatchPlanDefinition:
+        """Parse the complete canonical bytes through the strict service model.
+
+        Returns:
+            The strict execution definition parsed from the authoritative bytes.
+        """
+        parsed = DispatchPlanDefinition.model_validate_json(self.canonical_bytes)
+        if parsed.logical_id != self.logical_id or parsed.revision != self.revision:
+            transitions.refuse("dispatch-plan-stale")
+        return parsed
+
+
+class SourceGraphSnapshot(Request):
+    """Immutable GitHub/source-graph facts checked against dispatch policy."""
+
+    revision: str = Field(min_length=1)
+    milestone: int = Field(ge=1)
+    integration_branch: str = Field(min_length=1)
+    baseline_sha: str = Field(pattern=r"^[0-9a-f]{40,64}$")
+    members: tuple[DispatchMember, ...] = Field(min_length=1)
+
+    @property
+    def digest(self) -> str:
+        """Return the canonical graph identity computed by the service model."""
+        value = self.model_dump(mode="json")
+        value["members"] = sorted(value["members"], key=operator.itemgetter("task", "issue"))
+        return canonical_digest(value)
+
+
+class DispatchPlanReader(Protocol):
+    """Read immutable canonical dispatch-plan parser output."""
+
+    def read(self, plan_ref: str, /) -> DispatchPlanSnapshot:
+        """Return the immutable canonical snapshot for a logical plan reference."""
+        ...
+
+
+class SourceGraphReader(Protocol):
+    """Read immutable provider graph facts for one milestone."""
+
+    def read(self, milestone: int, /) -> SourceGraphSnapshot:
+        """Return the immutable provider graph snapshot for a milestone."""
+        ...
+
+
 class HostAuthority(Request):
     """Local opaque configuration marker, not an authenticated principal."""
 
@@ -81,21 +138,11 @@ class HostAuthority(Request):
 
 
 class RegisterTrain(Request):
-    """Register one checker-approved immutable dispatch definition."""
+    """Address sources the service resolves; no authority bytes are caller supplied."""
 
-    definition: DispatchPlanDefinition
-
-
-class SupersedeTrain(Request):
-    """Conclude an inactive generation in favor of an approved replacement."""
-
-    plan: str
-    generation: int = Field(ge=1)
-    current_dispatch_plan_revision: str
-    current_dispatch_plan_digest: str
-    replacement: DispatchPlanDefinition
-    replacement_checker_evidence_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
-    reason: str = Field(min_length=1)
+    plan_ref: str = Field(min_length=1)
+    milestone: int = Field(ge=1)
+    plan: str = Field(min_length=1)
 
 
 class DispatchReserved(Request):
@@ -131,10 +178,11 @@ class TrainView(BaseModel):
     dispatch_plan_id: str
     dispatch_plan_revision: str
     dispatch_plan_digest: str
+    source_graph_revision: str
+    source_graph_digest: str
     authority_host_id: str
     registered_seq: int
     superseded_seq: int | None = None
-    replacement_dispatch_plan_id: str | None = None
     noop: str | None = None
 
 
@@ -210,7 +258,8 @@ def train_row(connection: sqlite3.Connection, plan: str, generation: int | None 
         The materialized train row.
     """
     query = (
-        "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL ORDER BY generation DESC LIMIT 1"
+        "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL "
+        "AND invalidated_seq IS NULL ORDER BY generation DESC LIMIT 1"
         if generation is None
         else "SELECT * FROM merge_trains WHERE plan = :plan AND generation = :generation "
         "ORDER BY generation DESC LIMIT 1"
@@ -236,11 +285,19 @@ def definition_event(connection: sqlite3.Connection, plan: str, generation: int)
 
 
 class MergeTrain:
-    """Service owning T1 registration, supersession, and reserved dispatch."""
+    """Service owning T1 authoritative registration and reserved dispatch."""
 
-    def __init__(self, ledger: sqlite3.Connection, host_authority: HostAuthority) -> None:
+    def __init__(
+        self,
+        ledger: sqlite3.Connection,
+        dispatch_plans: DispatchPlanReader,
+        source_graph: SourceGraphReader,
+        host_authority: HostAuthority,
+    ) -> None:
         """Bind the service to one existing ledger and configured host marker."""
         self.ledger = ledger
+        self.dispatch_plans: Any = dispatch_plans
+        self.source_graph: Any = source_graph
         self.host_authority = host_authority
 
     def register(self, request: RegisterTrain) -> TrainView:
@@ -249,22 +306,38 @@ class MergeTrain:
         Returns:
             The registered generation.
         """
-        definition = request.definition
-        encoded = definition.canonical_bytes()
-        definition_digest = digest(encoded)
+        dispatch_snapshot = self.dispatch_plans.read(request.plan_ref)
+        graph_snapshot = self.source_graph.read(request.milestone)
+        definition = dispatch_snapshot.definition()
+        if definition.plan != request.plan or definition.milestone != request.milestone:
+            transitions.refuse("dispatch-plan-disagreement")
+        encoded = dispatch_snapshot.canonical_bytes
+        definition_digest = dispatch_snapshot.digest
         with store.transaction(self.ledger):
-            self.validate_definition(definition)
+            self.validate_definition(definition, graph_snapshot)
+            if any(int(row["attempt_open"] or 0) == 1 for row in store.plan_tasks(self.ledger, definition.plan)):
+                transitions.refuse("preexisting-open-attempt")
             active = store.rows_of(
                 self.ledger.execute(
-                    "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL",
+                    "SELECT * FROM merge_trains WHERE plan = :plan AND superseded_seq IS NULL AND invalidated_seq IS NULL",
                     {"plan": definition.plan},
                 )
             )
             if active:
                 row = active[0]
-                if str(row["dispatch_plan_digest"]) == definition_digest:
+                if (
+                    str(row["dispatch_plan_revision"]) == dispatch_snapshot.revision
+                    and str(row["dispatch_plan_digest"]) == definition_digest
+                    and str(row["source_graph_revision"]) == graph_snapshot.revision
+                    and str(row["source_graph_digest"]) == graph_snapshot.digest
+                ):
                     return self.train_view(row, noop="already-registered")
-                transitions.refuse("dispatch-plan-disagreement")
+                if (
+                    str(row["source_graph_revision"]) != graph_snapshot.revision
+                    or str(row["source_graph_digest"]) != graph_snapshot.digest
+                ):
+                    transitions.refuse("source-graph-stale")
+                transitions.refuse("dispatch-plan-stale")
             generation = int(
                 self.ledger.execute(
                     "SELECT COALESCE(MAX(generation), 0) + 1 FROM merge_trains WHERE plan = :plan",
@@ -278,6 +351,8 @@ class MergeTrain:
                 "dispatch_plan_id": definition.logical_id,
                 "dispatch_plan_revision": definition.revision,
                 "dispatch_plan_digest": definition_digest,
+                "source_graph_revision": graph_snapshot.revision,
+                "source_graph_digest": graph_snapshot.digest,
                 "member_set_digest": canonical_digest(sorted((member["issue"], member["task"]) for member in members)),
                 "role_map_digest": canonical_digest(sorted((member["task"], member["role"]) for member in members)),
                 "conflict_map_digest": canonical_digest(
@@ -297,13 +372,44 @@ class MergeTrain:
                 payload=payload,
                 at=store.now(),
             )
-            row = {**payload, "plan": definition.plan, "registered_seq": sequence, "superseded_seq": None}
+            row = {
+                **payload,
+                "plan": definition.plan,
+                "registered_seq": sequence,
+                "superseded_seq": None,
+                "invalidated_seq": None,
+                "invalidation_reason": None,
+            }
             columns = [column.name for column in store.TABLES["merge_trains"]]
             self.ledger.execute(store.insert_statement("merge_trains", columns), {name: row[name] for name in columns})
         return self.train_view(row)
 
-    def validate_definition(self, definition: DispatchPlanDefinition) -> None:
+    def validate_definition(self, definition: DispatchPlanDefinition, graph: SourceGraphSnapshot) -> None:
         """Require exact task, issue, dependency, and conflict-resource agreement."""
+        shared_definition = (
+            definition.milestone,
+            definition.integration_branch,
+            definition.baseline_sha,
+            tuple(
+                sorted(
+                    (member.issue, member.task, member.role, member.dependencies, member.conflict_group)
+                    for member in definition.members
+                )
+            ),
+        )
+        shared_graph = (
+            graph.milestone,
+            graph.integration_branch,
+            graph.baseline_sha,
+            tuple(
+                sorted(
+                    (member.issue, member.task, member.role, member.dependencies, member.conflict_group)
+                    for member in graph.members
+                )
+            ),
+        )
+        if shared_definition != shared_graph:
+            transitions.refuse("dispatch-plan-disagreement")
         plan = store.fetch_plan(self.ledger, definition.plan)
         tasks = {str(row["id"]): row for row in store.plan_tasks(self.ledger, definition.plan)}
         members = {member.task: member for member in definition.members}
@@ -321,6 +427,31 @@ class MergeTrain:
             if held_group != member.conflict_group:
                 transitions.refuse("dispatch-plan-disagreement")
 
+    def fresh_definition(self, row: dict[str, Any]) -> DispatchPlanDefinition:
+        """Re-read both authorities and require exact registered and ledger agreement.
+
+        Returns:
+            The current definition after all authority checks pass.
+        """
+        payload = definition_event(self.ledger, str(row["plan"]), int(row["generation"]))
+        plan_ref = str(payload["dispatch_plan_id"])
+        milestone = int(payload["milestone"])
+        dispatch_snapshot = self.dispatch_plans.read(plan_ref)
+        graph_snapshot = self.source_graph.read(milestone)
+        if (
+            dispatch_snapshot.revision != row["dispatch_plan_revision"]
+            or dispatch_snapshot.digest != row["dispatch_plan_digest"]
+        ):
+            transitions.refuse("dispatch-plan-stale")
+        if (
+            graph_snapshot.revision != row["source_graph_revision"]
+            or graph_snapshot.digest != row["source_graph_digest"]
+        ):
+            transitions.refuse("source-graph-stale")
+        definition = dispatch_snapshot.definition()
+        self.validate_definition(definition, graph_snapshot)
+        return definition
+
     def dispatch(self, request: DispatchReserved) -> DispatchView:
         """Atomically open an attempt and reserve its frozen conflict group.
 
@@ -328,9 +459,8 @@ class MergeTrain:
             The frozen assignment tuple and opened attempt.
         """
         train = train_row(self.ledger, request.plan)
-        definition = definition_event(self.ledger, request.plan, int(train["generation"]))["definition"]
-        members = definition["members"] if isinstance(definition, dict) else []
-        member = next((item for item in members if item["task"] == request.task), None)
+        definition = self.fresh_definition(train)
+        member = next((item for item in definition.members if item.task == request.task), None)
         if member is None:
             transitions.refuse("role-assignment-mismatch")
         result = dispatch_registered(
@@ -340,9 +470,12 @@ class MergeTrain:
             generation=request.generation,
             authority_host_id=self.host_authority.authority_host_id,
             dispatch_plan_digest=str(train["dispatch_plan_digest"]),
-            role=str(member["role"]),
-            github_issue=int(member["issue"]),
-            conflict_group=member.get("conflict_group"),
+            source_graph_revision=str(train["source_graph_revision"]),
+            source_graph_digest=str(train["source_graph_digest"]),
+            role=member.role,
+            github_issue=member.issue,
+            dependencies=member.dependencies,
+            conflict_group=member.conflict_group,
             ttl_seconds=request.ttl_seconds,
             worktree=request.worktree,
         )
@@ -351,75 +484,11 @@ class MergeTrain:
             generation=request.generation,
             task=request.task,
             attempt=int(result.attempt or 0),
-            role=str(member["role"]),
-            github_issue=int(member["issue"]),
-            conflict_group=member.get("conflict_group"),
+            role=member.role,
+            github_issue=member.issue,
+            conflict_group=member.conflict_group,
             noop=result.noop,
         )
-
-    def supersede(self, request: SupersedeTrain) -> TrainView:
-        """Conclude an inactive generation using host and replacement evidence authority.
-
-        Returns:
-            The concluded generation.
-        """
-        replacement_digest = digest(request.replacement.canonical_bytes())
-        with store.transaction(self.ledger):
-            row = train_row(self.ledger, request.plan, request.generation)
-            self.require_host(row)
-            if row["superseded_seq"] is not None:
-                events = store.events_of(self.ledger, request.plan, kind="merge.train-superseded")
-                prior = next(
-                    event["payload"]
-                    for event in events
-                    if isinstance(event["payload"], dict) and event["payload"].get("generation") == request.generation
-                )
-                if (
-                    prior.get("replacement_dispatch_plan_digest") != replacement_digest
-                    or prior.get("replacement_checker_evidence_digest") != request.replacement_checker_evidence_digest
-                    or prior.get("reason") != request.reason
-                ):
-                    transitions.refuse("train-generation-superseded")
-                return self.train_view(row, replacement=request.replacement.logical_id, noop="already-superseded")
-            if (
-                str(row["dispatch_plan_revision"]) != request.current_dispatch_plan_revision
-                or str(row["dispatch_plan_digest"]) != request.current_dispatch_plan_digest
-            ):
-                transitions.refuse("train-generation-stale")
-            if request.replacement.plan != request.plan or not request.replacement_checker_evidence_digest:
-                transitions.refuse("replacement-definition-unapproved")
-            self.validate_definition(request.replacement)
-            active = self.ledger.execute(
-                "SELECT 1 FROM tasks WHERE plan = :plan AND attempt_open = 1 UNION ALL "
-                "SELECT 1 FROM merge_reservations WHERE plan = :plan AND generation = :generation AND active = 1 LIMIT 1",
-                {"plan": request.plan, "generation": request.generation},
-            ).fetchone()
-            if active is not None:
-                transitions.refuse("train-generation-active")
-            payload = {
-                "generation": request.generation,
-                "current_dispatch_plan_revision": request.current_dispatch_plan_revision,
-                "current_dispatch_plan_digest": request.current_dispatch_plan_digest,
-                "replacement_dispatch_plan_id": request.replacement.logical_id,
-                "replacement_dispatch_plan_revision": request.replacement.revision,
-                "replacement_dispatch_plan_digest": replacement_digest,
-                "replacement_checker_evidence_digest": request.replacement_checker_evidence_digest,
-                "reason": request.reason,
-            }
-            sequence = store.append_event(
-                self.ledger,
-                kind="merge.train-superseded",
-                plan=request.plan,
-                task=None,
-                payload=payload,
-                at=store.now(),
-            )
-            self.ledger.execute(
-                "UPDATE merge_trains SET superseded_seq = :seq WHERE plan = :plan AND generation = :generation",
-                {"seq": sequence, "plan": request.plan, "generation": request.generation},
-            )
-            row["superseded_seq"] = sequence
-        return self.train_view(row, replacement=request.replacement.logical_id)
 
     def status(self, query: MergeQuery) -> MergePage:
         """Return one generation and all of its reservation history."""
@@ -464,6 +533,7 @@ class MergeTrain:
             folded = store.fold_events(store.all_events(self.ledger))
             projection_queries = {
                 "merge_trains": "SELECT * FROM merge_trains ORDER BY plan, generation",
+                "merge_dispatches": "SELECT * FROM merge_dispatches ORDER BY plan, generation, task, attempt",
                 "merge_reservations": (
                     "SELECT * FROM merge_reservations ORDER BY plan, generation, conflict_group, task, attempt"
                 ),
@@ -473,6 +543,8 @@ class MergeTrain:
                 if current != folded[table]:
                     findings.append(f"{table}-projection-drift")
             page = self.status(query)
+            train = train_row(self.ledger, query.plan, query.generation)
+            self.fresh_definition(train)
             payload = definition_event(self.ledger, query.plan, page.train.generation)
             encoded = json.dumps(payload["definition"], sort_keys=True, separators=(",", ":")).encode()
             if digest(encoded) != page.train.dispatch_plan_digest:
@@ -483,6 +555,21 @@ class MergeTrain:
                     findings.append("reservation-attempt-invalid")
                 if reservation.active and int(task["attempt_open"]) != 1:
                     findings.append("reservation-orphaned")
+            for task in store.plan_tasks(self.ledger, query.plan):
+                if int(task["attempt_open"] or 0) != 1:
+                    continue
+                count = self.ledger.execute(
+                    "SELECT COUNT(*) FROM merge_dispatches WHERE plan = :plan AND generation = :generation "
+                    "AND task = :task AND attempt = :attempt",
+                    {
+                        "plan": query.plan,
+                        "generation": page.train.generation,
+                        "task": task["id"],
+                        "attempt": task["attempts"],
+                    },
+                ).fetchone()[0]
+                if count != 1:
+                    findings.append("dispatch-binding-missing")
         except (KeyError, LookupError, ValueError, store.Refusal):
             findings.append("merge-event-stream-invalid")
         return ValidationResult(valid=not findings, findings=findings)
@@ -493,7 +580,7 @@ class MergeTrain:
             transitions.refuse("wrong-authority-host")
 
     @staticmethod
-    def train_view(row: dict[str, Any], *, replacement: str | None = None, noop: str | None = None) -> TrainView:
+    def train_view(row: dict[str, Any], *, noop: str | None = None) -> TrainView:
         """Convert a materialized row to the public train view.
 
         Returns:
@@ -505,9 +592,10 @@ class MergeTrain:
             dispatch_plan_id=str(row["dispatch_plan_id"]),
             dispatch_plan_revision=str(row["dispatch_plan_revision"]),
             dispatch_plan_digest=str(row["dispatch_plan_digest"]),
+            source_graph_revision=str(row["source_graph_revision"]),
+            source_graph_digest=str(row["source_graph_digest"]),
             authority_host_id=str(row["authority_host_id"]),
             registered_seq=int(row["registered_seq"]),
             superseded_seq=int(row["superseded_seq"]) if row["superseded_seq"] is not None else None,
-            replacement_dispatch_plan_id=replacement,
             noop=noop,
         )
