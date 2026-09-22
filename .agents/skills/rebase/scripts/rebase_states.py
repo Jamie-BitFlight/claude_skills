@@ -200,8 +200,13 @@ WORKFLOW_STATE_DEFINITIONS = (
         name=WorkflowState.REBASE_COMPLETE_VALIDATION_FAILED,
         kind=StateKind.TERMINAL,
         condition="At least one post-rebase verification oracle failed.",
-        next_action="End without publication and request an explicit recovery decision.",
-        artifact_policy="Preserve both rewritten and recovery refs plus every oracle result.",
+        next_action=(
+            "End with no further history mutation; another mutation requires an explicit recovery decision "
+            "and a newly validated plan."
+        ),
+        artifact_policy=(
+            "Freeze and retain the rewritten branch, recovery ref, plan, and every oracle result through the terminal."
+        ),
         evidence=["named failed verification oracle", "no publication claim"],
     ),
     WorkflowStateDefinition(

@@ -72,19 +72,23 @@ recovery evidence and returns `READY_TO_REBASE` plus its SHA-256.
 
 ## 4. Reject drift immediately before mutation
 
-Recheck the branch and target OIDs, authorized clean worktree, absence of operations, branch-transfer
-gate, plan validity and identical SHA-256, and recovery ref resolving to the captured old tip. Any ref
-drift emits `REPLAN_REF_DRIFT`; retain and mark the artifact stale, then recapture from Step 1. Any
-artifact drift returns to Step 3. Do not execute a stale plan.
+Run
+`uv run --script "<skill-dir>/scripts/rebase_plan.py" prepare <plan.json> --expected-sha256 <validated-sha256>`.
+This gate revalidates the artifact and rechecks live refs, authorized worktree ownership, clean
+state, operation absence, and recovery before deriving replay argv from the execution mode,
+immutable target, merge policy, and empty policy. Only `status=PREPARED` with the retained SHA-256
+and emitted argv passes. Any response without argv blocks mutation; ref drift requires recapture
+from Step 1 through `REPLAN_REF_DRIFT`, and artifact/hash drift returns to Step 3.
 
-Completion criterion: every immutable binding and recovery proof still matches the validated plan.
+Completion criterion: every live binding matches the unchanged plan and the gate emits its canonical
+argv.
 
 ## 5. Execute only validated intent
 
-Require the execution worktree to hold the planned branch unless the plan authorizes positional
-branch transfer. Execute against the immutable target with only the validated merge and
-installed-help-validated empty policies, surfacing clean cherry-picks and becomes-empty commits.
-Route every conflict, empty stop, command failure, or requested abort through
+Treat the validated plan hash as single-use: execute its validator-emitted argv exactly once. No
+other initial replay form is authorized; an `--onto` range requires a future typed schema that
+binds every boundary. After replay starts, retain the rewritten branch and recovery ref through the
+terminal. Route every conflict, empty stop, command failure, or requested abort through
 [active rebase](./active-rebase.md) before another mutation.
 
 Completion criterion: execution either has no active rebase metadata or ends at one canonical
@@ -95,7 +99,8 @@ blocked, decision, aborted, or failure terminal with command, output, status, an
 Verify planned branch identity and target ancestry, every old candidate disposition and old-to-new
 mapping, repository checks, clean worktree, no unmerged paths or active operation, and the recovery
 ref. Preserved merge topology also requires planned parent/tree evidence. Any failed oracle emits
-`REBASE_COMPLETE_VALIDATION_FAILED`, preserves rewritten and recovery refs, and stops mutation.
+`REBASE_COMPLETE_VALIDATION_FAILED`, freezes rewritten and recovery refs, and stops mutation.
+Another history mutation requires an explicit recovery decision and a newly validated plan.
 
 Only a complete pass emits `REBASE_COMPLETE_VERIFIED`. Report immutable branch/target/old/new OIDs,
 dispositions, repository-check evidence, clean state, recovery ref, and `not published`. Make that

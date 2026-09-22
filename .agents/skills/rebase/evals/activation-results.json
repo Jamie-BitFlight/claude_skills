@@ -5,7 +5,7 @@
   "content_sha256": {
     "SKILL.md": "6840875489b7c5bb95b3de082b23dfef6103f0fc06bc18159c5f7bca978006e7",
     "references/active-rebase.md": "dcf11d64ecd7119a6cf4e3d4c5a92ae6a7d0f3a33726d2444963a63ce0bec3fe",
-    "references/start-rebase.md": "a243ad1b7237f38acb9db009df712991af63e3eef7da61c46df57f78aec69c02"
+    "references/start-rebase.md": "932313fbb389684ca224b9c7b6e9ce2507e8d7c808a3bdaa73536561e29bca07"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },

@@ -22,6 +22,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
 from rebase_evidence import CommandEvidence, ExecutionMode, RepositoryStateEvidence
+from rebase_prepare import PrepareFailure, PrepareRequest, prepare_replay
 from rebase_states import WORKFLOW_STATE_DEFINITIONS, WorkflowState
 
 ObjectId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}([0-9a-f]{24})?$")]
@@ -334,12 +335,15 @@ def create_parser() -> argparse.ArgumentParser:
     """Create the plan-validator CLI parser.
 
     Returns:
-        Parser with validate, schema, and states commands.
+        Parser with validation, preparation, schema, state, and path commands.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate_parser = subparsers.add_parser("validate", help="Validate one JSON plan artifact.")
     validate_parser.add_argument("plan", type=Path)
+    prepare_parser = subparsers.add_parser("prepare", help="Recheck live state and emit canonical replay argv.")
+    prepare_parser.add_argument("plan", type=Path)
+    prepare_parser.add_argument("--expected-sha256", required=True)
     subparsers.add_parser("schema", help="Print the complete JSON Schema for a plan artifact.")
     subparsers.add_parser("states", help="Print the canonical workflow-state contract.")
     path_state_parser = subparsers.add_parser("path-state", help="Observe one resolved Git path.")
@@ -388,6 +392,62 @@ def validate_plan(path: Path) -> int:
     return 0
 
 
+def prepare_plan(path: Path, expected_sha256: str) -> int:
+    """Validate one unchanged artifact and emit replay argv only after live rechecks.
+
+    Returns:
+        Zero on complete preparation, one for a blocked/invalid gate, or two for I/O failure.
+    """
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        emit_json({"error": str(error), "state": WorkflowState.PLAN_INVALID, "status": "ERROR"})
+        return 2
+
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    if actual_sha256 != expected_sha256:
+        emit_json({
+            "error": "plan artifact SHA-256 differs from the validated hash",
+            "state": WorkflowState.PLAN_INVALID,
+            "status": "INVALID",
+        })
+        return 1
+    try:
+        plan = RebasePlan.model_validate_json(raw)
+    except ValidationError as error:
+        emit_json({
+            "errors": json.loads(error.json(include_url=False)),
+            "state": WorkflowState.PLAN_INVALID,
+            "status": "INVALID",
+        })
+        return 1
+
+    request = PrepareRequest(
+        branch_ref=plan.branch.ref,
+        branch_oid=plan.branch.oid,
+        target_ref=plan.target.ref,
+        target_oid=plan.target.oid,
+        execution_worktree=plan.execution_worktree,
+        execution_mode=plan.execution_mode,
+        merge_policy=plan.merge_policy.value,
+        becomes_empty_option=plan.becomes_empty_option.value,
+        recovery_ref=plan.recovery_ref,
+    )
+    try:
+        argv = prepare_replay(request, Path.cwd())
+    except PrepareFailure as error:
+        emit_json({"error": str(error), "state": error.state, "status": "BLOCKED"})
+        return 1
+    emit_json({
+        "argv": argv,
+        "plan_id": plan.plan_id,
+        "sha256": actual_sha256,
+        "state": WorkflowState.READY_TO_REBASE,
+        "status": "PREPARED",
+    })
+    return 0
+
+
 def main() -> int:
     """Run the selected validator operation.
 
@@ -397,6 +457,8 @@ def main() -> int:
     args = create_parser().parse_args()
     if args.command == "validate":
         return validate_plan(args.plan)
+    if args.command == "prepare":
+        return prepare_plan(args.plan, args.expected_sha256)
     if args.command == "schema":
         emit_json(RebasePlan.model_json_schema())
         return 0

@@ -59,3 +59,15 @@ def test_workflow_state_source_includes_every_reviewed_state() -> None:
     assert definitions[WorkflowState.PLAN_INVALID].kind is StateKind.TERMINAL
     assert "End this invocation" in definitions[WorkflowState.PLAN_INVALID].next_action
     assert "Retain the stale plan" in definitions[WorkflowState.REPLAN_REF_DRIFT].artifact_policy
+
+
+def test_validation_failure_freezes_history_until_a_new_authorized_plan() -> None:
+    """Make failed replay verification a single-use terminal, not a reset-and-retry loop."""
+    failed = workflow_state_definitions()[WorkflowState.REBASE_COMPLETE_VALIDATION_FAILED]
+
+    assert "no further history mutation" in failed.next_action
+    assert "explicit recovery decision" in failed.next_action
+    assert "newly validated plan" in failed.next_action
+    assert "rewritten branch" in failed.artifact_policy
+    assert "recovery ref" in failed.artifact_policy
+    assert "through the terminal" in failed.artifact_policy
