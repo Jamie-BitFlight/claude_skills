@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 from dh_core.integration_branch import (
     GitObjectFacts,
     GitPushAttempt,
@@ -72,7 +70,7 @@ def prepared() -> PreparedAdvance:
         ordered_parent_oids=("a" * 40,),
         prepared_identity_digest="sha256:" + "0" * 64,
     )
-    return replace(value, prepared_identity_digest=prepared_identity_digest(value))
+    return value.model_copy(update={"prepared_identity_digest": prepared_identity_digest(value)})
 
 
 def test_f21_default_capability_false_returns_expected_head_unsupported() -> None:
@@ -98,8 +96,8 @@ def test_f14_direct_fast_forward_requires_result_equals_candidate() -> None:
         remote_identity=capability().remote_identity,
         target_ref="refs/heads/integration/runtime-integrity",
     )
-    request = replace(prepared(), prepared_result_oid="d" * 40)
-    request = replace(request, prepared_identity_digest=prepared_identity_digest(request))
+    request = prepared().model_copy(update={"prepared_result_oid": "d" * 40})
+    request = request.model_copy(update={"prepared_identity_digest": prepared_identity_digest(request)})
 
     result = advancer.advance(request)
 

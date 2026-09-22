@@ -767,7 +767,7 @@ def prepare_claim(
         "expires": store.timestamp(store.now() + timedelta(seconds=300)),
         "result_sha": prepared.prepared_result_oid,
         "prepared_identity_digest": prepared.prepared_identity_digest,
-        "prepared_json": json.dumps(prepared.__dict__, sort_keys=True),
+        "prepared_json": prepared.model_dump_json(),
         "gate_evidence_refs": json.dumps(list(gate_refs)),
         "policy_snapshot_digest": blob.digest,
     }

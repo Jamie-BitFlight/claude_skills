@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, replace
 from typing import Literal, Protocol
 
+from pydantic import BaseModel, ConfigDict
 
-@dataclass(frozen=True)
-class PreparedAdvance:
+
+class StrictModel(BaseModel):
+    """Frozen strict adapter model."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+
+class PreparedAdvance(StrictModel):
     """Durable immutable operands for one target update."""
 
     remote_identity: str
@@ -23,8 +29,7 @@ class PreparedAdvance:
     prepared_identity_digest: str
 
 
-@dataclass(frozen=True)
-class GitPushCapability:
+class GitPushCapability(StrictModel):
     """Exact admitted runtime capability identity."""
 
     identity: str
@@ -43,16 +48,14 @@ class GitPushCapability:
     primitive: Literal["git-smart-push-explicit-lease"] = "git-smart-push-explicit-lease"
 
 
-@dataclass(frozen=True)
-class RepositoryIdentityObservation:
+class RepositoryIdentityObservation(StrictModel):
     """Observed credential-free repository identity."""
 
     remote_identity: str
     available: bool
 
 
-@dataclass(frozen=True)
-class RefObservation:
+class RefObservation(StrictModel):
     """One exact ref observation."""
 
     ref: str
@@ -60,8 +63,7 @@ class RefObservation:
     available: bool
 
 
-@dataclass(frozen=True)
-class GitObjectFacts:
+class GitObjectFacts(StrictModel):
     """Immutable object type and graph facts."""
 
     oid: str
@@ -71,8 +73,7 @@ class GitObjectFacts:
     ancestors: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
-class GitPushAttempt:
+class GitPushAttempt(StrictModel):
     """Complete result classification from one push invocation."""
 
     transmitted: bool
@@ -81,8 +82,7 @@ class GitPushAttempt:
     stderr: bytes
 
 
-@dataclass(frozen=True)
-class ExpectedHeadAdvanceResult:
+class ExpectedHeadAdvanceResult(StrictModel):
     """Stable advancement outcome."""
 
     outcome: str
@@ -114,7 +114,7 @@ def prepared_identity_digest(prepared: PreparedAdvance) -> str:
     Returns:
         The canonical SHA-256 identity.
     """
-    value = asdict(prepared)
+    value = prepared.model_dump(mode="json")
     value.pop("prepared_identity_digest")
     content = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     return "sha256:" + hashlib.sha256(content).hexdigest()
@@ -183,7 +183,7 @@ class IntegrationBranchAdvancer:
             ordered_parent_oids=candidate_facts.parent_oids,
             prepared_identity_digest="sha256:" + "0" * 64,
         )
-        return replace(value, prepared_identity_digest=prepared_identity_digest(value))
+        return value.model_copy(update={"prepared_identity_digest": prepared_identity_digest(value)})
 
     def reconcile(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult:
         """Observe target state without invoking push.
@@ -193,12 +193,12 @@ class IntegrationBranchAdvancer:
         """
         observed = self.port.observe_ref(ref=self.target_ref)
         if observed.available and observed.oid == prepared.prepared_result_oid:
-            return ExpectedHeadAdvanceResult("advanced-after-reconciliation")
+            return ExpectedHeadAdvanceResult(outcome="advanced-after-reconciliation")
         if observed.available and observed.oid == prepared.expected_target_oid:
-            return ExpectedHeadAdvanceResult("not-advanced")
+            return ExpectedHeadAdvanceResult(outcome="not-advanced")
         if observed.available:
-            return ExpectedHeadAdvanceResult("target-stale")
-        return ExpectedHeadAdvanceResult("reconciliation-required")
+            return ExpectedHeadAdvanceResult(outcome="target-stale")
+        return ExpectedHeadAdvanceResult(outcome="reconciliation-required")
 
     def validate_inputs(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
         """Validate capability, binding, shape, and durable identity.
@@ -213,13 +213,13 @@ class IntegrationBranchAdvancer:
             or capability.remote_identity != self.remote_identity
             or capability.target_ref_pattern != self.target_ref
         ):
-            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+            return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
         if prepared.remote_identity != self.remote_identity or prepared.target_ref != self.target_ref:
-            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+            return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
         if prepared.prepared_result_oid != prepared.candidate_oid:
-            return ExpectedHeadAdvanceResult("result-shape-unsupported")
+            return ExpectedHeadAdvanceResult(outcome="result-shape-unsupported")
         if prepared.prepared_identity_digest != prepared_identity_digest(prepared):
-            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+            return ExpectedHeadAdvanceResult(outcome="prepared-identity-mismatch")
         return None
 
     def validate_observations(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
@@ -230,15 +230,15 @@ class IntegrationBranchAdvancer:
         """
         repository = self.port.preflight_repository()
         if not repository.available or repository.remote_identity != self.remote_identity:
-            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+            return ExpectedHeadAdvanceResult(outcome="expected-head-unsupported")
         target = self.port.observe_ref(ref=self.target_ref)
         if not target.available:
-            return ExpectedHeadAdvanceResult("reconciliation-required")
+            return ExpectedHeadAdvanceResult(outcome="reconciliation-required")
         if target.oid != prepared.expected_target_oid:
-            return ExpectedHeadAdvanceResult("target-stale")
+            return ExpectedHeadAdvanceResult(outcome="target-stale")
         candidate = self.port.observe_ref(ref=prepared.candidate_ref)
         if not candidate.available or candidate.oid != prepared.candidate_oid:
-            return ExpectedHeadAdvanceResult("candidate-mismatch")
+            return ExpectedHeadAdvanceResult(outcome="candidate-mismatch")
         return None
 
     def validate_objects(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
@@ -262,20 +262,20 @@ class IntegrationBranchAdvancer:
         result_facts = facts.get(prepared.prepared_result_oid)
         tree_facts = facts.get(prepared.prepared_tree_oid)
         if target_facts is None or result_facts is None or tree_facts is None:
-            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+            return ExpectedHeadAdvanceResult(outcome="prepared-identity-mismatch")
         if (
             target_facts.object_type != "commit"
             or result_facts.object_type != "commit"
             or tree_facts.object_type != "tree"
         ):
-            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+            return ExpectedHeadAdvanceResult(outcome="prepared-identity-mismatch")
         if (
             result_facts.tree_oid != prepared.prepared_tree_oid
             or result_facts.parent_oids != prepared.ordered_parent_oids
         ):
-            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+            return ExpectedHeadAdvanceResult(outcome="prepared-identity-mismatch")
         if prepared.expected_target_oid not in result_facts.ancestors:
-            return ExpectedHeadAdvanceResult("non-fast-forward-prepared-result")
+            return ExpectedHeadAdvanceResult(outcome="non-fast-forward-prepared-result")
         return None
 
     def classify_attempt(self, prepared: PreparedAdvance, attempt: GitPushAttempt) -> ExpectedHeadAdvanceResult:
@@ -287,7 +287,9 @@ class IntegrationBranchAdvancer:
         observed = self.port.observe_ref(ref=self.target_ref)
         if observed.available and observed.oid == prepared.prepared_result_oid:
             outcome = "advanced" if attempt.succeeded else "advanced-after-reconciliation"
-            return ExpectedHeadAdvanceResult(outcome)
+            return ExpectedHeadAdvanceResult(outcome=outcome)
         if observed.available and observed.oid != prepared.expected_target_oid:
-            return ExpectedHeadAdvanceResult("target-stale")
-        return ExpectedHeadAdvanceResult("transport-failed" if not attempt.transmitted else "reconciliation-required")
+            return ExpectedHeadAdvanceResult(outcome="target-stale")
+        return ExpectedHeadAdvanceResult(
+            outcome="transport-failed" if not attempt.transmitted else "reconciliation-required"
+        )

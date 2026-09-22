@@ -216,6 +216,39 @@ def test_f11_admission_binds_distinct_accepted_checker(tmp_path: Path) -> None:
     assert train.status(MergeQuery(plan="Pt2")).train.generation == 1
 
 
+def test_f08_checker_tuple_substitution_refuses_without_admission(tmp_path: Path) -> None:
+    train, connection = service(tmp_path)
+    maker = accept_assignment(train, connection, "T1")
+    candidate = train.submit(
+        SubmitCandidate(
+            plan="Pt2",
+            generation=1,
+            branch="candidate",
+            pull_request_ref="PR1",
+            candidate_sha="b" * 40,
+            base_sha="a" * 40,
+            maker=maker,
+            maker_evidence_digest=train.evidence.put(b'{"maker":true}', "application/json").digest,
+        )
+    )
+    checker = accept_assignment(train, connection, "T2").model_copy(update={"attempt": 2})
+    evidence = train.evidence.put(b'{"checker":true}', "application/json")
+
+    with pytest.raises(store.Refusal, match="role-assignment-mismatch"):
+        train.admit(
+            AdmitCandidate(
+                plan="Pt2",
+                generation=1,
+                task="T1",
+                candidate_number=candidate.candidate_number,
+                checker=checker,
+                checker_evidence_digest=evidence.digest,
+            )
+        )
+
+    assert connection.execute("SELECT admitted_seq FROM merge_candidates").fetchone()[0] is None
+
+
 def test_f02_supersede_resolves_replacement_and_checker_evidence(tmp_path: Path) -> None:
     train, connection = service(tmp_path)
     current = train.dispatch_plans.value.definition()
