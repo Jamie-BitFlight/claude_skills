@@ -289,9 +289,7 @@ def evaluate_review_complete(snapshot: ReviewSnapshot, cycle: ReviewCycleState) 
         "recheck snapshot fingerprint does not match current snapshot",
     )
     require_authorization(
-        snapshot.unresolved_count == 0
-        and snapshot.outstanding_input_count == 0
-        and not snapshot.has_outstanding_work(),
+        snapshot.unresolved_count == 0 and snapshot.outstanding_input_count == 0 and not snapshot.unresponded_reviews,
         "provider snapshot has outstanding work",
     )
     validate_cycle_coverage(snapshot, cycle)
