@@ -39,11 +39,13 @@ action. Tag publication jobs declare no environment and therefore do not receive
 Protect both the default branch and release-tag pattern. Keep credentials out of component inputs,
 and prefer an explicitly requested external secret where available.
 
-The version components clear configured Git credential helpers, replace the selected remote's URL
-with the credential-free `repository-url` input, and force a runtime askpass helper that reads
-`RELEASE_PUSH_TOKEN` from the environment. The secret value is not written to a file or embedded in
-a repository URL. Generic package publication and GitLab Release creation use the job's short-lived
-`CI_JOB_TOKEN`.
+The version components replace the selected remote's URL with the credential-free `repository-url`
+input and export command-scoped Git configuration for all child processes. The first helper entry
+resets inherited Runner helpers; the second returns `oauth2` and reads `RELEASE_PUSH_TOKEN` from the
+runtime environment. This works when Runner sets `credential.interactive=never`, and prevents a
+lower-precedence `CI_JOB_TOKEN` helper from winning. The secret value is not written to a file or
+embedded in a repository URL. Generic package publication and GitLab Release creation use the job's
+short-lived `CI_JOB_TOKEN`.
 
 ## Test And Publish
 
@@ -57,6 +59,9 @@ publication, require observable evidence that:
 - default-branch and protected matching-tag simulations admit the intended jobs while a
   nonmatching tag admits none of the release jobs;
 - a selected version component succeeds for both no-release and release-worthy histories;
+- under the target Runner's noninteractive credential configuration, a child Git process resolves
+  the scoped release credential instead of inherited job-token helpers, while repository config,
+  remote URLs, helper configuration values, and created files contain no release credential;
 - a protected matching tag produces notes, one consumer build artifact, the Generic package, and
   the GitLab Release in dependency order; and
 - the Catalog publication job exists only for a semantic-version tag and succeeds after component

@@ -6,17 +6,15 @@ derived from that evidence.
 Include `assets/release-components/templates/semantic-release-version.yml` from a dedicated
 component project. Pass a unique job name, the consumer's version stage and rules, a digest-pinned
 Node image, an exact tool version, tag prefix, selected Git remote name, explicit credential-free
-repository URL, and the dedicated version environment. The component clears configured credential
-helpers, rewrites the selected remote, and forces askpass to read `RELEASE_PUSH_TOKEN` at runtime.
-It passes the URL as semantic-release's `repositoryUrl` and keeps only commit analysis so the tag
-pipeline owns notes, build, publication, and Release creation.
+repository URL, and the dedicated version environment. It passes the URL as semantic-release's
+`repositoryUrl` and keeps only commit analysis so the tag pipeline owns notes, build, publication,
+and Release creation.
 
 Requirements:
 
 - complete Git history and tags (`GIT_DEPTH: "0"`);
 - Git in the selected image;
 - selected remote exists and the explicit repository URL identifies its release target;
-- protected Git credential exposed as `GL_TOKEN` only in the version job;
 - `CI_DEFAULT_BRANCH` present and the consumer's prefix, regex, and protected wildcard aligned; and
 - successful no-release output when no configured commit warrants release.
 

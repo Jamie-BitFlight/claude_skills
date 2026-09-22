@@ -559,20 +559,25 @@ def test_version_components_require_explicit_remote_selection() -> None:
     semantic_inputs = component_inputs(semantic_path)
     python_inputs = component_inputs(python_path)
     semantic_job = component_job(semantic_path)
+    python_job = component_job(python_path)
 
     assert "default" not in object_map(semantic_inputs["git-remote-name"])
     assert "default" not in object_map(semantic_inputs["repository-url"])
     assert "default" not in object_map(python_inputs["git-remote-name"])
     assert "default" not in object_map(python_inputs["repository-url"])
-    variables = object_map(semantic_job["variables"])
-    assert variables["RELEASE_REPOSITORY_URL"] == "$[[ inputs.repository-url ]]"
+    semantic_variables = object_map(semantic_job["variables"])
+    python_variables = object_map(python_job["variables"])
+    assert semantic_variables["RELEASE_REPOSITORY_URL"] == "$[[ inputs.repository-url ]]"
+    assert {"GL_TOKEN", "GITLAB_TOKEN"}.isdisjoint(semantic_variables)
+    assert "GL_TOKEN" not in python_variables
+    assert python_variables["GITLAB_TOKEN"] == "$RELEASE_PUSH_TOKEN"
     commands = [*string_list(semantic_job["before_script"]), *string_list(semantic_job["script"])]
     script = "\n".join(commands)
     assert "git remote set-url" in script
     assert "repositoryUrl" in script
 
 
-def test_python_semantic_release_runtime_config_leaves_git_auth_to_askpass(tmp_path: Path) -> None:
+def test_python_semantic_release_runtime_config_leaves_git_auth_to_command_helper(tmp_path: Path) -> None:
     """The executed PSR config generator disables token-derived Git push authentication."""
     path = SKILL_ROOT / "assets" / "release-components" / "templates" / "python-semantic-release-version.yml"
     job = component_job(path)
@@ -594,34 +599,65 @@ def test_python_semantic_release_runtime_config_leaves_git_auth_to_askpass(tmp_p
 
     assert result.returncode == 0, result.stderr
     config = tomllib.loads(tmp_path.joinpath(".release-component.toml").read_text(encoding="utf-8"))
-    assert config["semantic_release"]["remote"]["ignore_token_for_push"] is True
+    remote = config["semantic_release"]["remote"]
+    assert remote["token"] == {"env": "GITLAB_TOKEN"}
+    assert remote["ignore_token_for_push"] is True
 
 
 @pytest.mark.parametrize("template_name", ["semantic-release-version.yml", "python-semantic-release-version.yml"])
-def test_version_credential_helper_forces_runtime_token_without_persisting_it(
+def test_version_command_helper_overrides_noninteractive_runner_credentials_without_persisting_token(
     template_name: str, tmp_path: Path
 ) -> None:
-    """The actual askpass setup resolves a fixture token without writing its value."""
+    """The command-scoped helper overrides Runner credentials with interactivity disabled."""
     path = SKILL_ROOT / "assets" / "release-components" / "templates" / template_name
     job = component_job(path)
     before_script = string_list(job["before_script"])
-    setup = next(command for command in before_script if "cat >.release-git-askpass" in command)
-    fixture_token = "fixture-release-token"
+    setup = next(command for command in before_script if "fixture_credential=" in command)
+    credential_sentinel = "release-credential-sentinel"
+    subprocess.run(["git", "init", "--quiet"], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://gitlab.example/group/project.git"], cwd=tmp_path, check=True
+    )
+    subprocess.run(["git", "config", "credential.interactive", "never"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "credential.helper",
+            '!f() { test "$1" = get || exit 0; printf \'username=gitlab-ci-token\\npassword=inherited-lower-credential\\n\'; }; f "$@"',
+        ],
+        cwd=tmp_path,
+        check=True,
+    )
     result = subprocess.run(
         ["bash", "-c", setup],
         cwd=tmp_path,
-        env={**os.environ, "CI_PROJECT_DIR": str(tmp_path), "RELEASE_PUSH_TOKEN": fixture_token},
+        env={**os.environ, "RELEASE_PUSH_TOKEN": credential_sentinel},
         text=True,
         capture_output=True,
         check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    helper = tmp_path / ".release-git-askpass"
-    assert helper.stat().st_mode & 0o777 == 0o700
-    assert fixture_token not in helper.read_text(encoding="utf-8")
-    assert "GIT_CONFIG_KEY_0=credential.helper" in setup
-    assert "GIT_CONFIG_VALUE_0=" in setup
+    assert credential_sentinel not in setup
+    assert {path.name for path in tmp_path.iterdir()} == {".git"}
+    configured_helpers = subprocess.run(
+        ["git", "config", "--local", "--get-all", "credential.helper"],
+        cwd=tmp_path,
+        text=True,
+        capture_output=True,
+        check=True,
+    ).stdout
+    remote_urls = subprocess.run(
+        ["git", "remote", "get-url", "--all", "origin"], cwd=tmp_path, text=True, capture_output=True, check=True
+    ).stdout.splitlines()
+    persisted = "\n".join(
+        path.read_text(encoding="utf-8", errors="replace") for path in tmp_path.rglob("*") if path.is_file()
+    )
+    assert credential_sentinel not in configured_helpers
+    assert remote_urls == ["https://gitlab.example/group/project.git"]
+    assert all(credential_sentinel not in url and "@" not in url for url in remote_urls)
+    assert credential_sentinel not in persisted
 
 
 def test_release_token_environment_scope_exists_only_on_version_jobs() -> None:

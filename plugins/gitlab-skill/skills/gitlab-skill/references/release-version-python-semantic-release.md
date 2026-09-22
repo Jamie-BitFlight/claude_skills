@@ -6,10 +6,9 @@ is derived from that evidence.
 Include `assets/release-components/templates/python-semantic-release-version.yml` from a dedicated
 component project. Pass a unique job name, the consumer's version stage and rules, a digest-pinned
 Python image, exact tool version, Git identity, remote name, credential-free repository URL, tag
-prefix, and the dedicated version environment. The component clears configured credential helpers,
-rewrites the selected remote, and forces askpass to read `RELEASE_PUSH_TOKEN` at runtime. It writes
-untracked runtime TOML from its typed inputs and `CI_DEFAULT_BRANCH`, then passes it through PSR's
-documented `--config` option. The remote name and URL have no defaults.
+prefix, and the dedicated version environment. It writes untracked runtime TOML from its typed
+inputs and `CI_DEFAULT_BRANCH`, then passes it through PSR's documented `--config` option. The
+remote name and URL have no defaults.
 
 Requirements:
 

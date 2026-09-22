@@ -59,24 +59,16 @@ spec:
     - git remote set-url "$RELEASE_GIT_REMOTE_NAME" "$RELEASE_REPOSITORY_URL"
     - test "$(git remote get-url "$RELEASE_GIT_REMOTE_NAME")" = "$RELEASE_REPOSITORY_URL"
     - |
-      cat >.release-git-askpass <<'EOF'
-      #!/bin/sh
-      case "$1" in
-        *Username*) printf '%s\n' oauth2 ;;
-        *Password*) printf '%s\n' "$RELEASE_PUSH_TOKEN" ;;
-        *) exit 1 ;;
-      esac
-      EOF
-      chmod 700 .release-git-askpass
-      export GIT_ASKPASS="$CI_PROJECT_DIR/.release-git-askpass"
-      export GIT_ASKPASS_REQUIRE=force
       export GIT_TERMINAL_PROMPT=0
-      export GIT_CONFIG_COUNT=1
+      export GIT_CONFIG_COUNT=2
       export GIT_CONFIG_KEY_0=credential.helper
       export GIT_CONFIG_VALUE_0=
-      fixture_credential="$(printf 'protocol=https\nhost=fixture.invalid\n\n' | RELEASE_PUSH_TOKEN=fixture-token git credential fill)"
+      export GIT_CONFIG_KEY_1=credential.helper
+      export GIT_CONFIG_VALUE_1='!f() { test "$1" = get || exit 0; printf "username=oauth2\npassword=%s\n" "$RELEASE_PUSH_TOKEN"; }; f "$@"'
+      case "$GIT_CONFIG_VALUE_1" in *"$RELEASE_PUSH_TOKEN"*) exit 1 ;; esac
+      fixture_credential="$(sh -c "printf 'protocol=https\\nhost=fixture.invalid\\n\\n' | git credential fill")"
       printf '%s\n' "$fixture_credential" | grep -Fxq 'username=oauth2'
-      printf '%s\n' "$fixture_credential" | grep -Fxq 'password=fixture-token'
+      test "$(printf '%s\n' "$fixture_credential" | sed -n 's/^password=//p')" = "$RELEASE_PUSH_TOKEN"
   script:
     - |
       python - <<'PY'

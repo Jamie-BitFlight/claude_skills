@@ -71,25 +71,20 @@ test-release-git-credential:
   image: alpine/git:__GIT_VERSION__@sha256:__GIT_IMAGE_DIGEST__
   script:
     - |
-      cat >credential-askpass <<'EOF'
-      #!/bin/sh
-      case "$1" in
-        *Username*) printf '%s\n' oauth2 ;;
-        *Password*) printf '%s\n' "$RELEASE_PUSH_TOKEN" ;;
-        *) exit 1 ;;
-      esac
-      EOF
-      chmod 700 credential-askpass
-      export GIT_ASKPASS="$CI_PROJECT_DIR/credential-askpass"
-      export GIT_ASKPASS_REQUIRE=force
+      RELEASE_PUSH_TOKEN=release-credential-sentinel
+      export RELEASE_PUSH_TOKEN
+      git config credential.interactive never
+      git config credential.helper '!f() { test "$1" = get || exit 0; printf "username=gitlab-ci-token\npassword=inherited-lower-credential\n"; }; f "$@"'
       export GIT_TERMINAL_PROMPT=0
-      export GIT_CONFIG_COUNT=1
+      export GIT_CONFIG_COUNT=2
       export GIT_CONFIG_KEY_0=credential.helper
       export GIT_CONFIG_VALUE_0=
-      fixture_credential="$(printf 'protocol=https\nhost=fixture.invalid\n\n' | RELEASE_PUSH_TOKEN=fixture-token git credential fill)"
+      export GIT_CONFIG_KEY_1=credential.helper
+      export GIT_CONFIG_VALUE_1='!f() { test "$1" = get || exit 0; printf "username=oauth2\npassword=%s\n" "$RELEASE_PUSH_TOKEN"; }; f "$@"'
+      case "$GIT_CONFIG_VALUE_1" in *"$RELEASE_PUSH_TOKEN"*) exit 1 ;; esac
+      fixture_credential="$(sh -c "printf 'protocol=https\\nhost=fixture.invalid\\n\\n' | git credential fill")"
       printf '%s\n' "$fixture_credential" | grep -Fxq 'username=oauth2'
-      printf '%s\n' "$fixture_credential" | grep -Fxq 'password=fixture-token'
-      ! grep -Fq fixture-token credential-askpass
+      test "$(printf '%s\n' "$fixture_credential" | sed -n 's/^password=//p')" = "$RELEASE_PUSH_TOKEN"
 
 test-release-tag-selection:
   stage: test
