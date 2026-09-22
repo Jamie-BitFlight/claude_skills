@@ -357,6 +357,20 @@ TABLES: dict[str, list[ledger_spec.Column]] = stored_columns()
 SOURCE_TABLES: frozenset[str] = frozenset({"merge_evidence_blobs"})
 """Immutable source tables retained when event projections are rebuilt."""
 
+EVIDENCE_BLOBS_DDL = (
+    "CREATE TABLE IF NOT EXISTS merge_evidence_blobs ("
+    "digest TEXT PRIMARY KEY, "
+    "byte_length INTEGER NOT NULL CHECK (byte_length >= 0), "
+    "media_type TEXT NOT NULL CHECK (length(trim(media_type)) > 0), "
+    "content BLOB NOT NULL, "
+    "created_at TEXT NOT NULL, "
+    "CHECK (length(digest) = 71 AND substr(digest, 1, 7) = 'sha256:' "
+    "AND substr(digest, 8) NOT GLOB '*[^0-9a-f]*'), "
+    "CHECK (typeof(content) = 'blob'), "
+    "CHECK (length(content) = byte_length))"
+)
+"""Private immutable evidence source table, intentionally outside ``TABLES``."""
+
 
 def admits_integer(candidate: object) -> bool:
     """Report whether one annotation stores as an integer.
@@ -547,7 +561,7 @@ def schema_statements() -> list[str]:
         The table statements in specification order, then the log, then the indexes.
     """
     statements = [table_ddl(table) for table in TABLES]
-    statements.append(EVENTS_DDL)
+    statements.extend((EVENTS_DDL, EVIDENCE_BLOBS_DDL))
     statements.extend(index_ddl(table, columns) for table, group in INDEXES.items() for columns in group)
     statements.extend((
         (

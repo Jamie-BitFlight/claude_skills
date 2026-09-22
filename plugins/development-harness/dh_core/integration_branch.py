@@ -137,5 +137,108 @@ class IntegrationBranchAdvancer:
         return self.push_capability
 
     def advance(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult:
-        """Validate and conditionally advance the bound target."""
-        raise NotImplementedError
+        """Validate and conditionally advance the bound target.
+
+        Returns:
+            A stable result with no hidden fallback.
+        """
+        for validation in (self.validate_inputs, self.validate_observations, self.validate_objects):
+            refused = validation(prepared)
+            if refused is not None:
+                return refused
+        attempt = self.port.push_exact(
+            expected_target_oid=prepared.expected_target_oid, prepared_result_oid=prepared.prepared_result_oid
+        )
+        return self.classify_attempt(prepared, attempt)
+
+    def validate_inputs(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
+        """Validate capability, binding, shape, and durable identity.
+
+        Returns:
+            A refusal result, or None when input validation passes.
+        """
+        capability = self.push_capability
+        if (
+            not capability.supports_expected_head_advance
+            or capability.supported_result_shape != "DIRECT_FAST_FORWARD"
+            or capability.remote_identity != self.remote_identity
+            or capability.target_ref_pattern != self.target_ref
+        ):
+            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+        if prepared.remote_identity != self.remote_identity or prepared.target_ref != self.target_ref:
+            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+        if prepared.prepared_result_oid != prepared.candidate_oid:
+            return ExpectedHeadAdvanceResult("result-shape-unsupported")
+        if prepared.prepared_identity_digest != prepared_identity_digest(prepared):
+            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+        return None
+
+    def validate_observations(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
+        """Validate repository and exact named refs before object upload.
+
+        Returns:
+            A refusal result, or None when observations match.
+        """
+        repository = self.port.preflight_repository()
+        if not repository.available or repository.remote_identity != self.remote_identity:
+            return ExpectedHeadAdvanceResult("expected-head-unsupported")
+        target = self.port.observe_ref(ref=self.target_ref)
+        if not target.available:
+            return ExpectedHeadAdvanceResult("reconciliation-required")
+        if target.oid != prepared.expected_target_oid:
+            return ExpectedHeadAdvanceResult("target-stale")
+        candidate = self.port.observe_ref(ref=prepared.candidate_ref)
+        if not candidate.available or candidate.oid != prepared.candidate_oid:
+            return ExpectedHeadAdvanceResult("candidate-mismatch")
+        return None
+
+    def validate_objects(self, prepared: PreparedAdvance) -> ExpectedHeadAdvanceResult | None:
+        """Validate immutable object type, tree, parent, and ancestry facts.
+
+        Returns:
+            A refusal result, or None when object facts match.
+        """
+        facts = {
+            fact.oid: fact
+            for fact in self.port.object_facts(
+                oids=(
+                    prepared.expected_target_oid,
+                    prepared.candidate_oid,
+                    prepared.prepared_result_oid,
+                    prepared.prepared_tree_oid,
+                )
+            )
+        }
+        target_facts = facts.get(prepared.expected_target_oid)
+        result_facts = facts.get(prepared.prepared_result_oid)
+        tree_facts = facts.get(prepared.prepared_tree_oid)
+        if target_facts is None or result_facts is None or tree_facts is None:
+            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+        if (
+            target_facts.object_type != "commit"
+            or result_facts.object_type != "commit"
+            or tree_facts.object_type != "tree"
+        ):
+            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+        if (
+            result_facts.tree_oid != prepared.prepared_tree_oid
+            or result_facts.parent_oids != prepared.ordered_parent_oids
+        ):
+            return ExpectedHeadAdvanceResult("prepared-identity-mismatch")
+        if prepared.expected_target_oid not in result_facts.ancestors:
+            return ExpectedHeadAdvanceResult("non-fast-forward-prepared-result")
+        return None
+
+    def classify_attempt(self, prepared: PreparedAdvance, attempt: GitPushAttempt) -> ExpectedHeadAdvanceResult:
+        """Classify one push only after observing the target again.
+
+        Returns:
+            The reconciled stable outcome.
+        """
+        observed = self.port.observe_ref(ref=self.target_ref)
+        if observed.available and observed.oid == prepared.prepared_result_oid:
+            outcome = "advanced" if attempt.succeeded else "advanced-after-reconciliation"
+            return ExpectedHeadAdvanceResult(outcome)
+        if observed.available and observed.oid != prepared.expected_target_oid:
+            return ExpectedHeadAdvanceResult("target-stale")
+        return ExpectedHeadAdvanceResult("transport-failed" if not attempt.transmitted else "reconciliation-required")

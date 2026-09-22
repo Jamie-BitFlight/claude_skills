@@ -61,7 +61,9 @@ def test_f10_missing_truncated_bad_digest_and_metadata_refuse(tmp_path) -> None:
         evidence.get("sha256:BAD")
     with pytest.raises(store.Refusal, match="evidence-not-found"):
         evidence.get("sha256:" + "0" * 64)
-    connection.execute("UPDATE merge_evidence_blobs SET content = x'00' WHERE digest = ?", (saved.digest,))
+    connection.execute(
+        "UPDATE merge_evidence_blobs SET content = x'00', byte_length = 1 WHERE digest = ?", (saved.digest,)
+    )
     with pytest.raises(store.Refusal, match="evidence-corrupt"):
         evidence.get(saved.digest)
 
