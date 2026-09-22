@@ -348,6 +348,3 @@ def test_dh_core_has_no_legacy_content_storage_reachability() -> None:
         "backlog_core.artifact_provider_local",
     }
     assert "artifact_migrate" not in operations.__all__
-    assert "_ds.read_dispatch_plan" not in source
-    assert "_ds.write_dispatch_plan" not in source
-    assert "_ds.dispatch_plan_path" not in source

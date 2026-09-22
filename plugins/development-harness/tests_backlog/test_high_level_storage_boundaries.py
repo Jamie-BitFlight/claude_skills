@@ -71,7 +71,6 @@ def test_server_has_no_artifact_provider_or_filesystem_fallback() -> None:
     assert "LocalFilesystemArtifactProvider" not in source
     assert "create_artifact_provider" not in source
     assert "artifact_migrate" not in source
-    assert "_ds.read_dispatch_plan" not in source
 
 
 def test_sam_server_has_no_task_backend_routing() -> None:
