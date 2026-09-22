@@ -181,7 +181,11 @@ capped at six Read calls, and the cap falls entirely on step 3.
    `research/` needs no exclusion and gets none: it lies under none of the six paths, so the corpus
    is already out of scope and an entry cannot anchor to another entry.
 
-   Record the match count for every term, matched or not.
+   Record the match count for every term, matched or not, in a working note that pairs the exact
+   term string with the integer the command actually printed — the number of lines in its output,
+   or 0 when `git grep` exits 1. This working note is the only source step 3's A2 records draw
+   from: every term and count written into an A2 record must be copied from this note verbatim, so
+   the recorded term set can never diverge from the term set actually searched.
 
 3. Read matched files and quote one exact line from each. At most six Reads, and selection is
    fixed, not a preference:
@@ -225,15 +229,21 @@ A1. Capability: {capability}  From: {the Phase 1 extract it came from}
     Feeds: {which Relevance item}
 
 A2. Capability: {capability}  From: {the Phase 1 extract it came from}
-    Today: git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
-           git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → 0 matches
+    Today: git grep --full-name -il "{narrow term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → {narrow term match count} matches
+           git grep --full-name -il "{broader term}" -- :/plugins/ :/.claude/skills/ :/.claude/agents/ :/rules/ :/docs/ :/AGENTS.md → {broader term match count} matches
     Feeds: {which Relevance item}
 ```
 
-Write both commands into an A2 record in full, every `:/` prefix included. A recorded scope that
-does not reproduce the command actually run is not re-runnable, which is the only property an
-absence anchor has — and a reader who re-runs a copy with the `:/` prefixes stripped, from a
-subdirectory, gets a clean zero that confirms nothing.
+`{narrow term match count}` and `{broader term match count}` are the integers step 2's working
+note actually recorded for those two exact terms — never a default of 0 typed in without having
+run the command. Write both commands into an A2 record in full, every `:/` prefix included, with
+each command's own count copied verbatim next to it. A recorded scope that does not reproduce the
+command actually run is not re-runnable, which is the only property an absence anchor has — and a
+reader who re-runs a copy with the `:/` prefixes stripped, from a subdirectory, gets a clean zero
+that confirms nothing. A written count that disagrees with what the command actually returns is
+now mechanically detected, not just reviewer-detectable: `validate_research.py`'s
+`relevance_absence_anchor_refuted` check re-executes every A2 command in the checkout and fails the
+entry when the recorded count and the command's real output disagree.
 
 An absence anchor needs both the narrow term and its broader pair at zero. When the broader term
 matches, there is no absence to record — read that file and write a presence anchor instead. An
@@ -241,8 +251,10 @@ absence anchor reports that these two terms returned nothing in this scope; it n
 the capability is missing here. Asserting nonexistence from a keyword search is the defect this
 pass exists to stop reproducing, not a shortcut it licenses one layer up.
 
-An A-record carrying neither a quoted line nor a search command is not an anchor. Drop it rather
-than writing it into the entry.
+An A-record carrying neither a quoted line nor a search command is not an anchor. An A2 record
+whose count was not copied from step 2's working note — including a count guessed or copied from
+a template rather than observed — is not an anchor either. Drop it rather than writing it into the
+entry.
 
 Scope of this pass versus the downstream analysis agents: `research-insight-extractor` and
 `research-utilization-assessor` run after the entry is written and do the deep repo-grounded work

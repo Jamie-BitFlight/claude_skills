@@ -1,0 +1,23 @@
+# DERIVED + CI-LINT-VERIFIED python-semantic-release adapter.
+include:
+  - local: '/.gitlab/release/base.gitlab-ci.yml'
+
+semantic_version_tag:
+  extends: .release_version
+  image: 'python:__PYTHON_VERSION__-alpine@sha256:__PYTHON_IMAGE_DIGEST__'
+  variables:
+    GIT_DEPTH: "0"
+    GITLAB_TOKEN: $RELEASE_PUSH_TOKEN
+    PSR_RUNTIME_CONFIG: '.gitlab/release/runtime-psr.toml'
+    RELEASE_GIT_REMOTE_NAME: '__RELEASE_GIT_REMOTE_NAME__'
+  before_script:
+    - apk add --no-cache git
+    - python -m pip install python-semantic-release==__PSR_VERSION__
+    - python .gitlab/release/materialize_psr_config.py --output "$PSR_RUNTIME_CONFIG"
+    - test -s "$PSR_RUNTIME_CONFIG"
+  script:
+    - git config user.name "__RELEASE_GIT_NAME__"
+    - git config user.email "__RELEASE_GIT_EMAIL__"
+    - git checkout -B "$CI_DEFAULT_BRANCH" "$CI_COMMIT_SHA"
+    - git branch --set-upstream-to="$RELEASE_GIT_REMOTE_NAME/$CI_DEFAULT_BRANCH" "$CI_DEFAULT_BRANCH"
+    - semantic-release --config "$PSR_RUNTIME_CONFIG" version --commit --tag --push --skip-build --no-vcs-release

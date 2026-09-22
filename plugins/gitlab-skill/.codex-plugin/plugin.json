@@ -1,25 +1,24 @@
 {
   "name": "gitlab-skill",
-  "version": "1.6.31",
-  "description": "The model must apply when tasks involve .gitlab-ci.yml configuration, GitLab Flavored Markdown (GLFM) syntax, gitlab-ci-local testing, CI/CD pipeline optimization, GitLab CI Steps composition, Docker-in-Docker workflows, or GitLab documentation creation. Triggers include modifying pipelines, writing GitLab README/Wiki content, debugging CI jobs locally, implementing caching strategies, or configuring release workflows.",
+  "version": "2.3.0",
+  "description": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
   "author": {
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "Gitlab Skill",
-    "shortDescription": "The model must apply when tasks involve .gitlab-ci.yml configuration, GitLab Flavored Markdown (GLFM) syntax, gitlab-ci-local testing, CI/CD pipeline optimization, GitLab CI Steps composition, Docker-in-Docker workflows, or GitLab...",
-    "longDescription": "The model must apply when tasks involve .gitlab-ci.yml configuration, GitLab Flavored Markdown (GLFM) syntax, gitlab-ci-local testing, CI/CD pipeline optimization, GitLab CI Steps composition, Docker-in-Docker workflows, or GitLab documentation creation. Triggers include modifying pipelines, writing GitLab README/Wiki content, debugging CI jobs locally, implementing caching strategies, or configuring release workflows.",
+    "displayName": "GitLab Skill",
+    "shortDescription": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
+    "longDescription": "Source-backed GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance.",
     "developerName": "Jamie Nelson",
     "category": "Developer Tools",
     "capabilities": [
       "Interactive",
-      "Read",
-      "Write"
+      "Read"
     ],
     "defaultPrompt": [
-      "The model must apply when tasks involve .gitlab-ci.yml configuration, GitLab Flavored Markdown (GLFM) syntax, gitlab-ci-local"
+      "Apply documented GitLab CI/CD, glab CLI, automatic release, component, Function, GLFM, and gitlab-ci-local guidance."
     ]
   }
 }

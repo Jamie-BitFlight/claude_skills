@@ -85,7 +85,7 @@ class TestInferResearchRoot:
     def _repo_with_entries(tmp_path: Path, *names: str) -> tuple[Path, list[Path]]:
         """Build a git repo containing research/coding-agents/<name> for each name."""
         repo = tmp_path / "repo"
-        (repo / ".git").mkdir(parents=True)
+        subprocess.run(["git", "init", "--quiet", str(repo)], check=True)
         category = repo / "research" / "coding-agents"
         category.mkdir(parents=True)
         entries = []
@@ -116,8 +116,10 @@ class TestInferResearchRoot:
         assert validate_research._infer_research_root([vault]) == vault
 
     def test_files_outside_any_repo_fall_back_to_common_ancestor(self, tmp_path: Path) -> None:
-        """With no enclosing .git, the common ancestor is the root."""
-        category = tmp_path / "vault" / "tools"
+        """An invalid .git marker above the files is not treated as a repository."""
+        outer = tmp_path / "not-a-repo"
+        (outer / ".git").mkdir(parents=True)
+        category = outer / "vault" / "tools"
         category.mkdir(parents=True)
         entries = []
         for name in ("alpha.md", "beta.md"):
@@ -125,6 +127,15 @@ class TestInferResearchRoot:
             entry.write_text("# Entry\n", encoding="utf-8")
             entries.append(entry)
         assert validate_research._infer_research_root(entries) == category
+
+    def test_files_in_unrelated_trees_fall_back_to_common_ancestor(self, tmp_path: Path) -> None:
+        """Files without a shared repository retain their deepest common directory."""
+        entries = [tmp_path / "first" / "alpha.md", tmp_path / "second" / "beta.md"]
+        for entry in entries:
+            entry.parent.mkdir()
+            entry.write_text("# Entry\n", encoding="utf-8")
+
+        assert validate_research._infer_research_root(entries) == tmp_path
 
 
 _UNPARSEABLE_ENTRY = """\

@@ -22,6 +22,8 @@ import importlib.util
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from datetime import date
 from io import StringIO
@@ -29,6 +31,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, TypedDict
 
 import typer
+from pydantic import BaseModel
 from ruamel.yaml import YAML
 
 import backlink_cache
@@ -550,6 +553,199 @@ def check_relevance_anchor_paths(
     ]
 
 
+# Fixed pathspec scope every absence-anchor ``git grep`` command searches, in this exact order --
+# see extraction-methodology.md's Phase 1c Repo Anchor Pass step 2. The check below re-executes a
+# recorded command's own scope, so the scope literal must match what step 2 actually runs, not an
+# independently-chosen value.
+_ANCHOR_SCOPE_PATHSPECS = (":/plugins/", ":/.claude/skills/", ":/.claude/agents/", ":/rules/", ":/docs/", ":/AGENTS.md")
+
+# One canonical absence-anchor unit: a ``git grep`` command against the fixed anchor scope,
+# immediately followed by its own recorded match count (extraction-methodology.md's A2 record
+# format). The quoted term is captured so it can be re-run; the whole shape must match exactly --
+# a command that only resembles this is refused by check_relevance_absence_anchors rather than
+# loosely re-interpreted, per that check's security constraint.
+_ABSENCE_ANCHOR_UNIT_PATTERN = re.compile(
+    r'git\s+grep\s+--full-name\s+-il\s+"([^"\n]+)"\s+--\s+'
+    r":/plugins/\s+:/\.claude/skills/\s+:/\.claude/agents/\s+:/rules/\s+:/docs/\s+:/AGENTS\.md"
+    r"`?\s*→\s*(\d+)\s*match(?:es)?\b"
+)
+
+# Broader trigger for "this text is attempting to record a git-grep absence anchor" -- deliberately
+# looser than _ABSENCE_ANCHOR_UNIT_PATTERN so a malformed attempt is still detected as an attempt
+# rather than silently ignored.
+_GIT_GREP_ATTEMPT_PATTERN = re.compile(r"git\s+grep")
+
+_ABSENCE_ANCHOR_TIMEOUT_SECONDS = 15
+
+
+class AbsenceAnchorUnit(BaseModel):
+    """One parsed absence-anchor ``git grep`` command and the match count recorded beside it."""
+
+    term: str
+    recorded_count: int
+    line: int
+
+
+class UnparsedAbsenceAnchorAttempt(BaseModel):
+    """A git-grep-shaped line that did not reproduce the canonical absence-anchor form."""
+
+    line_text: str
+    line: int
+
+
+def _parse_absence_anchor_units(
+    section_text: str, start_line: int
+) -> tuple[list[AbsenceAnchorUnit], list[UnparsedAbsenceAnchorAttempt]]:
+    r"""Parse the Relevance section text for recorded absence-anchor ``git grep`` commands.
+
+    Finds every canonical absence-anchor unit (a ``git grep`` command against the fixed Phase 1c
+    scope, immediately followed by its own recorded match count) and, separately, every
+    git-grep-shaped attempt whose text does not reproduce that canonical form -- an attempt is any
+    occurrence of ``git grep`` whose position falls outside every canonical match's span.
+
+    Args:
+        section_text: The Relevance section's raw text (its lines joined with ``\\n``).
+        start_line: 1-indexed file line number of the section's first line, used to convert a
+            match's character offset into a file-absolute line number.
+
+    Returns:
+        Tuple of (parsed units, unparsed attempts).
+    """
+    units: list[AbsenceAnchorUnit] = []
+    covered: list[tuple[int, int]] = []
+    for match in _ABSENCE_ANCHOR_UNIT_PATTERN.finditer(section_text):
+        line = start_line + section_text.count("\n", 0, match.start())
+        units.append(AbsenceAnchorUnit(term=match.group(1), recorded_count=int(match.group(2)), line=line))
+        covered.append((match.start(), match.end()))
+
+    unparsed: list[UnparsedAbsenceAnchorAttempt] = []
+    for attempt in _GIT_GREP_ATTEMPT_PATTERN.finditer(section_text):
+        if any(cov_start <= attempt.start() < cov_end for cov_start, cov_end in covered):
+            continue
+        line_start = section_text.rfind("\n", 0, attempt.start()) + 1
+        line_end_idx = section_text.find("\n", attempt.start())
+        line_end = line_end_idx if line_end_idx != -1 else len(section_text)
+        line = start_line + section_text.count("\n", 0, attempt.start())
+        unparsed.append(UnparsedAbsenceAnchorAttempt(line_text=section_text[line_start:line_end].strip(), line=line))
+
+    return units, unparsed
+
+
+def _run_git_grep_count(repo_root: Path, term: str) -> int | None:
+    """Re-run one absence-anchor ``git grep`` command and count its matching files.
+
+    Never shell-executes entry text: ``term`` is passed as a single ``argv`` element with
+    ``shell=False``, exactly as extracted from the canonical command's quoted argument -- nothing
+    from the entry file is interpolated into a shell string.
+
+    Args:
+        repo_root: Checkout root to run the command against.
+        term: The quoted search term, exactly as recorded in the entry.
+
+    Returns:
+        The number of matching files (``git grep -l``'s output line count), or ``None`` when the
+        command could not be completed at all (missing ``git`` binary, a timeout, or a ``git grep``
+        exit code outside its normal 0-matched/1-unmatched vocabulary).
+    """
+    cmd = ["git", "grep", "--full-name", "-il", term, "--", *_ANCHOR_SCOPE_PATHSPECS]
+    try:
+        result = subprocess.run(
+            cmd, cwd=repo_root, capture_output=True, text=True, timeout=_ABSENCE_ANCHOR_TIMEOUT_SECONDS, check=False
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode not in {0, 1}:
+        return None
+    return len([line for line in result.stdout.splitlines() if line])
+
+
+def check_relevance_absence_anchors(
+    lines: list[str], sections: dict[str, tuple[int, int]], repo_root: Path | None
+) -> list[Issue]:
+    """Re-execute every recorded absence anchor and compare its count against reality.
+
+    ``check_relevance_anchored`` tests only that anchor-shaped evidence is present; an A2 (absence)
+    record whose ``git grep ... -> 0 matches`` was typed in without ever running the command passes
+    that shape test for free, because the template shape and a fabricated one are identical text.
+    This check closes that hole the way ``check_relevance_anchor_paths`` closes it for A1 (presence)
+    records: by re-doing the work the record claims was done, rather than trusting its shape.
+
+    Args:
+        lines: Body lines of the entry.
+        sections: Section heading -> (start_line, end_line) mapping from ``_parse_sections``.
+        repo_root: Checkout root to re-run searches against, or ``None`` when it was not found.
+
+    Returns:
+        One ``relevance_absence_anchor_unparsed`` issue per git-grep-shaped command that does not
+        reproduce the canonical form; one ``relevance_absence_anchor_refuted`` issue per parsed
+        command whose re-executed count differs from its recorded count; or a single
+        ``relevance_absence_anchors_unchecked`` issue when anchors are present but no checkout root
+        was available to re-run them against, so a skipped check is never reported as a clean one.
+    """
+    section = sections.get(RELEVANCE_SECTION)
+    if section is None:
+        # section_completeness already reports the section as missing; do not double-report.
+        return []
+
+    start, end = section
+    section_text = "\n".join(lines[start - 1 : end])
+    units, unparsed = _parse_absence_anchor_units(section_text, start)
+
+    issues: list[Issue] = [
+        {
+            "check": "relevance_absence_anchor_unparsed",
+            "severity": "error",
+            "message": (
+                f"{RELEVANCE_SECTION} carries a git grep command that does not reproduce the "
+                f'canonical absence-anchor form, so it cannot be re-run: "{attempt.line_text}"'
+            ),
+            "line": attempt.line,
+        }
+        for attempt in unparsed
+    ]
+
+    if not units:
+        return issues
+
+    if repo_root is None:
+        issues.append({
+            "check": "relevance_absence_anchors_unchecked",
+            "severity": "warning",
+            "message": (
+                f"{RELEVANCE_SECTION} cites {len(units)} absence anchor(s) that were not checked: "
+                "no .git found above this entry -- run the validator inside the checkout"
+            ),
+            "line": start,
+        })
+        return issues
+
+    for unit in units:
+        actual = _run_git_grep_count(repo_root, unit.term)
+        if actual is None:
+            issues.append({
+                "check": "relevance_absence_anchors_unchecked",
+                "severity": "warning",
+                "message": (
+                    f'{RELEVANCE_SECTION} absence anchor for term "{unit.term}" was not checked: '
+                    "git grep did not complete (missing binary, timeout, or unexpected exit code)"
+                ),
+                "line": unit.line,
+            })
+            continue
+        if actual != unit.recorded_count:
+            issues.append({
+                "check": "relevance_absence_anchor_refuted",
+                "severity": "error",
+                "message": (
+                    f'{RELEVANCE_SECTION} absence anchor for term "{unit.term}" recorded '
+                    f"{unit.recorded_count} matches; re-running it now returns {actual} matches"
+                ),
+                "line": unit.line,
+            })
+
+    return issues
+
+
 def check_relevance_anchored(
     lines: list[str], sections: dict[str, tuple[int, int]], reference_date: str | None
 ) -> list[Issue]:
@@ -831,11 +1027,85 @@ def _infer_research_root(resolved: list[Path]) -> Path:
     if any(p.is_dir() for p in absolute_paths):
         return common
 
-    for candidate in (common, *common.parents):
-        # A worktree's .git is a file, not a directory -- exists() covers both.
-        if (candidate / ".git").exists():
-            return candidate
+    git = shutil.which("git")
+    if git is None:
+        return common
+    bounded_runner = Path(__file__).resolve().parents[4] / "scripts" / "run_bounded.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(bounded_runner),
+            "--timeout-seconds",
+            "10",
+            "--",
+            git,
+            "-C",
+            str(common),
+            "rev-parse",
+            "--show-toplevel",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return Path(result.stdout.strip()).resolve()
     return common
+
+
+def _yaml_frontmatter_issues(lines: list[str], repo_root: Path | None) -> list[Issue]:
+    """Run every check for a yaml_frontmatter entry.
+
+    Args:
+        lines: All file lines; first line must be ``---``.
+        repo_root: Checkout root for repo-anchored checks, or ``None`` when not found.
+
+    Returns:
+        Combined list of ``Issue`` dicts from every yaml_frontmatter check.
+    """
+    frontmatter = parse_yaml_frontmatter(lines)
+    body_lines = _yaml_body_lines(lines)
+    sections = _parse_sections(body_lines)
+    issues: list[Issue] = []
+    issues.extend(_check_section_completeness(sections, REQUIRED_BODY_SECTIONS))
+    issues.extend(_check_header_fields_yaml(frontmatter))
+    issues.extend(_check_empty_sections(body_lines, sections))
+    issues.extend(_check_access_dates(body_lines, sections))
+    issues.extend(_check_freshness_tracking_yaml(frontmatter))
+    issues.extend(_check_url_format(body_lines))
+    entry_date = reference_date_yaml(frontmatter, body_lines, sections)
+    issues.extend(check_cross_references(sections, entry_date))
+    issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
+    issues.extend(check_relevance_anchor_paths(body_lines, sections, repo_root))
+    issues.extend(check_relevance_absence_anchors(body_lines, sections, repo_root))
+    return issues
+
+
+def _text_header_issues(lines: list[str], repo_root: Path | None) -> list[Issue]:
+    """Run every check for a text_header entry.
+
+    Args:
+        lines: All file lines.
+        repo_root: Checkout root for repo-anchored checks, or ``None`` when not found.
+
+    Returns:
+        Combined list of ``Issue`` dicts from every text_header check.
+    """
+    header_lines, _ = _get_header_block(lines)
+    sections = _parse_sections(lines)
+    issues: list[Issue] = []
+    issues.extend(_check_section_completeness(sections, REQUIRED_BODY_SECTIONS + _REQUIRED_SECTIONS_TEXT_HEADER_ONLY))
+    issues.extend(_check_header_fields_text(header_lines))
+    issues.extend(_check_empty_sections(lines, sections))
+    issues.extend(_check_access_dates(lines, sections))
+    issues.extend(_check_freshness_tracking_text(lines, sections))
+    issues.extend(_check_url_format(lines))
+    entry_date = reference_date_text(header_lines, lines, sections)
+    issues.extend(check_cross_references(sections, entry_date))
+    issues.extend(check_relevance_anchored(lines, sections, entry_date))
+    issues.extend(check_relevance_anchor_paths(lines, sections, repo_root))
+    issues.extend(check_relevance_absence_anchors(lines, sections, repo_root))
+    return issues
 
 
 def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
@@ -867,38 +1137,12 @@ def validate_file(filepath: Path, research_root: Path) -> dict[str, Any]:
     lines = text.splitlines()
 
     fmt = detect_format(lines)
-
-    if fmt == "yaml_frontmatter":
-        frontmatter = parse_yaml_frontmatter(lines)
-        body_lines = _yaml_body_lines(lines)
-        sections = _parse_sections(body_lines)
-        all_issues: list[Issue] = []
-        all_issues.extend(_check_section_completeness(sections, REQUIRED_BODY_SECTIONS))
-        all_issues.extend(_check_header_fields_yaml(frontmatter))
-        all_issues.extend(_check_empty_sections(body_lines, sections))
-        all_issues.extend(_check_access_dates(body_lines, sections))
-        all_issues.extend(_check_freshness_tracking_yaml(frontmatter))
-        all_issues.extend(_check_url_format(body_lines))
-        entry_date = reference_date_yaml(frontmatter, body_lines, sections)
-        all_issues.extend(check_cross_references(sections, entry_date))
-        all_issues.extend(check_relevance_anchored(body_lines, sections, entry_date))
-        all_issues.extend(check_relevance_anchor_paths(body_lines, sections, repo_root_for(filepath)))
-    else:
-        header_lines, _ = _get_header_block(lines)
-        sections = _parse_sections(lines)
-        all_issues = []
-        all_issues.extend(
-            _check_section_completeness(sections, REQUIRED_BODY_SECTIONS + _REQUIRED_SECTIONS_TEXT_HEADER_ONLY)
-        )
-        all_issues.extend(_check_header_fields_text(header_lines))
-        all_issues.extend(_check_empty_sections(lines, sections))
-        all_issues.extend(_check_access_dates(lines, sections))
-        all_issues.extend(_check_freshness_tracking_text(lines, sections))
-        all_issues.extend(_check_url_format(lines))
-        entry_date = reference_date_text(header_lines, lines, sections)
-        all_issues.extend(check_cross_references(sections, entry_date))
-        all_issues.extend(check_relevance_anchored(lines, sections, entry_date))
-        all_issues.extend(check_relevance_anchor_paths(lines, sections, repo_root_for(filepath)))
+    repo_root = repo_root_for(filepath)
+    all_issues = (
+        _yaml_frontmatter_issues(lines, repo_root)
+        if fmt == "yaml_frontmatter"
+        else _text_header_issues(lines, repo_root)
+    )
 
     has_errors = any(i["severity"] == "error" for i in all_issues)
     status = "fail" if has_errors else "pass"

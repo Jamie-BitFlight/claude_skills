@@ -353,14 +353,11 @@ def main(
         typer.Option("--backlog-dir", help="Directory containing .md backlog files to migrate.", show_default=True),
     ] = _DEFAULT_BACKLOG_DIR,
     dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Parse and verify without writing .yaml or renaming .md files.", is_flag=True),
+        bool, typer.Option("--dry-run", help="Parse and verify without writing .yaml or renaming .md files.")
     ] = False,
-    confirm: Annotated[
-        bool, typer.Option("--confirm", help="Execute the migration (required for live runs).", is_flag=True)
-    ] = False,
+    confirm: Annotated[bool, typer.Option("--confirm", help="Execute the migration (required for live runs).")] = False,
     cleanup: Annotated[
-        bool, typer.Option("--cleanup", help="Remove .md.bak files after verifying YAML is correct.", is_flag=True)
+        bool, typer.Option("--cleanup", help="Remove .md.bak files after verifying YAML is correct.")
     ] = False,
 ) -> None:
     """Migrate .md backlog files to pure YAML format.

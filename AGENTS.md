@@ -120,6 +120,9 @@ Before a single `Write` call whose content may exceed 25,000 characters, read
 
 Before assigning a model or effort tier to a dispatched agent, read `rules/model-selection.md`.
 
+Before writing or editing Python, read `rules/python-development.md` for this repo's overrides on
+the Python skills, and load the skills it names.
+
 Before fixing any problem discovered during a session that the user did not ask about, read
 `rules/proactive-fix-gate.md` for the required gate.
 
@@ -272,43 +275,6 @@ repository's measurements of them, starting from
 [plugins/development-harness/CLAIMS-REGISTER.md](./plugins/development-harness/CLAIMS-REGISTER.md);
 add what you establish back to it.
 
-### Python
-
-- **Always** include `from __future__ import annotations` as first import
-- **Docstrings**: Google convention (`Args:`, `Returns:`, `Raises:`)
-- **Type hints**: Required for all public functions
-- **Max line length**: 120 characters
-- **Generics**: Use native forms (`list[str]`, `dict[str, Any]` not `List[str]`)
-- **Imports**: isort with `combine-as-imports = true`, `force-single-line = false`
-- **Banned**: `requests` library — use `httpx` instead (enforced by ruff `flake8-tidy-imports`).
-  Narrow per-file exceptions exist in `[tool.ruff.lint.per-file-ignores]` (e.g.
-  `backlog_core/sync_state.py`, which must match PyGithub's requests-based exception types).
-- **Scripts**: PEP 723 inline metadata (`# /// script`) for standalone scripts run via `uv run --script`
-- **Structured data → Pydantic, not dataclass/TypedDict**: this repo's ingestion and output objects
-  are standardizing on Pydantic `BaseModel`, not `@dataclass` or `TypedDict`. The
-  `python-engineering:python3-typing` skill's lane selection auto-detects from what a file already
-  imports — that means an existing `@dataclass` never gets reconsidered on its own. When adding or
-  touching a structured data shape (CLI output, MCP tool payloads, parsed file records), use
-  Pydantic `BaseModel` by default. `TypedDict`/`dataclass` remain correct only for genuinely
-  stdlib-only, dependency-constrained contexts (see `python-engineering:python3-stdlib-only`).
-- **Default to already-declared dependencies**: before writing a new shared module, check the PEP
-  723 dependency block of the scripts that will import it (`grep dependencies plugins/*/scripts/*.py`)
-  and reuse what's already declared (e.g. `httpx`, `ruamel.yaml`) instead of assuming a stdlib-only
-  design. Stdlib-only is a valid constraint only for a confirmed deployment restriction (airgapped,
-  no pip access) — not a default posture.
-- **Public by default**: name new functions and modules without a leading underscore. Early
-  "private" naming gets cargo-culted onto things that aren't private, then breaks tests that
-  legitimately need the name — add privacy once actually needed. Existing underscored code stays
-  as-is.
-
-Before writing a script or CLI meant to be consumed by an agent (which is every script/CLI/MCP
-server in this repo), read `docs/cli-output-conventions.md`.
-
-For parsing markdown structure (headers, list items, tables, section extraction), use the `marko`
-AST library rather than a regex parser — see the established usage patterns in the sibling
-`agentskills-linter` repo, and add `marko` via `uv add marko` if the target project doesn't already
-depend on it.
-
 ### Markdown (Skills/Commands/Agents)
 
 Skill handoffs use plain prose (`plugin:skill-name`, `/plugin:skill-name`), not
@@ -413,7 +379,6 @@ Rule files outside `rules/` that other harnesses read — not a full rule-file i
 | File | Purpose |
 |------|---------|
 | `.cursor/rules/backlog-before-work.mdc` | Always create backlog items for multi-step work |
-| `.cursor/rules/json-no-pretty-print.mdc` | Compact-JSON rule for agent-facing CLI output |
 | `.agent/rules/git-commits.md` | Commit message rules (conventional commits, no --no-verify) |
 
 ## PR Review Protocol

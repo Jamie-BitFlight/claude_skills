@@ -2606,13 +2606,7 @@ async def backlog_sync(
     """
     out = Output()
     try:
-        await ctx.info("Starting backlog sync" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.sync_items, dry_run=dry_run, output=out)
-        for w in out.warnings:
-            await ctx.warning(w)
-        created = result.get("created", 0)
-        pushed = result.get("pushed", 0)
-        await ctx.info(f"Sync complete: {created} issue(s) created, {pushed} item(s) pushed")
         return _respond(BacklogSyncResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogSyncResponse, {"error": str(e), **out.to_dict()})
@@ -3021,7 +3015,6 @@ async def backlog_groom(
             error="sections is mutually exclusive with section, content, entry_id, replace_section, reason, and append"
         ).model_dump(exclude_none=True)
     try:
-        await ctx.info(f"Grooming item: {selector}")
         result = await asyncio.to_thread(
             operations.groom_item,
             selector=selector,
@@ -3035,10 +3028,6 @@ async def backlog_groom(
             sections=sections,
             mark_groomed=mark_groomed,
         )
-        for w in out.warnings:
-            await ctx.warning(w)
-        title = result.get("title", selector)
-        await ctx.info(f"Groomed: {title}")
         return _respond(BacklogGroomResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogGroomResponse, {"error": str(e), **out.to_dict()})
@@ -3066,13 +3055,7 @@ async def backlog_normalize(
     """
     out = Output()
     try:
-        await ctx.info("Starting normalize" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.normalize_items, dry_run=dry_run, output=out)
-        for w in out.warnings:
-            await ctx.warning(w)
-        updated = result.get("normalized", 0)
-        suffix = " (dry-run)" if dry_run else ""
-        await ctx.info(f"Normalized {updated} file(s){suffix}")
         return _respond(BacklogNormalizeResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogNormalizeResponse, {"error": str(e), **out.to_dict()})
@@ -3117,12 +3100,7 @@ async def backlog_pull(
     out = Output()
     try:
         if selector is not None:
-            await ctx.info(f"Pulling issue: {selector}")
             result = await asyncio.to_thread(operations.pull_by_selector, selector, diff=diff, output=out)
-            for w in out.warnings:
-                await ctx.warning(w)
-            file_path = result.get("file_path")
-            await ctx.info(f"Pulled: {file_path}" if file_path else "Nothing pulled")
             response = BacklogPullResponse.model_validate({**result, **out.to_dict()})
             dump = response.model_dump(exclude_none=True)
             # file_path is a meaningful, documented null on this path's no-op
@@ -3132,12 +3110,7 @@ async def backlog_pull(
             # genuinely doesn't apply and should stay absent.
             dump["file_path"] = response.file_path
             return dump
-        await ctx.info("Starting bulk pull from GitHub" + (" (dry-run)" if dry_run else ""))
         result = await asyncio.to_thread(operations.pull_items, dry_run=dry_run, force=force, diff=diff, output=out)
-        for w in out.warnings:
-            await ctx.warning(w)
-        pulled = result.get("pulled", 0)
-        await ctx.info(f"Pull complete: {pulled} item(s) pulled")
         return _respond(BacklogPullResponse, {**result, **out.to_dict()})
     except BacklogError as e:
         return _respond(BacklogPullResponse, {"error": str(e), **out.to_dict()})

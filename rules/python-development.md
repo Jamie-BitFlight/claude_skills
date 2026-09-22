@@ -62,3 +62,27 @@ precedence over `pyproject.toml`'s `[tool.ty]` table — check for one first if 
 addition doesn't resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see
 [docs/linting-and-type-checking.md](docs/linting-and-type-checking.md#common-ty-failure-patterns).
+
+---
+
+## Repo Overrides on the Python Skills
+
+Load `/python-engineering:standards-for-python-development` before Python work. It carries the
+craft; this repo overrides three of its defaults.
+
+- Use Pydantic `BaseModel` for structured data — CLI output, MCP tool payloads, parsed file
+  records. `TypedDict` and `@dataclass` are correct only in a confirmed stdlib-only context
+  (`python-engineering:python3-stdlib-only`). `python-engineering:python3-typing` selects its lane
+  from what a file already imports, so an existing `@dataclass` is never reconsidered on its own —
+  choose the shape when adding or touching it.
+- Name new functions and modules without a leading underscore. Add privacy once a caller needs it.
+  Existing underscored code stays as-is.
+- Before writing a new shared module, read the PEP 723 dependency block of the scripts that will
+  import it (`grep dependencies plugins/*/scripts/*.py`) and reuse what is declared. Choose
+  stdlib-only for a confirmed deployment restriction, never as a default posture.
+
+Before writing a script, CLI, or MCP server, read
+[docs/cli-output-conventions.md](docs/cli-output-conventions.md).
+
+Parse markdown structure with the `marko` AST library, never a regex parser. Add it with
+`uv add marko` when the project does not already depend on it.

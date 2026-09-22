@@ -1,0 +1,13 @@
+# JSON output (no pretty-print by default)
+
+Applies to JSON an agent reads on stdout or stderr: script output, CLI results, MCP tool payloads.
+Excludes every JSON configuration file, whatever its name or location.
+
+- Emit compact JSON: `JSON.stringify(value)`, `json.dumps(data)`, `model_dump_json()`.
+- Never pass an indent argument: no `JSON.stringify(value, null, 2)`, no `indent=`.
+- Keep a configuration file's existing formatting.
+- Reformat a configuration file only when reformatting it is the requested task.
+
+Configuration files include `package.json`, `tsconfig.json`, `biome.json`, every harness plugin
+manifest (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`),
+`marketplace.json`, test fixtures, snapshots, and any JSON a program writes to disk.
