@@ -12,6 +12,10 @@ and recovery information are observable.
 The executing agent owns every step. This workflow rewrites local history only. A verified local
 rebase authorizes neither force-push nor merge.
 
+Bind `REBASE_SKILL_DIR` to the absolute directory containing this loaded `SKILL.md`, using the exact
+injected skill path supplied by the harness. Keep that binding for every bundled-script command;
+never resolve a bundled script from the consuming repository's working directory.
+
 Use Steps 1–6 for a new rebase. If a rebase is already active, start at Step 5 and follow its
 condition-bearing reference; never start a second rebase.
 
@@ -41,8 +45,8 @@ git for-each-ref --format='%(refname)' --contains <old-tip-oid> refs/remotes
 
 `git rev-parse --git-path` resolves a path; it does not test that path's existence.[2] Resolve both
 returned rebase paths against the repository and test each with the available filesystem tool. A
-directory at either path means a rebase is active. Treat an absent `MERGE_HEAD` or `CHERRY_PICK_HEAD`
-as the expected nonzero result; presence means that operation is active.
+directory at either path means a rebase is active.[7] Treat an absent `MERGE_HEAD` or
+`CHERRY_PICK_HEAD` as the expected nonzero result; presence means that operation is active.[1]
 
 Record the old branch OID, target OID, merge-base OID, current branch, complete porcelain status,
 operation-marker existence, owning worktree, configured upstream, and every remote ref containing
@@ -65,9 +69,10 @@ evidence; and successful outputs for every repository-required preflight.
 
 ## 2. Inventory every replay candidate and affected path
 
-Inventory the ordered commit graph before relying on endpoint diffs. Preserve parents so merge
-commits remain visible. Read each candidate's patch and rename/copy-aware status; then inspect target
-changes since the merge base and Git's clean-cherry-pick classification.
+Inventory the ordered commit graph before relying on endpoint diffs. A `rev-list --parents` record
+contains the commit followed by its parent commits, so preserve the full record for every
+candidate.[8] Read each candidate's patch and rename/copy-aware status; then inspect target changes
+since the merge base and Git's clean-cherry-pick classification.
 
 
 ```bash
@@ -96,32 +101,45 @@ empty, or has multiple parents needs an explicit execution policy.
 
 When the replay set contains merge commits, clean cherry-picks, intentionally empty commits, or
 commits that can become empty, read [rebase edge cases](./references/rebase-edge-cases.md) and bind
-the applicable topology and empty-commit policy. Confirm every selected rebase option appears in the
-installed Git help before the plan gate; an unavailable safety option blocks execution.
+the applicable topology and empty-commit policy. Capture `git rebase -h`; bind
+`becomes_empty_option` to the advertised stop-on-empty spelling (`stop` or `ask`) and store the
+complete help output in the plan. An unavailable safety option blocks execution.
 
 Completion criterion: every ordered source-only candidate and every affected branch path appears
 exactly once in the inventory with intent, evidence, dependencies, disposition, and verification
 surface.
 
-## 3. Pass the accounted plan gate
+## 3. Create recovery and pass the accounted plan gate
 
-Create a JSON plan artifact from the complete Step 1–2 evidence. Read the bundled
-[valid example](./references/example-plan.json), then obtain the complete maintained schema:
+Create a uniquely named local recovery branch at the captured old tip and prove it resolves to that
+OID before emitting a ready state:
 
 ```bash
-uv run --script scripts/rebase_plan.py schema
+git branch rebase-backup/<plan-id> <old-tip-oid>
+git rev-parse --verify refs/heads/rebase-backup/<plan-id>^{commit}
+```
+
+If recovery-ref creation or verification fails, enter `BLOCKED_GIT_STATE`. Keep the recovery ref
+after the rebase; cleanup is outside this workflow.
+
+Create a JSON plan artifact from the complete Step 1–2 evidence and recovery verification. Read the
+bundled [valid example](./references/example-plan.json), then obtain the complete maintained schema:
+
+```bash
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" schema
 ```
 
 Write the full artifact to the repository scratch location or a user-selected path. Preserve every
 command output; the validator imposes no display truncation. Validate before any rebase command:
 
 ```bash
-uv run --script scripts/rebase_plan.py validate <plan.json>
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" validate <plan.json>
 ```
 
-According to lines 235–352 of `scripts/rebase_plan.py`, the model requires the complete plan inputs
-and rejects failed evidence, unresolved decisions, incomplete path coverage, unsupported drops, and
-unbound merge policy. Lines 379–408 define the validator's structured result and plan SHA-256.
+According to lines 243–410 of [the validator source](./scripts/rebase_plan.py), the model requires
+the complete plan inputs, captured `rev-list` graph, verified recovery ref, and rejects failed
+evidence, unresolved decisions, incomplete path coverage, unsupported drops, and unbound merge
+policy. Lines 437–466 define the validator's structured result and plan SHA-256.
 
 Only exit code zero with compact JSON `status=VALID`, `state=READY_TO_REBASE`, and a plan SHA-256
 passes the gate. `PLAN_INVALID` is terminal for the current attempt: retain its complete structured
@@ -132,29 +150,20 @@ published-branch impact, or semantic ambiguity. Ask one concrete question for ea
 preserve the plan without mutation. The original explicit rebase request covers execution only when
 every candidate and change is accounted, `Unknowns: none`, and no extra decision is required.
 
-Completion criterion: the persisted plan validates as an exact cover of candidates and affected
-paths, every preflight has a successful evidence record, every destructive decision is approved,
-unknowns are empty, and the validator returns `READY_TO_REBASE` plus the artifact SHA-256.
+Completion criterion: the persisted plan validates as an exact cover of the captured replay graph
+and affected paths, every preflight and recovery check has a successful evidence record, every
+destructive decision is approved, unknowns are empty, and the validator returns `READY_TO_REBASE`
+plus the artifact SHA-256.
 
-## 4. Recheck immutable refs and create recovery
+## 4. Recheck immutable refs and recovery
 
 Resolve the branch and target names again. If either differs from the plan, enter
 `REPLAN_REF_DRIFT`, discard the stale plan, and return to Step 1 without rebasing. Reconfirm the
 authorized worktree, clean state, branch-transfer gate, and absence of a Git operation.
 
-Rerun `rebase_plan.py validate` on the persisted artifact. Require the same SHA-256 recorded at the
-plan gate; a changed or invalid artifact returns to Step 3. Then create the recovery ref.
-
-Create a uniquely named local recovery branch at the captured old tip and prove it resolves to that
-OID:
-
-```bash
-git branch rebase-backup/<plan-id> <old-tip-oid>
-git rev-parse --verify refs/heads/rebase-backup/<plan-id>^{commit}
-```
-
-If recovery-ref creation or verification fails, enter `BLOCKED_GIT_STATE`. Keep the recovery ref
-after the rebase; cleanup is outside this workflow.
+Rerun `uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" validate <plan.json>` on the
+persisted artifact. Require the same SHA-256 recorded at the plan gate; a changed or invalid artifact
+returns to Step 3. Reverify that the recovery ref still resolves to the captured old-tip OID.
 
 Completion criterion: branch and target names still match the planned OIDs, the execution worktree
 remains authorized and clean, and the durable recovery ref resolves exactly to the old-tip OID.
@@ -166,7 +175,7 @@ after its branch-transfer gate. Execute against the immutable target OID with th
 policy. Always surface clean cherry-picks and commits that become empty:
 
 ```bash
-git rebase --reapply-cherry-picks --empty=stop [--rebase-merges] <target-oid> [refs/heads/<branch>]
+git rebase --reapply-cherry-picks --empty=<becomes-empty-option> [--rebase-merges] <target-oid> [refs/heads/<branch>]
 ```
 
 Include `--rebase-merges` only for a preserve-topology plan. Use the positional branch only when the
@@ -221,10 +230,10 @@ evidence, clean state, recovery ref, and `not published`.
 
 ## Correct execution example
 
-The bundled [valid example](./references/example-plan.json) adapts a parser change through a target
-API change, accounts for both affected paths, records local publication and repository-preflight
-evidence, and carries no unknown. `rebase_plan.py validate` must return `READY_TO_REBASE` and its
-SHA-256 before the recovery ref or rebase is created.
+According to lines 1–119 of the bundled [valid example](./references/example-plan.json), it adapts a
+parser change through a target API change, accounts for the captured candidate and both affected
+paths, records local publication, repository-preflight, and recovery evidence, and carries no
+unknown. The validator must return `READY_TO_REBASE` and its SHA-256 before rebase execution.
 
 ## Failure example
 
@@ -232,7 +241,7 @@ The plan records target OID `51ad71b...`, but the pre-execution lookup returns `
 `REPLAN_REF_DRIFT`, preserve the plan as stale evidence, and return to Step 1. Running against either
 OID under the stale plan is not an allowed transition.
 
-## Sources
+## References
 
 1. [gitrevisions — specifying revisions](https://git-scm.com/docs/gitrevisions) (accessed 2026-09-22)
 2. [git-rev-parse — `--git-path`](https://git-scm.com/docs/git-rev-parse) (accessed 2026-09-22)
@@ -240,3 +249,5 @@ OID under the stale plan is not an allowed transition.
 4. [git-rebase](https://git-scm.com/docs/git-rebase) (accessed 2026-09-22)
 5. [git-range-diff](https://git-scm.com/docs/git-range-diff) (accessed 2026-09-22)
 6. [git-for-each-ref](https://git-scm.com/docs/git-for-each-ref) (accessed 2026-09-22)
+7. [gitrepository-layout — rebase state directories](https://git-scm.com/docs/gitrepository-layout) (accessed 2026-09-22)
+8. [git-rev-list — commit listing and `--parents`](https://git-scm.com/docs/git-rev-list) (accessed 2026-09-22)

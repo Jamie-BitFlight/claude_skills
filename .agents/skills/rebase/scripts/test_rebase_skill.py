@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -24,7 +23,7 @@ from marko.block import FencedCode
 from marko.inline import Link
 from pydantic import BaseModel
 
-from rebase_plan import Disposition, MergePolicy, workflow_state_names
+from rebase_plan import Disposition, MergePolicy, workflow_state_definitions
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -60,10 +59,19 @@ class ActivationCaseResult(BaseModel):
     """One observed harness activation decision."""
 
     harness: str
+    model: str
+    proxy: str
+    session_id: str
     eval_id: int
+    prompt: str
     expected_activation: bool
     observed_activation: bool
-    injected_skill_path: str | None
+    loaded_skill_path: str | None
+    read_references: list[str]
+    filesystem_action_events: list[str]
+    provider_action_events: list[str]
+    state_transitions: list[str]
+    final_terminal: str
     status: str
 
 
@@ -72,6 +80,10 @@ class ActivationResults(BaseModel):
 
     schema_version: int
     skill_name: str
+    repository_head_before: str
+    repository_head_after: str
+    repository_status_before: str
+    repository_status_after: str
     cases: list[ActivationCaseResult]
 
 
@@ -140,7 +152,7 @@ def run_git(
     if transcript is not None:
         transcript.append(command)
     result = subprocess.run(
-        [sys.executable, str(BOUNDED_RUNNER), "--timeout-seconds", str(TEST_COMMAND_TIMEOUT_SECONDS), "--", *command],
+        [str(BOUNDED_RUNNER), "--timeout-seconds", str(TEST_COMMAND_TIMEOUT_SECONDS), "--", *command],
         cwd=repository,
         check=False,
         capture_output=True,
@@ -149,6 +161,17 @@ def run_git(
     if check:
         result.check_returncode()
     return result
+
+
+def supported_empty_option(repository: Path, transcript: list[tuple[str, ...]] | None = None) -> str:
+    """Return the installed Git spelling that stops for a commit that becomes empty."""
+    result = run_git(repository, "rebase", "-h", check=False, transcript=transcript)
+    empty_line = next(line for line in f"{result.stdout}\n{result.stderr}".splitlines() if "--empty" in line)
+    if "stop" in empty_line:
+        return "stop"
+    if "ask" in empty_line:
+        return "ask"
+    raise AssertionError("installed Git help has no stop-on-empty spelling")
 
 
 def initialize_repository(repository: Path) -> str:
@@ -218,13 +241,14 @@ def test_terminal_state_contract_covers_every_safety_branch() -> None:
     """Reject prompt state tokens absent from the typed canonical vocabulary."""
     package_text = SKILL_PATH.read_text(encoding="utf-8") + REFERENCE_PATH.read_text(encoding="utf-8")
     presented_states = set(re.findall(r"`([A-Z][A-Z_]+)`", package_text))
-    canonical_states = {state.value for state in workflow_state_names()}
+    canonical_states = {state.value for state in workflow_state_definitions()}
     non_state_contract_tokens = {
         *(disposition.value for disposition in Disposition),
         *(policy.value for policy in MergePolicy),
         "CHERRY_PICK_HEAD",
         "MERGE_HEAD",
         "REBASE_HEAD",
+        "REBASE_SKILL_DIR",
         "STOP",
         "SURFACE",
         "VALID",
@@ -244,6 +268,8 @@ def test_executable_instructions_are_forge_neutral() -> None:
 
     assert not re.search(r"(?m)^\s*(?:gh|glab)\s", command_text)
     assert not re.search(r"(?m)^\s*git\s+(?:push\b|merge(?:\s|$))", command_text)
+    assert "scripts/rebase_plan.py" in command_text
+    assert not re.search(r"uv run --script scripts/rebase_plan\.py", command_text)
 
 
 def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> None:
@@ -271,8 +297,10 @@ def test_observed_activation_results_cover_every_opencode_eval_and_codex_positiv
     opencode_cases = {case.eval_id: case for case in results.cases if case.harness == "opencode"}
     codex_cases = [case for case in results.cases if case.harness == "codex"]
 
-    assert results.schema_version == 1
+    assert results.schema_version == 2
     assert results.skill_name == eval_package.skill_name
+    assert results.repository_head_before == results.repository_head_after
+    assert results.repository_status_before == results.repository_status_after == ""
     assert set(opencode_cases) == {case.id for case in eval_package.evals}
     assert codex_cases
     assert all(case.observed_activation for case in codex_cases)
@@ -282,7 +310,20 @@ def test_observed_activation_results_cover_every_opencode_eval_and_codex_positiv
         expected_activation = evaluation.expected_output.startswith("ACTIVATE")
         assert observed.expected_activation is expected_activation
         assert observed.observed_activation is expected_activation
-        assert (observed.injected_skill_path is not None) is expected_activation
+        assert observed.prompt == evaluation.prompt
+        assert observed.model
+        assert observed.proxy == "portkey"
+        assert observed.state_transitions
+        assert observed.final_terminal
+        assert (observed.loaded_skill_path is not None) is expected_activation
+        if expected_activation:
+            assert any(event.startswith("read:") for event in observed.filesystem_action_events)
+            assert not any(event.startswith(("write:", "delete:")) for event in observed.filesystem_action_events)
+            assert observed.provider_action_events == []
+            if evaluation.id in {2, 3}:
+                assert observed.read_references
+        else:
+            assert observed.final_terminal == "DO_NOT_ACTIVATE"
 
 
 def test_git_inventory_keeps_net_zero_commits_and_rename_pairs(tmp_path: Path) -> None:
@@ -354,13 +395,14 @@ def test_conflict_stages_have_swapped_rebase_sides_and_abort_restores(tmp_path: 
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     run_git(repository, "switch", "feature")
 
+    empty_option = supported_empty_option(repository)
     result = run_git(
         repository,
         "-c",
         "core.editor=true",
         "rebase",
         "--reapply-cherry-picks",
-        "--empty=stop",
+        f"--empty={empty_option}",
         target_oid,
         check=False,
     )
@@ -391,13 +433,14 @@ def test_reapply_cherry_pick_with_empty_stop_surfaces_exact_candidate(tmp_path: 
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     run_git(repository, "switch", "feature")
 
+    empty_option = supported_empty_option(repository)
     result = run_git(
         repository,
         "-c",
         "core.editor=true",
         "rebase",
         "--reapply-cherry-picks",
-        "--empty=stop",
+        f"--empty={empty_option}",
         target_oid,
         check=False,
     )
@@ -453,7 +496,10 @@ def run_linear_rebase_fixture(repository: Path, remote_url: str) -> tuple[list[t
     commit_file(repository, "target.txt", "target\n", "target change")
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     run_git(repository, "switch", "feature", transcript=transcript)
-    run_git(repository, "rebase", "--reapply-cherry-picks", "--empty=stop", target_oid, transcript=transcript)
+    empty_option = supported_empty_option(repository, transcript)
+    run_git(
+        repository, "rebase", "--reapply-cherry-picks", f"--empty={empty_option}", target_oid, transcript=transcript
+    )
     assert run_git(repository, "merge-base", "--is-ancestor", target_oid, "feature").returncode == 0
     assert run_git(repository, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
     tree = run_git(repository, "ls-tree", "-r", "--name-only", "HEAD").stdout

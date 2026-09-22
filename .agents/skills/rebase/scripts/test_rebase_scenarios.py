@@ -16,9 +16,9 @@ from enum import StrEnum
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, Field
 
-from rebase_plan import RebasePlan, WorkflowState
+from rebase_plan import RebasePlan
 from test_rebase_plan import valid_plan_data
 from test_rebase_skill import commit_file, initialize_repository, run_git
 
@@ -26,26 +26,47 @@ from test_rebase_skill import commit_file, initialize_repository, run_git
 class WorkflowEvent(StrEnum):
     """Observable events recorded by each behavioral fixture."""
 
+    RECOVERY_VERIFIED = "RECOVERY_VERIFIED"
     PLAN_VALIDATED = "PLAN_VALIDATED"
     REBASE_STARTED = "REBASE_STARTED"
     CONFLICT = "CONFLICT"
     PLAN_REVALIDATED = "PLAN_REVALIDATED"
     REBASE_CONTINUED = "REBASE_CONTINUED"
+    BLOCKED_GIT_STATE = "BLOCKED_GIT_STATE"
+    BLOCKED_INVALID_REF = "BLOCKED_INVALID_REF"
+    BLOCKED_WORKTREE_IN_USE = "BLOCKED_WORKTREE_IN_USE"
+    NO_CHANGE = "NO_CHANGE"
+    EMPTY_COMMIT_DECISION = "EMPTY_COMMIT_DECISION"
+    REBASE_ABORTED_RESTORED = "REBASE_ABORTED_RESTORED"
     REPLAN_REF_DRIFT = "REPLAN_REF_DRIFT"
     VALIDATION_FAILED = "VALIDATION_FAILED"
     COMPLETE_VERIFIED = "COMPLETE_VERIFIED"
 
 
+class CandidateFixture(BaseModel):
+    """One planned candidate derived from a real Git replay inventory."""
+
+    oid: str
+    parents: list[str]
+    paths: list[str]
+    disposition: str = "RETAIN"
+    expected_conflict_paths: list[str] = Field(default_factory=list)
+    equivalence_evidence: list[str] = Field(default_factory=list)
+
+
+class ScenarioEvidence(BaseModel):
+    """Pre/post refs, complete command transcript, and workflow states for one scenario."""
+
+    pre_refs: str
+    post_refs: str = ""
+    commands: list[tuple[str, ...]] = Field(default_factory=list)
+    events: list[WorkflowEvent] = Field(default_factory=list)
+    recovery_verified_at: int | None = None
+    plan_validated_at: int | None = None
+
+
 def scenario_plan_data(
-    *,
-    old_tip: str,
-    target_oid: str,
-    merge_base_oid: str,
-    candidate_oid: str,
-    candidate_parents: list[str],
-    paths: list[str],
-    disposition: str = "RETAIN",
-    expected_conflict_paths: list[str] | None = None,
+    *, old_tip: str, target_oid: str, merge_base_oid: str, candidates: list[CandidateFixture]
 ) -> dict[str, object]:
     """Build one plan tied to an actual temporary Git scenario.
 
@@ -53,11 +74,7 @@ def scenario_plan_data(
         old_tip: Captured feature-branch OID.
         target_oid: Captured target OID.
         merge_base_oid: Captured merge-base OID.
-        candidate_oid: Replay candidate OID.
-        candidate_parents: Candidate parent OIDs.
-        paths: Complete candidate path set.
-        disposition: Candidate disposition.
-        expected_conflict_paths: Paths the plan predicts can conflict.
+        candidates: Complete ordered replay-candidate inventory.
 
     Returns:
         Complete JSON-compatible plan.
@@ -69,7 +86,9 @@ def scenario_plan_data(
     assert isinstance(branch, dict)
     assert isinstance(target, dict)
     assert isinstance(publication, dict)
+    branch["ref"] = "refs/heads/feature"
     branch["oid"] = old_tip
+    target["ref"] = "refs/heads/main"
     target["oid"] = target_oid
     data["merge_base_oid"] = merge_base_oid
     data["repository_preflights"] = []
@@ -86,78 +105,253 @@ def scenario_plan_data(
     ]
     data["candidates"] = [
         {
-            "oid": candidate_oid,
-            "parents": candidate_parents,
-            "paths": paths,
+            "oid": candidate.oid,
+            "parents": candidate.parents,
+            "paths": candidate.paths,
             "intent": "Preserve the fixture's feature behavior.",
             "evidence": ["candidate patch", "target diff"],
-            "disposition": disposition,
+            "disposition": candidate.disposition,
             "verification_commands": [["git", "status", "--porcelain=v1"]],
-            "expected_conflict_paths": expected_conflict_paths or [],
-            "equivalence_evidence": [],
+            "expected_conflict_paths": candidate.expected_conflict_paths,
+            "equivalence_evidence": candidate.equivalence_evidence,
         }
+        for candidate in candidates
     ]
+    all_paths = sorted({path for candidate in candidates for path in candidate.paths})
     data["affected_paths"] = [
         {
             "path": path,
-            "candidate_oids": [candidate_oid],
+            "candidate_oids": [candidate.oid for candidate in candidates if path in candidate.paths],
             "target_interaction": "Inspected against the target diff.",
             "dependencies": [],
             "evidence": ["candidate patch", "target diff"],
             "verification_commands": [["git", "status", "--porcelain=v1"]],
         }
-        for path in paths
+        for path in all_paths
     ]
     data["repository_checks"] = [["git", "status", "--porcelain=v1", "--untracked-files=all"]]
     return data
 
 
-def validate_plan_event(data: dict[str, object], events: list[WorkflowEvent]) -> RebasePlan:
+def begin_scenario(repository: Path) -> ScenarioEvidence:
+    """Capture immutable refs immediately before workflow invocation."""
+    return ScenarioEvidence(pre_refs=run_git(repository, "show-ref").stdout)
+
+
+def capture_rebase_help(
+    repository: Path, transcript: list[tuple[str, ...]] | None = None
+) -> tuple[dict[str, object], str]:
+    """Capture installed rebase options and select its stop-on-empty spelling."""
+    result = run_git(repository, "rebase", "-h", check=False, transcript=transcript)
+    empty_line = next(line for line in f"{result.stdout}\n{result.stderr}".splitlines() if "--empty" in line)
+    if "stop" in empty_line:
+        option = "stop"
+    elif "ask" in empty_line:
+        option = "ask"
+    else:
+        raise AssertionError("installed Git help has no stop-on-empty spelling")
+    return (
+        {
+            "source": "installed-git",
+            "argv": ["git", "rebase", "-h"],
+            "exit_code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        },
+        option,
+    )
+
+
+def finish_scenario(repository: Path, evidence: ScenarioEvidence) -> None:
+    """Capture post refs and require every rebase to follow plan and recovery gates."""
+    evidence.post_refs = run_git(repository, "show-ref").stdout
+    rebase_positions = [
+        index
+        for index, command in enumerate(evidence.commands)
+        if "rebase" in command and "-h" not in command and "--help" not in command
+    ]
+    if rebase_positions:
+        assert WorkflowEvent.PLAN_VALIDATED in evidence.events
+        assert WorkflowEvent.RECOVERY_VERIFIED in evidence.events
+        assert evidence.events.index(WorkflowEvent.RECOVERY_VERIFIED) < evidence.events.index(
+            WorkflowEvent.PLAN_VALIDATED
+        )
+        assert evidence.recovery_verified_at is not None
+        assert evidence.plan_validated_at is not None
+        assert evidence.recovery_verified_at <= evidence.plan_validated_at
+        assert all(position >= evidence.plan_validated_at for position in rebase_positions)
+
+
+def validate_plan_event(repository: Path, data: dict[str, object], evidence: ScenarioEvidence) -> RebasePlan:
     """Validate a plan and record the pre-action gate event.
 
     Args:
         data: Plan mapping.
-        events: Scenario event transcript.
+        evidence: Scenario refs, commands, and state transitions.
 
     Returns:
         Validated plan token required by the rebase helper.
     """
+    branch = data["branch"]
+    target = data["target"]
+    assert isinstance(branch, dict)
+    assert isinstance(target, dict)
+    old_tip = branch["oid"]
+    target_oid = target["oid"]
+    assert isinstance(old_tip, str)
+    assert isinstance(target_oid, str)
+    help_evidence, empty_option = capture_rebase_help(repository, evidence.commands)
+    data["rebase_help"] = help_evidence
+    data["becomes_empty_option"] = empty_option
+    inventory = run_git(
+        repository,
+        "rev-list",
+        "--reverse",
+        "--topo-order",
+        "--parents",
+        f"{target_oid}..{old_tip}",
+        transcript=evidence.commands,
+    )
+    data["replay_inventory"] = {
+        "source": "local-git",
+        "argv": list(evidence.commands[-1]),
+        "exit_code": inventory.returncode,
+        "stdout": inventory.stdout,
+        "stderr": inventory.stderr,
+    }
+    recovery_ref = data["recovery_ref"]
+    assert isinstance(recovery_ref, str)
+    run_git(repository, "branch", recovery_ref.removeprefix("refs/heads/"), old_tip, transcript=evidence.commands)
+    recovery = run_git(repository, "rev-parse", "--verify", f"{recovery_ref}^{{commit}}", transcript=evidence.commands)
+    data["recovery_verification"] = {
+        "source": "local-git",
+        "argv": list(evidence.commands[-1]),
+        "exit_code": recovery.returncode,
+        "stdout": recovery.stdout,
+        "stderr": recovery.stderr,
+    }
+    evidence.events.append(WorkflowEvent.RECOVERY_VERIFIED)
+    evidence.recovery_verified_at = len(evidence.commands)
     plan = RebasePlan.model_validate(data)
-    events.append(WorkflowEvent.PLAN_VALIDATED)
+    evidence.events.append(WorkflowEvent.PLAN_VALIDATED)
+    evidence.plan_validated_at = len(evidence.commands)
     return plan
 
 
 def start_rebase(
-    repository: Path, plan: RebasePlan, events: list[WorkflowEvent], *, preserve_merges: bool = False
+    repository: Path, plan: RebasePlan, evidence: ScenarioEvidence, *, preserve_merges: bool = False
 ) -> int:
     """Start a rebase only after receiving a validated plan token.
 
     Args:
         repository: Temporary Git repository.
         plan: Validated machine-gate artifact.
-        events: Scenario event transcript.
+        evidence: Scenario refs, commands, and state transitions.
         preserve_merges: Include `--rebase-merges` for preserve-topology plans.
 
     Returns:
         Git rebase exit code.
     """
-    assert events[-1] in {WorkflowEvent.PLAN_VALIDATED, WorkflowEvent.PLAN_REVALIDATED}
-    arguments = ["-c", "core.editor=true", "rebase", "--reapply-cherry-picks", "--empty=stop"]
+    assert evidence.events[-1] in {WorkflowEvent.PLAN_VALIDATED, WorkflowEvent.PLAN_REVALIDATED}
+    arguments = [
+        "-c",
+        "core.editor=true",
+        "rebase",
+        "--reapply-cherry-picks",
+        f"--empty={plan.becomes_empty_option.value}",
+    ]
     if preserve_merges:
         arguments.append("--rebase-merges")
     arguments.append(plan.target.oid)
-    events.append(WorkflowEvent.REBASE_STARTED)
-    return run_git(repository, *arguments, check=False).returncode
+    evidence.events.append(WorkflowEvent.REBASE_STARTED)
+    return run_git(repository, *arguments, check=False, transcript=evidence.commands).returncode
 
 
-def assert_gate_precedes_rebase(events: list[WorkflowEvent]) -> None:
+def assert_gate_precedes_rebase(evidence: ScenarioEvidence) -> None:
     """Assert the plan event precedes every rebase-start event.
 
     Args:
-        events: Scenario event transcript.
+        evidence: Scenario refs, commands, and state transitions.
     """
-    assert WorkflowEvent.PLAN_VALIDATED in events
-    assert events.index(WorkflowEvent.PLAN_VALIDATED) < events.index(WorkflowEvent.REBASE_STARTED)
+    assert WorkflowEvent.RECOVERY_VERIFIED in evidence.events
+    assert WorkflowEvent.PLAN_VALIDATED in evidence.events
+    assert evidence.events.index(WorkflowEvent.RECOVERY_VERIFIED) < evidence.events.index(WorkflowEvent.PLAN_VALIDATED)
+    assert evidence.events.index(WorkflowEvent.PLAN_VALIDATED) < evidence.events.index(WorkflowEvent.REBASE_STARTED)
+
+
+@pytest.mark.parametrize("remote_url", ["git@github.com:group/project.git", "git@gitlab.example.com:group/project.git"])
+def test_linear_forge_neutral_rebase_records_complete_gate_and_refs(tmp_path: Path, remote_url: str) -> None:
+    """Run the universal linear path identically for GitHub- and GitLab-shaped remotes."""
+    repository = tmp_path / ("github" if "github" in remote_url else "gitlab")
+    merge_base = initialize_repository(repository)
+    run_git(repository, "remote", "add", "origin", remote_url)
+    run_git(repository, "switch", "-c", "feature")
+    candidate = commit_file(repository, "feature.txt", "feature\n", "feature change")
+    run_git(repository, "switch", "main")
+    commit_file(repository, "target.txt", "target\n", "target change")
+    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
+    run_git(repository, "switch", "feature")
+
+    evidence = begin_scenario(repository)
+    plan = validate_plan_event(
+        repository,
+        scenario_plan_data(
+            old_tip=candidate,
+            target_oid=target_oid,
+            merge_base_oid=merge_base,
+            candidates=[CandidateFixture(oid=candidate, parents=[merge_base], paths=["feature.txt"])],
+        ),
+        evidence,
+    )
+    assert start_rebase(repository, plan, evidence) == 0
+    evidence.events.append(WorkflowEvent.COMPLETE_VERIFIED)
+
+    assert_gate_precedes_rebase(evidence)
+    assert run_git(repository, "merge-base", "--is-ancestor", target_oid, "feature").returncode == 0
+    assert run_git(repository, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
+    finish_scenario(repository, evidence)
+
+
+def test_abort_restores_pre_rebase_refs_after_complete_gate(tmp_path: Path) -> None:
+    """Abort a gated conflict and prove exact old-tip and recovery restoration."""
+    repository = tmp_path / "abort"
+    initialize_repository(repository)
+    commit_file(repository, "shared.txt", "base\n", "add shared")
+    merge_base = run_git(repository, "rev-parse", "HEAD").stdout.strip()
+    run_git(repository, "switch", "-c", "feature")
+    candidate = commit_file(repository, "shared.txt", "feature\n", "feature edit")
+    run_git(repository, "switch", "main")
+    commit_file(repository, "shared.txt", "target\n", "target edit")
+    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
+    run_git(repository, "switch", "feature")
+
+    evidence = begin_scenario(repository)
+    plan = validate_plan_event(
+        repository,
+        scenario_plan_data(
+            old_tip=candidate,
+            target_oid=target_oid,
+            merge_base_oid=merge_base,
+            candidates=[
+                CandidateFixture(
+                    oid=candidate,
+                    parents=[merge_base],
+                    paths=["shared.txt"],
+                    disposition="MANUAL_MERGE",
+                    expected_conflict_paths=["shared.txt"],
+                )
+            ],
+        ),
+        evidence,
+    )
+    assert start_rebase(repository, plan, evidence) != 0
+    run_git(repository, "rebase", "--abort", transcript=evidence.commands)
+    evidence.events.append(WorkflowEvent.REBASE_ABORTED_RESTORED)
+
+    assert run_git(repository, "rev-parse", "feature").stdout.strip() == candidate
+    assert run_git(repository, "rev-parse", plan.recovery_ref).stdout.strip() == candidate
+    assert run_git(repository, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
+    finish_scenario(repository, evidence)
 
 
 def test_planned_conflict_resolves_combined_intent_before_continue(tmp_path: Path) -> None:
@@ -174,29 +368,38 @@ def test_planned_conflict_resolves_combined_intent_before_continue(tmp_path: Pat
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     run_git(repository, "switch", "feature")
 
-    events: list[WorkflowEvent] = []
+    evidence = begin_scenario(repository)
     data = scenario_plan_data(
         old_tip=old_tip,
         target_oid=target_oid,
         merge_base_oid=merge_base,
-        candidate_oid=candidate,
-        candidate_parents=[merge_base],
-        paths=["shared.py"],
-        disposition="MANUAL_MERGE",
-        expected_conflict_paths=["shared.py"],
+        candidates=[
+            CandidateFixture(
+                oid=candidate,
+                parents=[merge_base],
+                paths=["shared.py"],
+                disposition="MANUAL_MERGE",
+                expected_conflict_paths=["shared.py"],
+            )
+        ],
     )
-    plan = validate_plan_event(data, events)
-    assert start_rebase(repository, plan, events) != 0
-    events.append(WorkflowEvent.CONFLICT)
+    plan = validate_plan_event(repository, data, evidence)
+    assert start_rebase(repository, plan, evidence) != 0
+    evidence.events.append(WorkflowEvent.CONFLICT)
+    assert (
+        run_git(repository, "show", ":2:shared.py", transcript=evidence.commands).stdout == "target_value = 'target'\n"
+    )
+    assert run_git(repository, "show", ":3:shared.py", transcript=evidence.commands).stdout == "value = 'feature'\n"
     (repository / "shared.py").write_text("target_value = 'target'\nvalue = 'feature'\n", encoding="utf-8")
-    run_git(repository, "add", "shared.py")
-    assert run_git(repository, "ls-files", "--unmerged").stdout == ""
-    run_git(repository, "-c", "core.editor=true", "rebase", "--continue")
-    events.append(WorkflowEvent.REBASE_CONTINUED)
+    run_git(repository, "add", "shared.py", transcript=evidence.commands)
+    assert run_git(repository, "ls-files", "--unmerged", transcript=evidence.commands).stdout == ""
+    run_git(repository, "-c", "core.editor=true", "rebase", "--continue", transcript=evidence.commands)
+    evidence.events.append(WorkflowEvent.REBASE_CONTINUED)
 
-    assert_gate_precedes_rebase(events)
+    assert_gate_precedes_rebase(evidence)
     assert (repository / "shared.py").read_text(encoding="utf-8") == "target_value = 'target'\nvalue = 'feature'\n"
     assert run_git(repository, "merge-base", "--is-ancestor", target_oid, "feature").returncode == 0
+    finish_scenario(repository, evidence)
 
 
 def test_rename_edit_adapts_feature_change_to_target_path(tmp_path: Path) -> None:
@@ -213,24 +416,23 @@ def test_rename_edit_adapts_feature_change_to_target_path(tmp_path: Path) -> Non
     target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
     run_git(repository, "switch", "feature")
 
-    events: list[WorkflowEvent] = []
+    evidence = begin_scenario(repository)
     plan = validate_plan_event(
+        repository,
         scenario_plan_data(
             old_tip=candidate,
             target_oid=target_oid,
             merge_base_oid=merge_base,
-            candidate_oid=candidate,
-            candidate_parents=[merge_base],
-            paths=["old.py"],
-            disposition="ADAPT",
+            candidates=[CandidateFixture(oid=candidate, parents=[merge_base], paths=["old.py"], disposition="ADAPT")],
         ),
-        events,
+        evidence,
     )
-    assert start_rebase(repository, plan, events) == 0
+    assert start_rebase(repository, plan, evidence) == 0
 
-    assert_gate_precedes_rebase(events)
+    assert_gate_precedes_rebase(evidence)
     assert not (repository / "old.py").exists()
     assert (repository / "new.py").read_text(encoding="utf-8") == "value = 2\n"
+    finish_scenario(repository, evidence)
 
 
 def test_merge_candidate_requires_policy_before_preserving_topology(tmp_path: Path) -> None:
@@ -253,213 +455,20 @@ def test_merge_candidate_requires_policy_before_preserving_topology(tmp_path: Pa
         old_tip=merge_candidate,
         target_oid=target_oid,
         merge_base_oid=merge_base,
-        candidate_oid=merge_candidate,
-        candidate_parents=[first_parent, side_parent],
-        paths=["feature.txt", "side.txt"],
+        candidates=[
+            CandidateFixture(oid=first_parent, parents=[merge_base], paths=["feature.txt"]),
+            CandidateFixture(oid=side_parent, parents=[merge_base], paths=["side.txt"]),
+            CandidateFixture(
+                oid=merge_candidate, parents=[first_parent, side_parent], paths=["feature.txt", "side.txt"]
+            ),
+        ],
     )
-    with pytest.raises(ValidationError):
-        RebasePlan.model_validate(data)
-
     data["merge_policy"] = "PRESERVE_TOPOLOGY"
-    events: list[WorkflowEvent] = []
-    plan = validate_plan_event(data, events)
-    assert start_rebase(repository, plan, events, preserve_merges=True) == 0
+    evidence = begin_scenario(repository)
+    plan = validate_plan_event(repository, data, evidence)
+    assert start_rebase(repository, plan, evidence, preserve_merges=True) == 0
 
-    assert_gate_precedes_rebase(events)
+    assert_gate_precedes_rebase(evidence)
     parent_records = run_git(repository, "rev-list", "--parents", f"{target_oid}..feature").stdout.splitlines()
     assert any(len(record.split()) > 2 for record in parent_records)
-
-
-def test_existing_rebase_metadata_blocks_a_second_rebase(tmp_path: Path) -> None:
-    """Detect an active rebase directory and start no second history rewrite."""
-    repository = tmp_path / "existing-operation"
-    initialize_repository(repository)
-    commit_file(repository, "shared.txt", "base\n", "add shared")
-    merge_base = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "-c", "feature")
-    candidate = commit_file(repository, "shared.txt", "feature\n", "feature edit")
-    run_git(repository, "switch", "main")
-    commit_file(repository, "shared.txt", "target\n", "target edit")
-    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "feature")
-
-    events: list[WorkflowEvent] = []
-    plan = validate_plan_event(
-        scenario_plan_data(
-            old_tip=candidate,
-            target_oid=target_oid,
-            merge_base_oid=merge_base,
-            candidate_oid=candidate,
-            candidate_parents=[merge_base],
-            paths=["shared.txt"],
-            disposition="MANUAL_MERGE",
-            expected_conflict_paths=["shared.txt"],
-        ),
-        events,
-    )
-    assert start_rebase(repository, plan, events) != 0
-    rebase_merge = run_git(repository, "rev-parse", "--git-path", "rebase-merge").stdout.strip()
-    rebase_apply = run_git(repository, "rev-parse", "--git-path", "rebase-apply").stdout.strip()
-    active_paths = [path for path in (rebase_merge, rebase_apply) if (repository / path).is_dir()]
-
-    assert active_paths
-    assert events.count(WorkflowEvent.REBASE_STARTED) == 1
-    run_git(repository, "rebase", "--abort")
-
-
-def test_dirty_owning_worktree_blocks_without_stash_or_ref_change(tmp_path: Path) -> None:
-    """Observe tracked and untracked dirt while preserving refs and filesystem state."""
-    repository = tmp_path / "dirty-worktree"
-    initialize_repository(repository)
-    run_git(repository, "switch", "-c", "feature")
-    commit_file(repository, "tracked.txt", "committed\n", "add tracked file")
-    branch_before = run_git(repository, "rev-parse", "feature").stdout.strip()
-    target_before = run_git(repository, "rev-parse", "main").stdout.strip()
-    (repository / "tracked.txt").write_text("dirty\n", encoding="utf-8")
-    (repository / "untracked.txt").write_text("untracked\n", encoding="utf-8")
-
-    status = run_git(repository, "status", "--porcelain=v1", "--untracked-files=all").stdout
-
-    assert " M tracked.txt" in status
-    assert "?? untracked.txt" in status
-    assert run_git(repository, "rev-parse", "feature").stdout.strip() == branch_before
-    assert run_git(repository, "rev-parse", "main").stdout.strip() == target_before
-    assert run_git(repository, "stash", "list").stdout == ""
-    assert (repository / "tracked.txt").read_text(encoding="utf-8") == "dirty\n"
-    assert (repository / "untracked.txt").read_text(encoding="utf-8") == "untracked\n"
-
-
-def test_unexpected_conflict_requires_plan_revalidation_before_continue(tmp_path: Path) -> None:
-    """Record an unpredicted conflict and revalidate the plan before continuation."""
-    repository = tmp_path / "unexpected-conflict"
-    initialize_repository(repository)
-    commit_file(repository, "shared.txt", "base\n", "add shared")
-    merge_base = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "-c", "feature")
-    candidate = commit_file(repository, "shared.txt", "feature\n", "feature edit")
-    run_git(repository, "switch", "main")
-    commit_file(repository, "shared.txt", "target\n", "target edit")
-    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "feature")
-
-    events: list[WorkflowEvent] = []
-    data = scenario_plan_data(
-        old_tip=candidate,
-        target_oid=target_oid,
-        merge_base_oid=merge_base,
-        candidate_oid=candidate,
-        candidate_parents=[merge_base],
-        paths=["shared.txt"],
-        disposition="MANUAL_MERGE",
-        expected_conflict_paths=[],
-    )
-    plan = validate_plan_event(data, events)
-    assert start_rebase(repository, plan, events) != 0
-    assert "shared.txt" not in plan.candidates[0].expected_conflict_paths
-
-    candidates = data["candidates"]
-    assert isinstance(candidates, list)
-    candidate_data = candidates[0]
-    assert isinstance(candidate_data, dict)
-    candidate_data["expected_conflict_paths"] = ["shared.txt"]
-    RebasePlan.model_validate(data)
-    events.append(WorkflowEvent.PLAN_REVALIDATED)
-    (repository / "shared.txt").write_text("target\nfeature\n", encoding="utf-8")
-    run_git(repository, "add", "shared.txt")
-    assert events[-1] is WorkflowEvent.PLAN_REVALIDATED
-    run_git(repository, "-c", "core.editor=true", "rebase", "--continue")
-    events.append(WorkflowEvent.REBASE_CONTINUED)
-
-    assert events.index(WorkflowEvent.PLAN_REVALIDATED) < events.index(WorkflowEvent.REBASE_CONTINUED)
-
-
-def test_ref_drift_prevents_stale_plan_rebase(tmp_path: Path) -> None:
-    """Move the target after validation and emit ref-drift without starting rebase."""
-    repository = tmp_path / "ref-drift"
-    merge_base = initialize_repository(repository)
-    run_git(repository, "switch", "-c", "feature")
-    candidate = commit_file(repository, "feature.txt", "feature\n", "feature change")
-    run_git(repository, "switch", "main")
-    captured_target = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    events: list[WorkflowEvent] = []
-    validate_plan_event(
-        scenario_plan_data(
-            old_tip=candidate,
-            target_oid=captured_target,
-            merge_base_oid=merge_base,
-            candidate_oid=candidate,
-            candidate_parents=[merge_base],
-            paths=["feature.txt"],
-        ),
-        events,
-    )
-    commit_file(repository, "target.txt", "drift\n", "move target")
-    fresh_target = run_git(repository, "rev-parse", "main").stdout.strip()
-    if fresh_target != captured_target:
-        events.append(WorkflowEvent.REPLAN_REF_DRIFT)
-
-    assert events == [WorkflowEvent.PLAN_VALIDATED, WorkflowEvent.REPLAN_REF_DRIFT]
-
-
-def test_validation_failure_never_emits_complete_verified(tmp_path: Path) -> None:
-    """Finish a rebase, fail a named check, and retain the failure terminal."""
-    repository = tmp_path / "validation-failure"
-    merge_base = initialize_repository(repository)
-    run_git(repository, "switch", "-c", "feature")
-    candidate = commit_file(repository, "feature.txt", "feature\n", "feature change")
-    run_git(repository, "switch", "main")
-    commit_file(repository, "target.txt", "target\n", "target change")
-    target_oid = run_git(repository, "rev-parse", "HEAD").stdout.strip()
-    run_git(repository, "switch", "feature")
-    events: list[WorkflowEvent] = []
-    plan = validate_plan_event(
-        scenario_plan_data(
-            old_tip=candidate,
-            target_oid=target_oid,
-            merge_base_oid=merge_base,
-            candidate_oid=candidate,
-            candidate_parents=[merge_base],
-            paths=["feature.txt"],
-        ),
-        events,
-    )
-    assert start_rebase(repository, plan, events) == 0
-    failed_check = run_git(repository, "rev-parse", "--verify", "refs/heads/required-check", check=False)
-    if failed_check.returncode != 0:
-        events.append(WorkflowEvent.VALIDATION_FAILED)
-
-    assert WorkflowEvent.VALIDATION_FAILED in events
-    assert WorkflowEvent.COMPLETE_VERIFIED not in events
-    assert WorkflowState.REBASE_COMPLETE_VALIDATION_FAILED.value == "REBASE_COMPLETE_VALIDATION_FAILED"
-
-
-def test_equal_oid_no_op_creates_no_plan_recovery_or_rebase(tmp_path: Path) -> None:
-    """Terminate a distinct-ref same-OID request as NO_CHANGE without mutation."""
-    repository = tmp_path / "no-change"
-    oid = initialize_repository(repository)
-    run_git(repository, "branch", "feature", oid)
-    before_refs = run_git(repository, "show-ref").stdout
-
-    branch_oid = run_git(repository, "rev-parse", "feature").stdout.strip()
-    target_oid = run_git(repository, "rev-parse", "main").stdout.strip()
-    candidate_count = run_git(repository, "rev-list", "--count", f"{target_oid}..{branch_oid}").stdout.strip()
-    after_refs = run_git(repository, "show-ref").stdout
-
-    assert branch_oid == target_oid
-    assert candidate_count == "0"
-    assert before_refs == after_refs
-    assert "rebase-backup/" not in after_refs
-
-
-@pytest.mark.parametrize("missing_ref", ["refs/heads/missing", "missing-target^{commit}"])
-def test_invalid_ref_lookup_routes_to_invalid_ref_without_rebase(tmp_path: Path, missing_ref: str) -> None:
-    """Route failed branch and target lookups to BLOCKED_INVALID_REF."""
-    repository = tmp_path / missing_ref.replace("/", "-").replace("^", "-")
-    initialize_repository(repository)
-    if missing_ref.startswith("refs/heads"):
-        lookup = run_git(repository, "show-ref", "--verify", missing_ref, check=False)
-    else:
-        lookup = run_git(repository, "rev-parse", "--verify", missing_ref, check=False)
-
-    assert lookup.returncode != 0
-    assert WorkflowState.BLOCKED_INVALID_REF.value == "BLOCKED_INVALID_REF"
+    finish_scenario(repository, evidence)

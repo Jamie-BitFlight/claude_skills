@@ -14,19 +14,22 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from rebase_plan import RebasePlan, StateKind, WorkflowState, workflow_state_names
+from rebase_plan import RebasePlan, StateKind, WorkflowState, workflow_state_definitions
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 VALIDATOR_PATH = SKILL_ROOT / "scripts" / "rebase_plan.py"
 BOUNDED_RUNNER = REPOSITORY_ROOT / "scripts" / "run_bounded.py"
 EXAMPLE_PLAN_PATH = SKILL_ROOT / "references" / "example-plan.json"
+
+# Validator fixtures complete in milliseconds. Twenty seconds permits slow CI filesystems while
+# still proving that a hung dependency resolver or descendant is terminated by the bounded runner.
+TEST_COMMAND_TIMEOUT_SECONDS = 20
 
 
 def valid_plan_data() -> dict[str, object]:
@@ -71,6 +74,13 @@ def valid_plan_data() -> dict[str, object]:
                 }
             ],
         },
+        "replay_inventory": {
+            "source": "local-git",
+            "argv": ["git", "rev-list", "--reverse", "--topo-order", "--parents", f"{target_oid}..{old_tip}"],
+            "exit_code": 0,
+            "stdout": f"{candidate_oid} {'4' * 40}\n",
+            "stderr": "",
+        },
         "candidates": [
             {
                 "oid": candidate_oid,
@@ -105,7 +115,22 @@ def valid_plan_data() -> dict[str, object]:
         "merge_policy": "LINEAR_NO_MERGES",
         "clean_cherry_pick_policy": "SURFACE",
         "becomes_empty_policy": "STOP",
+        "becomes_empty_option": "stop",
+        "rebase_help": {
+            "source": "installed-git",
+            "argv": ["git", "rebase", "-h"],
+            "exit_code": 129,
+            "stdout": "",
+            "stderr": "--reapply-cherry-picks --rebase-merges --empty (drop|keep|stop)\n",
+        },
         "recovery_ref": "refs/heads/rebase-backup/feature-parser-onto-main",
+        "recovery_verification": {
+            "source": "local-git",
+            "argv": ["git", "rev-parse", "--verify", "refs/heads/rebase-backup/feature-parser-onto-main^{commit}"],
+            "exit_code": 0,
+            "stdout": f"{old_tip}\n",
+            "stderr": "",
+        },
         "repository_checks": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
         "unknowns": [],
         "user_decisions": [],
@@ -123,12 +148,10 @@ def run_validator(plan_path: Path) -> subprocess.CompletedProcess[str]:
     """
     return subprocess.run(
         [
-            sys.executable,
             str(BOUNDED_RUNNER),
             "--timeout-seconds",
-            "20",
+            str(TEST_COMMAND_TIMEOUT_SECONDS),
             "--",
-            sys.executable,
             str(VALIDATOR_PATH),
             "validate",
             str(plan_path),
@@ -164,6 +187,9 @@ def test_bundled_example_is_a_valid_ready_to_rebase_plan() -> None:
         "active-operation",
         "failed-preflight",
         "redundant-drop-without-equivalence",
+        "omitted-inventory-candidate",
+        "unverified-recovery",
+        "unsupported-empty-option",
     ],
 )
 def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
@@ -185,16 +211,41 @@ def test_incomplete_plan_cannot_reach_ready_to_rebase(mutation: str) -> None:
         preflight = preflights[0]
         assert isinstance(preflight, dict)
         preflight["exit_code"] = 1
-    else:
+    elif mutation == "redundant-drop-without-equivalence":
         candidates = data["candidates"]
         assert isinstance(candidates, list)
         candidate = candidates[0]
         assert isinstance(candidate, dict)
         candidate["disposition"] = "REDUNDANT_DROP"
         candidate["equivalence_evidence"] = []
+    elif mutation == "omitted-inventory-candidate":
+        replay_inventory = data["replay_inventory"]
+        assert isinstance(replay_inventory, dict)
+        replay_inventory["stdout"] = f"{'5' * 40} {'4' * 40}\n{replay_inventory['stdout']}"
+    elif mutation == "unverified-recovery":
+        recovery = data["recovery_verification"]
+        assert isinstance(recovery, dict)
+        recovery["stdout"] = f"{'9' * 40}\n"
+    else:
+        help_evidence = data["rebase_help"]
+        assert isinstance(help_evidence, dict)
+        help_evidence["stderr"] = "--reapply-cherry-picks --rebase-merges --empty (drop|keep|ask)\n"
 
     with pytest.raises(ValidationError):
         RebasePlan.model_validate(data)
+
+
+def test_git_243_ask_spelling_satisfies_the_logical_stop_policy() -> None:
+    """Accept Git 2.43's `ask` spelling when captured help advertises it."""
+    data = valid_plan_data()
+    data["becomes_empty_option"] = "ask"
+    help_evidence = data["rebase_help"]
+    assert isinstance(help_evidence, dict)
+    help_evidence["stderr"] = "--reapply-cherry-picks --rebase-merges --empty (drop|keep|ask)\n"
+
+    plan = RebasePlan.model_validate(data)
+
+    assert plan.becomes_empty_option.value == "ask"
 
 
 def test_validator_emits_compact_valid_result(tmp_path: Path) -> None:
@@ -212,6 +263,28 @@ def test_validator_emits_compact_valid_result(tmp_path: Path) -> None:
     assert output["state"] == "READY_TO_REBASE"
     assert output["plan_id"] == "feature-parser-onto-main"
     assert len(output["sha256"]) == 64
+
+
+def test_bundled_validator_runs_from_unrelated_consuming_directory(tmp_path: Path) -> None:
+    """Resolve the bundled executable by skill path instead of consuming-repository cwd."""
+    result = subprocess.run(
+        [
+            str(BOUNDED_RUNNER),
+            "--timeout-seconds",
+            str(TEST_COMMAND_TIMEOUT_SECONDS),
+            "--",
+            str(VALIDATOR_PATH),
+            "schema",
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    schema = json.loads(result.stdout)
+    assert schema["title"] == "RebasePlan"
 
 
 def test_validator_fails_closed_with_structured_errors(tmp_path: Path) -> None:
@@ -233,9 +306,9 @@ def test_validator_fails_closed_with_structured_errors(tmp_path: Path) -> None:
 
 def test_workflow_state_source_includes_every_reviewed_state() -> None:
     """Keep one typed state vocabulary for prompts, tests, and CLI output."""
-    names = workflow_state_names()
+    definitions = workflow_state_definitions()
 
-    assert WorkflowState.READY_TO_ANALYZE in names
-    assert WorkflowState.BLOCKED_COMMAND_FAILED in names
-    assert WorkflowState.PLAN_INVALID in names
-    assert all(state.kind in {StateKind.TRANSITION, StateKind.TERMINAL} for state in names.values())
+    assert WorkflowState.READY_TO_ANALYZE in definitions
+    assert WorkflowState.BLOCKED_COMMAND_FAILED in definitions
+    assert WorkflowState.PLAN_INVALID in definitions
+    assert all(state.kind in {StateKind.TRANSITION, StateKind.TERMINAL} for state in definitions.values())

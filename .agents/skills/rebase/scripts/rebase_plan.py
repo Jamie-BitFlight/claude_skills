@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Literal
@@ -71,7 +72,7 @@ WORKFLOW_STATE_DEFINITIONS = (
     WorkflowStateDefinition(
         name=WorkflowState.READY_TO_REBASE,
         kind=StateKind.TRANSITION,
-        evidence=["validator status VALID", "plan SHA-256", "recovery ref still pending creation"],
+        evidence=["validator status VALID", "plan SHA-256", "recovery ref resolves to old tip"],
     ),
     WorkflowStateDefinition(
         name=WorkflowState.BLOCKED_INVALID_REF,
@@ -146,7 +147,7 @@ WORKFLOW_STATE_DEFINITIONS = (
 )
 
 
-def workflow_state_names() -> dict[WorkflowState, WorkflowStateDefinition]:
+def workflow_state_definitions() -> dict[WorkflowState, WorkflowStateDefinition]:
     """Return the canonical workflow-state map.
 
     Returns:
@@ -232,6 +233,13 @@ class MergePolicy(StrEnum):
     APPROVED_FLATTEN = "APPROVED_FLATTEN"
 
 
+class BecomesEmptyOption(StrEnum):
+    """Installed Git spelling that stops on a commit that becomes empty."""
+
+    ASK = "ask"
+    STOP = "stop"
+
+
 class RebasePlan(BaseModel):
     """Machine-validatable gate artifact for one local rebase."""
 
@@ -247,12 +255,16 @@ class RebasePlan(BaseModel):
     repository_instruction_sources: Annotated[list[str], Field(min_length=1)]
     repository_preflights: list[CommandEvidence]
     publication: PublicationEvidence
+    replay_inventory: CommandEvidence
     candidates: Annotated[list[Candidate], Field(min_length=1)]
     affected_paths: Annotated[list[PathImpact], Field(min_length=1)]
     merge_policy: MergePolicy
     clean_cherry_pick_policy: Literal["SURFACE"]
     becomes_empty_policy: Literal["STOP"]
+    becomes_empty_option: BecomesEmptyOption
+    rebase_help: CommandEvidence
     recovery_ref: Annotated[str, StringConstraints(pattern=r"^refs/heads/rebase-backup/[a-z0-9][a-z0-9-]*$")]
+    recovery_verification: CommandEvidence
     repository_checks: Annotated[list[ArgumentVector], Field(min_length=1)]
     unknowns: list[str]
     user_decisions: list[UserDecision]
@@ -276,14 +288,17 @@ class RebasePlan(BaseModel):
         Raises:
             ValueError: If any exact-cover, evidence, decision, or state invariant fails.
         """
-        self._validate_repository_state()
-        approved_decisions = self._validate_decisions_and_preflights()
-        self._validate_exact_cover()
-        self._validate_dispositions(approved_decisions)
-        self._validate_merge_policy(approved_decisions)
+        self.validate_repository_state()
+        approved_decisions = self.validate_decisions_and_preflights()
+        self.validate_replay_inventory()
+        self.validate_recovery()
+        self.validate_rebase_capabilities()
+        self.validate_exact_cover()
+        self.validate_dispositions(approved_decisions)
+        self.validate_merge_policy(approved_decisions)
         return self
 
-    def _validate_repository_state(self) -> None:
+    def validate_repository_state(self) -> None:
         """Require distinct refs and a clean, authorized execution state."""
         if self.branch.ref == self.target.ref:
             raise ValueError("branch and target ref names must differ")
@@ -298,7 +313,7 @@ class RebasePlan(BaseModel):
         if self.unknowns:
             raise ValueError("plan has unresolved unknowns")
 
-    def _validate_decisions_and_preflights(self) -> set[str]:
+    def validate_decisions_and_preflights(self) -> set[str]:
         """Require successful evidence and collect approved decision IDs.
 
         Returns:
@@ -315,7 +330,50 @@ class RebasePlan(BaseModel):
             raise ValueError("plan contains an unapproved user decision")
         return {decision.decision_id for decision in self.user_decisions if decision.approved}
 
-    def _validate_exact_cover(self) -> None:
+    def validate_replay_inventory(self) -> None:
+        """Require captured rev-list evidence to exactly match planned candidates."""
+        expected_argv = [
+            "git",
+            "rev-list",
+            "--reverse",
+            "--topo-order",
+            "--parents",
+            f"{self.target.oid}..{self.branch.oid}",
+        ]
+        if self.replay_inventory.argv != expected_argv:
+            raise ValueError("replay inventory command does not bind the planned immutable OIDs")
+        if self.replay_inventory.exit_code != 0:
+            raise ValueError("replay inventory command failed")
+        observed_graph = [line.split() for line in self.replay_inventory.stdout.splitlines() if line.strip()]
+        planned_graph = [[candidate.oid, *candidate.parents] for candidate in self.candidates]
+        if observed_graph != planned_graph:
+            raise ValueError("planned candidates do not exactly cover the captured replay inventory")
+
+    def validate_recovery(self) -> None:
+        """Require the durable recovery ref to resolve to the captured old tip."""
+        expected_argv = ["git", "rev-parse", "--verify", f"{self.recovery_ref}^{{commit}}"]
+        if self.recovery_verification.argv != expected_argv:
+            raise ValueError("recovery verification command does not bind the planned recovery ref")
+        if self.recovery_verification.exit_code != 0:
+            raise ValueError("recovery ref verification failed")
+        if self.recovery_verification.stdout.strip() != self.branch.oid:
+            raise ValueError("recovery ref does not resolve to the captured old tip")
+
+    def validate_rebase_capabilities(self) -> None:
+        """Require every selected rebase option in captured installed-Git help."""
+        if self.rebase_help.argv != ["git", "rebase", "-h"]:
+            raise ValueError("rebase capability evidence must come from git rebase -h")
+        help_output = f"{self.rebase_help.stdout}\n{self.rebase_help.stderr}"
+        empty_pattern = rf"--empty[^\n]*\b{re.escape(self.becomes_empty_option.value)}\b"
+        if re.search(empty_pattern, help_output) is None:
+            raise ValueError("selected becomes-empty option is absent from installed Git help")
+        if re.search(r"--(?:\[no-\])?reapply-cherry-picks", help_output) is None:
+            raise ValueError("installed Git help lacks --reapply-cherry-picks")
+        supports_rebase_merges = re.search(r"--(?:\[no-\])?rebase-merges", help_output) is not None
+        if self.merge_policy is MergePolicy.PRESERVE_TOPOLOGY and not supports_rebase_merges:
+            raise ValueError("installed Git help lacks --rebase-merges")
+
+    def validate_exact_cover(self) -> None:
         """Require unique candidates and exact candidate-to-path membership."""
         candidate_by_oid = {candidate.oid: candidate for candidate in self.candidates}
         if len(candidate_by_oid) != len(self.candidates):
@@ -334,7 +392,7 @@ class RebasePlan(BaseModel):
             if any(oid not in candidate_by_oid for oid in impact.candidate_oids):
                 raise ValueError(f"affected path names an unknown candidate: {path}")
 
-    def _validate_dispositions(self, approved_decisions: set[str]) -> None:
+    def validate_dispositions(self, approved_decisions: set[str]) -> None:
         """Require evidence or approval for each redundant-drop disposition."""
         for candidate in self.candidates:
             if candidate.disposition is not Disposition.REDUNDANT_DROP:
@@ -343,7 +401,7 @@ class RebasePlan(BaseModel):
             if not candidate.equivalence_evidence and not approved_drop:
                 raise ValueError(f"redundant drop lacks equivalence evidence or approval: {candidate.oid}")
 
-    def _validate_merge_policy(self, approved_decisions: set[str]) -> None:
+    def validate_merge_policy(self, approved_decisions: set[str]) -> None:
         """Require a topology policy compatible with the candidate graph."""
         has_merge = any(len(candidate.parents) > 1 for candidate in self.candidates)
         if has_merge and self.merge_policy is MergePolicy.LINEAR_NO_MERGES:

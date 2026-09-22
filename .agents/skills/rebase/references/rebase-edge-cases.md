@@ -28,8 +28,8 @@ authority. Report the owning path as the observable blocker.
 
 ## Merge topology and commits Git can drop
 
-A `git rev-list --parents` record with more than one parent after the commit OID is a merge commit.
-Choose one policy before execution:
+A `git rev-list --parents` record with more than one parent after the commit OID is a merge
+commit.[5] Choose one policy before execution:
 
 - `preserve-topology`: account for the merge and its resolution, then execute with
   `--rebase-merges`.
@@ -40,8 +40,8 @@ Without a bound policy, emit `NEEDS_USER_DECISION`.
 
 Treat a `-` entry from `git cherry -v <target-oid> <old-tip-oid>` as a clean-cherry-pick candidate,
 not permission to omit it. Record the equivalent target evidence, use `--reapply-cherry-picks`, and
-let `--empty=stop` surface the candidate during replay. A `REDUNDANT_DROP` disposition requires that
-evidence or explicit approval.
+let the plan's installed-help-validated `becomes_empty_option` surface the candidate during replay.
+A `REDUNDANT_DROP` disposition requires that evidence or explicit approval.
 
 Record commits that start empty separately from commits that become empty. Preserve an intentionally
 empty commit when the plan assigns `PRESERVE_EMPTY`. When a nonempty candidate becomes empty, enter
@@ -55,7 +55,7 @@ empty commit when the plan assigns `PRESERVE_EMPTY`. When a nonempty candidate b
 5. Emit `NEEDS_USER_DECISION` when neither disposition is established.
 
 Git documents the default merge-commit drop, `--rebase-merges`, clean-cherry-pick handling,
-`--reapply-cherry-picks`, and `--empty=stop` behavior on the rebase reference.[2]
+`--reapply-cherry-picks`, and empty-commit behavior on the rebase reference.[2]
 
 ## Rebase stops, continuation, and recovery
 
@@ -115,19 +115,19 @@ both rewritten and recovery refs intact for an explicit recovery decision.
 Read the canonical state names, transition/terminal classification, and required evidence from the
 bundled typed source instead of maintaining a second prose roster:
 
-According to lines 32–155 of `../scripts/rebase_plan.py`, that source defines every state name,
-classification, and evidence contract in one typed collection.
+According to lines 33–156 of [the typed state source](../scripts/rebase_plan.py), that source defines
+every state name, classification, and evidence contract in one typed collection.
 
 ```bash
-uv run --script scripts/rebase_plan.py states
+uv run --script "$REBASE_SKILL_DIR/scripts/rebase_plan.py" states
 ```
 
-Use only a state returned by that command. If a prompt edit introduces an unknown state token, the
-package contract test fails before publication.
+Use only a state returned by that command.
 
-## Sources
+## References
 
 1. [git-worktree](https://git-scm.com/docs/git-worktree) (accessed 2026-09-22)
 2. [git-rebase](https://git-scm.com/docs/git-rebase) (accessed 2026-09-22)
 3. [git-status](https://git-scm.com/docs/git-status) (accessed 2026-09-22)
 4. [git-ls-files](https://git-scm.com/docs/git-ls-files) (accessed 2026-09-22)
+5. [git-rev-list — commit listing and `--parents`](https://git-scm.com/docs/git-rev-list) (accessed 2026-09-22)

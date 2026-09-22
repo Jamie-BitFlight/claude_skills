@@ -1,87 +1,178 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "skill_name": "rebase",
   "observed_on": "2026-09-22",
   "official_skill_docs": "https://learn.chatgpt.com/docs/build-skills",
-  "harnesses": {
-    "codex": {
-      "version": "0.155.1",
-      "provider": "portkey"
-    },
-    "opencode": {
-      "version": "1.18.32",
-      "provider": "portkey"
-    }
-  },
+  "repository_head_before": "62ee24a11f4aabff17b274fe4ead64474e730693",
+  "repository_head_after": "62ee24a11f4aabff17b274fe4ead64474e730693",
+  "repository_status_before": "",
+  "repository_status_after": "",
   "cases": [
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f3854e040ffeiY2I934qOXHXQu",
       "eval_id": 1,
+      "prompt": "Rebase `feature/a` onto `main`.",
       "expected_activation": true,
       "observed_activation": true,
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "loaded_skill_path": "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+      "read_references": [],
+      "filesystem_action_events": [
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+        "exec:git status --porcelain=v1 --untracked-files=all -> 0",
+        "exec:git show-ref --verify refs/heads/feature/a -> 128",
+        "exec:git rev-parse --verify main^{commit} -> 0",
+        "exec:git merge-base refs/heads/feature/a main -> 128",
+        "exec:git worktree list --porcelain -> 0",
+        "exec:git rev-parse --git-path rebase-merge -> 0",
+        "exec:git rev-parse --git-path rebase-apply -> 0",
+        "read:.git/rebase-merge -> absent",
+        "read:.git/rebase-apply -> absent"
+      ],
+      "provider_action_events": [],
+      "state_transitions": ["ACTIVATED_REBASE", "READY_TO_ANALYZE_FAILED", "BLOCKED_INVALID_REF"],
+      "final_terminal": "BLOCKED_INVALID_REF",
       "status": "PASSED"
     },
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f3854767dffeaLtglMgSqkswPx",
       "eval_id": 2,
+      "prompt": "Continue the rebase after I fixed this conflict.",
       "expected_activation": true,
       "observed_activation": true,
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "loaded_skill_path": "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+      "read_references": [
+        "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/references/rebase-edge-cases.md"
+      ],
+      "filesystem_action_events": [
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/references/rebase-edge-cases.md",
+        "exec:git status --porcelain=v1 --untracked-files=all -> 0",
+        "exec:git ls-files --unmerged -> 0",
+        "read:.git/rebase-merge -> absent",
+        "read:.git/rebase-apply -> absent",
+        "exec:git rev-parse --verify --quiet REBASE_HEAD -> 1",
+        "mutation-attempt:git -c core.editor=true rebase --continue -> 128, no rebase in progress"
+      ],
+      "provider_action_events": [],
+      "state_transitions": ["ACTIVATED_REBASE", "NO_ACTIVE_REBASE", "BLOCKED_COMMAND_FAILED"],
+      "final_terminal": "BLOCKED_COMMAND_FAILED",
       "status": "PASSED"
     },
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f3854039cffesSIQaebbYTkp7w",
       "eval_id": 3,
+      "prompt": "Abort this rebase and restore the original branch.",
       "expected_activation": true,
       "observed_activation": true,
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "loaded_skill_path": "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+      "read_references": [
+        "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/references/rebase-edge-cases.md"
+      ],
+      "filesystem_action_events": [
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/references/rebase-edge-cases.md",
+        "exec:git status --porcelain=v1 --branch --untracked-files=all -> 0",
+        "read:.git/rebase-merge -> absent",
+        "read:.git/rebase-apply -> absent",
+        "exec:git rev-parse --verify --quiet REBASE_HEAD -> 1",
+        "exec:git reflog -10 --date=iso -> 0"
+      ],
+      "provider_action_events": [],
+      "state_transitions": ["ACTIVATED_REBASE", "NO_ACTIVE_REBASE", "BLOCKED_GIT_STATE"],
+      "final_terminal": "BLOCKED_GIT_STATE",
       "status": "PASSED"
     },
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f3851eaa4ffe23q3mXUQabv40F",
       "eval_id": 4,
+      "prompt": "Update my branch from main using a merge commit.",
       "expected_activation": false,
       "observed_activation": false,
-      "injected_skill_path": null,
+      "loaded_skill_path": null,
+      "read_references": [],
+      "filesystem_action_events": [
+        "exec:git status --short --branch -> 0",
+        "exec:git branch --all --verbose --no-abbrev -> 0",
+        "exec:git worktree list --porcelain -> 0"
+      ],
+      "provider_action_events": [],
+      "state_transitions": ["DO_NOT_ACTIVATE"],
+      "final_terminal": "DO_NOT_ACTIVATE",
       "status": "PASSED"
     },
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f3851b0f8ffeQzKLk4P1o44Ppw",
       "eval_id": 5,
+      "prompt": "Enable rebase-and-merge on this GitHub repository.",
       "expected_activation": false,
       "observed_activation": false,
-      "injected_skill_path": null,
+      "loaded_skill_path": null,
+      "read_references": [],
+      "filesystem_action_events": [
+        "exec:git remote -v -> 0",
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md without activation"
+      ],
+      "provider_action_events": ["read:gh auth status; no GitHub mutation"],
+      "state_transitions": ["DO_NOT_ACTIVATE"],
+      "final_terminal": "DO_NOT_ACTIVATE",
       "status": "PASSED"
     },
     {
       "harness": "opencode",
+      "model": "@openai/gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "ses_f38515459ffesj98KAEZngkv3N",
       "eval_id": 6,
+      "prompt": "Merge this GitLab MR.",
       "expected_activation": false,
       "observed_activation": false,
-      "injected_skill_path": null,
+      "loaded_skill_path": null,
+      "read_references": [],
+      "filesystem_action_events": ["exec:git status --short --branch && git remote -v -> 0"],
+      "provider_action_events": ["read:glab mr view -> 1, unsupported flag; no GitLab mutation"],
+      "state_transitions": ["ACTIVATED_PR_LIFECYCLE", "DO_NOT_ACTIVATE_REBASE"],
+      "final_terminal": "DO_NOT_ACTIVATE",
       "status": "PASSED"
     },
     {
       "harness": "codex",
+      "model": "gpt-5.6-sol",
+      "proxy": "portkey",
+      "session_id": "01a0c7af-06bf-7133-90fc-1d1248d5c363",
       "eval_id": 1,
+      "prompt": "Rebase `feature/a` onto `main`.",
       "expected_activation": true,
       "observed_activation": true,
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
-      "status": "PASSED"
-    }
-  ],
-  "codex_checks": [
-    {
-      "mode": "app-server-explicit",
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
-      "observed_response": "READY_TO_ANALYZE\nACTIVATED_REBASE",
-      "status": "PASSED"
-    },
-    {
-      "mode": "cli-natural",
-      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
-      "observed_response": "BLOCKED_INVALID_REF after the exact local branch lookup; no mutation",
+      "loaded_skill_path": "/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+      "read_references": [],
+      "filesystem_action_events": [
+        "read:/tmp/rebase-rereview-activation.n6nsg5/.agents/skills/rebase/SKILL.md",
+        "exec:git status --porcelain=v1 --untracked-files=all -> 0",
+        "exec:git show-ref --verify refs/heads/feature/a -> 128",
+        "exec:git rev-parse --verify main^{commit} -> 0",
+        "exec:git merge-base refs/heads/feature/a main -> 128",
+        "exec:git worktree list --porcelain -> 0",
+        "exec:test -d .git/rebase-merge -> 1",
+        "exec:test -d .git/rebase-apply -> 1"
+      ],
+      "provider_action_events": [],
+      "state_transitions": ["ACTIVATED_REBASE", "READY_TO_ANALYZE_FAILED", "BLOCKED_INVALID_REF"],
+      "final_terminal": "BLOCKED_INVALID_REF",
       "status": "PASSED"
     }
   ]
