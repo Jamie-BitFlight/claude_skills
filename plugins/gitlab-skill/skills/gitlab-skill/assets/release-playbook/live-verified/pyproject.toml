@@ -1,0 +1,17 @@
+[project]
+name = "jira-ai-evaluation-release-playbook"
+version = "1.1.0"
+requires-python = ">=3.11"
+
+[tool.semantic_release]
+commit_parser = "conventional"
+tag_format = "release-playbook-v{version}"
+version_toml = ["pyproject.toml:project.version"]
+
+[tool.semantic_release.branches.main]
+match = "^main$"
+prerelease = false
+
+[tool.semantic_release.remote]
+type = "gitlab"
+token = { env = "GITLAB_TOKEN" }

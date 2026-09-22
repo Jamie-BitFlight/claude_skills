@@ -1,0 +1,15 @@
+# DERIVED + CI-LINT-VERIFIED semantic-release adapter.
+include:
+  - local: '/.gitlab/release/base.gitlab-ci.yml'
+
+semantic_version_tag:
+  extends: .release_version
+  image: 'node:__NODE_VERSION__-alpine@sha256:__NODE_IMAGE_DIGEST__'
+  variables:
+    GIT_DEPTH: "0"
+    GL_TOKEN: $RELEASE_PUSH_TOKEN
+  before_script:
+    - apk add --no-cache git
+    - '! grep -E "__(DEFAULT_BRANCH|RELEASE_TAG_FORMAT)__" .releaserc.json'
+  script:
+    - npx --yes semantic-release@__SEMANTIC_RELEASE_VERSION__

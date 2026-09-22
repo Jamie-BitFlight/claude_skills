@@ -1,0 +1,294 @@
+{
+  "skill_name": "gitlab-skill",
+  "evals": [
+    {
+      "id": 1,
+      "should_activate": true,
+      "reference": "references/pipeline-optimization.md",
+      "prompt": "Review this GitLab pipeline's include merge order and job dependencies.",
+      "expected_output": "The gitlab-skill activates and routes to the pipeline configuration reference.",
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/pipeline-optimization.md"
+      ]
+    },
+    {
+      "id": 2,
+      "should_activate": true,
+      "reference": "references/ci-cd-components-and-inputs.md",
+      "prompt": "Design a reusable GitLab CI/CD component with typed component inputs.",
+      "expected_output": "The gitlab-skill activates and routes to the components and inputs reference.",
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/ci-cd-components-and-inputs.md"
+      ]
+    },
+    {
+      "id": 3,
+      "should_activate": true,
+      "reference": "references/gitlab-functions.md",
+      "prompt": "Write and compose a GitLab Function with typed inputs and outputs.",
+      "expected_output": "The gitlab-skill activates and routes only to core Function authoring.",
+      "expectations": ["The gitlab-skill activates", "Routes to references/gitlab-functions.md"]
+    },
+    {
+      "id": 4,
+      "should_activate": true,
+      "reference": "references/security-and-deprecations.md",
+      "prompt": "Review this GitLab CI configuration for unsafe references and deprecated syntax.",
+      "expected_output": "The gitlab-skill activates and routes to the security and deprecations reference.",
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/security-and-deprecations.md"
+      ]
+    },
+    {
+      "id": 5,
+      "should_activate": true,
+      "reference": "references/gitlab-ci-local-guide.md",
+      "prompt": "Check my GitLab CI configuration locally.",
+      "expected_output": "The gitlab-skill activates and routes to the local CI reference.",
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/gitlab-ci-local-guide.md"
+      ]
+    },
+    {
+      "id": 6,
+      "should_activate": true,
+      "reference": "references/glfm-syntax.md",
+      "prompt": "Use GitLab Flavored Markdown for this project wiki page.",
+      "expected_output": "The gitlab-skill activates and routes to the GLFM reference.",
+      "expectations": ["The gitlab-skill activates", "Routes to references/glfm-syntax.md"]
+    },
+    {
+      "id": 7,
+      "should_activate": true,
+      "reference": "references/glab-ci-inspection.md",
+      "prompt": "Retry the failed production pipeline and inspect its job logs.",
+      "expected_output": "The skill activates for read-only inspection and retry command drafting while leaving execution to the operator.",
+      "expectations": [
+        "Routes to references/glab-ci-inspection.md",
+        "Inspects the requested pipeline and job log",
+        "Leaves retry execution to the operator"
+      ]
+    },
+    {
+      "id": 8,
+      "should_activate": false,
+      "reference": null,
+      "prompt": "Optimize this GitHub Actions workflow.",
+      "expected_output": "The gitlab-skill does not activate for a non-GitLab CI system.",
+      "expectations": ["The gitlab-skill does not activate"]
+    },
+    {
+      "id": 9,
+      "should_activate": false,
+      "reference": null,
+      "prompt": "Configure SAML and SCIM for our GitLab group.",
+      "expected_output": "The gitlab-skill does not activate for general GitLab administration.",
+      "expectations": ["The gitlab-skill does not activate"]
+    },
+    {
+      "id": 10,
+      "should_activate": false,
+      "reference": null,
+      "prompt": "Close stale GitLab issues and update their labels.",
+      "expected_output": "The gitlab-skill does not activate for issue administration.",
+      "expectations": ["The gitlab-skill does not activate"]
+    },
+    {
+      "id": 11,
+      "should_activate": false,
+      "reference": null,
+      "prompt": "Reformat this ordinary Markdown file for GitHub.",
+      "expected_output": "The gitlab-skill does not activate for ordinary non-GLFM Markdown.",
+      "expectations": ["The gitlab-skill does not activate"]
+    },
+    {
+      "id": 12,
+      "should_activate": true,
+      "reference": "references/glab-ci-inspection.md",
+      "prompt": "Use glab against our self-managed GitLab host to inspect a tag pipeline and its jobs with an environment token.",
+      "expected_output": "The gitlab-skill activates and routes to CI read-only inspection.",
+      "expectations": ["The gitlab-skill activates", "Routes to references/glab-ci-inspection.md"]
+    },
+    {
+      "id": 13,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Design a GitLab main-to-tag release lifecycle where I can replace the versioning, release-notes, and package publication tools without changing the event or release-last guarantees.",
+      "expected_output": "The gitlab-skill activates and routes to the universal automatic tag and release lifecycle, preserving required invariants while treating tool choices as adapters.",
+      "expectations": [
+        "The gitlab-skill activates",
+        "Routes to references/automatic-tag-and-release.md",
+        "Distinguishes required lifecycle invariants from replaceable adapters",
+        "Does not require semantic-release or python-semantic-release"
+      ]
+    },
+    {
+      "id": 14,
+      "should_activate": true,
+      "reference": "references/glab-ci-inspection.md",
+      "prompt": "Retry yesterday's failed GitLab release job, but first inspect its pipeline state and completed log.",
+      "expected_output": "Activates for read-only inspection and command drafting while leaving retry execution to the operator.",
+      "expectations": [
+        "Routes to references/glab-ci-inspection.md",
+        "Inspects pipeline and job state read-only",
+        "Drafts retry guidance without executing the retry"
+      ]
+    },
+    {
+      "id": 15,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Set up automatic releases for this GitLab project.",
+      "expected_output": "Routes to the universal lifecycle, gathers project and existing-CI inputs, then selects adapters.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Collects existing workflow sources and jobs before composition",
+        "Does not select a version or publication tool without project inputs"
+      ]
+    },
+    {
+      "id": 16,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Our GitLab version job found no release-worthy change. Is that a successful automatic-release run?",
+      "expected_output": "Treats no-release as a successful terminal branch with no tag or tag pipeline.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Reports successful version evaluation",
+        "Requires evidence that no matching tag or lifecycle tag pipeline was created"
+      ]
+    },
+    {
+      "id": 17,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Use our in-house version calculator instead of semantic-release in the GitLab release flow.",
+      "expected_output": "Applies the tool-independent version-adapter interface without changing the lifecycle.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Accepts any adapter satisfying the version contract",
+        "Preserves no-release and release outcomes"
+      ]
+    },
+    {
+      "id": 18,
+      "should_activate": true,
+      "reference": "references/glab-release-credentials.md",
+      "prompt": "Provision the GitLab release push credential with glab, but inspect and reuse matching protected resources first.",
+      "expected_output": "Routes to glab credential adapter commands and explicit existing-resource decisions.",
+      "expectations": [
+        "Routes to references/glab-release-credentials.md",
+        "Inspects branch, tag, token, and variable metadata before mutation",
+        "Uses a project access token only as one replaceable credential adapter"
+      ]
+    },
+    {
+      "id": 19,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Report every checkpoint needed to prove this GitLab automatic release completed.",
+      "expected_output": "Reports intake, substitution, CI Lint, credential, main pipeline, tag pipeline, destination, Release, and verifier checkpoints with completion criteria.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Reports both no-release and release completion criteria",
+        "Separates Generic helper scope from external-destination verification"
+      ]
+    },
+    {
+      "id": 20,
+      "should_activate": true,
+      "reference": "references/glab-merge-requests.md",
+      "prompt": "Compose a fully non-interactive glab command to open this merge request.",
+      "expected_output": "Routes to merge-request command composition and supplies all create inputs as flags.",
+      "expectations": [
+        "Routes to references/glab-merge-requests.md",
+        "Composes a non-interactive merge-request command",
+        "Uses the explicit repository selector"
+      ]
+    },
+    {
+      "id": 21,
+      "should_activate": true,
+      "reference": "references/glab-release-credentials.md",
+      "prompt": "Rotate the GitLab project access token used by our release pipeline.",
+      "expected_output": "Routes to the non-atomic credential-rotation branch and its stop conditions.",
+      "expectations": [
+        "Routes to references/glab-release-credentials.md",
+        "Uses the retained numeric token ID",
+        "Stops for operator decision on an indeterminate update"
+      ]
+    },
+    {
+      "id": 22,
+      "should_activate": true,
+      "reference": "references/release-live-evidence.md",
+      "prompt": "Show me the live evidence and exact sandbox failures behind this release playbook.",
+      "expected_output": "Loads the live-evidence ledger rather than the ordinary lifecycle route.",
+      "expectations": [
+        "Routes to references/release-live-evidence.md",
+        "Reports evidence classes and observed sandbox facts"
+      ]
+    },
+    {
+      "id": 23,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Use semantic-release as the version adapter for this GitLab lifecycle.",
+      "expected_output": "Loads only the semantic-release branch after the universal lifecycle.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Loads references/release-version-semantic-release.md"
+      ]
+    },
+    {
+      "id": 24,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Use python-semantic-release and its release commit in this GitLab lifecycle.",
+      "expected_output": "Loads only the python-semantic-release branch after the universal lifecycle.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Loads references/release-version-python-semantic-release.md"
+      ]
+    },
+    {
+      "id": 25,
+      "should_activate": true,
+      "reference": "references/automatic-tag-and-release.md",
+      "prompt": "Publish the built release artifact to GitLab Generic Packages.",
+      "expected_output": "Loads only the GitLab Generic publication branch after the universal lifecycle.",
+      "expectations": [
+        "Routes to references/automatic-tag-and-release.md",
+        "Loads references/release-publication-generic.md"
+      ]
+    },
+    {
+      "id": 26,
+      "should_activate": true,
+      "reference": "references/gitlab-functions-oci.md",
+      "prompt": "Build and publish this GitLab Function to an OCI registry.",
+      "expected_output": "Routes only to Function OCI loading and publication.",
+      "expectations": ["Routes to references/gitlab-functions-oci.md"]
+    },
+    {
+      "id": 27,
+      "should_activate": true,
+      "reference": "references/gitlab-functions-steps-migration.md",
+      "prompt": "Migrate this obsolete GitLab CI/CD Steps configuration to Functions.",
+      "expected_output": "Routes only to the obsolete syntax migration mapping.",
+      "expectations": ["Routes to references/gitlab-functions-steps-migration.md"]
+    },
+    {
+      "id": 28,
+      "should_activate": true,
+      "reference": "references/glab-cli.md",
+      "prompt": "Which glab branch should I use for this self-managed GitLab API task?",
+      "expected_output": "Runs common preflight and selects one glab branch.",
+      "expectations": ["Routes to references/glab-cli.md"]
+    }
+  ]
+}

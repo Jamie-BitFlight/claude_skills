@@ -1,0 +1,28 @@
+# glab API and Repository Selection
+
+Evidence: command forms checked against installed `glab 1.118.0` and the live sandbox.
+
+```bash
+test -n "${GITLAB_TOKEN:-}" || exit 1
+glab api --hostname "$HOST" user | jq '{id,username,name}'
+glab api --hostname "$HOST" "projects/$PROJECT"
+glab api --hostname "$HOST" "projects/$PROJECT/pipelines?per_page=100" | jq '...'
+glab api --hostname "$HOST" --paginate --output ndjson "projects/$PROJECT/jobs" | jq '...'
+glab api --hostname "$HOST" graphql -f 'query=query { currentUser { username } }'
+git clone "$SSH_REPO" "$DESTINATION"
+glab ci list --repo "$SSH_REPO" --output json
+```
+
+`HOST` is bare, without `https://`. Use `-f/--raw-field` for strings and `-F/--field` for typed
+values. Fields select POST by default; pass `-X GET` for read requests with query fields. Use
+`--input` for complete JSON and `--form` for multipart uploads. Repository-aware commands receive
+the explicit SSH Git URL rather than current-directory inference.
+
+Safety boundary: this branch supplies general API mechanics; mutation requires the task-specific
+branch that defines its inputs and criterion.
+
+Completion criterion: direct user and project reads identify the intended host/path, and the Git
+remote equals the supplied SSH URL without printing credentials.
+
+SOURCE: <https://docs.gitlab.com/cli/api/> (accessed 2026-09-22; installed-help and live-request verified)
+SOURCE: <https://docs.gitlab.com/cli/> (reviewed 2026-09-22; repository selector installed-help and live verified)
