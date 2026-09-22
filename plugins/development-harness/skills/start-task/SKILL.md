@@ -125,13 +125,15 @@ Without an attempt number, no runner is closing anything, so move the status dir
    task claimed that way leaves the ledger row exactly where it was and the orchestrator watching a
    task that never moved. Use `plan read --attempt {n}` (step 1) as your first command instead.
 
-   If `plan read` refuses:
+   A refusal prints its reason code and what that code means. Read the message; it names the
+   flag that lifts the refusal where one exists. Three codes need a reply beyond what the
+   message says:
 
-   | code | what it means and what to do |
+   | code | what to return |
    |---|---|
-   | `stale-attempt` | another attempt superseded yours. Stop and return STATUS: BLOCKED with `stale-attempt` as the reason. |
-   | `attempt-closed` | this attempt was already closed. Return STATUS: DONE when you had already run `finish`, otherwise STATUS: BLOCKED with `attempt-closed`. |
-   | `archived` | the plan is closed. Stop and report it. |
+   | `stale-attempt` | STATUS: BLOCKED with `stale-attempt` as the reason. |
+   | `attempt-closed` | STATUS: DONE when you had already run `finish`, otherwise STATUS: BLOCKED with `attempt-closed`. |
+   | `archived` | Stop and report it. |
 
 4. Register the active-task context via the SAM CLI (required for hook-driven updates):
 
