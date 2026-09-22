@@ -214,7 +214,7 @@ def test_f14_preflight_derives_actual_configured_remote_identity(tmp_path: Path)
 
     assert observed.available
     assert observed.remote_identity != "github.com/attacker/other"
-    assert Path(observed.remote_identity.removeprefix("file://")) == remote.resolve()
+    assert observed.remote_identity == remote.resolve().as_uri()
 
 
 def test_f14_github_preflight_derives_actual_remote_not_constructor_claim(
