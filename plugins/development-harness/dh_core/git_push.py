@@ -30,6 +30,23 @@ class ProcessResult:
     spawn_error: str | None = None
 
 
+def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
+    """Terminate one process and all descendants using the native platform primitive."""
+    if os.name == "nt":
+        taskkill = shutil.which("taskkill")
+        if taskkill is None:
+            process.kill()
+        else:
+            subprocess.run(
+                (taskkill, "/PID", str(process.pid), "/T", "/F"),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                check=False,
+            )
+    else:
+        os.killpg(process.pid, signal.SIGKILL)
+
+
 def run_bounded(
     argv: tuple[str, ...], *, cwd: Path, timeout_seconds: float, env: Mapping[str, str] | None = None
 ) -> ProcessResult:
@@ -55,19 +72,7 @@ def run_bounded(
         stdout, stderr = process.communicate(timeout=timeout_seconds)
         return ProcessResult(argv=argv, returncode=process.returncode, stdout=stdout, stderr=stderr)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            taskkill = shutil.which("taskkill")
-            if taskkill is None:
-                process.kill()
-            else:
-                subprocess.run(
-                    (taskkill, "/PID", str(process.pid), "/T", "/F"),
-                    stdin=subprocess.DEVNULL,
-                    capture_output=True,
-                    check=False,
-                )
-        else:
-            os.killpg(process.pid, signal.SIGKILL)
+        terminate_process_tree(process)
         stdout, stderr = process.communicate()
         return ProcessResult(argv=argv, returncode=process.returncode, stdout=stdout, stderr=stderr, timed_out=True)
 

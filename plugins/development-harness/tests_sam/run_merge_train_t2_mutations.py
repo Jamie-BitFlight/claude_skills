@@ -220,7 +220,7 @@ MUTANTS: tuple[Mutant, ...] = (
     Mutant(
         "T2-M28",
         "dh_core/git_push.py",
-        "os.killpg(process.pid, signal.SIGKILL)",
+        "terminate_process_tree(process)",
         "process.kill()",
         "tests_sam/test_merge_train_t2_provider.py::test_f15_timeout_kills_descendant_tree_and_retains_complete_output",
     ),
