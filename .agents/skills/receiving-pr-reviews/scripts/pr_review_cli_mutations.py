@@ -34,6 +34,7 @@ from pr_review_state import (
     record_completed_resolution,
     save_cycle,
     validate_cycle_coverage,
+    validate_cycle_projection,
     validate_snapshot_context,
 )
 from pr_review_state_models import AuthorizedReviewAction
@@ -77,6 +78,29 @@ def register_cycle_commands(
         target_resolver: Provider-neutral target selector used by completion.
         provider_resolver: Deep adapter selector used by completion.
     """
+
+    @app.command(name="validate-projection")
+    def validate_projection(snapshot_file: SnapshotFile, state_file: StateFile) -> None:
+        """Validate exhaustive typed dry-run state without authorizing mutation.
+
+        Args:
+            snapshot_file: Complete canonical snapshot JSON.
+            state_file: Exhaustive projected review-cycle JSON.
+        """
+        snapshot = load_snapshot(snapshot_file)
+        cycle = load_cycle(state_file)
+        inputs, assessments, clusters = validate_cycle_projection(snapshot, cycle)
+        typer.echo(
+            json.dumps({
+                "snapshot_fingerprint": snapshot.snapshot_fingerprint,
+                "inputs": len(inputs),
+                "assessments": len(assessments),
+                "clusters": len(clusters),
+                "cycle_state": cycle.cycle_state,
+                "cycle_terminal": cycle.cycle_terminal,
+                "mutation_authorized": False,
+            })
+        )
 
     @app.command(name="validate-cycle")
     def validate_cycle(snapshot_file: SnapshotFile, state_file: StateFile) -> None:

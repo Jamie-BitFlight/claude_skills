@@ -4,6 +4,26 @@ Read this contract after obtaining a complete snapshot and before assessing inpu
 cycle state. The Pydantic models are the exact schema; `validate-cycle` and `complete-cycle` are the
 executable gates.
 
+## Typed dry-run projection
+
+A trace, dry-run, or check-only request still materializes one exhaustive provider-neutral
+`ReviewCycleState`. Read `ReviewAssessment`, `ReviewCluster`, `ReviewCycleState`, and the applicable
+action model before authoring exact fields. Represent unperformed work with schema-valid unknown,
+pending, blocked, open, `not_required`, or `unavailable` values; never omit state because a mutation
+did not run.
+
+The projection includes the exact `input_census` and `assessed_inputs`, one full assessment per input,
+disjoint exact cluster cover, every unknown decision, implementation and verification evidence,
+per-input implementation/communication/resolution states, inspectable revision, snapshot and recheck
+fingerprints, terminal annotations, cycle state, and cycle terminal. Any projected provider action is
+bound to its canonical input and stable reference. Later gates stay ordered even when pending:
+provider-confirmed communication precedes a fresh complete recheck, which precedes `complete-cycle`.
+
+Run `validate-projection` against the saved snapshot and projected state. Its successful result proves
+schema, identity, fingerprint, and exhaustive coverage only and always reports
+`mutation_authorized: false`. Mutation still requires `validate-cycle` plus separate user or repository
+authority.
+
 ## Context and census
 
 Bind one cycle to one target, current remote revision, intended task or product outcome, repository

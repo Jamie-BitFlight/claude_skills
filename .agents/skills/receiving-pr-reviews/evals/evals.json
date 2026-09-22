@@ -69,21 +69,21 @@
       "expected_output": "Approval follows the full lifecycle and never shortcuts or fabricates the terminal gate.",
       "files": ["evals/files/case-06-snapshot.json"],
       "expectations": [
-        "The approval is assessed and communicated as an inbound input.",
-        "A complete recheck occurs after communication.",
+        "The approval receives one approval_assessed typed assessment and a pending communication plan bound to that input.",
+        "The projected lifecycle orders provider-confirmed communication before a fresh complete recheck.",
         "REVIEW_COMPLETE appears only after complete-cycle succeeds, not when approval is first observed."
       ]
     },
     {
       "id": 7,
       "tags": ["rejection", "change-request"],
-      "prompt": "Use the attached sealed canonical snapshot in evals/files/case-07-snapshot.json to trace the empty-body rejection and body-bearing change request through one systemic review cycle. Source edits, push, and top-level responses are authorized when warranted; do not perform live operations.",
-      "expected_output": "Both rejection forms remain explicit inputs and receive systemic dispositions.",
+      "prompt": "Use the attached sealed canonical snapshot in evals/files/case-07-snapshot.json to trace the empty-body rejection and body-bearing change request through one evidence-bound review cycle. Source edits, push, and top-level responses are authorized when warranted; do not perform live operations.",
+      "expected_output": "Both rejection forms remain explicit typed inputs and receive evidence-bound dispositions.",
       "files": ["evals/files/case-07-snapshot.json"],
       "expectations": [
         "Both inputs remain in the census despite one empty body.",
-        "Both use rejection_assessed and receive cluster assignments.",
-        "The systemic outcome is verified, communicated, and rechecked."
+        "Both use rejection_assessed and receive exact cluster assignments; unrelated evidence remains an explicit singleton.",
+        "The empty-body clarification stays open while the body-bearing rejection receives an evidence-bearing plan whose communication and recheck remain pending."
       ]
     },
     {
@@ -101,9 +101,9 @@
     {
       "id": 9,
       "tags": ["shared-cause", "systemic-fix"],
-      "prompt": "Three review comments in different files expose the same violated invariant. Address them.",
+      "prompt": "Use the attached sealed canonical snapshot in evals/files/case-09-snapshot.json to address three review comments that expose one shared invariant. Do not perform live operations.",
       "expected_output": "One multi-input cluster drives one owning-seam fix and verification surface.",
-      "files": [],
+      "files": ["evals/files/case-09-snapshot.json"],
       "expectations": [
         "All three inputs belong to one justified multi-input cluster.",
         "One owning-seam implementation and verification plan covers every member.",
@@ -164,7 +164,7 @@
       "expected_output": "The cycle returns to the complete census instead of reusing old completion state.",
       "files": [],
       "expectations": [
-        "The new input invalidates the prior census and fingerprint.",
+        "The new input makes prior completion state stale and requires a fresh complete snapshot.",
         "The complete changed set returns to assessment and clustering.",
         "REVIEW_COMPLETE is absent."
       ]

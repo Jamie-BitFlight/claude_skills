@@ -199,6 +199,56 @@ def validate_cycle_coverage(
     return (input_by_id, assessment_by_id, cluster_by_id)
 
 
+def validate_cycle_projection(
+    snapshot: ReviewSnapshot, cycle: ReviewCycleState
+) -> tuple[dict[str, ReviewInput], dict[str, ReviewAssessment], dict[str, ReviewCluster]]:
+    """Validate an exhaustive read-only cycle projection without authorizing action.
+
+    Args:
+        snapshot: Complete canonical provider snapshot used by the projection.
+        cycle: Typed dry-run or check-only state with pending lifecycle values.
+
+    Returns:
+        Input, assessment, and cluster indexes after exhaustive validation.
+    """
+    require_authorization(snapshot.provider_consistency_error() is None, snapshot.provider_consistency_error() or "")
+    require_authorization(snapshot.snapshot_complete and snapshot.completeness.complete, "snapshot is incomplete")
+    calculated_fingerprint = calculate_snapshot_fingerprint(
+        snapshot.target,
+        snapshot.head_revision,
+        snapshot.review_inputs,
+        snapshot.completeness,
+        revision_at=snapshot.revision_at,
+        reviewability=snapshot.reviewability,
+        provider_metadata=snapshot.provider_metadata,
+        communicated_input_ids=snapshot.communicated_input_ids,
+    )
+    require_authorization(
+        calculated_fingerprint == snapshot.snapshot_fingerprint,
+        "snapshot fingerprint does not match canonical snapshot content",
+    )
+    require_authorization(cycle.context.target == snapshot.target, "cycle target does not match snapshot target")
+    require_authorization(
+        cycle.context.revision == snapshot.head_revision and cycle.context.remote_head == snapshot.head_revision,
+        "cycle revision does not match snapshot revision",
+    )
+    require_authorization(
+        cycle.snapshot_fingerprint == snapshot.snapshot_fingerprint,
+        "cycle snapshot fingerprint does not match current snapshot",
+    )
+    require_authorization(
+        cycle.cycle_state != "REVIEW_COMPLETE" and cycle.cycle_terminal != "review_complete",
+        "read-only projection cannot assert REVIEW_COMPLETE",
+    )
+    indexes = validate_cycle_coverage(snapshot, cycle)
+    inbound_ids = {item.input_id for item in snapshot.review_inputs if item.direction == "inbound"}
+    require_authorization(
+        set(cycle.implementation_states) == inbound_ids,
+        "implementation states must exactly cover inbound review inputs",
+    )
+    return indexes
+
+
 def validate_action_state(
     review_input: ReviewInput,
     assessment: ReviewAssessment,

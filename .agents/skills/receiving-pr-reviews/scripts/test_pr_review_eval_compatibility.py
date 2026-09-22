@@ -31,7 +31,7 @@ from pr_review_state_models import calculate_snapshot_fingerprint
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 EVALS_PATH = SKILL_ROOT / "evals/evals.json"
 EVAL_FILES = SKILL_ROOT / "evals/files"
-ATTACHED_EVAL_IDS = {1, 2, 4, 5, 6, 7, 8, 13}
+ATTACHED_EVAL_IDS = {1, 2, 4, 5, 6, 7, 8, 9, 13}
 REQUIRED_EVAL_TAGS = {
     "github-activation",
     "gitlab-activation",
@@ -170,6 +170,36 @@ def test_attached_snapshots_contain_no_answers_or_cross_scenario_inputs() -> Non
             target = (snapshot.provider, snapshot.target.number)
             assert target not in targets
             targets.add(target)
+
+
+def test_rejection_fixture_retains_only_observed_provider_schema_facts() -> None:
+    snapshot = load_snapshot(EVAL_FILES / "case-07-snapshot.json")
+
+    assert snapshot.reviews_count == 2
+    assert [review.id for review in snapshot.reviews_with_body] == ["702"]
+    assert [review.state for review in snapshot.unresponded_reviews] == ["CHANGES_REQUESTED"]
+    assert {item.input_id for item in snapshot.review_inputs} == {"github:review:701", "github:review:702"}
+    assert all(item.provider_state == "CHANGES_REQUESTED" for item in snapshot.review_inputs)
+    assert snapshot.assessments == []
+    assert snapshot.clusters == []
+
+
+def test_shared_cause_fixture_supplies_raw_decision_evidence_without_answers() -> None:
+    snapshot = load_snapshot(EVAL_FILES / "case-09-snapshot.json")
+
+    assert {item.input_id for item in snapshot.review_inputs} == {
+        "github:thread:901",
+        "github:thread:902",
+        "github:thread:903",
+    }
+    assert {item.path for item in snapshot.review_inputs} == {
+        "src/github_adapter.py",
+        "src/gitlab_adapter.py",
+        "tests/test_request_boundary.py",
+    }
+    assert all("RequestBoundary" in item.body for item in snapshot.review_inputs)
+    assert snapshot.assessments == []
+    assert snapshot.clusters == []
 
 
 if __name__ == "__main__":

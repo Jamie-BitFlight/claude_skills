@@ -39,10 +39,10 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 5. When authorized, implement each accepted cluster at its owning seam, or record evidence for
    `no_change`, `superseded`, or `clarification_required`. Verify every cluster and repository-required
    gate. Push source changes to an inspectable current revision before citing them.
-6. Author the cycle state from the typed models and run `validate-cycle`. When authorized, communicate
-   every disposition with provider-backed evidence, then resolve only where the cluster policy and
-   provider capability permit. Clarifications remain open; unavailable resolution is recorded as
-   unavailable.
+6. Author the cycle state from the typed models. Use `validate-projection` for dry-run or check-only
+   state and `validate-cycle` for action readiness. When authorized, communicate every disposition
+   with provider-backed evidence, then resolve only where policy and capability permit. Clarifications
+   remain open; unavailable resolution is recorded as unavailable.
 7. Fetch a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
    communication evidence return the complete set to census, assessment, and clustering. Use bounded
    `watch` calls only to sample for later change; an elapsed call is not completion.
@@ -65,7 +65,7 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 ## Command source
 
 Run `scripts/pr_review_threads.py <command> --help` for current targets, arguments, and bounds. The
-stable operations are `fetch`, `watch`, `validate-cycle`, `complete-cycle`, `reply`, `resolve`,
-`comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Full output is action evidence;
-`--summary` is inspection only. Exact fields and enum values live in the Pydantic models, while the
-validation commands are the authority for action and completion gates.
+stable operations are `fetch`, `watch`, `validate-projection`, `validate-cycle`, `complete-cycle`,
+`reply`, `resolve`, `comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Full output is action
+evidence; `--summary` is inspection only. Exact fields and enum values live in the Pydantic models,
+while the validation commands are the authority for action and completion gates.
