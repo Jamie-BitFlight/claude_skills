@@ -35,10 +35,10 @@ from pr_review_contracts import ChangeRequestTarget
 from pr_review_gh import RESOLVE_THREAD_MUTATION, build_fetch_result, detect_repo_identity, run_gh
 from pr_review_github_provider import GitHubProvider
 from pr_review_gitlab_provider import GitLabProvider
-from pr_review_models import WatchResult, WatchSummary
-from pr_review_output import board_entry, summarize
+from pr_review_models import WatchActionView, WatchSummary
+from pr_review_output import action_view, summarize
 from pr_review_provider import ReviewProvider
-from pr_review_state import load_cycle, load_snapshot
+from pr_review_state import load_cycle, load_snapshot, save_snapshot
 
 __all__ = ["load_cycle", "load_snapshot"]
 
@@ -163,9 +163,8 @@ def parse_pr_list(value: str) -> list[int]:
     return numbers
 
 
-SummaryOption = Annotated[bool, typer.Option("--summary", help="Print canonical compact JSON.")]
-MaxBodyOption = Annotated[
-    int | None, typer.Option("--max-body", min=1, help="Visibly truncate compatibility bodies; unlimited by default.")
+SummaryOption = Annotated[
+    bool, typer.Option("--summary", help="Print aggregate status JSON; omit for live action content.")
 ]
 BaselineSnapshotOption = Annotated[
     Path | None,
@@ -175,6 +174,14 @@ BaselineSnapshotOption = Annotated[
         dir_okay=False,
         readable=True,
         help="Stop when canonical provider state differs from this complete snapshot.",
+    ),
+]
+SnapshotOutputOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--snapshot-file",
+        dir_okay=False,
+        help="Persist complete canonical evidence here; stdout remains a bounded projection.",
     ),
 ]
 
@@ -187,10 +194,10 @@ def fetch(
     repo: RepoOption = None,
     host: HostOption = None,
     summary: SummaryOption = False,
-    max_body: MaxBodyOption = None,
+    snapshot_file: SnapshotOutputOption = None,
     provider_timeout_seconds: ProviderTimeoutOption = DEFAULT_PROVIDER_TIMEOUT_SECONDS,
 ) -> None:
-    """Fetch complete canonical review snapshots.
+    """Fetch review state and print its live action projection.
 
     Args:
         pr: One or more comma-separated PR or MR numbers.
@@ -198,26 +205,23 @@ def fetch(
         provider: Explicit provider selection.
         repo: Provider repository path.
         host: Bare provider hostname.
-        summary: Emit compact status output instead of full action evidence.
-        max_body: Optional visible body truncation bound.
+        summary: Emit aggregate decision status instead of live action content.
+        snapshot_file: Optional destination for complete canonical evidence.
         provider_timeout_seconds: Positive provider subprocess bound.
     """
     numbers = parse_pr_list(pr)
+    if snapshot_file is not None and len(numbers) != 1:
+        raise typer.BadParameter("snapshot-file requires exactly one PR or MR", param_hint="snapshot-file")
     first_target = target_for_request(
         provider, repo, host, github, numbers[0], command_timeout=provider_timeout_seconds
     )
     selected_provider = review_provider_for_target(first_target)
-    if len(numbers) == 1 and not summary:
-        typer.echo(
-            selected_provider.snapshot(
-                first_target, deadline=None, command_timeout=provider_timeout_seconds
-            ).model_dump_json()
-        )
-        return
     for number in numbers:
         target = first_target.model_copy(update={"number": number})
         result = selected_provider.snapshot(target, deadline=None, command_timeout=provider_timeout_seconds)
-        output = summarize(result, pr=number, max_body=max_body) if summary else board_entry(number, result)
+        if snapshot_file is not None:
+            save_snapshot(snapshot_file, result)
+        output = summarize(result, pr=number) if summary else action_view(result, pr=number)
         typer.echo(output.model_dump_json())
 
 
@@ -229,7 +233,7 @@ def watch(
     repo: RepoOption = None,
     host: HostOption = None,
     summary: SummaryOption = False,
-    max_body: MaxBodyOption = None,
+    snapshot_file: SnapshotOutputOption = None,
     baseline_snapshot_file: BaselineSnapshotOption = None,
     interval_seconds: Annotated[int, typer.Option(min=1)] = DEFAULT_WATCH_INTERVAL_SECONDS,
     timeout_seconds: Annotated[int, typer.Option(min=0)] = DEFAULT_WATCH_TIMEOUT_SECONDS,
@@ -244,8 +248,8 @@ def watch(
         provider: Explicit provider selection.
         repo: Provider repository path.
         host: Bare provider hostname.
-        summary: Emit compact status output instead of the full snapshot.
-        max_body: Optional visible body truncation bound.
+        summary: Emit aggregate decision status instead of live action content.
+        snapshot_file: Optional destination for the final complete canonical evidence.
         baseline_snapshot_file: Optional complete snapshot establishing pre-watch provider state.
         interval_seconds: Delay between complete snapshots.
         timeout_seconds: Overall sampling window.
@@ -293,17 +297,20 @@ def watch(
         raise typer.Exit(code=1)
     timed_out = not current.has_watch_signal(baseline_fingerprint)
     exhausted = timed_out and attempts >= max_attempts
+    if snapshot_file is not None:
+        save_snapshot(snapshot_file, current)
     if summary:
-        compact = summarize(current, pr=pr, max_body=max_body)
+        compact = summarize(current, pr=pr, new_input=not timed_out)
         typer.echo(
             WatchSummary(
                 **compact.model_dump(), timed_out=timed_out, attempts=attempts, attempt_budget_exhausted=exhausted
             ).model_dump_json()
         )
         return
+    projected = action_view(current, pr=pr, new_input=not timed_out)
     typer.echo(
-        WatchResult(
-            timed_out=timed_out, state=current, attempts=attempts, attempt_budget_exhausted=exhausted
+        WatchActionView(
+            **projected.model_dump(), timed_out=timed_out, attempts=attempts, attempt_budget_exhausted=exhausted
         ).model_dump_json()
     )
 

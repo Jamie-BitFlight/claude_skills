@@ -36,9 +36,19 @@ from pr_review_gh_wire import (
     ReviewsConnection,
     ReviewThreadsConnection,
 )
-from pr_review_state_models import ReviewAssessment, ReviewCluster, ReviewInput, SnapshotCompleteness
+from pr_review_state_models import (
+    InputKind,
+    ProviderInputIdentity,
+    ReviewActor,
+    ReviewAssessment,
+    ReviewCapabilities,
+    ReviewCluster,
+    ReviewInput,
+    SnapshotCompleteness,
+)
 
 __all__ = [
+    "ActionableReviewInput",
     "Author",
     "BatchReviewAction",
     "BatchReviewActions",
@@ -46,6 +56,7 @@ __all__ = [
     "ChangeRequestTarget",
     "CommentNode",
     "CommentSummary",
+    "FetchActionView",
     "FetchResult",
     "FetchSummary",
     "ForcePushEvent",
@@ -74,6 +85,7 @@ __all__ = [
     "ThreadSummary",
     "TopLevelCommentAction",
     "UnresolvedThread",
+    "WatchActionView",
     "WatchResult",
     "WatchSummary",
 ]
@@ -120,6 +132,9 @@ class ReviewProviderMetadata(BaseModel):
     system_notes: list[ProviderSystemEvent] = Field(default_factory=list)
     approval_state: ProviderApprovalState | None = None
     blocking_discussions_resolved: bool | None = None
+    assigned_reviewers: list[str] | None = None
+    requested_reviewers: list[str] | None = None
+    checks_state: str | None = None
 
 
 class FetchResult(BaseModel):
@@ -222,15 +237,35 @@ class WatchResult(BaseModel):
     attempt_budget_exhausted: bool = False
 
 
+class ActionableReviewInput(BaseModel):
+    """Complete action content plus the stable context needed to act on it."""
+
+    input_id: str
+    provider_ids: ProviderInputIdentity
+    source_kind: str
+    kinds: list[InputKind]
+    location: Literal["inline", "top_level"]
+    actor: ReviewActor
+    body: str
+    stable_reference: str
+    revision_relation: Literal["current", "stale", "unknown"]
+    path: str | None
+    line: int | None
+    provider_state: str
+    capabilities: ReviewCapabilities
+    thread_id: str | None
+    parent_id: str | None
+
+
 class CommentSummary(BaseModel):
-    """One fetched follow-up inline comment."""
+    """Compatibility representation of one inline follow-up comment."""
 
     author: str | None
     body: str
 
 
 class ThreadSummary(BaseModel):
-    """Legacy reduced unresolved-thread projection."""
+    """Compatibility representation of one unresolved review thread."""
 
     thread_id: str
     comment_id: int
@@ -244,7 +279,7 @@ class ThreadSummary(BaseModel):
 
 
 class ReviewSummary(BaseModel):
-    """Legacy reduced unresponded-review projection."""
+    """Compatibility representation of one unresponded top-level review."""
 
     author: str | None
     state: str
@@ -253,33 +288,35 @@ class ReviewSummary(BaseModel):
 
 
 class FetchSummary(BaseModel):
-    """Canonical compact snapshot retaining legacy action fields."""
+    """Small metadata-only dashboard for choosing the next review action."""
 
     pr: int
     provider: ProviderName
-    target: ChangeRequestTarget
-    transport: ReviewTransport
     snapshot_complete: bool
-    snapshot_fingerprint: str
-    head_revision: str
-    revision_at: datetime
-    completeness: SnapshotCompleteness
-    review_inputs: list[ReviewInput]
-    assessments: list[ReviewAssessment]
-    clusters: list[ReviewCluster]
     cycle_state: Literal["SNAPSHOT_INCOMPLETE", "ASSESSMENT_REQUIRED"]
-    codex_approval_equivalence: Literal["available", "unavailable"]
-    reviews_count: int
-    threads_count: int
-    unresolved_count: int
-    outstanding_input_count: int
-    unresponded_count: int
+    unresolved_code_thread_count: int
+    unanswered_input_count: int
+    approval_count: int
+    rejection_count: int
     codex_approved: bool | None
-    blockers: list[str]
-    provider_metadata: ReviewProviderMetadata
-    communicated_input_ids: set[str]
-    unresolved: list[ThreadSummary]
-    unresponded_reviews: list[ReviewSummary]
+    provider_approved: bool | None
+    approvals_required: int | None
+    approvals_left: int | None
+    assigned_reviewer_count: int | None
+    requested_reviewer_count: int | None
+    is_draft: bool
+    mergeable: str
+    merge_state_status: str
+    has_conflicts: bool
+    checks_state: str | None
+    new_input: bool
+
+
+class FetchActionView(BaseModel):
+    """Live actionable inputs with the dashboard state needed to choose an action."""
+
+    dashboard: FetchSummary
+    actionable_inputs: list[ActionableReviewInput]
 
 
 class WatchSummary(FetchSummary):
@@ -290,8 +327,16 @@ class WatchSummary(FetchSummary):
     attempt_budget_exhausted: bool = False
 
 
+class WatchActionView(FetchActionView):
+    """Live watch result without historical canonical evidence on stdout."""
+
+    timed_out: bool
+    attempts: int = Field(default=1, gt=0)
+    attempt_budget_exhausted: bool = False
+
+
 class BoardEntry(BaseModel):
-    """Lightweight multi-PR status entry."""
+    """Compatibility representation of one compact multi-request status."""
 
     pr: int
     unresolved: int

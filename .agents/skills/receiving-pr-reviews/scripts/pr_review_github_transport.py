@@ -52,7 +52,7 @@ HEAD_QUERY = """
 query($o: String!, $r: String!, $pr: Int!) {
   repository(owner: $o, name: $r) { pullRequest(number: $pr) {
     isDraft mergeable mergeStateStatus author { login __typename }
-    commits(last: 1) { nodes { commit { oid committedDate } } }
+    commits(last: 1) { nodes { commit { oid committedDate statusCheckRollup { state } } } }
   } }
 }
 """

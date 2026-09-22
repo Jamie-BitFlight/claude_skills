@@ -114,10 +114,7 @@ def test_validate_projection_cli_reports_no_mutation_authority(tmp_path: Path, m
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {
-        "snapshot_fingerprint": canonical_snapshot().snapshot_fingerprint,
-        "inputs": 1,
-        "assessments": 1,
-        "clusters": 1,
+        "validation": "projection_valid",
         "cycle_state": "IMPLEMENTATION_REQUIRED",
         "cycle_terminal": "action_pending",
         "mutation_authorized": False,

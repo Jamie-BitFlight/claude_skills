@@ -26,7 +26,7 @@ from typer.testing import CliRunner
 
 import pr_review_threads
 from pr_review_cli_actions import authorized_action
-from pr_review_contracts import ReplyAction
+from pr_review_contracts import ReplyAction, ReviewActionResult
 from pr_review_models import ReviewSnapshot
 from pr_review_provider import ProviderResponseError
 from pr_review_state_models import (
@@ -128,10 +128,7 @@ def test_validate_cycle_checks_complete_evidence_without_provider_mutation(
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {
-        "snapshot_fingerprint": canonical_snapshot().snapshot_fingerprint,
-        "inputs": 1,
-        "assessments": 1,
-        "clusters": 1,
+        "validation": "action_ready",
         "cycle_state": "READY_FOR_ACTION",
         "cycle_terminal": "action_pending",
     }
@@ -192,6 +189,7 @@ def test_complete_cycle_refreshes_provider_evidence_and_persists_only_success_te
     )
 
     assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == {"cycle_state": "REVIEW_COMPLETE", "cycle_terminal": "review_complete"}
     persisted = pr_review_threads.load_cycle(state_file)
     assert persisted.cycle_state == "REVIEW_COMPLETE"
     assert persisted.cycle_terminal == "review_complete"
@@ -215,6 +213,12 @@ def test_mutation_commands_forward_timeout_bound(command: str, tmp_path: Path, m
     result = runner.invoke(app, argv)
 
     assert result.exit_code == 0, result.output
+    expected = (
+        {"input_id": canonical_input().input_id, "replied": True}
+        if command == "reply"
+        else {"input_id": canonical_input().input_id, "resolved": True}
+    )
+    assert json.loads(result.output) == expected
     assert run_mock.call_args.kwargs["timeout"] == pytest.approx(7)
     persisted = pr_review_threads.load_cycle(state_file)
     if command == "reply":
@@ -234,6 +238,27 @@ def test_reply_and_resolve_does_not_resolve_after_invalid_reply(tmp_path: Path, 
 
     assert result.exit_code != 0
     assert run_mock.call_count == 1
+    assert pr_review_threads.load_cycle(state_file).communication_states[canonical_input().input_id] == "pending"
+
+
+def test_reply_and_resolve_does_not_record_or_resolve_after_unsuccessful_provider_result(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    """An unconfirmed reply leaves the cycle pending and prevents resolution."""
+    snapshot_file, state_file = write_ready_files(tmp_path)
+    provider = mocker.Mock()
+    provider.snapshot.return_value = pr_review_threads.load_snapshot(snapshot_file)
+    provider.act.return_value = ReviewActionResult(
+        provider="github", action_kind="reply", success=False, provider_object_id=None, raw={}
+    )
+    mocker.patch.object(pr_review_threads, "review_provider", return_value=provider)
+
+    result = runner.invoke(
+        app, ["reply-and-resolve", "--pr", "17", "--body", "Addressed.", *gated_args(snapshot_file, state_file)]
+    )
+
+    assert result.exit_code != 0
+    assert provider.act.call_count == 1, result.output
     assert pr_review_threads.load_cycle(state_file).communication_states[canonical_input().input_id] == "pending"
 
 

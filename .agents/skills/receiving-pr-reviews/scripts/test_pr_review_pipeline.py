@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -41,7 +42,9 @@ if TYPE_CHECKING:
 # --- fetch: full JSON-in/JSON-out pipeline -----------------------------------------------------
 
 
-def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(mocker: MockerFixture) -> None:
+def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
     """`fetch` keeps resolved history in the census while projecting only unresolved threads,
     and derives `unresponded_reviews` and `codex_approved` from the issue-comments, reactions,
     authenticated-identity, and head-commit-date calls in the same pipeline.
@@ -194,7 +197,16 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
                     "isDraft": False,
                     "mergeable": "MERGEABLE",
                     "mergeStateStatus": "CLEAN",
-                    "commits": {"nodes": [{"commit": {"committedDate": "2026-01-01T12:00:00Z"}}]},
+                    "commits": {
+                        "nodes": [
+                            {
+                                "commit": {
+                                    "committedDate": "2026-01-01T12:00:00Z",
+                                    "statusCheckRollup": {"state": "SUCCESS"},
+                                }
+                            }
+                        ]
+                    },
                 }
             }
         }
@@ -216,10 +228,11 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
         ],
     )
 
-    result = runner.invoke(app, ["fetch", "--pr", "3208"])
+    snapshot_file = tmp_path / "snapshot.json"
+    result = runner.invoke(app, ["fetch", "--pr", "3208", "--snapshot-file", str(snapshot_file)])
 
     assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
+    data = json.loads(snapshot_file.read_text(encoding="utf-8"))
     assert data["threads_count"] == 3
     assert data["unresolved_count"] == 2
     unresolved_ids = {thread["id"] for thread in data["unresolved"]}
@@ -240,6 +253,8 @@ def test_fetch_flattens_pages_preserves_resolved_inputs_and_derives_new_fields(m
         "merge_state_status": "CLEAN",
         "blockers": [],
     }
+    assert data["provider_metadata"]["checks_state"] == "SUCCESS"
+    assert data["provider_metadata"]["assigned_reviewers"] is None
     assert data["snapshot_complete"] is True
     assert data["cycle_state"] == "ASSESSMENT_REQUIRED"
     assert data["completeness"]["truncated_input_ids"] == []

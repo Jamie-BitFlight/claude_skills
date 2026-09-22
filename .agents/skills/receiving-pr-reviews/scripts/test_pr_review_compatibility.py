@@ -369,7 +369,10 @@ def test_watch_reports_reviewability_on_a_timed_out_result(mocker: MockerFixture
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is True
-    assert data["state"]["reviewability"]["blockers"] == ["draft: x", "conflicting: y"]
+    assert data["dashboard"]["is_draft"] is True
+    assert data["dashboard"]["mergeable"] == "CONFLICTING"
+    assert data["dashboard"]["merge_state_status"] == "DIRTY"
+    assert data["dashboard"]["has_conflicts"] is True
 
 
 def test_blockers_do_not_change_has_outstanding_work() -> None:

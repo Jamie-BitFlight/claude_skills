@@ -84,7 +84,7 @@ def test_watch_polls_until_thread_becomes_unresolved(mocker: MockerFixture) -> N
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["state"]["unresolved_count"] == 1
+    assert data["dashboard"]["unresolved_code_thread_count"] == 1
 
 
 def test_watch_times_out_when_nothing_outstanding(mocker: MockerFixture) -> None:
@@ -140,7 +140,7 @@ def test_watch_survives_transient_gh_failure_mid_window(mocker: MockerFixture) -
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["state"]["unresolved_count"] == 1
+    assert data["dashboard"]["unresolved_code_thread_count"] == 1
 
 
 def test_watch_survives_a_validation_error_mid_window(mocker: MockerFixture) -> None:
@@ -158,7 +158,7 @@ def test_watch_survives_a_validation_error_mid_window(mocker: MockerFixture) -> 
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["timed_out"] is False
-    assert data["state"]["unresolved_count"] == 1
+    assert data["dashboard"]["unresolved_code_thread_count"] == 1
 
 
 def test_watch_fails_loudly_on_a_validation_error_at_the_deadline(mocker: MockerFixture) -> None:
@@ -291,11 +291,10 @@ def test_watch_first_fetch_is_not_deadline_bounded(mocker: MockerFixture) -> Non
     assert json.loads(result.output)["timed_out"] is True
     assert fetch_mock.call_args.kwargs["gh_timeout"] == pytest.approx(30)
     assert fetch_mock.call_args.kwargs["target"].number == 3208
-    state = json.loads(result.output)["state"]
-    assert state["provider"] == "github"
-    assert state["target"]["number"] == 3208
-    assert state["transport"] == "github_cli"
-    assert state["snapshot_complete"] is True
+    dashboard = json.loads(result.output)["dashboard"]
+    assert dashboard["provider"] == "github"
+    assert dashboard["pr"] == 3208
+    assert dashboard["snapshot_complete"] is True
 
 
 def test_watch_first_snapshot_uses_tighter_caller_command_timeout(mocker: MockerFixture) -> None:

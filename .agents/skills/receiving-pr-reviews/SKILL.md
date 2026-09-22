@@ -27,9 +27,9 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 
 1. Establish the target, current remote revision, intended outcome, repository instructions, and
    mutation authority. This step closes when those facts and authority classes are explicit.
-2. Fetch and save one full canonical snapshot. A complete snapshot has every required surface,
-   pagination, and nested conversation accounted for. `SNAPSHOT_INCOMPLETE` stops assessment and all
-   mutation.
+2. Run `fetch --snapshot-file <path>` to persist one full canonical snapshot. Stdout contains only the
+   live action view; the file retains complete reconciliation evidence. `SNAPSHOT_INCOMPLETE` stops
+   assessment and all mutation.
 3. Read the [review-cycle contract](./references/review-cycle-contract.md). Build an exact census of
    every inbound comment, question, approval, rejection/change request, bot summary, and other human,
    reviewer, or stakeholder input. Assess each once, preserve resolved history, and record unknowns.
@@ -43,9 +43,10 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
    state and `validate-cycle` for action readiness. When authorized, communicate every disposition
    with provider-backed evidence, then resolve only where policy and capability permit. Clarifications
    remain open; unavailable resolution is recorded as unavailable.
-7. Fetch a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
+7. Persist a new complete snapshot. New or changed inputs, revision, provider state, fingerprints, or
    communication evidence return the complete set to census, assessment, and clustering. Use bounded
-   `watch` calls only to sample for later change; an elapsed call is not completion.
+   `watch --snapshot-file <path>` calls only to sample for later change; an elapsed call is not
+   completion.
 8. Run `complete-cycle` against current provider state. Only its successful persisted result emits
    `REVIEW_COMPLETE`.
 
@@ -66,6 +67,8 @@ evidence into action-ready canonical state. One snapshot uses one executable tra
 
 Run `scripts/pr_review_threads.py <command> --help` for current targets, arguments, and bounds. The
 stable operations are `fetch`, `watch`, `validate-projection`, `validate-cycle`, `complete-cycle`,
-`reply`, `resolve`, `comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Full output is action
-evidence; `--summary` is inspection only. Exact fields and enum values live in the Pydantic models,
-while the validation commands are the authority for action and completion gates.
+`reply`, `resolve`, `comment`, `reply-and-resolve`, and `reply-and-resolve-batch`. Default fetch and
+watch output contains only live unanswered inputs and their complete action content; `--summary`
+contains aggregate decision metadata only. Use focused provider commands for deeper inspection and
+`--snapshot-file` for internal reconciliation evidence. Exact fields and enum values live in the
+Pydantic models, while validation commands govern action and completion gates.

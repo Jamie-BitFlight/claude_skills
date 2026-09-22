@@ -38,10 +38,7 @@ if TYPE_CHECKING:
 # --- multi-PR --pr ----------------------------------------------------------------------------
 
 
-def test_fetch_multi_pr_prints_one_board_entry_per_pr_in_order(mocker: MockerFixture) -> None:
-    """`--pr 41,42,44` without `--summary` prints one compact-JSON board entry per PR, in order,
-    rather than the (potentially enormous) full JSON for each -- and rather than a hand-built
-    text line, per this repository's own agent-only-output policy (AGENTS.md)."""
+def test_fetch_multi_pr_prints_one_live_action_view_per_pr_in_order(mocker: MockerFixture) -> None:
     states = {
         41: _fetch_result(unresolved=[_thread_with_comment()], mergeable="CONFLICTING", merge_state_status="DIRTY"),
         42: _fetch_result(),
@@ -56,26 +53,14 @@ def test_fetch_multi_pr_prints_one_board_entry_per_pr_in_order(mocker: MockerFix
     assert result.exit_code == 0, result.output
     lines = [json.loads(line) for line in result.output.strip("\n").split("\n")]
     assert len(lines) == 3
-    assert lines[0] == {
-        "pr": 41,
-        "unresolved": 1,
-        "unresponded": 0,
-        "codex_approved": False,
-        "mergeable": "CONFLICTING",
-        "merge_state_status": "DIRTY",
-        "blockers": [],
-    }
-    assert lines[1] == {
-        "pr": 42,
-        "unresolved": 0,
-        "unresponded": 0,
-        "codex_approved": False,
-        "mergeable": "MERGEABLE",
-        "merge_state_status": "CLEAN",
-        "blockers": [],
-    }
-    assert lines[2]["pr"] == 44
-    assert lines[2]["codex_approved"] is True
+    assert lines[0]["dashboard"]["pr"] == 41
+    assert lines[0]["dashboard"]["unresolved_code_thread_count"] == 1
+    assert lines[0]["dashboard"]["mergeable"] == "CONFLICTING"
+    assert lines[1]["dashboard"]["pr"] == 42
+    assert lines[1]["dashboard"]["unresolved_code_thread_count"] == 0
+    assert lines[2]["dashboard"]["pr"] == 44
+    assert lines[2]["dashboard"]["codex_approved"] is True
+    assert all(line["actionable_inputs"] == [] for line in lines)
     assert [call.args[2] for call in fetch_mock.call_args_list] == [41, 42, 44]
 
 
@@ -90,8 +75,8 @@ def test_fetch_multi_pr_with_summary_prints_one_json_line_per_pr(mocker: MockerF
     assert result.exit_code == 0, result.output
     lines = [json.loads(line) for line in result.output.strip("\n").split("\n")]
     assert [line["pr"] for line in lines] == [41, 42]
-    assert lines[0]["unresolved_count"] == 1
-    assert lines[1]["unresolved_count"] == 0
+    assert lines[0]["unresolved_code_thread_count"] == 1
+    assert lines[1]["unresolved_code_thread_count"] == 0
 
 
 def test_fetch_multi_pr_tolerates_whitespace_around_entries(mocker: MockerFixture) -> None:

@@ -9,7 +9,7 @@ from typing import Literal
 
 from pr_review_contracts import ChangeRequestTarget
 from pr_review_gh_wire import ReviewThreadNode
-from pr_review_models import Author, IssueComment, Reaction, Reviewability, ReviewNode
+from pr_review_models import Author, IssueComment, Reaction, Reviewability, ReviewNode, ReviewProviderMetadata
 from pr_review_provider_text import reference_present
 from pr_review_state_models import (
     ProviderInputIdentity,
@@ -313,6 +313,7 @@ def fingerprint(
     *,
     revision_at: datetime | None = None,
     reviewability: Reviewability | None = None,
+    provider_metadata: ReviewProviderMetadata | None = None,
     communicated_input_ids: set[str] | None = None,
 ) -> str:
     """Hash the complete normalized snapshot identity.
@@ -324,6 +325,7 @@ def fingerprint(
         completeness: Evidence for every required provider surface.
         revision_at: Provider-observed current-revision timestamp.
         reviewability: Provider-normalized draft, merge, and blocker state.
+        provider_metadata: Provider status retained outside the input census.
         communicated_input_ids: Inputs with provider-observed response evidence.
 
     Returns:
@@ -336,6 +338,7 @@ def fingerprint(
         completeness,
         revision_at=revision_at,
         reviewability=reviewability,
+        provider_metadata=provider_metadata,
         communicated_input_ids=communicated_input_ids,
     )
 

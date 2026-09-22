@@ -123,11 +123,18 @@ class Reaction(GitHubResponseModel):
     id: int | None = None
 
 
+class StatusCheckRollup(GitHubResponseModel):
+    """Aggregate status of the current revision's checks."""
+
+    state: str
+
+
 class GitHubCommitDate(GitHubResponseModel):
     """Current head commit identity and date."""
 
     committedDate: GitHubTimestamp
     oid: str | None = None
+    statusCheckRollup: StatusCheckRollup | None = None
 
 
 class HeadCommitNode(GitHubResponseModel):

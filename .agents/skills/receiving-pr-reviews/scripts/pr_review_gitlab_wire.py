@@ -56,6 +56,12 @@ class GitLabDiscussion(GitLabWireModel):
     notes: list[GitLabNote] = Field(min_length=1)
 
 
+class GitLabPipeline(GitLabWireModel):
+    """Current merge-request pipeline status."""
+
+    status: str = Field(min_length=1)
+
+
 class GitLabMergeRequest(GitLabWireModel):
     """Merge-request identity, revision, and reviewability fields."""
 
@@ -70,6 +76,8 @@ class GitLabMergeRequest(GitLabWireModel):
     detailed_merge_status: str
     blocking_discussions_resolved: bool
     author: GitLabUser
+    reviewers: list[GitLabUser] = Field(default_factory=list)
+    head_pipeline: GitLabPipeline | None = None
 
 
 class GitLabDiffVersion(GitLabWireModel):

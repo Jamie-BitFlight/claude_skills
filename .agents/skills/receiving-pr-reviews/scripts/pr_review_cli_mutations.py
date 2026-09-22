@@ -23,6 +23,7 @@ from pr_review_contracts import (
     ChangeRequestTarget,
     ReplyAction,
     ResolveAction,
+    ReviewActionResult,
     TopLevelCommentAction,
 )
 from pr_review_provider import ProviderResponseError, ReviewProvider
@@ -41,6 +42,20 @@ from pr_review_state_models import AuthorizedReviewAction
 
 SnapshotFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
 StateFile = Annotated[Path, typer.Option(exists=True, dir_okay=False)]
+
+
+def require_provider_confirmation(result: ReviewActionResult, operation: str) -> None:
+    """Reject a provider response that did not confirm the requested mutation.
+
+    Args:
+        result: Provider-normalized mutation result.
+        operation: Human-readable mutation name used in the error.
+
+    Raises:
+        ProviderResponseError: If the provider did not confirm success.
+    """
+    if not result.success:
+        raise ProviderResponseError(f"provider did not confirm {operation}")
 
 
 class TargetResolver(Protocol):
@@ -89,13 +104,10 @@ def register_cycle_commands(
         """
         snapshot = load_snapshot(snapshot_file)
         cycle = load_cycle(state_file)
-        inputs, assessments, clusters = validate_cycle_projection(snapshot, cycle)
+        validate_cycle_projection(snapshot, cycle)
         typer.echo(
             json.dumps({
-                "snapshot_fingerprint": snapshot.snapshot_fingerprint,
-                "inputs": len(inputs),
-                "assessments": len(assessments),
-                "clusters": len(clusters),
+                "validation": "projection_valid",
                 "cycle_state": cycle.cycle_state,
                 "cycle_terminal": cycle.cycle_terminal,
                 "mutation_authorized": False,
@@ -113,13 +125,10 @@ def register_cycle_commands(
         snapshot = load_snapshot(snapshot_file)
         cycle = load_cycle(state_file)
         validate_snapshot_context(snapshot, cycle)
-        inputs, assessments, clusters = validate_cycle_coverage(snapshot, cycle)
+        validate_cycle_coverage(snapshot, cycle)
         typer.echo(
             json.dumps({
-                "snapshot_fingerprint": snapshot.snapshot_fingerprint,
-                "inputs": len(inputs),
-                "assessments": len(assessments),
-                "clusters": len(clusters),
+                "validation": "action_ready",
                 "cycle_state": cycle.cycle_state,
                 "cycle_terminal": cycle.cycle_terminal,
             })
@@ -155,7 +164,7 @@ def register_cycle_commands(
         )
         completed = evaluate_review_complete(snapshot, load_cycle(state_file))
         save_cycle(state_file, completed)
-        typer.echo(completed.model_dump_json())
+        typer.echo(json.dumps({"cycle_state": completed.cycle_state, "cycle_terminal": completed.cycle_terminal}))
 
 
 def register_response_commands(
@@ -208,8 +217,9 @@ def register_response_commands(
             command_timeout=provider_timeout_seconds,
         )
         result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        require_provider_confirmation(result, "reply")
         save_cycle(state_file, record_completed_communication(cycle, input_id))
-        typer.echo(json.dumps(result.raw))
+        typer.echo(json.dumps({"input_id": input_id, "replied": result.success}))
 
     @app.command(name="resolve")
     def resolve(
@@ -248,8 +258,9 @@ def register_response_commands(
             command_timeout=provider_timeout_seconds,
         )
         result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        require_provider_confirmation(result, "resolution")
         save_cycle(state_file, record_completed_resolution(cycle, input_id))
-        typer.echo(json.dumps(result.raw))
+        typer.echo(json.dumps({"input_id": input_id, "resolved": result.success}))
 
     @app.command(name="comment")
     def comment(
@@ -292,8 +303,9 @@ def register_response_commands(
             command_timeout=provider_timeout_seconds,
         )
         result = selected_provider.act(target, action, command_timeout=provider_timeout_seconds)
+        require_provider_confirmation(result, "comment")
         save_cycle(state_file, record_completed_communication(cycle, input_id))
-        typer.echo(json.dumps(result.raw))
+        typer.echo(json.dumps({"input_id": input_id, "commented": result.success}))
 
     @app.command(name="reply-and-resolve")
     def reply_and_resolve(
@@ -329,15 +341,16 @@ def register_response_commands(
         )
         cycle = load_cycle(state_file)
         reply_action, resolve_action, _simulated = authorize_reply_and_resolve(snapshot, cycle, input_id, body)
-        typer.echo(
-            json.dumps(selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds).raw)
-        )
+        reply_result = selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds)
+        require_provider_confirmation(reply_result, "reply")
         cycle = record_completed_communication(cycle, input_id)
         save_cycle(state_file, cycle)
-        typer.echo(
-            json.dumps(selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds).raw)
-        )
+        typer.echo(json.dumps({"input_id": input_id, "replied": reply_result.success, "resolved": False}))
+        resolve_result = selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
         save_cycle(state_file, record_completed_resolution(cycle, input_id))
+        typer.echo(
+            json.dumps({"input_id": input_id, "replied": reply_result.success, "resolved": resolve_result.success})
+        )
 
 
 def register_batch_command(
@@ -393,11 +406,13 @@ def register_batch_command(
         for input_id, reply_action, resolve_action in planned:
             replied = False
             try:
-                selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds)
+                reply_result = selected_provider.act(target, reply_action, command_timeout=provider_timeout_seconds)
+                require_provider_confirmation(reply_result, "reply")
                 replied = True
                 cycle = record_completed_communication(cycle, input_id)
                 save_cycle(state_file, cycle)
-                selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
+                resolve_result = selected_provider.act(target, resolve_action, command_timeout=provider_timeout_seconds)
+                require_provider_confirmation(resolve_result, "resolution")
                 cycle = record_completed_resolution(cycle, input_id)
                 save_cycle(state_file, cycle)
             except (ProviderResponseError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:

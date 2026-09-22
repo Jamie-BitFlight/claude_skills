@@ -33,7 +33,7 @@ from pr_review_contracts import ChangeRequestTarget, ReplyAction, RepositoryTarg
 from pr_review_gitlab_normalize import normalize_state
 from pr_review_gitlab_provider import GitLabProvider
 from pr_review_gitlab_transport import collect_state, parse_ndjson
-from pr_review_gitlab_wire import GitLabApprovals, GitLabDiscussion
+from pr_review_gitlab_wire import GitLabApprovals, GitLabDiscussion, GitLabPipeline
 from pr_review_output import summarize
 from pr_review_provider import ProviderResponseError, ReviewProvider
 from pr_review_state_models import AuthorizedReviewAction
@@ -154,7 +154,31 @@ def test_zero_required_approved_state_is_preserved_as_provider_metadata() -> Non
     assert [item.model_dump() for item in snapshot.provider_metadata.system_notes] == [
         {"id": "13", "body": "pushed commits", "created_at": NOW + timedelta(seconds=13)}
     ]
-    assert summarize(snapshot, pr=3, max_body=None).provider_metadata == snapshot.provider_metadata
+    dashboard = summarize(snapshot, pr=3)
+    assert dashboard.provider == "gitlab"
+    assert dashboard.provider_approved is True
+    assert dashboard.approvals_required == 0
+    assert dashboard.approvals_left == 0
+    assert "provider_metadata" not in dashboard.model_dump()
+    assert "review_inputs" not in dashboard.model_dump()
+
+
+def test_summary_reports_gitlab_reviewer_and_pipeline_state() -> None:
+    fetched = state()
+    assigned = user(8, "assigned-reviewer")
+    fetched = fetched.model_copy(
+        update={
+            "merge_request": fetched.merge_request.model_copy(
+                update={"reviewers": [assigned], "head_pipeline": GitLabPipeline(status="running")}
+            )
+        }
+    )
+
+    dashboard = summarize(normalize_state(fetched, target()), pr=3)
+
+    assert dashboard.assigned_reviewer_count == 1
+    assert dashboard.requested_reviewer_count == 1
+    assert dashboard.checks_state == "running"
 
 
 def test_note_actor_without_observed_role_remains_unknown() -> None:
@@ -365,7 +389,7 @@ def test_cli_routes_explicit_gitlab_target(mocker: MockerFixture) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert json.loads(result.output)["provider"] == "gitlab"
+    assert json.loads(result.output)["dashboard"]["provider"] == "gitlab"
     provider.snapshot.assert_called_once_with(target(), deadline=None, command_timeout=6.0)
 
 

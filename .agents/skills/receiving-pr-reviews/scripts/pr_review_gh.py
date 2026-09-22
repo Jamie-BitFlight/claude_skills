@@ -28,9 +28,11 @@ from pr_review_github_normalize import (
 )
 from pr_review_models import (
     FetchResult,
+    GitHubCommitDate,
     IssueComment,
     PullRequestHeadState,
     Reaction,
+    ReviewProviderMetadata,
     ReviewsConnection,
     ReviewSnapshot,
     ReviewThreadsConnection,
@@ -41,6 +43,16 @@ from pr_review_subprocess import DEFAULT_COMMAND_TIMEOUT_SECONDS
 
 RESOLVE_THREAD_MUTATION = transport.RESOLVE_THREAD_MUTATION
 run_gh = transport.run_gh
+GITHUB_SURFACES = {
+    "threads",
+    "reviews",
+    "issue_comments",
+    "reactions",
+    "identity",
+    "head_state",
+    "checks",
+    "force_push",
+}
 
 
 def detect_repo_identity(*, gh_timeout: float | None = None) -> tuple[str, str]:
@@ -139,6 +151,20 @@ def collect_state(owner: str, repo: str, pr: int, timeout: Callable[[], float | 
     )
 
 
+def provider_metadata(head_commit: GitHubCommitDate) -> ReviewProviderMetadata:
+    """Project GitHub facts fetched by the current snapshot transport.
+
+    Args:
+        head_commit: Current revision and aggregate check status.
+
+    Returns:
+        Provider metadata used by dashboards and canonical fingerprints.
+    """
+    return ReviewProviderMetadata(
+        checks_state=head_commit.statusCheckRollup.state if head_commit.statusCheckRollup is not None else None
+    )
+
+
 def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> ReviewSnapshot:
     """Normalize complete GitHub state without discarding resolved history.
 
@@ -210,15 +236,15 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
         ),
     ]
     truncated_threads = {thread.id for thread in all_threads if thread.comments.pageInfo.hasNextPage}
-    surface_names = {"threads", "reviews", "issue_comments", "reactions", "identity", "head_state", "force_push"}
     completeness = SnapshotCompleteness(
         transport="github_cli",
-        required_surfaces=surface_names,
-        completed_surfaces=surface_names,
+        required_surfaces=GITHUB_SURFACES,
+        completed_surfaces=GITHUB_SURFACES,
         truncated_input_ids=[item.input_id for item in canonical_inputs if item.thread_id in truncated_threads],
         unavailable_capabilities=[],
     )
     communicated_input_ids = communicated_inputs(canonical_inputs)
+    metadata = provider_metadata(head_commit)
     return ReviewSnapshot.model_validate({
         **legacy.model_dump(),
         "provider": "github",
@@ -232,6 +258,7 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
             completeness,
             revision_at=revision_at,
             reviewability=legacy.reviewability,
+            provider_metadata=metadata,
             communicated_input_ids=communicated_input_ids,
         ),
         "head_revision": head_revision,
@@ -242,6 +269,7 @@ def normalize_state(fetched: GitHubState, target: ChangeRequestTarget) -> Review
         "clusters": [],
         "cycle_state": "ASSESSMENT_REQUIRED" if completeness.complete else "SNAPSHOT_INCOMPLETE",
         "codex_approval_equivalence": "available",
+        "provider_metadata": metadata,
         "communicated_input_ids": communicated_input_ids,
     })
 

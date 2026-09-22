@@ -44,6 +44,18 @@ def load_cycle(path: Path) -> ReviewCycleState:
     return ReviewCycleState.model_validate_json(path.read_text(encoding="utf-8"))
 
 
+def save_snapshot(path: Path, snapshot: ReviewSnapshot) -> None:
+    """Atomically persist complete canonical evidence away from stdout.
+
+    Args:
+        path: Destination for the complete canonical snapshot.
+        snapshot: Complete provider snapshot used for reconciliation.
+    """
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(snapshot.model_dump_json(indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
 def require_authorization(condition: bool, message: str) -> None:
     """Raise the canonical authorization error when an invariant is false.
 

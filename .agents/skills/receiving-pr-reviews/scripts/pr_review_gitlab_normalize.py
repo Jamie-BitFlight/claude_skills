@@ -277,6 +277,11 @@ def provider_metadata(state: GitLabState) -> ReviewProviderMetadata:
             approval_rules_left=state.approvals.approval_rules_left,
         ),
         blocking_discussions_resolved=state.merge_request.blocking_discussions_resolved,
+        assigned_reviewers=sorted(user.username for user in state.merge_request.reviewers),
+        requested_reviewers=sorted(user.username for user in state.merge_request.reviewers),
+        checks_state=state.merge_request.head_pipeline.status
+        if state.merge_request.head_pipeline is not None
+        else None,
     )
 
 
