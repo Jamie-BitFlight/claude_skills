@@ -7,6 +7,6 @@ Select exactly one branch:
 - [python-semantic-release](./release-version-python-semantic-release.md) - Load when Python tooling
   should update project version state, push a release commit, and push the tag.
 
-Do not load the sibling implementation after selection.
+Continue with only the selected implementation.
 
 SOURCE: <https://docs.gitlab.com/ci/> (reviewed 2026-09-22; adapter selection follows the composed lifecycle)

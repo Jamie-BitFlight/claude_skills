@@ -5,11 +5,16 @@ another installed version.
 
 ## Common Preflight
 
-- Environment API authentication: confirm `GITLAB_TOKEN` is present without printing it, then call
-  `glab api --hostname "$HOST" user`.
-- Persisted authentication: use `glab auth status --hostname "$HOST"` only when persisted login is
-  the subject.
-- Git transport: use the user-supplied SSH URL. REST authentication does not test Git transport.
+Run this from the target repository. `glab` infers the GitLab host from repository context and uses
+the credential selected by its normal resolution. Every downstream glab/API branch uses that same
+resolved credential unless the task explicitly requires a named environment variable. On failure,
+request that the user authenticate or correct the credential selected for this repository and
+preserve the probe status.
+
+```bash
+glab api --silent user >/dev/null || { rc=$?; printf '%s\n' 'glab authentication failed: ask the user to authenticate or correct the credential selected for this repository' >&2; exit "$rc"; }
+```
+
 - Self-managed raw API calls use a bare hostname and external `jq`; encode namespaced project paths
   or use the numeric project ID.
 
@@ -17,8 +22,8 @@ Select one branch:
 
 - [API and Repository Selection](./glab-api-and-repository.md) - Load for raw REST/GraphQL calls,
   pagination, typed fields, explicit repository selectors, or Git transport.
-- [CI Read-Only Inspection](./glab-ci-inspection.md) - Load for listing pipelines, inspecting one
-  pipeline and its jobs, tracing a requested completed job, or CI Lint.
+- [CI Context Index](./glab-ci-inspection.md) - Load to choose unmerged local candidate validation or
+  post-merge/existing-ref inspection.
 - [Merge Request Commands](./glab-merge-requests.md) - Load for non-interactive MR create/merge
   command composition or command-local scratch-clone identity.
 - [Release Credential Operations](./glab-release-credentials.md) - Load for protected branch/tag
