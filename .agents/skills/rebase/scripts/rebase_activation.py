@@ -19,6 +19,7 @@ class ActionKind(StrEnum):
     COMMAND = "command"
     MUTATION = "mutation"
     PROVIDER = "provider"
+    TERMINAL = "terminal"
 
 
 class ActionEvent(BaseModel):
@@ -39,13 +40,14 @@ class EvalCase(BaseModel):
     required_sources: list[str]
     allowed_mutations: list[str]
     allowed_provider_actions: list[str]
+    exact_action_order: list[str] = Field(default_factory=list)
     expectations: list[str]
 
 
 class EvalPackage(BaseModel):
     """Validated activation-evaluation package."""
 
-    schema_version: Literal[2]
+    schema_version: Literal[3]
     skill_name: str
     evals: list[EvalCase]
 
@@ -80,7 +82,7 @@ class ActivationCaseResult(BaseModel):
 class ActivationResults(BaseModel):
     """Persisted evidence plus an explicit harness/branch acceptance matrix."""
 
-    schema_version: Literal[3]
+    schema_version: Literal[4]
     skill_name: str
     observed_on: str
     content_sha256: dict[str, str]
@@ -151,6 +153,7 @@ def evaluate_case(case: ActivationCaseResult, evaluation: EvalCase) -> list[str]
         failures.append(f"required source was not loaded: {key}")
     if any(state.value not in canonical_states for state in case.state_transitions):
         failures.append(f"undeclared workflow transition: {key}")
+    failures.extend(evaluate_terminal_trace(case, evaluation))
     mutations = [action.operation for action in case.actions if action.kind is ActionKind.MUTATION]
     if mutations != evaluation.allowed_mutations:
         failures.append(f"mutation contract mismatch: {key}")
@@ -161,6 +164,29 @@ def evaluate_case(case: ActivationCaseResult, evaluation: EvalCase) -> list[str]
         failures.append(f"repository HEAD changed: {key}")
     if case.repository_status_before != case.repository_status_after:
         failures.append(f"repository status changed: {key}")
+    return failures
+
+
+def evaluate_terminal_trace(case: ActivationCaseResult, evaluation: EvalCase) -> list[str]:
+    """Evaluate action ordering and the terminal boundary.
+
+    Returns:
+        Every terminal-trace failure for the case.
+    """
+    key = (case.harness, case.eval_id)
+    failures: list[str] = []
+    terminal_positions = [index for index, action in enumerate(case.actions) if action.kind is ActionKind.TERMINAL]
+    if len(terminal_positions) != 1:
+        failures.append(f"terminal-event contract mismatch: {key}")
+    else:
+        terminal_position = terminal_positions[0]
+        terminal_action = case.actions[terminal_position]
+        if terminal_position != len(case.actions) - 1:
+            failures.append(f"actions observed after terminal: {key}")
+        if terminal_action.operation != case.final_terminal:
+            failures.append(f"terminal event differs from final terminal: {key}")
+    if evaluation.exact_action_order and [action.operation for action in case.actions] != evaluation.exact_action_order:
+        failures.append(f"action-order contract mismatch: {key}")
     return failures
 
 

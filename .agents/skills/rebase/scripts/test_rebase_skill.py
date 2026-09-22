@@ -35,7 +35,8 @@ from rebase_test_support import (
 )
 
 SKILL_PATH = SKILL_ROOT / "SKILL.md"
-REFERENCE_PATH = SKILL_ROOT / "references" / "rebase-edge-cases.md"
+START_REFERENCE_PATH = SKILL_ROOT / "references" / "start-rebase.md"
+ACTIVE_REFERENCE_PATH = SKILL_ROOT / "references" / "active-rebase.md"
 EVALS_PATH = SKILL_ROOT / "evals" / "evals.json"
 ACTIVATION_RESULTS_PATH = SKILL_ROOT / "evals" / "activation-results.json"
 
@@ -103,20 +104,25 @@ def test_canonical_package_has_relative_claude_alias() -> None:
 
 def test_every_bundled_markdown_link_resolves() -> None:
     """Keep progressive-disclosure resources reachable from the canonical skill."""
-    document = parse_markdown(SKILL_PATH)
-    local_links = [
-        node.dest.split("#", maxsplit=1)[0]
-        for node in walk(document)
-        if isinstance(node, Link) and not node.dest.startswith("http")
-    ]
+    source_paths = (SKILL_PATH, *sorted((SKILL_ROOT / "references").glob("*.md")))
+    local_links = []
+    for source_path in source_paths:
+        document = parse_markdown(source_path)
+        local_links.extend(
+            (source_path.parent / node.dest.split("#", maxsplit=1)[0]).resolve()
+            for node in walk(document)
+            if isinstance(node, Link) and not node.dest.startswith("http")
+        )
 
     assert local_links
-    assert all((SKILL_ROOT / destination).is_file() for destination in local_links)
+    assert all(destination.is_file() for destination in local_links)
 
 
 def test_terminal_state_contract_covers_every_safety_branch() -> None:
     """Reject prompt state tokens absent from the typed canonical vocabulary."""
-    package_text = SKILL_PATH.read_text(encoding="utf-8") + REFERENCE_PATH.read_text(encoding="utf-8")
+    package_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in (SKILL_PATH, *sorted((SKILL_ROOT / "references").glob("*.md")))
+    )
     presented_states = set(re.findall(r"`([A-Z][A-Z_]+)`", package_text))
     canonical_states = {state.value for state in workflow_state_definitions()}
     non_state_contract_tokens = {
@@ -124,6 +130,7 @@ def test_terminal_state_contract_covers_every_safety_branch() -> None:
         *(policy.value for policy in MergePolicy),
         *(mode.value for mode in ExecutionMode),
         "CHERRY_PICK_HEAD",
+        "HEAD",
         "MERGE_HEAD",
         "REBASE_HEAD",
         "REBASE_SKILL_DIR",
@@ -138,10 +145,9 @@ def test_terminal_state_contract_covers_every_safety_branch() -> None:
 
 def test_executable_instructions_are_forge_neutral() -> None:
     """Exclude provider, publication, and merge commands from runtime instructions."""
-    document = parse_markdown(SKILL_PATH)
-    reference = parse_markdown(REFERENCE_PATH)
+    documents = [parse_markdown(path) for path in (SKILL_PATH, *sorted((SKILL_ROOT / "references").glob("*.md")))]
     command_text = "\n".join(
-        node_text(node) for tree in (document, reference) for node in walk(tree) if isinstance(node, FencedCode)
+        node_text(node) for tree in documents for node in walk(tree) if isinstance(node, FencedCode)
     )
 
     assert not re.search(r"(?m)^\s*(?:gh|glab)\s", command_text)
@@ -155,11 +161,28 @@ def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> 
     package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
 
     assert package.skill_name == "rebase"
-    assert package.schema_version == 2
+    assert package.schema_version == 3
     assert len(package.evals) == 6
     assert len({case.id for case in package.evals}) == len(package.evals)
     assert all(case.expectations for case in package.evals)
     assert [case.expected_activation for case in package.evals] == [True, True, True, False, False, False]
+
+
+def test_invocation_routes_disclose_only_the_selected_workflow() -> None:
+    """Keep start-only planning out of continue and abort context."""
+    package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
+    cases = {case.id: case for case in package.evals}
+
+    assert cases[1].required_sources == ["SKILL.md", "references/start-rebase.md"]
+    assert cases[2].required_sources == ["SKILL.md", "references/active-rebase.md"]
+    assert cases[3].required_sources == ["SKILL.md", "references/active-rebase.md"]
+    assert START_REFERENCE_PATH.is_file()
+    assert ACTIVE_REFERENCE_PATH.is_file()
+
+    active_bytes = len(SKILL_PATH.read_bytes()) + len(ACTIVE_REFERENCE_PATH.read_bytes())
+    start_bytes = len(SKILL_PATH.read_bytes()) + len(START_REFERENCE_PATH.read_bytes())
+    assert len(SKILL_PATH.read_bytes()) < 3_000
+    assert active_bytes < start_bytes
 
 
 def test_observed_activation_results_derive_pass_from_current_sources_and_actions() -> None:
@@ -167,7 +190,7 @@ def test_observed_activation_results_derive_pass_from_current_sources_and_action
     eval_package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
     results = ActivationResults.model_validate_json(ACTIVATION_RESULTS_PATH.read_text(encoding="utf-8"))
 
-    assert results.schema_version == 3
+    assert results.schema_version == 4
     assert evaluate_activation_results(SKILL_ROOT, eval_package, results) == []
 
 

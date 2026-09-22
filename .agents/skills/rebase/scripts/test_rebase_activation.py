@@ -49,6 +49,40 @@ def test_continue_mutation_fails_even_if_observation_claims_activation() -> None
     assert "mutation contract mismatch: ('opencode', 2)" in failures
 
 
+def test_terminal_event_must_end_the_action_trace() -> None:
+    """Reject commands observed after the first terminal event."""
+    package, results = load_evidence()
+    unsafe = deepcopy(results)
+    case = next(case for case in unsafe.cases if case.harness == "opencode" and case.eval_id == 1)
+    terminal = case.actions.pop()
+    case.actions.append(terminal)
+    case.actions.append(ActionEvent(kind=ActionKind.COMMAND, operation="git status --short", exit_code=0))
+
+    failures = evaluate_activation_results(SKILL_ROOT, package, unsafe)
+
+    assert "actions observed after terminal: ('opencode', 1)" in failures
+
+
+def test_exact_action_order_rejects_reordered_invalid_ref_trace() -> None:
+    """Reject an invalid-ref trace whose terminal-trigger order is wrong."""
+    package, results = load_evidence()
+    reordered = deepcopy(results)
+    case = next(case for case in reordered.cases if case.harness == "opencode" and case.eval_id == 1)
+    case.actions = [
+        ActionEvent(
+            kind=ActionKind.COMMAND,
+            operation="git immutable preflight through refs/heads/feature/a lookup",
+            exit_code=128,
+        ),
+        ActionEvent(kind=ActionKind.READ, operation="load rebase skill"),
+        ActionEvent(kind=ActionKind.TERMINAL, operation="BLOCKED_INVALID_REF"),
+    ]
+
+    failures = evaluate_activation_results(SKILL_ROOT, package, reordered)
+
+    assert "action-order contract mismatch: ('opencode', 1)" in failures
+
+
 def test_source_edit_invalidates_persisted_activation_evidence(tmp_path: Path) -> None:
     """Bind observations to the exact instruction content that produced them."""
     package, results = load_evidence()

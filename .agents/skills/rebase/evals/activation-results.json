@@ -1,10 +1,11 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "skill_name": "rebase",
   "observed_on": "2026-09-22",
   "content_sha256": {
-    "SKILL.md": "44c48374e3764af43b753f23604f23a37f76fb2d57028f8b70e21f0d3031b2bd",
-    "references/rebase-edge-cases.md": "6917ffa9fd1d2cecf41452fa00c99610d6648ecf66a2580daf02d23b70e80dfb"
+    "SKILL.md": "5b840d50b91c134fae13fc8e6cbd9b9a56d381998a00caa3cc2a2f9cad7b59c0",
+    "references/active-rebase.md": "ddb8e0ed44fafeeb78d4aa48ef80e688f7e03a7e177c22bb305e52d511246c2b",
+    "references/start-rebase.md": "6de4fb668eb3f49b33326bf1a4dbf6ec2f06df9ce678e2e786af9791c307ad5d"
   },
   "acceptance_matrix": [
     { "harness": "opencode", "eval_id": 1 },
@@ -20,114 +21,73 @@
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3820d58effesl2NmsR84RIiiv",
+      "session_id": "ses_f380b3ffbffebMhwBMmRCk8WFD",
       "eval_id": 1,
       "prompt": "Rebase feature/a onto main.",
       "observed_activation": true,
-      "loaded_sources": ["SKILL.md"],
+      "loaded_sources": ["SKILL.md", "references/start-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
+        { "kind": "read", "operation": "load start-rebase reference" },
+        { "kind": "read", "operation": "search repository instruction locations", "exit_code": 0 },
+        { "kind": "command", "operation": "git rev-parse --show-toplevel", "exit_code": 0 },
         {
           "kind": "command",
-          "operation": "git immutable preflight through refs/heads/feature/a lookup",
+          "operation": "git show-ref --verify refs/heads/feature/a",
           "exit_code": 128
         },
-        { "kind": "command", "operation": "git rebase -h", "exit_code": 129 },
-        {
-          "kind": "command",
-          "operation": "git branch/status/current-branch inspection",
-          "exit_code": 0
-        },
-        {
-          "kind": "command",
-          "operation": "git repository/worktree/operation-marker inspection",
-          "exit_code": 1
-        }
+        { "kind": "terminal", "operation": "BLOCKED_INVALID_REF" }
       ],
       "state_transitions": ["BLOCKED_INVALID_REF"],
       "final_terminal": "BLOCKED_INVALID_REF",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_status_before": "?? .agents/skills/rebase\n",
+      "repository_status_after": "?? .agents/skills/rebase\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f382229cbffeTsLgSRYO5Auzpg",
+      "session_id": "ses_f380a25f6ffeaGx6QrYri9Z1AP",
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
-      "loaded_sources": ["SKILL.md"],
+      "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
-        { "kind": "command", "operation": "git rev-parse --show-toplevel", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-merge", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-apply", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "git rev-parse --verify --quiet REBASE_HEAD",
-          "exit_code": 1
-        },
-        { "kind": "command", "operation": "git symbolic-ref --quiet --short HEAD", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "git status --porcelain=v1 --branch --untracked-files=all",
-          "exit_code": 0
-        },
-        {
-          "kind": "command",
-          "operation": "rebase_plan.py path-state rebase-merge",
-          "exit_code": 0
-        },
-        { "kind": "command", "operation": "rebase_plan.py path-state rebase-apply", "exit_code": 0 }
+        { "kind": "read", "operation": "load active-rebase entry reference" },
+        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_status_before": "?? .agents/skills/rebase\n",
+      "repository_status_after": "?? .agents/skills/rebase\n"
     },
     {
       "harness": "opencode",
       "model": "@openai/gpt-5.6-luna",
       "proxy": "portkey",
-      "session_id": "ses_f3821d235ffePEwzPSo8O2bJOY",
+      "session_id": "ses_f3808f3fdffes41zLK4ooKizr4",
       "eval_id": 3,
       "prompt": "Abort this rebase and restore the original branch.",
       "observed_activation": true,
-      "loaded_sources": ["SKILL.md"],
+      "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "load rebase skill" },
-        { "kind": "command", "operation": "git rev-parse --show-toplevel", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-merge", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-apply", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "git rev-parse --verify --quiet REBASE_HEAD",
-          "exit_code": 1
-        },
-        { "kind": "command", "operation": "git symbolic-ref --quiet --short HEAD", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "git status --porcelain=v1 --branch --untracked-files=all",
-          "exit_code": 0
-        },
-        {
-          "kind": "command",
-          "operation": "rebase_plan.py path-state rebase-merge",
-          "exit_code": 0
-        },
-        { "kind": "command", "operation": "rebase_plan.py path-state rebase-apply", "exit_code": 0 }
+        { "kind": "read", "operation": "load active-rebase entry reference" },
+        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_status_before": "?? .agents/skills/rebase\n",
+      "repository_status_after": "?? .agents/skills/rebase\n"
     },
     {
       "harness": "opencode",
@@ -152,7 +112,8 @@
           "operation": "git status --porcelain=v1 --untracked-files=all",
           "exit_code": 0
         },
-        { "kind": "command", "operation": "git show-ref", "exit_code": 0 }
+        { "kind": "command", "operation": "git show-ref", "exit_code": 0 },
+        { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
@@ -180,7 +141,8 @@
           "exit_code": 1
         },
         { "kind": "command", "operation": "git last-commit inspection", "exit_code": 0 },
-        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 }
+        { "kind": "command", "operation": "git status --short --branch", "exit_code": 0 },
+        { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
@@ -217,7 +179,8 @@
           "kind": "command",
           "operation": "git show --stat --oneline --decorate HEAD",
           "exit_code": 0
-        }
+        },
+        { "kind": "terminal", "operation": "DO_NOT_ACTIVATE" }
       ],
       "state_transitions": [],
       "final_terminal": "DO_NOT_ACTIVATE",
@@ -230,40 +193,23 @@
       "harness": "codex",
       "model": "gpt-5.6-sol",
       "proxy": "portkey",
-      "session_id": "01a0c7df-c478-78b0-9d21-bae650ac5b67",
+      "session_id": "01a0c7f7-49b8-79e0-b70a-5cc29ee8977a",
       "eval_id": 2,
       "prompt": "Continue the rebase after I fixed this conflict.",
       "observed_activation": true,
-      "loaded_sources": ["SKILL.md"],
+      "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
       "actions": [
         { "kind": "read", "operation": "read complete rebase SKILL.md" },
-        {
-          "kind": "command",
-          "operation": "git rev-parse --verify --quiet REBASE_HEAD",
-          "exit_code": 1
-        },
-        { "kind": "command", "operation": "git rev-parse --show-toplevel", "exit_code": 0 },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-merge", "exit_code": 0 },
-        { "kind": "command", "operation": "git symbolic-ref --quiet --short HEAD", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "git status --porcelain=v1 --branch --untracked-files=all",
-          "exit_code": 0
-        },
-        { "kind": "command", "operation": "git rev-parse --git-path rebase-apply", "exit_code": 0 },
-        {
-          "kind": "command",
-          "operation": "rebase_plan.py path-state rebase-merge",
-          "exit_code": 0
-        },
-        { "kind": "command", "operation": "rebase_plan.py path-state rebase-apply", "exit_code": 0 }
+        { "kind": "read", "operation": "read complete active-rebase entry reference" },
+        { "kind": "command", "operation": "rebase_active.py", "exit_code": 0 },
+        { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
       ],
       "state_transitions": ["NO_ACTIVE_REBASE"],
       "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_head_after": "005246bab25028d9d8cbe96d72ba91eca66fc315",
-      "repository_status_before": "",
-      "repository_status_after": ""
+      "repository_head_before": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_head_after": "7627dded16cf98bbb9191261ba0bc78203f174a2",
+      "repository_status_before": "?? .agents/skills/rebase\n",
+      "repository_status_after": "?? .agents/skills/rebase\n"
     }
   ]
 }
