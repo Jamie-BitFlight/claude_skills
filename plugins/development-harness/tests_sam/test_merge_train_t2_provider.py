@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -98,3 +100,28 @@ def test_f15_gate_runner_retains_complete_binary_stdout_stderr(tmp_path: Path) -
 
     assert base64.b64decode(record["stdout_base64"]) == b"out\x00end"
     assert base64.b64decode(record["stderr_base64"]) == b"err\xffend"
+
+
+def test_f22_installed_plugin_imports_t2_from_unrelated_workdir(tmp_path: Path) -> None:
+    plugin = Path(__file__).parents[1]
+    installed = tmp_path / "installed" / "development-harness"
+    unrelated = tmp_path / "unrelated"
+    shutil.copytree(plugin, installed)
+    unrelated.mkdir()
+    script = (
+        "from dh_core.merge_train import MergeNext, TrainSupersession; "
+        "from dh_core.git_push import GateRunner, LocalBareGitPushPort; "
+        "from dh_core.integration_branch import IntegrationBranchAdvancer; print('installed-t2-ok')"
+    )
+
+    completed = subprocess.run(
+        (sys.executable, "-c", script),
+        cwd=unrelated,
+        env={**os.environ, "PYTHONPATH": str(installed)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "installed-t2-ok"
