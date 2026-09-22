@@ -55,6 +55,58 @@ def test_stopped_rebase_with_detached_head_routes_as_active(tmp_path: Path) -> N
     run_git(repository, "rebase", "--abort")
 
 
+def test_stopped_apply_backend_routes_as_active(tmp_path: Path) -> None:
+    """Treat rebase-apply metadata as an authoritative active operation."""
+    repository = tmp_path / "stopped-apply-rebase"
+    initialize_repository(repository)
+    commit_file(repository, "shared.txt", "base\n", "add shared")
+    run_git(repository, "switch", "-c", "feature")
+    commit_file(repository, "shared.txt", "feature\n", "feature edit")
+    run_git(repository, "switch", "main")
+    commit_file(repository, "shared.txt", "target\n", "target edit")
+    run_git(repository, "switch", "feature")
+    assert run_git(repository, "rebase", "--apply", "main", check=False).returncode != 0
+
+    result = run_active_route(repository)
+    observation = json.loads(result.stdout)
+
+    assert result.returncode == 0
+    assert observation["route"] == "active"
+    assert observation["rebase_merge_present"] is False
+    assert observation["rebase_apply_present"] is True
+    run_git(repository, "rebase", "--abort")
+
+
+def test_completed_rebase_with_stale_rebase_head_routes_to_no_active_terminal(tmp_path: Path) -> None:
+    """Ignore a retained REBASE_HEAD after the rebase metadata is removed."""
+    repository = tmp_path / "completed-rebase"
+    initialize_repository(repository)
+    commit_file(repository, "shared.txt", "base\n", "add shared")
+    run_git(repository, "switch", "-c", "feature")
+    commit_file(repository, "shared.txt", "feature\n", "feature edit")
+    run_git(repository, "switch", "main")
+    commit_file(repository, "shared.txt", "target\n", "target edit")
+    run_git(repository, "switch", "feature")
+    assert run_git(repository, "rebase", "main", check=False).returncode != 0
+
+    (repository / "shared.txt").write_text("target\nfeature\n", encoding="utf-8")
+    run_git(repository, "add", "shared.txt")
+    run_git(repository, "-c", "core.editor=true", "rebase", "--continue")
+    assert run_git(repository, "rev-parse", "--verify", "--quiet", "REBASE_HEAD").returncode == 0
+
+    result = run_active_route(repository)
+    observation = json.loads(result.stdout)
+
+    assert result.returncode == 0
+    assert observation["route"] == "NO_ACTIVE_REBASE"
+    assert observation["current_branch"] == "feature"
+    assert observation["head_detached"] is False
+    assert observation["rebase_merge_present"] is False
+    assert observation["rebase_apply_present"] is False
+    assert observation["rebase_head_present"] is True
+    assert observation["status"] == "## feature\n"
+
+
 def test_repository_without_rebase_routes_to_no_active_terminal(tmp_path: Path) -> None:
     """Return the existing no-active terminal from a clean attached repository."""
     repository = tmp_path / "no-active-rebase"

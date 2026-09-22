@@ -101,7 +101,7 @@ def inspect_active_rebase() -> tuple[dict[str, object], int]:
     rebase_apply_present = resolve_git_path(repository_root, captured["rebase_apply"]).is_dir()
     rebase_head_present = command_exit(captured["rebase_head"]) == 0
     current_branch = command_stdout(captured["current_branch"]).strip() or None
-    active = rebase_merge_present or rebase_apply_present or rebase_head_present
+    active = rebase_merge_present or rebase_apply_present
     route = "active" if active else "NO_ACTIVE_REBASE"
     return (
         {
