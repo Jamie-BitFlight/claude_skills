@@ -18,8 +18,9 @@ condition-bearing reference; never start a second rebase.
 ## 1. Bind refs and repository state
 
 Read repository instructions and resolve the repository root, the named local branch, the target,
-and their full commit OIDs. Use `refs/heads/<branch>` to reject a detached or remote-only branch.
-Reject identical ref names as `BLOCKED_INVALID_REF`.
+and their full commit OIDs. Use `refs/heads/<branch>` to bind a local branch exactly.[1] Route a
+nonzero branch lookup, target lookup, or merge-base command, and identical ref names, to
+`BLOCKED_INVALID_REF`; report the exact failing command and leave refs unchanged.
 
 ```bash
 git rev-parse --show-toplevel
@@ -34,12 +35,20 @@ git rev-parse --git-path rebase-merge
 git rev-parse --git-path rebase-apply
 git rev-parse --verify --quiet MERGE_HEAD
 git rev-parse --verify --quiet CHERRY_PICK_HEAD
+git for-each-ref --format='%(upstream)' refs/heads/<branch>
+git for-each-ref --format='%(refname)' --contains <old-tip-oid> refs/remotes
 ```
 
-Treat an absent operation ref as the expected nonzero result; treat every other unexpected nonzero
-result as `BLOCKED_GIT_STATE`. Record the old branch OID, target OID, merge-base OID, current branch,
-status, operation metadata, and owning worktree. Report whether the branch is published or shared,
-but do not publish anything.
+`git rev-parse --git-path` resolves a path; it does not test that path's existence.[2] Resolve both
+returned rebase paths against the repository and test each with the available filesystem tool. A
+directory at either path means a rebase is active. Treat an absent `MERGE_HEAD` or `CHERRY_PICK_HEAD`
+as the expected nonzero result; presence means that operation is active.
+
+Record the old branch OID, target OID, merge-base OID, current branch, complete porcelain status,
+operation-marker existence, owning worktree, configured upstream, and every remote ref containing
+the old tip.[6] Report these observable local publication signals without claiming knowledge of
+downstream consumers. Record every repository instruction source examined and every required
+preflight as complete argv, exit code, stdout, and stderr.
 
 Enter `BLOCKED_GIT_STATE` when tracked or untracked changes exist or another Git operation is active.
 Do not create a stash. Enter `NO_CHANGE` when distinct branch and target refs resolve to the same OID
@@ -48,10 +57,11 @@ and report zero replay candidates without creating a recovery ref.
 When the branch is owned by another worktree or execution would switch branches, read
 [rebase edge cases](./references/rebase-edge-cases.md) before proceeding. Enter
 `BLOCKED_WORKTREE_IN_USE` unless the current session owns the mutation path and every repository
-branch-transfer gate passes.
+branch-transfer gate passes.[3]
 
 Completion criterion: `READY_TO_ANALYZE` contains immutable branch, target, and merge-base OIDs; an
-authorized clean worktree; no active Git operation; and successful repository preflight evidence.
+authorized clean worktree; false/absent results for every operation marker; exact local publication
+evidence; and successful outputs for every repository-required preflight.
 
 ## 2. Inventory every replay candidate and affected path
 
@@ -95,40 +105,45 @@ surface.
 
 ## 3. Pass the accounted plan gate
 
-Emit the complete plan before any rebase command. Use this shape:
+Create a JSON plan artifact from the complete Step 1–2 evidence. Read the bundled
+[valid example](./references/example-plan.json), then obtain the complete maintained schema:
 
-```text
-Pre-rebase plan — <branch> onto <target>
-Branch ref/OID: refs/heads/<branch> @ <old-tip-oid>
-Target ref/OID: <target> @ <target-oid>
-Merge base: <merge-base-oid>
-Execution worktree: <authorized-path>
-Recovery ref: refs/heads/rebase-backup/<plan-id> -> <old-tip-oid>
-Replay candidates, in order:
-  <candidate-oid>: <RETAIN|ADAPT|MANUAL_MERGE|REDUNDANT_DROP|PRESERVE_EMPTY> — <evidence>
-Affected paths and dependencies:
-  <old-path> -> <new-path>: <branch intent, target interaction, verification surface>
-Merge policy: <linear-no-merges|preserve-topology|approved-flatten>
-Clean-cherry-pick policy: surface with --reapply-cherry-picks
-Becomes-empty policy: stop for EMPTY_COMMIT_DECISION
-Repository checks: <exact commands>
-Unknowns: none
+```bash
+uv run --script scripts/rebase_plan.py schema
 ```
 
-Enter `NEEDS_USER_DECISION` for an unapproved discard, topology flattening, intent change, shared-
-branch impact, or semantic ambiguity. Ask one concrete question for each decision and preserve the
-plan without mutation. The original explicit rebase request covers execution only when every
-candidate and change is accounted, `Unknowns: none`, and no extra decision is required.
+Write the full artifact to the repository scratch location or a user-selected path. Preserve every
+command output; the validator imposes no display truncation. Validate before any rebase command:
 
-Completion criterion: the plan forms an exact cover of candidates and affected changes, names every
-policy and validation command, contains no unknown, and reaches `READY_TO_REBASE` or
-`NEEDS_USER_DECISION`.
+```bash
+uv run --script scripts/rebase_plan.py validate <plan.json>
+```
+
+According to lines 235–352 of `scripts/rebase_plan.py`, the model requires the complete plan inputs
+and rejects failed evidence, unresolved decisions, incomplete path coverage, unsupported drops, and
+unbound merge policy. Lines 379–408 define the validator's structured result and plan SHA-256.
+
+Only exit code zero with compact JSON `status=VALID`, `state=READY_TO_REBASE`, and a plan SHA-256
+passes the gate. `PLAN_INVALID` is terminal for the current attempt: retain its complete structured
+errors, revise evidence or decisions, and rerun validation from the plan file.
+
+Enter `NEEDS_USER_DECISION` for an unapproved discard, topology flattening, intent change,
+published-branch impact, or semantic ambiguity. Ask one concrete question for each decision and
+preserve the plan without mutation. The original explicit rebase request covers execution only when
+every candidate and change is accounted, `Unknowns: none`, and no extra decision is required.
+
+Completion criterion: the persisted plan validates as an exact cover of candidates and affected
+paths, every preflight has a successful evidence record, every destructive decision is approved,
+unknowns are empty, and the validator returns `READY_TO_REBASE` plus the artifact SHA-256.
 
 ## 4. Recheck immutable refs and create recovery
 
 Resolve the branch and target names again. If either differs from the plan, enter
 `REPLAN_REF_DRIFT`, discard the stale plan, and return to Step 1 without rebasing. Reconfirm the
 authorized worktree, clean state, branch-transfer gate, and absence of a Git operation.
+
+Rerun `rebase_plan.py validate` on the persisted artifact. Require the same SHA-256 recorded at the
+plan gate; a changed or invalid artifact returns to Step 3. Then create the recovery ref.
 
 Create a uniquely named local recovery branch at the captured old tip and prove it resolves to that
 OID:
@@ -156,7 +171,7 @@ git rebase --reapply-cherry-picks --empty=stop [--rebase-merges] <target-oid> [r
 
 Include `--rebase-merges` only for a preserve-topology plan. Use the positional branch only when the
 plan authorizes the resulting checkout; otherwise require the current branch to equal the planned
-branch.
+branch.[4]
 
 When continuing or aborting an active rebase, or when execution stops on a conflict, unexpected
 conflict, empty commit, command failure, or requested abort, read
@@ -182,7 +197,7 @@ git range-diff <merge-base-oid>..<old-tip-oid> <target-oid>..<new-tip-oid>
 git rev-parse --verify refs/heads/rebase-backup/<plan-id>^{commit}
 ```
 
-For preserved merge topology, augment `range-diff` with the planned commit/parent and tree evidence.
+For preserved merge topology, augment `range-diff` with the planned commit/parent and tree evidence.[5]
 Account for every old candidate through its disposition; a missing mapping is a validation failure.
 Run every exact repository check named in the plan and retain its exit code and output.
 
@@ -195,33 +210,33 @@ Completion criterion: only all passing oracles emit `REBASE_COMPLETE_VERIFIED`. 
 target names, old tip, new tip, immutable target OID, candidate dispositions, repository-check
 evidence, clean state, recovery ref, and `not published`.
 
+## Rationalization checks
+
+| Rationalization | Response |
+|---|---|
+| "The endpoint diff is empty, so the candidate inventory is unnecessary" | Inventory every ordered candidate and validate the exact-cover plan before mutation |
+| "Git can decide which merge or empty commits to drop" | Bind topology and empty-commit policies in the validated artifact before execution |
+| "The conflict is obvious; I can continue before updating the plan" | Record the deviation and revalidate the artifact before continuation |
+| "The rebase exited zero, so verification is optional" | Run every named oracle; only their complete pass emits `REBASE_COMPLETE_VERIFIED` |
+
 ## Correct execution example
 
-```text
-Pre-rebase plan — feature/parser onto main
-Branch ref/OID: refs/heads/feature/parser @ 8c4f3c2a21b7d57c909bdf4ebcad350defc48721
-Target ref/OID: main @ 51ad71b98d7b68f427daefb841244f4616d78453
-Merge base: 106a43dc14109bd61c34a57f587ee25da8cb423d
-Execution worktree: /work/project
-Recovery ref: refs/heads/rebase-backup/parser-51ad71b -> 8c4f3c2a21b7d57c909bdf4ebcad350defc48721
-Replay candidates, in order:
-  a7e61ff09c795ddd6c4ef6f621f6edb2ba9a312b: ADAPT — target renamed parser.py; retain validation intent in parse.py
-  8c4f3c2a21b7d57c909bdf4ebcad350defc48721: RETAIN — adds independent parser error tests
-Affected paths and dependencies:
-  parser.py -> parse.py: adapt validation call; run parser unit tests
-  tests/test_parser.py: retain new cases; depends on parse.py adaptation
-Merge policy: linear-no-merges
-Clean-cherry-pick policy: surface with --reapply-cherry-picks
-Becomes-empty policy: stop for EMPTY_COMMIT_DECISION
-Repository checks: uv run pytest tests/test_parser.py -q
-Unknowns: none
-```
-
-The plan reaches `READY_TO_REBASE`; the recovery ref is verified before execution; all verification
-oracles pass afterward; the report emits `REBASE_COMPLETE_VERIFIED` and `not published`.
+The bundled [valid example](./references/example-plan.json) adapts a parser change through a target
+API change, accounts for both affected paths, records local publication and repository-preflight
+evidence, and carries no unknown. `rebase_plan.py validate` must return `READY_TO_REBASE` and its
+SHA-256 before the recovery ref or rebase is created.
 
 ## Failure example
 
 The plan records target OID `51ad71b...`, but the pre-execution lookup returns `d7490c1...`. Emit
 `REPLAN_REF_DRIFT`, preserve the plan as stale evidence, and return to Step 1. Running against either
 OID under the stale plan is not an allowed transition.
+
+## Sources
+
+1. [gitrevisions — specifying revisions](https://git-scm.com/docs/gitrevisions) (accessed 2026-09-22)
+2. [git-rev-parse — `--git-path`](https://git-scm.com/docs/git-rev-parse) (accessed 2026-09-22)
+3. [git-worktree](https://git-scm.com/docs/git-worktree) (accessed 2026-09-22)
+4. [git-rebase](https://git-scm.com/docs/git-rebase) (accessed 2026-09-22)
+5. [git-range-diff](https://git-scm.com/docs/git-range-diff) (accessed 2026-09-22)
+6. [git-for-each-ref](https://git-scm.com/docs/git-for-each-ref) (accessed 2026-09-22)

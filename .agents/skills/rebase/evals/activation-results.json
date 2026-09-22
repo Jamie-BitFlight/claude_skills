@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "skill_name": "rebase",
+  "observed_on": "2026-09-22",
+  "official_skill_docs": "https://learn.chatgpt.com/docs/build-skills",
+  "harnesses": {
+    "codex": {
+      "version": "0.155.1",
+      "provider": "portkey"
+    },
+    "opencode": {
+      "version": "1.18.32",
+      "provider": "portkey"
+    }
+  },
+  "cases": [
+    {
+      "harness": "opencode",
+      "eval_id": 1,
+      "expected_activation": true,
+      "observed_activation": true,
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "status": "PASSED"
+    },
+    {
+      "harness": "opencode",
+      "eval_id": 2,
+      "expected_activation": true,
+      "observed_activation": true,
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "status": "PASSED"
+    },
+    {
+      "harness": "opencode",
+      "eval_id": 3,
+      "expected_activation": true,
+      "observed_activation": true,
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "status": "PASSED"
+    },
+    {
+      "harness": "opencode",
+      "eval_id": 4,
+      "expected_activation": false,
+      "observed_activation": false,
+      "injected_skill_path": null,
+      "status": "PASSED"
+    },
+    {
+      "harness": "opencode",
+      "eval_id": 5,
+      "expected_activation": false,
+      "observed_activation": false,
+      "injected_skill_path": null,
+      "status": "PASSED"
+    },
+    {
+      "harness": "opencode",
+      "eval_id": 6,
+      "expected_activation": false,
+      "observed_activation": false,
+      "injected_skill_path": null,
+      "status": "PASSED"
+    },
+    {
+      "harness": "codex",
+      "eval_id": 1,
+      "expected_activation": true,
+      "observed_activation": true,
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "status": "PASSED"
+    }
+  ],
+  "codex_checks": [
+    {
+      "mode": "app-server-explicit",
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "observed_response": "READY_TO_ANALYZE\nACTIVATED_REBASE",
+      "status": "PASSED"
+    },
+    {
+      "mode": "cli-natural",
+      "injected_skill_path": "/tmp/rebase-activation.mmdMOj/.agents/skills/rebase/SKILL.md",
+      "observed_response": "BLOCKED_INVALID_REF after the exact local branch lookup; no mutation",
+      "status": "PASSED"
+    }
+  ]
+}

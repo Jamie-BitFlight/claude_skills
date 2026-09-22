@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "plan_id": "feature-parser-onto-main",
+  "branch": {
+    "ref": "refs/heads/feature/parser",
+    "oid": "1111111111111111111111111111111111111111"
+  },
+  "target": {
+    "ref": "refs/heads/main",
+    "oid": "2222222222222222222222222222222222222222"
+  },
+  "merge_base_oid": "4444444444444444444444444444444444444444",
+  "execution_worktree": "/work/project",
+  "worktree_authorized": true,
+  "status_porcelain": "",
+  "active_operations": [],
+  "repository_instruction_sources": ["AGENTS.md"],
+  "repository_preflights": [
+    {
+      "source": "AGENTS.md",
+      "argv": ["uv", "run", "scripts/audit_branch_transfer.py"],
+      "exit_code": 0,
+      "stdout": "{\"ok\":true}",
+      "stderr": ""
+    }
+  ],
+  "publication": {
+    "configured_upstream": "origin/feature/parser",
+    "remote_refs_containing_old_tip": ["refs/remotes/origin/feature/parser"],
+    "evidence_commands": [
+      {
+        "source": "local-git",
+        "argv": [
+          "git",
+          "for-each-ref",
+          "--contains",
+          "1111111111111111111111111111111111111111",
+          "refs/remotes"
+        ],
+        "exit_code": 0,
+        "stdout": "refs/remotes/origin/feature/parser\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "oid": "3333333333333333333333333333333333333333",
+      "parents": ["4444444444444444444444444444444444444444"],
+      "paths": ["parser.py", "tests/test_parser.py"],
+      "intent": "Add parser validation and tests.",
+      "evidence": ["candidate patch", "target rename diff"],
+      "disposition": "ADAPT",
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
+      "expected_conflict_paths": [],
+      "equivalence_evidence": [],
+      "drop_approval_decision_id": null
+    }
+  ],
+  "affected_paths": [
+    {
+      "path": "parser.py",
+      "candidate_oids": ["3333333333333333333333333333333333333333"],
+      "target_interaction": "Target renamed the API used by this path.",
+      "dependencies": ["tests/test_parser.py"],
+      "evidence": ["candidate patch", "target diff"],
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]]
+    },
+    {
+      "path": "tests/test_parser.py",
+      "candidate_oids": ["3333333333333333333333333333333333333333"],
+      "target_interaction": "Tests depend on the adapted parser path.",
+      "dependencies": ["parser.py"],
+      "evidence": ["candidate patch"],
+      "verification_commands": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]]
+    }
+  ],
+  "merge_policy": "LINEAR_NO_MERGES",
+  "clean_cherry_pick_policy": "SURFACE",
+  "becomes_empty_policy": "STOP",
+  "recovery_ref": "refs/heads/rebase-backup/feature-parser-onto-main",
+  "repository_checks": [["uv", "run", "pytest", "tests/test_parser.py", "-q"]],
+  "unknowns": [],
+  "user_decisions": []
+}

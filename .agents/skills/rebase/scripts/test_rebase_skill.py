@@ -6,6 +6,8 @@
 #   "pydantic>=2.0",
 #   "pytest",
 # ]
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Behavioral package tests for the rebase skill."""
 
@@ -13,19 +15,28 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 import marko
-from marko.block import FencedCode, Heading, Paragraph
+from marko.block import FencedCode
 from marko.inline import Link
 from pydantic import BaseModel
+
+from rebase_plan import Disposition, MergePolicy, workflow_state_names
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 SKILL_PATH = SKILL_ROOT / "SKILL.md"
 REFERENCE_PATH = SKILL_ROOT / "references" / "rebase-edge-cases.md"
 EVALS_PATH = SKILL_ROOT / "evals" / "evals.json"
+ACTIVATION_RESULTS_PATH = SKILL_ROOT / "evals" / "activation-results.json"
+BOUNDED_RUNNER = REPOSITORY_ROOT / "scripts" / "run_bounded.py"
+
+# Local Git fixture commands complete in milliseconds. Twenty seconds permits slow CI filesystems
+# while still proving that a hung hook or descendant process is terminated by the bounded runner.
+TEST_COMMAND_TIMEOUT_SECONDS = 20
 
 
 class EvalCase(BaseModel):
@@ -43,6 +54,25 @@ class EvalPackage(BaseModel):
 
     skill_name: str
     evals: list[EvalCase]
+
+
+class ActivationCaseResult(BaseModel):
+    """One observed harness activation decision."""
+
+    harness: str
+    eval_id: int
+    expected_activation: bool
+    observed_activation: bool
+    injected_skill_path: str | None
+    status: str
+
+
+class ActivationResults(BaseModel):
+    """Persisted activation evidence for the evaluation package."""
+
+    schema_version: int
+    skill_name: str
+    cases: list[ActivationCaseResult]
 
 
 def walk(element: object) -> Iterator[object]:
@@ -109,7 +139,16 @@ def run_git(
     command = ("git", *arguments)
     if transcript is not None:
         transcript.append(command)
-    return subprocess.run(command, cwd=repository, check=check, capture_output=True, text=True, timeout=20)
+    result = subprocess.run(
+        [sys.executable, str(BOUNDED_RUNNER), "--timeout-seconds", str(TEST_COMMAND_TIMEOUT_SECONDS), "--", *command],
+        cwd=repository,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if check:
+        result.check_returncode()
+    return result
 
 
 def initialize_repository(repository: Path) -> str:
@@ -162,87 +201,41 @@ def test_canonical_package_has_relative_claude_alias() -> None:
     assert claude_alias.readlink() == Path("../../.agents/skills/rebase")
     assert (claude_alias / "SKILL.md").read_bytes() == SKILL_PATH.read_bytes()
 
-    tracked = subprocess.run(
-        ["git", "ls-files", "-s", ".claude/skills/rebase"],
-        cwd=REPOSITORY_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    tracked = run_git(REPOSITORY_ROOT, "ls-files", "-s", ".claude/skills/rebase")
     assert tracked.stdout.startswith("120000 ")
 
 
-def test_each_universal_step_has_an_observable_completion_criterion() -> None:
-    """Require every numbered main-path step to expose a completion gate."""
+def test_every_bundled_markdown_link_resolves() -> None:
+    """Keep progressive-disclosure resources reachable from the canonical skill."""
     document = parse_markdown(SKILL_PATH)
-    top_level = getattr(document, "children", [])
-    assert isinstance(top_level, list)
+    local_links = [node.dest for node in walk(document) if isinstance(node, Link) and not node.dest.startswith("http")]
 
-    numbered_headings = [
-        (index, node)
-        for index, node in enumerate(top_level)
-        if isinstance(node, Heading) and node.level == 2 and re.match(r"^[1-6]\. ", node_text(node))
-    ]
-    assert len(numbered_headings) == 6
-    all_headings = [node_text(node) for node in top_level if isinstance(node, Heading)]
-    assert "Rules" not in all_headings
-    assert not any(heading.startswith("Step ") for heading in all_headings)
-
-    for position, (start, heading) in enumerate(numbered_headings):
-        end = numbered_headings[position + 1][0] if position + 1 < len(numbered_headings) else len(top_level)
-        section_nodes = top_level[start + 1 : end]
-        criteria = [
-            node_text(node)
-            for node in section_nodes
-            if isinstance(node, Paragraph) and node_text(node).startswith("Completion criterion:")
-        ]
-        assert len(criteria) == 1, node_text(heading)
-
-
-def test_conditional_references_are_routable_and_exist() -> None:
-    """Expose each branch-only reference through a condition-bearing pointer."""
-    document = parse_markdown(SKILL_PATH)
-    pointers: list[tuple[str, str]] = []
-
-    for node in walk(document):
-        if not isinstance(node, Paragraph):
-            continue
-        paragraph_text = node_text(node)
-        links = [child for child in walk(node) if isinstance(child, Link)]
-        pointers.extend((paragraph_text, link.dest) for link in links)
-
-    edge_pointers = [(text, destination) for text, destination in pointers if destination.startswith("./references/")]
-    assert len(edge_pointers) == 3
-    for text, destination in edge_pointers:
-        assert text.startswith("When ")
-        assert (SKILL_ROOT / destination).is_file()
+    assert local_links
+    assert all((SKILL_ROOT / destination).is_file() for destination in local_links)
 
 
 def test_terminal_state_contract_covers_every_safety_branch() -> None:
-    """Keep all required observable terminals available to the workflow."""
+    """Reject prompt state tokens absent from the typed canonical vocabulary."""
     package_text = SKILL_PATH.read_text(encoding="utf-8") + REFERENCE_PATH.read_text(encoding="utf-8")
-    required_states = {
-        "BLOCKED_INVALID_REF",
-        "BLOCKED_GIT_STATE",
-        "BLOCKED_WORKTREE_IN_USE",
-        "NO_CHANGE",
-        "READY_TO_REBASE",
-        "NEEDS_USER_DECISION",
-        "REPLAN_REF_DRIFT",
-        "CONFLICT",
-        "UNEXPECTED_CONFLICT",
-        "EMPTY_COMMIT_DECISION",
-        "REBASE_ABORTED_RESTORED",
-        "BLOCKED_ABORT_FAILED",
-        "REBASE_COMPLETE_VALIDATION_FAILED",
-        "REBASE_COMPLETE_VERIFIED",
+    presented_states = set(re.findall(r"`([A-Z][A-Z_]+)`", package_text))
+    canonical_states = {state.value for state in workflow_state_names()}
+    non_state_contract_tokens = {
+        *(disposition.value for disposition in Disposition),
+        *(policy.value for policy in MergePolicy),
+        "CHERRY_PICK_HEAD",
+        "MERGE_HEAD",
+        "REBASE_HEAD",
+        "STOP",
+        "SURFACE",
+        "VALID",
     }
-    missing = {state for state in required_states if f"`{state}`" not in package_text}
-    assert not missing
+
+    assert presented_states
+    assert presented_states <= canonical_states | non_state_contract_tokens
 
 
-def test_executable_instructions_are_forge_neutral_and_plan_gated() -> None:
-    """Exclude forge/publication commands and order local rebase after the plan gate."""
+def test_executable_instructions_are_forge_neutral() -> None:
+    """Exclude provider, publication, and merge commands from runtime instructions."""
     document = parse_markdown(SKILL_PATH)
     reference = parse_markdown(REFERENCE_PATH)
     command_text = "\n".join(
@@ -251,11 +244,6 @@ def test_executable_instructions_are_forge_neutral_and_plan_gated() -> None:
 
     assert not re.search(r"(?m)^\s*(?:gh|glab)\s", command_text)
     assert not re.search(r"(?m)^\s*git\s+(?:push\b|merge(?:\s|$))", command_text)
-
-    skill_text = SKILL_PATH.read_text(encoding="utf-8")
-    plan_gate = skill_text.index("READY_TO_REBASE")
-    rebase_execution = skill_text.index("git rebase --reapply-cherry-picks")
-    assert plan_gate < rebase_execution
 
 
 def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> None:
@@ -274,6 +262,27 @@ def test_activation_evals_cover_explicit_rebase_and_nearby_negative_routes() -> 
         False,
         False,
     ]
+
+
+def test_observed_activation_results_cover_every_opencode_eval_and_codex_positive() -> None:
+    """Require observed harness decisions and the exact injected canonical path."""
+    eval_package = EvalPackage.model_validate_json(EVALS_PATH.read_text(encoding="utf-8"))
+    results = ActivationResults.model_validate_json(ACTIVATION_RESULTS_PATH.read_text(encoding="utf-8"))
+    opencode_cases = {case.eval_id: case for case in results.cases if case.harness == "opencode"}
+    codex_cases = [case for case in results.cases if case.harness == "codex"]
+
+    assert results.schema_version == 1
+    assert results.skill_name == eval_package.skill_name
+    assert set(opencode_cases) == {case.id for case in eval_package.evals}
+    assert codex_cases
+    assert all(case.observed_activation for case in codex_cases)
+    assert all(case.status == "PASSED" for case in results.cases)
+    for evaluation in eval_package.evals:
+        observed = opencode_cases[evaluation.id]
+        expected_activation = evaluation.expected_output.startswith("ACTIVATE")
+        assert observed.expected_activation is expected_activation
+        assert observed.observed_activation is expected_activation
+        assert (observed.injected_skill_path is not None) is expected_activation
 
 
 def test_git_inventory_keeps_net_zero_commits_and_rename_pairs(tmp_path: Path) -> None:

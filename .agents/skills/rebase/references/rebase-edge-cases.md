@@ -7,12 +7,12 @@ Load only the section selected by the condition-bearing pointer in `SKILL.md`.
 - Worktree ownership and branch transfer
 - Merge topology and commits Git can drop
 - Rebase stops, continuation, and recovery
-- Terminal evidence
+- Workflow state contract
 
 ## Worktree ownership and branch transfer
 
 Parse `git worktree list --porcelain` as records. Match `branch refs/heads/<branch>` and record its
-`worktree` path.
+`worktree` path.[1]
 
 - If the match names another worktree, establish from session context that this session owns that
   worktree. If ownership is absent or unknown, emit `BLOCKED_WORKTREE_IN_USE`; leave its branch,
@@ -54,6 +54,9 @@ empty commit when the plan assigns `PRESERVE_EMPTY`. When a nonempty candidate b
    `PRESERVE_EMPTY`; verify the resulting commit before continuing.
 5. Emit `NEEDS_USER_DECISION` when neither disposition is established.
 
+Git documents the default merge-commit drop, `--rebase-merges`, clean-cherry-pick handling,
+`--reapply-cherry-picks`, and `--empty=stop` behavior on the rebase reference.[2]
+
 ## Rebase stops, continuation, and recovery
 
 For an explicit continue or abort request, first inspect the active operation, current branch,
@@ -65,7 +68,7 @@ recovery branch at the reconstructed old tip and verify it before continuing or 
 
 During a rebase conflict, Git labels the accumulated rebased series beginning at the target as
 `ours`; it labels the working-branch commit being replayed as `theirs`. Resolve by planned intent and
-hunk evidence. A side label never authorizes whole-file replacement.
+hunk evidence. A side label never authorizes whole-file replacement.[2]
 
 For `CONFLICT`:
 
@@ -79,6 +82,9 @@ For `CONFLICT`:
 6. Continue with `git -c core.editor=true rebase --continue` when the existing commit message needs
    no edit. If an edit is required, use the repository's approved PTY route.
 7. Inspect the result: loop to `CONFLICT`, route to `EMPTY_COMMIT_DECISION`, or finish Step 5.
+
+The status and unmerged-index commands above expose the worktree/index states defined by Git's
+status and `ls-files` references.[3] [4]
 
 For `UNEXPECTED_CONFLICT`, record the path, hunk, current candidate, and mismatch with the plan.
 Update the candidate/path disposition and evidence. Route to `NEEDS_USER_DECISION` when the update
@@ -104,22 +110,24 @@ If a rebase command fails without an active conflict or empty-commit stop, emit
 later decision. If post-rebase verification fails, emit `REBASE_COMPLETE_VALIDATION_FAILED`; leave
 both rewritten and recovery refs intact for an explicit recovery decision.
 
-## Terminal evidence
+## Workflow state contract
 
-| State | Observable evidence |
-|---|---|
-| `BLOCKED_INVALID_REF` | Exact failing ref lookup or identical ref names; branch and target OIDs unchanged. |
-| `BLOCKED_GIT_STATE` | Dirty status, active operation, or recovery-ref failure; no new rebase. |
-| `BLOCKED_WORKTREE_IN_USE` | Owning worktree path; foreign HEAD, index, and files unchanged. |
-| `NO_CHANGE` | Distinct refs resolve to one OID; zero candidates; no recovery ref. |
-| `READY_TO_REBASE` | Immutable refs, exact-cover plan, `Unknowns: none`, verified recovery ref. |
-| `NEEDS_USER_DECISION` | Concrete unresolved decisions; no new rebase. |
-| `REPLAN_REF_DRIFT` | Fresh branch or target OID differs from the plan; no stale-plan rebase. |
-| `CONFLICT` | Current candidate and unmerged entries recorded; resolution loop remains active. |
-| `UNEXPECTED_CONFLICT` | Deviation and revised disposition recorded before resolution. |
-| `EMPTY_COMMIT_DECISION` | Exact stopped candidate and planned evidence recorded before skip/keep. |
-| `REBASE_ABORTED_RESTORED` | Old tip, clean recorded state, absent metadata, and recovery ref verified. |
-| `BLOCKED_ABORT_FAILED` | Abort error or restoration mismatch; evidence preserved. |
-| `BLOCKED_COMMAND_FAILED` | Failing command/output with refs, status, and recovery ref preserved. |
-| `REBASE_COMPLETE_VALIDATION_FAILED` | At least one named verification oracle failed; no publication claim. |
-| `REBASE_COMPLETE_VERIFIED` | Every oracle passed; old/new/target OIDs and recovery ref reported as not published. |
+Read the canonical state names, transition/terminal classification, and required evidence from the
+bundled typed source instead of maintaining a second prose roster:
+
+According to lines 32–155 of `../scripts/rebase_plan.py`, that source defines every state name,
+classification, and evidence contract in one typed collection.
+
+```bash
+uv run --script scripts/rebase_plan.py states
+```
+
+Use only a state returned by that command. If a prompt edit introduces an unknown state token, the
+package contract test fails before publication.
+
+## Sources
+
+1. [git-worktree](https://git-scm.com/docs/git-worktree) (accessed 2026-09-22)
+2. [git-rebase](https://git-scm.com/docs/git-rebase) (accessed 2026-09-22)
+3. [git-status](https://git-scm.com/docs/git-status) (accessed 2026-09-22)
+4. [git-ls-files](https://git-scm.com/docs/git-ls-files) (accessed 2026-09-22)
