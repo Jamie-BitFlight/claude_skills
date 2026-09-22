@@ -35,7 +35,13 @@ EXCLUDED_TOOLS = {"profile_list", "profile_load"}  # different ownership, out of
 # list-response fields to Optional (fixing error-arm default-value leaks,
 # e.g. dispatch_wave_status) pushed one tool to 604 -- still nowhere near
 # sam_plan's per-tool cost.
-_MAX_TOTAL_SCHEMA_TOKENS = 13000
+# Raised 13000->14000 when every error arm gained ``retryable``: 26 tokens per tool across 40
+# tools, measured at 1,040, taking the total from 12,773 to 13,813. The field is what lets a
+# caller tell a transient backend failure from one that repeats identically, which no message
+# text could say without becoming prose. Shrinking it to a plain ``bool`` would fit the old
+# number and lose the difference between "cannot succeed" and "not known" -- the same
+# information loss an untested cap forced the last time, recorded above.
+_MAX_TOTAL_SCHEMA_TOKENS = 14000
 _MAX_SINGLE_TOOL_SCHEMA_TOKENS = 700
 
 # backlog_view (#3368) is the deliberate multi-mode outlier: one tool

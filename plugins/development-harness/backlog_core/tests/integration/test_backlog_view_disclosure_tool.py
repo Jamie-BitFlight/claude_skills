@@ -1073,8 +1073,10 @@ class TestCodeFenceMissErrorShape:
     Spy contract: patches backlog_core.operations.view_item.
     """
 
-    #: Key set expected in any OrdinalNotFoundError response (matches TC-T3).
-    _ORDINAL_NOT_FOUND_KEYS: frozenset[str] = frozenset({"error", "requested_ordinal", "valid_ordinals"})
+    #: Key set expected in any OrdinalNotFoundError response (matches TC-T3). ``retryable`` joined
+    #: it when every error arm started reporting whether the call can succeed again; an ordinal the
+    #: item does not hold never can, so it reports False on both miss paths and the shapes still match.
+    _ORDINAL_NOT_FOUND_KEYS: frozenset[str] = frozenset({"error", "retryable", "requested_ordinal", "valid_ordinals"})
 
     @_skip_without_recursive_nav
     @_skip_without_real_enc
