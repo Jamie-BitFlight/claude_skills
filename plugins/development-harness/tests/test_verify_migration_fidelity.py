@@ -10,9 +10,12 @@ used Rich) and is not the focus here.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from backlog_core.operations import render_sections_as_body
 from backlog_core.yaml_io import load_item_text, save_item
 
@@ -28,6 +31,10 @@ from scripts.verify_migration_fidelity import CONTENT_LOSS, MATCH, FileResult, V
 from typer.testing import CliRunner
 
 runner = CliRunner()
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_SCRIPT_PATH = Path("plugins/development-harness/scripts/verify_migration_fidelity.py")
+_BOUNDED_RUNNER = Path("scripts/run_bounded.py")
 
 _ITEM_MD = """\
 ---
@@ -133,6 +140,38 @@ def test_summary_payload_includes_verification_errors(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.integration
+def test_standalone_pep723_invocation_reaches_help() -> None:
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    env.pop("VIRTUAL_ENV", None)
+
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--script",
+            str(_BOUNDED_RUNNER),
+            "--timeout-seconds",
+            "180",
+            "--",
+            "uv",
+            "run",
+            str(_SCRIPT_PATH),
+            "--help",
+        ],
+        cwd=_REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Compare .md.bak originals" in result.stdout
+    assert "Traceback" not in result.stderr
+
+
 def test_main_missing_backlog_dir_errors(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist"
 
@@ -153,6 +192,26 @@ def test_main_reports_match_and_exits_0(tmp_path: Path) -> None:
     assert payload["classification_counts"]["MATCH"] == 1
     assert payload["classification_counts"]["CONTENT_LOSS"] == 0
     assert Path(payload["report_path"]).exists()
+
+    Path(payload["report_path"]).unlink()
+
+
+def test_main_verbose_flag_includes_non_loss_diff(tmp_path: Path) -> None:
+    _write_matching_pair(tmp_path)
+    bak_path = tmp_path / "item1.md.bak"
+    bak_path.write_text(
+        bak_path.read_text(encoding="utf-8").replace("Some context content that must survive migration.\n", ""),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--backlog-dir", str(tmp_path), "--verbose"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload["verbose_diffs"]) == 1
+    assert payload["verbose_diffs"][0]["file"] == "item1.md.bak"
+    assert payload["verbose_diffs"][0]["classification"] == "CONTENT_GAIN"
+    assert "+Some context content that must survive migration.\n" in payload["verbose_diffs"][0]["diff"]
 
     Path(payload["report_path"]).unlink()
 

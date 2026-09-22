@@ -11,6 +11,7 @@
 #   "tiktoken>=0.12.0",
 #   "typing-extensions>=4.0.0",
 #   "marko>=2.0.0",
+#   "httpx>=0.28.1",
 # ]
 #
 # [tool.ty.environment]
@@ -503,7 +504,7 @@ def main(
         typer.Option("--limit", help="Process only the first N .md.bak files (for testing).", show_default=False),
     ] = None,
     verbose: Annotated[
-        bool, typer.Option("--verbose", help="Show diffs for all files, not just CONTENT_LOSS items.", is_flag=True)
+        bool, typer.Option("--verbose", help="Show diffs for all files, not just CONTENT_LOSS items.")
     ] = False,
 ) -> None:
     """Compare .md.bak originals against migrated .yaml files for content-level fidelity.

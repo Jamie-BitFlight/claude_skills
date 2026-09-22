@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import threading
-import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -55,6 +55,28 @@ def _init_repo(path: Path) -> git.Repo:
     repo.index.add(["tracked.txt"])
     repo.index.commit("initial commit")
     return repo
+
+
+@pytest.fixture
+def hanging_repo_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[threading.Thread]]:
+    """Install a blocked Repo constructor and join every worker before teardown completes."""
+    release_worker = threading.Event()
+    workers: list[threading.Thread] = []
+    monkeypatch.setattr(dh_paths, "_GIT_RESOLUTION_TIMEOUT_SECONDS", 0.05)
+
+    def _hang(*args: object, **kwargs: object) -> git.Repo:
+        del args, kwargs
+        workers.append(threading.current_thread())
+        release_worker.wait()
+        raise git.exc.InvalidGitRepositoryError("synthetic timeout worker released")
+
+    monkeypatch.setattr(dh_paths.git, "Repo", _hang)
+    yield workers
+
+    release_worker.set()
+    for worker in workers:
+        worker.join(timeout=1)
+        assert not worker.is_alive(), f"synthetic timeout worker {worker.name} did not finish"
 
 
 # ---------------------------------------------------------------------------
@@ -318,28 +340,17 @@ class TestGitCommonRootResourceCleanup:
 class TestGitCommonRootHangProtection:
     """Tests that a hung GitPython Repo() construction times out with an actionable error.
 
-    Strategy: monkeypatch git.Repo with a stub that sleeps past a shortened
-    timeout, proving the wrapper itself enforces the bound rather than relying
-    on the real (long) production timeout in a test.
+    Strategy: monkeypatch git.Repo with a stub held by an event past a shortened
+    timeout, proving the wrapper itself enforces the bound. The owning fixture
+    releases and joins every synthetic worker before test teardown completes.
     """
 
     def setup_method(self) -> None:
         """Clear module-level root cache before each test."""
         dh_paths._root_cache.clear()
 
-    @staticmethod
-    def _install_hanging_repo_stub(monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(dh_paths, "_GIT_RESOLUTION_TIMEOUT_SECONDS", 0.05)
-
-        def _hang(*args: object, **kwargs: object) -> git.Repo:
-            del args, kwargs
-            time.sleep(2)
-            raise AssertionError("hanging stub should never return")
-
-        monkeypatch.setattr(dh_paths.git, "Repo", _hang)
-
     def test_git_common_root_raises_timeout_error_on_hang(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, hanging_repo_stub: list[threading.Thread]
     ) -> None:
         """_git_common_root bounds a hung Repo() construction and raises an actionable error.
 
@@ -348,14 +359,14 @@ class TestGitCommonRootHangProtection:
         Why: A bad NFS mount must fail fast with a diagnosable message, not hang forever
         """
         # Arrange
-        self._install_hanging_repo_stub(monkeypatch)
+        assert not hanging_repo_stub
 
-        # Act / Assert — bounded by the shortened timeout, not the 2-second stub sleep
+        # Act / Assert — bounded by the shortened timeout, not the event-held stub
         with pytest.raises(dh_paths.GitResolutionTimeoutError, match="unreachable network filesystem"):
             dh_paths._git_common_root(tmp_path)
 
     def test_git_root_if_directory_treats_hang_as_failed_candidate(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, hanging_repo_stub: list[threading.Thread]
     ) -> None:
         """_git_root_if_directory treats a hang as a failed candidate, not a fatal error.
 
@@ -364,7 +375,7 @@ class TestGitCommonRootHangProtection:
         Why: A hang on one candidate directory must not abort the whole hint chain
         """
         # Arrange
-        self._install_hanging_repo_stub(monkeypatch)
+        assert not hanging_repo_stub
 
         # Act
         result = dh_paths._git_root_if_directory(tmp_path)
@@ -373,7 +384,7 @@ class TestGitCommonRootHangProtection:
         assert result is None
 
     def test_infer_project_root_raises_actionable_runtime_error_on_hang(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hanging_repo_stub: list[threading.Thread]
     ) -> None:
         """infer_project_root turns a final-fallback git hang into the documented RuntimeError.
 
@@ -388,14 +399,14 @@ class TestGitCommonRootHangProtection:
         monkeypatch.delenv("CURSOR_PROJECT_ROOT", raising=False)
         monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
         monkeypatch.delenv("CODEX_THREAD_ID", raising=False)
-        self._install_hanging_repo_stub(monkeypatch)
+        assert not hanging_repo_stub
 
         # Act / Assert
         with pytest.raises(RuntimeError, match="unreachable network filesystem"):
             dh_paths.infer_project_root(tmp_path)
 
     def test_hung_worker_is_left_as_a_daemon_thread_not_an_executor_thread(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, hanging_repo_stub: list[threading.Thread]
     ) -> None:
         """A timed-out worker must be exempt from being joined at interpreter shutdown.
 
@@ -409,17 +420,42 @@ class TestGitCommonRootHangProtection:
              from that join.
         """
         # Arrange
-        threads_before = set(threading.enumerate())
-        self._install_hanging_repo_stub(monkeypatch)
+        assert not hanging_repo_stub
 
         # Act
         with pytest.raises(dh_paths.GitResolutionTimeoutError):
             dh_paths._git_common_root(tmp_path)
 
         # Assert -- the abandoned worker is a daemon thread, exempt from interpreter-exit join
-        new_threads = set(threading.enumerate()) - threads_before
-        assert new_threads, "expected the timed-out worker thread to still be running"
-        assert all(thread.daemon for thread in new_threads)
+        assert hanging_repo_stub, "expected the timed-out worker thread to still be running"
+        assert all(thread.is_alive() and thread.daemon for thread in hanging_repo_stub)
+
+    def test_unexpected_git_error_is_reported_by_worker_thread(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Unexpected Repo failures remain visible through Python's thread exception hook."""
+        reported = threading.Event()
+        reported_exceptions: list[BaseException] = []
+
+        def _record_exception(args: threading.ExceptHookArgs) -> None:
+            assert args.exc_value is not None
+            reported_exceptions.append(args.exc_value)
+            reported.set()
+
+        def _raise(*args: object, **kwargs: object) -> git.Repo:
+            del args, kwargs
+            raise AssertionError("unexpected synthetic GitPython failure")
+
+        monkeypatch.setattr(dh_paths, "_GIT_RESOLUTION_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr(threading, "excepthook", _record_exception)
+        monkeypatch.setattr(dh_paths.git, "Repo", _raise)
+
+        with pytest.raises(dh_paths.GitResolutionTimeoutError):
+            dh_paths._git_common_root(tmp_path)
+
+        assert reported.wait(timeout=1), "worker exception was not reported"
+        assert len(reported_exceptions) == 1
+        assert isinstance(reported_exceptions[0], AssertionError)
 
     def test_real_git_error_propagates_unchanged_across_the_worker_thread(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
