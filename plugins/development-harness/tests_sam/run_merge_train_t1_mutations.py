@@ -22,6 +22,7 @@ AMENDMENT_CASES = {
     "test_f02_import_replace_invalidates_inactive_registration",
     "test_f03_f08_deleted_binding_cannot_authorize_open_attempt",
     "test_f08_cross_copied_event_and_projection_reject_against_frozen_member",
+    "test_f08_released_reservation_event_and_projection_cannot_cross_copy_role",
     "test_f02_no_group_judge_pending_work_blocks_every_replacement_route",
     "test_s1_active_registration_refuses_dispatch_revision_only_drift",
 }
@@ -238,6 +239,12 @@ MUTANTS: tuple[tuple[str, str, ast.NodeTransformer, str], ...] = (
         "dh_core/ledger/store.py",
         ReplaceIfTest("expected != actual", False),
         "test_f08_cross_copied_event_and_projection_reject_against_frozen_member",
+    ),
+    (
+        "F08-skip-frozen-member-reservation-check",
+        "dh_core/ledger/store.py",
+        ReplaceIfTest("reservation_expected != reservation_actual", False),
+        "test_f08_released_reservation_event_and_projection_cannot_cross_copy_role",
     ),
     (
         "F24-remove-host-marker-check",

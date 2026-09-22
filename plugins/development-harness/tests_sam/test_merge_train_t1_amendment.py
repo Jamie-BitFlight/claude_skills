@@ -164,6 +164,16 @@ def corrupt_dispatch_authority(
     connection.execute(f"UPDATE merge_dispatches SET {field} = :value", {"value": row_value})
 
 
+def corrupt_reservation_role(connection: sqlite3.Connection, role: str) -> None:
+    event = store.events_of(connection, "P3798", kind="merge.reserved")[0]
+    payload = dict(event["payload"])
+    payload["role"] = role
+    connection.execute(
+        "UPDATE events SET payload = :payload WHERE seq = :seq", {"payload": json.dumps(payload), "seq": event["seq"]}
+    )
+    connection.execute("UPDATE merge_reservations SET role = :role", {"role": role})
+
+
 def independent_dispatch_authority_findings(connection: sqlite3.Connection) -> list[str]:
     """Check binding events against literal retained definitions without production fold helpers."""
     registrations: dict[tuple[str, int], dict[str, tuple[object, ...]]] = {}
@@ -473,6 +483,35 @@ def test_f08_fold_rejects_cross_task_binding_event(tmp_path: Path) -> None:
 
     with pytest.raises(LookupError, match="dispatch binding"):
         store.fold_events(events)
+
+
+def test_f08_released_reservation_event_and_projection_cannot_cross_copy_role(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    transitions.state(connection, "P3798", "T1", new_status="blocked", reason="released", force=True)
+    corrupt_reservation_role(connection, "checker")
+
+    assert not train.validate(MergeQuery(plan="P3798")).valid
+    assert not train.validate(MergeQuery(plan="P3798", generation=1)).valid
+    with pytest.raises(LookupError, match="reservation"):
+        store.rebuild(connection)
+
+
+def test_f05_legal_released_reservation_history_survives_reacquisition_and_rebuild(tmp_path: Path) -> None:
+    train, connection, _, _ = service(tmp_path)
+    register(train)
+    first = train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+    transitions.state(connection, "P3798", "T1", new_status="blocked", reason="released", force=True)
+    transitions.reclaim(connection, "P3798", "T1", reason="retry")
+    second = train.dispatch(DispatchReserved(plan="P3798", generation=1, task="T1"))
+
+    assert second.attempt == first.attempt + 1
+    assert train.validate(MergeQuery(plan="P3798")).valid
+    assert train.validate(MergeQuery(plan="P3798", generation=1)).valid
+    store.rebuild(connection)
+    assert train.validate(MergeQuery(plan="P3798")).valid
+    assert train.validate(MergeQuery(plan="P3798", generation=1)).valid
 
 
 def test_f25_mutation_subprocess_contract_is_bounded_and_classifies_timeout() -> None:

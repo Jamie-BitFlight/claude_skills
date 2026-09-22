@@ -1389,6 +1389,33 @@ def fold_merge_dispatch_bound(tables: Folded, event: Mapping[str, Any]) -> None:
 def fold_merge_reserved(tables: Folded, event: Mapping[str, Any]) -> None:
     """Materialize active ownership of a registered conflict group."""
     payload = event["payload"]
+    train_key = (str(event["plan"]), int(payload["generation"]))
+    definition = tables["merge_authority"].get(train_key)
+    if isinstance(definition, str):
+        definition = json.loads(definition)
+    members = definition.get("members") if isinstance(definition, dict) else None
+    member = (
+        next((item for item in members if isinstance(item, dict) and item.get("task") == event["task"]), None)
+        if isinstance(members, list)
+        else None
+    )
+    reservation_expected = (
+        (int(member["issue"]), str(member["role"]), member.get("conflict_group")) if member is not None else None
+    )
+    reservation_actual = (int(payload["github_issue"]), str(payload["role"]), payload.get("conflict_group"))
+    binding = tables["merge_dispatches"].get((
+        str(event["plan"]),
+        int(payload["generation"]),
+        str(event["task"]),
+        int(payload["attempt"]),
+    ))
+    if (
+        reservation_expected != reservation_actual
+        or binding is None
+        or (int(binding["github_issue"]), str(binding["role"]), binding["conflict_group"]) != reservation_actual
+    ):
+        msg = f"event {event['seq']} carries reservation outside registered authority {train_key}"
+        raise LookupError(msg)
     row = blank_row("merge_reservations")
     row.update(carried("merge_reservations", payload))
     row.update(
