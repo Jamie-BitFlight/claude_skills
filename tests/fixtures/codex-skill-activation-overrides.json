@@ -1,4 +1,37 @@
 {
+  "repo-skills:rebase": {
+    "chain": [],
+    "evidence": {
+      "behavior": {
+        "expected_tokens_matched": 2,
+        "expected_tokens_requested": 2
+      },
+      "cache_provenance": {
+        "installed_tree_sha256": "a240c0e7f297ae31d40d6b21313f31aefca1636fa67636bfd47c31ea0dcbdc2c",
+        "matched": true,
+        "source_tree_sha256": "a240c0e7f297ae31d40d6b21313f31aefca1636fa67636bfd47c31ea0dcbdc2c"
+      },
+      "distribution": {
+        "installation_kind": "repo-scoped-skill-copy",
+        "installed_skill": ".agents/skills/rebase/SKILL.md"
+      },
+      "injection": {
+        "evidence_file": "tests/fixtures/rebase-codex-consumer-evidence.json",
+        "instructed_command_path_matched": true,
+        "skill_root_matched": true
+      },
+      "safety": {
+        "approval_policy": "never",
+        "blocked_event_types": ["commandExecution", "fileChange", "mcpToolCall"],
+        "sandbox": "read-only"
+      }
+    },
+    "expected_outcome": "The real Codex consumer activates the installed repo-scoped rebase skill and reports its injected absolute skill_root and resolved rebase_plan.py command without executing commands or reading the authoring checkout.",
+    "safety_class": "READ_ONLY",
+    "status": "PASSED",
+    "task_source": "tests/fixtures/codex-skill-activation-overrides.json",
+    "task_text": "Read only. Do not run commands and do not access any source checkout. Using only the Codex-supplied skill_root for the explicitly selected rebase skill, report exactly two lines: SKILL_ROOT=<absolute loaded skill directory> and COMMAND=<that directory>/scripts/rebase_plan.py."
+  },
   "rwr:audit": {
     "chain": [],
     "expected_outcome": "The explicitly selected audit skill uses compare mode and returns a read-only evidence ledger whose conflicting claim is STALE and whose implementation value is 60 seconds.",

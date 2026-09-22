@@ -14,7 +14,6 @@
     { "harness": "opencode", "eval_id": 4 },
     { "harness": "opencode", "eval_id": 5 },
     { "harness": "opencode", "eval_id": 6 },
-    { "harness": "codex", "eval_id": 2 },
     { "harness": "isolated", "eval_id": 7 }
   ],
   "cases": [
@@ -274,55 +273,6 @@
       "repository_head_after": "86404f16549b623199b7974b82f20fe6fa8b6e9f",
       "repository_status_before": "?? .agents/\n",
       "repository_status_after": "?? .agents/\n"
-    },
-    {
-      "harness": "codex",
-      "model": "gpt-5.6-sol",
-      "proxy": "local",
-      "session_id": "copied-consumer-codex-continue-20260923",
-      "eval_id": 2,
-      "prompt": "Continue the rebase after I fixed this conflict.",
-      "observed_activation": true,
-      "skill_directory": "/tmp/rebase-consumer-copy.UJ8Abh/rebase",
-      "consumer_installation": {
-        "method": "copied-skill-directory",
-        "source_package_sha256": "776110b519196615769674626b187f657120891b7f106dd0487a5fe2fbcc6028",
-        "installed_package_sha256": "776110b519196615769674626b187f657120891b7f106dd0487a5fe2fbcc6028",
-        "installed_skill_directory": "/tmp/rebase-consumer-copy.UJ8Abh/rebase",
-        "fixture_directory": "/tmp/rebase-consumer-fixtures.nqaaex/continue",
-        "runner": "isolated-no-repository-agent",
-        "source_repository_accessed": false
-      },
-      "loaded_sources": ["SKILL.md", "references/active-rebase.md"],
-      "actions": [
-        { "kind": "read", "operation": "read complete rebase SKILL.md" },
-        { "kind": "read", "operation": "read complete active-rebase entry reference" },
-        {
-          "kind": "command",
-          "operation": "rebase_active.py",
-          "script_path": "/tmp/rebase-consumer-copy.UJ8Abh/rebase/scripts/rebase_active.py",
-          "exit_code": 0,
-          "execution": {
-            "argv": [
-              "uv",
-              "run",
-              "--script",
-              "/tmp/rebase-consumer-copy.UJ8Abh/rebase/scripts/rebase_active.py"
-            ],
-            "cwd": "/tmp/rebase-consumer-fixtures.nqaaex/continue",
-            "exit_code": 0,
-            "stdout": "{\"commands\":[{\"argv\":[\"git\",\"rev-parse\",\"--show-toplevel\"],\"exit_code\":0,\"stdout\":\"/tmp/rebase-consumer-fixtures.nqaaex/continue\\n\",\"stderr\":\"\",\"timed_out\":false},{\"argv\":[\"git\",\"rev-parse\",\"--git-path\",\"rebase-merge\"],\"exit_code\":0,\"stdout\":\".git/rebase-merge\\n\",\"stderr\":\"\",\"timed_out\":false},{\"argv\":[\"git\",\"rev-parse\",\"--git-path\",\"rebase-apply\"],\"exit_code\":0,\"stdout\":\".git/rebase-apply\\n\",\"stderr\":\"\",\"timed_out\":false},{\"argv\":[\"git\",\"rev-parse\",\"--verify\",\"--quiet\",\"REBASE_HEAD\"],\"exit_code\":1,\"stdout\":\"\",\"stderr\":\"\",\"timed_out\":false},{\"argv\":[\"git\",\"symbolic-ref\",\"--quiet\",\"--short\",\"HEAD\"],\"exit_code\":0,\"stdout\":\"main\\n\",\"stderr\":\"\",\"timed_out\":false},{\"argv\":[\"git\",\"status\",\"--porcelain=v1\",\"--branch\",\"--untracked-files=all\"],\"exit_code\":0,\"stdout\":\"## main\\n\",\"stderr\":\"\",\"timed_out\":false}],\"route\":\"NO_ACTIVE_REBASE\",\"reason\":null,\"current_branch\":\"main\",\"head_detached\":false,\"rebase_apply_present\":false,\"rebase_head_present\":false,\"rebase_merge_present\":false,\"repository_root\":\"/tmp/rebase-consumer-fixtures.nqaaex/continue\",\"status\":\"## main\\n\"}\n",
-            "stderr": ""
-          }
-        },
-        { "kind": "terminal", "operation": "NO_ACTIVE_REBASE" }
-      ],
-      "state_transitions": ["NO_ACTIVE_REBASE"],
-      "final_terminal": "NO_ACTIVE_REBASE",
-      "repository_head_before": "1f3fd7f572c5596b5e8eba8a1ab8c4ec1f2d0ecd",
-      "repository_head_after": "1f3fd7f572c5596b5e8eba8a1ab8c4ec1f2d0ecd",
-      "repository_status_before": "",
-      "repository_status_after": ""
     },
     {
       "harness": "isolated",
