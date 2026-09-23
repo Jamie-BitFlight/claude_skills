@@ -39,7 +39,7 @@ class WireContractModel(BaseModel):
 _BEADS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]*-[A-Za-z0-9.]+$")
 
 # Status normalization map — maps human-readable and emoji variants to canonical values.
-# Sourced from task_format.py:28-45 (plugins/python3-development/skills/implementation-manager/scripts/)
+# Sourced from task_format.py:28-45 (plugins/development-harness/skills/implementation-manager/scripts/)
 STATUS_MAP: dict[str, str] = {
     # Space-separated variants
     "NOT STARTED": "not-started",

@@ -48,7 +48,7 @@ def _load(
         Field(
             description=(
                 "Agent name in bare form (e.g. 'python-cli-architect') or "
-                "plugin-qualified form (e.g. 'python3-development:code-reviewer'). "
+                "plugin-qualified form (e.g. 'python-engineering:code-reviewer'). "
                 "Subdirectory agents should be plugin-qualified to avoid ambiguity."
             )
         ),
@@ -126,7 +126,7 @@ def _list(
             default=None,
             description=(
                 "When provided, restrict the listing to agents owned by this plugin "
-                "(e.g. 'development-harness', 'python3-development'). "
+                "(e.g. 'development-harness', 'python-engineering'). "
                 "When omitted or null, all plugins are included."
             ),
         ),

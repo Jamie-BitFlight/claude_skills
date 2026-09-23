@@ -22,7 +22,7 @@ class AgentEntry(BaseModel):
     """
 
     name: str = Field(description="Bare agent name as it appears in the filename, e.g. 'python-cli-architect'.")
-    plugin: str = Field(description="Name of the owning plugin directory, e.g. 'python3-development'.")
+    plugin: str = Field(description="Name of the owning plugin directory, e.g. 'python-engineering'.")
     path: Path = Field(description="Absolute filesystem path to the agent's .md definition file.")
 
 
@@ -37,7 +37,7 @@ class AgentMetadata(BaseModel):
     description: str = Field(description="One-line description of the agent's purpose.")
     skills: list[str] = Field(
         default_factory=list,
-        description="Ordered list of skill URIs this agent loads, e.g. ['python3-development', 'dh:subagent-contract'].",
+        description="Ordered list of skill URIs this agent loads, e.g. ['python-engineering:python3-core', 'dh:subagent-contract'].",
     )
     tools: list[str] = Field(
         default_factory=list, description="MCP tool names or glob patterns the agent is allowed to call."
@@ -59,7 +59,7 @@ class AgentProfile(BaseModel):
     """
 
     name: str = Field(description="Agent name, e.g. 'python-cli-architect'.")
-    plugin: str = Field(description="Owning plugin directory name, e.g. 'python3-development'.")
+    plugin: str = Field(description="Owning plugin directory name, e.g. 'python-engineering'.")
     description: str = Field(description="One-line description from the agent frontmatter.")
     model: str | None = Field(
         default=None, description="Preferred model identifier from frontmatter. None means use caller default."
@@ -98,7 +98,7 @@ class ProfileListEntry(BaseModel):
     """
 
     name: str = Field(description="Agent name, e.g. 'code-reviewer'.")
-    plugin: str = Field(description="Owning plugin directory name, e.g. 'python3-development'.")
+    plugin: str = Field(description="Owning plugin directory name, e.g. 'python-engineering'.")
     description: str = Field(description="One-line description from the agent frontmatter.")
     skill_count: int = Field(
         description="Number of skill URIs declared in the agent frontmatter (not recursively expanded)."

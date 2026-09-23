@@ -105,7 +105,7 @@ claim about this repository, and each needs the search that produced it recorded
 The cost of skipping the search is building something that already exists.
 `research/insights/2026-03-10-cocoindex-code-improvements.md` states "No skill in `.claude/skills/`
 or `plugins/` provides semantic code search capability" and targets creating one, while
-`plugins/python3-development/skills/semantic-code-search/SKILL.md` and
+`plugins/python-engineering/agents/semantic-code-search.md` and
 `plugins/python-engineering/agents/semantic-code-search.md` both exist. One
 `git grep -il "semantic" -- plugins/` would have prevented it.
 
@@ -165,7 +165,7 @@ Each proposal in the output file follows this structure exactly:
 
 {Describe the observable current state. Name the specific file and field or behavior that is absent or weaker.
 Example: "task_status_hook.py writes LastActivity on every tool call but no process reads this field
-to detect or act on stalled agents. File: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py"}
+to detect or act on stalled agents. File: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py"}
 
 ### Target state
 

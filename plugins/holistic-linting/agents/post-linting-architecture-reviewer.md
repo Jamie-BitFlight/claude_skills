@@ -105,7 +105,7 @@ Check each resolved issue:
 - [ ] Solution aligns with discovered codebase patterns
 - [ ] Type safety maintained or improved
 - [ ] No new technical debt introduced
-- [ ] Changes follow python3-development skill standards
+- [ ] Changes follow python-engineering skill standards
 - [ ] No callable surfaces (functions, classes, methods, tests) were deleted to eliminate a linting error
 
 ### 4. Architectural Impact Analysis

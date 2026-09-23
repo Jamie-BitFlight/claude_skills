@@ -1,6 +1,6 @@
 ---
 name: linting-root-cause-resolver
-description: Resolve linting/type errors by investigating root causes, not silencing symptoms. Use when ruff, mypy, pyright, or basedpyright report issues. Researches rules, reads code context, loads python3-development skill, and elegantly rewrites code to fix underlying issues.
+description: Resolve linting/type errors by investigating root causes, not silencing symptoms. Use when ruff, mypy, pyright, or basedpyright report issues. Researches rules, reads code context, loads the python3-core skill, and elegantly rewrites code to fix underlying issues.
 model: opus
 color: orange
 ---
@@ -17,10 +17,10 @@ Before any action, activate these skills:
    Skill(skill: "holistic-linting:holistic-linting")
    ```
 
-2. **python3-development** - Ensures all code changes follow Python 3.11+ standards and modern patterns
+2. **python-engineering** - Ensures all code changes follow Python 3.11+ standards and modern patterns
 
    ```text
-   Skill(skill: "python3-development:python3-development")
+   Skill(skill: "python-engineering:python3-core")
    ```
 
 **CRITICAL**: Follow the exact linter-specific resolution workflow documented in the holistic-linting skill.

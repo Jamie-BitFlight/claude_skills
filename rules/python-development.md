@@ -21,28 +21,10 @@ package's) that silently diverge — a split-brain, not a cleanup.
 
 ### Splitting a PEP 723 script
 
-A PEP 723 script may import its own modules; the inline block governs its PyPI dependencies, not
-its file count. Split a script that passes ~500 lines, per the File Size Policy in
-[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md).
-
-Imports resolve two ways:
-
-- **A sibling module in the script's own directory** imports by name with no setup. `uv run` puts
-  the script's directory first on `sys.path` whatever the working directory.
-- **A script inside a package, importing that package by name**, needs the package's parent on the
-  path first:
-
-  ```python
-  sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-  ```
-
-  `sam_schema/cli.py` does exactly this before `from sam_schema import artifacts, backlog, …`.
-
-Only the entry script carries the shebang and the `# /// script` block; the modules it imports are
-plain `.py` files.
-
-`ty` needs `root` inside the script's own block to resolve those imports — `tests_sam/scripted_runner.py` carries
-`root = [".", ".."]`. Load `python-engineering:ty`; it holds the full rule.
+Split a script that passes ~500 lines, per the File Size Policy in
+[`python-cli-architect.md`](plugins/python-engineering/agents/python-cli-architect.md). For how the
+resulting modules import each other, see `PEP723.md` in `python-engineering:python3-core`;
+`sam_schema/cli.py` is this repo's worked instance of the package-relative form.
 
 ---
 
@@ -51,15 +33,14 @@ plain `.py` files.
 ### `unresolved-import` errors
 
 A PEP 723 script importing its own modules is the exception, and is fixed by `root` inside the
-script's block — see "Splitting a PEP 723 script" above, and `python-engineering:ty`. Everywhere
-else: when `ty` reports `unresolved-import` for a module that genuinely exists on disk, the
-module's directory is almost always missing from `[tool.ty.environment] extra-paths` in
-`pyproject.toml`.
+script's block — see `PEP723.md` in `python-engineering:python3-core`, and
+`python-engineering:ty`. Everywhere else: when `ty` reports `unresolved-import` for a module that
+genuinely exists on disk, the module's directory is almost always missing from
+`[tool.ty.environment] extra-paths` in `pyproject.toml`.
 Add the directory there, then re-verify with `uv run ty check <path>` before investigating the
-importing code itself. A PEP 723 script is the exception: when its editor diagnostics and
-`uv run ty check <path>` disagree, the CLI is right. A root-level `ty.toml`, if one exists, takes
-precedence over `pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths`
-addition doesn't resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
+importing code itself. A root-level `ty.toml`, if one exists, takes precedence over
+`pyproject.toml`'s `[tool.ty]` table — check for one first if an `extra-paths` addition doesn't
+resolve the error. For the related `unresolved-attribute` failure on a `ModuleType` (a different
 symptom, same environment-resolution root cause), see
 [docs/linting-and-type-checking.md](docs/linting-and-type-checking.md#common-ty-failure-patterns).
 
@@ -68,21 +49,9 @@ symptom, same environment-resolution root cause), see
 ## Repo Overrides on the Python Skills
 
 Load `/python-engineering:standards-for-python-development` before Python work. It carries the
-craft; this repo overrides three of its defaults.
+craft. This repo adds two rules it cannot carry, because both are about this checkout's layout:
 
-- Use Pydantic `BaseModel` for structured data — CLI output, MCP tool payloads, parsed file
-  records. `TypedDict` and `@dataclass` are correct only in a confirmed stdlib-only context
-  (`python-engineering:python3-stdlib-only`). `python-engineering:python3-typing` selects its lane
-  from what a file already imports, so an existing `@dataclass` is never reconsidered on its own —
-  choose the shape when adding or touching it.
-- Name new functions and modules without a leading underscore. Add privacy once a caller needs it.
-  Existing underscored code stays as-is.
 - Before writing a new shared module, read the PEP 723 dependency block of the scripts that will
-  import it (`grep dependencies plugins/*/scripts/*.py`) and reuse what is declared. Choose
-  stdlib-only for a confirmed deployment restriction, never as a default posture.
-
-Before writing a script, CLI, or MCP server, read
-[docs/cli-output-conventions.md](docs/cli-output-conventions.md).
-
-Parse markdown structure with the `marko` AST library, never a regex parser. Add it with
-`uv add marko` when the project does not already depend on it.
+  import it (`grep dependencies plugins/*/scripts/*.py`) and reuse what is declared.
+- Before writing a script, CLI, or MCP server, read
+  [docs/cli-output-conventions.md](docs/cli-output-conventions.md).

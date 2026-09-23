@@ -10,7 +10,7 @@ Add automated documentation updater to Claude skills. Downloads documentation fr
 
 ```mermaid
 graph TD
-    Start([User Request]) --> LoadSkills[Phase 1: Load Skills<br/>python3-development<br/>skill-creator]
+    Start([User Request]) --> LoadSkills[Phase 1: Load Skills<br/>python3-core<br/>skill-creator]
     LoadSkills --> Architect[Delegate to<br/>python-cli-architect]
 
     Architect --> ScriptCreated{Script Created?}
@@ -227,7 +227,7 @@ Add to repository root:
 
 **Phase 1: Implementation**
 
-1. Load skills: `python3-development`, `skill-creator`
+1. Load skills: `python-engineering:python3-core`, `skill-creator`
 2. Delegate to `python-cli-architect`:
    - Provide all requirements above
    - Specify path: `{SKILL_NAME}/scripts/sync_gitlab_docs.py`
