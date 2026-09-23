@@ -1229,11 +1229,7 @@ def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> 
     Returns:
         The configured bool if present, otherwise ``None``.
     """
-    from pathlib import Path as _Path  # ruff: ignore[import-outside-top-level]
-
-    from ruamel.yaml import YAML as _YAML  # ruff: ignore[import-outside-top-level]
-
-    if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, _Path) or not config_path.is_file():
+    if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, Path) or not config_path.is_file():
         return None
     try:
         raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
