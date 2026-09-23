@@ -52,14 +52,14 @@ _HTTP_FORBIDDEN = 403
 
 _github_token = os.environ.get("GITHUB_TOKEN")
 if _github_token:
-    import httpx as _httpx
+    import httpx
 
     try:
-        _probe = _httpx.get(
+        _probe = httpx.get(
             "https://api.github.com/user", headers={"Authorization": f"Bearer {_github_token}"}, timeout=5.0
         )
         _proxy_blocks_github = _probe.status_code == _HTTP_FORBIDDEN
-    except _httpx.HTTPError:
+    except httpx.HTTPError:
         _proxy_blocks_github = False
 
     if _proxy_blocks_github:

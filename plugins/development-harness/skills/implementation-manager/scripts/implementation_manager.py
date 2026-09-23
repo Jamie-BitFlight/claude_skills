@@ -40,7 +40,7 @@ if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import typer
-from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
+from ruamel.yaml import YAML, YAMLError
 
 # task_format.py is a sibling module in the same scripts/ directory.
 # Ensure the script directory is on sys.path for direct execution.
@@ -522,7 +522,7 @@ def parse_task_content(content: str) -> list[Task]:
         List of Task objects parsed from the frontmatter blocks.  Returns an
         empty list when no valid frontmatter is found.
     """
-    yaml = _YAML(typ="safe")
+    yaml = YAML(typ="safe")
     tasks: list[Task] = []
 
     # Match bare ---\n...\n--- blocks (no fenced code path).
@@ -531,7 +531,7 @@ def parse_task_content(content: str) -> list[Task]:
         raw_block = match.group(1)
         try:
             parsed = yaml.load(io.StringIO(raw_block))
-        except _YAMLError:
+        except YAMLError:
             continue
         if not isinstance(parsed, dict):
             continue
@@ -852,12 +852,12 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
         sys.stderr.write("WARNING: backlog_core not found — cannot fetch from GitHub. Falling back to local files.\n")
         return None
 
-    import backlog_core.gh_client as _gh  # ruff: ignore[import-outside-top-level]
-    import backlog_core.parsing as _parsing  # ruff: ignore[import-outside-top-level]
+    import backlog_core.gh_client as gh  # ruff: ignore[import-outside-top-level]
+    from backlog_core import parsing  # ruff: ignore[import-outside-top-level]
 
     try:
-        repo = _gh.try_get_github()
-    except _gh.GitHubUnavailableError as exc:
+        repo = gh.try_get_github()
+    except gh.GitHubUnavailableError as exc:
         # A configured token that fails at call time (rate limit, 5xx, network
         # error) is not the same as no token being configured, but this caller
         # only has a cached-task fallback either way — route both through it
@@ -871,7 +871,7 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
             sys.stderr.write("WARNING: GitHub unavailable and no cache found. Cannot fetch tasks.\n")
         return cached
 
-    sub_issues = _gh.get_task_issues(repo, parent_issue_number)
+    sub_issues = gh.get_task_issues(repo, parent_issue_number)
     tasks = []
     for si in sub_issues:
         try:
@@ -879,7 +879,7 @@ def fetch_tasks_from_github(parent_issue_number: int, feature_slug: str, cache_p
             # returned by get_task_issues() via GraphQL. The body field
             # is always populated in the GraphQL response.
             body = si["body"] or ""
-            sam = _parsing.parse_sam_task_metadata(body)
+            sam = parsing.parse_sam_task_metadata(body)
             if sam is None:
                 continue
             try:

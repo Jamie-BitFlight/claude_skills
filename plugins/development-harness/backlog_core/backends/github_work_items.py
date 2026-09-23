@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from backlog_core import gh_client, rendering as _rendering
+from backlog_core import gh_client, rendering
 from backlog_core.backends._github_work_item_versions import (
     WorkItemHead,
     WorkItemVersion,
@@ -680,7 +680,7 @@ class _GitHubReconciliation:
             snapshot = records_by_reference.get(mutation.item.reference)
             item = mutation.item
             if item.sections:
-                item = item.model_copy(update={"sections": _rendering.normalize_unknown_sections(item.sections)})
+                item = item.model_copy(update={"sections": rendering.normalize_unknown_sections(item.sections)})
             records_by_reference[mutation.item.reference] = LogicalCacheRecord(
                 key=snapshot.key if snapshot is not None else mutation.key, item=item
             )

@@ -34,7 +34,7 @@ _plugin_root = Path(__file__).parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
-import dh_paths as _dh_paths
+import dh_paths
 
 
 def _resolve_repo_root(project_dir: str | None = None) -> Path:
@@ -51,7 +51,7 @@ def _resolve_repo_root(project_dir: str | None = None) -> Path:
     """
     if project_dir:
         return Path(project_dir).resolve()
-    return _dh_paths.git_project_root()
+    return dh_paths.git_project_root()
 
 
 @dataclasses.dataclass
@@ -167,7 +167,7 @@ def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
     """
     global _config  # ruff: ignore[global-statement]
     repo_root = _resolve_repo_root(project_dir)
-    backlog_dir = _dh_paths.backlog_dir(repo_root)
+    backlog_dir = dh_paths.backlog_dir(repo_root)
     if repo is not None:
         default_repo = _validate_repo_slug(repo)
     else:
@@ -179,7 +179,7 @@ def init_paths(project_dir: str | None = None, repo: str | None = None) -> None:
     _config = BacklogConfig(repo_root=repo_root, backlog_dir=backlog_dir, default_repo=default_repo)
 
 
-#: Backward-compat alias — server.py imports ``init as _init_models``.
+#: Backward-compat alias — server.py imports ``init as init_models``.
 init = init_paths
 
 

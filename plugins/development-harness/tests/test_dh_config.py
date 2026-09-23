@@ -111,7 +111,7 @@ def test_when_env_var_set_then_returns_env_var_value(
     _write_config(config_path, "backend:\n  name: sqlite\n")
 
     fake_dh_paths = _make_dh_paths_mock(tmp_path / "project")
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -139,7 +139,7 @@ def test_when_env_var_set_then_config_file_is_not_consulted(
     _write_config(config_path, f"{subsystem}:\n  backend: github\n")
 
     fake_dh_paths = _make_dh_paths_mock(tmp_path / "project")
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -173,7 +173,7 @@ def test_when_subsystem_section_present_then_overrides_global_backend(
     _write_config(config_path, config_content)
 
     fake_dh_paths = _make_dh_paths_mock(tmp_path / "project")
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -203,7 +203,7 @@ def test_when_other_subsystem_section_present_then_current_subsystem_sees_global
     _write_config(config_path, config_content)
 
     fake_dh_paths = _make_dh_paths_mock(tmp_path / "project")
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -236,7 +236,7 @@ def test_when_only_global_backend_section_then_all_subsystems_use_it(
     _write_config(config_path, "backend:\n  name: sqlite\n")
 
     fake_dh_paths = _make_dh_paths_mock(tmp_path / "project")
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -266,7 +266,7 @@ def test_when_project_config_exists_then_it_is_read(tmp_path: Path, monkeypatch:
     _write_config(config_path, "backend:\n  name: sqlite\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")
@@ -298,7 +298,7 @@ def test_when_project_config_exists_then_it_takes_priority_over_user_config(
     _write_config(user_config, "backend:\n  name: memory\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")
@@ -333,7 +333,7 @@ def test_when_only_user_config_exists_then_user_config_is_used(tmp_path: Path, m
     project_root = tmp_path / "emptyproject"
     project_root.mkdir(parents=True)
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")
@@ -367,7 +367,7 @@ def test_when_beads_dir_exists_and_no_env_and_no_config_then_returns_beads(
     (project_root / ".beads" / "dh-backend").write_text("", encoding="utf-8")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -397,7 +397,7 @@ def test_when_config_file_present_then_beads_auto_detect_is_not_consulted(
     _write_config(config_path, "backend:\n  name: local\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -425,7 +425,7 @@ def test_when_beads_path_is_file_not_directory_then_auto_detect_is_skipped(
     (project_root / ".beads").write_text("not a directory", encoding="utf-8")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act — falls through to default
     result = DHConfig().get_backend("backlog")
@@ -454,7 +454,7 @@ def test_when_nothing_configured_then_backlog_returns_github(tmp_path: Path, mon
     project_root.mkdir(parents=True)
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")
@@ -481,7 +481,7 @@ def test_when_nothing_configured_then_task_and_context_return_local(
     project_root.mkdir(parents=True)
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -514,7 +514,7 @@ def test_when_config_file_absent_then_no_exception_is_raised(
     # Deliberately do NOT create any config.yaml
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act — must not raise
     result = DHConfig().get_backend(subsystem)
@@ -547,7 +547,7 @@ def test_when_config_file_contains_invalid_yaml_then_no_exception_is_raised(
     _write_config(config_path, ":::not valid yaml:::\n  - [unclosed\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act — must not raise
     result = DHConfig().get_backend(subsystem)
@@ -580,7 +580,7 @@ def test_when_project_config_invalid_yaml_then_user_config_is_tried(
     _write_config(user_config, "backend:\n  name: memory\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend(subsystem)
@@ -612,7 +612,7 @@ def test_when_config_has_empty_backend_name_then_falls_through_to_default(
     _write_config(config_path, "backend:\n  name: ''\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")
@@ -639,7 +639,7 @@ def test_when_config_has_missing_backend_section_then_falls_through_to_default(
     _write_config(config_path, "other_setting: true\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("task")
@@ -666,7 +666,7 @@ def test_when_subsystem_section_has_empty_backend_then_global_section_is_used(
     _write_config(config_path, "backend:\n  name: sqlite\ntask:\n  backend: ''\n")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("task")
@@ -694,7 +694,7 @@ def test_when_env_var_set_then_beads_auto_detect_is_not_consulted(
     (project_root / ".beads" / "dh-backend").write_text("", encoding="utf-8")
 
     fake_dh_paths = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr("dh_config._dh_paths", fake_dh_paths)
+    monkeypatch.setattr("dh_config.dh_paths", fake_dh_paths)
 
     # Act
     result = DHConfig().get_backend("backlog")

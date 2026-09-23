@@ -61,7 +61,7 @@ _plugin_root = Path(__file__).parent.parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
-import dh_paths as _dh_paths
+import dh_paths
 
 if TYPE_CHECKING:
     from backlog_core.artifact_provider import ItemId
@@ -598,7 +598,7 @@ class BeadsArtifactProvider:
     def _resolved_root_worktree(self) -> Path:
         """Lazily resolve and cache the git project root via ``dh_paths``."""
         if self._root_worktree is None:
-            self._root_worktree = _dh_paths.git_project_root()
+            self._root_worktree = dh_paths.git_project_root()
         return self._root_worktree
 
     def _validate_artifact_path(self, path: str) -> None:

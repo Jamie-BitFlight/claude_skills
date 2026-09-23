@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import backlog_core
 import pytest
-from backlog_core import operations as _ops
+from backlog_core import operations as ops
 from backlog_core.backends.bd_runner import BdInvocationError, BdJsonDecodeError, BdNotInstalledError, BdRunner
 from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.dispatch_state import DispatchStateManager
@@ -156,7 +156,7 @@ def test_a_missing_artifact_is_final() -> None:
 def test_a_reserved_section_name_is_final() -> None:
     """The name itself is refused, so the identical write is refused identically."""
     with pytest.raises(BacklogError) as caught:
-        _ops._normalize_section_key("Description")
+        ops._normalize_section_key("Description")
     assert _retryable(caught.value) is False
 
 

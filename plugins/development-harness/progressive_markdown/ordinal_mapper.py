@@ -23,7 +23,7 @@ from typing import Protocol
 
 from progressive_markdown.exceptions import OrdinalNotFoundError
 from progressive_markdown.indexer import MarkdownIndexer
-from progressive_markdown.list_navigator import ENCODING as _ENCODING
+from progressive_markdown.list_navigator import ENCODING
 from progressive_markdown.models import CodeBlock, SectionNode
 from progressive_markdown.parser import MarkdownItParser
 
@@ -389,7 +389,7 @@ class OrdinalPathMapper:
         self._sections = sections
         # Reuse the module-level ENCODING singleton from list_navigator
         # so all progressive-disclosure components share one cl100k_base instance.
-        self._enc = _ENCODING
+        self._enc = ENCODING
         self._map_entries: list[OrdinalEntry] = []
         # Eager resolution index covering all depths (§5.3).
         # Replaces the previous two-level _resolution_map.

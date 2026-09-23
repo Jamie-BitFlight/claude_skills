@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
     from backlog_core.models import Output, SamTask
 
-from backlog_core import rendering as _rendering
+from backlog_core import rendering
 from backlog_core.backend_types import (
     AddedCommentNode,
     IssueCommentNode,
@@ -1401,7 +1401,7 @@ class SQLiteBackend:
         Returns:
             Heading text string (e.g. ``"Rt Ica"`` for ``"unknown__rt_ica"``).
         """
-        return _rendering.unknown_key_to_heading(key)
+        return rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:
@@ -1410,7 +1410,7 @@ class SQLiteBackend:
         Returns:
             Dict mapping section storage key to display heading string.
         """
-        return _rendering.SECTION_HEADING
+        return rendering.SECTION_HEADING
 
     def render_groomed_section(self, groomed: GroomedData) -> str:
         """Render a GroomedData as ``## Groomed ({date})`` with subsection children.
@@ -1421,7 +1421,7 @@ class SQLiteBackend:
         Returns:
             Rendered section string (no trailing newline).
         """
-        return _rendering.render_groomed_section(groomed)
+        return rendering.render_groomed_section(groomed)
 
     def section_display_title(self, key: str, groomed_date: str = "") -> str:
         """Return the human-readable title for a section storage key.
@@ -1433,7 +1433,7 @@ class SQLiteBackend:
         Returns:
             Display title string (e.g. ``"Fact-Check"``).
         """
-        return _rendering.section_display_title(key, groomed_date)
+        return rendering.section_display_title(key, groomed_date)
 
     # ------------------------------------------------------------------
     # Integration branches — not supported by SQLite backend

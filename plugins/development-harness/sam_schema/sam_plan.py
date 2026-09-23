@@ -146,7 +146,7 @@ _ACCEPTANCE_CRITERIA_ADAPTER = TypeAdapter(list[AcceptanceCriterion])
 
 _SYNC_ERRORS: tuple[type[Exception], ...]
 try:
-    from backlog_core.operations import sync_items as _sync_backlog
+    from backlog_core.operations import sync_items as sync_backlog
 
     _BACKLOG_CORE_AVAILABLE = True
     _SYNC_ERRORS = (BacklogError, OSError, ValueError)
@@ -1894,7 +1894,7 @@ def _attempt_backlog_sync() -> None:
     """Best-effort backlog sync before bulk migration."""
     if _BACKLOG_CORE_AVAILABLE:
         try:
-            _sync_backlog()
+            sync_backlog()
         except _SYNC_ERRORS as exc:
             typer.echo(f"Warning: backlog sync failed; continuing. ({exc})", err=True)
         else:

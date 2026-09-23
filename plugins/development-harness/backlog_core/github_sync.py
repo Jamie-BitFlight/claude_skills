@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import re
 
-from pydantic import ValidationError as _PydanticValidationError
+from pydantic import ValidationError as PydanticValidationError
 
-from . import rendering as _rendering
+from . import rendering
 from .artifact_registry import parse_manifest_section, render_manifest_section, replace_manifest_in_body
 from .entry_blocks import _deduplicate_timestamps, _render_entry_raw, parse_entries
 from .models import BacklogItem, GroomedData, Section, ValidationError, parse_issue_number
@@ -47,7 +47,7 @@ _METADATA_LINE_RE = re.compile(r"^(\w+):\s*(.*)$")
 _SUBSECTION_RE = re.compile(r"### ([^\n]+)\n([\s\S]*?)(?=\n### |\Z)")
 
 # Re-exported from rendering — canonical definition lives in rendering.SECTION_HEADING
-SECTION_HEADING = _rendering.SECTION_HEADING
+SECTION_HEADING = rendering.SECTION_HEADING
 
 # All known section keys plus "groomed" — used to identify unknown sections in render_issue_body
 _KNOWN_SECTION_KEYS: frozenset[str] = frozenset(SECTION_HEADING) | {"groomed"}
@@ -68,14 +68,14 @@ def heading_to_section_key(heading_text: str) -> str | None:
         Normalised section key (e.g. ``"fact_check"``) or ``None`` when the heading
         does not correspond to a known section.
     """
-    return _rendering.resolve_section_name(heading_text)
+    return rendering.resolve_section_name(heading_text)
 
 
 # Re-exported from rendering — canonical definitions live there so that the
 # local-write path (operations._normalize_section_key) and the GitHub-parse
 # path (parse_issue_body below) normalise unknown section names identically.
-heading_to_unknown_key = _rendering.heading_to_unknown_key
-unknown_key_to_heading = _rendering.unknown_key_to_heading
+heading_to_unknown_key = rendering.heading_to_unknown_key
+unknown_key_to_heading = rendering.unknown_key_to_heading
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ def _render_groomed(groomed: GroomedData) -> str:
     Returns:
         Rendered section string (no trailing newline).
     """
-    return _rendering.render_groomed_section(groomed)
+    return rendering.render_groomed_section(groomed)
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ def _parse_groomed_section(heading_name: str, content: str) -> GroomedData:
         # (rendering.normalize_groomed_subsections) use, so a GitHub-authored
         # "### priority" and a locally-written "Priority" collide on one key
         # instead of round-tripping as two separate subsections.
-        sub_key = _rendering.resolve_subsection_name(raw_sub_key) or raw_sub_key
+        sub_key = rendering.resolve_subsection_name(raw_sub_key) or raw_sub_key
         sub_content = sub_match.group(2).strip()
         # When two ### headings in the same body collide onto one canonical
         # key (e.g. "### Priority" and "### priority"), the LONGER content
@@ -303,7 +303,7 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
         # subsection parser above use, so a registered historic heading (e.g.
         # "## Facts check") resolves to its canonical key here too instead of
         # only an exact SECTION_HEADING display-text match.
-        section_key = _rendering.resolve_section_name(heading_name)
+        section_key = rendering.resolve_section_name(heading_name)
         target_key = section_key if section_key is not None else heading_to_unknown_key(heading_name)
         entries = parse_entries(content, show="all")
         # A canonical heading and one of its aliases (e.g. "## Fact-Check" and
@@ -365,7 +365,7 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
             section=base.section,
             file_path=base.file_path,
         )
-    except _PydanticValidationError as exc:
+    except PydanticValidationError as exc:
         raise ValidationError("; ".join(error["msg"] for error in exc.errors())) from exc
 
 
@@ -379,7 +379,7 @@ def parse_issue_body(body: str, existing: BacklogItem | None = None) -> BacklogI
 # fold so there is one struck-wins/longer-content-wins merge policy, not one
 # per caller. Kept under this name for backward compatibility with existing
 # callers that import it directly from github_sync.
-_merge_entries = _rendering.merge_entries
+_merge_entries = rendering.merge_entries
 
 
 def _merge_groomed(local: GroomedData, remote: GroomedData) -> GroomedData:
