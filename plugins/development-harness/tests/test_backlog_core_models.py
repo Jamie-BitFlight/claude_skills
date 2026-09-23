@@ -705,7 +705,7 @@ class TestResolveRepo:
                 repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
                 backlog_dir=existing.backlog_dir
                 if existing is not None
-                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                else _bc_models.dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
                 default_repo="owner/default",
             ),
         )
@@ -721,7 +721,7 @@ class TestResolveRepo:
                 repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
                 backlog_dir=existing.backlog_dir
                 if existing is not None
-                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                else _bc_models.dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
                 default_repo="owner/default",
             ),
         )

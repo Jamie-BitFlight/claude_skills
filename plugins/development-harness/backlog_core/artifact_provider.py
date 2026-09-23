@@ -57,7 +57,7 @@ _plugin_root = Path(__file__).parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
-import dh_paths as _dh_paths
+import dh_paths
 
 logger = logging.getLogger(__name__)
 
@@ -456,7 +456,7 @@ class GitHubGistArtifactProvider:
                 ``~/.dh/projects/{slug}/`` directory).
         """
         self._repo = repo
-        self._root_worktree = root_worktree if root_worktree is not None else _dh_paths.state_root()
+        self._root_worktree = root_worktree if root_worktree is not None else dh_paths.state_root()
         self._gist_cache: dict[int, Gist] = {}
 
     # ------------------------------------------------------------------
@@ -861,7 +861,7 @@ class LinearArtifactProvider:
             raise ValueError(msg)
         self._api_key = api_key
         self._team_id = team_id
-        self._root_worktree = root_worktree or Path(_dh_paths.state_root())
+        self._root_worktree = root_worktree or Path(dh_paths.state_root())
 
     # ------------------------------------------------------------------
     # ArtifactBackend implementation
@@ -1119,7 +1119,7 @@ class GitLabArtifactProvider:
         self._project_id = project_id
         self._private_token = private_token
         self._gitlab_url = gitlab_url.rstrip("/")
-        self._root_worktree = root_worktree or Path(_dh_paths.state_root())
+        self._root_worktree = root_worktree or Path(dh_paths.state_root())
         self._snippet_cache: dict[int, int] = {}
 
     # ------------------------------------------------------------------
@@ -1428,7 +1428,7 @@ def create_artifact_provider(
         return BeadsArtifactProvider()
     if resolved in {BackendName.local, "local"}:
         return LocalFilesystemArtifactProvider(
-            root_worktree=root_worktree or _dh_paths.git_project_root(), manifest_dir=None
+            root_worktree=root_worktree or dh_paths.git_project_root(), manifest_dir=None
         )
     if resolved in {BackendName.sqlite, BackendName.memory, "sqlite", "memory"}:
         msg = f"Backend '{resolved}' does not support artifact storage. Use github, linear, or gitlab."

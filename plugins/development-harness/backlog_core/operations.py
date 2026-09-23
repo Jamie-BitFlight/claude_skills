@@ -24,11 +24,11 @@ from github.Repository import Repository
 from pydantic import BaseModel, ConfigDict
 from ruamel.yaml.error import YAMLError
 from sam_schema.core.backends.content import parse_plan_content
-from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SAM_CORE_SUCCESSFUL_STATUSES
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as SAM_CORE_SUCCESSFUL_STATUSES
 from sam_schema.core.models import Plan
 from typing_extensions import TypedDict
 
-from . import models as _models
+from . import models
 from ._capability_gates import require_github_extras, require_milestone_support
 from .backend_protocol import get_config
 from .backend_types import (
@@ -101,14 +101,14 @@ from .parsing import (
     today,
     view_result_from_local_item,
 )
-from .rendering import heading_to_unknown_key, unknown_key_to_heading as _reconstruct_unknown_heading
+from .rendering import heading_to_unknown_key, unknown_key_to_heading as reconstruct_unknown_heading
 from .search import ContentDuplicateMatch, DuplicateCheckStatus, apply_search_filter, find_content_duplicates
 from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
 
-_SAM_SUCCESSFUL_STATUSES: frozenset[str] = _SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
+_SAM_SUCCESSFUL_STATUSES: frozenset[str] = SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
 
 
@@ -1129,7 +1129,7 @@ def _normalize_section_key(name: str, *, output: Output | None = None) -> str:
         # neither a SectionKey value nor the "facts check" alias spelling —
         # only its reconstructed heading "Facts Check" does.
         stripped = name.removeprefix("unknown__")
-        recovered = resolve_section_name(stripped) or resolve_section_name(_reconstruct_unknown_heading(name))
+        recovered = resolve_section_name(stripped) or resolve_section_name(reconstruct_unknown_heading(name))
         return recovered if recovered is not None else name
     key = heading_to_unknown_key(name)
     # #3370: heading_to_unknown_key() itself now folds to a canonical key
@@ -3290,7 +3290,7 @@ def _populate_yaml_item_compact(result: ViewItemResult, item: BacklogItem) -> No
     """
     yaml_sections = _build_sections_from_yaml_item(item)
     result.sections_metadata = [
-        _models.SectionMeta(name=name, num_entries=_compact_entry_count(sec), num_struck=_int_field(sec, "num_struck"))
+        models.SectionMeta(name=name, num_entries=_compact_entry_count(sec), num_struck=_int_field(sec, "num_struck"))
         for name, sec in yaml_sections.items()
     ]
 
@@ -3442,7 +3442,7 @@ def _assemble_view_compact(
             else:
                 all_sections = [all_sections[i] for i in matched_indices]
         result.sections_metadata = [
-            _models.SectionMeta(
+            models.SectionMeta(
                 name=str(s.get("name", "")),
                 num_entries=int(s.get("num_entries", 0)),
                 num_struck=int(s.get("num_struck", 0)),

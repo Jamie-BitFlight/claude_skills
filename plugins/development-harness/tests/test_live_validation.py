@@ -18,8 +18,8 @@ import uuid
 import backlog_core.models as _bc_models
 import backlog_core.server as _backlog_server
 import pytest
-from backlog_core.backend_protocol import reset_config as _bp_reset_config, set_config as _bp_set_config
-from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
+from backlog_core.backend_protocol import reset_config as bp_reset_config, set_config as bp_set_config
+from backlog_core.backend_types import BacklogConfig as BPBacklogConfig
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.models import BacklogConfig
 from backlog_core.server import mcp
@@ -93,7 +93,7 @@ def live_items(tmp_path_factory, monkeypatch_class):
     # backlog_sync (L8) as it fetches the entire real issue list from GitHub.
     # GitHubBackend() with no repo arg falls through to resolve_repo("") →
     # models.get_default_repo() → the already-patched _bc_models._config.default_repo.
-    _bp_set_config(_BPBacklogConfig(backend=GitHubBackend()))
+    bp_set_config(BPBacklogConfig(backend=GitHubBackend()))
 
     test_id = str(uuid.uuid4())[:8]
     ctx: dict = {
@@ -113,7 +113,7 @@ def live_items(tmp_path_factory, monkeypatch_class):
     yield ctx
 
     # Restore backend_protocol singleton so later tests don't inherit the test config.
-    _bp_reset_config()
+    bp_reset_config()
 
     # Teardown: close all created issues — log failures instead of swallowing silently
     token = os.environ.get("GITHUB_TOKEN", "")

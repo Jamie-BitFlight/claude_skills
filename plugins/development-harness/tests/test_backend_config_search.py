@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, cast
 
 import backlog_core.backend_protocol as _bp
-import dh_config as _dh_config
+import dh_config
 import pytest
 import sam_schema.core.task_config as _tc
 from backlog_core.backend_protocol import BEADS_DIR, BEADS_OPT_IN_MARKER
@@ -49,15 +49,15 @@ _make_dh_paths_mock = make_dh_paths_mock
 def _patch_dh_paths(
     monkeypatch: pytest.MonkeyPatch, module: _BackendSearchModule, project_root: Path, tmp_path: Path
 ) -> None:
-    """Patch _dh_paths in the shim module (when present) and in dh_config.
+    """Patch dh_paths in the shim module (when present) and in dh_config.
 
-    task_config and context_config no longer hold _dh_paths; they delegate entirely to DHConfig.
-    Only backend_protocol retains _dh_paths for its _auto_detect_beads() function.
+    task_config and context_config no longer hold dh_paths; they delegate entirely to DHConfig.
+    Only backend_protocol retains dh_paths for its _auto_detect_beads() function.
     """
     dh_mock = _make_dh_paths_mock(project_root, user_dh_root=tmp_path / "fakehome" / ".dh")
-    if hasattr(module, "_dh_paths"):
-        monkeypatch.setattr(module, "_dh_paths", dh_mock)
-    monkeypatch.setattr(_dh_config, "_dh_paths", dh_mock)
+    if hasattr(module, "dh_paths"):
+        monkeypatch.setattr(module, "dh_paths", dh_mock)
+    monkeypatch.setattr(dh_config, "dh_paths", dh_mock)
 
 
 def _resolve(module: object, subsystem: str) -> str:
@@ -135,7 +135,7 @@ def test_returns_none_when_no_config_files(
     monkeypatch.delenv("BACKLOG_BACKEND", raising=False)
     monkeypatch.delenv("TASKBACKEND", raising=False)
     # Ensure no .beads/ dir so auto-detect returns None too; patch both module
-    # and dh_config._dh_paths so DHConfig sees the isolated tmp project root
+    # and dh_config.dh_paths so DHConfig sees the isolated tmp project root
     _patch_dh_paths(monkeypatch, module, project_root, tmp_path)
     assert _resolve(module, subsystem) == default_cls
 
@@ -212,7 +212,7 @@ def test_sqlite_factory_uses_persistent_project_state(tmp_path: Path, monkeypatc
     state_root = tmp_path / "state"
     dh_paths_mock = _make_dh_paths_mock(project_root)
     dh_paths_mock.state_root.return_value = state_root
-    monkeypatch.setattr(_bp, "_dh_paths", dh_paths_mock)
+    monkeypatch.setattr(_bp, "dh_paths", dh_paths_mock)
 
     backend = _bp.create_backend("sqlite")
 
@@ -235,7 +235,7 @@ def test_auto_detect_beads_found_when_opt_in_marker_exists(tmp_path: Path, monke
     (project_root / BEADS_DIR).mkdir(parents=True)
     (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).write_text("", encoding="utf-8")
     dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(_bp, "_dh_paths", dh_mock)
+    monkeypatch.setattr(_bp, "dh_paths", dh_mock)
 
     assert _bp._auto_detect_beads() == "beads"
 
@@ -253,7 +253,7 @@ def test_auto_detect_beads_returns_none_when_only_dot_beads_dir(
     (project_root / BEADS_DIR).mkdir(parents=True)
     # No BEADS_OPT_IN_MARKER file — directory alone must not trigger detection
     dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(_bp, "_dh_paths", dh_mock)
+    monkeypatch.setattr(_bp, "dh_paths", dh_mock)
 
     assert _bp._auto_detect_beads() is None
 
@@ -267,18 +267,18 @@ def test_auto_detect_beads_not_found_when_dot_beads_absent(tmp_path: Path, monke
     project_root = tmp_path / "project"
     project_root.mkdir()
     dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(_bp, "_dh_paths", dh_mock)
+    monkeypatch.setattr(_bp, "dh_paths", dh_mock)
 
     assert _bp._auto_detect_beads() is None
 
 
 def test_auto_detect_beads_returns_none_when_dh_paths_absent(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_auto_detect_beads() returns None when _dh_paths is None.
+    """_auto_detect_beads() returns None when dh_paths is None.
 
     Why: dh_paths is an optional import (absent in test environments without the
          plugin installed).  None must not propagate as a AttributeError crash.
     """
-    monkeypatch.setattr(_bp, "_dh_paths", None)
+    monkeypatch.setattr(_bp, "dh_paths", None)
 
     assert _bp._auto_detect_beads() is None
 
@@ -293,7 +293,7 @@ def test_auto_detect_beads_file_not_dir_returns_none(tmp_path: Path, monkeypatch
     project_root.mkdir()
     (project_root / BEADS_DIR).write_text("not a directory", encoding="utf-8")
     dh_mock = _make_dh_paths_mock(project_root)
-    monkeypatch.setattr(_bp, "_dh_paths", dh_mock)
+    monkeypatch.setattr(_bp, "dh_paths", dh_mock)
 
     assert _bp._auto_detect_beads() is None
 

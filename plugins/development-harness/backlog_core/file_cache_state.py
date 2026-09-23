@@ -8,7 +8,7 @@ import json
 import logging
 import os
 import tempfile
-import time as _time
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from threading import Lock
@@ -432,7 +432,7 @@ class _CacheStateStore:
             legacy_state = self._verify_queue_keys(self._salvage(raw, self._legacy_state_path), self._legacy_state_path)
         except CacheStateCorruptError as exc:
             unparsable_backup = self._legacy_state_path.with_name(
-                f"{self._legacy_state_path.name}.corrupt.{_time.time_ns()}"
+                f"{self._legacy_state_path.name}.corrupt.{time.time_ns()}"
             )
             _log.error(
                 "Cache state %s: could not read for merge before superseding, preserving as %s instead: %s",

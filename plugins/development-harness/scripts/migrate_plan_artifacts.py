@@ -47,7 +47,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from backlog_core import models as _models
+from backlog_core import models
 from backlog_core.artifact_provider import GitHubArtifactProvider
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType
@@ -469,7 +469,7 @@ def _run_registrations(
                 outcome = register_one(provider, registry, c, dry_run=False)
             log(f"  {c.rel_path}: {outcome}")
             registered += 1
-        except (_models.BacklogError, ValueError, OSError) as exc:
+        except (models.BacklogError, ValueError, OSError) as exc:
             log(f"  FAILED: {c.rel_path}: {exc}")
             failed += 1
     return registered, failed
@@ -494,9 +494,9 @@ def main(dry_run: bool) -> None:
     log(f"Timestamp: {datetime.now(UTC).isoformat()}")
     log("")
 
-    _models.init(project_dir=PROJECT_DIR)
-    log(f"Repo: {_models.DEFAULT_REPO}")
-    log(f"Repo root: {_models.get_repo_root()}")
+    models.init(project_dir=PROJECT_DIR)
+    log(f"Repo: {models.DEFAULT_REPO}")
+    log(f"Repo root: {models.get_repo_root()}")
     log("")
 
     log("Fetching backlog items for slug matching...")
@@ -517,7 +517,7 @@ def main(dry_run: bool) -> None:
     registry = ArtifactRegistry()
     provider: GitHubArtifactProvider | None = None
     if not dry_run:
-        provider = GitHubArtifactProvider(repo=_models.DEFAULT_REPO, root_worktree=DH_STATE_ROOT)
+        provider = GitHubArtifactProvider(repo=models.DEFAULT_REPO, root_worktree=DH_STATE_ROOT)
 
     registered_count, failed_count = _run_registrations(log, actionable, provider, registry, dry_run)
 

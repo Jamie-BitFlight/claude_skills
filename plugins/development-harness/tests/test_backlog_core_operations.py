@@ -1294,14 +1294,14 @@ class TestListItemsBeadsBackend:
     def _make_beads_backend_config(self, mocker: MockerFixture) -> object:
         """Patch get_config() to return a BacklogConfig backed by BeadsBackend."""
 
-        from backlog_core.backend_types import BacklogConfig as _BPConfig
+        from backlog_core.backend_types import BacklogConfig as BPConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
         runner = MagicMock(spec=BdRunner)
         runner.is_available.return_value = True
         beads_backend = BeadsBackend(runner=runner)
-        patched = _BPConfig(backend=beads_backend)
+        patched = BPConfig(backend=beads_backend)
         mocker.patch("backlog_core.operations.get_config", return_value=patched)
         return beads_backend
 
@@ -1385,7 +1385,7 @@ class TestApplyIssueStatusLabelsBeads:
     def _make_beads_config(self, mocker: MockerFixture) -> None:
         """Patch get_config() to return a BacklogConfig backed by BeadsBackend."""
 
-        from backlog_core.backend_types import BacklogConfig as _BPConfig
+        from backlog_core.backend_types import BacklogConfig as BPConfig
         from backlog_core.backends.bd_runner import BdRunner
         from backlog_core.backends.beads_backend import BeadsBackend
 
@@ -1393,7 +1393,7 @@ class TestApplyIssueStatusLabelsBeads:
         runner.is_available.return_value = True
         self._beads_runner = runner
         beads_backend = BeadsBackend(runner=runner)
-        patched = _BPConfig(backend=beads_backend)
+        patched = BPConfig(backend=beads_backend)
         mocker.patch("backlog_core.operations.get_config", return_value=patched)
 
     def test_status_in_progress_updates_native_beads_reference(self, mocker: MockerFixture) -> None:

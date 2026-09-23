@@ -38,7 +38,7 @@ def test_migrate_dry_run_uses_plan_relative_paths_outside_repo(monkeypatch, tmp_
     (state_plan_dir / "P42-state-plan.yaml").write_text("issue: 42\n", encoding="utf-8")
     (codebase_dir / "architecture.md").write_text("---\nissue: 42\n---\n", encoding="utf-8")
     monkeypatch.setattr(artifact_migration.dh_paths, "plan_dir", lambda _repo_root: state_plan_dir)
-    monkeypatch.setattr(artifact_migration._models, "get_repo_root", lambda: repo_root)
+    monkeypatch.setattr(artifact_migration.models, "get_repo_root", lambda: repo_root)
 
     result = artifact_migration.migrate_dry_run(42)
 

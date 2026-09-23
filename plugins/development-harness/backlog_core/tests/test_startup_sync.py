@@ -1358,7 +1358,7 @@ class TestKillSwitch:
         reset_sync_state()
 
         mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
-        mocker.patch("backlog_core.server._get_config", return_value=BackendConfig(backend=backend))
+        mocker.patch("backlog_core.server.get_config", return_value=BackendConfig(backend=backend))
         mocker.patch("backlog_core.server._active_startup_sync_task", None)
         create_task = mocker.patch("backlog_core.server.asyncio.create_task")
 

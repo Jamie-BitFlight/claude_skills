@@ -28,10 +28,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-import dh_paths as _dh_paths
+import dh_paths
 from github import GithubObject
 
-from backlog_core import gh_client, github_branches, github_sync, rendering as _rendering
+from backlog_core import gh_client, github_branches, github_sync, rendering
 from backlog_core.artifact_provider import ArtifactBackend, GitHubGistArtifactProvider
 from backlog_core.backend_types import MilestoneFullNode
 from backlog_core.backends.github_content_migration import (
@@ -141,7 +141,7 @@ class GitHubBackend:
             contents: GitHub Contents persistence, injectable for isolated callers.
         """
         self._repo = repo
-        self._cache = cache or FileCache(_dh_paths.state_root() / "github-cache")
+        self._cache = cache or FileCache(dh_paths.state_root() / "github-cache")
         self._artifact_provider = artifact_provider or GitHubGistArtifactProvider(repo=repo)
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
         self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
@@ -864,7 +864,7 @@ class GitHubBackend:
         Returns:
             Heading text string (e.g. ``"My Section"``).
         """
-        return _rendering.unknown_key_to_heading(key)
+        return rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:
@@ -873,7 +873,7 @@ class GitHubBackend:
         Returns:
             Dict mapping section storage key to display heading string.
         """
-        return _rendering.SECTION_HEADING
+        return rendering.SECTION_HEADING
 
     def render_groomed_section(self, groomed: GroomedData) -> str:
         """Render a GroomedData as ``## Groomed ({date})`` with subsection children.
@@ -884,7 +884,7 @@ class GitHubBackend:
         Returns:
             Rendered section string (no trailing newline).
         """
-        return _rendering.render_groomed_section(groomed)
+        return rendering.render_groomed_section(groomed)
 
     def section_display_title(self, key: str, groomed_date: str = "") -> str:
         """Return the human-readable title for a section storage key.
@@ -896,7 +896,7 @@ class GitHubBackend:
         Returns:
             Display title string (e.g. ``"Fact-Check"``).
         """
-        return _rendering.section_display_title(key, groomed_date)
+        return rendering.section_display_title(key, groomed_date)
 
     # ------------------------------------------------------------------
     # Integration branches

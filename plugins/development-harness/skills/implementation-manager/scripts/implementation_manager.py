@@ -40,7 +40,7 @@ if isinstance(sys.stderr, TextIOWrapper):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import typer
-from ruamel.yaml import YAML as _YAML, YAMLError as _YAMLError
+from ruamel.yaml import YAML, YAMLError
 
 # task_format.py is a sibling module in the same scripts/ directory.
 # Ensure the script directory is on sys.path for direct execution.
@@ -522,7 +522,7 @@ def parse_task_content(content: str) -> list[Task]:
         List of Task objects parsed from the frontmatter blocks.  Returns an
         empty list when no valid frontmatter is found.
     """
-    yaml = _YAML(typ="safe")
+    yaml = YAML(typ="safe")
     tasks: list[Task] = []
 
     # Match bare ---\n...\n--- blocks (no fenced code path).
@@ -531,7 +531,7 @@ def parse_task_content(content: str) -> list[Task]:
         raw_block = match.group(1)
         try:
             parsed = yaml.load(io.StringIO(raw_block))
-        except _YAMLError:
+        except YAMLError:
             continue
         if not isinstance(parsed, dict):
             continue

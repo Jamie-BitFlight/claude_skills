@@ -642,10 +642,10 @@ class TestUpdateFieldYamlFrontmatter:
         y = _YAML(typ="rt")
         raw.split("\n---")[1].lstrip("\n").split("\n---")[0]
         # simpler: load from between the first --- pair
-        import re as _re
+        import re
 
         after_open = raw[4:]
-        close = _re.search(r"\n---", after_open)
+        close = re.search(r"\n---", after_open)
         assert close is not None
         data = y.load(after_open[: close.start()])
         assert data["status"] == "in-progress"
@@ -661,13 +661,13 @@ class TestUpdateFieldYamlFrontmatter:
         f.write_text(_FRONTMATTER_SINGLE)
         update_field(f, "T1", "status", "complete")
         raw = f.read_text(encoding="utf-8")
-        import re as _re
+        import re
 
         from ruamel.yaml import YAML as _YAML
 
         y = _YAML(typ="rt")
         after_open = raw[4:]
-        close = _re.search(r"\n---", after_open)
+        close = re.search(r"\n---", after_open)
         assert close is not None
         data = y.load(after_open[: close.start()])
         assert data["title"] == "A yaml_frontmatter task"
@@ -747,13 +747,13 @@ class TestUpdateFieldsYamlFrontmatter:
         f.write_text(_FRONTMATTER_SINGLE)
         update_fields(f, "T1", {"status": "complete", "last-activity": "2026-01-01T00:00:00"})
         raw = f.read_text(encoding="utf-8")
-        import re as _re
+        import re
 
         from ruamel.yaml import YAML as _YAML
 
         y = _YAML(typ="rt")
         after_open = raw[4:]
-        close = _re.search(r"\n---", after_open)
+        close = re.search(r"\n---", after_open)
         assert close is not None
         data = y.load(after_open[: close.start()])
         assert data["status"] == "complete"

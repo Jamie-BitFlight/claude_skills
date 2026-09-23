@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING
 
 import dh_core.operations as _dh_ops
 import pytest
-from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
-from backlog_core.backend_types import BacklogConfig as _BacklogConfig
+from backlog_core.backend_protocol import reset_config as reset_bp_config, set_config as set_bp_config
+from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import ContentUnavailableError
 
@@ -35,9 +35,9 @@ def sqlite_backend():
     ResourceWarning.
     """
     backend = SQLiteBackend(":memory:")
-    _set_bp_config(_BacklogConfig(backend=backend))
+    set_bp_config(BacklogConfig(backend=backend))
     yield
-    _reset_bp_config()
+    reset_bp_config()
     backend._conn.close()
 
 

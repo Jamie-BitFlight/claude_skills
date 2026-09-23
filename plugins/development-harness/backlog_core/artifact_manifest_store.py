@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from typing import Final
 
-from pydantic import ValidationError as _PydanticValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 from .artifact_registry import ArtifactRegistry
 from .backend_types import ContentProvider
@@ -97,7 +97,7 @@ def artifact_content_reference(item_id: int | str, entry: ArtifactEntry) -> Cont
         return ContentRef(
             kind="artifact_content", namespace=str(item_id), artifact_type=entry.artifact_type.value, name=name
         )
-    except _PydanticValidationError as exc:
+    except PydanticValidationError as exc:
         raise ValidationError("; ".join(error["msg"] for error in exc.errors())) from exc
 
 

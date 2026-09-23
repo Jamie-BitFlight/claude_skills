@@ -11,7 +11,7 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import operator
-import re as _re
+import re
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
@@ -68,8 +68,8 @@ def _item_matches_term(item: dict[str, str | bool], term: str, haystack: str | N
     if (term.startswith("/") and term.endswith("/") and len(term) > _REGEX_SLASH_MIN_LEN) or term.startswith("regex:"):
         pattern_str = term[1:-1] if term.startswith("/") else term[len("regex:") :]
         try:
-            pattern = _re.compile(pattern_str, _re.IGNORECASE)
-        except _re.error:
+            pattern = re.compile(pattern_str, re.IGNORECASE)
+        except re.error:
             # Invalid regex — fall through to plain substring match on the raw term.
             pass
         else:
@@ -553,7 +553,7 @@ _CONCEPT_STOPWORDS: frozenset[str] = frozenset({
 # Concept tokens shorter than this are treated as noise, not a topic word.
 _MIN_CONCEPT_TOKEN_LEN = 3
 
-_WORD_RE = _re.compile(r"[a-zA-Z0-9]+")
+_WORD_RE = re.compile(r"[a-zA-Z0-9]+")
 
 
 class DuplicateCheckStatus(StrEnum):

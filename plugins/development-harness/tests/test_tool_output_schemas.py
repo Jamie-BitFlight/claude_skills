@@ -10,7 +10,7 @@ import inspect
 import json
 
 import tiktoken
-from backlog_core import tool_responses as _tool_responses
+from backlog_core import tool_responses
 from backlog_core.models import Output
 from backlog_core.server import mcp
 from pydantic import BaseModel
@@ -106,7 +106,7 @@ def test_no_response_model_field_shadows_an_output_method() -> None:
         name for name, _ in inspect.getmembers(Output, predicate=inspect.isfunction) if not name.startswith("_")
     }
     offenders: dict[str, set[str]] = {}
-    for name, obj in vars(_tool_responses).items():
+    for name, obj in vars(tool_responses).items():
         if isinstance(obj, type) and issubclass(obj, BaseModel) and issubclass(obj, Output):
             shadowed = set(obj.model_fields) & output_method_names
             if shadowed:

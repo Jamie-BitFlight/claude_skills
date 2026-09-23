@@ -17,43 +17,39 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
-import difflib as _difflib
-import json as _json
-import logging as _logging
-import os as _os
-import re as _re
+import difflib
+import json
+import logging
+import os
+import re
 import sqlite3
 import sys
-import time as _time
-from datetime import UTC, datetime as _datetime
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeAlias, TypeGuard
 
-import dh_paths as _dh_paths
-import dispatch_schema as _ds
+import dh_paths
+import dispatch_schema
 import tiktoken
 from dh_core import operations
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp_tasks import TasksExtension
-from github import GithubException as _GithubException
+from github import GithubException
 from mcp.types import ToolAnnotations
 from progressive_markdown.exceptions import OrdinalNotFoundError
-from pydantic import BaseModel, Field, ValidationError as _PydanticValidationError
-from ruamel.yaml import YAML as _YAML
+from pydantic import BaseModel, Field, ValidationError as PydanticValidationError
+from ruamel.yaml import YAML
 
-from . import models as _models, sync_engine as _sync_engine
-from .artifact_manifest_store import (
-    artifact_content_reference,
-    load_manifest as _load_manifest_record,
-    publish_artifact,
-)
+from . import models, sync_engine
+from .artifact_manifest_store import artifact_content_reference, load_manifest as load_manifest_record, publish_artifact
 from .artifact_registry import ArtifactRegistry
-from .backend_protocol import get_config as _get_config
+from .backend_protocol import get_config
 from .backend_types import ContentProvider, SyncProvider
 from .disclosure_handler import BacklogViewDisclosureHandler, DisclosureRequest, DisclosureRequestParser
 from .disclosure_types import DisclosureMode, DisclosureParamError
-from .dispatch_state import DispatchStateManager as _DispatchStateManager
+from .dispatch_state import DispatchStateManager
 from .models import (
     AmbiguousSelectorError,
     ArtifactContent,
@@ -61,8 +57,8 @@ from .models import (
     ArtifactManifest,
     ArtifactStatus,
     ArtifactType,
-    BackendAvailability as _BackendAvailability,
-    BackendStatus as _BackendStatus,
+    BackendAvailability,
+    BackendStatus,
     BacklogError,
     BranchConflictError,
     CacheStateCorruptError,
@@ -73,9 +69,9 @@ from .models import (
     ContentRef,
     ContentUnavailableError,
     ContentWrite,
-    DispatchItemRecord as _DispatchItemRecord,
-    DispatchWaveRecord as _DispatchWaveRecord,
-    DispatchWaveSummary as _DispatchWaveSummary,
+    DispatchItemRecord,
+    DispatchWaveRecord,
+    DispatchWaveSummary,
     DuplicateItemError,
     EntryNotFoundError,
     ItemNotFoundError,
@@ -86,7 +82,7 @@ from .models import (
     UnsupportedBackendCapabilityError,
     UnsupportedCapabilityError,
     ValidationError,
-    init as _init_models,
+    init as init_models,
 )
 from .parsing import parse_issue_number
 from .search import (
@@ -94,17 +90,14 @@ from .search import (
     _META_FIELDS,
     _REGEX_SLASH_MIN_LEN,
     _SEARCH_FIELDS,
-    _format_match_text,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._format_match_text test imports
     _make_snippet,
-    _make_snippet_parts,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._make_snippet_parts test imports
     _parse_body_sections,
-    apply_search_filter as _apply_search_filter,  # ruff: ignore[unused-import] - re-exported for backlog_core.server._apply_search_filter test imports
-    tokenize_search as _tokenize_search,
+    tokenize_search,
 )
 from .sync_state import (
     RETRYABLE_TRANSIENT_EXCEPTIONS,
     SyncErrorKind,
-    SyncState as _SyncState,
+    SyncState,
     SyncStatus,
     classify_github_failure,
     get_sync_state,
@@ -310,7 +303,7 @@ def _retryable(exc: BaseException) -> bool | None:
 
 # Module-level logger for done-callback exception reporting.
 # Named _sync_task_log so tests can patch backlog_core.server._sync_task_log.
-_sync_task_log = _logging.getLogger(__name__)
+_sync_task_log = logging.getLogger(__name__)
 
 # Token budget for auto-pagination in backlog_list: 4400 tokens (cl100k_base encoding).
 _LIST_TOKEN_BUDGET = 4_400
@@ -364,18 +357,18 @@ def _view_payload_token_count(full_response: dict[str, object]) -> int:
     raw_sections = full_response.get("sections")
     if not isinstance(raw_sections, dict) or not raw_sections:
         # No structured sections dict to de-duplicate against — measure verbatim.
-        return _token_count(_json.dumps(full_response))
+        return _token_count(json.dumps(full_response))
     body = full_response.get("body")
     if not (isinstance(body, str) and body):
         # ``body`` is empty/cleared (e.g. the structured-key drift path): the
         # per-entry ``content`` under ``sections`` is the SOLE delivered copy, so
         # it must be counted in full.  Measure the payload verbatim.
-        return _token_count(_json.dumps(full_response))
+        return _token_count(json.dumps(full_response))
     # ``body`` is non-empty and carries the content once; blank the redundant
     # per-entry ``content`` so it is not double-counted against the budget.
     measured = dict(full_response)
     measured["sections"] = {name: _section_without_entry_content(sec) for name, sec in raw_sections.items()}
-    return _token_count(_json.dumps(measured))
+    return _token_count(json.dumps(measured))
 
 
 def _section_without_entry_content(section: object) -> object:
@@ -501,8 +494,8 @@ def _collect_regex_matches(
         (caller should fall through to plain-text matching).
     """
     try:
-        pattern = _re.compile(pattern_str, _re.IGNORECASE)
-    except _re.error:
+        pattern = re.compile(pattern_str, re.IGNORECASE)
+    except re.error:
         return None
     matches: list[dict[str, str]] = []
     for field in _META_FIELDS:
@@ -650,7 +643,7 @@ def _extract_leaf_terms(search: str) -> list[str]:
         List of term strings in left-to-right order.
     """
     OPERATORS = frozenset({"AND", "OR", "NOT"})
-    tokens = _tokenize_search(search)
+    tokens = tokenize_search(search)
     return [t for t in tokens if t not in OPERATORS and t not in {"(", ")"}]
 
 
@@ -762,7 +755,7 @@ def _compute_match_tokens(item: dict[str, object]) -> int:
     # Serialize the match output (header + all match text lines) and count tokens.
     # We use json.dumps on the relevant keys rather than subscript access to stay
     # type-safe: item is dict[str, object] so individual values are object.
-    return _token_count(_json.dumps({"h": item.get("match_header"), "m": item.get("matches")}))
+    return _token_count(json.dumps({"h": item.get("match_header"), "m": item.get("matches")}))
 
 
 def _paginate_match_items(
@@ -957,7 +950,7 @@ def _metadata_entry_name(entry: object) -> str:
 
 
 def _filter_view_sections(
-    response: dict[str, object], sections: list[str], result: _models.ViewItemResult
+    response: dict[str, object], sections: list[str], result: models.ViewItemResult
 ) -> dict[str, object]:
     """Filter the backlog_view response to only the requested sections.
 
@@ -1126,7 +1119,7 @@ def _build_section_miss_error(filter_expr: str, valid_names: list[str], out: Out
     if unresolved_names:
         error_dict["unresolved_sections"] = unresolved_names
     if valid_names and filter_expr:
-        matches = _difflib.get_close_matches(filter_expr, valid_names, n=1, cutoff=0.6)
+        matches = difflib.get_close_matches(filter_expr, valid_names, n=1, cutoff=0.6)
         if matches:
             error_dict["suggestion"] = f"Did you mean: {matches[0]!r}?"
     return error_dict
@@ -1161,7 +1154,7 @@ _args = _parse_args()
 # via environment variables or git discovery, which is less likely to crash at
 # import time.
 if _args.project_dir is not None:
-    _init_models(_args.project_dir)
+    init_models(_args.project_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -1229,7 +1222,7 @@ def _read_enabled_from_config_file(yaml_parser: object, config_path: object) -> 
     Returns:
         The configured bool if present, otherwise ``None``.
     """
-    if not isinstance(yaml_parser, _YAML) or not isinstance(config_path, Path) or not config_path.is_file():
+    if not isinstance(yaml_parser, YAML) or not isinstance(config_path, Path) or not config_path.is_file():
         return None
     try:
         raw = yaml_parser.load(config_path.read_text(encoding="utf-8"))
@@ -1259,11 +1252,11 @@ def _read_startup_sync_enabled_from_yaml() -> bool | None:
     """
     search_paths = []
     with contextlib.suppress(FileNotFoundError, RuntimeError):
-        project_root = _dh_paths.git_project_root()
-        search_paths.append(_dh_paths.project_dh_dir(project_root) / "config.yaml")
-    search_paths.append(_dh_paths._dh_user_root() / "config.yaml")
+        project_root = dh_paths.git_project_root()
+        search_paths.append(dh_paths.project_dh_dir(project_root) / "config.yaml")
+    search_paths.append(dh_paths._dh_user_root() / "config.yaml")
 
-    yaml = _YAML(typ="safe")
+    yaml = YAML(typ="safe")
 
     for config_path in search_paths:
         result = _read_enabled_from_config_file(yaml, config_path)
@@ -1309,8 +1302,8 @@ async def _backlog_lifespan(_server: object) -> AsyncGenerator[dict[str, object]
     #   if RUNNING is already set (second lifespan entry) we skip create_task so
     #   only one background sync task runs per process lifetime.
     global _active_startup_sync_task  # ruff: ignore[global-statement]
-    if _startup_sync_enabled() and isinstance(_get_config().backend, SyncProvider) and state.try_start():
-        bg_task: asyncio.Task[None] | None = asyncio.create_task(_sync_engine._startup_sync_loop(state))
+    if _startup_sync_enabled() and isinstance(get_config().backend, SyncProvider) and state.try_start():
+        bg_task: asyncio.Task[None] | None = asyncio.create_task(sync_engine._startup_sync_loop(state))
         _register_bg_task(bg_task)
         # Store module-level reference so a re-entrant lifespan (FastMCP #1115)
         # cancels the same task on teardown rather than creating a dangling one.
@@ -1401,7 +1394,7 @@ async def sync_now(
     all retries), clears the state and attempts a fresh sync.
     """
     state = get_sync_state()
-    if not isinstance(_get_config().backend, SyncProvider):
+    if not isinstance(get_config().backend, SyncProvider):
         return SyncNowResponse.model_validate({
             "triggered": False,
             "sync_state": state.to_dict(),
@@ -1427,7 +1420,7 @@ async def sync_now(
             "messages": ["A sync is already in progress. Returning current progress."],
         })
 
-    bg_sync_task = asyncio.create_task(_sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
+    bg_sync_task = asyncio.create_task(sync_engine._startup_sync_loop(state, full_refresh=full_refresh))
     _register_bg_task(bg_sync_task)
     return SyncNowResponse.model_validate({
         "triggered": True,
@@ -1518,13 +1511,13 @@ def _assert_config() -> None:
         BacklogError: When no project root is discoverable and no env vars are set.
     """
     try:
-        _models.get_config()
+        models.get_config()
     except RuntimeError as exc:
         # No project root and no env vars: the next identical call discovers the same nothing.
         raise BacklogError(str(exc), retryable=False) from exc
 
 
-def _probe_backend_status() -> _BackendStatus:
+def _probe_backend_status() -> BackendStatus:
     """Delegate to the configured backend's probe_backend_status().
 
     Extracted as a module-level function so tests can patch
@@ -1540,12 +1533,12 @@ def _probe_backend_status() -> _BackendStatus:
         default NOT_CHECKED status when config is unavailable.
     """
     try:
-        return _get_config().backend.probe_backend_status()
+        return get_config().backend.probe_backend_status()
     except (RuntimeError, ValueError):
-        return _BackendStatus(availability=_BackendAvailability.NOT_CHECKED)
+        return BackendStatus(availability=BackendAvailability.NOT_CHECKED)
 
 
-def _format_backend_status_message(status: _BackendStatus) -> str:
+def _format_backend_status_message(status: BackendStatus) -> str:
     """Format a single-line human-readable backend status string for the messages list.
 
     When reachable, the format is:
@@ -1562,7 +1555,7 @@ def _format_backend_status_message(status: _BackendStatus) -> str:
     """
     availability_label = status.availability.value
     if (
-        status.availability == _BackendAvailability.REACHABLE
+        status.availability == BackendAvailability.REACHABLE
         and status.open_count is not None
         and status.total_count is not None
     ):
@@ -1608,7 +1601,7 @@ def _extract_item_list(result: Mapping[str, object]) -> list[dict[str, str | boo
     return [item for item in raw if _is_str_bool_dict(item)]
 
 
-def _build_sync_state_block(sync_state: _SyncState) -> tuple[dict[str, object] | None, list[str]]:
+def _build_sync_state_block(sync_state: SyncState) -> tuple[dict[str, object] | None, list[str]]:
     """Build the sync_state payload block and warning strings when the sync is not IDLE.
 
     Returns ``(None, [])`` when the sync status is IDLE so callers can skip
@@ -1747,7 +1740,7 @@ def _resolve_effective_limit(all_items: list[dict[str, str | bool]], offset: int
     candidate = all_items[offset:]
     effective = len(candidate)
     while effective > 1:
-        if _token_count(_json.dumps(candidate[:effective])) <= _LIST_TOKEN_BUDGET:
+        if _token_count(json.dumps(candidate[:effective])) <= _LIST_TOKEN_BUDGET:
             break
         effective = max(1, effective // 2)
     return effective
@@ -2121,7 +2114,7 @@ async def backlog_list(
 
 
 def _build_compact_manifest(
-    result: _models.ViewItemResult, full_response: dict[str, object], selector: str
+    result: models.ViewItemResult, full_response: dict[str, object], selector: str
 ) -> dict[str, object]:
     """Build the compact routing manifest returned by ``backlog_view(summary=True)``.
 
@@ -2134,11 +2127,11 @@ def _build_compact_manifest(
         Compact dict with issue_number, title, labels, status, plan_address,
         and size hint for the full response.
     """
-    full_chars = len(_json.dumps(full_response))
+    full_chars = len(json.dumps(full_response))
     plan_address: str | None = result.plan or None
     issue_number: int | None = result.number
     if issue_number is None:
-        num_match = _re.search(r"(\d+)", result.issue)
+        num_match = re.search(r"(\d+)", result.issue)
         if num_match:
             issue_number = int(num_match.group(1))
     status: str = "closed" if result.state == "closed" else "open"
@@ -2173,7 +2166,7 @@ def _build_compact_manifest(
     return compact
 
 
-def _sections_index_from_result(result: _models.ViewItemResult) -> str:
+def _sections_index_from_result(result: models.ViewItemResult) -> str:
     r"""Build a ``## Sections`` index string from a populated ViewItemResult.
 
     Prefers ``result.sections_index`` when already set (YAML items with
@@ -2209,7 +2202,7 @@ def _sections_index_from_result(result: _models.ViewItemResult) -> str:
 
 
 def _build_over_budget_view(
-    result: _models.ViewItemResult, full_chars: int, selector: str, *, narrowed_to_single_section: bool = False
+    result: models.ViewItemResult, full_chars: int, selector: str, *, narrowed_to_single_section: bool = False
 ) -> dict[str, object]:
     """Build a compact section-directory response for an over-budget backlog_view call.
 
@@ -2602,7 +2595,7 @@ async def backlog_view(
             # measured in full, so a genuinely-too-large body (or narrowed slice)
             # still gates.  ``_full_chars`` in the directory hint reports the real
             # serialised char length of the full payload the caller would receive.
-            serialised = _json.dumps(full_response)
+            serialised = json.dumps(full_response)
             if _view_payload_token_count(full_response) > _VIEW_TOKEN_BUDGET:
                 # Read the narrowed section count from full_response, not result:
                 # _filter_view_sections() narrows full_response["sections"] for the
@@ -3258,7 +3251,7 @@ def _require_artifact_entries(entries: list, label: str) -> None:
 
 
 def _get_artifact_provider() -> ContentProvider:
-    provider = _get_config().backend
+    provider = get_config().backend
     if not isinstance(provider, ContentProvider):
         raise ContentUnavailableError("Active backend does not support artifact content")
     return provider
@@ -3284,12 +3277,12 @@ def _manifest_reference(item_id: ItemId) -> ContentRef:
     """
     try:
         return ContentRef(kind=ContentKind.ARTIFACT_MANIFEST, namespace=str(item_id), name="manifest")
-    except _PydanticValidationError as exc:
+    except PydanticValidationError as exc:
         raise ValidationError("; ".join(error["msg"] for error in exc.errors())) from exc
 
 
 def _load_manifest(provider: ContentProvider, item_id: ItemId) -> ArtifactManifest:
-    return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
+    return load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
 def _artifact_type(value: str) -> ArtifactType:
@@ -3353,7 +3346,7 @@ async def artifact_register(
             artifact_type=artifact_type,
             artifact_id=artifact_id,
             status=status,
-            created_at=_datetime.now(UTC).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             agent=agent,
         )
 
@@ -3980,14 +3973,14 @@ def _dispatch_reference(milestone_number: int) -> ContentRef:
     return ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone_number}")
 
 
-def _read_dispatch_plan(milestone_number: int) -> _ds.DispatchPlan:
-    return _ds.DispatchPlan.model_validate_json(
+def _read_dispatch_plan(milestone_number: int) -> dispatch_schema.DispatchPlan:
+    return dispatch_schema.DispatchPlan.model_validate_json(
         _get_artifact_provider().get_content(_dispatch_reference(milestone_number)).content
     )
 
 
 def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, content: str) -> None:
-    log = _logging.getLogger(__name__)
+    log = logging.getLogger(__name__)
     try:
         provider = _get_artifact_provider()
         entry = ArtifactEntry(
@@ -4003,7 +3996,7 @@ def _try_register_dispatch_plan_artifact(item_id: ItemId, artifact_id: str, cont
         ContentUnavailableError,
         ContentConflictError,
         UnsupportedCapabilityError,
-        _GithubException,
+        GithubException,
     ) as exc:
         log.warning(
             "dispatch_create_plan: artifact registration failed for item %s (artifact=%s): %s",
@@ -4070,7 +4063,7 @@ async def dispatch_validate(
             DispatchValidateResponse,
             {"error": str(exc), "retryable": _retryable(exc), "milestone_number": milestone_number},
         )
-    result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
+    result = await asyncio.to_thread(dispatch_schema.validate_plan_integrity, plan)
     return _respond(DispatchValidateResponse, {"milestone_number": milestone_number, **dataclasses.asdict(result)})
 
 
@@ -4112,7 +4105,7 @@ async def dispatch_stale_check(
 )
 async def dispatch_create_plan(
     milestone_number: Annotated[int, Field(description="GitHub milestone number")],
-    plan: Annotated[_ds.DispatchPlan, Field(description="The dispatch plan for this milestone.")],
+    plan: Annotated[dispatch_schema.DispatchPlan, Field(description="The dispatch plan for this milestone.")],
     overwrite: Annotated[
         bool,
         Field(
@@ -4210,7 +4203,7 @@ async def dispatch_create_plan(
     val_errors: list[str] = []
     val_warnings: list[str] = []
     if validate:
-        val_result = await asyncio.to_thread(_ds.validate_plan_integrity, plan)
+        val_result = await asyncio.to_thread(dispatch_schema.validate_plan_integrity, plan)
         is_valid = val_result.is_valid
         val_errors = list(val_result.errors)
         val_warnings = list(val_result.warnings)
@@ -4268,7 +4261,7 @@ async def dispatch_conflicts(
 
 #: Lazily created singleton DispatchStateManager.
 # TODO(H05): Move to FastMCP lifespan context — eliminate module-level singleton.
-_dispatch_state_mgr: _DispatchStateManager | None = None
+_dispatch_state_mgr: DispatchStateManager | None = None
 
 #: Path to the spawn.py script resolved once at module level.
 _SPAWN_SCRIPT: Path = Path(__file__).parent.parent / "skills" / "kage-bunshin" / "scripts" / "spawn.py"
@@ -4284,11 +4277,11 @@ def _project_stub() -> str:
     Returns:
         Slug string, e.g. ``home-user-repos-my_project``.
     """
-    project_root = _models.get_repo_root()
+    project_root = models.get_repo_root()
     return str(project_root).lstrip("/").replace("/", "-")
 
 
-def _dispatch_state_manager() -> _DispatchStateManager:
+def _dispatch_state_manager() -> DispatchStateManager:
     """Return the lazily created DispatchStateManager singleton.
 
     Creates the state database under ``~/.dh/projects/{project-stub}/`` on
@@ -4301,7 +4294,7 @@ def _dispatch_state_manager() -> _DispatchStateManager:
     if _dispatch_state_mgr is None:
         db_path = Path.home() / ".dh" / "projects" / _project_stub() / "dispatch-state.db"
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        _dispatch_state_mgr = _DispatchStateManager(db_path)
+        _dispatch_state_mgr = DispatchStateManager(db_path)
     return _dispatch_state_mgr
 
 
@@ -4331,7 +4324,7 @@ async def dispatch_wave_start(
     """
     try:
         item_records = [
-            _DispatchItemRecord(
+            DispatchItemRecord(
                 milestone=milestone, wave_num=wave_num, issue=int(str(item["issue"])), title=str(item.get("title", ""))
             )
             for item in items
@@ -4342,7 +4335,7 @@ async def dispatch_wave_start(
             {"error": f"Malformed item entry: {exc}", "retryable": False, "milestone": milestone, "wave_num": wave_num},
         )
     try:
-        wave: _DispatchWaveRecord = await asyncio.to_thread(
+        wave: DispatchWaveRecord = await asyncio.to_thread(
             _dispatch_state_manager().create_wave, milestone, wave_num, item_records
         )
     except sqlite3.IntegrityError:
@@ -4465,7 +4458,7 @@ async def dispatch_wave_status(
     mgr = _dispatch_state_manager()
     warnings: list[str] = []
 
-    def _check_and_query() -> _DispatchWaveRecord | None:
+    def _check_and_query() -> DispatchWaveRecord | None:
         stale = mgr.check_stale_pids()
         warnings.extend(
             f"PID {stale_item.pid} for issue #{stale_item.issue} is dead — marked failed"
@@ -4487,8 +4480,8 @@ async def dispatch_wave_status(
     elapsed: float | None = None
     if wave.started_at:
         with contextlib.suppress(ValueError):
-            start = _datetime.fromisoformat(wave.started_at)
-            end = _datetime.fromisoformat(wave.completed_at) if wave.completed_at else _datetime.now(UTC)
+            start = datetime.fromisoformat(wave.started_at)
+            end = datetime.fromisoformat(wave.completed_at) if wave.completed_at else datetime.now(UTC)
             elapsed = (end - start).total_seconds()
 
     # TODO: not yet wired to stored dispatch state — always zero. See docstring.
@@ -4577,7 +4570,7 @@ def _build_spawn_cmd(
 
 
 async def _poll_until_done(
-    mgr: _DispatchStateManager, milestone: int, wave_num: int, issue_num: int, pid: int, result_file: str
+    mgr: DispatchStateManager, milestone: int, wave_num: int, issue_num: int, pid: int, result_file: str
 ) -> tuple[bool, float | None]:
     """Poll until a spawned item completes or its PID dies.
 
@@ -4608,7 +4601,7 @@ async def _poll_until_done(
                     content = ""
                 item_cost: float | None = None
                 try:
-                    rj = _json.loads(content)
+                    rj = json.loads(content)
                     item_cost = float(rj.get("cost", 0)) or None
                 except (ValueError, KeyError, TypeError):
                     pass
@@ -4618,7 +4611,7 @@ async def _poll_until_done(
         pid_alive = True
         if pid > 0:
             try:
-                _os.kill(pid, 0)
+                os.kill(pid, 0)
             except ProcessLookupError:
                 pid_alive = False
             except PermissionError:
@@ -4631,7 +4624,7 @@ async def _poll_until_done(
 
 
 async def _run_spawn_item(
-    mgr: _DispatchStateManager,
+    mgr: DispatchStateManager,
     semaphore: asyncio.Semaphore,
     counters: _WaveCounters,
     warnings: list[str],
@@ -4675,7 +4668,7 @@ async def _run_spawn_item(
             stdout_text = stdout_bytes.decode(errors="replace").strip()
 
             try:
-                spawn_data = _json.loads(stdout_text)
+                spawn_data = json.loads(stdout_text)
                 pid = int(spawn_data.get("pid", -1))
                 result_file = str(spawn_data.get("result_file", ""))
                 session_id = spawn_data.get("session_id")
@@ -4775,11 +4768,11 @@ async def dispatch_spawn(
     mgr = _dispatch_state_manager()
     await asyncio.to_thread(mgr.check_stale_pids)
 
-    start_time = _time.monotonic()
+    start_time = time.monotonic()
     integration_branch: str = plan.milestone.integration_branch
     all_waves = [w for w in plan.waves if w.wave >= wave_num]
     total_items = sum(len(w.items) for w in all_waves)
-    per_wave_summaries: list[_DispatchWaveSummary] = []
+    per_wave_summaries: list[DispatchWaveSummary] = []
     warnings: list[str] = []
     semaphore = asyncio.Semaphore(max_concurrent)
     overall = _WaveCounters()
@@ -4791,7 +4784,7 @@ async def dispatch_spawn(
                 milestone,
                 wave.wave,
                 [
-                    _DispatchItemRecord(milestone=milestone, wave_num=wave.wave, issue=i.issue, title=i.title)
+                    DispatchItemRecord(milestone=milestone, wave_num=wave.wave, issue=i.issue, title=i.title)
                     for i in wave.items
                 ],
             )
@@ -4823,7 +4816,7 @@ async def dispatch_spawn(
 
         fetched = await asyncio.to_thread(mgr.get_wave, milestone, wave.wave)
         per_wave_summaries.append(
-            _DispatchWaveSummary(
+            DispatchWaveSummary(
                 milestone=milestone,
                 wave_num=wave.wave,
                 status=fetched.status if fetched else "complete",
@@ -4849,7 +4842,7 @@ async def dispatch_spawn(
         completed=overall.completed,
         failed=overall.failed,
         skipped=overall.skipped,
-        elapsed_seconds=_time.monotonic() - start_time,
+        elapsed_seconds=time.monotonic() - start_time,
         per_wave=[w.model_dump(mode="json") for w in per_wave_summaries],
         total_cost=total_cost,
         messages=[f"Dispatch complete: {overall.completed}/{total_items} items succeeded"],
@@ -4863,9 +4856,9 @@ async def dispatch_spawn(
     return dump
 
 
-from agent_profile import mcp as _agent_profile_mcp
+from agent_profile import mcp as agent_profile_mcp
 
-mcp.mount(_agent_profile_mcp, namespace="profile")
+mcp.mount(agent_profile_mcp, namespace="profile")
 
 if __name__ == "__main__":
     mcp.run()

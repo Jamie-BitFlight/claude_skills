@@ -28,19 +28,19 @@ _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
-from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
-from backlog_core.backend_types import BacklogConfig as _BPBacklogConfig
+from backlog_core.backend_protocol import reset_config as reset_bp_config, set_config as set_bp_config
+from backlog_core.backend_types import BacklogConfig as BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import BacklogItem
-from backlog_core.server import mcp as _backlog_mcp
+from backlog_core.server import mcp as backlog_mcp
 from fastmcp.exceptions import ToolError
 from sam_schema import artifacts, dispatch
 from sam_schema.cli import app
 from sam_schema.core.backends.local_context_backend import LocalContextBackend
 from sam_schema.core.backends.memory_context_backend import InMemoryContextBackend
 from sam_schema.core.context_config import ContextConfig, reset_context_config, set_context_config
-from sam_schema.server import mcp as _sam_mcp
+from sam_schema.server import mcp as sam_mcp
 from typer.testing import CliRunner
 
 from tests.helpers import call_mcp_tool, run_cli_subprocess
@@ -106,7 +106,7 @@ def dh_env(tmp_path: Path, request: pytest.FixtureRequest, monkeypatch: pytest.M
     os.environ["DH_STATE_HOME"] = dh_state
     db_path = dh_paths.state_root() / "backlog.sqlite3"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    _set_bp_config(_BPBacklogConfig(backend=SQLiteBackend(str(db_path))))
+    set_bp_config(BPBacklogConfig(backend=SQLiteBackend(str(db_path))))
     set_context_config(ContextConfig(backend=InMemoryContextBackend()))
     if request.node.name.startswith("test_active_task_"):
         set_context_config(ContextConfig(backend=LocalContextBackend()))
@@ -118,7 +118,7 @@ def dh_env(tmp_path: Path, request: pytest.FixtureRequest, monkeypatch: pytest.M
     else:
         os.environ.pop("DH_STATE_HOME", None)
     reset_context_config()
-    _reset_bp_config()
+    reset_bp_config()
 
 
 @pytest.mark.integration
@@ -129,8 +129,8 @@ async def test_memory_provider_is_process_local(dh_env: dict[str, str]) -> None:
     cli_result = _run_cli(
         ["backlog", "add", "--title", "Memory Only", "--description", "test", "--priority", "P1"], env=memory_env
     )
-    _set_bp_config(_BPBacklogConfig(backend=InMemoryBackend()))
-    mcp_list = await call_mcp_tool(_backlog_mcp, "backlog_list", {})
+    set_bp_config(BPBacklogConfig(backend=InMemoryBackend()))
+    mcp_list = await call_mcp_tool(backlog_mcp, "backlog_list", {})
 
     assert cli_result["title"] == "Memory Only"
     assert "Memory Only" not in {item["title"] for item in mcp_list.get("items", [])}
@@ -154,7 +154,7 @@ async def test_backlog_list_parity(dh_env: dict[str, str]) -> None:
     _run_cli(["backlog", "add", "--title", "Parity Item", "--description", "test", "--priority", "P1"], env=dh_env)
 
     cli_list = _run_cli(["backlog", "list"], env=dh_env)
-    mcp_list = await call_mcp_tool(_backlog_mcp, "backlog_list", {})
+    mcp_list = await call_mcp_tool(backlog_mcp, "backlog_list", {})
 
     cli_titles = {item["title"] for item in cli_list.get("items", [])}
     mcp_titles = {item["title"] for item in mcp_list.get("items", [])}
@@ -172,7 +172,7 @@ async def test_query_filter_parity(dh_env: dict[str, str]) -> None:
     _invoke_cli(["backlog", "add", "--title", "Filter Item", "--description", "test", "--priority", "P1"])
 
     cli_filtered = _invoke_cli(["backlog", "list", "--filter", "section=P1"])
-    mcp_filtered = await call_mcp_tool(_backlog_mcp, "backlog_list", {"filter_by_key": {"section": "P1"}})
+    mcp_filtered = await call_mcp_tool(backlog_mcp, "backlog_list", {"filter_by_key": {"section": "P1"}})
 
     cli_titles = {item["title"] for item in cli_filtered.get("items", [])}
     mcp_titles = {item["title"] for item in mcp_filtered.get("items", [])}
@@ -185,7 +185,7 @@ async def test_query_filter_absent_key_returns_empty(dh_env: dict[str, str]) -> 
     _invoke_cli(["backlog", "add", "--title", "No Match Item", "--description", "test", "--priority", "P1"])
 
     cli_filtered = _invoke_cli(["backlog", "list", "--filter", "nonexistent_key=xyz"])
-    mcp_filtered = await call_mcp_tool(_backlog_mcp, "backlog_list", {"filter_by_key": {"nonexistent_key": "xyz"}})
+    mcp_filtered = await call_mcp_tool(backlog_mcp, "backlog_list", {"filter_by_key": {"nonexistent_key": "xyz"}})
 
     assert cli_filtered.get("count", 0) == 0
     assert len(mcp_filtered.get("items", [])) == 0
@@ -209,7 +209,7 @@ async def test_backlog_add_parity(dh_env: dict[str, str]) -> None:
         "P1",
     ])
     mcp_result = await call_mcp_tool(
-        _backlog_mcp,
+        backlog_mcp,
         "backlog_add",
         {"title": "Parity MCP Add", "priority": "P1", "description": "mcp test", "force": True},
     )
@@ -232,7 +232,7 @@ async def test_backlog_view_parity(dh_env: dict[str, str]) -> None:
 
     cli_view = _invoke_cli(["backlog", "view", "--selector", "Parity View Item"])
     mcp_view = await call_mcp_tool(
-        _backlog_mcp, "backlog_view", {"selector": "Parity View Item", "summary": False, "include_content": True}
+        backlog_mcp, "backlog_view", {"selector": "Parity View Item", "summary": False, "include_content": True}
     )
 
     assert cli_view.get("title") == "Parity View Item"
@@ -261,7 +261,7 @@ async def test_backlog_update_parity(dh_env: dict[str, str]) -> None:
 
     # MCP update
     mcp_update = await call_mcp_tool(
-        _backlog_mcp, "backlog_update", {"selector": "Parity Update MCP", "title": "MCP Updated Title"}
+        backlog_mcp, "backlog_update", {"selector": "Parity Update MCP", "title": "MCP Updated Title"}
     )
     assert "MCP Updated Title" in str(mcp_update)
 
@@ -294,7 +294,7 @@ async def test_backlog_close_parity(dh_env: dict[str, str]) -> None:
 
     # MCP close
     mcp_close = await call_mcp_tool(
-        _backlog_mcp, "backlog_close", {"selector": "Parity Close MCP", "reason": "duplicate"}
+        backlog_mcp, "backlog_close", {"selector": "Parity Close MCP", "reason": "duplicate"}
     )
     assert mcp_close.get("title") == "Parity Close MCP"
     assert mcp_close.get("closed") is True
@@ -331,7 +331,7 @@ async def test_backlog_resolve_parity(dh_env: dict[str, str]) -> None:
 
     # MCP close
     mcp_close = await call_mcp_tool(
-        _backlog_mcp, "backlog_close", {"selector": "Parity Close MCP2", "reason": "duplicate"}
+        backlog_mcp, "backlog_close", {"selector": "Parity Close MCP2", "reason": "duplicate"}
     )
     assert mcp_close.get("title") == "Parity Close MCP2"
     assert mcp_close.get("closed") is True
@@ -369,14 +369,14 @@ async def test_backlog_groom_parity(dh_env: dict[str, str]) -> None:
 
     # MCP groom
     mcp_groom = await call_mcp_tool(
-        _backlog_mcp, "backlog_groom", {"selector": "Parity Groom MCP", "section": "Analysis", "content": GROOM_CONTENT}
+        backlog_mcp, "backlog_groom", {"selector": "Parity Groom MCP", "section": "Analysis", "content": GROOM_CONTENT}
     )
     assert mcp_groom.get("title") == "Parity Groom MCP"
 
     # Verify both items have groomed content via view
     cli_view = _invoke_cli(["backlog", "view", "--selector", "Parity Groom CLI", "--section", "Analysis"])
     mcp_view = await call_mcp_tool(
-        _backlog_mcp, "backlog_view", {"selector": "Parity Groom MCP", "summary": False, "section": "Analysis"}
+        backlog_mcp, "backlog_view", {"selector": "Parity Groom MCP", "summary": False, "section": "Analysis"}
     )
 
     assert "needs investigation" in str(cli_view)
@@ -397,14 +397,14 @@ async def test_plan_create_read_parity(dh_env: dict[str, str], tmp_path: Path) -
     cli_result = _invoke_cli(["plan", "create", "--slug", "cli-plan", "--goal", "CLI goal", "--plan-dir", plan_dir])
     plan_id = cli_result["plan_id"]
     mcp_result = await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id, "plan_dir": plan_dir}
+        sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id, "plan_dir": plan_dir}
     )
     assert mcp_result["plan"]["feature"] == "cli-plan"
     assert mcp_result["plan"]["goal"] == "CLI goal"
 
     # MCP creates, CLI reads
     mcp_create = await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_plan",
         {"config": {"action": "create", "slug": "mcp-plan", "goal": "MCP goal"}, "plan_dir": plan_dir},
     )
@@ -433,7 +433,7 @@ async def test_plan_status_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id, "--plan-dir", plan_dir])
     mcp_status = await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id, "plan_dir": plan_dir}
+        sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id, "plan_dir": plan_dir}
     )
     assert cli_status["feature"] == mcp_status["feature"]
     assert cli_status["total_tasks"] == mcp_status["total_tasks"]
@@ -448,7 +448,7 @@ async def test_plan_list_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
         _invoke_cli(["plan", "create", "--slug", slug, "--goal", f"Goal {slug}", "--plan-dir", plan_dir])
 
     cli_list = _invoke_cli(["plan", "list", "--plan-dir", plan_dir])
-    mcp_list = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "list"}, "plan_dir": plan_dir})
+    mcp_list = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "list"}, "plan_dir": plan_dir})
     cli_ids = {item.get("plan_id", item.get("plan_ref")) for item in cli_list.get("items", [])}
     mcp_ids = {item.get("plan_id", item.get("plan_ref")) for item in mcp_list.get("items", [])}
     assert cli_ids == mcp_ids
@@ -482,7 +482,7 @@ async def test_plan_ready_parity(dh_env: dict[str, str], tmp_path: Path) -> None
 
     cli_ready = _invoke_cli(["plan", "ready", "--plan-address", plan_id, "--plan-dir", plan_dir])
     mcp_ready = await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id, "plan_dir": plan_dir}
+        sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id, "plan_dir": plan_dir}
     )
     assert cli_ready["feature"] == mcp_ready["feature"]
     assert cli_ready["count"] == mcp_ready["count"] == 1
@@ -532,7 +532,7 @@ async def test_plan_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
 
     # MCP update plan_b
     mcp_update = await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_plan",
         {
             "config": {"action": "update", "set_fields_json": {"goal": "MCP Updated"}},
@@ -580,7 +580,7 @@ async def test_plan_append_task_parity(dh_env: dict[str, str], tmp_path: Path) -
 
     # MCP append to plan_b
     mcp_append = await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_plan",
         {"config": {"action": "append_task", "task": _TASK_DEF}, "plan": plan_b, "plan_dir": plan_dir},
     )
@@ -621,7 +621,7 @@ async def test_plan_finalize_parity(dh_env: dict[str, str], tmp_path: Path) -> N
 
     # MCP finalize plan_b
     mcp_finalize = await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "finalize"}, "plan": plan_b, "plan_dir": plan_dir}
+        sam_mcp, "sam_plan", {"config": {"action": "finalize"}, "plan": plan_b, "plan_dir": plan_dir}
     )
     assert mcp_finalize["finalized"] is True
     assert mcp_finalize["state"] == "ready"
@@ -675,7 +675,7 @@ async def test_task_read_parity(dh_env: dict[str, str], tmp_path: Path) -> None:
 
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert cli_read["task"]["id"] == mcp_read["task"]["id"] == "T01"
     assert cli_read["task"]["title"] == mcp_read["task"]["title"] == "Parity Task"
@@ -704,7 +704,7 @@ async def test_task_claim_parity(dh_env: dict[str, str], tmp_path: Path) -> None
     _invoke_cli(["plan", "finalize", "--plan-address", plan_id, "--plan-dir", plan_dir])
 
     mcp_claim = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "claim"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "claim"}, "plan_dir": plan_dir}
     )
     assert mcp_claim["claimed"] is True
     assert mcp_claim["task_id"] == "T02"
@@ -735,7 +735,7 @@ async def test_task_state_parity(dh_env: dict[str, str], tmp_path: Path) -> None
 
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert cli_read["task"]["status"] == "complete"
     assert mcp_read["task"]["status"] == "complete"
@@ -785,7 +785,7 @@ async def test_task_update_parity(dh_env: dict[str, str], tmp_path: Path) -> Non
 
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert cli_read["task"]["priority"] == 5
     assert mcp_read["task"]["priority"] == 5
@@ -834,7 +834,7 @@ async def test_task_set_fields_parity(dh_env: dict[str, str], tmp_path: Path) ->
     ])
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert cli_read["task"]["priority"] == 5
     assert mcp_read["task"]["priority"] == 5
@@ -845,7 +845,7 @@ async def test_task_set_fields_parity(dh_env: dict[str, str], tmp_path: Path) ->
     _invoke_cli(["plan", "finalize", "--plan-address", plan_id, "--plan-dir", plan_dir])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_task",
         {
             "plan": plan_id,
@@ -856,7 +856,7 @@ async def test_task_set_fields_parity(dh_env: dict[str, str], tmp_path: Path) ->
     )
     cli_read2 = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T02", "--plan-dir", plan_dir])
     mcp_read2 = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert cli_read2["task"]["priority"] == 3
     assert mcp_read2["task"]["priority"] == 3
@@ -909,7 +909,7 @@ async def test_task_append_section_parity(dh_env: dict[str, str], tmp_path: Path
     ])
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01", "--plan-dir", plan_dir])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     cli_notes = cli_read["task"].get("context-notes", "")
     mcp_notes = mcp_read["task"].get("context-notes", "")
@@ -924,7 +924,7 @@ async def test_task_append_section_parity(dh_env: dict[str, str], tmp_path: Path
     _invoke_cli(["plan", "finalize", "--plan-address", plan_id, "--plan-dir", plan_dir])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_task",
         {
             "plan": plan_id,
@@ -935,7 +935,7 @@ async def test_task_append_section_parity(dh_env: dict[str, str], tmp_path: Path
     )
     cli_read2 = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T02", "--plan-dir", plan_dir])
     mcp_read2 = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T02", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     cli_notes2 = cli_read2["task"].get("context-notes", "")
     mcp_notes2 = mcp_read2["task"].get("context-notes", "")
@@ -1016,7 +1016,7 @@ async def test_sam_plan_status_matches_the_cli_on_an_imported_plan(dh_env: dict[
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
-    mcp_status = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id})
+    mcp_status = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_id})
 
     assert cli_status["tasks"][0]["status"] == "in-progress"  # non-vacuity: CLI actually read the ledger
     assert _without_nulls(mcp_status) == _without_nulls(cli_status)
@@ -1035,7 +1035,7 @@ async def test_sam_plan_append_task_lands_in_the_ledger_on_an_imported_plan(dh_e
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_plan",
         {
             "config": {
@@ -1068,7 +1068,7 @@ async def test_sam_task_state_moves_the_ledger_row_on_an_imported_plan(dh_env: d
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_task",
         {"plan": plan_id, "task": "T01", "config": {"action": "state", "status": "skipped", "reason": "user"}},
     )
@@ -1094,7 +1094,7 @@ async def test_sam_plan_ready_matches_the_cli_on_an_imported_plan(dh_env: dict[s
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     cli_ready = _invoke_cli(["plan", "ready", "--plan-address", plan_id])
-    mcp_ready = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id})
+    mcp_ready = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "ready"}, "plan": plan_id})
 
     assert cli_ready["count"] == 0  # non-vacuity: the dispatched task is gone from the ledger's queue
     assert mcp_ready == cli_ready
@@ -1110,7 +1110,7 @@ async def test_sam_plan_read_matches_the_cli_on_an_imported_plan(dh_env: dict[st
     _invoke_cli(["plan", "update", "--plan-address", plan_id, "--set", "goal=Ledger-only goal"])
 
     cli_read = _invoke_cli(["plan", "read", "--address", plan_id])
-    mcp_read = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id})
+    mcp_read = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "read"}, "plan": plan_id})
 
     assert cli_read["source_format"] == "ledger"  # non-vacuity: the CLI actually read the ledger
     assert cli_read["plan"]["goal"] == "Ledger-only goal"
@@ -1126,7 +1126,7 @@ async def test_sam_plan_update_lands_in_the_ledger_on_an_imported_plan(dh_env: d
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "update", "context": "MCP-WROTE-THIS"}, "plan": plan_id}
+        sam_mcp, "sam_plan", {"config": {"action": "update", "context": "MCP-WROTE-THIS"}, "plan": plan_id}
     )
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
@@ -1140,7 +1140,7 @@ async def test_sam_plan_finalize_moves_the_ledger_plan_out_of_drafting(dh_env: d
     _invoke_cli(["plan", "append-task", "--plan-address", plan_id, *_task_args(_TASK_DEF)])
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
-    mcp_finalize = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "finalize"}, "plan": plan_id})
+    mcp_finalize = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "finalize"}, "plan": plan_id})
     assert mcp_finalize.get("noop") is None  # a TransitionResult carries no finalized/state keys to assert on
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
@@ -1157,7 +1157,7 @@ async def test_sam_task_read_matches_the_cli_on_an_imported_plan(dh_env: dict[st
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01"])
-    mcp_read = await call_mcp_tool(_sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
+    mcp_read = await call_mcp_tool(sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
 
     assert cli_read["row"]["status"] == "in-progress"  # non-vacuity: the CLI actually read the ledger
     assert _without_nulls(mcp_read) == _without_nulls(cli_read)
@@ -1173,7 +1173,7 @@ async def test_sam_task_update_lands_in_the_ledger_on_an_imported_plan(dh_env: d
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_task",
         {"plan": plan_id, "task": "T01", "config": {"action": "update", "set_fields_json": {"priority": 5}}},
     )
@@ -1183,7 +1183,7 @@ async def test_sam_task_update_lands_in_the_ledger_on_an_imported_plan(dh_env: d
 
     # The runner's actual write shape: an attempt-scoped section append, not a bare field patch.
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_task",
         {
             "plan": plan_id,
@@ -1228,7 +1228,7 @@ async def test_sam_plan_status_matches_the_cli_for_a_plan_id_spelled_in_another_
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", spell(plan_id)])
-    mcp_status = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": spell(plan_id)})
+    mcp_status = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": spell(plan_id)})
 
     assert _without_nulls(mcp_status) == _without_nulls(cli_status)
 
@@ -1251,7 +1251,7 @@ async def test_sam_task_read_matches_the_cli_for_a_plan_id_spelled_in_another_ca
 
     cli_read = _invoke_cli(["plan", "read", "--address", f"{plan_id}/T01"])
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": spell(plan_id), "task": "T01", "config": {"action": "read"}}
+        sam_mcp, "sam_task", {"plan": spell(plan_id), "task": "T01", "config": {"action": "read"}}
     )
 
     assert _without_nulls(mcp_read) == _without_nulls(cli_read)
@@ -1274,7 +1274,7 @@ async def test_sam_plan_update_lands_in_the_ledger_for_a_plan_id_spelled_in_anot
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "update", "context": "CASE-WROTE-THIS"}, "plan": spell(plan_id)}
+        sam_mcp, "sam_plan", {"config": {"action": "update", "context": "CASE-WROTE-THIS"}, "plan": spell(plan_id)}
     )
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
@@ -1307,7 +1307,7 @@ async def test_sam_task_read_matches_the_cli_on_a_ledger_native_plan(dh_env: dic
     assert cli_read["task"] == "T01"  # non-vacuity: the CLI actually found the ledger-native plan
     assert cli_read["row"]["id"] == "T01"
 
-    mcp_read = await call_mcp_tool(_sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
+    mcp_read = await call_mcp_tool(sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}})
 
     assert _without_nulls(mcp_read) == _without_nulls(cli_read)
 
@@ -1332,7 +1332,7 @@ async def test_mcp_reads_content_for_a_plan_the_ledger_does_not_hold(dh_env: dic
     _invoke_cli(["plan", "finalize", "--plan-address", plan_b])
 
     cli_status_b = _invoke_cli(["plan", "status", "--plan-address", plan_b])
-    mcp_status_b = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_b})
+    mcp_status_b = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "status"}, "plan": plan_b})
 
     assert "by_status" in mcp_status_b  # non-vacuity: this is the content shape, not the ledger's
     assert _without_nulls(mcp_status_b) == _without_nulls(cli_status_b)
@@ -1353,7 +1353,7 @@ async def test_sam_plan_append_task_refuses_on_an_archived_ledger_plan(dh_env: d
 
     with pytest.raises(ToolError):
         await call_mcp_tool(
-            _sam_mcp,
+            sam_mcp,
             "sam_plan",
             {
                 "config": {
@@ -1398,7 +1398,7 @@ async def test_sam_task_refuses_on_an_imported_plan_the_way_the_ledger_does(
     _invoke_cli(["plan", "dispatch", "--address", f"{plan_id}/T01"])
 
     with pytest.raises(ToolError):
-        await call_mcp_tool(_sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": action_config})
+        await call_mcp_tool(sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": action_config})
 
     cli_status = _invoke_cli(["plan", "status", "--plan-address", plan_id])
     assert cli_status["tasks"][0]["status"] == "in-progress"  # the ledger row must stay untouched
@@ -1427,7 +1427,7 @@ async def test_sam_plan_update_refuses_an_unwritable_set_field_like_the_cli_on_a
 
     with pytest.raises(ToolError):
         await call_mcp_tool(
-            _sam_mcp,
+            sam_mcp,
             "sam_plan",
             {"config": {"action": "update", "set_fields_json": {"archived": "2020-01-01"}}, "plan": plan_id},
         )
@@ -1458,7 +1458,7 @@ async def test_sam_task_update_refuses_an_unwritable_set_field_like_the_cli_on_a
 
     with pytest.raises(ToolError):
         await call_mcp_tool(
-            _sam_mcp,
+            sam_mcp,
             "sam_task",
             {"plan": plan_id, "task": "T01", "config": {"action": "update", "set_fields_json": {"status": "complete"}}},
         )
@@ -1478,7 +1478,7 @@ async def test_sam_plan_append_task_sets_the_conflict_group_on_an_imported_plan(
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_plan",
         {
             "config": {
@@ -1509,9 +1509,9 @@ async def test_sam_plan_ready_full_false_returns_the_compact_manifest_on_an_impo
     _invoke_cli(["plan", "import", "--from", "content", "--plan-address", plan_id])
 
     mcp_compact = await call_mcp_tool(
-        _sam_mcp, "sam_plan", {"config": {"action": "ready", "full": False}, "plan": plan_id}
+        sam_mcp, "sam_plan", {"config": {"action": "ready", "full": False}, "plan": plan_id}
     )
-    mcp_full = await call_mcp_tool(_sam_mcp, "sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
+    mcp_full = await call_mcp_tool(sam_mcp, "sam_plan", {"config": {"action": "ready", "full": True}, "plan": plan_id})
 
     assert mcp_compact["count"] == 1
     compact_keys = set(mcp_compact["items"][0])
@@ -1531,16 +1531,14 @@ async def test_active_task_get_parity(dh_env: dict[str, str]) -> None:
     """CLI ``active-task get`` and MCP ``sam_active_task(action='get')`` return the same result."""
     # Both report None when nothing is set
     cli_get = _invoke_cli(["active-task", "get", "--session-id", _AT_SESSION])
-    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
+    mcp_get = await call_mcp_tool(sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
     assert cli_get["active_task"] is None
     assert mcp_get["active_task"] is None
 
     # Set via CLI and both read it back
     _invoke_cli(["active-task", "set", "--address", "P1/T3", "--session-id", _AT_SESSION])
     cli_get2 = _invoke_cli(["active-task", "get", "--session-id", _AT_SESSION])
-    mcp_get2 = await call_mcp_tool(
-        _sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION}
-    )
+    mcp_get2 = await call_mcp_tool(sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
     assert cli_get2["active_task"]["plan"] == mcp_get2["active_task"]["plan"]
     assert cli_get2["active_task"]["task"] == mcp_get2["active_task"]["task"]
 
@@ -1549,15 +1547,13 @@ async def test_active_task_set_parity(dh_env: dict[str, str]) -> None:
     """CLI set → MCP get and MCP set → CLI get produce identical active task context."""
     # CLI sets, MCP reads
     cli_set = _invoke_cli(["active-task", "set", "--address", "P5/T7", "--session-id", _AT_SESSION])
-    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
+    mcp_get = await call_mcp_tool(sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
     assert mcp_get["active_task"]["plan"] == cli_set["active_task"]["plan"]
     assert mcp_get["active_task"]["task"] == cli_set["active_task"]["task"]
 
     # MCP sets, CLI reads
     mcp_set = await call_mcp_tool(
-        _sam_mcp,
-        "sam_active_task",
-        {"config": {"action": "set", "plan": "P9", "task": "T2"}, "session_id": _AT_SESSION},
+        sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": "P9", "task": "T2"}, "session_id": _AT_SESSION}
     )
     cli_get = _invoke_cli(["active-task", "get", "--session-id", _AT_SESSION])
     assert cli_get["active_task"]["plan"] == mcp_set["active_task"]["plan"]
@@ -1585,7 +1581,7 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
 
     # Set active task via MCP (preserves 'T01' prefix that plan file uses)
     await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_active_task",
         {"config": {"action": "set", "plan": plan_id, "task": "T01", "plan_dir": plan_dir}, "session_id": _AT_SESSION},
     )
@@ -1603,7 +1599,7 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
 
     # MCP read verifies the update
     mcp_read = await call_mcp_tool(
-        _sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
+        sam_mcp, "sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "read"}, "plan_dir": plan_dir}
     )
     assert mcp_read["task"]["priority"] == 5
 
@@ -1623,7 +1619,7 @@ async def test_active_task_update_parity(dh_env: dict[str, str], tmp_path: Path)
 
     # MCP update
     mcp_update = await call_mcp_tool(
-        _sam_mcp,
+        sam_mcp,
         "sam_active_task",
         {"config": {"action": "update", "set_fields_json": {"priority": 4}}, "session_id": _AT_SESSION},
     )
@@ -1644,17 +1640,15 @@ async def test_active_task_clear_parity(dh_env: dict[str, str]) -> None:
     assert cli_clear["cleared"] is True
 
     # MCP get returns null
-    mcp_get = await call_mcp_tool(_sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
+    mcp_get = await call_mcp_tool(sam_mcp, "sam_active_task", {"config": {"action": "get"}, "session_id": _AT_SESSION})
     assert mcp_get["active_task"] is None
 
     # MCP set, MCP clear, CLI get returns null
     await call_mcp_tool(
-        _sam_mcp,
-        "sam_active_task",
-        {"config": {"action": "set", "plan": "P8", "task": "T4"}, "session_id": _AT_SESSION},
+        sam_mcp, "sam_active_task", {"config": {"action": "set", "plan": "P8", "task": "T4"}, "session_id": _AT_SESSION}
     )
     mcp_clear = await call_mcp_tool(
-        _sam_mcp, "sam_active_task", {"config": {"action": "clear"}, "session_id": _AT_SESSION}
+        sam_mcp, "sam_active_task", {"config": {"action": "clear"}, "session_id": _AT_SESSION}
     )
     assert mcp_clear["cleared"] is True
 
