@@ -139,54 +139,147 @@ flowchart TD
     FixD --> Convert
 ```
 
-## Validation Model Selection
+## Process and System Improvement Loop
 
-After completeness and triage establish what the process means, identify the important correctness claims before choosing how to validate them. Classify claims independently: one process may need more than one validation model.
+Treat process improvement as recursive systems engineering, not diagram cleanup. At each useful resolution: establish purpose, model behavior, extract falsifiable claims, challenge them, improve defects that can be resolved without inventing intent, validate with the least-formal sufficient method, and feed failures back into improvement.
 
-For each important claim, ask in order:
+### Five Phases
 
-1. **What failure must be excluded?** State the prohibited behavior or required property in observable terms.
-2. **At what resolution does the claim exist?** Distinguish workflow/system behavior from component, algorithm, or transformation behavior.
-3. **What is the least-formal model capable of falsifying or proving it?** Do not add formalism that buys no additional confidence.
+1. **UNDERSTAND** — establish purpose, scope, evidence, desired outcomes, constraints, and current resolution.
+2. **MODEL** — extract actors, state, actions, inputs, outputs, decisions, resources, assumptions, goals, invariants, failure paths, and terminal states.
+3. **CHALLENGE** — identify ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, missing failure handling, and unverifiable claims. Ask what observation would falsify each important claim.
+4. **IMPROVE** — correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
+5. **VALIDATE** — select the cheapest sufficient validator per claim, gather evidence, and feed counterexamples or failures back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
 
-Route the claim as follows:
+### Authoritative Loop
 
-- **Executable checks/tests** — use when representative executions or property-based tests provide sufficient evidence.
-- **Mermaid structural validation** — use when the claim is that actors, steps, guards, branches, and terminal states are explicit and traversable. Mermaid specifies execution structure; it does not prove behavioral correctness.
-- **TLA+ candidate** — use when correctness depends on multiple possible executions: concurrency, interleavings, message/order variation, retries, crashes, shared mutable state, resource ownership, atomicity, fairness, deadlock freedom, safety invariants, or liveness requirements. Extract state variables, initial conditions, actions/transitions, guards, safety invariants, liveness properties, and environmental/fairness assumptions. Prefer model checking when finite state-space exploration can expose a counterexample.
-- **Lean candidate** — use when correctness requires a universal proposition over values, transformations, or formally defined states, such as invariant preservation, semantic equivalence, termination, or "for every valid input" guarantees. Prefer a cheaper validation method when representative execution or state-space exploration is sufficient.
+```mermaid
+flowchart TD
+    Start(["Process or system received"]) --> Scope["Discover relevant source material, constraints, existing behavior, and surrounding system"]
+    Scope --> Purpose{"Purpose and desired outcomes sufficiently explicit?"}
+    Purpose -->|"No"| PurposeGap["Identify missing purpose, goals, or success criteria"]
+    PurposeGap --> ResolvePurpose{"Can available evidence resolve the gap without inventing intent?"}
+    ResolvePurpose -->|"Yes"| DerivePurpose["Derive candidate purpose and record evidence"]
+    DerivePurpose --> Purpose
+    ResolvePurpose -->|"No"| AskPurpose["Explain gap and ask only questions required to continue"]
+    AskPurpose --> Blocked(["Blocked pending information"])
+    Purpose -->|"Yes"| Model["Build semantic model at current resolution"]
+    Model --> Inventory["Inventory actors, states, actions, inputs, outputs, decisions, resources, constraints, failures, and terminal states"]
+    Inventory --> Claims["Extract goals, invariants, assumptions, guarantees, safety, liveness, and other correctness claims"]
+    Claims --> Gaps["Detect ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, and unverifiable claims"]
+    Gaps --> ResolveGap{"Can gaps be resolved from established intent and evidence?"}
+    ResolveGap -->|"No"| Explain["Report known facts, gaps, consequences, and minimal questions"]
+    Explain --> Blocked
+    ResolveGap -->|"Yes"| Improve["Produce candidate improvement preserving established intent"]
+    Improve --> Reclaims["Re-extract claims from candidate"]
+    Reclaims --> Validate["Select cheapest sufficient validator for each important claim"]
+    Validate --> Kind{"Claim type?"}
+    Kind -->|"Observable execution"| Tests["Examples, executable checks, simulation, or property-based tests"]
+    Kind -->|"Structural or routing"| Mermaid["Mermaid plus semantic-fidelity checks"]
+    Kind -->|"State-space or concurrency"| TLA["TLA+ model plus TLC when tooling is available"]
+    Kind -->|"Universal proposition"| LeanProof["Lean specification plus proof when tooling is available"]
+    Kind -->|"Human or environmental"| Evidence["Inspection, measurement, experiment, or explicit user acceptance"]
+    Tests --> Result
+    Mermaid --> Result
+    TLA --> Result
+    LeanProof --> Result
+    Evidence --> Result
+    Result{"Claim supported at required confidence?"}
+    Result -->|"No"| Diagnose["Turn failure or counterexample into diagnostic evidence"]
+    Diagnose --> Root["Identify violated assumption, missing behavior, bad requirement, model defect, or implementation defect"]
+    Root --> Intent{"Would correction create or change established intent?"}
+    Intent -->|"No"| Improve
+    Intent -->|"Yes or uncertain"| Explain
+    Result -->|"Yes"| More{"Important unvalidated claims remain?"}
+    More -->|"Yes"| Validate
+    More -->|"No"| Resolution{"Would finer resolution materially expose new failure modes?"}
+    Resolution -->|"Yes"| Decompose["Decompose relevant subsystem; inherit parent goals, constraints, and invariants"]
+    Decompose --> Model
+    Resolution -->|"No"| Final["Record validated model, evidence, assumptions, residual risks, and validation boundaries"]
+    Final --> Done(["Ready for use"])
+```
 
-Do not route an entire document to TLA+ or Lean merely because one claim qualifies. Route individual claims and retain Mermaid for the executable process representation when useful.
+### Purpose at Any Resolution
 
-### Formal-Validation Signals
+Every process or subsystem must have enough purpose to judge improvement. Do not require a fully formal goal hierarchy before useful work begins. Establish the smallest defensible purpose at the current resolution, then refine only where additional resolution can change a correctness decision.
 
-When reviewing a process, explicitly inventory these signals if present:
+Child processes inherit applicable parent goals, constraints, and invariants. They may strengthen them but must not silently contradict them.
 
-- shared mutable state or exclusive resources
-- concurrent or independently scheduled actors
-- ordering assumptions or asynchronous messages
-- retries, crashes, recovery, rollback, or partial failure
-- atomic operations or transactions
-- fairness or eventual-progress assumptions
-- safety requirements — something prohibited must never occur
-- liveness requirements — something required must eventually occur
-- universal transformation or preservation claims
-- equivalence or termination claims
+### Uncertainty Classification
 
-A TLA+ or Lean classification is a recommendation to create or invoke an appropriate formal model; do not invent a proof or claim verification from the process diagram alone.
+Do not treat every unknown as blocking. Classify uncertainty:
 
-### Validation Gate
+- **KNOWN + VALID** — evidence supports the claim.
+- **KNOWN + INVALID** — evidence or a counterexample contradicts it.
+- **UNKNOWN + RESOLVABLE** — investigate available source, repository, runtime, or other evidence before asking the user.
+- **UNKNOWN + INTENT-DEPENDENT** — only the process owner can choose; explain the consequence and ask the minimum question.
+- **ASSUMED** — continuation requires an assumption; state it explicitly and do not present it as verified.
+- **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
-Before declaring an improved process ready, record:
+Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement.
 
-- the important correctness claims identified
-- the failure mode each claim excludes
-- the resolution at which each claim exists
-- the selected validation model and why it is sufficient
-- assumptions required by that validation
-- the success criterion: observable check, counterexample absence within a stated model, or machine-checked proof
+### Claims Are the Unit of Validation
 
-A process may be structurally ready for Mermaid conversion while still carrying correctness claims that require separate validation. Do not describe Mermaid syntax validation or semantic-fidelity checking as proof that those claims hold.
+Do not select one validator for an entire document or process. Extract important correctness claims and validate them independently.
+
+For each claim record:
+
+1. the claim in falsifiable terms;
+2. the failure it excludes;
+3. the resolution at which it exists;
+4. assumptions it depends on;
+5. what observation would falsify it;
+6. the cheapest sufficient validator;
+7. the evidence produced and validation boundary.
+
+### Validation Model Selection
+
+Escalate validation only as far as needed:
+
+- **Static inspection / observable checks** — direct structural or environmental facts.
+- **Example execution / executable tests** — representative behavior is sufficient.
+- **Generated or property-based tests / simulation** — broad execution sampling can challenge the claim.
+- **Mermaid structural validation** — actors, actions, guards, branches, and terminal states must be explicit and traversable. Mermaid describes execution structure; it does not prove behavioral correctness.
+- **TLA+ / model checking candidate** — correctness depends on multiple possible executions: concurrency, interleavings, ordering, asynchronous messages, retries, crashes, shared mutable state, resource ownership, atomicity, fairness, deadlock freedom, safety, or liveness.
+- **Lean theorem-proving candidate** — correctness requires a universal proposition such as invariant preservation, semantic equivalence, termination, or a guarantee over every valid input.
+
+Prefer the least-formal method that provides the required confidence. TLA+ and Lean are not mandatory escalation stages.
+
+When TLA+ applies, extract state variables, initial conditions, actions/transitions, guards, safety invariants, liveness properties, and fairness/environmental assumptions. When Lean applies, extract definitions, assumptions, proposition, and proof obligations.
+
+If formal tooling is unavailable, produce a validation handoff containing those artifacts and mark the claim UNVALIDATED. Never imply that recommending TLA+ or Lean constitutes verification.
+
+### Counterexamples Drive Improvement
+
+Treat validation failures as first-class evidence. Translate a failing execution, model-checker trace, test failure, or proof failure back into process vocabulary:
+
+1. state the violated claim;
+2. show the smallest relevant execution or counterexample;
+3. identify the violated assumption or missing/incorrect behavior;
+4. distinguish process defect, requirement defect, model defect, validator mismatch, and implementation defect;
+5. propose a correction only when established intent determines it;
+6. re-enter IMPROVE, re-extract claims, and rerun affected validation.
+
+Do not modify a process merely to satisfy a bad model. Diagnose the source of the mismatch first.
+
+### Authority Boundary
+
+Improve directly only when the correction follows from established purpose, goals, invariants, constraints, or other evidence. If multiple legitimate behaviors remain and choosing among them would create policy or alter intent, explain the alternatives and consequences and ask the user.
+
+### Completion Record
+
+An improved process/system is ready only when its required claims have sufficient evidence or unresolved uncertainty is explicitly surfaced. Record:
+
+- purpose and scope at the validated resolution;
+- semantic model: actors, states, actions, decisions, resources, constraints, and failure paths;
+- correctness model: claims, invariants, safety/liveness properties, and assumptions;
+- claim → validator → evidence mapping;
+- counterexamples addressed;
+- residual uncertainty and unvalidated claims;
+- environmental dependencies and validation boundaries;
+- useful representations such as Mermaid, tests, TLA+, Lean, or explanatory documentation.
+
+Mermaid is one projection of this semantic model, not the semantic model itself.
 
 ## Practical Improvement Framework
 
