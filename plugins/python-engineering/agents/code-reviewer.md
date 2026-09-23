@@ -112,7 +112,7 @@ Look for:
 - Undocumented CLI options
 - Missing type hints
 - Identifier naming violations: acronym-named public functions or methods (`gcd`, `lcm`,
-  `bfs`, `dfs`) that should be expanded (see python3-standards.md §1.5)
+  `bfs`, `dfs`) that should be expanded (see `standards-for-python-development` §1.5)
 - Missing Hypothesis property-based tests: scan for functions that are strong candidates:
   - Parsers, serializers, and codecs (round-trip: `encode → decode == identity`)
   - Validators and boundary parsers (`validate_*(x)` should hold for all valid domain inputs)

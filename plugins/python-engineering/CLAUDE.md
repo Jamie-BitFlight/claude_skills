@@ -55,7 +55,7 @@ Strategy auto-detected from Python version and dependencies. See `python3-core` 
 
 All detailed reference material lives in `references/` subdirectories of specialist skills. One level deep from SKILL.md — no nested reference chains.
 
-- `skills/python3-core/references/python3-standards.md` — unified standards
+- `skills/standards-for-python-development/SKILL.md` — the shared rules every other skill applies
 - `skills/python3-core/references/typing-matrix.md` — version/dependency typing matrix
 - `skills/python3-typing/references/typing-policy.md` — boundary validation policy
 - `skills/python3-typing/references/pydantic-boundaries.md` — Pydantic patterns
