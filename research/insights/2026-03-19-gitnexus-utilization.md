@@ -2,10 +2,10 @@
 title: "Utilization Proposals: GitNexus"
 ---
 
-## Utilization 1: python3-development plugin → GitNexus MCP impact analysis
+## Utilization 1: development-harness plugin → GitNexus MCP impact analysis
 
 **Research entry**: ./research/mcp-ecosystem/gitnexus.md
-**Caller**: ./plugins/python3-development (agents: code-reviewer, context-refinement, feature-verifier)
+**Caller**: ./plugins/development-harness (agents: code-reviewer, context-refinement, feature-verifier)
 **Integration mechanism**: MCP tool call (`gitnexus_impact`, `gitnexus_detect_changes`)
 **Replaces or adds**: Replaces manual blast-radius estimation with precomputed graph-based impact analysis
 **Setup cost**: Low (MCP server setup one-time; tools accessed via existing MCP client in Claude Code)
@@ -165,7 +165,7 @@ npx gitnexus analyze --skills
 
 ## Integration Priority and Dependencies
 
-1. **Utilization 1** (python3-development impact analysis): **HIGH PRIORITY**
+1. **Utilization 1** (development-harness impact analysis): **HIGH PRIORITY**
    - Unblocks better risk assessment in code-review phase
    - Reduces false-positive estimates in feature-verifier
    - Feeds into context-refinement confidence scoring
