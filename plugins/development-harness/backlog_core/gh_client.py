@@ -63,7 +63,7 @@ from .parsing import (
     today,
 )
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
-from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS
+from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, SyncErrorKind, classify_sync_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -1638,7 +1638,7 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
         return {}
     if (repo_obj := try_get_github(repo)) is None:
         msg = "Live GitHub status unavailable: unable to create a GitHub client"
-        raise BackendUnavailableError(msg)
+        raise BackendUnavailableError(msg, retryable=True)
     try:
         owner, repo_name = repo_obj.full_name.split("/", 1)
         all_issues = sync_issues_graphql(repo_obj, owner, repo_name, state="OPEN,CLOSED")
@@ -1647,7 +1647,9 @@ def batch_fetch_statuses(items: list[BacklogItem], repo: str = "") -> dict[int, 
         raise
     except (BacklogError, GithubException, *_REQUEST_TRANSPORT_ERRORS) as exc:
         msg = f"Live GitHub status unavailable: {exc}"
-        raise BackendUnavailableError(msg) from exc
+        kind = classify_sync_error(exc)
+        retryable = True if kind is SyncErrorKind.RETRYABLE else False if kind is SyncErrorKind.NON_RETRYABLE else None
+        raise BackendUnavailableError(msg, retryable=retryable) from exc
     result: dict[int, IssueStatus] = {}
     for item in items:
         if (num := parse_issue_number(item.issue)) is None:

@@ -536,7 +536,8 @@ class ContentUnavailableError(ContentProviderError):
     limiting, network blocked, or a backend server error) as well as
     structural failures unrelated to connectivity (malformed, oversized, or
     mismatched stored content; a backend workspace that could not be
-    resolved). The raising call site's message names which of these applies.
+    resolved). The raising call site states ``retryable`` only when it can distinguish those
+    conditions; otherwise the verdict remains unspecified.
     """
 
 
@@ -654,7 +655,8 @@ class BackendUnavailableError(BacklogError):
     Base class for all backend-specific availability errors.  Callers
     catching this exception handle any backend absence uniformly; callers
     that need to distinguish backend types (e.g. to render install hints)
-    catch the appropriate subclass.
+    catch the appropriate subclass. Subclasses do not inherit a retry verdict: each constructor
+    or raise site states one only when its condition supports it.
     """
 
 
