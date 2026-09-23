@@ -7,11 +7,6 @@ Scope: all 30 directories under `plugins/`, inventoried by subagents against the
 <!-- removed-skill-citations -->
 > **Removed-call citation:** the `TeamCreate` call cited below no longer exists in Claude Code. Since v2.1.178, naming a teammate on an `Agent` call under `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` spawns it directly, with no separate setup step (`plugins/agent-orchestration/skills/delegate/references/harness-notes/claude-code.md` § "Agent teams"). This file stands as the dated record of what was analysed and is not rewritten; re-verify any conclusion below that rests on `TeamCreate` — "already covered", "already implemented", or a proposed dispatch — against the current tree before acting on it.
 
-> **Plugin retirement note (2026-09-24)**: `python3-development` is retired and
-> `python-engineering` supersedes it. The `python3-development` row and the remediation
-> batches below record June 2026 state and are not rewritten; re-verify any remediation
-> they assign to `python3-development` against `python-engineering` before acting.
-
 ## Global Findings
 
 - Codex documentation establishes `.codex-plugin/plugin.json`, bundled `skills`, plugin MCP servers, hooks, apps, and marketplace metadata as plugin surfaces.
@@ -46,13 +41,12 @@ Scope: all 30 directories under `plugins/`, inventoried by subagents against the
 | `plugin-creator` | `dynamic-skill` | High | Deep helper-agent graph, MCP bootstrap, `${CLAUDE_*}` docs, scratch-path conventions, and repo-relative scripts. | Keep top-level router skills; add required-runtime reference; normalize repo-relative examples or label workspace-only. | Create a new skill and verify valid frontmatter plus `skilllint` route. |
 | `process-siren` | `mcp-dependent` | Medium-high | Mermaid MCP uses live `npx ...@latest`; delegator skill references Claude-style subagent dispatch. | Pin or vendor validator path; document Codex skill-only fallback when MCP or agent dispatch is absent. | Convert a 3-step conditional workflow to Mermaid and report quality triage. |
 | `python-engineering` | `agent-dependent` | High | Many workflows rely on agents, external skill namespaces, `!` probes, and SAM/development-harness assumptions. | Add a Codex dispatcher or degrade agent routing explicitly; vendor/remove external namespaces; move probes to scripts/docs. | Plan a Python CLI feature and verify router selects CLI/testing guidance. |
-| `python3-development` | `mcp-dependent` | Medium-high | Semantic search hard-depends on plugin MCP tool names and network-installed MCP bootstrap. | Add MCP-required preflight and graceful BLOCKED path when tools are absent. | Ask for semantic implementation search and verify tool-backed file/line/snippet output. |
 | `rtfp` | `agent-dependent` | High | Real pipeline lives in agents/scripts and Claude transcript layout. | Collapse agent split into script entrypoints; make session root configurable. | Feed fake transcript and verify strongest reaction plus PNG output. |
 | `scientific-method` | `mcp-dependent` | High | MCP, hook, agent, slash-command behavior not fully represented in Codex; version drift exists. | Sync metadata; collapse hook/agent roles into skills or mark unavailable; validate MCP separately. | Start synthetic investigation and expose experiment registry tools. |
 | `summarizer` | `hook-dependent` | High | Validation hook and subagent/team orchestration use Claude-specific runtime constructs and `$SKILL_DIR`. | Replace hook enforcement with Codex-native validator/test harness; make templates discoverable without env-token paths. | Summarize one Markdown file and verify required structured sections and sources. |
 | `the-rewrite-room` | `command-dependent` | High | Slash commands, agents, hooks, external plugin dependencies, and GitLab validator path are not Codex-native. | Add top-level router skill or explicit Codex command equivalent; document required external plugins and tokens. | Run authoring workflow on GitLab README draft and verify STATUS block plus GLFM validation. |
 | `twelve-factor-app` | `static-skill` | Low | Placeholder references/scripts reduce usefulness, but core skill is portable. | Replace placeholders with concrete checklists/examples when desired. | Ask for Factor III review of hardcoded config and verify tool-free env-var guidance. |
-| `uv` | `static-skill` | Low-medium | README references repo-root update script and the skill tree is symlinked to `python3-development`. | Keep repo-maintenance script clearly marked; do not rewrite the symlink unless Codex marketplace/runtime validation fails. | Create and run a PEP 723 script without source-repo path inspection or sibling-plugin use. |
+| `uv` | `static-skill` | Low-medium | README references repo-root update script. | Keep repo-maintenance script clearly marked; do not rewrite the symlink unless Codex marketplace/runtime validation fails. | Create and run a PEP 723 script without source-repo path inspection or sibling-plugin use. |
 | `verification-gate` | `static-skill` | Low-medium | Claude tool names and missing reference file reduce Codex fit; enforcement is prose-only. | Rewrite terminology to Codex action model and fix/remove broken reference. | Diagnose missing PEP 723 dependency and verify it does not jump to `uv sync`. |
 | `xdg-base-directory` | `static-skill` | Low | No major runtime gap; pure guidance skill. | No immediate remediation beyond optional prompt tests. | Resolve unset/relative XDG env var cases correctly. |
 
@@ -60,7 +54,7 @@ Scope: all 30 directories under `plugins/`, inventoried by subagents against the
 
 1. **Safe static fixes:** `xdg-base-directory`, `conventional-commits`, `twelve-factor-app`, `commitlint`, `uv`, `verification-gate`, `clang-format`, `litellm`, `bash-development`, `agent-orchestration`.
 2. **Command-dependent fixes:** `gitlab-skill`, `dasel`, `fastmcp-creator`, `llamafile`, `perl-development`, `holistic-linting`, `the-rewrite-room`.
-3. **MCP-dependent fixes:** `process-siren`, `frustration-analyzer`, `scientific-method`, `python3-development`, `agentskill-kaizen`.
+3. **MCP-dependent fixes:** `process-siren`, `frustration-analyzer`, `scientific-method`, `agentskill-kaizen`.
 4. **Hook/agent-heavy fixes:** `orchestrator-discipline`, `summarizer`, `dot-dash`, `development-harness`, `python-engineering`, `rtfp`, `plugin-creator`.
 
 ## Static Fixes Applied
@@ -69,11 +63,11 @@ Scope: all 30 directories under `plugins/`, inventoried by subagents against the
 | --- | --- | --- |
 | `verification-gate` | Replaced Claude-specific action/tool wording with generic write-capable action wording; replaced a symlinked shared reference with a local bundled reference so the plugin remains standalone. | Isolated copied/zipped install passed; Codex selected the installed `verification-gate:verification-gate` skill and produced the expected PEP 723 vs `uv sync` alignment response. |
 | `xdg-base-directory` | No code/docs fix needed beyond the base Codex package. | Isolated copied/zipped install passed; Codex returned the correct XDG config/data/cache/state/runtime defaults from an unrelated temp project. |
-| `uv` | Removed standalone docs that implied sibling `python3-development` / `python-engineering` plugin dependency; marked release-note sync as repo-maintenance only. | `rg` confirmed no remaining `python3-development` or `python-engineering` references under `plugins/uv` docs, and repo-marketplace validation passed with the current symlinked skill layout. |
+| `uv` | Removed standalone docs that implied sibling `python-engineering` plugin dependency; marked release-note sync as repo-maintenance only. | `rg` confirmed no remaining `python-engineering` references under `plugins/uv` docs, and repo-marketplace validation passed with the current symlinked skill layout. |
 | `clang-format` | Corrected editor integration asset names and added external `clang-format` binary validation guidance. | `rg` confirmed `clang-format.py` is no longer referenced by the navigation doc. |
 | `commitlint` | Replaced direct cross-skill invocation wording with generic guidance plus optional plugin wording. | Cross-skill reference search passed for the edited plugin set. |
 | `conventional-commits` | Removed stale `Skill(...)` references and clarified optional external tooling such as `commit-staged`. | Cross-skill reference search passed; one `commit-staged` mention remains intentionally optional. |
-| `litellm` | Replaced direct related-skill invocation with standalone fallback wording. | Cross-skill reference search passed for `Skill(`, `python3-development`, and `llamafile:`. |
+| `litellm` | Replaced direct related-skill invocation with standalone fallback wording. | Cross-skill reference search passed for `Skill(` and `llamafile:`. |
 
 ## Acceptance Notes
 

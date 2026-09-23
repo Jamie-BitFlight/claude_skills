@@ -86,14 +86,6 @@ Vibium's API is flatter and semantic-focused compared to Playwright's object hie
 
 ---
 
-## Skipped Systems
-
-| Local System | Reason skipped |
-|---|---|
-| python3-development plugin (testing infrastructure) | Browser testing is optional feature, not core to language development. Vibium would be added as an optional test fixture, not a replacement for existing pytest patterns. Integration surface exists but scope is testing-specific, not general plugin usage. |
-
----
-
 ## Integration Decision
 
 This proposal flags an **architectural decision point**, not a quick integration win. The research entry documents that:

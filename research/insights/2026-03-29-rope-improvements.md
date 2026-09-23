@@ -12,7 +12,7 @@ title: "Improvement Proposals: Rope"
 
 ### Current state
 
-The code-reviewer agent (plugins/python3-development/agents/code-reviewer.md) performs code review entirely via LLM reading and judgment, supplemented by linting tools (ruff, mypy, pyright) loaded via the holistic-linting skill. There is no programmatic AST-based analysis for scope-aware symbol detection, occurrence counting, or import conflict identification. The agent reviews code by reading files and applying learned patterns.
+The code-reviewer agent performs code review entirely via LLM reading and judgment, supplemented by linting tools (ruff, mypy, pyright) loaded via the holistic-linting skill. There is no programmatic AST-based analysis for scope-aware symbol detection, occurrence counting, or import conflict identification. The agent reviews code by reading files and applying learned patterns.
 
 ### Target state
 

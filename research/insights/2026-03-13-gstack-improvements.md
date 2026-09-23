@@ -12,9 +12,9 @@ title: "Improvement Proposals: gstack"
 
 ### Current state
 
-The code-reviewer agent (`plugins/python3-development/agents/code-reviewer.md`) focuses exclusively on architecture compliance, pattern compliance, dependency utilization, and testing standards. Its Review Checklist (lines 129-161) covers type hints, docstrings, module placement, Rich/Typer patterns, and test coverage. It does not check for production failure modes: race conditions, N+1 queries, trust boundary violations, stale reads, broken invariants, retry logic correctness, or tests that pass while missing real failure scenarios.
+The code-reviewer agent focuses exclusively on architecture compliance, pattern compliance, dependency utilization, and testing standards. Its Review Checklist (lines 129-161) covers type hints, docstrings, module placement, Rich/Typer patterns, and test coverage. It does not check for production failure modes: race conditions, N+1 queries, trust boundary violations, stale reads, broken invariants, retry logic correctness, or tests that pass while missing real failure scenarios.
 
-The integration-checker agent (`plugins/python3-development/agents/integration-checker.md`) checks cross-module wiring (exports, imports, call sites, data flows) but also does not check for production failure modes.
+The integration-checker agent checks cross-module wiring (exports, imports, call sites, data flows) but also does not check for production failure modes.
 
 ### Target state
 
@@ -48,4 +48,4 @@ Read `plugins/python-engineering/agents/code-reviewer.md` -- a section titled "P
 | Role-specific agent pattern (cognitive switching) | Already covered -- the SAM pipeline in `plugins/development-harness/skills/implement-feature/SKILL.md` and `plugins/development-harness/skills/complete-implementation/SKILL.md` already implements role-specific agents: code-reviewer, feature-verifier, integration-checker, doc-drift-auditor, context-refinement. Each agent has a distinct cognitive mode and scope. |
 | Browser automation with lower context overhead | Already covered -- `.claude/skills/agent-browser/SKILL.md` implements equivalent functionality: Playwright-based CLI with daemon architecture, accessibility tree refs (@e1, @e2), snapshot diffing, parallel sessions, and zero-protocol-overhead design. |
 | Parallel execution via environment variables (multi-workspace isolation) | Already tracked in backlog as #452 (Concurrency cap for parallel task dispatch in implement-feature) and #453 (Systematic git worktree isolation for concurrent task agents). |
-| Skill organization with shared binary across multiple skills | Already covered -- the plugin system organizes skills per-plugin with shared scripts (e.g., implementation_manager scripts in `plugins/python3-development/skills/implementation-manager/scripts/` shared across implement-feature, start-task, and complete-implementation skills). |
+| Skill organization with shared binary across multiple skills | Already covered -- the plugin system organizes skills per-plugin with shared scripts. |

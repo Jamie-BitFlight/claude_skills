@@ -15,9 +15,9 @@ title: "Improvement Proposals: 1Code"
 
 ### Current state
 
-`plugins/python3-development/skills/implement-feature/SKILL.md` dispatches task agents directly into full execution mode via `Skill(skill="start-task", ...)`. No mechanism exists for the agent to surface a structured plan for human review before the sub-agent executes file edits, bash commands, or other irreversible operations.
+The `implement-feature` skill dispatches task agents directly into full execution mode via `Skill(skill="start-task", ...)`. No mechanism exists for the agent to surface a structured plan for human review before the sub-agent executes file edits, bash commands, or other irreversible operations.
 
-`plugins/python3-development/skills/start-task/SKILL.md` claims the task at step 3 and immediately proceeds to implementation at step 6 (`Implement against the task acceptance criteria`). There is no plan-first phase between claiming and executing.
+The `start-task` skill claims the task at step 3 and immediately proceeds to implementation at step 6 (`Implement against the task acceptance criteria`). There is no plan-first phase between claiming and executing.
 
 The `swarm-patterns` skill (`./.claude/skills/swarm-patterns/SKILL.md`) documents Pattern 5 (Plan Approval Workflow) using `mode: "plan"` with team swarms and `plan_approval_response` messages, but this pattern is not wired into the SAM task execution path.
 

@@ -56,7 +56,7 @@ Create `.dh/quality-gates.yaml` with 3 gates (e.g., omit T2 and T3). Run `/compl
 
 ### Current state
 
-The fix loop documented at lines 612–618 (Step 1 of Recursive Follow-up Handling) and the documentation-update phase T5 commit auto-generated changes directly without surfacing the diff for developer approval. The fix loop creates `fix-{slug}-blocking-N` SAM plans, dispatches `dh:task-worker`, and re-runs T1; the developer is not shown the cumulative diff between iterations and has no opt-out short of killing the session. The Final Step: Commit and Push section (lines 887–905) commits remaining changes in a single sweep at the end. The autonomy field (`Plan.autonomy: full_auto | checkpoint | per_task`, mentioned in CLAUDE.md `python3-development` plugin docs) gates dispatch but not auto-fix commits within `/complete-implementation`.
+The fix loop documented at lines 612–618 (Step 1 of Recursive Follow-up Handling) and the documentation-update phase T5 commit auto-generated changes directly without surfacing the diff for developer approval. The fix loop creates `fix-{slug}-blocking-N` SAM plans, dispatches `dh:task-worker`, and re-runs T1; the developer is not shown the cumulative diff between iterations and has no opt-out short of killing the session. The Final Step: Commit and Push section (lines 887–905) commits remaining changes in a single sweep at the end. The autonomy field (`Plan.autonomy: full_auto | checkpoint | per_task`) gates dispatch but not auto-fix commits within `/complete-implementation`.
 
 ### Target state
 

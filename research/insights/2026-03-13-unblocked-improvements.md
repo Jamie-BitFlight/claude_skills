@@ -8,11 +8,11 @@ title: "Improvement Proposals: Unblocked"
 **Local system**: plugins/python-engineering/agents/code-reviewer.md
 **Confidence**: Medium
 **Impact**: Medium
-**Backlog**: Deferred -- confidence medium: the code-reviewer loads skills (python3-development, holistic-linting, validation-protocol) that may already inject project-specific patterns at runtime; would need to trace skill content to confirm the gap
+**Backlog**: Deferred -- confidence medium: the code-reviewer loads skills (holistic-linting, validation-protocol) that may already inject project-specific patterns at runtime; would need to trace skill content to confirm the gap
 
 ### Current state
 
-The code-reviewer agent (plugins/python3-development/agents/code-reviewer.md) reviews code against a static set of generic Python standards hardcoded in the agent file (layered architecture, Typer/Click patterns, shared/ module conventions, pytest). It does not dynamically retrieve project-specific conventions, historical decisions from git history, or prior PR review patterns. The agent receives the task file path and reviews against its built-in checklist.
+The code-reviewer agent reviews code against a static set of generic Python standards hardcoded in the agent file (layered architecture, Typer/Click patterns, shared/ module conventions, pytest). It does not dynamically retrieve project-specific conventions, historical decisions from git history, or prior PR review patterns. The agent receives the task file path and reviews against its built-in checklist.
 
 ### Target state
 
@@ -50,7 +50,7 @@ A section titled "Source Precedence" or equivalent exists in .claude/CLAUDE.md o
 
 | Pattern | Confidence | Reason |
 |---|---|---|
-| Project-specific pattern retrieval in code-reviewer | medium | The code-reviewer loads skills (python3-development, holistic-linting, validation-protocol) that may already inject project-specific context at runtime; tracing skill content at execution time is needed to confirm the gap |
+| Project-specific pattern retrieval in code-reviewer | medium | The code-reviewer loads skills (holistic-linting, validation-protocol) that may already inject project-specific context at runtime; tracing skill content at execution time is needed to confirm the gap |
 | Source deconfliction for contradicting context sources | low | The research entry describes source deconfliction in the Architecture section but does not explicitly recommend it in the Relevance section; the gap is inferred rather than directly stated; the local system may handle this implicitly through load order |
 
 ---

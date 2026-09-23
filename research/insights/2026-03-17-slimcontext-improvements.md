@@ -34,7 +34,7 @@ An active `/start-task` execution with rapid Write/Edit/Bash cycles does not los
 
 ### Current state
 
-The implement-feature SKILL.md (plugins/python3-development/skills/implement-feature/SKILL.md) dispatches sub-agents with no explicit token budget. The delegation prompt does not specify max context size, threshold for when to summarize prior work, or minimum recent messages to preserve. Token management is entirely implicit -- the Claude Code runtime handles it.
+The implement-feature SKILL.md dispatches sub-agents with no explicit token budget. The delegation prompt does not specify max context size, threshold for when to summarize prior work, or minimum recent messages to preserve. Token management is entirely implicit -- the Claude Code runtime handles it.
 
 ### Target state
 

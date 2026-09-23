@@ -14,7 +14,7 @@ title: "Improvement Proposals: tori-cli"
 
 Task readiness in the SAM system is determined solely by dependency graph resolution: a task is "ready" when its status is `NOT STARTED` and all dependency tasks have status `COMPLETE`. There is no mechanism to express conditional readiness based on observable system state (e.g., "file X exists", "command Y exits 0", "field Z in config has value V"). Acceptance criteria in task files are free-text prose that agents interpret; they are not machine-evaluable conditions.
 
-File: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py` -- the `get_ready_tasks` function checks only `status` and `dependencies` fields. No condition evaluation exists.
+The `get_ready_tasks` function in `implementation_manager.py` checks only `status` and `dependencies` fields. No condition evaluation exists.
 
 ### Target state
 
@@ -38,7 +38,7 @@ Run: `uv run sam ready P{N}` on a plan where a task has `conditions: ["file.some
 
 The `get_iso_timestamp()` function at line 227 of `task_status_hook.py` calls `datetime.now(UTC).isoformat(timespec="seconds")` directly. All callers (`handle_subagent_stop`, `handle_post_tool_use`) use this function without the ability to inject a fixed time. Tests for this hook must either mock `datetime.now` at the module level or accept non-deterministic timestamps, making assertions about timestamp ordering or staleness detection fragile.
 
-File: `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py`, line 227-233.
+File: `task_status_hook.py`, line 227-233.
 
 ### Target state
 

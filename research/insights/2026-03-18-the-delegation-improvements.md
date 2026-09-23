@@ -14,7 +14,7 @@ title: "Improvement Proposals: The Delegation"
 
 The SAM workflow has three implicit phases (planning via `/add-new-feature`, execution via `/implement-feature`, quality gates via `/complete-implementation`) but no explicit plan-level phase field in the data model. Running `uv run sam status P{N}` returns task counts (`total_tasks`, `by_status`, `ready_tasks`, `blocked_tasks`, `completion_pct`) but does not report which workflow phase the plan is in. The orchestrator infers phase from task status counts (e.g., "all tasks COMPLETE" means ready for quality gates), but this inference is implicit and undocumented.
 
-File: `plugins/python3-development/skills/implement-feature/SKILL.md` — the Progress Loop section queries `sam status` and `sam ready` but has no mechanism to read or write a plan-level phase. File: `packages/sam_schema/` — Grep for `phase` returns only code comments about addressing resolution phases, not a workflow phase field.
+The Progress Loop section of the `implement-feature` skill queries `sam status` and `sam ready` but has no mechanism to read or write a plan-level phase. File: `packages/sam_schema/` — Grep for `phase` returns only code comments about addressing resolution phases, not a workflow phase field.
 
 ### Target state
 
@@ -58,7 +58,7 @@ After running `/implement-feature` on a plan with 3+ tasks, `plan/action-log-{sl
 
 ### Current state
 
-The `/start-task` skill (file: `plugins/python3-development/skills/start-task/SKILL.md`) has no mechanism for a sub-agent to halt execution and request human input mid-task. The `/complete-implementation` skill provides human review checkpoints but only after all tasks are complete. If a sub-agent encounters an ambiguity during task execution, it must either make a decision autonomously or fail the task — there is no "request approval and wait" pattern.
+The `/start-task` skill has no mechanism for a sub-agent to halt execution and request human input mid-task. The `/complete-implementation` skill provides human review checkpoints but only after all tasks are complete. If a sub-agent encounters an ambiguity during task execution, it must either make a decision autonomously or fail the task — there is no "request approval and wait" pattern.
 
 ### Target state
 
