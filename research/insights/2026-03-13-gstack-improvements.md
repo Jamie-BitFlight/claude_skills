@@ -5,7 +5,7 @@ title: "Improvement Proposals: gstack"
 ## Improvement 1: Add production failure mode checklist to code-reviewer agent
 
 **Source pattern**: gstack's `/review` skill — "Paranoid Staff Engineer Mode" that asks "what can still break?" and checks for "N+1 queries, race conditions, stale reads, bad trust boundaries, escaping bugs, broken invariants, bad retry logic, and tests that pass while missing real failure modes." (Section: Eight Workflow Skills, subsection 3)
-**Local system**: `plugins/python3-development/agents/code-reviewer.md`
+**Local system**: `plugins/python-engineering/agents/code-reviewer.md`
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: the code-reviewer loads `holistic-linting:holistic-linting` skill which may partially cover some of these checks, and the integration-checker covers wiring issues. A full audit of what holistic-linting covers is needed to confirm the gap.
@@ -29,7 +29,7 @@ The code-reviewer agent's Review Checklist includes a "Production Failure Modes"
 
 ### Measurable signal
 
-Read `plugins/python3-development/agents/code-reviewer.md` -- a section titled "Production Failure Modes" or equivalent exists in the Review Checklist, containing at least 4 of the 7 categories listed above. The code-reviewer agent output for a reviewed feature mentions at least one production failure mode assessment (even if no issues are found).
+Read `plugins/python-engineering/agents/code-reviewer.md` -- a section titled "Production Failure Modes" or equivalent exists in the Review Checklist, containing at least 4 of the 7 categories listed above. The code-reviewer agent output for a reviewed feature mentions at least one production failure mode assessment (even if no issues are found).
 
 ---
 

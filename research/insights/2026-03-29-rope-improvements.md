@@ -5,7 +5,7 @@ title: "Improvement Proposals: Rope"
 ## Improvement 1: AST-Based Static Analysis in Code Review Quality Gates
 
 **Source pattern**: "Leverage rope's AST analysis and scope tracking to build custom code auditing or linting tools" (Relevance to Claude Code Development, Use Case 3)
-**Local system**: plugins/python3-development/agents/code-reviewer.md
+**Local system**: plugins/python-engineering/agents/code-reviewer.md
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: the research entry describes this as an aspirational use case ("Leverage... to build"), not a concrete mechanism with specific inputs/outputs. The local code-reviewer agent operates via LLM judgment with linting tool integration (ruff, mypy, pyright). Rope's AST scope analysis could supplement this by detecting unreferenced symbols, import conflicts, or scope violations programmatically. However, the research entry does not describe a specific auditing pattern that maps to a gap -- it suggests a category of tools that could be built.

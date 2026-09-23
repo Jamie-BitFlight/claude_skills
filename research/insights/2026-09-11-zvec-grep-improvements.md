@@ -13,6 +13,12 @@
 > `mcp__plugin_dh_backlog__backlog_sync` (or `backlog_pull`) from a session with REST-backed issue
 > creation to assign numbers, then replace the slugs here.
 
+> **Plugin retirement note (2026-09-24)**: `python3-development` is retired and
+> `python-engineering` supersedes it. The `semantic-code-search` skill and its agent
+> wrapper, which both proposals below target, have no equivalent under
+> `plugins/python-engineering` — locate where that skill now lives before acting on either
+> item.
+
 ---
 
 ## Improvement 1: semantic-code-search routes lexical and semantic search as mutually exclusive, with no combined path for cross-file questions

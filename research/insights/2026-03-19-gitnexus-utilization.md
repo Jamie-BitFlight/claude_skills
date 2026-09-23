@@ -2,6 +2,12 @@
 title: "Utilization Proposals: GitNexus"
 ---
 
+> **Plugin retirement note (2026-09-24)**: `python3-development` is retired and
+> `python-engineering` supersedes it. Of the three caller agents named in Utilization 1,
+> `code-reviewer` is now under `plugins/python-engineering`, while `context-refinement` and
+> `feature-verifier` are under `plugins/development-harness`. Resolve the caller set before
+> acting on this proposal.
+
 ## Utilization 1: python3-development plugin → GitNexus MCP impact analysis
 
 **Research entry**: ./research/mcp-ecosystem/gitnexus.md

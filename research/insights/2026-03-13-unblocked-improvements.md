@@ -5,7 +5,7 @@ title: "Improvement Proposals: Unblocked"
 ## Improvement 1: Project-specific pattern retrieval in code-reviewer agent
 
 **Source pattern**: "Code Generation Fidelity: By providing architectural context and team patterns to Claude Code's code generation capabilities, agents produce code that aligns with existing systems without requiring human review cycles." (Relevance section, item 1) and "Code Review Automation: Unblocked's AI code review feature can serve as a first-pass reviewer for Claude Code-generated PRs, catching logical errors and pattern violations before human review." (Relevance section, item 5)
-**Local system**: plugins/python3-development/agents/code-reviewer.md
+**Local system**: plugins/python-engineering/agents/code-reviewer.md
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: the code-reviewer loads skills (python3-development, holistic-linting, validation-protocol) that may already inject project-specific patterns at runtime; would need to trace skill content to confirm the gap

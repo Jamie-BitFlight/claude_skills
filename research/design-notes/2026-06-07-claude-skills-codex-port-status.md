@@ -6,6 +6,12 @@ title: "Claude Skills to Codex Port Status"
 
 Date: 2026-06-07
 
+> **Plugin retirement note (2026-09-24)**: `python3-development` is retired and
+> `python-engineering` supersedes it. This file stands as the dated record of what was
+> ported in June 2026 and is not rewritten; read any `python3-development` follow-up below
+> — including the suggested next port — as applying to `python-engineering`, and re-verify
+> it against the current tree before acting.
+
 Legend:
 
 - `base-port`: Codex manifest + marketplace path exist

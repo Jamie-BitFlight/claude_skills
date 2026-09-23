@@ -5,7 +5,7 @@ title: "Improvement Proposals: TheAlgorithms-Python"
 ## Improvement 1: Add "expand acronyms" naming convention rule to Python coding standards
 
 **Source pattern**: From "Naming Conventions" section of TheAlgorithms-Python.md, citing the project's CONTRIBUTING.md: "Expand acronyms because `gcd()` is hard to understand but `greatest_common_divisor()` is not."
-**Local system**: ./plugins/python3-development/skills/python3-development/references/python3-standards.md (and the parallel file in python-engineering)
+**Local system**: ./plugins/python-engineering/skills/python3-core/references/python3-standards.md
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #1958 created
@@ -23,11 +23,11 @@ title: "Improvement Proposals: TheAlgorithms-Python"
 3. A scoped exception: established three-letter acronyms accepted as words (URL, API, SQL, HTTP, JSON, XML) may remain abbreviated when they are the standard term in the domain
 4. A pointer to apply the same rule to local variables when the variable's lifetime exceeds 5 lines
 
-The same content is added to `plugins/python-engineering/skills/python3-core/SKILL.md` Naming Defaults section, or `python3-core` references the python3-development standard if that file is the canonical source.
+The same content is added to `plugins/python-engineering/skills/python3-core/SKILL.md` Naming Defaults section, or `python3-core` references `python3-standards.md` if that file is the canonical source.
 
 ### Measurable signal
 
-Run: `grep -n "expand acron\|greatest_common_divisor" plugins/python3-development/skills/python3-development/references/python3-standards.md` returns at least one match in a section heading or rule statement. The file contains the literal contrast example pair `gcd()` and `greatest_common_divisor()`. Cross-reference: `grep -n "expand acron" plugins/python-engineering/skills/python3-core/SKILL.md` returns either the rule or an explicit pointer to the python3-development source.
+Run: `grep -n "expand acron\|greatest_common_divisor" plugins/python-engineering/skills/python3-core/references/python3-standards.md` returns at least one match in a section heading or rule statement. The file contains the literal contrast example pair `gcd()` and `greatest_common_divisor()`. Cross-reference: `grep -n "expand acron" plugins/python-engineering/skills/python3-core/SKILL.md` returns either the rule or an explicit pointer to the python3-development source.
 
 ---
 

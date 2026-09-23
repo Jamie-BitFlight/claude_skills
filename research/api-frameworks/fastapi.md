@@ -366,8 +366,8 @@ async def websocket_endpoint(websocket: WebSocket):
 | Target | Type | How |
 |--------|------|-----|
 | `plugins/fastmcp-creator/skills/fastmcp-creator/` | skill | FastMCP wraps FastAPI for MCP server development. Could enhance the skill with FastAPI-specific patterns: dependency injection for resource management, background tasks for async operations, middleware chains for request/response processing, and TestClient patterns for MCP server testing. |
-| `plugins/python3-development/skills/python3-development/` | skill | Expand the Web Frameworks & APIs section in modern-modules.md with FastAPI's latest features (v0.128.1): FastAPI CLI commands (`fastapi dev`, `fastapi run`), Pydantic v2 integration patterns, OpenAPI 3.x spec generation for tool discovery, and uvloop performance optimizations. |
-| `plugins/python3-development/skills/async-python-patterns/` | skill | Add FastAPI as concrete example for async web APIs section. Include FastAPI's dependency injection with async generators, background task patterns, WebSocket async handling, and Starlette's async middleware patterns for real-world async application architecture. |
+| `plugins/python-engineering/skills/python3-core/` | skill | Expand the Web Frameworks & APIs section in modern-modules.md with FastAPI's latest features (v0.128.1): FastAPI CLI commands (`fastapi dev`, `fastapi run`), Pydantic v2 integration patterns, OpenAPI 3.x spec generation for tool discovery, and uvloop performance optimizations. |
+| `plugins/python-engineering/skills/async-python-patterns/` | skill | Add FastAPI as concrete example for async web APIs section. Include FastAPI's dependency injection with async generators, background task patterns, WebSocket async handling, and Starlette's async middleware patterns for real-world async application architecture. |
 
 ### New MCP Server Candidates
 
