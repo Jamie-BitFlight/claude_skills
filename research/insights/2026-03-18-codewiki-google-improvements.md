@@ -5,7 +5,7 @@ title: "Improvement Proposals: CodeWiki (Google)"
 ## Improvement 1: CI-triggered documentation drift detection
 
 **Source pattern**: "CodeWiki scans the full repository, maintains links to every symbol, and regenerates diagrams that reflect the current state of the code" and "regeneration of documentation is a continuous process that effectively eliminates the problem of documentation drift" (Section: Key Features, subsection 1)
-**Local system**: plugins/python3-development/agents/doc-drift-auditor.md
+**Local system**: plugins/development-harness/agents/doc-drift-auditor.md
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: requires measurement of how often drift occurs outside feature cycles to confirm value

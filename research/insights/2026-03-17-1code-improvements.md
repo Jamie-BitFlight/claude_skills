@@ -8,7 +8,7 @@ title: "Improvement Proposals: 1Code"
 ## Improvement 1: Add plan-mode gate to implement-feature SAM execution workflow before destructive agent dispatch
 
 **Source pattern**: "Plan mode before agent mode: requiring the agent to produce and surface a structured plan for review before executing destructive operations (file edits, bash commands) reduces irreversible mistakes — directly applicable to skill design." (Research entry §Relevance to Claude Code Development > Patterns Worth Adopting)
-**Local system**: `plugins/python3-development/skills/implement-feature/SKILL.md`, `plugins/python3-development/skills/start-task/SKILL.md`
+**Local system**: `plugins/development-harness/skills/implement-feature/SKILL.md`, `plugins/development-harness/skills/start-task/SKILL.md`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #758 created
