@@ -77,7 +77,8 @@ _REPEATS_IDENTICALLY = [
 _TRIP_FAILED = [
     *(transport("the transport failed") for transport in RETRYABLE_TRANSIENT_EXCEPTIONS),
     GitHubUnavailableError("network blocked"),
-    ContentUnavailableError("network blocked"),
+    BackendUnavailableError("network blocked", retryable=True),
+    ContentUnavailableError("network blocked", retryable=True),
     GithubException(503, {"message": "Service Unavailable"}, {}),
     GithubException(429, {"message": "rate limited"}, {}),
     GithubException(403, {"message": "slow down"}, {"Retry-After": "30"}),
@@ -116,6 +117,12 @@ def test_a_bare_backlog_error_with_no_stated_verdict_reports_nothing() -> None:
     one default mislabels every raise site that meant the other.
     """
     assert _retryable(BacklogError("the fetch failed")) is None
+
+
+@pytest.mark.parametrize("error_type", [BackendUnavailableError, ContentUnavailableError])
+def test_an_unspecified_mixed_base_reports_no_verdict(error_type: type[BacklogError | ContentProviderError]) -> None:
+    """The mixed bases cover structural and transport failures, so neither has a safe default."""
+    assert _retryable(error_type("stored content is structurally invalid")) is None
 
 
 def test_an_unclassified_failure_reports_nothing_rather_than_no() -> None:
@@ -247,26 +254,34 @@ def _subclasses_of(base: type) -> set[type]:
     return found
 
 
-#: One instance per subclass of ``BackendUnavailableError`` or ``ContentUnavailableError``. Each
-#: is built the way its raise site builds it, because the verdict of the mixed ones is fixed by
-#: what they are built with.
-_TRANSPORT_SUBCLASS_SAMPLES: dict[type, BacklogError | ContentProviderError] = {
-    GitHubUnavailableError: GitHubUnavailableError("credentials are unavailable"),
-    GraphQLUnavailableError: GraphQLUnavailableError("the environment refuses GraphQL"),
-    BdNotInstalledError: BdNotInstalledError("bd is not installed; see https://beads.sh/docs/install"),
-    BdInvocationError: BdInvocationError("bd exited 2", ["bd", "list"], 2, "", ""),
-    BdJsonDecodeError: BdJsonDecodeError("stdout is not JSON", "not json"),
-    ContentNotFoundError: ContentNotFoundError("no such record"),
-    _GitHubContentIntegrityError: _GitHubContentIntegrityError("GitHub content path is not a file: docs/"),
+class _UnspecifiedBackendUnavailable(BackendUnavailableError):
+    """Test-only subclass that deliberately states no retry verdict."""
+
+
+class _UnspecifiedContentUnavailable(ContentUnavailableError):
+    """Test-only subclass that deliberately states no retry verdict."""
+
+
+#: One instance and expected verdict per subclass of the two mixed bases. Each production instance
+#: is built the way its raise site builds it; the test-only subclasses hold the default contract.
+_TRANSPORT_SUBCLASS_SAMPLES: dict[type, tuple[BacklogError | ContentProviderError, bool | None]] = {
+    GitHubUnavailableError: (GitHubUnavailableError("credentials are unavailable"), True),
+    GraphQLUnavailableError: (GraphQLUnavailableError("the environment refuses GraphQL"), False),
+    BdNotInstalledError: (BdNotInstalledError("bd is not installed; see https://beads.sh/docs/install"), False),
+    BdInvocationError: (BdInvocationError("bd exited 2", ["bd", "list"], 2, "", ""), False),
+    BdJsonDecodeError: (BdJsonDecodeError("stdout is not JSON", "not json"), False),
+    ContentNotFoundError: (ContentNotFoundError("no such record"), False),
+    _GitHubContentIntegrityError: (_GitHubContentIntegrityError("GitHub content path is not a file: docs/"), False),
+    _UnspecifiedBackendUnavailable: (_UnspecifiedBackendUnavailable("no verdict"), None),
+    _UnspecifiedContentUnavailable: (_UnspecifiedContentUnavailable("no verdict"), None),
 }
 
 
 def test_every_subclass_of_a_transport_base_is_sampled() -> None:
-    """A new subclass fails here until someone decides what it answers.
+    """A new subclass fails here until its default behavior is exercised.
 
-    Both bases sit in ``_TRANSPORT_FAILED``, so a subclass that states nothing inherits "retry
-    this" from the base -- silently, at the moment it is declared. This list is the gate: adding a
-    subclass without adding it here fails, and adding it here forces the verdict test below.
+    The list is the gate: adding a subclass without adding a representative instance here fails,
+    and adding it here forces the verdict test below.
     """
     declared = _subclasses_of(BackendUnavailableError) | _subclasses_of(ContentUnavailableError)
     assert declared == set(_TRANSPORT_SUBCLASS_SAMPLES), (
@@ -276,19 +291,29 @@ def test_every_subclass_of_a_transport_base_is_sampled() -> None:
     )
 
 
-@pytest.mark.parametrize("exc", _TRANSPORT_SUBCLASS_SAMPLES.values(), ids=lambda e: type(e).__name__)
-def test_a_transport_subclass_states_its_own_verdict(exc: BacklogError | ContentProviderError) -> None:
-    """The subclass narrows its base to one condition, so it, not the base, knows the answer.
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    _TRANSPORT_SUBCLASS_SAMPLES.values(),
+    ids=[error_type.__name__ for error_type in _TRANSPORT_SUBCLASS_SAMPLES],
+)
+def test_a_transport_subclass_uses_only_its_stated_verdict(
+    exc: BacklogError | ContentProviderError, expected: bool | None
+) -> None:
+    """A subclass inherits no verdict from a base that spans incompatible conditions.
 
-    ``BackendUnavailableError`` and ``ContentUnavailableError`` are listed as trips that failed.
-    Their subclasses are not all trips: a binary that is not installed, stdout that is not JSON,
-    and a path that is a directory are all conditions the next identical call meets identically.
+    Known conditions state an answer. A newly declared subclass starts unknown until its own
+    constructor or raise site has enough evidence to state one.
     """
-    assert exc.retryable is not None, (
-        f"{type(exc).__name__} states no verdict of its own, so it reports whatever its base "
-        f"reports -- 'retry this' -- for a condition it may repeat identically forever."
-    )
-    assert _retryable(exc) is exc.retryable
+    assert _retryable(exc) is expected
+
+
+@pytest.mark.parametrize("verdict", [True, False])
+@pytest.mark.parametrize("error_type", [_UnspecifiedBackendUnavailable, _UnspecifiedContentUnavailable])
+def test_an_explicit_subclass_instance_verdict_wins(
+    error_type: type[BacklogError | ContentProviderError], verdict: bool
+) -> None:
+    """Raise sites retain an accurate answer when a mixed subclass represents multiple failures."""
+    assert _retryable(error_type("classified at the raise site", retryable=verdict)) is verdict
 
 
 def test_bd_answers_a_timeout_and_a_refusal_differently() -> None:
@@ -337,6 +362,27 @@ async def test_a_plan_that_disagrees_with_its_milestone_is_final() -> None:
         "waves": [{"wave": 1, "items": [{"title": "Issue", "issue": 101, "priority": "P1"}]}],
     }
     assert (await _call("dispatch_create_plan", {"milestone_number": 10, "plan": plan}))["retryable"] is False
+
+
+async def test_a_structural_content_failure_omits_retryable_on_the_wire(mocker: MockerFixture) -> None:
+    """An exact mixed-base instance must not serialize the old transport-default verdict."""
+    mocker.patch(
+        "backlog_core.server._read_dispatch_plan",
+        side_effect=ContentUnavailableError("Dispatch content envelope is invalid"),
+    )
+    result = await _call("dispatch_validate", {"milestone_number": 10})
+    assert result["error"] == "Dispatch content envelope is invalid"
+    assert "retryable" not in result
+
+
+async def test_an_explicit_connectivity_failure_keeps_retryable_on_the_wire(mocker: MockerFixture) -> None:
+    """Removing the unsafe base default must not erase a raise site's supported transport verdict."""
+    mocker.patch(
+        "backlog_core.server._read_dispatch_plan",
+        side_effect=ContentUnavailableError("connection timed out", retryable=True),
+    )
+    result = await _call("dispatch_validate", {"milestone_number": 10})
+    assert result["retryable"] is True
 
 
 async def test_a_plan_that_already_exists_is_final(mocker: MockerFixture) -> None:

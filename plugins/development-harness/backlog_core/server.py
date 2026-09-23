@@ -63,7 +63,6 @@ from .models import (
     ArtifactType,
     BackendAvailability as _BackendAvailability,
     BackendStatus as _BackendStatus,
-    BackendUnavailableError,
     BacklogError,
     BranchConflictError,
     CacheStateCorruptError,
@@ -107,7 +106,7 @@ from .sync_state import (
     SyncErrorKind,
     SyncState as _SyncState,
     SyncStatus,
-    classify_sync_error,
+    classify_github_failure,
     get_sync_state,
 )
 from .tool_responses import (
@@ -255,22 +254,11 @@ _NEVER_RETRYABLE: tuple[type[BaseException], ...] = (
     ValidationError,
 )
 
-#: Failures of the trip rather than of the call: the request never reached a backend that could
-#: answer it. A dropped connection, a timeout, a backend whose credentials or transport are
-#: unreachable, content the provider could not be asked for.
-#:
-#: These two answer for themselves only. A subclass narrows its base to one condition -- ``bd``
-#: absent from ``PATH``, a provider that was reached and said the path is a directory -- and
-#: several of those conditions repeat identically, so inheriting "retry this" from the base is
-#: how a subclass ships a wrong verdict the moment it is declared. ``_retryable`` therefore
-#: reports nothing for a subclass that states none, and
-#: ``tests/test_retryable_classification.py`` fails until it states one.
-_TRANSPORT_BASES: tuple[type[BaseException], ...] = (BackendUnavailableError, ContentUnavailableError)
-
-#: Failures of the trip rather than of the call: the request never reached a backend that could
-#: answer it. A dropped connection, a timeout, a backend whose credentials or transport are
-#: unreachable, content the provider could not be asked for.
-_TRANSPORT_FAILED: tuple[type[BaseException], ...] = (*_TRANSPORT_BASES, *RETRYABLE_TRANSIENT_EXCEPTIONS)
+#: Concrete transport failures whose type alone proves a later attempt may succeed. The mixed
+#: ``BackendUnavailableError`` and ``ContentUnavailableError`` bases are deliberately absent: exact
+#: instances and subclasses can represent structural failures too, so their constructors or raise
+#: sites must state a verdict on the exception instance when one is supported.
+_TRANSPORT_FAILED: tuple[type[BaseException], ...] = RETRYABLE_TRANSIENT_EXCEPTIONS
 
 
 def _retryable(exc: BaseException) -> bool | None:
@@ -282,19 +270,18 @@ def _retryable(exc: BaseException) -> bool | None:
        condition that raised it fixes the answer, and the author who knows that condition is the
        one who can say so.
     2. A class in ``_NEVER_RETRYABLE`` describes the call, so the answer is ``False``.
-    3. A class in ``_TRANSPORT_FAILED``, or a ``GithubException`` whose status says the server
-       asked for another attempt (a rate limit, a 5xx, a 403 carrying ``Retry-After``), describes
-       the trip, so the answer is ``True``. ``_TRANSPORT_BASES`` answers for those two classes
-       themselves and not for their subclasses: a subclass narrows its base to one condition, so
-       only it knows, and one that says nothing in step 1 gets nothing reported rather than its
-       base's answer.
+    3. A concrete class in ``_TRANSPORT_FAILED``, or a direct/cause-wrapped ``GithubException``,
+       uses the canonical GitHub classifier. Known transient statuses report ``True``, known final
+       statuses report ``False``, and an absent or unknown GitHub status reports nothing. Mixed
+       availability bases with no such cause report nothing unless step 1 found an explicit
+       instance verdict.
     4. Anything else reports nothing.
 
-    ``classify_sync_error`` is deliberately not the general answer here, though it is reused for
-    the GitHub status codes in step 3. It answers a different question -- whether the sync engine
-    should keep spending its retry budget -- so its ``NON_RETRYABLE`` means "stop now", not
-    "impossible", and its ``BacklogError`` default means "a fetch failed", which at this boundary
-    is wrong for every call-shaped refusal raised as a bare ``BacklogError``.
+    ``classify_github_failure`` is the shared source for GitHub status and cause-chain semantics.
+    The broader ``classify_sync_error`` is deliberately not the general answer here: it answers
+    whether the sync engine should keep spending its retry budget, so its ``NON_RETRYABLE`` means
+    "stop now", not "impossible", and its ``BacklogError`` default means "a fetch failed", which
+    at this boundary is wrong for every call-shaped refusal raised as a bare ``BacklogError``.
 
     A bare ``BacklogError`` with no stated verdict therefore reports ``None`` rather than a guess.
     The caller must be able to tell "cannot succeed" from "not known", and ``exclude_none=True``
@@ -311,12 +298,13 @@ def _retryable(exc: BaseException) -> bool | None:
         return exc.retryable
     if isinstance(exc, _NEVER_RETRYABLE):
         return False
-    if isinstance(exc, _TRANSPORT_BASES) and type(exc) not in _TRANSPORT_BASES:
-        return None
     if isinstance(exc, _TRANSPORT_FAILED):
         return True
-    if isinstance(exc, _GithubException) and classify_sync_error(exc) is SyncErrorKind.RETRYABLE:
+    github_failure = classify_github_failure(exc)
+    if github_failure is SyncErrorKind.RETRYABLE:
         return True
+    if github_failure is SyncErrorKind.NON_RETRYABLE:
+        return False
     return None
 
 
