@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import ANY, MagicMock
 
-import backlog_core.models as _bc_models
+import backlog_core.models as bc_models
 import backlog_core.operations as ops
 import pytest
 from backlog_core.backend_types import SyncProvider
@@ -186,9 +186,9 @@ def _isolate_backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     fake_dir = dh_paths.backlog_dir(project_root=fake_project_root)
     fake_dir.mkdir(parents=True, exist_ok=True)
 
-    existing = _bc_models._config
+    existing = bc_models._config
     monkeypatch.setattr(
-        _bc_models,
+        bc_models,
         "_config",
         BacklogConfig(
             repo_root=fake_project_root,
@@ -621,7 +621,7 @@ class TestAddItemValidatesPriorityAndType:
         """
         mock_try_gh = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        fake_dir: Path = _bc_models.get_backlog_dir()
+        fake_dir: Path = bc_models.get_backlog_dir()
         with pytest.raises(ValidationError):
             add_item(title="Bad Priority No Side Effects", description="desc", priority="P3")
 
@@ -665,7 +665,7 @@ class TestAddItemValidatesPriorityAndType:
         """
         mock_try_gh = mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        fake_dir: Path = _bc_models.get_backlog_dir()
+        fake_dir: Path = bc_models.get_backlog_dir()
         with pytest.raises(ValidationError):
             add_item(title="Bad Type No Side Effects", description="desc", priority="P1", type_="Enhancement")
 
@@ -3183,9 +3183,9 @@ class TestGroomItemEntryBlocks:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item(backlog_dir, title="Test Entry Groom", priority="P1", topic="test-entry-groom")
 
         out = Output()
@@ -3205,9 +3205,9 @@ class TestGroomItemEntryBlocks:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() finds the item after the first save_item call
         filepath = _write_item_yaml(backlog_dir, title="Multi Entry", priority="P1", topic="multi-entry")
 
@@ -3241,9 +3241,9 @@ class TestGroomItemAppend:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item(backlog_dir, title="Append First", priority="P1", topic="append-first")
 
         out = Output()
@@ -3269,9 +3269,9 @@ class TestGroomItemAppend:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() finds the item after the first save_item call
         filepath = _write_item_yaml(backlog_dir, title="Append Multi", priority="P1", topic="append-multi")
 
@@ -3296,9 +3296,9 @@ class TestGroomItemAppend:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item(backlog_dir, title="Append Default", priority="P1", topic="append-default")
 
         out = Output()
@@ -3325,9 +3325,9 @@ class TestStrikeEntryOperation:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so strike_entry's parse_backlog() re-finds the item after groom_item saves it
         filepath = _write_item_yaml(backlog_dir, title="Strike Test", priority="P1", topic="strike-test")
 
@@ -3359,9 +3359,9 @@ class TestStrikeEntryOperation:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         _write_item(backlog_dir, title="No Entry", priority="P1", topic="no-entry")
 
         out = Output()
@@ -3383,9 +3383,9 @@ class TestStrikeEntryOperation:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item_yaml(backlog_dir, title="Collision Test", priority="P1", topic="collision-test")
 
         shared_id = "2026-01-01T00:00:00Z"
@@ -3428,9 +3428,9 @@ class TestStrikeEntryOperation:
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        import backlog_core.models as _m
+        import backlog_core.models as m
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item_yaml(backlog_dir, title="Dup View Test", priority="P1", topic="dup-view-test")
 
         shared_id = "2026-01-01T00:00:00Z"
@@ -3680,12 +3680,12 @@ class TestGroomItemMarkGroomed:
         How: Write item with no issue; call groom_item with mark_groomed=True.
         Why: Local status must advance even when there is no GitHub issue to label.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
         filepath = _write_item_yaml(backlog_dir, title="Mark Groomed Local", priority="P1", topic="mark-groomed-local")
 
@@ -3706,13 +3706,13 @@ class TestGroomItemMarkGroomed:
         How: Write item with issue #123; mock apply_status_groomed; call with mark_groomed=True.
         Why: GitHub label transition must be routed to the dedicated function, not implemented inline.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
         _write_item_yaml(
             backlog_dir, title="Mark Groomed Github", priority="P1", topic="mark-groomed-github", issue="#123"
@@ -3739,13 +3739,13 @@ class TestGroomItemMarkGroomed:
         How: Write item with issue; call groom_item with mark_groomed=False.
         Why: Default False must not silently advance status on every groom call.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item(
             backlog_dir, title="Mark Groomed False", priority="P1", topic="mark-groomed-false", issue="#456"
         )
@@ -3773,13 +3773,13 @@ class TestGroomItemMarkGroomed:
         How: Write item with issue; call with sections dict and mark_groomed=True.
         Why: mark_groomed must execute once at the end, not once per section.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         # Use .yaml file so parse_backlog() re-finds the item after save_item converts it
         _write_item_yaml(
             backlog_dir, title="Mark Groomed Batch", priority="P1", topic="mark-groomed-batch", issue="#789"
@@ -3804,14 +3804,14 @@ class TestGroomItemMarkGroomed:
         How: Mock update_item to return error dict; call with mark_groomed=True.
         Why: Status must not advance if the grooming write did not succeed.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Output
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.update_item", return_value={"error": "some error"})
         mock_apply = mocker.patch("backlog_core.operations.apply_status_groomed")
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = _write_item(
             backlog_dir, title="Mark Groomed Error", priority="P1", topic="mark-groomed-error", issue="#999"
         )
@@ -3862,18 +3862,18 @@ class TestViewItemUnknownSections:
              appear in the output, under a human-readable title, or downstream consumers
              silently lose issue body content or see an internal storage key.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-unknown-section-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="unknown-section-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Unknown Section Item",
             description="Test item with unknown sections",
             metadata=metadata,
@@ -3912,18 +3912,18 @@ class TestViewItemUnknownSections:
              under the section's display title.
         Why: MCP clients read num_entries and entries — wrong shape breaks consumers.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-unknown-shape-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="unknown-shape-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Unknown Shape Item",
             description="Test shape of unknown sections",
             metadata=metadata,
@@ -3952,19 +3952,19 @@ class TestViewItemUnknownSections:
              assert entry content matches under the section's display title.
         Why: Silent content loss would cause MCP clients to display empty section entries.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-unknown-content-item.yaml"
 
         expected_content = "Must handle rate limits gracefully"
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="unknown-content-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Unknown Content Item",
             description="Test content preservation",
             metadata=metadata,
@@ -3998,18 +3998,18 @@ class TestViewItemUnknownSections:
              under the section's display title.
         Why: MCP clients display entry counts — must be accurate regardless of key prefix.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-unknown-count-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="unknown-count-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Unknown Count Item",
             description="Test entry counting",
             metadata=metadata,
@@ -4045,18 +4045,18 @@ class TestViewItemUnknownSections:
              assert both display titles are present with correct SectionEntryMetadata shapes.
         Why: Real GitHub issues have mixed headings — known and unknown must both survive.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-mixed-sections-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="mixed-sections-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Mixed Sections Item",
             description="Test mixed known and unknown sections",
             metadata=metadata,
@@ -4093,18 +4093,18 @@ class TestViewItemUnknownSections:
         Why: GroomedSectionMetadata and SectionEntryMetadata are discriminated by presence of
              the "type" key — MCP clients must receive both shapes correctly.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, GroomedData, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-groomed-unknown-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="groomed-unknown-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Groomed Unknown Item",
             description="Test groomed alongside unknown",
             metadata=metadata,
@@ -4158,18 +4158,18 @@ class TestViewItemUnknownSections:
         Why: Before this fix, the second section silently overwrote the first in the
              result dict — no error, no warning, entries from one section vanished.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Section
 
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-collision-item.yaml"
 
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="collision-item"
         )
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Collision Item",
             description="Test display-title collision between distinct storage keys",
             metadata=metadata,
@@ -4258,19 +4258,19 @@ class TestEntryIdReadWriteInvariant:
         section must resolve back to the entry that produced it, even when two entries
         share a stored id.
         """
-        import backlog_core.models as _m
+        import backlog_core.models as m
         from backlog_core.models import Entry, Output, Section
 
         mocker.patch("backlog_core.operations.try_get_github", return_value=None)
         mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
 
-        backlog_dir = _m.get_backlog_dir()
+        backlog_dir = m.get_backlog_dir()
         filepath = backlog_dir / "p1-dup-groom-item.yaml"
-        metadata = _m.BacklogItemMetadata(
+        metadata = m.BacklogItemMetadata(
             source="test", added="2026-01-01", priority="P1", status="open", topic="dup-groom-item"
         )
         shared_id = "2026-01-01T00:00:00Z"
-        item = _m.BacklogItem(
+        item = m.BacklogItem(
             title="Dup Groom Item",
             description="Test duplicate stored ids via groom_item",
             metadata=metadata,

@@ -40,7 +40,6 @@ from backlog_core.backends.github_content_migration import (
     _PlanPersistence,
 )
 from backlog_core.backends.github_content_stores import (
-    _content_revision as _compute_content_revision,
     _ContentPersistence,
     _GitHubDispatchPersistence,
     _GitHubPlanPersistence,
@@ -467,15 +466,6 @@ class GitHubBackend:
             The written content record.
         """
         return self._content_migration.write(request)
-
-    @staticmethod
-    def _content_revision(content: str) -> str:
-        """Return the content-addressed revision for a logical content body.
-
-        Returns:
-            Hex SHA-256 digest of the UTF-8 encoded content.
-        """
-        return _compute_content_revision(content)
 
     # ------------------------------------------------------------------
     # Issue synchronisation

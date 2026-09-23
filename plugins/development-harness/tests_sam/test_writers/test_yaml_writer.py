@@ -637,9 +637,7 @@ class TestUpdateFieldYamlFrontmatter:
         raw = f.read_text(encoding="utf-8")
         assert raw.startswith("---\n")
         # Re-parse just the frontmatter block to check status
-        from ruamel.yaml import YAML as _YAML
-
-        y = _YAML(typ="rt")
+        y = YAML(typ="rt")
         raw.split("\n---")[1].lstrip("\n").split("\n---")[0]
         # simpler: load from between the first --- pair
         import re
@@ -663,9 +661,7 @@ class TestUpdateFieldYamlFrontmatter:
         raw = f.read_text(encoding="utf-8")
         import re
 
-        from ruamel.yaml import YAML as _YAML
-
-        y = _YAML(typ="rt")
+        y = YAML(typ="rt")
         after_open = raw[4:]
         close = re.search(r"\n---", after_open)
         assert close is not None
@@ -749,9 +745,7 @@ class TestUpdateFieldsYamlFrontmatter:
         raw = f.read_text(encoding="utf-8")
         import re
 
-        from ruamel.yaml import YAML as _YAML
-
-        y = _YAML(typ="rt")
+        y = YAML(typ="rt")
         after_open = raw[4:]
         close = re.search(r"\n---", after_open)
         assert close is not None

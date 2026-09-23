@@ -15,8 +15,8 @@ import logging
 import os
 import uuid
 
-import backlog_core.models as _bc_models
-import backlog_core.server as _backlog_server
+import backlog_core.models as bc_models
+import backlog_core.server as backlog_server
 import pytest
 from backlog_core.backend_protocol import reset_config as bp_reset_config, set_config as bp_set_config
 from backlog_core.backend_types import BacklogConfig as BPBacklogConfig
@@ -68,7 +68,7 @@ def live_items(tmp_path_factory, monkeypatch_class):
     import dh_paths
 
     tmp_root = tmp_path_factory.mktemp("live_backlog")
-    monkeypatch_class.setattr(_backlog_server, "_startup_sync_enabled", lambda: False)
+    monkeypatch_class.setattr(backlog_server, "_startup_sync_enabled", lambda: False)
     monkeypatch_class.setenv("DH_STATE_HOME", str(tmp_root / "dh_state"))
 
     fake_project_root = tmp_root / "project"
@@ -77,22 +77,22 @@ def live_items(tmp_path_factory, monkeypatch_class):
     bd = dh_paths.backlog_dir(project_root=fake_project_root)
     bd.mkdir(parents=True, exist_ok=True)
 
-    existing = _bc_models._config
+    existing = bc_models._config
     # Prefer GITHUB_REPO env var (set in CI) over the already-resolved default_repo.
     # The fixture replaces _config directly, bypassing _discover_via_env(), so without
     # this the env var is never consulted and default_repo stays "" in CI — causing 404s.
     resolved_repo = os.environ.get("GITHUB_REPO", existing.default_repo if existing is not None else "")
     monkeypatch_class.setattr(
-        _bc_models, "_config", BacklogConfig(repo_root=fake_project_root, backlog_dir=bd, default_repo=resolved_repo)
+        bc_models, "_config", BacklogConfig(repo_root=fake_project_root, backlog_dir=bd, default_repo=resolved_repo)
     )
 
     # operations.py imports get_config from backend_protocol (a separate singleton from
-    # _bc_models._config). Without patching backend_protocol._active_config, all
+    # bc_models._config). Without patching backend_protocol._active_config, all
     # operations.py calls (add_item, sync_items, etc.) hit the real ~/.dh backlog with
     # 800+ issues instead of the test temp directory — causing a 10-minute hang in
     # backlog_sync (L8) as it fetches the entire real issue list from GitHub.
     # GitHubBackend() with no repo arg falls through to resolve_repo("") →
-    # models.get_default_repo() → the already-patched _bc_models._config.default_repo.
+    # models.get_default_repo() → the already-patched bc_models._config.default_repo.
     bp_set_config(BPBacklogConfig(backend=GitHubBackend()))
 
     test_id = str(uuid.uuid4())[:8]

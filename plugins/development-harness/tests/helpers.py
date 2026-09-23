@@ -13,12 +13,11 @@ import json
 import os
 import signal
 import subprocess
+from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from fastmcp import FastMCP
 
 
@@ -166,13 +165,11 @@ def make_dh_paths_mock(project_root: Path, user_dh_root: Path | None = None) -> 
     project structure or home directory layout. The deferred Path.home() resolution
     (when user_dh_root is None) lets monkeypatching HOME take effect correctly.
     """
-    from pathlib import Path as _Path
-
     mock = MagicMock()
     mock.git_project_root.return_value = project_root
     if user_dh_root is not None:
         mock._dh_user_root.return_value = user_dh_root
     else:
-        mock._dh_user_root.side_effect = lambda: _Path.home() / ".dh"
+        mock._dh_user_root.side_effect = lambda: Path.home() / ".dh"
     mock.project_dh_dir.return_value = project_root / ".dh"
     return mock

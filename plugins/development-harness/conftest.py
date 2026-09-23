@@ -251,9 +251,9 @@ def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.Fixtu
     # including the lightweight nested pytest subprocesses that
     # tests/test_network_guard.py spawns to probe guard behaviour in isolation,
     # which run with tight wall-clock timeouts. See per-file-ignore below.
-    import backlog_core.server as _server
+    from backlog_core import server
 
-    monkeypatch.setattr(_server, "_startup_sync_enabled", lambda: False)
+    monkeypatch.setattr(server, "_startup_sync_enabled", lambda: False)
 
 
 @pytest.hookimpl(hookwrapper=True)

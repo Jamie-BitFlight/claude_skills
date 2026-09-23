@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,9 +17,6 @@ from sam_schema.server_backend import get_backend
 from sam_schema.server_plan_ops import _sam_plan_read
 
 from tests.helpers import call_mcp_tool
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Shared call helper
@@ -679,8 +676,6 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     Act: read the raw YAML file back after the write.
     Assert: dependencies is a list of strings in the stored YAML, not a string repr.
     """
-    from pathlib import Path as _Path
-
     from ruamel.yaml import YAML
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
     from sam_schema.core.models import Complexity, Priority, Task, TaskStatus
@@ -698,7 +693,7 @@ def test_update_task_round_trips_list_fields_without_coercion(tmp_path: Path) ->
     )
     backend = LocalYamlTaskProvider(p_dir)
     plan_id = backend.create_plan("roundtrip", "Goal", [minimal_task])["plan_id"]
-    plan_path = _Path(p_dir) / f"{plan_id}.yaml"
+    plan_path = Path(p_dir) / f"{plan_id}.yaml"
 
     task_data = backend.read_task(plan_id, "T01")
     updated_task = Task.model_validate({**task_data, "dependencies": ["T01", "T02"]})
@@ -942,8 +937,6 @@ async def test_sam_plan_update_persists_list_model_fields_as_dicts() -> None:
 
 
 def test_local_yaml_plan_update_list_field_has_no_model_repr(tmp_path: Path) -> None:
-    from pathlib import Path as _Path
-
     from dh_core.operations import update_plan_fields
     from sam_schema.core.backends.local_yaml import LocalYamlTaskProvider
     from sam_schema.core.models import BookendType, Task, TaskStatus
@@ -979,7 +972,7 @@ def test_local_yaml_plan_update_list_field_has_no_model_repr(tmp_path: Path) -> 
 
     update_plan_fields(backend, plan_id, set_fields={"acceptance-criteria-structured": ac_value})
 
-    plan_yaml_files = list(_Path(p_dir).glob(f"{plan_id}.*")) + list(_Path(p_dir).glob(f"{plan_id}-*"))
+    plan_yaml_files = list(Path(p_dir).glob(f"{plan_id}.*")) + list(Path(p_dir).glob(f"{plan_id}-*"))
     assert plan_yaml_files, f"No YAML file found for plan {plan_id} in {p_dir}"
     raw_content = plan_yaml_files[0].read_text()
     assert "AcceptanceCriterion" not in raw_content, (

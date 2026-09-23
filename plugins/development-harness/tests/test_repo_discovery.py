@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import backlog_core.models as _bc_models
+import backlog_core.models as bc_models
 import pytest
 from backlog_core.models import (
     BacklogConfig,
@@ -329,9 +329,9 @@ class TestDiscoverViaGit:
         """
         project_root = tmp_path / "my-app"
         project_root.mkdir()
-        existing = _bc_models._config
+        existing = bc_models._config
         monkeypatch.setattr(
-            _bc_models,
+            bc_models,
             "_config",
             BacklogConfig(
                 repo_root=project_root,
