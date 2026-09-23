@@ -22,7 +22,7 @@ _DH_PLUGIN_DIR = Path(__file__).resolve().parents[3]
 if str(_DH_PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(_DH_PLUGIN_DIR))
 
-import dh_paths as _dh_paths
+import dh_paths
 
 
 def get_available_features() -> dict[str, Any]:
@@ -32,7 +32,7 @@ def get_available_features() -> dict[str, Any]:
         Dictionary containing features array, count, and optional message.
     """
     try:
-        plan_path = _dh_paths.plan_dir()
+        plan_path = dh_paths.plan_dir()
     except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError) as e:
         return {"features": [], "count": 0, "message": f"Could not resolve plan dir: {e}"}
 
@@ -71,7 +71,7 @@ def get_active_task() -> str:
         JSON content of active task file, or message if no active task.
     """
     try:
-        ctx_dir = _dh_paths.context_dir()
+        ctx_dir = dh_paths.context_dir()
     except (FileNotFoundError, subprocess.CalledProcessError, RuntimeError) as e:
         return f"No active task (could not resolve context dir: {e})"
 

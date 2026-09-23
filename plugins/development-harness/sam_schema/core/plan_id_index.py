@@ -390,10 +390,10 @@ def _config_search_paths() -> list[Path]:
 
     # Project-level config — resolve via dh_paths when available.
     with contextlib.suppress(ImportError, FileNotFoundError, RuntimeError):
-        import dh_paths as _dh_paths  # ruff: ignore[import-outside-top-level]
+        import dh_paths  # ruff: ignore[import-outside-top-level]
 
-        project_root = _dh_paths.git_project_root()
-        project_dh_dir = _dh_paths.project_dh_dir(project_root)
+        project_root = dh_paths.git_project_root()
+        project_dh_dir = dh_paths.project_dh_dir(project_root)
         paths.append(project_dh_dir / "config.yaml")
 
     # User-level config fallback.

@@ -7,14 +7,14 @@ from unittest.mock import patch
 
 import pytest
 
-import backlog_core.models as _models
+import backlog_core.models as models
 from backlog_core.models import BacklogConfig, get_backlog_dir, get_config, get_default_repo, get_repo_root, init_paths
 
 
 @pytest.fixture(autouse=True)
 def _reset_config(monkeypatch: pytest.MonkeyPatch) -> None:
     """Restore _config to None after each test to isolate state."""
-    monkeypatch.setattr(_models, "_config", None)
+    monkeypatch.setattr(models, "_config", None)
 
 
 class TestGetConfigAutoInit:
@@ -22,53 +22,53 @@ class TestGetConfigAutoInit:
 
     def test_get_config_auto_inits_when_project_root_discoverable(self, tmp_path: Path) -> None:
         """get_config() succeeds when _resolve_repo_root succeeds."""
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
             cfg = get_config()
         assert cfg.repo_root == tmp_path
 
     def test_get_config_raises_when_project_root_not_discoverable(self) -> None:
         """get_config() raises RuntimeError when _resolve_repo_root raises RuntimeError."""
         with (
-            patch.object(_models, "_resolve_repo_root", side_effect=RuntimeError("no git root")),
+            patch.object(models, "_resolve_repo_root", side_effect=RuntimeError("no git root")),
             pytest.raises(RuntimeError, match="not initialised"),
         ):
             get_config()
 
     def test_get_repo_root_auto_inits(self, tmp_path: Path) -> None:
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
             root = get_repo_root()
         assert root == tmp_path
 
     def test_get_backlog_dir_auto_inits(self, tmp_path: Path) -> None:
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
             backlog_dir = get_backlog_dir()
         assert isinstance(backlog_dir, Path)
 
     def test_get_default_repo_auto_inits(self, tmp_path: Path) -> None:
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
             repo = get_default_repo()
         assert isinstance(repo, str)
 
     def test_module_backlog_dir_attr_auto_inits(self, tmp_path: Path) -> None:
-        """_models.BACKLOG_DIR access via __getattr__ auto-initialises when needed."""
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
-            val = _models.BACKLOG_DIR  # type: ignore[attr-defined]
+        """models.BACKLOG_DIR access via __getattr__ auto-initialises when needed."""
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
+            val = models.BACKLOG_DIR  # type: ignore[attr-defined]
         assert isinstance(val, Path)
 
     def test_module_repo_root_attr_auto_inits(self, tmp_path: Path) -> None:
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
-            val = _models._REPO_ROOT  # type: ignore[attr-defined]
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
+            val = models._REPO_ROOT  # type: ignore[attr-defined]
         assert isinstance(val, Path)
 
     def test_module_default_repo_attr_auto_inits(self, tmp_path: Path) -> None:
-        with patch.object(_models, "_resolve_repo_root", return_value=tmp_path):
-            val = _models.DEFAULT_REPO  # type: ignore[attr-defined]
+        with patch.object(models, "_resolve_repo_root", return_value=tmp_path):
+            val = models.DEFAULT_REPO  # type: ignore[attr-defined]
         assert isinstance(val, str)
 
     def test_auto_init_error_message_mentions_env_vars(self) -> None:
         """Error message guides the user to set environment variables."""
         with (
-            patch.object(_models, "_resolve_repo_root", side_effect=RuntimeError("no git root")),
+            patch.object(models, "_resolve_repo_root", side_effect=RuntimeError("no git root")),
             pytest.raises(RuntimeError, match="DH_PROJECT_ROOT"),
         ):
             get_config()
@@ -78,8 +78,8 @@ class TestGetConfigAutoInit:
         import logging
 
         with (
-            patch.object(_models, "_resolve_repo_root", return_value=tmp_path),
-            caplog.at_level(logging.WARNING, logger=_models.__name__),
+            patch.object(models, "_resolve_repo_root", return_value=tmp_path),
+            caplog.at_level(logging.WARNING, logger=models.__name__),
         ):
             get_config()
         assert any("auto-initialised" in r.message for r in caplog.records)
@@ -107,17 +107,17 @@ class TestInitPaths:
         assert isinstance(get_backlog_dir(), Path)
 
     def test_module_backlog_dir_attr_matches_accessor(self, tmp_path: Path) -> None:
-        """_models.BACKLOG_DIR via __getattr__ must equal get_backlog_dir()."""
+        """models.BACKLOG_DIR via __getattr__ must equal get_backlog_dir()."""
         init_paths(project_dir=str(tmp_path), repo="owner/repo")
-        assert get_backlog_dir() == _models.BACKLOG_DIR  # type: ignore[attr-defined]
+        assert get_backlog_dir() == models.BACKLOG_DIR  # type: ignore[attr-defined]
 
     def test_module_repo_root_attr_matches_accessor(self, tmp_path: Path) -> None:
         init_paths(project_dir=str(tmp_path), repo="owner/repo")
-        assert get_repo_root() == _models._REPO_ROOT  # type: ignore[attr-defined]
+        assert get_repo_root() == models._REPO_ROOT  # type: ignore[attr-defined]
 
     def test_module_default_repo_attr_matches_accessor(self, tmp_path: Path) -> None:
         init_paths(project_dir=str(tmp_path), repo="owner/repo")
-        assert get_default_repo() == _models.DEFAULT_REPO  # type: ignore[attr-defined]
+        assert get_default_repo() == models.DEFAULT_REPO  # type: ignore[attr-defined]
 
     def test_explicit_init_takes_precedence_over_auto_init(self, tmp_path: Path) -> None:
         """Calling init_paths() explicitly sets config regardless of auto-init path."""
@@ -186,4 +186,4 @@ class TestInitAlias:
 class TestUnknownAttributeRaises:
     def test_unknown_attr_raises_attribute_error(self) -> None:
         with pytest.raises(AttributeError, match="has no attribute"):
-            _ = _models.DOES_NOT_EXIST  # type: ignore[attr-defined]
+            _ = models.DOES_NOT_EXIST  # type: ignore[attr-defined]

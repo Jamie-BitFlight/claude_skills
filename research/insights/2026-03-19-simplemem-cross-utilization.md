@@ -5,7 +5,7 @@ title: "Utilization Proposals: SimpleMem-Cross"
 ## Utilization 1: context-gathering agent → SimpleMem-Cross cross-session memory
 
 **Research entry**: ./research/context-management/simplemem-cross.md
-**Caller**: ./plugins/python3-development/agents/context-gathering.md
+**Caller**: ./plugins/development-harness/agents/dh-context-gathering.md
 **Integration mechanism**: Python async library (pip dependency `simplemem[cross]`)
 **Replaces or adds**: Adds persistent cross-session context discovery — agents currently re-discover context from scratch each session
 **Setup cost**: Medium (async integration with sam CLI, context manifest serialization layer)
@@ -75,7 +75,7 @@ async def gather_context(task_file_path):
 ## Utilization 2: implement-feature skill → SimpleMem-Cross task execution memory
 
 **Research entry**: ./research/context-management/simplemem-cross.md
-**Caller**: ./plugins/python3-development/skills/implement-feature/SKILL.md
+**Caller**: ./plugins/development-harness/skills/implement-feature/SKILL.md
 **Integration mechanism**: Python async library + HTTP REST API (for agent communication tracking)
 **Replaces or adds**: Adds persistent execution memory across task loops — currently no record of which agents were delegated tasks, what decisions they made, or patterns they followed
 **Setup cost**: High (requires task loop refactoring to call SimpleMem-Cross, hook script integration for event recording, HTTP endpoint exposure for agent discovery)
@@ -181,7 +181,7 @@ async def implement_feature_loop(task_file_path):
 ## Utilization 3: task_status_hook.py → SimpleMem-Cross lifecycle event recording
 
 **Research entry**: ./research/context-management/simplemem-cross.md
-**Caller**: ./plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Caller**: ./plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Integration mechanism**: Python async library (pip dependency)
 **Replaces or adds**: Adds persistent audit trail of task lifecycle events — currently task status updates are recorded locally to task files only, not persisted across sessions
 **Setup cost**: Medium (async subprocess integration in hook script, context file extension to include memory_session_id)

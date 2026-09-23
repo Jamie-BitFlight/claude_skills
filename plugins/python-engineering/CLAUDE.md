@@ -35,7 +35,7 @@ Opinionated Python 3.11+ engineering system. Establishes strong defaults and rou
 - `@python-engineering:python-cli-design-spec` — produces architecture specs for CLIs
 - `@python-engineering:python-pytest-architect` — writes pytest test suites
 - `@python-engineering:code-reviewer` — general code review with Python awareness
-- `@python-engineering:semantic-code-search` — semantic search over Python codebases
+- `@python-engineering:semantic-code-search` — pattern and structure search over Python codebases
 
 ---
 
@@ -55,14 +55,15 @@ Strategy auto-detected from Python version and dependencies. See `python3-core` 
 
 All detailed reference material lives in `references/` subdirectories of specialist skills. One level deep from SKILL.md — no nested reference chains.
 
-- `skills/python3-core/references/python3-standards.md` — unified standards
+- `skills/standards-for-python-development/SKILL.md` — the shared rules every other skill applies
 - `skills/python3-core/references/typing-matrix.md` — version/dependency typing matrix
 - `skills/python3-typing/references/typing-policy.md` — boundary validation policy
 - `skills/python3-typing/references/pydantic-boundaries.md` — Pydantic patterns
 - `skills/python3-typing/references/hypothesis-boundaries.md` — property-based testing
 - `skills/python3-testing/references/testing-standards.md` — testing standards
-- `skills/python3-cli/references/typer-patterns.md` — Typer patterns
-- `skills/python3-cli/references/rich-patterns.md` — Rich patterns
+- `skills/python3-cli/references/typer-*.md` — Typer app, parameters, subcommands, testing, advanced patterns
+- `skills/python3-cli/references/rich-*.md` — Rich console, renderables, progress, logging, text, advanced patterns
+- `skills/python3-cli/references/typer-rich-*.md` — tables, non-TTY width, exception handling, testing patterns
 - `skills/python3-tools/references/tooling-defaults.md` — tooling defaults
 - `skills/python3-tools/references/compatibility-lanes.md` — compatibility guidance
 

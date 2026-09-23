@@ -547,23 +547,22 @@ async def test_backlog_list_search_body_field_specific_prefix():
 
 
 # ---------------------------------------------------------------------------
-# _apply_search_filter — unit tests for pre-computed haystack optimisation
+# apply_search_filter — unit tests for pre-computed haystack optimisation
 # ---------------------------------------------------------------------------
 
 
-def test_apply_search_filter_and_operator_pre_computed_haystack():
-    """_apply_search_filter AND returns only items matching all terms.
+def testapply_search_filter_and_operator_pre_computed_haystack():
+    """apply_search_filter AND returns only items matching all terms.
 
     Tests: correctness of the AND branch after the pre-computed haystack
     optimisation — each item's haystack is built once and reused across all
     terms in the query.
-    How: Call _apply_search_filter directly with a 3-item list and an AND query
+    How: Call apply_search_filter directly with a 3-item list and an AND query
     with 2 terms.  Verify the returned list contains only the item that matches
     both, not those matching one or neither.
     Why: Pre-computing the haystack must not change which items match — only
     how many times the haystack string is constructed per item.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Auth token bug", "section": "P1", "topic": "security", "type": "Bug", "body": ""},
@@ -572,23 +571,22 @@ def test_apply_search_filter_and_operator_pre_computed_haystack():
         {"title": "Unrelated", "section": "P3", "topic": "docs", "type": "Docs", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "auth AND bug")
+    result = apply_search_filter(items, "auth AND bug")
     titles = [i["title"] for i in result]
 
     assert titles == ["Auth token bug"], f"Expected only 'Auth token bug', got {titles}"
 
 
-def test_apply_search_filter_or_operator_pre_computed_haystack():
-    """_apply_search_filter OR returns items matching either term.
+def testapply_search_filter_or_operator_pre_computed_haystack():
+    """apply_search_filter OR returns items matching either term.
 
     Tests: correctness of the OR branch after the pre-computed haystack
     optimisation — each item's haystack is built once before evaluating any()
     across terms.
-    How: Call _apply_search_filter directly with a 4-item list and an OR query.
+    How: Call apply_search_filter directly with a 4-item list and an OR query.
     Verify matched set and excluded set.
     Why: Same as AND — the optimisation must be semantically transparent.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Auth service", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
@@ -597,7 +595,7 @@ def test_apply_search_filter_or_operator_pre_computed_haystack():
         {"title": "Docs cleanup", "section": "P4", "topic": "docs", "type": "Docs", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "auth OR deploy")
+    result = apply_search_filter(items, "auth OR deploy")
     titles = [i["title"] for i in result]
 
     assert "Auth service" in titles
@@ -1237,7 +1235,7 @@ async def test_backlog_view_summary_true_full_chars_reflects_full_response_size(
     Why: An inaccurate _full_chars defeats the purpose of the hint — callers would
          not know whether fetching the full body is worth the token cost.
     """
-    import json as _json_test
+    import json as json_test
 
     # Arrange
     op_result = _make_view_result({
@@ -1251,7 +1249,7 @@ async def test_backlog_view_summary_true_full_chars_reflects_full_response_size(
         "warnings": [],
     })
     # _full_chars is computed from model_dump() which includes all ViewItemResult fields.
-    expected_full_chars = len(_json_test.dumps(op_result.model_dump()))
+    expected_full_chars = len(json_test.dumps(op_result.model_dump()))
 
     # Act
     with patch("dh_core.operations.view_item", return_value=op_result):
@@ -2009,8 +2007,8 @@ async def test_backlog_sync_no_error_key_on_success():
 # ---------------------------------------------------------------------------
 
 
-def test_apply_search_filter_not_excludes_matching_item():
-    """_apply_search_filter NOT term excludes items that match the term.
+def testapply_search_filter_not_excludes_matching_item():
+    """apply_search_filter NOT term excludes items that match the term.
 
     How: Three items; query "backlog NOT quality". Items with "backlog" but
     also "quality" in the haystack must be excluded. Items with "backlog"
@@ -2018,7 +2016,6 @@ def test_apply_search_filter_not_excludes_matching_item():
     Why: Validates the _NotPred short-circuit path and its interaction with
     the pre-computed haystack.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Backlog grooming", "section": "P1", "topic": "process", "type": "Chore", "body": ""},
@@ -2026,7 +2023,7 @@ def test_apply_search_filter_not_excludes_matching_item():
         {"title": "Auth refactor", "section": "P2", "topic": "security", "type": "Refactor", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "backlog NOT quality")
+    result = apply_search_filter(items, "backlog NOT quality")
     titles = [i["title"] for i in result]
 
     assert "Backlog grooming" in titles, "Item matching 'backlog' only must be included"
@@ -2034,15 +2031,14 @@ def test_apply_search_filter_not_excludes_matching_item():
     assert "Auth refactor" not in titles, "Item not matching 'backlog' must be excluded"
 
 
-def test_apply_search_filter_not_with_field_prefix():
-    """_apply_search_filter NOT with field:value syntax excludes field matches.
+def testapply_search_filter_not_with_field_prefix():
+    """apply_search_filter NOT with field:value syntax excludes field matches.
 
     How: Query "title:backlog AND NOT type:feature". Items with "backlog" in
     title but type Feature must be excluded; those with other types must be
     included.
     Why: Validates that NOT correctly negates field-specific predicates.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Backlog feature X", "section": "P1", "topic": "backlog", "type": "Feature", "body": ""},
@@ -2050,7 +2046,7 @@ def test_apply_search_filter_not_with_field_prefix():
         {"title": "Unrelated item", "section": "P2", "topic": "other", "type": "Bug", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "title:backlog AND NOT type:feature")
+    result = apply_search_filter(items, "title:backlog AND NOT type:feature")
     titles = [i["title"] for i in result]
 
     assert "Backlog chore Y" in titles
@@ -2084,8 +2080,8 @@ async def test_backlog_list_search_not_operator_excludes_term():
 # ---------------------------------------------------------------------------
 
 
-def test_apply_search_filter_parenthetical_grouping_or_within_and():
-    """_apply_search_filter supports (A OR B) AND C grouping.
+def testapply_search_filter_parenthetical_grouping_or_within_and():
+    """apply_search_filter supports (A OR B) AND C grouping.
 
     How: Query "(auth OR deploy) AND quality". Items must match either
     'auth' or 'deploy', AND also 'quality'. Items matching only auth or
@@ -2093,7 +2089,6 @@ def test_apply_search_filter_parenthetical_grouping_or_within_and():
     Why: Validates the recursive-descent parser handles grouped OR inside
     an AND expression correctly.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Auth quality gate", "section": "P1", "topic": "security", "type": "Feature", "body": ""},
@@ -2102,7 +2097,7 @@ def test_apply_search_filter_parenthetical_grouping_or_within_and():
         {"title": "Refactor models", "section": "P3", "topic": "quality", "type": "Refactor", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "(auth OR deploy) AND quality")
+    result = apply_search_filter(items, "(auth OR deploy) AND quality")
     titles = [i["title"] for i in result]
 
     assert "Auth quality gate" in titles
@@ -2111,15 +2106,14 @@ def test_apply_search_filter_parenthetical_grouping_or_within_and():
     assert "Refactor models" not in titles, "Matches quality but not auth/deploy — must be excluded"
 
 
-def test_apply_search_filter_parenthetical_not_inside_group():
-    """_apply_search_filter supports NOT inside a parenthetical group.
+def testapply_search_filter_parenthetical_not_inside_group():
+    """apply_search_filter supports NOT inside a parenthetical group.
 
     How: Query "(backlog AND NOT quality) OR deploy". Items matching the
     parenthetical expression (backlog without quality) OR 'deploy' must be
     included.
     Why: Validates correct precedence when NOT appears inside parentheses.
     """
-    from backlog_core.server import _apply_search_filter
 
     items: list[dict[str, str | bool]] = [
         {"title": "Backlog grooming", "section": "P1", "topic": "process", "type": "Chore", "body": ""},
@@ -2128,7 +2122,7 @@ def test_apply_search_filter_parenthetical_not_inside_group():
         {"title": "Auth service", "section": "P3", "topic": "security", "type": "Feature", "body": ""},
     ]
 
-    result = _apply_search_filter(items, "(backlog AND NOT quality) OR deploy")
+    result = apply_search_filter(items, "(backlog AND NOT quality) OR deploy")
     titles = [i["title"] for i in result]
 
     assert "Backlog grooming" in titles
@@ -2421,7 +2415,7 @@ def test_snippet_context_parameter_respected():
          with snippet_context=100. Assert pre + post chars total ≤ 100.
     Why: Callers pass snippet_context to control response token cost.
     """
-    from backlog_core.server import _make_snippet_parts
+    from backlog_core.search import _make_snippet_parts
 
     text = "A" * 100 + "MATCH" + "B" * 100
     start = 100
@@ -2445,7 +2439,7 @@ def test_snippet_context_budget_redistribution_near_start():
          Assert post_chars > 50 (received redistributed budget).
     Why: Sliding-window ensures we fill the window even when one side is at a boundary.
     """
-    from backlog_core.server import _make_snippet_parts
+    from backlog_core.search import _make_snippet_parts
 
     text = "START" + "MATCH" + "C" * 200
     start = 5
@@ -2467,7 +2461,7 @@ def test_snippet_context_budget_redistribution_near_end():
          Assert pre_chars > 50 (received redistributed budget).
     Why: Sliding-window ensures we fill the window even when one side is at a boundary.
     """
-    from backlog_core.server import _make_snippet_parts
+    from backlog_core.search import _make_snippet_parts
 
     text = "D" * 200 + "MATCH" + "END12"
     start = 200
@@ -2488,7 +2482,7 @@ def test_snippet_ellipsis_present_when_content_truncated():
          Assert raw snippet starts and ends with '...'.
     Why: Consumers use '...' to detect truncation and decide if full body is needed.
     """
-    from backlog_core.server import _make_snippet_parts
+    from backlog_core.search import _make_snippet_parts
 
     text = "A" * 150 + "MATCH" + "B" * 150
     start = 150
@@ -2509,7 +2503,7 @@ def test_snippet_no_ellipsis_at_boundaries():
     How: 20-char text with match at position 0. snippet_context=200.
     Why: False '...' misleads consumers into thinking content was truncated.
     """
-    from backlog_core.server import _make_snippet_parts
+    from backlog_core.search import _make_snippet_parts
 
     text = "MATCHrestoftext12345"
     start = 0
@@ -2533,7 +2527,7 @@ def test_format_match_text_section_label_not_counted_in_budget():
     Why: The label is structural metadata; counting it would shrink the useful
          context around the matched term.
     """
-    from backlog_core.server import _format_match_text
+    from backlog_core.search import _format_match_text
 
     text = "E" * 100 + "KEYWORD" + "F" * 100
     start = 100

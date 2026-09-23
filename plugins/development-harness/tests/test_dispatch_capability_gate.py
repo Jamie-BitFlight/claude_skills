@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import dh_core.operations as _dh_ops
+import dh_core.operations as dh_ops
 import pytest
-from backlog_core.backend_protocol import reset_config as _reset_bp_config, set_config as _set_bp_config
-from backlog_core.backend_types import BacklogConfig as _BacklogConfig
+from backlog_core.backend_protocol import reset_config as reset_bp_config, set_config as set_bp_config
+from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import ContentUnavailableError
 
@@ -35,9 +35,9 @@ def sqlite_backend():
     ResourceWarning.
     """
     backend = SQLiteBackend(":memory:")
-    _set_bp_config(_BacklogConfig(backend=backend))
+    set_bp_config(BacklogConfig(backend=backend))
     yield
-    _reset_bp_config()
+    reset_bp_config()
     backend._conn.close()
 
 
@@ -53,7 +53,7 @@ def test_dispatch_stale_check_reports_capability_gap_on_non_github_backend(
     """
     mocker.patch("dh_core.operations._read_dispatch_plan", return_value=object())
 
-    result = _dh_ops.dispatch_stale_check(milestone_number=42)
+    result = dh_ops.dispatch_stale_check(milestone_number=42)
 
     assert result["unsupported_capability"] == "github_extras"
     assert result["backend"] == "SQLiteBackend"
@@ -67,7 +67,7 @@ def test_dispatch_conflicts_reports_capability_gap_on_non_github_backend(sqlite_
 
     Why: same contract as dispatch_stale_check, exercised on the real function.
     """
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result["unsupported_capability"] == "github_extras"
     assert result["backend"] == "SQLiteBackend"
@@ -121,10 +121,10 @@ def test_dispatch_conflicts_reads_canonical_systems_inventory(mocker: MockerFixt
         for number, title in enumerate(("A", "B"), start=1)
     ]
     github_backend.resolve_issue_body.side_effect = authoritative_bodies
-    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
-    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+    mocker.patch.object(dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(dh_ops, "require_github_extras", return_value=github_backend)
 
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result["count"] == 1
     assert result["conflict_groups"][0]["items"] == ["A", "B"]
@@ -159,10 +159,10 @@ def test_dispatch_conflicts_reads_rendered_impact_radius_shapes(body_shape: str,
         for number, title in enumerate(("A", "B"), start=1)
     ]
     github_backend.resolve_issue_body.side_effect = [radius, radius]
-    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
-    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+    mocker.patch.object(dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(dh_ops, "require_github_extras", return_value=github_backend)
 
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result["count"] == 1
     assert result["conflict_groups"][0]["items"] == ["A", "B"]
@@ -180,10 +180,10 @@ def test_dispatch_conflicts_accepts_atx_closing_hashes(mocker: MockerFixture) ->
         for number, title in enumerate(("A", "B"), start=1)
     ]
     github_backend.resolve_issue_body.side_effect = [body, body]
-    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
-    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+    mocker.patch.object(dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(dh_ops, "require_github_extras", return_value=github_backend)
 
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result["count"] == 1
     assert result["conflict_groups"][0]["reason"] == f"Shared systems: {shared}"
@@ -215,10 +215,10 @@ def test_dispatch_conflicts_ignores_impact_radius_headings_inside_fences(mocker:
         for number, title in enumerate(("A", "B"), start=1)
     ]
     github_backend.resolve_issue_body.side_effect = authoritative_bodies
-    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
-    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+    mocker.patch.object(dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(dh_ops, "require_github_extras", return_value=github_backend)
 
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result["count"] == 1
     assert result["conflict_groups"][0]["reason"] == f"Shared systems: {shared}"
@@ -228,14 +228,14 @@ def test_dispatch_conflicts_ignores_impact_radius_headings_inside_fences(mocker:
 def test_extract_impact_radius_prefers_outer_section_over_later_subsection() -> None:
     body = "## Impact Radius\n- shared.py\n## Fact-Check\n### Impact Radius\nNo scope change."
 
-    assert _dh_ops._extract_impact_radius_section(body) == "- shared.py"
+    assert dh_ops._extract_impact_radius_section(body) == "- shared.py"
 
 
 @pytest.mark.unit
 def test_extract_impact_radius_uses_ast_level_for_indented_heading_boundary() -> None:
     body = "  ## Impact Radius\n- shared.py\n## Systems Inventory\n- unrelated.py"
 
-    assert _dh_ops._extract_impact_radius_section(body) == "- shared.py"
+    assert dh_ops._extract_impact_radius_section(body) == "- shared.py"
 
 
 @pytest.mark.unit
@@ -246,10 +246,10 @@ def test_dispatch_conflicts_fails_closed_when_authoritative_body_is_unavailable(
         {"id": "issue-1", "title": "A", "number": 1, "body": "Human-owned body"}
     ]
     github_backend.resolve_issue_body.side_effect = ContentUnavailableError("head record unavailable")
-    mocker.patch.object(_dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
-    mocker.patch.object(_dh_ops, "require_github_extras", return_value=github_backend)
+    mocker.patch.object(dh_ops, "get_config", return_value=mocker.Mock(backend=object()))
+    mocker.patch.object(dh_ops, "require_github_extras", return_value=github_backend)
 
-    result = _dh_ops.dispatch_conflicts(milestone_number=42)
+    result = dh_ops.dispatch_conflicts(milestone_number=42)
 
     assert result == {
         "error": "Could not resolve authoritative body for issue #1: head record unavailable",

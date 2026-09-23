@@ -31,14 +31,14 @@ import os
 from pathlib import Path
 from typing import TypeGuard
 
-import dh_paths as _dh_paths
-from ruamel.yaml import YAML as _RuamelYAML
-from ruamel.yaml.error import YAMLError as _YAMLError
+import dh_paths
+from ruamel.yaml import YAML as RuamelYAML
+from ruamel.yaml.error import YAMLError
 
 __all__ = ["DHConfig"]
 
-_YAML: _RuamelYAML = _RuamelYAML(typ="safe")
-_YAML_PARSE_ERRORS: tuple[type[Exception], ...] = (OSError, _YAMLError)
+_YAML: RuamelYAML = RuamelYAML(typ="safe")
+_YAML_PARSE_ERRORS: tuple[type[Exception], ...] = (OSError, YAMLError)
 
 # ---------------------------------------------------------------------------
 # Subsystem configuration constants
@@ -83,14 +83,14 @@ def _load_yaml_config(path: Path) -> dict[str, object] | None:
 def _dh_user_root_path() -> Path:
     """Return the user-level .dh directory path.
 
-    Uses _dh_paths._dh_user_root(), falls back to Path.home() / ".dh" if it
+    Uses dh_paths._dh_user_root(), falls back to Path.home() / ".dh" if it
     raises FileNotFoundError or RuntimeError (e.g. not in a git repo).
 
     Returns:
         Path to the user-level .dh directory.
     """
     try:
-        return _dh_paths._dh_user_root()  # ruff: ignore[private-member-access]
+        return dh_paths._dh_user_root()  # ruff: ignore[private-member-access]
     except (FileNotFoundError, RuntimeError):
         return Path.home() / ".dh"
 
@@ -106,8 +106,8 @@ def _get_config_search_paths() -> list[Path]:
     paths: list[Path] = []
 
     with contextlib.suppress(FileNotFoundError, RuntimeError):
-        project_root = _dh_paths.git_project_root()
-        dh_dir = _dh_paths.project_dh_dir(project_root)
+        project_root = dh_paths.git_project_root()
+        dh_dir = dh_paths.project_dh_dir(project_root)
         paths.append(dh_dir / _CONFIG_FILENAME)
 
     paths.append(_dh_user_root_path() / _CONFIG_FILENAME)
@@ -150,14 +150,14 @@ def _resolve_from_config(subsystem: str) -> str | None:
 def _auto_detect_beads() -> str | None:
     """Return 'beads' when .beads/dh-backend marker file exists at the project root.
 
-    Uses _dh_paths to resolve project root. Returns None if project root
+    Uses dh_paths to resolve project root. Returns None if project root
     cannot be determined or .beads/dh-backend does not exist as a file.
 
     Returns:
         "beads" when the opt-in marker file is present, otherwise None.
     """
     try:
-        project_root = _dh_paths.git_project_root()
+        project_root = dh_paths.git_project_root()
     except (FileNotFoundError, RuntimeError):
         return None
     return "beads" if (project_root / ".beads" / "dh-backend").is_file() else None

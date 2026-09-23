@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import TypeAdapter
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
-from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SUCCESSFUL_STATUSES
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
     PlanExistsError,
@@ -45,15 +45,11 @@ __all__ = ["InMemoryTaskProvider"]
 # Pydantic TypeAdapters for validating and narrowing set_fields dicts to the
 # strongly-typed PlanFieldsUpdate / TaskFieldsUpdate TypedDicts required by
 # TypedDict.update().  Created at module load; safe to reuse across calls.
-from sam_schema.core.task_backend_types import (
-    PlanFieldsUpdate as _PlanFieldsUpdate,
-    PlanUpdateValue,
-    TaskFieldsUpdate as _TaskFieldsUpdate,
-)
+from sam_schema.core.task_backend_types import PlanFieldsUpdate, PlanUpdateValue, TaskFieldsUpdate
 
-_PLAN_UPDATE_TA: TypeAdapter[_PlanFieldsUpdate] = TypeAdapter(_PlanFieldsUpdate)
+_PLAN_UPDATE_TA: TypeAdapter[PlanFieldsUpdate] = TypeAdapter(PlanFieldsUpdate)
 _PLAN_UPDATE_TA.rebuild(_types_namespace={"PlanState": PlanState})
-_TASK_UPDATE_TA: TypeAdapter[_TaskFieldsUpdate] = TypeAdapter(_TaskFieldsUpdate)
+_TASK_UPDATE_TA: TypeAdapter[TaskFieldsUpdate] = TypeAdapter(TaskFieldsUpdate)
 
 # All valid TaskStatus values.
 _VALID_STATUSES: frozenset[str] = frozenset({
@@ -580,7 +576,7 @@ class InMemoryTaskProvider:
         for task in tasks:
             if task["status"] != "not-started":
                 continue
-            if all(status_by_id.get(dep_id, "") in _SUCCESSFUL_STATUSES for dep_id in task["dependencies"]):
+            if all(status_by_id.get(dep_id, "") in SUCCESSFUL_STATUSES for dep_id in task["dependencies"]):
                 ready.append(copy.deepcopy(task))
 
         return ready
@@ -614,7 +610,7 @@ class InMemoryTaskProvider:
         for task in tasks:
             if task["status"] != "not-started":
                 continue
-            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in _SUCCESSFUL_STATUSES]
+            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in SUCCESSFUL_STATUSES]
             if unsatisfied:
                 blocked_tasks.append({task["id"]: unsatisfied})
             else:

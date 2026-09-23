@@ -579,7 +579,7 @@ def test_data_dirs_ignores_relative_paths(monkeypatch):
 For TOML configuration files with XDG support, activate the toml-python skill:
 
 ```text
-Skill(skill: "python3-development:toml-python")
+Skill(skill: "python-engineering:toml-python")
 ```
 
 The toml-python skill provides comprehensive guidance on TOML parsing with `tomllib` (Python 3.11+) and `tomli` (backport), including validation with Pydantic models.
@@ -589,7 +589,7 @@ The toml-python skill provides comprehensive guidance on TOML parsing with `toml
 **Activate these skills for related functionality:**
 
 - `toml-python` - TOML configuration file parsing and validation
-- `python3-development` - Modern Python development patterns and best practices
+- `python-engineering` - Modern Python development patterns and best practices
 - `uv` - Python package and project management
 
 ## References

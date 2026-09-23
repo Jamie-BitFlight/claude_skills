@@ -53,7 +53,7 @@ from typing import TYPE_CHECKING, Final, Literal, Protocol
 
 from pydantic import ValidationError
 
-from backlog_core import github_sync, rendering as _rendering
+from backlog_core import github_sync, rendering
 from backlog_core.backends.bd_runner import (
     BdInvocationError,
     BdJsonDecodeError,
@@ -1052,7 +1052,7 @@ class BeadsBackend:
         Returns:
             Heading text string (e.g. ``"My Section"``).
         """
-        return _rendering.unknown_key_to_heading(key)
+        return rendering.unknown_key_to_heading(key)
 
     @property
     def section_heading(self) -> dict[str, str]:
@@ -1061,7 +1061,7 @@ class BeadsBackend:
         Returns:
             Dict mapping section storage key to display heading string.
         """
-        return _rendering.SECTION_HEADING
+        return rendering.SECTION_HEADING
 
     def render_groomed_section(self, groomed: GroomedData) -> str:
         r"""Render a GroomedData to markdown via rendering.render_groomed_section.
@@ -1072,7 +1072,7 @@ class BeadsBackend:
         Returns:
             Markdown string such as ``"## Groomed (2026-03-01)\\n\\n..."``.
         """
-        return _rendering.render_groomed_section(groomed)
+        return rendering.render_groomed_section(groomed)
 
     def section_display_title(self, key: str, groomed_date: str = "") -> str:
         """Return the human-readable title for a section storage key.
@@ -1084,4 +1084,4 @@ class BeadsBackend:
         Returns:
             Display title string (e.g. ``"Fact-Check"``).
         """
-        return _rendering.section_display_title(key, groomed_date)
+        return rendering.section_display_title(key, groomed_date)

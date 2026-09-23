@@ -5,7 +5,7 @@ title: "Improvement Proposals: SlimContext"
 ## Improvement 1: Compression guard to prevent context compaction during tool-use cycles
 
 **Source pattern**: "Both strategies only compress when the last message is from a user role (to avoid disrupting assistant-assistant or tool-use cycles). Long tool-use sequences (assistant <-> tool -> assistant <-> tool) may accumulate tokens without triggering compression if final message is not user message." (Limitations and Caveats section)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: Claude Code's context compaction is controlled by the Claude Code runtime, not by this repository's hooks. The task_status_hook.py fires on PostToolUse events but does not control when or how context compaction occurs. Implementing a compression guard would require access to Claude Code's internal context management, which is outside this repository's control surface.
@@ -27,14 +27,14 @@ An active `/start-task` execution with rapid Write/Edit/Bash cycles does not los
 ## Improvement 2: Token budget configuration per agent delegation
 
 **Source pattern**: "TokenBudgetConfig: Shared configuration tuple (maxModelTokens, thresholdPercent, estimateTokens, minRecentMessages)" and "Memory Budget Allocation: Token budget config aligns with Claude Code's token accounting for sub-agent work -- both require explicit token thresholds and preservation rules." (Technical Architecture and Relevance sections)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: The implement-feature SKILL.md does not contain any token budget configuration. However, SAM: Context Size Management (#111) and SAM: Cost/Token Management (#120) already track the need for token budget guidance. The specific TokenBudgetConfig pattern (maxModelTokens, thresholdPercent, estimateTokens, minRecentMessages) from SlimContext is a TypeScript interface for chat history compression -- it would need significant adaptation to apply to Claude Code's agent delegation model, which dispatches sub-agents rather than managing chat history arrays.
 
 ### Current state
 
-The implement-feature SKILL.md (plugins/python3-development/skills/implement-feature/SKILL.md) dispatches sub-agents with no explicit token budget. The delegation prompt does not specify max context size, threshold for when to summarize prior work, or minimum recent messages to preserve. Token management is entirely implicit -- the Claude Code runtime handles it.
+The implement-feature SKILL.md dispatches sub-agents with no explicit token budget. The delegation prompt does not specify max context size, threshold for when to summarize prior work, or minimum recent messages to preserve. Token management is entirely implicit -- the Claude Code runtime handles it.
 
 ### Target state
 
@@ -42,7 +42,7 @@ Agent delegation prompts include a token budget hint (e.g., estimated context co
 
 ### Measurable signal
 
-Task YAML or skill YAML contains a `token_budget` or equivalent field. The implement-feature orchestrator reads this field and adjusts delegation prompt size accordingly. Run: `grep -r "token_budget" plugins/python3-development/skills/` returns at least one match.
+Task YAML or skill YAML contains a `token_budget` or equivalent field. The implement-feature orchestrator reads this field and adjusts delegation prompt size accordingly. Run: `grep -r "token_budget" plugins/development-harness/skills/` returns at least one match.
 
 ---
 

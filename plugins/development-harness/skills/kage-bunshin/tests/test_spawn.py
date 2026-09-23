@@ -17,7 +17,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 from typing import TYPE_CHECKING
 
-import spawn as _spawn
+import spawn
 
 if TYPE_CHECKING:
     import argparse
@@ -36,7 +36,7 @@ def _save_registry(state_dir: Path, session_id: str, registry: dict[str, dict]) 
     can remain readable without duplicating _write_entry calls inline.
     """
     for name, entry in registry.items():
-        _spawn._write_entry(state_dir, session_id, name, entry)
+        spawn._write_entry(state_dir, session_id, name, entry)
 
 
 # ---------------------------------------------------------------------------
@@ -45,31 +45,31 @@ def _save_registry(state_dir: Path, session_id: str, registry: dict[str, dict]) 
 
 
 def test_slugify_with_plain_text_returns_lowercase_hyphenated():
-    result = _spawn._slugify("Hello World")
+    result = spawn._slugify("Hello World")
     assert result == "hello-world"
 
 
 def test_slugify_with_special_chars_replaces_with_hyphens():
-    result = _spawn._slugify("Load /dh:work-backlog-item #42!")
+    result = spawn._slugify("Load /dh:work-backlog-item #42!")
     assert result == "load-dh-work-backlog-item-42"
 
 
 def test_slugify_with_long_text_truncates_to_max_length():
     # _slugify truncates to _NAME_MAX_CHARS (30) and strips trailing hyphens.
     long_text = "a" * 100
-    result = _spawn._slugify(long_text)
-    assert len(result) <= _spawn._NAME_MAX_CHARS
+    result = spawn._slugify(long_text)
+    assert len(result) <= spawn._NAME_MAX_CHARS
 
 
 def test_slugify_with_trailing_hyphens_strips_them():
     # Input that would produce trailing hyphens after truncation.
     text = "hello" + "-" * 25
-    result = _spawn._slugify(text)
+    result = spawn._slugify(text)
     assert not result.endswith("-")
 
 
 def test_slugify_with_empty_string_returns_empty():
-    result = _spawn._slugify("")
+    result = spawn._slugify("")
     assert result == ""
 
 
@@ -79,12 +79,12 @@ def test_slugify_with_empty_string_returns_empty():
 
 
 def test_repo_slug_replaces_slashes_with_hyphens():
-    result = _spawn._repo_slug(Path("/home/user/repos/claude_skills"))
+    result = spawn._repo_slug(Path("/home/user/repos/claude_skills"))
     assert result == "-home-user-repos-claude_skills"
 
 
 def test_repo_slug_leading_hyphen_is_intentional():
-    result = _spawn._repo_slug(Path("/foo/bar"))
+    result = spawn._repo_slug(Path("/foo/bar"))
     assert result.startswith("-")
 
 
@@ -94,12 +94,12 @@ def test_repo_slug_leading_hyphen_is_intentional():
 
 
 def test_repo_dir_name_returns_last_path_component():
-    result = _spawn._repo_dir_name(Path("/home/user/repos/claude_skills"))
+    result = spawn._repo_dir_name(Path("/home/user/repos/claude_skills"))
     assert result == "claude_skills"
 
 
 def test_repo_dir_name_single_component():
-    result = _spawn._repo_dir_name(Path("/myrepo"))
+    result = spawn._repo_dir_name(Path("/myrepo"))
     assert result == "myrepo"
 
 
@@ -109,12 +109,12 @@ def test_repo_dir_name_single_component():
 
 
 def test_claude_tmux_session_name_uses_worktree_pattern():
-    result = _spawn._claude_tmux_session_name("claude_skills", "test-1")
+    result = spawn._claude_tmux_session_name("claude_skills", "test-1")
     assert result == "claude_skills_worktree-test-1"
 
 
 def test_claude_tmux_session_name_with_different_repo():
-    result = _spawn._claude_tmux_session_name("myproject", "sess")
+    result = spawn._claude_tmux_session_name("myproject", "sess")
     assert result == "myproject_worktree-sess"
 
 
@@ -126,13 +126,13 @@ def test_claude_tmux_session_name_with_different_repo():
 def test_dh_state_home_returns_default_when_env_unset():
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop("DH_STATE_HOME", None)
-        result = _spawn._dh_state_home()
+        result = spawn._dh_state_home()
     assert result == Path.home() / ".dh"
 
 
 def test_dh_state_home_respects_env_override(tmp_path):
     with patch.dict(os.environ, {"DH_STATE_HOME": str(tmp_path)}):
-        result = _spawn._dh_state_home()
+        result = spawn._dh_state_home()
     assert result == tmp_path
 
 
@@ -142,48 +142,48 @@ def test_dh_state_home_respects_env_override(tmp_path):
 
 
 def test_load_registry_returns_empty_dict_when_file_absent(tmp_path):
-    result = _spawn._load_registry(tmp_path, "default")
+    result = spawn._load_registry(tmp_path, "default")
     assert result == {}
 
 
 def test_write_entry_and_load_registry_round_trips(tmp_path):
     entry = {"name": "mysession", "model": "sonnet"}
-    _spawn._write_entry(tmp_path, "default", "mysession", entry)
-    loaded = _spawn._load_registry(tmp_path, "default")
+    spawn._write_entry(tmp_path, "default", "mysession", entry)
+    loaded = spawn._load_registry(tmp_path, "default")
     assert loaded == {"mysession": entry}
 
 
 def test_write_entry_writes_atomically(tmp_path):
     entry = {"name": "a"}
-    _spawn._write_entry(tmp_path, "default", "a", entry)
-    ep = _spawn._entry_path(tmp_path, "default", "a")
+    spawn._write_entry(tmp_path, "default", "a", entry)
+    ep = spawn._entry_path(tmp_path, "default", "a")
     assert ep.exists()
     # No .tmp file should remain after atomic rename.
     assert not ep.with_suffix(".json.tmp").exists()
 
 
 def test_entry_path_uses_name_in_filename(tmp_path):
-    path = _spawn._entry_path(tmp_path, "abc123", "mysess")
+    path = spawn._entry_path(tmp_path, "abc123", "mysess")
     assert path.name == "mysess.json"
     assert path.parent.name == "abc123"
 
 
 def test_entry_path_default_session_id(tmp_path):
-    path = _spawn._entry_path(tmp_path, "default", "mysess")
+    path = spawn._entry_path(tmp_path, "default", "mysess")
     assert path.parent.name == "default"
     assert path.name == "mysess.json"
 
 
 def test_get_session_raises_system_exit_when_missing(tmp_path):
     with pytest.raises(SystemExit) as exc_info:
-        _spawn._get_session(tmp_path, "default", "nonexistent")
+        spawn._get_session(tmp_path, "default", "nonexistent")
     assert exc_info.value.code == 1
 
 
 def test_get_session_returns_entry_when_present(tmp_path):
     entry = {"name": "mysess", "model": "haiku"}
-    _spawn._write_entry(tmp_path, "default", "mysess", entry)
-    result = _spawn._get_session(tmp_path, "default", "mysess")
+    spawn._write_entry(tmp_path, "default", "mysess", entry)
+    result = spawn._get_session(tmp_path, "default", "mysess")
     assert result["model"] == "haiku"
 
 
@@ -192,11 +192,11 @@ def test_session_id_scoping_isolates_registries(tmp_path):
     entry_a = {"name": "sess-a", "model": "sonnet"}
     entry_b = {"name": "sess-b", "model": "haiku"}
 
-    _spawn._write_entry(tmp_path, "orchestrator-1", "sess-a", entry_a)
-    _spawn._write_entry(tmp_path, "orchestrator-2", "sess-b", entry_b)
+    spawn._write_entry(tmp_path, "orchestrator-1", "sess-a", entry_a)
+    spawn._write_entry(tmp_path, "orchestrator-2", "sess-b", entry_b)
 
-    loaded_a = _spawn._load_registry(tmp_path, "orchestrator-1")
-    loaded_b = _spawn._load_registry(tmp_path, "orchestrator-2")
+    loaded_a = spawn._load_registry(tmp_path, "orchestrator-1")
+    loaded_b = spawn._load_registry(tmp_path, "orchestrator-2")
 
     assert "sess-a" in loaded_a
     assert "sess-b" not in loaded_a
@@ -211,7 +211,7 @@ def test_session_id_scoping_isolates_registries(tmp_path):
 
 def test_tmux_alive_returns_false_when_session_absent():
     # Use an implausible session name that won't exist.
-    result = _spawn._tmux_alive("kage-bunshin-test-nonexistent-xyzzy-99999")
+    result = spawn._tmux_alive("kage-bunshin-test-nonexistent-xyzzy-99999")
     assert result is False
 
 
@@ -221,7 +221,7 @@ def test_tmux_run_in_session_calls_send_keys_with_enter():
     fake_result.stderr = ""
 
     with patch("subprocess.run", return_value=fake_result) as mock_run:
-        _spawn._tmux_run_in_session("myproject_worktree-sess", "echo hello")
+        spawn._tmux_run_in_session("myproject_worktree-sess", "echo hello")
 
     mock_run.assert_called_once()
     cmd = mock_run.call_args[0][0]
@@ -239,7 +239,7 @@ def test_tmux_run_in_session_exits_1_on_failure():
     fake_result.stderr = "no session"
 
     with patch("subprocess.run", return_value=fake_result), pytest.raises(SystemExit) as exc_info:
-        _spawn._tmux_run_in_session("nosuchsession", "echo hi")
+        spawn._tmux_run_in_session("nosuchsession", "echo hi")
     assert exc_info.value.code == 1
 
 
@@ -249,19 +249,19 @@ def test_tmux_run_in_session_exits_1_on_failure():
 
 
 def test_format_age_seconds():
-    assert _spawn._format_age(45) == "45s"
+    assert spawn._format_age(45) == "45s"
 
 
 def test_format_age_minutes():
-    assert _spawn._format_age(120) == "2m"
+    assert spawn._format_age(120) == "2m"
 
 
 def test_format_age_hours():
-    assert _spawn._format_age(7200) == "2h"
+    assert spawn._format_age(7200) == "2h"
 
 
 def test_format_age_days():
-    assert _spawn._format_age(172800) == "2d"
+    assert spawn._format_age(172800) == "2d"
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ def test_format_age_days():
 
 
 def test_build_parser_spawn_subcommand_parses_prompt():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["spawn", "my prompt"])
     assert args.prompt == ["my prompt"]
     assert args.model == "sonnet"
@@ -279,7 +279,7 @@ def test_build_parser_spawn_subcommand_parses_prompt():
 
 
 def test_build_parser_spawn_with_all_flags():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["spawn", "--name", "sess", "--model", "opus", "--max-budget", "3.0", "prompt"])
     assert args.name == "sess"
     assert args.model == "opus"
@@ -287,51 +287,51 @@ def test_build_parser_spawn_with_all_flags():
 
 
 def test_build_parser_send_requires_name():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["send", "message"])
 
 
 def test_build_parser_send_with_name_and_message():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["send", "--name", "mysess", "hello"])
     assert args.name == "mysess"
     assert args.message == ["hello"]
 
 
 def test_build_parser_read_defaults():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["read", "--name", "s"])
     assert args.wait == pytest.approx(0.0)
     assert args.follow is False
 
 
 def test_build_parser_read_follow_flag():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["read", "--name", "s", "--follow"])
     assert args.follow is True
 
 
 def test_build_parser_read_wait_option():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["read", "--name", "s", "--wait", "10"])
     assert args.wait == pytest.approx(10.0)
 
 
 def test_build_parser_kill_requires_name():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["kill"])
 
 
 def test_build_parser_list_has_no_required_args():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["list"])
     assert args.command == "list"
 
 
 def test_build_parser_status_requires_name():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["status"])
 
@@ -342,7 +342,7 @@ def test_build_parser_status_requires_name():
 
 
 def test_build_spawn_shell_cmd_returns_interactive_argv_without_p_flag():
-    argv = _spawn._build_spawn_shell_cmd("mysess", "sonnet", None, "sess-001", "tmux-mysess")
+    argv = spawn._build_spawn_shell_cmd("mysess", "sonnet", None, "sess-001", "tmux-mysess")
     # env is used to inject child-session env vars before the claude executable
     assert argv[0] == "env"
     assert "KAGE_BUNSHIN_CHILD=1" in argv
@@ -360,36 +360,36 @@ def test_build_spawn_shell_cmd_returns_interactive_argv_without_p_flag():
 
 
 def test_build_spawn_shell_cmd_includes_max_budget_when_set():
-    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", 5.0, "sess-002", "tmux-sess")
+    argv = spawn._build_spawn_shell_cmd("sess", "haiku", 5.0, "sess-002", "tmux-sess")
     assert "--max-budget-usd" in argv
     assert "5.0" in argv
 
 
 def test_build_spawn_shell_cmd_omits_max_budget_when_none():
-    argv = _spawn._build_spawn_shell_cmd("sess", "haiku", None, "sess-003", "tmux-sess")
+    argv = spawn._build_spawn_shell_cmd("sess", "haiku", None, "sess-003", "tmux-sess")
     assert "--max-budget-usd" not in argv
 
 
 def test_build_parser_spawn_effort_flag_listed_in_help(capsys: pytest.CaptureFixture[str]) -> None:
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["spawn", "--help"])
     help_text = capsys.readouterr().out
     assert "--effort" in help_text
-    for level in _spawn.EFFORT_LEVELS:
+    for level in spawn.EFFORT_LEVELS:
         assert level in help_text
 
 
-@pytest.mark.parametrize("level", _spawn.EFFORT_LEVELS)
+@pytest.mark.parametrize("level", spawn.EFFORT_LEVELS)
 def test_build_spawn_shell_cmd_injects_effort_level_when_set(level: str):
-    argv = _spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=level)
+    argv = spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=level)
     effort_arg = f"CLAUDE_CODE_EFFORT_LEVEL={level}"
     assert effort_arg in argv
     assert argv.index(effort_arg) < argv.index("claude")
 
 
 def test_build_spawn_shell_cmd_omits_effort_level_when_none():
-    argv = _spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=None)
+    argv = spawn._build_spawn_shell_cmd("sess", "sonnet", None, "sess-id", "tmux-sess", effort=None)
     assert not any("CLAUDE_CODE_EFFORT_LEVEL" in arg for arg in argv)
 
 
@@ -420,11 +420,11 @@ def test_cmd_spawn_exits_1_when_claude_not_in_path(tmp_path):
     args = _make_spawn_args()
     with (
         patch("shutil.which", return_value=None),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
     assert exc_info.value.code == 1
 
 
@@ -436,11 +436,11 @@ def test_cmd_spawn_exits_1_when_tmux_not_in_path(tmp_path):
 
     with (
         patch("shutil.which", side_effect=fake_which),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
     assert exc_info.value.code == 1
 
 
@@ -453,18 +453,18 @@ def test_cmd_spawn_creates_registry_entry(tmp_path, capsys):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", return_value=fake_run_result),
         # claude tmux session appears immediately
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("time.sleep"),
-        patch.object(_spawn, "_tmux_run_in_session"),
+        patch.object(spawn, "_tmux_run_in_session"),
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
 
     # Registry entry written.
-    registry = _spawn._load_registry(tmp_path, "default")
+    registry = spawn._load_registry(tmp_path, "default")
     assert "testsess" in registry
     entry = registry["testsess"]
     assert entry["model"] == "sonnet"
@@ -491,12 +491,12 @@ def test_cmd_spawn_exits_1_when_tmux_launcher_fails(tmp_path):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", return_value=fake_run_result),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
     assert exc_info.value.code == 1
 
 
@@ -517,14 +517,14 @@ def test_cmd_spawn_includes_worktree_flag_in_argv(tmp_path, capsys):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", side_effect=fake_run),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("time.sleep"),
-        patch.object(_spawn, "_tmux_run_in_session"),
+        patch.object(spawn, "_tmux_run_in_session"),
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
 
     assert captured_argv, "tmux new-session was not called"
     argv = captured_argv[0]
@@ -557,14 +557,14 @@ def test_cmd_spawn_waits_for_claude_tmux_session(tmp_path, capsys):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", return_value=fake_run_result),
-        patch.object(_spawn, "_tmux_alive", side_effect=fake_alive),
+        patch.object(spawn, "_tmux_alive", side_effect=fake_alive),
         patch("time.sleep"),
-        patch.object(_spawn, "_tmux_run_in_session"),
+        patch.object(spawn, "_tmux_run_in_session"),
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
 
     assert alive_calls[0] >= 3
 
@@ -584,14 +584,14 @@ def test_cmd_spawn_sends_initial_prompt_via_send_keys(tmp_path, capsys):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", return_value=fake_run_result),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("time.sleep"),
-        patch.object(_spawn, "_tmux_run_in_session", side_effect=fake_run_in_session),
+        patch.object(spawn, "_tmux_run_in_session", side_effect=fake_run_in_session),
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
 
     assert len(sent) == 1, "expected exactly one send-keys call for the initial prompt"
     tmux_session, prompt = sent[0]
@@ -609,16 +609,16 @@ def test_cmd_spawn_exits_1_when_claude_session_never_appears(tmp_path):
 
     with (
         patch("shutil.which", return_value="/usr/bin/claude"),
-        patch.object(_spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_git_repo_root", return_value=Path("/repo/claude_skills")),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         patch("subprocess.run", return_value=fake_run_result),
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_tmux_alive", return_value=False),
         patch("time.sleep"),
         # Make the deadline expire immediately.
-        patch("time.monotonic", side_effect=[0.0, 0.0, _spawn._SPAWN_WAIT_SECONDS + 1]),
+        patch("time.monotonic", side_effect=[0.0, 0.0, spawn._SPAWN_WAIT_SECONDS + 1]),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_spawn(args)
+        spawn.cmd_spawn(args)
     assert exc_info.value.code == 1
 
 
@@ -632,8 +632,8 @@ def test_cmd_send_exits_1_when_session_not_found(tmp_path):
     ns.name = "nosuchsession"
     ns.message = ["hi"]
     ns.session_id = "default"
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
-        _spawn.cmd_send(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
+        spawn.cmd_send(ns)
     assert exc_info.value.code == 1
 
 
@@ -647,11 +647,11 @@ def test_cmd_send_exits_1_when_tmux_dead(tmp_path):
     ns.session_id = "default"
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=False),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_send(ns)
+        spawn.cmd_send(ns)
     assert exc_info.value.code == 1
 
 
@@ -671,11 +671,11 @@ def test_cmd_send_sends_message_via_tmux(tmp_path, capsys):
         sent_cmds.append((tmux_session, cmd))
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_run_in_session", side_effect=fake_run_in_session),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_run_in_session", side_effect=fake_run_in_session),
     ):
-        _spawn.cmd_send(ns)
+        spawn.cmd_send(ns)
 
     assert len(sent_cmds) == 1
     tmux_session, cmd = sent_cmds[0]
@@ -701,10 +701,10 @@ def test_cmd_kill_removes_registry_entry(tmp_path):
     ns.name = "sess"
     ns.session_id = "default"
 
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path), patch.object(_spawn, "_tmux_kill"):
-        _spawn.cmd_kill(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path), patch.object(spawn, "_tmux_kill"):
+        spawn.cmd_kill(ns)
 
-    assert "sess" not in _spawn._load_registry(tmp_path, "default")
+    assert "sess" not in spawn._load_registry(tmp_path, "default")
 
 
 def test_cmd_kill_kills_claude_tmux_session(tmp_path):
@@ -718,10 +718,10 @@ def test_cmd_kill_kills_claude_tmux_session(tmp_path):
     killed: list[str] = []
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_kill", side_effect=killed.append),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_kill", side_effect=killed.append),
     ):
-        _spawn.cmd_kill(ns)
+        spawn.cmd_kill(ns)
 
     assert "claude_skills_worktree-sess" in killed
 
@@ -730,8 +730,8 @@ def test_cmd_kill_exits_1_when_session_not_found(tmp_path):
     ns = MagicMock()
     ns.name = "ghost"
     ns.session_id = "default"
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
-        _spawn.cmd_kill(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
+        spawn.cmd_kill(ns)
     assert exc_info.value.code == 1
 
 
@@ -743,8 +743,8 @@ def test_cmd_kill_exits_1_when_session_not_found(tmp_path):
 def test_cmd_list_prints_no_sessions_when_registry_empty(tmp_path, capsys):
     ns = MagicMock()
     ns.session_id = "default"
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path):
-        _spawn.cmd_list(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path):
+        spawn.cmd_list(ns)
     captured = capsys.readouterr()
     assert "No sessions" in captured.out
 
@@ -774,10 +774,10 @@ def test_cmd_list_shows_alive_and_dead_sessions(tmp_path, capsys):
     ns = MagicMock()
     ns.session_id = "default"
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", side_effect=fake_alive),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", side_effect=fake_alive),
     ):
-        _spawn.cmd_list(ns)
+        spawn.cmd_list(ns)
 
     captured = capsys.readouterr()
     assert "alive-sess" in captured.out
@@ -812,10 +812,10 @@ def test_cmd_list_all_registries_when_no_session_id(tmp_path, capsys):
     ns = MagicMock()
     ns.session_id = None
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=False),
     ):
-        _spawn.cmd_list(ns)
+        spawn.cmd_list(ns)
 
     captured = capsys.readouterr()
     assert "sess-a" in captured.out
@@ -830,8 +830,8 @@ def test_cmd_list_all_registries_no_sessions_at_all(tmp_path, capsys):
     """When session_id is None and no registries exist, prints no-sessions message."""
     ns = MagicMock()
     ns.session_id = None
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path):
-        _spawn.cmd_list(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path):
+        spawn.cmd_list(ns)
     captured = capsys.readouterr()
     assert "No sessions" in captured.out
 
@@ -858,10 +858,10 @@ def test_cmd_status_shows_alive_true(tmp_path, capsys):
     ns.session_id = "default"
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
     ):
-        _spawn.cmd_status(ns)
+        spawn.cmd_status(ns)
 
     captured = capsys.readouterr()
     status = json.loads(captured.out)
@@ -887,10 +887,10 @@ def test_cmd_status_shows_session_fields(tmp_path, capsys):
     ns.session_id = "default"
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=False),
     ):
-        _spawn.cmd_status(ns)
+        spawn.cmd_status(ns)
 
     captured = capsys.readouterr()
     status = json.loads(captured.out)
@@ -921,11 +921,11 @@ def test_cmd_read_prints_pane_content(tmp_path, capsys):
     fake_result.stderr = ""
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("subprocess.run", return_value=fake_result),
     ):
-        _spawn.cmd_read(ns)
+        spawn.cmd_read(ns)
 
     captured = capsys.readouterr()
     assert "The answer is 42." in captured.out
@@ -954,11 +954,11 @@ def test_cmd_read_calls_capture_pane_with_correct_session(tmp_path):
         return fake_result
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("subprocess.run", side_effect=fake_run),
     ):
-        _spawn.cmd_read(ns)
+        spawn.cmd_read(ns)
 
     assert captured_cmds, "subprocess.run was not called"
     cmd = captured_cmds[0]
@@ -978,11 +978,11 @@ def test_cmd_read_exits_1_when_session_not_alive(tmp_path):
     ns.session_id = "default"
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=False),
         pytest.raises(SystemExit) as exc_info,
     ):
-        _spawn.cmd_read(ns)
+        spawn.cmd_read(ns)
 
     assert exc_info.value.code == 1
 
@@ -995,11 +995,11 @@ def test_cmd_read_exits_1_when_session_not_alive(tmp_path):
 def test_wait_for_session_exit_returns_true_when_session_exits_promptly():
     # Session is gone on the first poll.
     with (
-        patch.object(_spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_tmux_alive", return_value=False),
         patch("time.sleep"),
         patch("time.monotonic", side_effect=[0.0, 0.1]),
     ):
-        result = _spawn._wait_for_session_exit("some-session", timeout=5.0)
+        result = spawn._wait_for_session_exit("some-session", timeout=5.0)
     assert result is True
 
 
@@ -1008,11 +1008,11 @@ def test_wait_for_session_exit_returns_false_when_timeout_exceeded():
     monotonic_values = [0.0] + [i * 0.5 for i in range(1, 70)]
 
     with (
-        patch.object(_spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_alive", return_value=True),
         patch("time.sleep"),
         patch("time.monotonic", side_effect=monotonic_values),
     ):
-        result = _spawn._wait_for_session_exit("some-session", timeout=5.0)
+        result = spawn._wait_for_session_exit("some-session", timeout=5.0)
     assert result is False
 
 
@@ -1025,11 +1025,11 @@ def test_wait_for_session_exit_returns_true_after_a_few_polls():
         return alive_calls[0] < 3
 
     with (
-        patch.object(_spawn, "_tmux_alive", side_effect=fake_alive),
+        patch.object(spawn, "_tmux_alive", side_effect=fake_alive),
         patch("time.sleep"),
         patch("time.monotonic", side_effect=[0.0, 0.5, 1.0, 1.5, 2.0, 2.5]),
     ):
-        result = _spawn._wait_for_session_exit("some-session", timeout=10.0)
+        result = spawn._wait_for_session_exit("some-session", timeout=10.0)
     assert result is True
 
 
@@ -1053,16 +1053,16 @@ def test_cmd_stop_graceful_exit_path_removes_registry_entry(tmp_path, capsys):
     ns = _make_stop_ns()
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         # Session is alive initially (liveness check), then exits after Ctrl-C.
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_send_ctrlc"),
-        patch.object(_spawn, "_wait_for_session_exit", return_value=True),
-        patch.object(_spawn, "_tmux_kill"),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_send_ctrlc"),
+        patch.object(spawn, "_wait_for_session_exit", return_value=True),
+        patch.object(spawn, "_tmux_kill"),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
-    assert "sess" not in _spawn._load_registry(tmp_path, "default")
+    assert "sess" not in spawn._load_registry(tmp_path, "default")
     captured = capsys.readouterr()
     result = json.loads(captured.out)
     assert result["status"] == "stopped"
@@ -1079,13 +1079,13 @@ def test_cmd_stop_graceful_exit_path_does_not_force_kill(tmp_path):
     killed: list[str] = []
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_send_ctrlc"),
-        patch.object(_spawn, "_wait_for_session_exit", return_value=True),
-        patch.object(_spawn, "_tmux_kill", side_effect=killed.append),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_send_ctrlc"),
+        patch.object(spawn, "_wait_for_session_exit", return_value=True),
+        patch.object(spawn, "_tmux_kill", side_effect=killed.append),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
     # Only the launcher session should be killed (not the claude session).
     assert "claude_skills_worktree-sess" not in killed
@@ -1101,17 +1101,17 @@ def test_cmd_stop_timeout_path_force_kills_and_sets_forced_true(tmp_path, capsys
     killed: list[str] = []
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_send_ctrlc"),
-        patch.object(_spawn, "_wait_for_session_exit", return_value=False),
-        patch.object(_spawn, "_tmux_kill", side_effect=killed.append),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_send_ctrlc"),
+        patch.object(spawn, "_wait_for_session_exit", return_value=False),
+        patch.object(spawn, "_tmux_kill", side_effect=killed.append),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
     assert "claude_skills_worktree-sess" in killed
     assert "kb-launcher-sess" in killed
-    assert "sess" not in _spawn._load_registry(tmp_path, "default")
+    assert "sess" not in spawn._load_registry(tmp_path, "default")
 
     captured = capsys.readouterr()
     result = json.loads(captured.out)
@@ -1127,16 +1127,16 @@ def test_cmd_stop_already_dead_session_cleans_up_registry_without_force(tmp_path
     ns = _make_stop_ns()
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
         # Session is already dead.
-        patch.object(_spawn, "_tmux_alive", return_value=False),
-        patch.object(_spawn, "_tmux_send_ctrlc") as mock_ctrlc,
-        patch.object(_spawn, "_tmux_kill"),
+        patch.object(spawn, "_tmux_alive", return_value=False),
+        patch.object(spawn, "_tmux_send_ctrlc") as mock_ctrlc,
+        patch.object(spawn, "_tmux_kill"),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
     mock_ctrlc.assert_not_called()
-    assert "sess" not in _spawn._load_registry(tmp_path, "default")
+    assert "sess" not in spawn._load_registry(tmp_path, "default")
     captured = capsys.readouterr()
     result = json.loads(captured.out)
     assert result["already_dead"] is True
@@ -1152,21 +1152,21 @@ def test_cmd_stop_sends_ctrlc_to_correct_session(tmp_path):
     ctrlc_targets: list[str] = []
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_send_ctrlc", side_effect=ctrlc_targets.append),
-        patch.object(_spawn, "_wait_for_session_exit", return_value=True),
-        patch.object(_spawn, "_tmux_kill"),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_send_ctrlc", side_effect=ctrlc_targets.append),
+        patch.object(spawn, "_wait_for_session_exit", return_value=True),
+        patch.object(spawn, "_tmux_kill"),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
     assert ctrlc_targets == ["claude_skills_worktree-sess"]
 
 
 def test_cmd_stop_exits_1_when_session_not_in_registry(tmp_path):
     ns = _make_stop_ns(name="ghost")
-    with patch.object(_spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
-        _spawn.cmd_stop(ns)
+    with patch.object(spawn, "_session_state_dir", return_value=tmp_path), pytest.raises(SystemExit) as exc_info:
+        spawn.cmd_stop(ns)
     assert exc_info.value.code == 1
 
 
@@ -1179,13 +1179,13 @@ def test_cmd_stop_kills_launcher_session_after_graceful_exit(tmp_path):
     killed: list[str] = []
 
     with (
-        patch.object(_spawn, "_session_state_dir", return_value=tmp_path),
-        patch.object(_spawn, "_tmux_alive", return_value=True),
-        patch.object(_spawn, "_tmux_send_ctrlc"),
-        patch.object(_spawn, "_wait_for_session_exit", return_value=True),
-        patch.object(_spawn, "_tmux_kill", side_effect=killed.append),
+        patch.object(spawn, "_session_state_dir", return_value=tmp_path),
+        patch.object(spawn, "_tmux_alive", return_value=True),
+        patch.object(spawn, "_tmux_send_ctrlc"),
+        patch.object(spawn, "_wait_for_session_exit", return_value=True),
+        patch.object(spawn, "_tmux_kill", side_effect=killed.append),
     ):
-        _spawn.cmd_stop(ns)
+        spawn.cmd_stop(ns)
 
     assert "kb-launcher-myname" in killed
 
@@ -1196,16 +1196,16 @@ def test_cmd_stop_kills_launcher_session_after_graceful_exit(tmp_path):
 
 
 def test_build_parser_stop_requires_name():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["stop"])
 
 
 def test_build_parser_stop_with_name_sets_func():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["stop", "--name", "mysess"])
     assert args.name == "mysess"
-    assert args.func is _spawn.cmd_stop
+    assert args.func is spawn.cmd_stop
 
 
 # ---------------------------------------------------------------------------
@@ -1215,13 +1215,13 @@ def test_build_parser_stop_with_name_sets_func():
 
 def test_build_parser_session_id_defaults_to_none():
     """Parser leaves session_id as None; main() resolves the default."""
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["list"])
     assert args.session_id is None
 
 
 def test_build_parser_session_id_explicit_value():
-    parser = _spawn._build_parser()
+    parser = spawn._build_parser()
     args = parser.parse_args(["--session-id", "my-session", "list"])
     assert args.session_id == "my-session"
 
@@ -1233,7 +1233,7 @@ def test_main_resolves_session_id_to_default_for_non_list_subcommands(tmp_path):
     def fake_func(args: argparse.Namespace) -> None:
         dispatched.append(args.session_id)  # type: ignore[attr-defined]
 
-    with patch.dict(os.environ, {}, clear=False), patch.object(_spawn, "_build_parser") as mock_bp:
+    with patch.dict(os.environ, {}, clear=False), patch.object(spawn, "_build_parser") as mock_bp:
         os.environ.pop("KB_SESSION_ID", None)
         fake_parser = MagicMock()
         fake_args = MagicMock()
@@ -1243,7 +1243,7 @@ def test_main_resolves_session_id_to_default_for_non_list_subcommands(tmp_path):
         fake_parser.parse_args.return_value = fake_args
         mock_bp.return_value = fake_parser
 
-        _spawn.main(["kill", "--name", "x"])
+        spawn.main(["kill", "--name", "x"])
 
     assert dispatched == ["default"]
 
@@ -1257,7 +1257,7 @@ def test_main_resolves_session_id_from_env_var():
 
     with (
         patch.dict(os.environ, {"KB_SESSION_ID": "env-session"}, clear=False),
-        patch.object(_spawn, "_build_parser") as mock_bp,
+        patch.object(spawn, "_build_parser") as mock_bp,
     ):
         fake_parser = MagicMock()
         fake_args = MagicMock()
@@ -1267,7 +1267,7 @@ def test_main_resolves_session_id_from_env_var():
         fake_parser.parse_args.return_value = fake_args
         mock_bp.return_value = fake_parser
 
-        _spawn.main(["kill", "--name", "x"])
+        spawn.main(["kill", "--name", "x"])
 
     assert dispatched == ["env-session"]
 
@@ -1281,7 +1281,7 @@ def test_main_explicit_session_id_overrides_env_var():
 
     with (
         patch.dict(os.environ, {"KB_SESSION_ID": "env-session"}, clear=False),
-        patch.object(_spawn, "_build_parser") as mock_bp,
+        patch.object(spawn, "_build_parser") as mock_bp,
     ):
         fake_parser = MagicMock()
         fake_args = MagicMock()
@@ -1291,7 +1291,7 @@ def test_main_explicit_session_id_overrides_env_var():
         fake_parser.parse_args.return_value = fake_args
         mock_bp.return_value = fake_parser
 
-        _spawn.main(["--session-id", "explicit-session", "kill", "--name", "x"])
+        spawn.main(["--session-id", "explicit-session", "kill", "--name", "x"])
 
     # session_id was already set by the parser; main() should not override it.
     assert dispatched == ["explicit-session"]
@@ -1304,7 +1304,7 @@ def test_main_list_subcommand_leaves_session_id_none_when_not_supplied():
     def fake_func(args: argparse.Namespace) -> None:
         dispatched.append(args.session_id)  # type: ignore[attr-defined]
 
-    with patch.dict(os.environ, {}, clear=False), patch.object(_spawn, "_build_parser") as mock_bp:
+    with patch.dict(os.environ, {}, clear=False), patch.object(spawn, "_build_parser") as mock_bp:
         os.environ.pop("KB_SESSION_ID", None)
         fake_parser = MagicMock()
         fake_args = MagicMock()
@@ -1314,6 +1314,6 @@ def test_main_list_subcommand_leaves_session_id_none_when_not_supplied():
         fake_parser.parse_args.return_value = fake_args
         mock_bp.return_value = fake_parser
 
-        _spawn.main(["list"])
+        spawn.main(["list"])
 
     assert dispatched == [None]

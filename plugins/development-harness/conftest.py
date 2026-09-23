@@ -80,7 +80,7 @@ def close_sqlite_connections(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         connection.close()
 
 
-import tiktoken as _tk
+import tiktoken
 from tests.network_blocked import NetworkBlocked
 
 # tiktoken downloads its BPE encoding from openaipublic.blob.core.windows.net
@@ -89,16 +89,16 @@ from tests.network_blocked import NetworkBlocked
 # first; if that fails (no cache + network blocked), fall back to a byte-level
 # mock that can encode any string without the real BPE tables.
 try:
-    _tk.get_encoding("cl100k_base")
+    tiktoken.get_encoding("cl100k_base")
 except OSError:
-    _mock_enc = _tk.Encoding(
+    _mock_enc = tiktoken.Encoding(
         name="cl100k_base",
         pat_str=r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+""",
         mergeable_ranks={bytes([i]): i for i in range(256)},
         special_tokens={},
     )
 
-    def _mock_get_encoding(encoding_name: str) -> _tk.Encoding:
+    def _mock_get_encoding(encoding_name: str) -> tiktoken.Encoding:
         """Return the byte-level mock encoder used when real BPE tables are unavailable.
 
         Args:
@@ -110,7 +110,7 @@ except OSError:
         """
         return _mock_enc
 
-    _network_patch.setattr(_tk, "get_encoding", _mock_get_encoding)
+    _network_patch.setattr(tiktoken, "get_encoding", _mock_get_encoding)
 
 
 def _is_local(address: _Address) -> bool:
@@ -251,9 +251,9 @@ def _disable_startup_sync(monkeypatch: pytest.MonkeyPatch, request: pytest.Fixtu
     # including the lightweight nested pytest subprocesses that
     # tests/test_network_guard.py spawns to probe guard behaviour in isolation,
     # which run with tight wall-clock timeouts. See per-file-ignore below.
-    import backlog_core.server as _server
+    from backlog_core import server
 
-    monkeypatch.setattr(_server, "_startup_sync_enabled", lambda: False)
+    monkeypatch.setattr(server, "_startup_sync_enabled", lambda: False)
 
 
 @pytest.hookimpl(hookwrapper=True)

@@ -527,7 +527,7 @@ libtmux self-describes as pre-1.0. Upstream recommends pinning to a minor versio
 | Target | Type | How |
 |--------|------|-----|
 | `rules/interactive-terminal-workarounds.md` | rule | Add libtmux as a named Python option under "PTY Providers" — `Server(socket_name=...) + new_session(attach=False, x=160, y=50)` replaces the `tmux new-session -d` shell invocation pattern, providing typed output from `capture_pane()` instead of `tmux capture-pane -p` shell call |
-| `plugins/python3-development/` | plugin | Add libtmux to the modern-modules reference as the recommended library for any Python script needing to create, control, or monitor tmux sessions — with the note to pin `libtmux==0.53.*` |
+| `plugins/python-engineering/` | plugin | Add libtmux to the modern-modules reference as the recommended library for any Python script needing to create, control, or monitor tmux sessions — with the note to pin `libtmux==0.53.*` |
 | `research/developer-tools/psmux.md` | research | Cross-reference — psmux is a minimal tmux scripting alternative; libtmux is the full-featured ORM approach with pytest integration |
 | `research/developer-tools/using-tmux-with-claude-code.md` | research | Cross-reference libtmux as the Python programmatic control layer on top of the tmux patterns documented there |
 

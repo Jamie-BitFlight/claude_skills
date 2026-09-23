@@ -342,7 +342,7 @@ name: coder-tui-textual-httpx
 description: 'Implements scoped features and fixes in Python 3.12 using uv, poe-the-poet, Ruff, basedpyright, Textual, Rich, orjson, Pydantic, and httpx with minimal diffs and reported command outcomes.'
 model: sonnet
 permissionMode: acceptEdits
-skills: subagent-contract, python3-development
+skills: subagent-contract, python-engineering:python3-core
 ---
 
 # Coder (Textual TUI)

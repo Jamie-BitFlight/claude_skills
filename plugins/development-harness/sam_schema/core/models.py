@@ -7,14 +7,12 @@ All format-specific readers normalize to these models.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from enum import IntEnum, StrEnum
-from typing import TYPE_CHECKING, Any, Literal
+from pathlib import Path
+from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
-
-if TYPE_CHECKING:
-    from datetime import datetime
-    from pathlib import Path
 
 # Task ID pattern: supports numeric (1, 1.1), alphanumeric (T1, T2.3),
 # letter-suffixed (T10a, T10b), and slash-separated compound IDs (P1/T3, T10a/T10b).
@@ -41,7 +39,7 @@ class WireContractModel(BaseModel):
 _BEADS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]*-[A-Za-z0-9.]+$")
 
 # Status normalization map — maps human-readable and emoji variants to canonical values.
-# Sourced from task_format.py:28-45 (plugins/python3-development/skills/implementation-manager/scripts/)
+# Sourced from task_format.py:28-45 (plugins/development-harness/skills/implementation-manager/scripts/)
 STATUS_MAP: dict[str, str] = {
     # Space-separated variants
     "NOT STARTED": "not-started",
@@ -914,15 +912,14 @@ class ActiveTaskClearResult(BaseModel):
     cleared: bool
 
 
-# Rebuild models that reference TYPE_CHECKING-guarded types (datetime, Path).
-# `from __future__ import annotations` defers annotation evaluation; Pydantic needs
-# to resolve these types at model-build time. Pass the types explicitly so Pydantic
-# can resolve forward references without requiring runtime imports at the top level.
-import datetime as _dt
-from pathlib import Path as _Path
-
-Task.model_rebuild(_types_namespace={"datetime": _dt.datetime, "Path": _Path})
-Plan.model_rebuild(_types_namespace={"Path": _Path, "Task": Task, "AcceptanceCriterion": AcceptanceCriterion})
-ReadResult.model_rebuild(_types_namespace={"Path": _Path, "Plan": Plan, "SchemaGap": SchemaGap})
-TaskAssignment.model_rebuild(_types_namespace={"Task": Task})
-ReadyTasksResult.model_rebuild(_types_namespace={"Task": Task})
+# ``Plan``, ``ReadResult``, ``TaskAssignment`` and ``ReadyTasksResult`` annotate fields
+# with classes defined further down this module, and ``from __future__ import
+# annotations`` leaves those forward references unresolved at class-creation time.
+# ``dh_core.ledger.port.structured_fields`` reads ``model_fields[...].annotation`` to
+# decide which columns the ledger stores as JSON text, so an unresolved reference there
+# silently stops a field round-tripping. Rebuild each one so the annotations are real.
+Task.model_rebuild()
+Plan.model_rebuild()
+ReadResult.model_rebuild()
+TaskAssignment.model_rebuild()
+ReadyTasksResult.model_rebuild()

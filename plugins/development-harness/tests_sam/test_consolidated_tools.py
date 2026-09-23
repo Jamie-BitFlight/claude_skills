@@ -65,7 +65,7 @@ _SINGLE_TASK_LIST = [
 ]
 
 
-from tests_sam.conftest import make_task_def as _task_def
+from tests_sam.conftest import make_task_def as task_def
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -145,7 +145,7 @@ async def test_sam_task_read_returns_task_assignment(client: Client, task_backen
     Why: Verifies MCP schema validation and JSON round-trip of a nested TaskAssignment.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -166,7 +166,7 @@ async def test_sam_task_read_missing_task_raises_tool_error(client: Client, task
     Why: FastMCP converts unhandled TaskNotFoundError to ToolError.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act / Assert
@@ -201,7 +201,7 @@ async def test_sam_task_claim_transitions_to_in_progress(client: Client, task_ba
     Why: Claim is the primary write operation that prevents duplicate dispatch.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -224,7 +224,7 @@ async def test_sam_task_claim_double_claim_returns_claimed_false(
     Why: Duplicate dispatch prevention must work through the MCP protocol.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
     await client.call_tool("sam_task", {"plan": plan_id, "task": "T01", "config": {"action": "claim"}})
 
@@ -248,7 +248,7 @@ async def test_sam_task_claim_complete_task_returns_claimed_false(
     Why: Completed tasks must not be re-claimed — confirms guard fires for all non-not-started states.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def(status="complete")])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def(status="complete")])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -273,7 +273,7 @@ async def test_sam_task_state_updates_task_status(client: Client, task_backend: 
     Why: Status mutation is the primary write operation in the task workflow.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -295,7 +295,7 @@ async def test_sam_task_state_complete_sets_status(client: Client, task_backend:
     Why: Agents use state to mark tasks done after verification steps pass.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -317,7 +317,7 @@ async def test_sam_task_state_invalid_status_raises_tool_error(
     Why: FastMCP converts unhandled TaskValidationError to ToolError.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act / Assert
@@ -386,7 +386,7 @@ async def test_sam_task_update_set_fields_patches_task(client: Client, task_back
     Why: Agents patch task fields mid-execution to record divergence notes.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -414,7 +414,7 @@ async def test_sam_task_update_append_section_stores_content(
     Why: start-task skill appends progress sections to task bodies during execution.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -442,7 +442,7 @@ async def test_sam_task_update_invalid_json_raises_tool_error(
     Why: Pydantic rejects non-dict values; FastMCP wraps ValidationError as ToolError.
     """
     # Arrange
-    plan_data = task_backend.create_plan("test-plan", "Test goal", [_task_def()])
+    plan_data = task_backend.create_plan("test-plan", "Test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act / Assert
@@ -540,7 +540,7 @@ async def test_sam_plan_read_returns_plan_fields(client: Client, task_backend: I
     Why: Plan read is used by orchestrators to load goal/context before dispatch.
     """
     # Arrange
-    plan_data = task_backend.create_plan("read-plan", "Read test goal", [_task_def()])
+    plan_data = task_backend.create_plan("read-plan", "Read test goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -611,8 +611,8 @@ async def test_sam_plan_list_returns_all_plans_with_summary_fields(
     Why: Orchestrators depend on list to find plans for dispatch.
     """
     # Arrange
-    task_backend.create_plan("alpha", "Alpha goal", [_task_def("T01")])
-    task_backend.create_plan("beta", "Beta goal", [_task_def("T01")])
+    task_backend.create_plan("alpha", "Alpha goal", [task_def("T01")])
+    task_backend.create_plan("beta", "Beta goal", [task_def("T01")])
 
     # Act
     result = await client.call_tool("sam_plan", {"config": {"action": "list"}})
@@ -639,8 +639,8 @@ async def test_sam_plan_list_search_filters_by_feature_substring(
     Why: Search is how orchestrators locate the right plan by name.
     """
     # Arrange
-    task_backend.create_plan("alpha-feature", "Do alpha work", [_task_def("T01")])
-    task_backend.create_plan("beta-feature", "Do beta work", [_task_def("T01")])
+    task_backend.create_plan("alpha-feature", "Do alpha work", [task_def("T01")])
+    task_backend.create_plan("beta-feature", "Do beta work", [task_def("T01")])
 
     # Act
     result = await client.call_tool("sam_plan", {"config": {"action": "list", "search": "alpha"}})
@@ -659,9 +659,9 @@ async def test_sam_plan_list_pagination_offset_and_limit(client: Client, task_ba
     Why: Token-budget pagination must work through the MCP protocol.
     """
     # Arrange
-    task_backend.create_plan("first", "First goal", [_task_def("T01")])
-    task_backend.create_plan("second", "Second goal", [_task_def("T01")])
-    task_backend.create_plan("third", "Third goal", [_task_def("T01")])
+    task_backend.create_plan("first", "First goal", [task_def("T01")])
+    task_backend.create_plan("second", "Second goal", [task_def("T01")])
+    task_backend.create_plan("third", "Third goal", [task_def("T01")])
 
     # Get all to determine insertion order
     all_result = await client.call_tool("sam_plan", {"config": {"action": "list"}})
@@ -692,7 +692,7 @@ async def test_sam_plan_status_returns_progress_summary(client: Client, task_bac
     """
     # Arrange
     plan_data = task_backend.create_plan(
-        "progress-plan", "Progress goal", [_task_def("T01", status="complete"), _task_def("T02")]
+        "progress-plan", "Progress goal", [task_def("T01", status="complete"), task_def("T02")]
     )
     plan_id = plan_data["plan_id"]
 
@@ -733,7 +733,7 @@ async def test_sam_plan_ready_returns_tasks_with_satisfied_deps(
     """
     # Arrange
     plan_data = task_backend.create_plan(
-        "ready-plan", "Ready goal", [_task_def("T01", status="complete"), _task_def("T02", deps=["T01"])]
+        "ready-plan", "Ready goal", [task_def("T01", status="complete"), task_def("T02", deps=["T01"])]
     )
     plan_id = plan_data["plan_id"]
 
@@ -756,7 +756,7 @@ async def test_sam_plan_ready_full_returns_complete_task_fields(
     Why: full=True is needed when agents require all task fields, not just the 7-field manifest.
     """
     # Arrange
-    plan_data = task_backend.create_plan("full-plan", "Full goal", [_task_def("T01")])
+    plan_data = task_backend.create_plan("full-plan", "Full goal", [task_def("T01")])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -798,7 +798,7 @@ async def test_sam_plan_update_sets_context_field(client: Client, task_backend: 
     Why: Context is set by the context-gathering agent after discovery.
     """
     # Arrange
-    plan_data = task_backend.create_plan("update-plan", "Update goal", [_task_def()])
+    plan_data = task_backend.create_plan("update-plan", "Update goal", [task_def()])
     plan_id = plan_data["plan_id"]
 
     # Act
@@ -993,7 +993,7 @@ async def test_sam_active_task_update_patches_task_via_active_context(
          re-specify plan/task on every call.
     """
     # Arrange
-    plan_data = task_backend.create_plan("active-plan", "Active goal", [_task_def("T01")])
+    plan_data = task_backend.create_plan("active-plan", "Active goal", [task_def("T01")])
     plan_id = plan_data["plan_id"]
     await client.call_tool(
         "sam_active_task",

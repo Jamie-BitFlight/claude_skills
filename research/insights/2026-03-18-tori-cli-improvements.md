@@ -5,7 +5,7 @@ title: "Improvement Proposals: tori-cli"
 ## Improvement 1: Declarative condition syntax for task readiness and acceptance criteria
 
 **Source pattern**: "Tori's 3-token condition format (`scope.field op value`) could be adapted to define task readiness conditions, success criteria, or SLA alerts in Claude Code's task management system." (Integration Opportunities section)
-**Local system**: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py`
+**Local system**: `plugins/development-harness/skills/implementation-manager/scripts/implementation_manager.py`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #781 created
@@ -14,7 +14,7 @@ title: "Improvement Proposals: tori-cli"
 
 Task readiness in the SAM system is determined solely by dependency graph resolution: a task is "ready" when its status is `NOT STARTED` and all dependency tasks have status `COMPLETE`. There is no mechanism to express conditional readiness based on observable system state (e.g., "file X exists", "command Y exits 0", "field Z in config has value V"). Acceptance criteria in task files are free-text prose that agents interpret; they are not machine-evaluable conditions.
 
-File: `plugins/python3-development/skills/implementation-manager/scripts/implementation_manager.py` -- the `get_ready_tasks` function checks only `status` and `dependencies` fields. No condition evaluation exists.
+The `get_ready_tasks` function in `implementation_manager.py` checks only `status` and `dependencies` fields. No condition evaluation exists.
 
 ### Target state
 
@@ -29,7 +29,7 @@ Run: `uv run sam ready P{N}` on a plan where a task has `conditions: ["file.some
 ## Improvement 2: Deterministic time injection in task_status_hook.py
 
 **Source pattern**: "The Alerter's `now func() time.Time` field allows time-based logic to be tested without `time.Sleep`. A pattern worth adopting in any agent system with time-dependent state." (Patterns Worth Adopting section)
-**Local system**: `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py`
+**Local system**: `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`
 **Confidence**: High
 **Impact**: Low
 **Backlog**: #782 created
@@ -38,7 +38,7 @@ Run: `uv run sam ready P{N}` on a plan where a task has `conditions: ["file.some
 
 The `get_iso_timestamp()` function at line 227 of `task_status_hook.py` calls `datetime.now(UTC).isoformat(timespec="seconds")` directly. All callers (`handle_subagent_stop`, `handle_post_tool_use`) use this function without the ability to inject a fixed time. Tests for this hook must either mock `datetime.now` at the module level or accept non-deterministic timestamps, making assertions about timestamp ordering or staleness detection fragile.
 
-File: `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py`, line 227-233.
+File: `task_status_hook.py`, line 227-233.
 
 ### Target state
 
@@ -53,7 +53,7 @@ File `task_status_hook.py` contains `def get_iso_timestamp(*, now: Callable[[], 
 ## Improvement 3: Alert state machine for task status transitions
 
 **Source pattern**: "The alert state machine (inactive -> pending -> firing -> resolved) is a clean pattern for managing long-lived conditions that require hysteresis (preventing flapping). Applicable to agent status tracking and availability detection." (Applications section)
-**Local system**: `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py`
+**Local system**: `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`
 **Confidence**: Low
 **Impact**: High
 **Backlog**: Deferred -- confidence low: the existing backlog items #87 "SAM: Timeout/Stall Detection" and #448 "Stall detection for subagent tasks" already cover the stall detection use case. The state machine pattern would be the implementation mechanism for those items, not a separate concern. Additionally, task status transitions in SAM are currently simple (NOT STARTED -> IN PROGRESS -> COMPLETE | BLOCKED) and the hysteresis benefit (preventing flapping) applies mainly to monitoring systems, not task execution where transitions are agent-driven and unidirectional.
@@ -73,7 +73,7 @@ File `task_status_hook.py` contains `def get_iso_timestamp(*, now: Callable[[], 
 ## Improvement 5: Version handshake for agent-orchestrator protocol
 
 **Source pattern**: "The version handshake approach (client sends version, server checks and warns but never blocks) is a pragmatic upgrade strategy that could apply to Claude Code's agent protocol evolution." (Applications section)
-**Local system**: `plugins/python3-development/skills/implement-feature/SKILL.md`
+**Local system**: `plugins/development-harness/skills/implement-feature/SKILL.md`
 **Confidence**: Low
 **Impact**: Low
 **Backlog**: Deferred -- confidence low: Claude Code agents communicate via prompt text, not a structured wire protocol. There is no client-server handshake to version. The pattern is architecturally incompatible with the current prompt-based delegation model where the orchestrator constructs prompts and sub-agents execute them in the same process space.

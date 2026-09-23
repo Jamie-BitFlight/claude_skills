@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import backlog_core.models as _models
+import backlog_core.models as models
 import pytest
 from backlog_core.backend_protocol import set_config
 from backlog_core.backend_types import BacklogConfig
@@ -58,7 +58,7 @@ def sync_provider(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> _SyncProvi
     backlog_dir = tmp_path / "backlog"
     backlog_dir.mkdir()
     monkeypatch.setattr(
-        _models, "_config", _models.BacklogConfig(repo_root=tmp_path, backlog_dir=backlog_dir, default_repo="")
+        models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=backlog_dir, default_repo="")
     )
     provider = _SyncProviderStub()
     set_config(BacklogConfig(backend=provider))
@@ -104,7 +104,7 @@ def test_refresh_wrapper_surfaces_a_dead_lettered_entry(tmp_path: Path, monkeypa
         lambda request: ProviderSnapshot(items=[], sync_started_at="2026-08-12T01:00:00Z", pages_fetched=1),
     )
     monkeypatch.setattr(
-        _models, "_config", _models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
+        models, "_config", models.BacklogConfig(repo_root=tmp_path, backlog_dir=tmp_path / "backlog", default_repo="")
     )
     set_config(BacklogConfig(backend=backend))
 

@@ -8,16 +8,16 @@ title: "Improvement Proposals: 1Code"
 ## Improvement 1: Add plan-mode gate to implement-feature SAM execution workflow before destructive agent dispatch
 
 **Source pattern**: "Plan mode before agent mode: requiring the agent to produce and surface a structured plan for review before executing destructive operations (file edits, bash commands) reduces irreversible mistakes — directly applicable to skill design." (Research entry §Relevance to Claude Code Development > Patterns Worth Adopting)
-**Local system**: `plugins/python3-development/skills/implement-feature/SKILL.md`, `plugins/python3-development/skills/start-task/SKILL.md`
+**Local system**: `plugins/development-harness/skills/implement-feature/SKILL.md`, `plugins/development-harness/skills/start-task/SKILL.md`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #758 created
 
 ### Current state
 
-`plugins/python3-development/skills/implement-feature/SKILL.md` dispatches task agents directly into full execution mode via `Skill(skill="start-task", ...)`. No mechanism exists for the agent to surface a structured plan for human review before the sub-agent executes file edits, bash commands, or other irreversible operations.
+The `implement-feature` skill dispatches task agents directly into full execution mode via `Skill(skill="start-task", ...)`. No mechanism exists for the agent to surface a structured plan for human review before the sub-agent executes file edits, bash commands, or other irreversible operations.
 
-`plugins/python3-development/skills/start-task/SKILL.md` claims the task at step 3 and immediately proceeds to implementation at step 6 (`Implement against the task acceptance criteria`). There is no plan-first phase between claiming and executing.
+The `start-task` skill claims the task at step 3 and immediately proceeds to implementation at step 6 (`Implement against the task acceptance criteria`). There is no plan-first phase between claiming and executing.
 
 The `swarm-patterns` skill (`./.claude/skills/swarm-patterns/SKILL.md`) documents Pattern 5 (Plan Approval Workflow) using `mode: "plan"` with team swarms and `plan_approval_response` messages, but this pattern is not wired into the SAM task execution path.
 

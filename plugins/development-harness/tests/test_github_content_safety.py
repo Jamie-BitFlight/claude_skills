@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubPlanPersistence
+from backlog_core.backends.github_content_stores import _content_revision
 from backlog_core.backends.github_contents import _GitHubContentIntegrityError
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
@@ -473,9 +474,7 @@ def test_replay_conflict_continues_to_later_mutation_and_acknowledges_once(
         if request.reference == first_reference:
             raise ContentConflictError("conflict")
         return ContentRecord(
-            reference=request.reference,
-            content=request.content,
-            revision=GitHubBackend._content_revision(request.content),
+            reference=request.reference, content=request.content, revision=_content_revision(request.content)
         )
 
     writes.side_effect = write

@@ -46,7 +46,7 @@ For each skill reference in an agent prompt:
 - Does the agent pass appropriate inputs to the skill?
 - Does the agent consume the skill's output format correctly?
 
-**Example**: An agent loads `/python3-development:modernpython` and instructs "run modernpython to fix legacy patterns." But `modernpython` is a reference guide, not an automated fixer. The agent's prompt misrepresents what the skill does.
+**Example**: An agent loads `/python-engineering:modernpython` and instructs "run modernpython to fix legacy patterns." But `modernpython` is a reference guide, not an automated fixer. The agent's prompt misrepresents what the skill does.
 
 **Output**: Per-agent list of skill loads with semantic correctness evaluation.
 
