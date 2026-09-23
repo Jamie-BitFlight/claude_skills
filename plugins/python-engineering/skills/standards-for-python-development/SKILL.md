@@ -14,12 +14,12 @@ skill that applies them.
 ### 1.1 Type Safety & Modern Patterns
 - **Native Types**: Use Python 3.11+ native type hints (`list[str]`, `dict[str, int]`, `str | None`) instead of legacy `typing` imports (`List`, `Dict`, `Optional`, `Union`).
 - **`Any` Boundary Policy**: `Any`, broad `object`, and unchecked `cast()` belong only in dedicated validator, parser, adapter, or boundary modules, where unknown-shape external data enters. Those modules validate and convert raw input into strongly typed internal objects immediately, so the typed core never receives an unvalidated payload. Everywhere else, replace `Any` with a specific type, `TypeVar`, `Generic`, or `Protocol`. A narrow lint exception for `Any` belongs to a boundary module or nowhere.
-- **Data Structures**: Use `dataclasses` (with `slots=True, frozen=True` when possible), `TypedDict` (with `NotRequired`), or `pydantic` for structured data.
+- **Data Structures**: Prefer a Pydantic `BaseModel` for structured data — CLI output, tool payloads, parsed file records. `TypedDict` (with `NotRequired`) and `dataclasses` (with `slots=True, frozen=True`) are the right shape in a confirmed stdlib-only context. Typing lane selection follows what a file already imports, so an existing `@dataclass` is never reconsidered on its own — choose the shape when adding or touching it.
 - **Duck Typing**: Use `typing.Protocol` for structural subtyping instead of ABCs where appropriate.
 - **Narrowing**: Use `TypeIs` (PEP 742, Python 3.13+) for bidirectional type narrowing. Use `TypeGuard` only when targeting Python < 3.13 without `typing_extensions`.
 - **Modern Operators**: Utilize the walrus operator (`:=`) and `match-case` statements where they improve readability.
 - **Type Checking**: Use **ty** (Astral) as the default checker — `uv run ty check` (paths per project). Detect the active checker from `.pre-commit-config.yaml`, then CI, never from a config table alone: repos keep `[tool.mypy]`, `[tool.basedpyright]`, or `pyrightconfig.json` as IDE stubs while hooks run ty. When hooks or CI actually run mypy, basedpyright, or pyright, follow that project's configuration rather than forcing a migration. When migrating to ty, silence those stub tables (`exclude = [".*"]`, `typeCheckingMode = "off"`) instead of deleting them, so built-in IDE checkers stop duplicating ty. See the `python-engineering:ty` skill.
-- **TOML**: Use `tomlkit` to read and write TOML (it preserves formatting and comments); `tomllib` (stdlib) only for stdlib-only scripts.
+- **Parsing**: Use `tomlkit` to read and write TOML (it preserves formatting and comments); `tomllib` (stdlib) only for stdlib-only scripts. Parse markdown through the `marko` AST, never a regex parser — add it with `uv add marko` when the project does not already depend on it.
 - **Type Safety Reference**: For Generics, Protocols, TypedDict, Type Narrowing, and the attrs/dataclasses/pydantic comparison, see `type-safety-mypy.md` in the `python-engineering:python3-typing` skill. (Filename references mypy docs; patterns apply to ty and other checkers unless a rule is mypy-specific.)
 - **Version-Specific Features**: Check the project's `requires-python` floor against the per-version supplements (`python311-features.md` through `python314-features.md`) in the `python-engineering:python3-core` skill.
 - **Version Lifecycle** (SOURCE: <https://devguide.python.org/versions>, accessed 2026-03-23): 3.10 EOL 2026-10, 3.11 security-only until 2027-10, 3.12 security-only until 2028-10, 3.13 bugfix until 2029-10, 3.14 bugfix until 2030-10. When choosing a `requires-python` floor, prefer versions still in bugfix status.
@@ -71,6 +71,16 @@ skill that applies them.
 - **Local Variable Scope**: Short names are acceptable for local variables with a lifetime
   under 5 lines (loop indices, comprehension variables, short closures). Expand acronyms
   when the variable is referenced beyond 5 lines of its definition.
+- **Public by Default**: Name new functions, modules, variables, and import aliases without a
+  leading underscore. Add privacy once a caller needs it.
+- **An Existing Underscore Is a Finding**: Establish what it defends against before keeping it.
+  Bind the bare name instead and see whether the module already binds it; if nothing collides,
+  the prefix is habit — drop it. A dotted import needs an alias because `import a.b` binds only
+  `a`, so prefer `import a.b as ab` over `import a.b as _ab`.
+- **Fix the Collision, Not the Name**: Where a collision is real, two shapes recur — a wrapper
+  that shadows the function it delegates to, and a local name that shadows a third-party one.
+  The collision is the defect; the alias is the symptom. A per-file `private-member-access` lint
+  exemption is the same signal at file scale.
 
 ### 1.6 Script Dependencies
 Default to Typer + Rich declared in a PEP 723 inline block: less code to write, better output, and
@@ -79,6 +89,9 @@ a single-file executable that `uv` resolves at launch. The cost is network acces
 Choose stdlib-only — manual `argparse`, manual formatting, plainer output — for a confirmed
 deployment restriction such as an air-gapped or locked-down environment, never as a default
 posture.
+
+For inline-block syntax, shebang form, and how a script that outgrows one file imports its own
+modules, see `PEP723.md` in the `python-engineering:python3-core` skill.
 
 ### 1.7 UI & CLI (Rich / Typer)
 - **Rich Emoji Usage**: In Rich console output, always use Rich emoji tokens (e.g., `:white_check_mark:`) instead of literal Unicode emojis. This ensures cross-platform compatibility, consistent rendering, and markdown-safe alignment.
@@ -112,7 +125,8 @@ tool, or a rule here that contradicts official Python documentation, update this
    the ecosystem, or an explicit request for a standard update. State it.
 2. **Verify against a primary source**: Check the proposed rule against Python PEPs or official
    library documentation (`docs.python.org`, `docs.pytest.org`, `docs.astral.sh`) before writing
-   it.
+   it. A measured sweep of real code is also a primary source — record the command and the commit
+   that reproduce it.
 3. **Compare**: Weigh the verified practice against Section 1. A gap exists when the concept is
    missing or the existing rule is the anti-pattern.
 4. **Write it**: Add or modify bullets in the Section 1 subsection the rule belongs to. Keep the
