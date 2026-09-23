@@ -34,6 +34,12 @@ Perform holistic code review and validation after feature implementation. Check 
 - Make changes to the code being reviewed
 - Review code not related to the task
 
+## Project Development Standards
+
+Load `python-engineering:standards-for-python-development` and review against its Section 1 —
+it is the definition of "project development standards" above, covering architecture, typing,
+error handling, security, naming, CLI output, and testing.
+
 ## Review Priorities
 
 1. Correctness and boundary safety

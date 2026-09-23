@@ -102,6 +102,63 @@ uv run mutmut results
 
 Target: >90% mutation score for critical code paths.
 
+## Fixture Composition
+
+Depend on a fixture from another fixture rather than repeating its setup. Each layer cleans up
+what it created.
+
+```python
+@pytest.fixture
+def database_connection() -> Generator[Connection, None, None]:
+    conn = connect_to_db()
+    yield conn
+    conn.close()
+
+
+@pytest.fixture
+def database_with_users(database_connection: Connection) -> Generator[Connection, None, None]:
+    create_users(database_connection)
+    yield database_connection
+    delete_users(database_connection)
+```
+
+## Exception Handling in Tests
+
+- **Default to fail-fast**: let exceptions propagate. A test that raises is a test that failed,
+  which is the signal you want.
+- **Use `pytest.raises` only to test error handling**, and match the message:
+  `with pytest.raises(ValueError, match="Invalid email format"):`
+- **Keep test helpers narrow**: a bare `except:` or `except Exception:` in a helper swallows the
+  bug the suite exists to catch.
+
+## Patterns by Scenario
+
+| Code under test | What the tests must do |
+|---|---|
+| Critical business logic (payments, auth, validation) | 95%+ coverage, mutation testing, every boundary and invalid input, every error path asserted |
+| Async code | `@pytest.mark.asyncio`; `AsyncClient` for HTTP; `asyncio.gather()` for concurrency; cover timeouts and retries |
+| CLI applications | `CliRunner` from `typer.testing`; capture Rich output; run with and without `NO_COLOR`. See `typer-rich-testing-patterns.md` in the `python-engineering:python3-cli` skill |
+| Database operations | Isolated test database (`tmp_path` or `pytest-postgresql`); assert commit on success and rollback on error; test migrations against a real engine |
+
+## Performance Tests
+
+Profile before optimizing — `cProfile` for CPU, `pytest-memray` for memory. Guard against
+regression with `pytest-benchmark`, which fails the test when timing regresses:
+
+```python
+def test_operation_performance(benchmark) -> None:
+    """Benchmark operation performance against its SLA."""
+    result = benchmark(expensive_operation, arg1, arg2)
+    assert result.success
+```
+
+## Migrating unittest.mock to pytest-mock
+
+- Replace `unittest.mock` imports with `pytest_mock.MockerFixture`.
+- Turn `@patch` decorators into `mocker.patch()` calls inside the test.
+- Turn `Mock()` into `mocker.Mock()`.
+- Drop the `with` context managers; call `mocker` directly.
+
 ## Test Directory Structure
 
 ```text
