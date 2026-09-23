@@ -20,7 +20,7 @@ Apply before converting when the source shows ANY of:
 
 ## Frameworks (Reference Only)
 
-These frameworks share one principle — a process must be deterministic, auditable, and actor-owned.
+These frameworks share one principle — a process must make its permitted behavior explicit, auditable, and actor-owned. Do not confuse explicit behavior with determinism: concurrent or distributed processes may intentionally permit multiple valid next states.
 
 **Lean** (Ohno) — eliminate steps that produce no state change; apply 5 Whys to trace ambiguity to its root
 
@@ -41,7 +41,7 @@ These frameworks share one principle — a process must be deterministic, audita
 Before converting, verify the source process satisfies:
 
 - [ ] Clarity — no interpretive gaps; every term has one meaning
-- [ ] Determinism — same input produces same output, independent of executor
+- [ ] Explicit behavior — permitted outcomes and transitions are defined; require determinism only where the process contract requires one outcome
 - [ ] Minimal cognitive load — relies on structure, not memory
 - [ ] Explicit feedback loops — error paths and retry conditions stated
 - [ ] Measurable outcomes — each terminal state has an observable signal
@@ -138,6 +138,55 @@ flowchart TD
     D -->|"Yes"| Convert(["Process is ready for Mermaid conversion"])
     FixD --> Convert
 ```
+
+## Validation Model Selection
+
+After completeness and triage establish what the process means, identify the important correctness claims before choosing how to validate them. Classify claims independently: one process may need more than one validation model.
+
+For each important claim, ask in order:
+
+1. **What failure must be excluded?** State the prohibited behavior or required property in observable terms.
+2. **At what resolution does the claim exist?** Distinguish workflow/system behavior from component, algorithm, or transformation behavior.
+3. **What is the least-formal model capable of falsifying or proving it?** Do not add formalism that buys no additional confidence.
+
+Route the claim as follows:
+
+- **Executable checks/tests** — use when representative executions or property-based tests provide sufficient evidence.
+- **Mermaid structural validation** — use when the claim is that actors, steps, guards, branches, and terminal states are explicit and traversable. Mermaid specifies execution structure; it does not prove behavioral correctness.
+- **TLA+ candidate** — use when correctness depends on multiple possible executions: concurrency, interleavings, message/order variation, retries, crashes, shared mutable state, resource ownership, atomicity, fairness, deadlock freedom, safety invariants, or liveness requirements. Extract state variables, initial conditions, actions/transitions, guards, safety invariants, liveness properties, and environmental/fairness assumptions. Prefer model checking when finite state-space exploration can expose a counterexample.
+- **Lean candidate** — use when correctness requires a universal proposition over values, transformations, or formally defined states, such as invariant preservation, semantic equivalence, termination, or "for every valid input" guarantees. Prefer a cheaper validation method when representative execution or state-space exploration is sufficient.
+
+Do not route an entire document to TLA+ or Lean merely because one claim qualifies. Route individual claims and retain Mermaid for the executable process representation when useful.
+
+### Formal-Validation Signals
+
+When reviewing a process, explicitly inventory these signals if present:
+
+- shared mutable state or exclusive resources
+- concurrent or independently scheduled actors
+- ordering assumptions or asynchronous messages
+- retries, crashes, recovery, rollback, or partial failure
+- atomic operations or transactions
+- fairness or eventual-progress assumptions
+- safety requirements — something prohibited must never occur
+- liveness requirements — something required must eventually occur
+- universal transformation or preservation claims
+- equivalence or termination claims
+
+A TLA+ or Lean classification is a recommendation to create or invoke an appropriate formal model; do not invent a proof or claim verification from the process diagram alone.
+
+### Validation Gate
+
+Before declaring an improved process ready, record:
+
+- the important correctness claims identified
+- the failure mode each claim excludes
+- the resolution at which each claim exists
+- the selected validation model and why it is sufficient
+- assumptions required by that validation
+- the success criterion: observable check, counterexample absence within a stated model, or machine-checked proof
+
+A process may be structurally ready for Mermaid conversion while still carrying correctness claims that require separate validation. Do not describe Mermaid syntax validation or semantic-fidelity checking as proof that those claims hold.
 
 ## Practical Improvement Framework
 
