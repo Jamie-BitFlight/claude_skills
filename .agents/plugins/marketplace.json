@@ -257,18 +257,6 @@
       "category": "Developer Tools"
     },
     {
-      "name": "python3-development",
-      "source": {
-        "source": "local",
-        "path": "./plugins/python3-development"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Developer Tools"
-    },
-    {
       "name": "rtfp",
       "source": {
         "source": "local",

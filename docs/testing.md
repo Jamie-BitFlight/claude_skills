@@ -16,10 +16,10 @@ Coverage (`--cov=scripts --cov=plugins`) is always on via addopts — passing `-
 ## Plugin installation testing
 
 ```bash
-claude --plugin-dir ./plugins/python3-development       # Load single plugin
+claude --plugin-dir ./plugins/python-engineering        # Load single plugin
 claude --plugin-dir ./plugins/holistic-linting          # Load multiple plugins
 /plugin marketplace add ./.claude-plugin/marketplace.json  # Add local marketplace
-/plugin install python3-development@jamie-bitflight-skills --scope local
+/plugin install python-engineering@jamie-bitflight-skills --scope local
 /plugin validate ./plugins/plugin-name                  # Validate plugin structure
 ```
 

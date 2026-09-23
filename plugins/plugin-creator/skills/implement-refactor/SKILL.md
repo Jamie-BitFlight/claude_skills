@@ -25,7 +25,7 @@ $ARGUMENTS
 If `<plugin_target/>` is:
 
 - A `.md` path: Use directly
-- A slug (e.g., `python3-development`): GLOB for `.plugin-creator/plans/tasks-refactor-{slug}.md`
+- A slug (e.g., `python-engineering`): GLOB for `.plugin-creator/plans/tasks-refactor-{slug}.md`
 
 ---
 
@@ -108,12 +108,12 @@ Agent(
 Agent(
     subagent_type="plugin-creator:refactor-skill",
     description="Task 1: Split python3 core skill",
-    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python3-development.md --task 1"
+    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python-engineering.md --task 1"
 )
 Agent(
     subagent_type="subagent-refactorer",
     description="Task 2: Optimize python-cli-architect agent",
-    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python3-development.md --task 2"
+    prompt="/start-refactor-task .plugin-creator/plans/tasks-refactor-python-engineering.md --task 2"
 )
 ```
 

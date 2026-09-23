@@ -60,7 +60,6 @@ Comprehensive frameworks with multiple skills, commands, and specialized agents.
 | Plugin | Install name | What It Does |
 | --- | --- | --- |
 | [development-harness](./plugins/development-harness) | `dh` | Language-agnostic SAM 7-stage pipeline (Discovery → Planning → Context → Decomposition → Execution → Review → Verification) with backlog management, milestone dispatch, and kage-bunshin parallel sessions. See the plugin's `skills/` and `agents/` directories for the full roster, plus an MCP backlog server. |
-| [python3-development](./plugins/python3-development) | `python3-development` | Python 3.11+ specialist with TDD workflows. Covers Typer/Rich CLI development, pytest test suites, code review, type checking, and PEP 723 inline script metadata. MCP semantic code search included. |
 | [python-engineering](./plugins/python-engineering) | `python-engineering` | Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI (Typer/Rich), web, data/science, and constrained environments. |
 | [bash-development](./plugins/bash-development) | `bash-development` | Write robust Bash 5.1+ scripts with modern patterns, error handling, POSIX portability, and specialized agents for development and auditing. |
 | [perl-development](./plugins/perl-development) | `perl-development` | Build production-quality Perl 5.30+ scripts with modern practices, CPAN ecosystem integration, comprehensive testing, and CLI architecture. |
@@ -121,7 +120,7 @@ Focused plugins that teach Claude specific conventions or tools without heavy wo
 
 The SAM (Stateless Agent Methodology) pipeline in a single plugin. Every feature request moves through seven stages that each produce a file artifact: Discovery, Planning (with RT-ICA information completeness analysis), Context Integration, Task Decomposition, Execution, Forensic Review, and Final Verification.
 
-Language plugins like `python3-development` plug into the harness by telling it which specialist agents to use for each task. The harness dispatches `dh:task-worker` either way — it loads the specialist profile the task names, and without a language plugin no profile is named and it executes with the skills the task carries.
+Language plugins like `python-engineering` plug into the harness by telling it which specialist agents to use for each task. The harness dispatches `dh:task-worker` either way — it loads the specialist profile the task names, and without a language plugin no profile is named and it executes with the skills the task carries.
 
 Install name: `dh`
 
@@ -130,22 +129,6 @@ Install name: `dh`
 **Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and more.
 
 **MCP servers:** Backlog and SAM servers for selected structured workflow operations, artifact management, and dispatch orchestration; sequential-thinking server. Provider-native operations remain on the configured backend (for example, `bd` in a Beads workspace).
-
-### python3-development
-
-Python specialist that composes with `development-harness`. Install both for the full Python development pipeline.
-
-**Skills include:** Python 3.11+ patterns, Typer/Rich CLI development, pytest workflows, type checking, linting resolution, PEP 723 inline script metadata, pyproject.toml configuration, and more.
-
-**Agents include:**
-
-- `@python3-development:python-cli-architect` — implements Python CLI features end-to-end
-- `@python3-development:python-cli-design-spec` — produces architecture specs
-- `@python3-development:python-pytest-architect` — writes pytest test suites
-- `@python3-development:code-reviewer` — code review with Python idiom awareness
-- `@python3-development:semantic-code-search` — semantic search over Python codebases
-
-**MCP servers:** cocoindex-code semantic code search, sequential-thinking server.
 
 ### python-engineering
 
@@ -159,7 +142,7 @@ Opinionated Python 3.11+ engineering system that establishes strong defaults and
 - `@python-engineering:python-cli-design-spec` — produces architecture specs for CLIs
 - `@python-engineering:python-pytest-architect` — writes pytest test suites
 - `@python-engineering:code-reviewer` — code review with Python idiom awareness
-- `@python-engineering:semantic-code-search` — semantic search over Python codebases
+- `@python-engineering:semantic-code-search` — pattern and structure search over Python codebases
 
 ### plugin-creator
 

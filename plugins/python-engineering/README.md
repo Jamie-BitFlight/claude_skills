@@ -98,7 +98,7 @@ These skills are not invoked directly — `python3-core` and `orchestrate` load 
 | `python-cli-design-spec` | Designs CLI architecture and produces architecture specifications |
 | `code-reviewer` | Reviews Python code for quality, types, security, performance |
 | `adversarial-solution-design` | Stress-tests design decisions before committing |
-| `semantic-code-search` | Searches codebase by behavior, not just keywords |
+| `semantic-code-search` | Searches codebase by identifier, import shape, type signature and code pattern |
 
 ## Standing Defaults (applied on every task)
 

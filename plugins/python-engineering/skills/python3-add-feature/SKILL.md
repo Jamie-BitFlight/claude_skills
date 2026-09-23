@@ -34,7 +34,7 @@ CHECK:
 - [ ] pyproject.toml exists and has project configuration
 - [ ] src/ or packages/ directory structure
 - [ ] tests/ directory with existing test patterns
-- [ ] Linting and type-check configuration (ruff; ty and/or mypy per project — see python3-standards)
+- [ ] Linting and type-check configuration (ruff; ty and/or mypy per project — see `standards-for-python-development`)
 - [ ] Existing patterns for similar features
 ```
 

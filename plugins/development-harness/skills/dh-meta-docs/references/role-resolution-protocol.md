@@ -78,7 +78,7 @@ Find the command for each gate type in the repository. Check these sources in or
 - **lint** — Static analysis (e.g., `uv run ruff check {files}`)
 - **typecheck** — Type checking (e.g., `uv run mypy {files}`)
 - **test** — Test execution (e.g., `uv run pytest tests/`)
-- **standards** — Language-specific standards skill (e.g., `/python3-development:stinkysnake`)
+- **standards** — Language-specific standards skill (e.g., `/python-engineering:stinkysnake`)
 
 **Fallback gates (no source names the command):**
 

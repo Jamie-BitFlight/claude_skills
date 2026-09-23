@@ -62,10 +62,6 @@
       "source": "./plugins/perl-development"
     },
     {
-      "name": "python3-development",
-      "source": "./plugins/python3-development"
-    },
-    {
       "name": "verification-gate",
       "source": "./plugins/verification-gate"
     },
