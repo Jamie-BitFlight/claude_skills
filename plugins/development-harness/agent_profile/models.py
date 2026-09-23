@@ -9,12 +9,9 @@ be imported in isolation during testing.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class AgentEntry(BaseModel):
@@ -109,12 +106,3 @@ class ProfileListEntry(BaseModel):
     model: str | None = Field(
         default=None, description="Preferred model identifier from frontmatter. None when not declared."
     )
-
-
-# Rebuild models that reference Path which is under TYPE_CHECKING.
-# Required by Pydantic v2 when `from __future__ import annotations` is active
-# and the type is only imported inside `if TYPE_CHECKING`.
-from pathlib import Path as _Path
-
-_rebuild_ns = {"Path": _Path}
-AgentEntry.model_rebuild(_types_namespace=_rebuild_ns)
