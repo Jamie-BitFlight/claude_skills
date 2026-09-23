@@ -8,7 +8,7 @@ title: "Improvement Proposals: Sidecar"
 ## Improvement 1: Persistent structured session metadata for cross-session context recovery
 
 **Source pattern**: "Context Window Recovery: The Conversations plugin aggregates session history across all supported AI agents, enabling developers to review past conversations, token usage, and reasoning chains when context resets between agent invocations." (Relevance to Claude Code Development > Applications)
-**Local system**: `plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py`
+**Local system**: `plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py`
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #775 created
@@ -74,7 +74,7 @@ Running `tmux list-sessions` during an `/implement-feature` execution shows sess
 ## Improvement 4: Sub-agent direct task/backlog linking during execution
 
 **Source pattern**: "Task Linking: Extend the TD Monitor plugin to accept task creation prompts from Claude Code sessions, allowing agents to directly link ongoing work to task entries without manual user action." (Integration Opportunities, item 2)
-**Local system**: `plugins/python3-development/skills/start-task/SKILL.md`, `plugins/python3-development/skills/implement-feature/SKILL.md`
+**Local system**: `plugins/development-harness/skills/start-task/SKILL.md`, `plugins/development-harness/skills/implement-feature/SKILL.md`
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: Sub-agents during `/start-task` have access to backlog MCP tools and could create follow-up items. The current design deliberately centralizes follow-up creation in `/complete-implementation` Phase 1 (code-reviewer) to maintain quality gates. Whether allowing sub-agents to create backlog items during execution improves outcomes or fragments the review process needs architectural analysis.

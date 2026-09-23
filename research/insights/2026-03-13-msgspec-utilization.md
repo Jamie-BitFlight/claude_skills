@@ -182,7 +182,6 @@ The refactored version consolidates eight explicit validation checks into a sing
 | Local System | Reason skipped |
 |---|---|
 | ./plugins/development-harness/scripts/manifest_resolver.py (lines 68-75) | Integration surface present: `json.loads()` is used to read plugin.json files. However, the manifest files are read only once during startup by the manifest discovery system. The performance benefit of msgspec (6-12x faster parsing) is not material for one-off startup reads. Additionally, the function is shared utility code in a multi-language development harness; introducing Python serialization library dependencies would increase coupling to that plugin. Scope does not justify integration cost. |
-| ./plugins/python3-development/agents/python-cli-architect.md | Integration surface present: this agent provides guidance for Python CLI tools (Typer) that may ingest JSON. However, the agent itself is not a local system that calls msgspec; it is guidance documentation. The agent directs implementation to specialists (@python-cli-architect subagent). Whether that subagent's delegated implementations use msgspec is an implementation choice, not a utilization opportunity for this agent file itself. No callable integration surface in the agent. |
 
 ---
 

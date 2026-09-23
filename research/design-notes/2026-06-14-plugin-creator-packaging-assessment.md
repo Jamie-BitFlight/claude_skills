@@ -67,7 +67,6 @@ Observed failure classes from the real validator:
    - `frustration-analyzer`
    - `plugin-creator`
    - `process-siren`
-   - `python3-development`
    - `scientific-method`
 
    The validator expects `.mcp.json` to contain a top-level `mcpServers` object. Current plugin files instead expose server names at top level.

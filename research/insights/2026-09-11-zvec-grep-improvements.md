@@ -33,8 +33,6 @@ This is a two-branch exclusive router keyed on one variable — whether the agen
 
 The question shape zvec-grep names as its best case — evidence spanning files or modules where the target location is unknown (call-chain, data-flow, architectural questions) — is not addressed by either branch. An agent holding a partial identifier *and* a behavioral description is instructed to pick one path, not to run both and reconcile.
 
-The agent wrapper at `./plugins/python3-development/agents/semantic-code-search.md` line 9 reinforces the exclusivity from the other direction: "If the tool is unavailable, report BLOCKED — do not fall back to pattern-based search."
-
 Note on partial coverage: `./plugins/development-harness/agents/codebase-analyzer.md` does show both paths side by side per focus area (e.g. its "For conventions focus" block pairs `ccc search error handling exception raise catch` with `Grep(pattern="raise |except |try:")`), and its Search Tool Priority (line 118) says to use Grep "after ccc narrows the search space". That is a sequential narrowing recipe inside one agent, not a routing rule in the skill that owns the decision — and it exists only in that agent, not in the skill other callers load.
 
 ### Target state

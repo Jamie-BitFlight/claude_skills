@@ -42,7 +42,6 @@ Important QA correction:
 | `plugin-creator` | skills, agents | skills+agents | yes | no | medium | |
 | `process-siren` | skills, agents, mcp | mcp-heavy | yes | no | high | `bunx --yes mcp-mermaid@latest` initializes and exposes `generate_mermaid_diagram`; the rendering call was cancelled before a result, so end-to-end MCP validation remains incomplete |
 | `python-engineering` | skills, agents | skills+agents | yes | yes | medium | plugin visible and selectable in Codex CLI validation |
-| `python3-development` | skills, agents | skills+agents | yes | no | medium | |
 | `rtfp` | skills, agents | skills+agents | yes | no | medium | |
 | `scientific-method` | skills, agents, hooks, mcp | complex | yes | no | high | copied/zipped isolated install and `experiment-registry/list_experiment_types` MCP invocation pass; skills and hooks remain unvalidated |
 | `summarizer` | skills, agents, hooks | hook-heavy | yes | no | high | |
@@ -201,7 +200,6 @@ Important QA correction:
   - fresh `codex exec` from unrelated temp project: pass
   - prompt constrained against source-repo path inspection and sibling-plugin usage: pass
   - Codex produced valid PEP 723 `uv` workflow guidance from that temp install: pass
-  - current `plugins/uv/skills/uv -> ../../python3-development/skills/uv` symlink caused no observed Codex install/runtime failure in this repo-marketplace validation: pass
   - note: this proves install/runtime viability, but not explicit named-skill activation provenance; re-run needed under the stricter QA standard
 
 ## Runtime Prerequisites and Local Environment Notes
@@ -241,7 +239,6 @@ Important QA correction:
 - Generated missing root `.mcp.json` files for plugins whose Claude manifests carried inline MCP config:
   - `development-harness`
   - `plugin-creator`
-  - `python3-development`
   - `scientific-method`
 - Attempted a first variable cleanup pass, then reverted the `SKILL.md` edits after identifying a category error:
   - I had incorrectly mixed harness-side `SKILL.md` substitution with shell-side parameter expansion fallback
@@ -251,7 +248,6 @@ Important QA correction:
 
 ## Next Suggested Representative Ports
 
-1. skills+agents: `python3-development`
-2. complex: `agentskill-kaizen`
-3. command-heavy: `holistic-linting`
-4. hook-heavy follow-up: `development-harness`
+1. complex: `agentskill-kaizen`
+2. command-heavy: `holistic-linting`
+3. hook-heavy follow-up: `development-harness`

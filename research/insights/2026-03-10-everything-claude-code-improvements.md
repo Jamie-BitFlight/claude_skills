@@ -5,7 +5,7 @@ title: "Improvement Proposals: Everything Claude Code"
 ## Improvement 1: SubagentStop hook should capture a structured summary of subagent work
 
 **Source pattern**: "Session Summaries in Hook SubagentStop Phase — Rather than losing context when subagents complete, ECC's hooks capture a summary of what was done, allowing parent agents to make informed routing decisions." (Patterns Worth Adopting, item 4)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #576 created

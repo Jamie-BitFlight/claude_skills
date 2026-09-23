@@ -8,7 +8,7 @@ title: "Improvement Proposals: Agent Deck"
 ## Improvement 1: Hook-based instant status detection via SQLite event store
 
 **Source pattern**: "Agent Deck uses tool-specific hooks (Claude hooks, Gemini hooks, Codex hooks) installed into each tool to detect state changes and write to SQLite. This pattern is more reliable than polling file timestamps and enables instant status updates without excessive polling overhead" (Patterns Worth Adopting, bullet 1)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: the local hook system already writes status changes to task YAML files on every SubagentStop and PostToolUse event. Agent Deck's SQLite approach provides faster indexed queries, but it is unclear whether the current YAML-based approach causes observable query latency in practice. Would need profiling data (e.g., `sam status` latency at >50 tasks) to confirm a real gap.
@@ -30,7 +30,7 @@ Run `uv run sam status P{N}` on a plan with 20+ tasks. Measure wall-clock time b
 ## Improvement 2: Session forking with context inheritance for multi-branch exploration
 
 **Source pattern**: "Forking a session with full history enables exploring multiple solution branches without losing the original approach; applicable to any multi-decision AI workflow" (Patterns Worth Adopting, bullet 2)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: the implement-feature loop dispatches tasks sequentially. Forking a session to explore alternative approaches is a fundamentally different interaction model that would require changes to Claude Code's session management, not just to local skill files. The local system cannot implement this without external session management capabilities.
@@ -74,7 +74,7 @@ N/A -- architectural incompatibility.
 ## Improvement 4: Conductor pattern -- persistent monitor session for child agent orchestration
 
 **Source pattern**: "Conductors are persistent Claude Code sessions that monitor child sessions, auto-respond when confident, and escalate to Telegram/Slack for remote control" (Problem Addressed table, row 5) and "Conductors are Claude Code sessions that monitor other sessions; this creates a meta-orchestration pattern where Claude Code can be used to build supervisors for Claude Code workloads" (Integration Opportunities, bullet 3)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md, .claude/skills/swarm-patterns/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md, .claude/skills/swarm-patterns/SKILL.md
 **Confidence**: Medium
 **Impact**: High
 **Backlog**: Deferred -- confidence medium: the local `/implement-feature` skill already acts as an orchestrator that dispatches tasks and monitors completion via hooks. Agent Deck's conductor adds heartbeat monitoring with configurable intervals and parent nudges on status transitions, which is conceptually similar to the existing stall-detection backlog items (#87, #448). The specific conductor pattern (persistent session monitoring child sessions with Telegram/Slack escalation) would require infrastructure beyond skill files. However, the heartbeat monitoring interval idea could strengthen the existing stall detection proposals.
@@ -96,7 +96,7 @@ Run `uv run sam status P{N}` on a plan with an in-progress task whose LastActivi
 ## Improvement 5: Git worktree isolation for concurrent agent sessions
 
 **Source pattern**: "Git worktree integration isolates each session in its own working directory with automatic cleanup and branch management" (Problem Addressed table, row 6) and "Each worktree is isolated working directory with its own branch; multiple agents can work on the same repo without merge conflicts" (Git Worktree Integration section)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: High
 **Impact**: High
 **Backlog**: Skipped -- already tracked as #453 "Systematic git worktree isolation for concurrent task agents"
@@ -118,7 +118,7 @@ See backlog item #453.
 ## Improvement 6: Stall detection with heartbeat monitoring interval
 
 **Source pattern**: "Heartbeat monitoring on configurable interval (default 15 minutes); parent nudges when child sessions move running to waiting/error/idle" (Conductor section, Monitoring bullet)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: High
 **Impact**: High
 **Backlog**: Skipped -- already tracked as #87 "SAM: Timeout/Stall Detection" and #448 "Stall detection for subagent tasks"
@@ -164,7 +164,7 @@ File `skills.toml` exists at project root with a `[project.skills]` section list
 ## Improvement 8: Concurrency cap for parallel task dispatch
 
 **Source pattern**: "Manage multiple Claude Code instances across projects from a single interface" (Applications, bullet 1) combined with Agent Deck's multi-session management showing practical concurrent agent dispatch
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: Skipped -- already tracked as #452 "Concurrency cap for parallel task dispatch in implement-feature"
@@ -186,7 +186,7 @@ See backlog item #452.
 ## Improvement 9: SubagentStop hook captures structured work summary
 
 **Source pattern**: "Built-in transition notifiers watch status changes" (Conductor section) and "Hooks write session state changes to SQLite; agent-deck polls and displays status" (Hook System section). Agent Deck's hook system captures structured event data on state transitions, not just timestamps.
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: Skipped -- already tracked as #576 "SubagentStop hook should capture structured summary of subagent work"

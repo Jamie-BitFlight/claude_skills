@@ -325,10 +325,10 @@ logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
 | Target | Type | How |
 |--------|------|-----|
-| `plugins/python3-development/skills/python3-development/` | skill | Add Loguru to modern-modules.md reference as a recommended alternative to stdlib logging for CLI scripts, emphasizing zero-config logger and PEP 723 compatibility for scripts needing structured logging with automatic rotation. |
-| `plugins/python3-development/skills/shebangpython/` | skill | Include guidance on adding `loguru` to PEP 723 dependency blocks for scripts needing logging with rotation, showing the uv shebang pattern handles dependency installation automatically. |
+| `plugins/python-engineering/skills/python3-core/` | skill | Add Loguru to modern-modules.md reference as a recommended alternative to stdlib logging for CLI scripts, emphasizing zero-config logger and PEP 723 compatibility for scripts needing structured logging with automatic rotation. |
+| `plugins/python-engineering/skills/shebangpython/` | skill | Include guidance on adding `loguru` to PEP 723 dependency blocks for scripts needing logging with rotation, showing the uv shebang pattern handles dependency installation automatically. |
 | `plugins/bash-development/skills/bash-logging/` | skill | Add cross-reference note that Python scripts with PEP 723 can achieve similar structured logging (levels, colors, rotation) using Loguru instead of implementing bash logging functions from scratch. |
-| `plugins/python3-development/skills/stinkysnake/` | skill | Add Loguru's `logger.catch` decorator to exception handling best practices section as modern approach for automatic exception logging with full context (replacing manual try-except logging patterns). |
+| `plugins/python-engineering/skills/stinkysnake/` | skill | Add Loguru's `logger.catch` decorator to exception handling best practices section as modern approach for automatic exception logging with full context (replacing manual try-except logging patterns). |
 
 ### Cross-References
 
