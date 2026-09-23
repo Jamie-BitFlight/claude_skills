@@ -106,7 +106,7 @@ from .sync_state import (
     SyncErrorKind,
     SyncState as _SyncState,
     SyncStatus,
-    classify_sync_error,
+    classify_github_failure,
     get_sync_state,
 )
 from .tool_responses import (
@@ -270,17 +270,18 @@ def _retryable(exc: BaseException) -> bool | None:
        condition that raised it fixes the answer, and the author who knows that condition is the
        one who can say so.
     2. A class in ``_NEVER_RETRYABLE`` describes the call, so the answer is ``False``.
-    3. A concrete class in ``_TRANSPORT_FAILED``, or a ``GithubException`` whose status says the server
-       asked for another attempt (a rate limit, a 5xx, a 403 carrying ``Retry-After``), describes
-       the trip, so the answer is ``True``. Mixed availability bases and their subclasses report
-       nothing unless step 1 found an explicit instance verdict.
+    3. A concrete class in ``_TRANSPORT_FAILED``, or a direct/cause-wrapped ``GithubException``,
+       uses the canonical GitHub classifier. Known transient statuses report ``True``, known final
+       statuses report ``False``, and an absent or unknown GitHub status reports nothing. Mixed
+       availability bases with no such cause report nothing unless step 1 found an explicit
+       instance verdict.
     4. Anything else reports nothing.
 
-    ``classify_sync_error`` is deliberately not the general answer here, though it is reused for
-    the GitHub status codes in step 3. It answers a different question -- whether the sync engine
-    should keep spending its retry budget -- so its ``NON_RETRYABLE`` means "stop now", not
-    "impossible", and its ``BacklogError`` default means "a fetch failed", which at this boundary
-    is wrong for every call-shaped refusal raised as a bare ``BacklogError``.
+    ``classify_github_failure`` is the shared source for GitHub status and cause-chain semantics.
+    The broader ``classify_sync_error`` is deliberately not the general answer here: it answers
+    whether the sync engine should keep spending its retry budget, so its ``NON_RETRYABLE`` means
+    "stop now", not "impossible", and its ``BacklogError`` default means "a fetch failed", which
+    at this boundary is wrong for every call-shaped refusal raised as a bare ``BacklogError``.
 
     A bare ``BacklogError`` with no stated verdict therefore reports ``None`` rather than a guess.
     The caller must be able to tell "cannot succeed" from "not known", and ``exclude_none=True``
@@ -299,8 +300,11 @@ def _retryable(exc: BaseException) -> bool | None:
         return False
     if isinstance(exc, _TRANSPORT_FAILED):
         return True
-    if isinstance(exc, _GithubException) and classify_sync_error(exc) is SyncErrorKind.RETRYABLE:
+    github_failure = classify_github_failure(exc)
+    if github_failure is SyncErrorKind.RETRYABLE:
         return True
+    if github_failure is SyncErrorKind.NON_RETRYABLE:
+        return False
     return None
 
 

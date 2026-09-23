@@ -50,6 +50,7 @@ __all__ = [
     "SyncErrorKind",
     "SyncState",
     "SyncStatus",
+    "classify_github_failure",
     "classify_sync_error",
     "get_sync_state",
     "reset_sync_state",
@@ -371,6 +372,21 @@ def _find_wrapped_github_exception(exc: BaseException) -> GithubException | None
     return None
 
 
+def classify_github_failure(exc: BaseException) -> SyncErrorKind:
+    """Classify a direct or cause-wrapped GitHub failure using the canonical status rules.
+
+    Args:
+        exc: A direct ``GithubException`` or an exception whose explicit cause chain may contain
+            one.
+
+    Returns:
+        The GitHub exception's classification, or ``UNKNOWN`` when the exception and its cause
+        chain contain no GitHub failure.
+    """
+    github_error = exc if isinstance(exc, GithubException) else _find_wrapped_github_exception(exc)
+    return _classify_github_exception(github_error) if github_error is not None else SyncErrorKind.UNKNOWN
+
+
 def _classify_content_provider_error(exc: ContentProviderError) -> SyncErrorKind:
     """Classify a ContentProviderError by inspecting its wrapped cause chain, if any.
 
@@ -393,10 +409,8 @@ def _classify_content_provider_error(exc: ContentProviderError) -> SyncErrorKind
         capability gap, a not-found, a revision conflict), and retrying
         won't fix it.
     """
-    github_cause = _find_wrapped_github_exception(exc)
-    if github_cause is not None:
-        return _classify_github_exception(github_cause)
-    return SyncErrorKind.NON_RETRYABLE
+    classification = classify_github_failure(exc)
+    return SyncErrorKind.NON_RETRYABLE if classification is SyncErrorKind.UNKNOWN else classification
 
 
 def classify_sync_error(exc: BaseException) -> SyncErrorKind:
@@ -454,7 +468,7 @@ def classify_sync_error(exc: BaseException) -> SyncErrorKind:
         # _classify_content_provider_error's docstring.
         return _classify_content_provider_error(exc)
     if isinstance(exc, GithubException):
-        return _classify_github_exception(exc)
+        return classify_github_failure(exc)
     if isinstance(exc, (BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS)):
         # Generic BacklogError (e.g. from sync_issues_graphql) and the transient
         # network exceptions both mean "worth retrying" — merged into one branch to

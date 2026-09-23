@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,8 +22,13 @@ from backlog_core.models import (
     ContentWrite,
     UnsupportedCapabilityError,
 )
+from backlog_core.server import _retryable, mcp
+from fastmcp.client import Client
 from github import GithubException
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 ContentRecords: TypeAlias = list[ContentRecord]
 
@@ -97,6 +102,7 @@ class _Repository:
         self.branch_create_false_conflict_status = 422
         self.branch_lookup_calls: list[str] = []
         self.tree_shas: list[str] = []
+        self.tree_error: GithubException | None = None
 
     def _require_branch(self, branch: str) -> None:
         """Reject an operation against a branch this fake never created.
@@ -161,6 +167,8 @@ class _Repository:
     def get_git_tree(self, sha: str, recursive: bool) -> _Tree:
         self.tree_shas.append(sha)
         self._require_branch(sha)
+        if self.tree_error is not None:
+            raise self.tree_error
         snapshot = dict(self.files.items())
         self._blobs = {file.sha: file.content for file in snapshot.values()}
         if self.mutate_after_tree:
@@ -305,6 +313,88 @@ def test_truncated_tree_fails_closed(store: _GitHubContentsStore, repository: _R
 
     with pytest.raises(ContentUnavailableError, match="truncated"):
         store.list(ContentQuery(kind=ContentKind.PLAN))
+
+
+def _github_failure(status: int, headers: dict[str, str] | None = None) -> GithubException:
+    return GithubException(status, {"message": "provider unavailable"}, headers or {})
+
+
+def _list_failure(
+    store: _GitHubContentsStore, repository: _Repository, github_error: GithubException
+) -> ContentUnavailableError:
+    repository.existing_branches.add(_CONTENT_BRANCH)
+    repository.tree_error = github_error
+    with pytest.raises(ContentUnavailableError, match="discovery failed") as caught:
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+    return caught.value
+
+
+async def _dispatch_validate_failure(exc: ContentUnavailableError, mocker: MockerFixture) -> dict[str, Any]:
+    mocker.patch("backlog_core.server._read_dispatch_plan", side_effect=exc)
+    async with Client(mcp) as client:
+        return (await client.call_tool("dispatch_validate", {"milestone_number": 10})).structured_content
+
+
+@pytest.mark.parametrize(
+    ("status", "headers"),
+    [(503, {}), (429, {}), (403, {"Retry-After": "30"})],
+    ids=["server-error", "rate-limit", "retry-after"],
+)
+def test_real_content_discovery_transports_are_retryable(
+    store: _GitHubContentsStore, repository: _Repository, status: int, headers: dict[str, str]
+) -> None:
+    github_error = _github_failure(status, headers)
+    failure = _list_failure(store, repository, github_error)
+
+    assert failure.__cause__ is github_error
+    assert _retryable(failure) is True
+
+
+@pytest.mark.parametrize(
+    ("status", "headers"),
+    [(503, {}), (429, {}), (403, {"Retry-After": "30"})],
+    ids=["server-error", "rate-limit", "retry-after"],
+)
+async def test_real_content_discovery_transports_serialize_retryable(
+    store: _GitHubContentsStore, repository: _Repository, mocker: MockerFixture, status: int, headers: dict[str, str]
+) -> None:
+    result = await _dispatch_validate_failure(
+        _list_failure(store, repository, _github_failure(status, headers)), mocker
+    )
+
+    assert result["retryable"] is True
+
+
+@pytest.mark.parametrize("status", [401, 403], ids=["unauthorized", "unthrottled-forbidden"])
+async def test_real_final_github_failures_serialize_false(
+    store: _GitHubContentsStore, repository: _Repository, mocker: MockerFixture, status: int
+) -> None:
+    failure = _list_failure(store, repository, _github_failure(status))
+
+    assert _retryable(failure) is False
+    assert (await _dispatch_validate_failure(failure, mocker))["retryable"] is False
+
+
+async def test_structural_content_failure_omits_retryable_on_the_wire(
+    store: _GitHubContentsStore, mocker: MockerFixture
+) -> None:
+    with pytest.raises(ContentUnavailableError, match="1 MB") as caught:
+        store.put(ContentWrite(reference=ContentRef(kind=ContentKind.PLAN, name="P1"), content="x" * 1_000_000))
+
+    assert caught.value.__cause__ is None
+    assert _retryable(caught.value) is None
+    assert "retryable" not in await _dispatch_validate_failure(caught.value, mocker)
+
+
+async def test_integrity_content_failure_serializes_false(
+    store: _GitHubContentsStore, repository: _Repository, mocker: MockerFixture
+) -> None:
+    repository.tree_truncated = True
+    with pytest.raises(ContentUnavailableError, match="truncated") as caught:
+        store.list(ContentQuery(kind=ContentKind.PLAN))
+
+    assert _retryable(caught.value) is False
+    assert (await _dispatch_validate_failure(caught.value, mocker))["retryable"] is False
 
 
 def test_list_reads_one_resolved_tree_snapshot(store: _GitHubContentsStore, repository: _Repository) -> None:
