@@ -142,7 +142,7 @@ Opinionated Python 3.11+ engineering system that establishes strong defaults and
 - `@python-engineering:python-cli-design-spec` — produces architecture specs for CLIs
 - `@python-engineering:python-pytest-architect` — writes pytest test suites
 - `@python-engineering:code-reviewer` — code review with Python idiom awareness
-- `@python-engineering:semantic-code-search` — semantic search over Python codebases
+- `@python-engineering:semantic-code-search` — pattern and structure search over Python codebases
 
 ### plugin-creator
 

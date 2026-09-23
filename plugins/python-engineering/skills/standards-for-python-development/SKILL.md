@@ -7,7 +7,8 @@ user-invocable: false
 # Python 3 Development Standards
 
 This document holds the rules. `python-engineering:python3-core` routes a task to the specialist
-skill that applies them.
+skill that applies them and carries this plugin's reference files; the bare filenames cited below
+are indexed in its References table.
 
 ## 1. Shared Development Standards
 
@@ -21,7 +22,7 @@ skill that applies them.
 - **Type Checking**: Use **ty** (Astral) as the default checker — `uv run ty check` (paths per project). Detect the active checker from `.pre-commit-config.yaml`, then CI, never from a config table alone: repos keep `[tool.mypy]`, `[tool.basedpyright]`, or `pyrightconfig.json` as IDE stubs while hooks run ty. When hooks or CI actually run mypy, basedpyright, or pyright, follow that project's configuration rather than forcing a migration. When migrating to ty, silence those stub tables (`exclude = [".*"]`, `typeCheckingMode = "off"`) instead of deleting them, so built-in IDE checkers stop duplicating ty. See the `python-engineering:ty` skill.
 - **Parsing**: Use `tomlkit` to read and write TOML (it preserves formatting and comments); `tomllib` (stdlib) only for stdlib-only scripts. Parse markdown through the `marko` AST, never a regex parser — add it with `uv add marko` when the project does not already depend on it.
 - **Type Safety Reference**: For Generics, Protocols, TypedDict, Type Narrowing, and the attrs/dataclasses/pydantic comparison, see `type-safety-mypy.md` in the `python-engineering:python3-typing` skill. (Filename references mypy docs; patterns apply to ty and other checkers unless a rule is mypy-specific.)
-- **Version-Specific Features**: Check the project's `requires-python` floor against the per-version supplements (`python311-features.md` through `python314-features.md`) in the `python-engineering:python3-core` skill.
+- **Version-Specific Features**: Check the project's `requires-python` floor against the per-version supplements, `python311-features.md` through `python314-features.md`.
 - **Version Lifecycle** (SOURCE: <https://devguide.python.org/versions>, accessed 2026-03-23): 3.10 EOL 2026-10, 3.11 security-only until 2027-10, 3.12 security-only until 2028-10, 3.13 bugfix until 2029-10, 3.14 bugfix until 2030-10. When choosing a `requires-python` floor, prefer versions still in bugfix status.
 
 ### 1.2 Architecture & Design
@@ -91,7 +92,7 @@ deployment restriction such as an air-gapped or locked-down environment, never a
 posture.
 
 For inline-block syntax, shebang form, and how a script that outgrows one file imports its own
-modules, see `PEP723.md` in the `python-engineering:python3-core` skill.
+modules, see `PEP723.md`.
 
 ### 1.7 UI & CLI (Rich / Typer)
 - **Rich Emoji Usage**: In Rich console output, always use Rich emoji tokens (e.g., `:white_check_mark:`) instead of literal Unicode emojis. This ensures cross-platform compatibility, consistent rendering, and markdown-safe alignment.

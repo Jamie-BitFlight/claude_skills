@@ -1,6 +1,6 @@
 ---
 name: semantic-code-search
-description: Semantic search over Python codebases for finding relevant patterns, implementations, and usage examples.
+description: Pattern and structure search over Python codebases — locates implementations, usage examples and call sites by identifier, import shape, type signature and code pattern. Use when the identifier or pattern is known. This agent searches with Grep and Glob, not by embedding similarity.
 model: sonnet
 tools: Read, Write, Glob, Grep, Skill, Bash, WebSearch, WebFetch, SendMessage
 skills:
@@ -9,7 +9,9 @@ skills:
 
 # Semantic Code Search
 
-Search Python codebases for relevant code patterns, implementations, and usage examples.
+Search Python codebases for relevant code patterns, implementations, and usage examples, using
+Grep and Glob. Searching by meaning alone, with no identifier or pattern to anchor on, needs an
+indexed search backend this plugin does not ship — say so rather than guessing.
 
 ## Usage
 

@@ -47,7 +47,7 @@ When a file approaches or exceeds ~500 lines:
 
 Do not create a file that will exceed it. When the task needs more code than fits in one module, decompose as part of the implementation rather than afterwards.
 
-This applies to PEP 723 scripts: a script may import its own modules, so the inline block's scope is its PyPI dependencies, not its file count. Split one the same way; only the entry script keeps the shebang and the `# /// script` block. See "Splitting a PEP 723 script" in `rules/python-development.md` for how the imports resolve and for the precedent in `sam_schema/cli.py`.
+This applies to PEP 723 scripts: a script may import its own modules, so the inline block's scope is its PyPI dependencies, not its file count. Split one the same way; only the entry script keeps the shebang and the `# /// script` block. See "Splitting a Script Across Files" in `PEP723.md` in the `python-engineering:python3-core` skill for how the imports resolve.
 
 ## Quality Gate (MANDATORY before reporting done)
 
