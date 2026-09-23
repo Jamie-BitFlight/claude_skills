@@ -842,46 +842,6 @@
         }
       }
     },
-    "python3-development": {
-      "manifests": {
-        "claude": true,
-        "codex": true,
-        "portable": false,
-        "hermes_native": false
-      },
-      "components": {
-        "skills": 32,
-        "agents": 5,
-        "mcp_servers": 2,
-        "hooks": false
-      },
-      "blockers": {
-        "claude_plugin_root_uses": 12,
-        "claude_skill_dir_uses": 0
-      },
-      "verification": {
-        "claude-code": {
-          "status": "unverified",
-          "date": null,
-          "notes": null
-        },
-        "codex": {
-          "status": "unverified",
-          "date": null,
-          "notes": null
-        },
-        "hermes": {
-          "status": "unverified",
-          "date": null,
-          "notes": null
-        },
-        "kimi": {
-          "status": "unverified",
-          "date": null,
-          "notes": null
-        }
-      }
-    },
     "rtfp": {
       "manifests": {
         "claude": true,

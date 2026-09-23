@@ -107,7 +107,7 @@ Display all collected values in structured format. Ask user to confirm before en
 
 **Activate Python development workflow**
 
-Invoke `/python3-development` skill to load Python development orchestration standards.
+Invoke the `/python-engineering:python3-core` skill to load Python development orchestration standards.
 
 **Prepare substituted template**
 

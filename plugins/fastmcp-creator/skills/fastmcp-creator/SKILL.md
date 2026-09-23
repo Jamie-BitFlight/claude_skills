@@ -253,7 +253,7 @@ Preserved references:
 - For `fastmcp list` / `fastmcp call` / `fastmcp discover` CLI usage:
   `Skill(skill: "fastmcp-creator:fastmcp-client-cli")`
 - For Python project setup (pyproject.toml, uv, src layout):
-  `Skill(skill: "python3-development:python3-development")`
+  `Skill(skill: "python-engineering:python3-core")`
 - For evaluating MCP server quality: [./references/evaluation-guide.md](./references/evaluation-guide.md)
 - For Claude Code MCP config (`.mcp.json`): [./references/claude-code-mcp-integration.md](./references/claude-code-mcp-integration.md)
 

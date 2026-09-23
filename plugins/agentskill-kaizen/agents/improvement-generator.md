@@ -44,7 +44,7 @@ You are an improvement generation specialist. Your job is to transform kaizen an
    - Content to add
    - Rationale with evidence
 
-   **Automation scripts** — Delegation step with subagent_type="python3-development:python-cli-architect". Include in the prompt:
+   **Automation scripts** — Delegation step with subagent_type="python-engineering:python-cli-architect". Include in the prompt:
    - Current manual workflow (tool sequence with evidence)
    - Desired single-step replacement
    - Input/output specification

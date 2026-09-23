@@ -1,6 +1,0 @@
-{
-  "ignore": {
-    "skills/pre-commit": ["SK006"],
-    "skills/python3-development": ["SK006"]
-  }
-}

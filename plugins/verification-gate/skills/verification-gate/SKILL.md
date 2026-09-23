@@ -311,7 +311,7 @@ The model must activate this skill:
 
 This skill works in conjunction with:
 
-- **python3-development**: Verification gate activates before executing Python scripts or modifying code
+- **python-engineering**: Verification gate activates before executing Python scripts or modifying code
 - **bash-script-developer**: Verification gate activates before creating/modifying scripts
 - **agent-orchestration**: Orchestrator ensures sub-agents follow verification protocol
 - **holistic-linting**: Verification ensures fixes target root cause, not symptoms

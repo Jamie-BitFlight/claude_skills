@@ -207,7 +207,7 @@ For each skill reference in agent prompts:
 - Does the agent pass appropriate inputs to the skill?
 - Does the agent consume the skill's output format correctly?
 
-**Example issue:** Agent loads `/python3-development:modernpython` and instructs "run modernpython to fix legacy patterns" but modernpython is a reference guide, not an automated fixer. The agent misrepresents what the skill does.
+**Example issue:** Agent loads `/python-engineering:modernpython` and instructs "run modernpython to fix legacy patterns" but modernpython is a reference guide, not an automated fixer. The agent misrepresents what the skill does.
 
 **Output:** Per-agent list of skill loads with semantic correctness evaluation.
 
@@ -359,9 +359,9 @@ graph TD
 
 ```mermaid
 graph LR
-    A[python-cli-architect] -->|loads| S1[/python3-development:modernpython/]
+    A[python-cli-architect] -->|loads| S1[/python-engineering:modernpython/]
     A -->|loads| S2[/astral:uv/]
-    B[python-pytest-architect] -->|loads| S3[/python3-development:testing/]
+    B[python-pytest-architect] -->|loads| S3[/python-engineering:python3-testing/]
 ```
 
 ## Tool Usage Matrix
@@ -405,7 +405,7 @@ Agent `test-runner` has instruction "Run pytest tests" but tools field is `["Rea
 
 **Found In:**
 - plugin-creator:refactor-executor (line 42)
-- python3-development:python-pytest-architect (line 67)
+- python-engineering:python-pytest-architect (line 67)
 
 ---
 
