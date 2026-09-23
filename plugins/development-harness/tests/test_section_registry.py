@@ -11,11 +11,15 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import backlog_core.operations as ops
 import pytest
 from backlog_core import github_sync, rendering, section_registry
 from backlog_core.models import BacklogItem, Entry, GroomedData, Output, Section
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 _PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 
@@ -109,26 +113,34 @@ def test_normalize_section_key_unknown_prefix_stays_prefixed_when_unregistered()
 # ---------------------------------------------------------------------------
 
 
-def test_unregistered_section_name_emits_stderr_diagnostic(capsys: pytest.CaptureFixture[str]) -> None:
+def test_unregistered_section_name_emits_stderr_diagnostic(
+    capsys: pytest.CaptureFixture[str], mocker: MockerFixture
+) -> None:
     """A genuinely novel, unregistered section name triggers a stderr diagnostic.
 
-    Tests: operations._normalize_section_key -> _warn_unregistered_section
-    How: Call _normalize_section_key with a name that resolves through neither
-         the registry nor the alias map (never seen anywhere in this repo).
+    Tests: operations.groom_item -> _warn_unregistered_section
+    How: Groom a section under a name that resolves through neither the
+         registry nor the alias map (never seen anywhere in this repo).
     Why: The direct root cause #2970 exists to close — unregistered names must
          be visible immediately, not silently accumulate under unknown__.
 
     The reader is an agent in another repository, on a project of its own,
     with no access to this plugin's source. The message therefore carries the
-    section name and the one constraint that bears on that agent's task — a
-    later read must use the same name verbatim — and none of this plugin's
-    design-time concerns: not the registry, not the unknown__ key, and no
-    instruction to change anything here.
+    section name, the one name a later read has to ask for, and none of this
+    plugin's design-time concerns: not the registry, not the unknown__ key,
+    and no instruction to change anything here.
     """
+    _mock_no_github(mocker)
     novel_name = "Never Before Seen Diagnostic Probe"
     key = ops._normalize_section_key(novel_name)
-
     assert key.startswith("unknown__")
+
+    out = Output()
+    title = "Novel name diagnostic"
+    ops.add_item(title=title, priority="P1", description="Test", output=out)
+    capsys.readouterr()
+    ops.groom_item(selector=title, section=novel_name, content="Probe.", output=out)
+
     captured = capsys.readouterr()
     assert novel_name in captured.err
     assert "exactly" in captured.err
@@ -136,33 +148,138 @@ def test_unregistered_section_name_emits_stderr_diagnostic(capsys: pytest.Captur
         assert leak not in captured.err, f"message leaks a design-time concern: {leak!r}"
 
 
-def test_unregistered_section_name_records_output_warning() -> None:
+def test_unregistered_section_name_records_output_warning(mocker: MockerFixture) -> None:
     """The same fallback also records a structured warning on the Output aggregator.
 
-    Tests: operations._normalize_section_key(output=...) -> Output.warnings
+    Tests: operations.groom_item -> Output.warnings
     Why: An MCP caller reads Output.warnings, not stderr — both channels must
          carry the diagnostic (see ARCHITECTURE.md "Module: section_registry.py").
     """
-    out = Output()
+    _mock_no_github(mocker)
     novel_name = "Another Never Before Seen Probe"
+    out = Output()
+    title = "Novel name warning"
+    ops.add_item(title=title, priority="P1", description="Test", output=out)
 
-    ops._normalize_section_key(novel_name, output=out)
+    write = Output()
+    ops.groom_item(selector=title, section=novel_name, content="Probe.", output=write)
 
-    assert any(novel_name in w for w in out.warnings)
+    assert any(novel_name in w for w in write.warnings)
 
 
-def test_registered_section_name_emits_no_stderr_diagnostic(capsys: pytest.CaptureFixture[str]) -> None:
+def test_registered_section_name_emits_no_stderr_diagnostic(
+    capsys: pytest.CaptureFixture[str], mocker: MockerFixture
+) -> None:
     """A canonical or aliased name never triggers the unregistered-name diagnostic.
 
-    Tests: operations._normalize_section_key resolved path — falsification check
+    Tests: operations.groom_item resolved path — falsification check
     Why: Proves the diagnostic fires only on a genuine fallback, not on every
-         call — a diagnostic that fires unconditionally would be noise, not signal.
+         write — a diagnostic that fires unconditionally would be noise, not signal.
     """
-    ops._normalize_section_key("RT-ICA")
-    ops._normalize_section_key("Facts check")
+    _mock_no_github(mocker)
+    out = Output()
+    title = "Registered name quiet"
+    ops.add_item(title=title, priority="P1", description="Test", output=out)
+    capsys.readouterr()
 
-    captured = capsys.readouterr()
-    assert captured.err == ""
+    write = Output()
+    ops.groom_item(selector=title, section="RT-ICA", content="Probe.", output=write)
+    ops.groom_item(selector=title, section="Facts check", content="Probe.", output=write)
+
+    assert capsys.readouterr().err == ""
+    assert write.warnings == []
+
+
+# ---------------------------------------------------------------------------
+# The name the diagnostic tells the caller to read back with (#3800)
+# ---------------------------------------------------------------------------
+
+# Names that survive the storage key's punctuation folding differently: the
+# first three come back under a different spelling, the fourth is unchanged.
+# Parametrizing over both proves the message names a retrievable spelling in
+# either case rather than echoing whatever the caller wrote.
+_UNREGISTERED_NAMES = ["Diffusion/Images", "Cost & Latency", "RFC-2119 Notes", "Grooming Drift"]
+
+
+def _mock_no_github(mocker: MockerFixture) -> None:
+    mocker.patch("backlog_core.operations.view_enrich_from_github", return_value=False)
+    mocker.patch("backlog_core.operations.try_get_github", return_value=None)
+
+
+def _name_the_message_says_to_use(message: str) -> str:
+    """Return the section name *message* instructs a later read to ask for.
+
+    Reads the instruction the way its audience does — the last name the
+    sentence quotes — so this stays valid for any rewording that still ends by
+    naming one spelling. The quote must not sit against a word character, or a
+    contraction in the prose ("tool's") would open a spurious span.
+    """
+    quoted = re.findall(r"(?<!\w)'([^']*)'(?!\w)", message)
+    assert quoted, f"message names no section at all: {message!r}"
+    return quoted[-1]
+
+
+@pytest.mark.parametrize("name", _UNREGISTERED_NAMES)
+def test_unregistered_section_round_trips_under_the_name_the_message_gives(name: str, mocker: MockerFixture) -> None:
+    """Reading back with the name the diagnostic gives returns the content written.
+
+    Tests: operations.groom_item write -> _warn_unregistered_section message
+           -> operations.view_item(section=...) read
+    How: Write a section under an unregistered name, take the name the emitted
+         warning instructs a reader to use, and ask view_item for exactly that.
+    Why: The message is the only thing its audience has. A spelling the storage
+         layer will not return makes an agent conclude the write was lost, so
+         the round trip — not the wording — is what has to hold.
+    """
+    _mock_no_github(mocker)
+    setup = Output()
+    title = f"Message round trip {name}"
+    ops.add_item(title=title, priority="P1", description="Test", output=setup)
+
+    write = Output()
+    ops.groom_item(selector=title, section=name, content="Round-trip probe.", output=write)
+
+    warnings = [w for w in write.warnings if repr(name) in w]
+    assert len(warnings) == 1, f"expected one warning naming {name!r}, got {write.warnings}"
+    asked = _name_the_message_says_to_use(warnings[0])
+
+    result = ops.view_item(selector=title, section=asked, output=Output())
+    contents = [
+        entry["content"]
+        for section in result.sections.values()
+        if ops._is_section_entry_metadata(section)
+        for entry in section["entries"]
+    ]
+    assert "Round-trip probe." in contents, (
+        f"message told the caller to read back {asked!r}; that returned {result.sections}"
+    )
+
+
+def test_no_save_is_announced_when_the_write_fails(mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """A failed section write announces nothing on either channel.
+
+    Tests: operations.groom_item -> _warn_unregistered_section emission point
+    How: Make the backend write raise, then groom an unregistered section name.
+    Why: The message says the section saved. Emitting it from the key
+         computation announced the save before the write was attempted, so a
+         backend failure left the caller told only that the write succeeded.
+    """
+    _mock_no_github(mocker)
+    setup = Output()
+    title = "Announce only on success"
+    ops.add_item(title=title, priority="P1", description="Test", output=setup)
+    capsys.readouterr()
+
+    from backlog_core.backend_protocol import get_config
+
+    mocker.patch.object(type(get_config().backend), "put_work_item", side_effect=RuntimeError("backend down"))
+
+    write = Output()
+    with pytest.raises(RuntimeError):
+        ops.groom_item(selector=title, section="Never Saved Probe", content="Lost.", output=write)
+
+    assert capsys.readouterr().err == ""
+    assert write.warnings == []
 
 
 # ---------------------------------------------------------------------------
