@@ -56,11 +56,9 @@ def _load(
 ) -> dict:
     """Compile an agent definition into a loadable profile.
 
-    Locates the agent file by name, parses its YAML frontmatter and instruction
-    body, and returns an ``AgentProfile`` dict ready for context injection into a
-    task-worker. Skill URIs are returned as raw strings — load each skill via
-    ``Skill(skill=uri)`` using the Claude Code SDK. Exposed as ``profile_load``
-    in the backlog MCP namespace.
+    Finds the agent ``agent_name`` names, reads its frontmatter and instruction
+    body, and returns a profile ready for context injection into a task-worker.
+    Skills come back as raw name strings for the caller to load itself.
 
     Args:
         agent_name: Agent name in bare or plugin-qualified form.
@@ -134,11 +132,9 @@ def _list(
 ) -> dict:
     """Enumerate agent definitions across all plugins.
 
-    Scans all ``plugins/*/agents/**/*.md`` files, reads their frontmatter to
-    extract summary metadata, and returns a list of :class:`ProfileListEntry`
-    objects. Agents that cannot be parsed are skipped with a warning rather
-    than causing the entire call to fail. Exposed as ``profile_list`` in the
-    backlog MCP namespace.
+    Reads every plugin's agent definitions and returns one summary entry per
+    agent. An agent that cannot be parsed is skipped with a warning rather than
+    failing the call. Pass ``plugin`` to enumerate a single plugin.
 
     Args:
         plugin: Optional plugin name to filter results. When ``None``, all

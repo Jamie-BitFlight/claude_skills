@@ -3501,8 +3501,8 @@ async def artifact_read(
 ) -> Annotated[dict[str, object], _wire_schema(ArtifactReadResponse)]:
     """Read provider-owned logical content for a registered artifact.
 
-    The selected ContentProvider resolves the artifact by owner, type, and
-    logical identifier. This layer does not access local artifact files.
+    The configured backend resolves the artifact from ``item_id``, ``artifact_type``
+    and ``artifact_id``. No local artifact file is read.
 
     Omitting ``artifact_id`` returns the most recently registered entry of the type.
     Supplying it addresses one specific entry.
@@ -4147,9 +4147,9 @@ async def dispatch_create_plan(
 ) -> Annotated[dict[str, object], _wire_schema(DispatchCreatePlanResponse)]:
     """Create or overwrite a stored dispatch plan for a milestone.
 
-    Accepts a typed ``DispatchPlan`` model, stores it atomically through the
-    configured content backend, and optionally validates structural integrity
-    after writing. On the GitHub backend, writing a genuinely new plan (not
+    ``plan`` is the typed plan itself, stored atomically through the configured
+    content backend, and validated for structural integrity after writing unless
+    ``validate`` is false. On the GitHub backend, writing a genuinely new plan (not
     byte-identical to what's stored) is unsupported and returns an error.
 
     ``errors`` and ``warnings`` carry the plan's validation results, not this call's
@@ -4760,8 +4760,7 @@ async def dispatch_spawn(
     2. Reads the dispatch plan to get wave items.
     3. Iterates waves from ``wave_num`` through the last wave in the plan.
     4. For each wave: spawns items throttled to ``max_concurrent``, monitors
-       PIDs, reads result files, and reports progress via
-       ``ctx.report_progress()``.
+       PIDs, reads result files, and reports progress as it goes.
     5. On item failure: marks failed, continues with remaining items.
     6. Reports the run summary once every wave completes.
     """
