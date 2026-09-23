@@ -444,6 +444,11 @@ function buildAgentList() {
       agentFile: 'codebase-analyzer.md',
     },
     {
+      key: 'development-harness:dh-context-gathering',
+      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
+      agentFile: 'dh-context-gathering.md',
+    },
+    {
       key: 'development-harness:context-refinement',
       pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
       agentFile: 'context-refinement.md',
