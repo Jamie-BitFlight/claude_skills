@@ -10,26 +10,7 @@ Complete syntax reference for all Mermaid diagram types. Enables AI agents to co
 
 ## Scope
 
-TRIGGER: Activate when the user asks to create, fix, or modify any Mermaid diagram, or when generating Mermaid diagram code of any type.
-
-COVERS:
-
-- Flowchart/graph diagrams — node shapes, edge types, subgraphs, styling, interactivity
-- Sequence diagrams — actors, messages, loops, activations, notes
-- Class diagrams — classes, relationships, methods, visibility
-- State diagrams — states, transitions, composite states, forks
-- Entity-relationship diagrams — entities, attributes, relationships
-- Gantt charts — tasks, sections, dependencies, date formats
-- Git graphs — commits, branches, merges, cherry-picks
-- Mindmaps — nodes, icons, classes, shapes
-- Timeline and user journey diagrams
-- Data charts — pie, quadrant, XY chart, sankey
-- Advanced diagrams — block, C4, kanban, packet
-
-DOES NOT COVER:
-
-- Mermaid.js API or rendering engine internals
-- HTML/JavaScript integration beyond click callbacks
+Use when constructing, selecting, or debugging Mermaid syntax. Choose the diagram family that best expresses the intended semantics, then load only the relevant reference below. This skill covers Mermaid construction and parser/rendering constraints; it does not define the process/system being represented.
 
 ## Quick Reference — Common Patterns
 
@@ -101,6 +82,8 @@ For flowchart styling, subgraphs, and interactivity, also load [subgraphs-and-la
 For the full 6-phase flowchart element selection process (direction, shape, edge, label, grouping, styling), see [Flowchart Construction Decision Process](./references/flowchart-construction.md).
 
 ## Reference Files
+
+Load only references needed by the current diagram branch.
 
 ### Flowchart References
 
