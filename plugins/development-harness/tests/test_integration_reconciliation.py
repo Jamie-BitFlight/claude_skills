@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import patch
 
+import pytest
 from backlog_core.backend_protocol import get_config
 from backlog_core.models import BacklogItem, IssueStatus
 from backlog_core.operations import _filter_closed_items, list_items
@@ -109,6 +110,7 @@ class TestFilterClosedItemsOperations:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestListItemsIncludeClosed:
     """Verify list_items function respects include_closed parameter end-to-end."""
 

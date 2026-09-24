@@ -117,7 +117,9 @@ class TestWorkBacklogItem:
 
         assert isinstance(result["items"], list)
         assert result["count"] >= 0
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        assert provider_state.call_args.kwargs["snapshot"].items == []
 
     # Scenario 4: list with label filter (does not error without GitHub)
     async def test_list_with_label_filter(self, backlog_dir, mock_github, write_test_item):
@@ -209,7 +211,9 @@ class TestWorkBacklogItem:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_update_creates_github_issue_when_missing(self, backlog_dir, mock_github, write_test_item):
+    async def test_update_creates_github_issue_when_missing(
+        self, backlog_dir, mock_github, write_test_item, plain_memory_backend
+    ):
         """Scenario 10: backlog_update creates a GitHub issue when the item lacks one."""
         write_test_item("Issue Create Test", priority="P1")
         mock_github["try_get_github"].return_value = MagicMock()
@@ -304,7 +308,9 @@ class TestGroomBacklogItem:
         assert any(
             "groomed content" in entry.content for section in stored.sections.values() for entry in section.entries
         )
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#80"]),)
+        assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#80"
         assert isinstance(result["messages"], list)
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
@@ -354,7 +360,9 @@ class TestGroomBacklogItem:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_groom_local_only(self, backlog_dir, mock_github, write_test_item, provider_state):
+    async def test_groom_local_only(
+        self, backlog_dir, mock_github, write_test_item, provider_state, plain_memory_backend
+    ):
         write_test_item("Groom Local Only Test")
         mock_github["try_get_github"].return_value = None
 
@@ -466,13 +474,15 @@ class TestBacklogItemGroomer:
 class TestSyncAndPull:
     """Scenarios for backlog_sync and backlog_pull tools."""
 
-    async def test_sync_creates_missing_issues(self, backlog_dir, mock_github, write_test_item):
+    async def test_sync_creates_missing_issues(self, backlog_dir, mock_github, write_test_item, mocker):
         """Scenario 20: backlog_sync creates GitHub issues for items that lack them."""
         write_test_item("Sync Test Item", priority="P1")
         mock_repo = MagicMock()
         mock_github["get_github"].return_value = mock_repo
         mock_github["fetch_open_issues_by_title"].return_value = {}
         mock_github["create_issue_for_item"].return_value = 99
+        backend = get_config().backend
+        mocker.patch.object(backend, "pending_work_items", side_effect=lambda repo="": backend.list_work_items())
 
         result = await _call("backlog_sync")
 
@@ -482,9 +492,11 @@ class TestSyncAndPull:
         assert isinstance(result["warnings"], list)
         assert isinstance(result["errors"], list)
 
-    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item, provider_state):
+    async def test_pull_updates_local(self, backlog_dir, mock_github, write_test_item, provider_state, mocker):
         write_test_item("Pull Test Item", priority="P1", issue="#50")
         provider_state.return_value = ReconcileResult(local_updates=1)
+        backend = get_config().backend
+        mocker.patch.object(backend, "pending_work_items", side_effect=lambda repo="": backend.list_work_items())
 
         result = await _call("backlog_pull")
 
@@ -813,6 +825,7 @@ class TestLifecycles:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestSemanticMatchingInfrastructure:
     """Integration tests for the semantic matching strategy chain infrastructure.
 
@@ -928,6 +941,7 @@ class TestSemanticMatchingInfrastructure:
         assert result["count"] == 3
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestSemanticQueryCorpus:
     """Corpus-based integration tests verifying the filter infrastructure
     supports semantic matching for a diverse set of queries.
@@ -1196,6 +1210,7 @@ class TestEndToEndQueryToResult:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("plain_memory_backend")
 class TestCompactBacklogView:
     """Scenarios for backlog_view with include_content=False (compact mode).
 
@@ -1498,7 +1513,8 @@ class TestResolveVerifiedGate:
     ):
         write_test_item("Premature Close Test", issue="#206")
 
-        def reconcile_closed(_request: ReconcileRequest) -> ReconcileResult:
+        def reconcile_closed(_request: ReconcileRequest, *, snapshot=None) -> ReconcileResult:
+            assert snapshot is not None
             item = _stored_item("Premature Close Test")
             item.status = "closed"
             item.metadata.status = "closed"
@@ -1511,7 +1527,9 @@ class TestResolveVerifiedGate:
         result = await _call("backlog_list", {"refresh": True, "include_closed": True})
 
         assert isinstance(result["items"], list)
-        provider_state.assert_called_once_with(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, references=["#206"]))
+        provider_state.assert_called_once()
+        assert provider_state.call_args.args == (ReconcileRequest(scope=ReconcileScope.INCREMENTAL),)
+        assert provider_state.call_args.kwargs["snapshot"].items[0].reference == "#206"
         stored = _stored_item("Premature Close Test")
         assert stored.reference == "#206"
         assert stored.status == "closed"
