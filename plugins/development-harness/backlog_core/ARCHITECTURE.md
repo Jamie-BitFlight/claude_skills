@@ -1038,7 +1038,10 @@ a bulk snapshot. Title selectors and global operations obtain one complete comma
 snapshot and reuse it for selection, status facts, duplicate checks, and compatible reconciliation.
 Pending mutations are joined separately as local intent; they do not replace the provider
 observation. Provider failure propagates by default, while `allow_cached=True` permits a warned
-cache fallback after that failure. A successful empty provider observation is final.
+cache fallback after that failure. That fallback calls the GitHub-specific
+`cached_work_items(repo)` seam with the command's repository, so equal issue numbers in different
+repositories cannot select the configured/default repository's baseline. A successful empty
+provider observation is final.
 
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.

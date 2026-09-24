@@ -213,6 +213,14 @@ class GitHubBackend:
         """
         return self._reconciliation.list_work_items()
 
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]:
+        """List cached provider rows for one repository.
+
+        Returns:
+            Persisted work items scoped to the selected repository.
+        """
+        return self._reconciliation.list_work_items(repo)
+
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
 

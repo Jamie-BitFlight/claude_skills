@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,9 @@ import pytest
 
 from backlog_core import operations
 from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.file_cache import FileCache
 from backlog_core.github_sync import render_issue_body
 from backlog_core.models import (
     BackendUnavailableError,
@@ -102,6 +105,10 @@ class _LiveBackend(InMemoryBackend):
     def list_work_items(self) -> list[BacklogItem]:
         self.cached_list_calls += 1
         return [item.model_copy(deep=True) for item in self.cached_items]
+
+    def cached_work_items(self, repo: str = "") -> list[BacklogItem]:
+        del repo
+        return self.list_work_items()
 
     def get_work_item(self, reference: str) -> BacklogItem:
         self.cached_get_calls += 1
@@ -361,3 +368,57 @@ def test_pending_only_tombstone_queues_without_direct_provider_side_effect(mocke
 
     provider_call.assert_not_called()
     assert backend.writes
+
+
+def test_exact_groom_and_mark_groomed_persist_content_and_status_together(mocker: MockerFixture) -> None:
+    """The final queued item contains both mutations from one exact command."""
+    live = BacklogItem(title="live title", issue="#7", priority="P1")
+    backend = _LiveBackend([live])
+    _configure(mocker, backend)
+    mocker.patch.object(operations, "apply_status_groomed")
+
+    operations.groom_item(
+        "#7", section="Acceptance Criteria", content="- [ ] Retain the new criterion", mark_groomed=True
+    )
+
+    stored = backend.writes[-1]
+    section = stored.sections["acceptance_criteria"]
+    assert isinstance(section, Section)
+    assert section.entries[-1].content == "- [ ] Retain the new criterion"
+    assert stored.metadata.status == "groomed"
+
+
+@pytest.mark.parametrize(("pending_only", "allow_cached"), [(False, True), (True, False)])
+def test_verified_fallback_persists_queued_status_intent(
+    tmp_path: Path, mocker: MockerFixture, pending_only: bool, allow_cached: bool
+) -> None:
+    """A queued verified report corresponds to a durable local status mutation."""
+    repo = "owner/repository"
+    item = BacklogItem(title="selected title", issue="#7", priority="P1")
+    backend = GitHubBackend(repo=repo, cache=FileCache(tmp_path))
+    if pending_only:
+        backend.put_work_item(item, repo)
+        snapshot = ProviderSnapshot(
+            items=[
+                ProviderItem(
+                    provider_id="", reference="#7", title="", body="", state="", labels=[], revision="", exists=False
+                )
+            ],
+            sync_started_at="2026-09-24T00:00:00+00:00",
+        )
+        mocker.patch.object(backend, "fetch_snapshot", return_value=snapshot)
+    else:
+        backend.reconcile(
+            ReconcileRequest(scope=ReconcileScope.INITIAL, repo=repo, apply_local_patches=False),
+            snapshot=ProviderSnapshot(items=[_provider_item(item)], sync_started_at="2026-09-24T00:00:00+00:00"),
+        )
+        mocker.patch.object(backend, "fetch_snapshot", side_effect=BackendUnavailableError("offline"))
+    mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
+    apply_verified = mocker.patch.object(operations, "apply_status_verified")
+
+    result = operations.update_item("#7", verified=True, repo=repo, allow_cached=allow_cached)
+
+    apply_verified.assert_not_called()
+    assert result["verified"] is True
+    queued = backend.pending_work_items(repo)
+    assert queued[-1].metadata.status == "verified"
