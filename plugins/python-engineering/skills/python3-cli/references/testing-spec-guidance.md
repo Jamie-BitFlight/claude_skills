@@ -12,7 +12,7 @@ Include these in every architecture spec's technology stack:
 
 ```text
 pytest>=8.0.0              # test execution
-pytest-cov>=6.0.0          # coverage (80% minimum, 95%+ critical code)
+pytest-cov>=6.0.0          # coverage evidence for changed behavior and configured project gates
 pytest-mock>=3.14.0        # mocking (never unittest.mock directly)
 pytest-asyncio>=0.24.0     # async support
 typer.testing.CliRunner    # CLI integration testing
@@ -24,9 +24,10 @@ mutmut>=2.4.0              # mutation testing (payments, auth, security)
 
 ## Coverage Requirements to Specify
 
-- **Overall**: 80% line and branch coverage (enforced in pyproject.toml `fail_under=80`)
-- **Critical code** (payment, auth, security, compliance): 95%+ coverage
-- **Mutation testing**: 90%+ kill rate for critical code paths
+- Cover changed behavior, public contracts, boundaries, regressions, and meaningful failure paths.
+- Preserve an existing repository coverage threshold when one is configured; do not introduce a percentage target when none exists.
+- Inspect uncovered changed branches and explicitly decide whether they represent meaningful risk.
+- Use mutation testing for critical logic when it materially strengthens confidence; do not invent a universal kill-rate target.
 
 ---
 
@@ -108,7 +109,7 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 80
+# Preserve the project's existing fail_under value when one is configured.
 ```
 
 ---
