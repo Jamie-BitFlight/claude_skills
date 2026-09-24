@@ -76,8 +76,10 @@ The collision response identifies the colliding reference and existing title, re
 directs the caller to invoke creation again for distinct work. Existing update and groom operations
 continue to modify an exact reference.
 
-Identity immutability and collision handling rely on the backlog's existing reference protections;
-this decision adds no lower-layer immutability machinery.
+For explicit references, create-only behavior requires an atomic insert-if-absent operation at the
+`WorkItemBackend`/provider boundary. A frontend check followed by an ordinary write is insufficient
+because another creator can win between those operations. This provider-boundary primitive
+satisfies the collision invariant without adding a separate reference-immutability subsystem.
 
 ### Provider status contract
 
