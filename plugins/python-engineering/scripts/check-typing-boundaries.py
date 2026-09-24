@@ -45,9 +45,13 @@ def find_any_usage(filepath: Path) -> list[tuple[int, str]]:
                 isinstance(node.func, ast.Attribute) and node.func.attr == "cast"
             ):
                 violations.append((node.lineno, "calls cast()"))
-        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            if node.value.id == "typing" and node.attr == "Any":
-                violations.append((node.lineno, "uses typing.Any"))
+        elif (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "typing"
+            and node.attr == "Any"
+        ):
+            violations.append((node.lineno, "uses typing.Any"))
 
     return violations
 
