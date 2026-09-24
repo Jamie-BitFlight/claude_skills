@@ -17,9 +17,17 @@ Covers: app creation with `typer.Typer()` and `typer.run()`, CLI arguments and o
 
 ---
 
+## Agent-facing CLI output
+
+**Triggers**: CLI or script implemented inside an Agent Skill or plugin; command primarily consumed by AI agents or automation.
+
+Keep output machine-readable: compact JSON on stdout, preferably `BaseModel.model_dump_json()`; diagnostics on stderr. Do not route to Rich/UI skills unless a separate human-facing presentation mode is explicitly required.
+
+---
+
 ## Terminal UI — Rich
 
-**Triggers**: `rich.console.Console`, `rich.table.Table`, `rich.progress.track`, `rich.progress.Progress`, `rich.panel.Panel`, `rich.tree.Tree`, `rich.live.Live`, `rich.syntax.Syntax`, `rich.markdown.Markdown`, `rich.logging.RichHandler`, `rich.traceback.install`, `rich.print`, Rich markup tags, `rich.columns.Columns`, `rich.layout.Layout`, `rich.json.JSON`, `rich.pretty.pprint`, `__rich_console__`, `__rich__`, `__rich_repr__`
+**Triggers**: human-facing terminal presentation using `rich.console.Console`, `rich.table.Table`, `rich.progress.track`, `rich.progress.Progress`, `rich.panel.Panel`, `rich.tree.Tree`, `rich.live.Live`, `rich.syntax.Syntax`, `rich.markdown.Markdown`, `rich.logging.RichHandler`, `rich.traceback.install`, `rich.print`, Rich markup tags, `rich.columns.Columns`, `rich.layout.Layout`, `rich.json.JSON`, `rich.pretty.pprint`, `__rich_console__`, `__rich__`, `__rich_repr__`
 
 ```text
 Skill(skill="python-engineering:python3-cli")
