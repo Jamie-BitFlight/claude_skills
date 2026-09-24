@@ -2,6 +2,17 @@
   <img src="./assets/claude-skills-overview.svg" alt="Diagram showing engineering workflows routed through Claude Skills to skills, specialist agents, hooks, and MCP tools." width="100%" />
 </p>
 
+<p align="center">
+  <a href="#quick-start"><strong>Get started</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="#start-with-these"><strong>Explore workflows</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="#plugin-catalogue"><strong>Browse plugins</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="./CONTRIBUTING.md"><strong>Contribute</strong></a>
+</p>
+
+
 # Claude Skills
 
 A marketplace of opinionated Agent Skills, specialist agents, hooks, and engineering workflows for Claude Code.
