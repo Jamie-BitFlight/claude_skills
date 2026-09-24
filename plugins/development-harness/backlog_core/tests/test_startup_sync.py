@@ -38,7 +38,14 @@ from backlog_core.backend_types import BacklogConfig as BackendConfig, WorkItemB
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.backends.sqlite_backend import SQLiteBackend
-from backlog_core.models import BackendUnavailableError, BacklogError
+from backlog_core.models import (
+    BackendStatus,
+    BackendUnavailableError,
+    BacklogError,
+    ProviderSnapshot,
+    ReconcileRequest,
+    ReconcileResult,
+)
 from backlog_core.sync_engine import _startup_sync_loop
 from backlog_core.sync_state import (
     SyncErrorKind,
@@ -161,6 +168,68 @@ class TestSingletonSyncLaunch:
             f"Got {sync_called_count} start(s). "
             "If >1, the lifespan is re-running on each tool call (FastMCP issue #1115)."
         )
+
+    @pytest.mark.allow_startup_sync
+    async def test_successful_read_returns_while_cold_checkpoint_maintenance_is_blocked(
+        self, mocker: MockerFixture
+    ) -> None:
+        """A successful MCP read schedules one singleton sync without awaiting it."""
+
+        class ColdSyncBackend(InMemoryBackend):
+            def has_synced_snapshot(self) -> bool:
+                return False
+
+            def reconcile(
+                self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None
+            ) -> ReconcileResult:
+                del request, snapshot
+                return ReconcileResult()
+
+        reset_sync_state()
+        started = asyncio.Event()
+        release = asyncio.Event()
+        launch_count = 0
+
+        async def blocked_sync(state: SyncState, full_refresh: bool = False) -> None:
+            nonlocal launch_count
+            del full_refresh
+            launch_count += 1
+            started.set()
+            await release.wait()
+            state.status = SyncStatus.IDLE
+
+        result = {
+            "items": [],
+            "count": 0,
+            "from_cache": False,
+            "has_pending_writes": False,
+            "status_source": "live",
+            "unavailable_capabilities": [],
+            "filters_evaluated_against_unavailable_data": [],
+            "messages": [],
+            "warnings": [],
+            "errors": [],
+        }
+        mocker.patch("backlog_core.server.get_config", return_value=BackendConfig(backend=ColdSyncBackend()))
+        mocker.patch("backlog_core.server.operations.list_items", return_value=result)
+        mocker.patch("backlog_core.server._probe_backend_status", return_value=BackendStatus())
+        mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
+        mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=blocked_sync)
+
+        from backlog_core.server import backlog_list
+
+        try:
+            first = await backlog_list(count_only=True)
+            await asyncio.wait_for(started.wait(), timeout=1.0)
+            second = await backlog_list(count_only=True)
+            await asyncio.sleep(0)
+
+            assert first["count"] == second["count"] == 0
+            assert get_sync_state().status == SyncStatus.RUNNING
+            assert launch_count == 1
+        finally:
+            release.set()
+            await asyncio.sleep(0)
 
 
 # ---------------------------------------------------------------------------

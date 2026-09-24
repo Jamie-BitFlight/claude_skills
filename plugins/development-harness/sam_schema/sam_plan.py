@@ -2053,12 +2053,26 @@ def sam_tasks(
     parent_issue_number: Annotated[int, typer.Option("--parent-issue-number", min=1)],
     refresh_cache: Annotated[bool, typer.Option("--refresh-cache/--no-refresh-cache")] = True,
     repo: Annotated[str, typer.Option("--repo")] = "",
+    allow_cached: Annotated[
+        bool,
+        typer.Option(
+            "--allow-cached",
+            help="After a live provider read fails, permit a warned fallback to cached provider records",
+        ),
+    ] = False,
 ) -> None:
     """List SAM tasks under a parent issue."""
     output = Output()
-    result = operations.get_sam_tasks(
-        parent_issue_number=parent_issue_number, refresh_cache=refresh_cache, repo=repo, output=output
-    )
+    try:
+        result = operations.get_sam_tasks(
+            parent_issue_number=parent_issue_number,
+            refresh_cache=refresh_cache,
+            repo=repo,
+            allow_cached=allow_cached,
+            output=output,
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit_sam_result(result, output)
 
 

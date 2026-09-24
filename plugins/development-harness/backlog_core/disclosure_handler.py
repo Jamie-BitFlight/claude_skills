@@ -244,7 +244,7 @@ class BacklogViewDisclosureHandler:
         self._extractor = extractor if extractor is not None else TokenBoundedExtractor()
 
     def handle(
-        self, selector: str, request: DisclosureRequest, refresh: bool = False
+        self, selector: str, request: DisclosureRequest, refresh: bool = False, allow_cached: bool = False
     ) -> MapResponse | NavigateResponse | BoundedResponse:
         """Fetch item content and dispatch to the appropriate disclosure handler.
 
@@ -259,6 +259,7 @@ class BacklogViewDisclosureHandler:
             refresh: Forwarded unchanged to ``operations.view_item()``. Drop this
                 and ``refresh=True`` silently no-ops under map/navigate/extract —
                 the bug this parameter fixes.
+            allow_cached: Permit warned cached fallback after a live read failure.
 
         Returns:
             ``MapResponse``, ``NavigateResponse``, or ``BoundedResponse``
@@ -287,7 +288,7 @@ class BacklogViewDisclosureHandler:
         # returned MapResponse/NavigateResponse/BoundedResponse instead of
         # being silently dropped.
         output = Output()
-        view_result = operations.view_item(selector, refresh=refresh, output=output)
+        view_result = operations.view_item(selector, refresh=refresh, allow_cached=allow_cached, output=output)
         sections = self._normalizer.normalize(view_result)
         # Provenance of this read's live-enrichment data, forwarded onto every
         # disclosure response constructed below (#3546, B5/B6; Codex review,

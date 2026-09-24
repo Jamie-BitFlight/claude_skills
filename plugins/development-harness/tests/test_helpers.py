@@ -7,37 +7,66 @@ tests for.
 
 from __future__ import annotations
 
-import asyncio
+import json
+from types import SimpleNamespace
+from typing import Self
 
 import pytest
 from fastmcp import FastMCP
-from mcp import ClientSession
 
 from tests.helpers import call_mcp_tool
 
-_SAFETY_NET_SECONDS = 5.0
+
+async def test_call_mcp_tool_has_no_default_tool_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The shared helper bounds initialization but leaves ordinary tool calls unbounded."""
+    constructor_kwargs: dict[str, object] = {}
+    call_kwargs: dict[str, object] = {}
+
+    class RecordingClient:
+        def __init__(self, _mcp: FastMCP, **kwargs: object) -> None:
+            constructor_kwargs.update(kwargs)
+
+        async def __aenter__(self) -> Self:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+        async def call_tool(self, _name: str, _params: dict[str, object], **kwargs: object) -> object:
+            call_kwargs.update(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(text=json.dumps({"ok": True}))])
+
+    monkeypatch.setattr("fastmcp.client.Client", RecordingClient)
+
+    result = await call_mcp_tool(FastMCP("timeout-contract"), "probe")
+
+    assert result == {"ok": True}
+    assert constructor_kwargs == {"timeout": None, "init_timeout": 30.0}
+    assert call_kwargs == {}
 
 
-async def test_call_mcp_tool_bounds_a_stalled_initialization_handshake(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A stalled MCP initialization handshake must fail within timeout_seconds.
+async def test_call_mcp_tool_applies_only_an_explicit_tool_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit deadline belongs to call_tool, not the reusable client transport."""
+    constructor_kwargs: dict[str, object] = {}
+    call_kwargs: dict[str, object] = {}
 
-    Regression test for the gap where call_mcp_tool passed timeout (the
-    per-request read timeout) but not init_timeout (a separate FastMCP
-    Client parameter defaulting to disabled) -- a server that stalls
-    during the initialize() handshake, before any tool call even starts,
-    would hang forever despite the documented timeout bound.
+    class RecordingClient:
+        def __init__(self, _mcp: FastMCP, **kwargs: object) -> None:
+            constructor_kwargs.update(kwargs)
 
-    The whole test is wrapped in a hard wall-clock safety net well above
-    the configured timeout, so if the fix regresses this test fails
-    loudly instead of hanging the suite.
-    """
+        async def __aenter__(self) -> Self:
+            return self
 
-    async def _hang_forever(self: ClientSession, *args: object, **kwargs: object) -> None:
-        await asyncio.sleep(999)
+        async def __aexit__(self, *_args: object) -> None:
+            return None
 
-    monkeypatch.setattr(ClientSession, "send_discover", _hang_forever)
+        async def call_tool(self, _name: str, _params: dict[str, object], **kwargs: object) -> object:
+            call_kwargs.update(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(text=json.dumps({"ok": True}))])
 
-    mcp = FastMCP("stall-test")
+    monkeypatch.setattr("fastmcp.client.Client", RecordingClient)
 
-    with pytest.raises(RuntimeError, match="Failed to initialize"):
-        await asyncio.wait_for(call_mcp_tool(mcp, "nonexistent_tool", timeout_seconds=1.0), timeout=_SAFETY_NET_SECONDS)
+    await call_mcp_tool(FastMCP("timeout-contract"), "probe", timeout_seconds=1.5)
+
+    assert constructor_kwargs == {"timeout": None, "init_timeout": 30.0}
+    assert call_kwargs == {"timeout": 1.5}
