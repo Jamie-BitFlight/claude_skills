@@ -28,6 +28,7 @@ __all__ = [
     "ReconcileOutcome",
     "ReconcilePlan",
     "finalize_reconciliation",
+    "provider_item_to_backlog_item",
     "reconcile_backlog",
     "synchronized_fingerprint",
 ]
@@ -144,7 +145,12 @@ def _compose(
     )
 
 
-def _new_local_item(provider: ProviderItem) -> BacklogItem:
+def provider_item_to_backlog_item(provider: ProviderItem) -> BacklogItem:
+    """Convert one normalized provider item into the logical work-item model.
+
+    Returns:
+        Parsed logical work item carrying provider-owned fields.
+    """
     parsed = parse_issue_body(provider.body)
     return _compose(BacklogItem(reference=provider.reference), provider, parsed)
 
@@ -231,7 +237,7 @@ def _plan_item(
 ) -> None:
     if record is None:
         if provider.exists:
-            item = _checkpoint(_new_local_item(provider), provider.revision)
+            item = _checkpoint(provider_item_to_backlog_item(provider), provider.revision)
             plan.cache_actions.append(_action(provider.reference, item))
             plan.result.changed_references.append(provider.reference)
         return

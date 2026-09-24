@@ -128,7 +128,7 @@ class _ReconcileProvider(Protocol):
     snapshot and patch steps substitutable on the composing backend.
     """
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot: ...
     def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]: ...
 
 
@@ -351,6 +351,7 @@ class _GitHubWorkItemSync:
             state=issue["state"],
             labels=[label["name"] for label in issue["labels"]],
             revision=version.revision,
+            milestone=issue["milestone"]["title"] if issue["milestone"] else "",
         )
 
     def work_item_version(
@@ -533,6 +534,10 @@ class _GitHubReconciliation:
         """
         return bool(self._cache._pending_work_item_mutations())
 
+    def pending_work_items(self) -> list[BacklogItem]:
+        """Return copied queued work-item intent without cached provider rows."""
+        return [mutation.item.model_copy(deep=True) for mutation in self._cache._pending_work_item_mutations()]
+
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
 
@@ -559,14 +564,19 @@ class _GitHubReconciliation:
         """
         self._cache._queue_work_item(item.reference, item.model_copy())
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
             Completed reconciliation counts with changed logical references.
         """
         effective_request = self._with_snapshot_checkpoint(request)
-        snapshot = self._provider._fetch_snapshot(effective_request)
+        if snapshot is None:
+            snapshot = self._provider.fetch_snapshot(effective_request)
+        elif effective_request.scope in {ReconcileScope.LINKED, ReconcileScope.TARGETED}:
+            observed = {item.reference for item in snapshot.items}
+            if missing := set(effective_request.references) - observed:
+                raise ValueError(f"Supplied snapshot is missing requested references: {sorted(missing)}")
         pending_work_items = self._cache._pending_work_item_mutations()
         plan = reconcile_backlog(self.load_records(pending_work_items), snapshot, effective_request)
         cache_results: list[ActionResult] = []

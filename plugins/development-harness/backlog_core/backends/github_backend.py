@@ -249,13 +249,13 @@ class GitHubBackend:
         """Persist a work-item intent for provider reconciliation."""
         self._reconciliation.put_work_item(item)
 
-    def reconcile(self, request: ReconcileRequest) -> ReconcileResult:
+    def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
 
         Returns:
             Completed reconciliation counts with changed logical references.
         """
-        return self._reconciliation.reconcile(request)
+        return self._reconciliation.reconcile(request, snapshot=snapshot)
 
     def _load_reconcile_records(
         self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
@@ -267,13 +267,17 @@ class GitHubBackend:
         """
         return self._reconciliation.load_records(pending_work_items)
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Fetch one normalized bounded GitHub snapshot for reconciliation.
 
         Returns:
             Provider snapshot whose pagination remains private to this adapter.
         """
         return self._work_items.fetch_snapshot(request)
+
+    def pending_work_items(self) -> list[BacklogItem]:
+        """Return copied queued work-item intent without cached provider rows."""
+        return self._reconciliation.pending_work_items()
 
     def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.

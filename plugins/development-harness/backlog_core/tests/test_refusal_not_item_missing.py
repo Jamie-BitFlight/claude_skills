@@ -689,7 +689,7 @@ class TestListingProvenance:
         withholds that cached result with explicit warnings."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.fetch_snapshot = MagicMock(return_value=_snapshot())
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
         assert cache._get_snapshot_checkpoint() is None  # A1: still honestly never-synced
 
@@ -714,7 +714,7 @@ class TestListingProvenance:
         """The same low-confidence state, opted into explicitly."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.fetch_snapshot = MagicMock(return_value=_snapshot())
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label="nonexistent-label"))
 
         mocker.patch.object(operations, "get_config", return_value=mocker.Mock(backend=backend))
@@ -767,7 +767,7 @@ class TestListingProvenance:
         missed (it only noticed the inverse: a cold cache with queued items)."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.fetch_snapshot = MagicMock(return_value=_snapshot())
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))  # unlabeled -> warm checkpoint
         assert cache._get_snapshot_checkpoint() is not None
 
@@ -797,7 +797,7 @@ class TestListingProvenance:
         listing must serve it normally -- no warning, no withheld items."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(return_value=_snapshot())
+        backend.fetch_snapshot = MagicMock(return_value=_snapshot())
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
         assert cache._get_snapshot_checkpoint() is not None
 
@@ -820,7 +820,7 @@ class TestListingProvenance:
         has_synced_snapshot() alone reports True."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(
+        backend.fetch_snapshot = MagicMock(
             return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
         )
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
@@ -872,7 +872,7 @@ class TestRefreshEscalatesToFullOnSkipSignal:
     ) -> None:
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(
+        backend.fetch_snapshot = MagicMock(
             return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
         )
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))
@@ -898,7 +898,7 @@ class TestRefreshEscalatesToFullOnSkipSignal:
         finding-2 escalation just because ``refresh=True`` was passed."""
         cache = FileCache(tmp_path)
         backend = GitHubBackend(cache=cache)
-        backend._fetch_snapshot = MagicMock(
+        backend.fetch_snapshot = MagicMock(
             return_value=_snapshot(items=[_provider_item("#1", "Issue 1"), _provider_item("#2", "Issue 2")])
         )
         backend.reconcile(ReconcileRequest(scope=ReconcileScope.INITIAL))

@@ -24,6 +24,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import pytest
+
 from backlog_core.backends.github_work_items import _GitHubReconciliation
 from backlog_core.file_cache import FileCache
 from backlog_core.github_sync import render_issue_body
@@ -51,11 +53,12 @@ class _FakeReconcileProvider:
     def __init__(self, snapshot: ProviderSnapshot, *, patch_status: _PatchStatus = "applied") -> None:
         self._snapshot = snapshot
         self._patch_status = patch_status
+        self.fetch_snapshot_calls: list[ReconcileRequest] = []
         self.apply_patches_calls: list[list[ProviderPatch]] = []
 
-    def _fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
         """Return the fixed snapshot regardless of the request (test double)."""
-        del request
+        self.fetch_snapshot_calls.append(request)
         return self._snapshot
 
     def _apply_patches(self, patches: list[ProviderPatch]) -> list[PatchResult]:
@@ -123,6 +126,23 @@ class TestFetchOnlyReconcileAdvancesTheCheckpoint:
         pending = cache._pending_work_item_mutations()
         assert len(pending) == 1
         assert pending[0].item.reference == _ISSUE_REFERENCE
+
+    def test_supplied_snapshot_skips_a_second_provider_fetch(self, tmp_path: Path) -> None:
+        cache = FileCache(tmp_path)
+        provider = _FakeReconcileProvider(_provider_snapshot())
+        reconciliation = _GitHubReconciliation(cache, provider)
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[_ISSUE_REFERENCE])
+
+        reconciliation.reconcile(request, snapshot=_provider_snapshot())
+
+        assert provider.fetch_snapshot_calls == []
+
+    def test_supplied_targeted_snapshot_must_cover_every_requested_reference(self, tmp_path: Path) -> None:
+        reconciliation = _GitHubReconciliation(FileCache(tmp_path), _FakeReconcileProvider(_provider_snapshot()))
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#1", "#2"])
+
+        with pytest.raises(ValueError, match="#2"):
+            reconciliation.reconcile(request, snapshot=_provider_snapshot())
 
     def test_a_second_fetch_only_call_does_not_repeat_the_full_fetch(self, tmp_path: Path) -> None:
         """Regression guard for the reported symptom: once the checkpoint has
