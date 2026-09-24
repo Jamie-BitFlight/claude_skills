@@ -333,7 +333,7 @@ flowchart TD
     Publish -->|No| Handoff; Publish -->|Yes| Remote["`Read [publication](./references/publication.md); reconcile one authorized attempt`"]
     Remote --> RemoteResult{Remote stage result?}
     RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Authorized exact-lease push]
-    RemoteResult -->|Every moved commit disposed; interactions validated| Orient
+    RemoteResult -->|Destination moved after one reconciliation/final observation| Retry
     RemoteResult -->|Conflict| RemoteConflict["`Read [conflict and ambiguity](./references/conflict-and-ambiguity.md); resolve remote intent`"]
     RemoteResult -->|Failure or unobservable| Recover
     RemoteConflict --> RemoteIntent{Exactly one outcome preserves compatible intent and passes checks?}
