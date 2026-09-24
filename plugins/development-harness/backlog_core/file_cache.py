@@ -26,6 +26,7 @@ from .file_cache_state import (
     _ProviderSnapshotCheckpoint,
     _RejectedMutation,
     _RejectedWorkItemMutation,
+    _work_item_identity,
     _work_item_mutation_key,
 )
 from .models import BacklogItem, ContentRecord, ContentRef, ContentUnavailableError, ContentWrite, parse_issue_number
@@ -78,7 +79,12 @@ class FileCache:
     def __init__(self, root: Path) -> None:
         """Initialize durable cache state beneath the provider-owned root."""
         self._root = root
+        self._default_repo = ""
         self._state = _CacheStateStore(root)
+
+    def _set_default_repo(self, repo: str) -> None:
+        self._default_repo = repo
+        self._state.default_repo = repo
 
     def get_content(self, reference: ContentRef, *, stale: bool = False) -> ContentRecord:
         """Return cached content, distinguishing an offline miss from stale data.
@@ -299,12 +305,17 @@ class FileCache:
         mutation = _PendingWorkItemMutation(
             idempotency_key=_work_item_mutation_key(key, item, repo), key=key, item=item, repo=repo
         )
+        identity = _work_item_identity(repo, key, self._default_repo)
         return self._state.transaction(
             lambda state: (
                 state.model_copy(
                     update={
                         "pending_work_items": [
-                            *(entry for entry in state.pending_work_items if (entry.repo, entry.key) != (repo, key)),
+                            *(
+                                entry
+                                for entry in state.pending_work_items
+                                if _work_item_identity(entry.repo, entry.key, self._default_repo) != identity
+                            ),
                             mutation,
                         ]
                     }

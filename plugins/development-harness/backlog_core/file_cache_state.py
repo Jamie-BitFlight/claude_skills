@@ -255,11 +255,16 @@ def _work_item_mutation_key(key: str, item: BacklogItem, repo: str = "") -> str:
     return hashlib.sha256(f"{identity}:{payload}".encode()).hexdigest()
 
 
+def _work_item_identity(repo: str, key: str, default_repo: str) -> tuple[str, str]:
+    return repo or default_repo, key
+
+
 class _CacheStateStore:
     """Serialize state transactions across threads and processes."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, default_repo: str = "") -> None:
         self._root = root
+        self.default_repo = default_repo
         self._state_path = root / _STATE_FILE
         self._legacy_state_path = root / _LEGACY_STATE_FILE
 
@@ -460,8 +465,7 @@ class _CacheStateStore:
         superseded = self._legacy_state_path.with_name(self._legacy_state_path.name + ".superseded")
         self._legacy_state_path.replace(superseded)
 
-    @staticmethod
-    def _merge_queue_state(current: _CacheState, legacy: _CacheState) -> _CacheState:
+    def _merge_queue_state(self, current: _CacheState, legacy: _CacheState) -> _CacheState:
         """Union all five queue/dead-letter fields from ``legacy`` into ``current``.
 
         ``rejected``/``rejected_work_items``/``corrupt_queue_entries`` are
@@ -498,8 +502,8 @@ class _CacheStateStore:
             ]
 
         pending, superseded_pending = _CacheStateStore._merge_pending_by_reference(current.pending, legacy.pending)
-        pending_work_items, superseded_work_items = _CacheStateStore._merge_pending_work_items_by_key(
-            current.pending_work_items, legacy.pending_work_items
+        pending_work_items, superseded_work_items = self._merge_pending_work_items_by_key(
+            current.pending_work_items, legacy.pending_work_items, self.default_repo
         )
         rejected = [*merged_by_key(current.rejected, legacy.rejected), *superseded_pending]
         rejected_work_items = [
@@ -567,7 +571,7 @@ class _CacheStateStore:
 
     @staticmethod
     def _merge_pending_work_items_by_key(
-        current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation]
+        current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation], default_repo: str = ""
     ) -> tuple[list[_PendingWorkItemMutation], list[_RejectedWorkItemMutation]]:
         """Union queues, keeping at most one entry per repository and work-item key.
 
@@ -578,13 +582,13 @@ class _CacheStateStore:
             for why idempotency_key alone isn't enough here.
         """
         existing_keys = {entry.idempotency_key for entry in current}
-        existing_work_keys = {(entry.repo, entry.key) for entry in current}
+        existing_work_keys = {_work_item_identity(entry.repo, entry.key, default_repo) for entry in current}
         survivors = list(current)
         superseded: list[_RejectedWorkItemMutation] = []
         for entry in legacy:
             if entry.idempotency_key in existing_keys:
                 continue
-            if (entry.repo, entry.key) in existing_work_keys:
+            if _work_item_identity(entry.repo, entry.key, default_repo) in existing_work_keys:
                 superseded.append(
                     _RejectedWorkItemMutation(
                         idempotency_key=entry.idempotency_key,
