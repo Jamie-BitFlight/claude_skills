@@ -368,10 +368,12 @@ flowchart TD
 ```
 
 Every stage has an observable result gate. Expected semantic branches instruct the agent to read
-their linked conditional reference; a failure or unobservable result selects recovery. Continue and
+their linked conditional reference; a failure or unobservable result selects recovery except an
+unresolved worker-handoff observation, which selects its Pending non-completion report. Continue and
 abort stay in the metadata-owning worktree/Git dir, while new worktree creation is start-only. Waits
 have one observed outcome rather than a silent retry. Every acquired worker obligation is discharged
-before a terminal, and the lifecycle stash guard applies across start, continue, and abort.
+before a completion terminal; an unresolved obligation stops at Pending worker handoff without a
+completion claim. The lifecycle stash guard applies across start, continue, and abort.
 
 ## Cross-harness boundary
 
@@ -436,7 +438,7 @@ conflict resolution `UNVALIDATED`.
 | Every exact source kind has a worktree route | Owned branch, unowned branch, and detached non-branch cases execute at the bound ref/OID and place the result at the bound destination. | `PASS` |
 | Fresh-invocation contract facts are rebound | Continue proves only Git-recorded state; target name, goal, completion predicate, destinations, authority, stash, and worker facts are rebound or pause. Abort requires only restoration/worker facts. Continue publication never infers destination or authority from onto OID. | `PASS` |
 | Lifecycle stash identity survives invocations | With unrelated stashes present, fresh continue and abort select only the exact lifecycle stash, preserve it through conflict, and remove it only after conflict-free restoration. | `PASS` |
-| Every stage failure reaches observed-state recovery | Enumerate every final-router gate; inject a failure and observation failure at each; all traces reach the stopped-state report and none reaches completion. | `PASS` |
+| Every failure reaches recovery or pending handoff reporting | Enumerate every final-router gate; inject a failure and observation failure at each; non-handoff traces reach the stopped-state report, unresolved worker-handoff traces reach their Pending report, and none reaches completion. | `PASS` |
 | No-worker execution can terminate | Foreground-only Local, Published, and Aborted cases reach their terminal without delivery, acknowledgement, resume, or summary-record nodes. | `PASS` |
 | Compact intent guidance preserves compatible changes | Each non-leading conflict case preserves every compatible stated intent and passes affected checks; incompatible/multiple semantic classes pause and name evidence and alternatives. | `PASS` |
 | Reorientation catches changed assumptions | Direct overlap and indirect producer/consumer cases inventory every observed interaction, rerun its covering check, and adjust or pause before worker resumption. | `PASS` |
