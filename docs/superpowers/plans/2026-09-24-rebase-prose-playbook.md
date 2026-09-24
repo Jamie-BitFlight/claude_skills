@@ -25,8 +25,11 @@
 - Every mutation depends only on facts proven from Git or explicitly rebound from the current request/task context.
 - Shared skill content uses skill-relative paths and contains no harness-specific invocation syntax, root-path assumptions, hooks, MCP servers, or worker identifiers.
 - Every invocation-matrix row, validation-table row, and named case must record `PASS`; `UNRUN`, `FAIL`, and `INCONCLUSIVE` block completion.
-- Behavioral fixtures and runners are disposable, live outside the repository checkout, and receive no maintained tests of their own.
-- The orchestrator passes Task 1's absolute evidence-directory path to Tasks 4 and 5; shell variables do not cross fresh subagents.
+- Behavioral runners and evidence are disposable under `.tmp/scratch/`; Git execution fixtures live under `/tmp` and receive no repository instructions.
+- The disposable runner has no maintained tests, package, fixture generator, or production use.
+- The orchestrator passes Task 1's absolute evidence and fixture paths to Tasks 2, 4, and 5; shell variables do not cross fresh subagents.
+- Portkey is the evaluation transport; Sol is the default model and every control/treatment case has a matched Luna arm.
+- A wording correction may remain implementation-local; changing an approved semantic contract requires a spec update and user alignment first.
 - Make no turn- or token-saving claim without a matched treatment arm.
 - Preserve `.claude/skills/rebase -> ../../.agents/skills/rebase` unchanged.
 - Use file-scoped Conventional Commits with the repository-required scope; never bypass hooks.
@@ -40,35 +43,41 @@
 - Read: `docs/superpowers/specs/2026-09-24-rebase-prose-playbook-design.md`
 - Read: `.agents/skills/rebase/SKILL.md`
 - Do not create or modify tracked files
-- Create temporarily outside the checkout: one directory from `mktemp -d` containing prompts, bare/local Git fixtures, raw transcripts, and `red-matrix.md`
+- Create temporarily: `.tmp/scratch/rebase-prose-eval.*` for runner/evidence and `/tmp/rebase-prose-fixtures.*` for isolated Git execution
 
 **Interfaces:**
 - Consumes: the invocation matrix, validation table, observable predicates, and current skill package from the spec and checkout
-- Produces: a disposable RED evidence directory whose `red-matrix.md` records commands, exit statuses, final Git observations, and adjudication for every baseline case run; Task 3 uses the same prompts, fixtures, model, and criteria for matched treatment
+- Produces: disposable evidence and fixture paths whose records bind prompts, models, tool events, commands, final Git state, and adjudication; Task 4 reuses them for matched treatment
 
 - [ ] **Step 1: Establish the isolated evidence directory and record its absolute path**
 
 Run from `/tmp/claude-skills-rebase-prose`:
 
 ```bash
-REBASE_RED_DIR="$(mktemp -d /tmp/rebase-prose-red.XXXXXX)"
-printf '%s\n' "$REBASE_RED_DIR"
+REBASE_EVIDENCE_DIR="$(mktemp -d .tmp/scratch/rebase-prose-eval.XXXXXX)"
+REBASE_FIXTURE_ROOT="$(mktemp -d /tmp/rebase-prose-fixtures.XXXXXX)"
+printf 'evidence=%s\nfixtures=%s\n' "$(realpath "$REBASE_EVIDENCE_DIR")" "$REBASE_FIXTURE_ROOT"
 git status --short --branch
 ```
 
-Expected: `REBASE_RED_DIR` is outside the checkout and Git reports the isolated implementation branch; no repository file changes.
+Expected: evidence is ignored under `.tmp/scratch`, fixtures are outside the implementation checkout, and that checkout has no tracked change.
 
 - [ ] **Step 2: Write the complete RED matrix before running prompts**
 
-In `$REBASE_RED_DIR/red-matrix.md`, enumerate the invocation cases exactly as `Start`, `Continue`, `Abort`, `Start + publication`, `Continue + publication`, `Merge update`, `Forge setting`, `PR/MR merge`, `Standalone push`, and `Post-completion publication`. Also enumerate every validation row and every case named inside it; give each entry these fields:
+In `$REBASE_EVIDENCE_DIR/red-matrix.md`, enumerate the invocation cases exactly as `Start`, `Continue`, `Abort`, `Start + publication`, `Continue + publication`, `Merge update`, `Forge setting`, `PR/MR merge`, `Standalone push`, and `Post-completion publication`. Also enumerate every validation row and every case named inside it; give each entry these fields:
 
 ```markdown
 ## Invocation/Start
 - Model:
+- Provider/config source:
+- Arm: control | current-skill | final-skill
 - Prompt fixture:
 - Repository fixture:
 - Expected observable outcome:
-- Command:
+- Bounded command:
+- Automatic skill event:
+- Reference-read event:
+- Tool events:
 - Exit status:
 - Final Git observations:
 - Adjudication: UNRUN
@@ -76,9 +85,25 @@ In `$REBASE_RED_DIR/red-matrix.md`, enumerate the invocation cases exactly as `S
 
 Expected: no validation case is hidden inside a summary count; every entry begins `UNRUN` until evidence changes it.
 
-- [ ] **Step 3: Build only the cheapest fixtures needed to expose current failures**
+- [ ] **Step 3: Create the disposable bounded Portkey runner**
 
-Use ordinary Git commands inside `$REBASE_RED_DIR` to create isolated repositories for these outcome-changing controls:
+Read `rules/python-development.md`, then create `$REBASE_EVIDENCE_DIR/runner.py` as single-use orchestration code. Read provider and model identifiers from `~/.config/opencode/opencode.json`; obtain credentials only from the existing environment and never serialize headers, tokens, or environment values. Require the configured Portkey provider to expose `@openai/gpt-5.6-sol` and `@openai/gpt-5.6-luna`.
+
+For each case, the runner creates fresh control and treatment copies beneath `$REBASE_FIXTURE_ROOT`, invokes OpenCode from that fixture with no parent repository instructions, and records raw JSON events:
+
+```bash
+uv run --script /tmp/claude-skills-rebase-prose/scripts/run_bounded.py --timeout-seconds 180 -- \
+  opencode run --pure --auto --format json --dir "$CASE_FIXTURE" \
+  --model "portkey/$MODEL_ID" --title "$CASE_ID-$ARM-$MODEL_SLUG" -- "$CASE_PROMPT"
+```
+
+Use `MODEL_ID=@openai/gpt-5.6-sol` by default, then run the identical arm with `MODEL_ID=@openai/gpt-5.6-luna`. The control has no rebase skill; current/final treatment copies the exact package into `$CASE_FIXTURE/.agents/skills/rebase`. Do not test, package, commit, or generalize `runner.py`.
+
+The runner writes one manifest and JSONL transcript per case/model/arm. The manifest records prompt SHA, fixture SHA, package SHA or `none`, model ID, provider name, bounded command, timeout, process exit, and transcript path. Raw harness events—not the model's prose claim—prove automatic activation (`skill` tool selects `rebase`), each reference read (tool path equals one of the five copied `references/*.md` paths), and all shell/tool actions. A missing required event is `FAIL`, not inferred from the final answer.
+
+- [ ] **Step 4: Build only the cheapest fixtures needed to expose current failures**
+
+Use ordinary Git commands inside `$REBASE_FIXTURE_ROOT` to create isolated repository templates for these outcome-changing controls:
 
 1. a named `feature/a` source and named `main` target with a tempting related ref;
 2. an active conflicted rebase for continue and abort;
@@ -88,32 +113,33 @@ Use ordinary Git commands inside `$REBASE_RED_DIR` to create isolated repositori
 6. a prose conflict where two compatible intentions must survive; and
 7. a producer/consumer change whose interaction is indirect.
 
-Record every fixture-construction command and exit status in `red-matrix.md`. Do not create a fixture generator, evaluator package, reusable runner, Python module, or tests for the disposable setup.
+Record every fixture-construction command and exit status in `red-matrix.md`. Before and after every run, snapshot `HEAD`, all local refs/OIDs, remote refs/OIDs, porcelain status, unmerged index entries, stash OIDs/messages, worktree list, and rebase metadata presence. Adjudication uses the raw tool events plus these final Git observations. Do not create a maintained fixture generator, evaluator package, reusable runner, or tests for the disposable setup.
 
-- [ ] **Step 4: Run the invocation RED cases against the current description**
+- [ ] **Step 5: Run the invocation RED cases against the current description**
 
-Run each isolated prompt without repository instructions. Give the evaluator only the current skill discovery metadata and the user request; do not reveal the expected answer. Record whether it selects the rebase skill. The `Start + publication` and `Continue + publication` cases are RED unless the current description activates the same rebase lifecycle with explicitly bound authority and destination; all negative branches are RED if they activate.
+Run each isolated prompt through the disposable harness with the current skill package copied into the fixture. Do not reveal the expected answer. Record the OpenCode automatic skill-selection event and any reference-read/tool events. The `Start + publication` and `Continue + publication` cases are RED unless the current description activates the same rebase lifecycle with explicitly bound authority and destination; all negative branches are RED if they activate.
 
 Expected: at least the publication-positive contract is RED because the current description excludes publishing rewritten history. If observation contradicts this expectation, record the actual outcome rather than manufacturing a failure.
 
-- [ ] **Step 5: Run matched no-skill safety controls for ambiguity-sensitive claims**
+- [ ] **Step 6: Run matched no-skill safety controls for ambiguity-sensitive claims**
 
-Use the same model, prompt, Git fixture, and adjudication criteria that Task 3 will use. Run no-skill controls for named-target binding, separate publication authority, moved-remote exact lease, lifecycle stash identity, compatible-intent conflict resolution, and indirect producer/consumer reorientation. Ignore syntactic variants such as `switch` versus `checkout`; adjudicate only final Git and task outcomes.
+Use the same Sol and Luna model IDs, prompt, cloned Git template, bounded command, and adjudication criteria that Task 4 will use. Run no-skill controls for named-target binding, separate publication authority, moved-remote exact lease, lifecycle stash identity, compatible-intent conflict resolution, and indirect producer/consumer reorientation. Ignore syntactic variants such as `switch` versus `checkout`; adjudicate only raw tool events and final Git/task outcomes.
 
 Expected: each result records the full response, commands, exit status, final refs/OIDs/status/stash state, and `PASS`, `FAIL`, or `INCONCLUSIVE`. Known baseline evidence permits authority and named-target failures; it does not permit inventing failures or claiming saved turns/tokens.
 
-- [ ] **Step 6: Verify RED evidence is disposable and the checkout remains unchanged**
+- [ ] **Step 7: Verify RED evidence is disposable and the checkout remains unchanged**
 
 Run:
 
 ```bash
 git status --short
-git ls-files --error-unmatch "$REBASE_RED_DIR/red-matrix.md"
+git check-ignore "$REBASE_EVIDENCE_DIR/red-matrix.md" "$REBASE_EVIDENCE_DIR/runner.py"
+git ls-files --error-unmatch "$REBASE_EVIDENCE_DIR/red-matrix.md"
 ```
 
-Expected: `git status --short` prints nothing; `git ls-files` exits nonzero because the evidence is outside the repository.
+Expected: tracked status is clean, both evidence files are ignored, and `git ls-files` exits nonzero.
 
-Do not commit Task 1; its output is validation evidence, not product/runtime content. Preserve the printed temporary path for Task 3, then end the Task 1 subagent.
+Do not commit Task 1; its output is validation evidence, not product/runtime content. Return both absolute paths to the orchestrator for Tasks 2, 4, and 5, then end the Task 1 subagent.
 
 ---
 
@@ -166,14 +192,15 @@ Do not commit Task 1; its output is validation evidence, not product/runtime con
 - Retain unchanged: `.claude/skills/rebase` relative symlink
 
 **Interfaces:**
-- Consumes: the exact discovery metadata, router, reference ownership, invariants, predicates, and terminal signals in the approved spec
+- Consumes: the exact discovery metadata, router, reference ownership, invariants, predicates, and terminal signals in the approved spec, plus Task 1's evidence path
 - Produces: the canonical script-free rebase skill package; direct router references named `references/named-stash.md`, `references/history-shape.md`, `references/conflict-and-ambiguity.md`, `references/active-rebase-recovery.md`, and `references/publication.md`
+- Produces: disposable deletion-equivalence evidence at `$REBASE_EVIDENCE_DIR/deletion-equivalence.md`
 
 - [ ] **Step 1: Read the authoring skills and inspect every resource before replacement**
 
 Read `/plugin-creator:skill-creator`, `/writing-for-agents`, and `/process-siren:improve-processes`, then inspect the full current `.agents/skills/rebase/` directory. Before deleting each old reference or runtime family, map every hard-won safety behavior to either the Mermaid router, one of the five node-owned references, intrinsic Git knowledge intentionally omitted, or deleted runtime bookkeeping intentionally rejected.
 
-Expected: a written Task 2 work note identifies the replacement home for target binding, worker checkpointing, named stash identity, topology/equivalence, combined-intent conflicts, recovery reporting, reorientation, remote movement, and exact-lease publication. A missing replacement blocks deletion.
+Write `$REBASE_EVIDENCE_DIR/deletion-equivalence.md`. It identifies the replacement home for target binding, worker checkpointing, named stash identity, topology/equivalence, combined-intent conflicts, recovery reporting, reorientation, remote movement, and exact-lease publication. It also records every deleted file and classifies its remaining content as represented in the new hierarchy, intrinsic Git knowledge intentionally omitted, or rejected runtime bookkeeping. A missing or unsupported classification blocks deletion. Keep this evidence ignored and out of the product commit.
 
 - [ ] **Step 2: Rewrite `SKILL.md` from the approved exact metadata and router**
 
@@ -227,7 +254,7 @@ Limit this reference to the path where start/continue already bound explicit aut
 
 - [ ] **Step 8: Verify replacement content before deleting old content**
 
-Compare the Task 2 work note against the new router and five references. Confirm every approved hard-won behavior has one authoritative home and every deleted runtime concept is either intrinsic Git operation or rejected bookkeeping. Stop if any valid safety content would be lost.
+Compare `$REBASE_EVIDENCE_DIR/deletion-equivalence.md` against the new router and five references. Confirm every approved hard-won behavior has one authoritative home and every deleted runtime concept is either intrinsic Git operation or rejected bookkeeping. Stop if any valid safety content would be lost.
 
 Expected: no item is marked “needs merge,” “unknown,” or “later”; all approved behavior is mapped before deletion.
 
@@ -294,8 +321,9 @@ Expected: hooks pass and the commit contains only the rebase package replacement
 - Modify: `scripts/validate_codex_skill_activation.py`
 - Modify: `tests/test_validate_codex_skill_activation.py`
 - Modify: `tests/fixtures/codex-skill-activation-overrides.json`
-- Regenerate after a live probe only: `tests/fixtures/codex-skill-activation-matrix.jsonl`
-- Regenerate after a live probe only: `tests/fixtures/rebase-codex-consumer-evidence.json`
+- Regenerate conditionally: `harness_compatibility.json`
+- Defer final-package regeneration to Task 5: `tests/fixtures/codex-skill-activation-matrix.jsonl`
+- Defer final-package regeneration to Task 5: `tests/fixtures/rebase-codex-consumer-evidence.json`
 
 **Interfaces:**
 - Consumes: the script-free canonical package from Task 2 and the validator's existing source/install provenance contract
@@ -303,7 +331,7 @@ Expected: hooks pass and the commit contains only the rebase package replacement
 
 - [ ] **Step 1: Read the validator, its tests, override fixture, and fixture-regeneration instructions**
 
-Locate every rebase-specific `rebase_plan.py` assumption. Preserve generic copy/provenance tests that use a dummy script as fixture data when they do not claim the production skill includes that script. Identify the exact live-probe output contract and fixture generation command before editing.
+Read `rules/python-development.md` and `docs/testing.md`. Locate every rebase-specific `rebase_plan.py` assumption. Preserve generic copy/provenance tests that use a dummy script as fixture data when they do not claim the production skill includes that script. Identify the exact live-probe output contract and fixture generation command before editing.
 
 - [ ] **Step 2: Write the failing script-free activation tests**
 
@@ -355,11 +383,11 @@ uv run pytest tests/test_validate_codex_skill_activation.py -q
 
 Expected: all tests pass, and generic dummy-copy tests remain valid without claiming that the production rebase skill ships Python.
 
-- [ ] **Step 6: Run the real read-only Codex activation probe and regenerate only its owned evidence**
+- [ ] **Step 6: Defer live activation evidence until prose is final**
 
-Use the fixture-regeneration command documented by the validator. The probe must run against the installed repo-scoped skill, under read-only/no-approval safety, and record successful resolution of the installed `SKILL.md` and `references/publication.md`. Do not hand-edit generated matrix or consumer-evidence output.
+Record the documented live-probe command for Task 5, but do not regenerate the activation matrix or consumer evidence here. Tasks 4 and 5 can still correct prose, so evidence generated now would bind a non-final package SHA.
 
-Expected: the regenerated rebase row is `PASSED`, source and installed tree hashes match, and no rebase evidence references `rebase_plan.py`.
+Expected: unit tests prove the new contract while the tracked generated evidence remains explicitly pending final-package regeneration.
 
 - [ ] **Step 7: Check objective harness metadata remains generated and current**
 
@@ -369,14 +397,15 @@ Run:
 uv run --script scripts/generate_harness_compatibility.py --check
 ```
 
-Expected: `harness_compatibility.json is current`. If the approved changes alter an objective generated field, regenerate it using the same script and include that generated file in this task; do not hand-edit it.
+Expected: `harness_compatibility.json is current`. If the check fails because objective fields changed, run `uv run --script scripts/generate_harness_compatibility.py`, verify `--check` passes, and include `harness_compatibility.json` in this task; do not hand-edit it.
 
 - [ ] **Step 8: Commit the cross-harness probe update separately**
 
-Stage only the validator, its focused test, and generated fixture files actually changed:
+Stage only the validator, its focused test, and override. Stage generated compatibility data only when Step 7 changed it:
 
 ```bash
-git add scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json tests/fixtures/codex-skill-activation-matrix.jsonl tests/fixtures/rebase-codex-consumer-evidence.json
+git add scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json
+git diff --quiet -- harness_compatibility.json || git add harness_compatibility.json
 git diff --cached --check
 git commit -m "test(rebase): validate script-free activation"
 ```
@@ -392,15 +421,15 @@ Expected: hooks and focused tests pass; the commit contains no skill implementat
 - Read conditionally through router nodes: `.agents/skills/rebase/references/*.md`
 - Modify only when a failed treatment demonstrates a skill defect: the authoritative skill/reference file that owns that rule
 - Do not add tracked evaluator, runner, fixture, transcript, matrix, receipt, or result files
-- Reuse temporarily: the Task 1 RED directory and matched prompts/fixtures, or recreate an equivalent `mktemp -d` directory if the original no longer exists
+- Reuse temporarily: Task 1's exact evidence directory, runner, prompts, adjudication criteria, and Git fixture templates
 
 **Interfaces:**
-- Consumes: Task 1's control prompts/fixtures/adjudication criteria and Task 2's prose package
+- Consumes: Task 1's absolute evidence/fixture paths, disposable runner, matched Sol/Luna controls, and Task 2's prose package
 - Produces: an exhaustive disposable `green-matrix.md` in which every invocation and validation case is `PASS`, plus evidence-backed narrow prose corrections when treatment exposed a defect
 
 - [ ] **Step 1: Copy the RED case identities into a separate GREEN ledger**
 
-Create `$REBASE_RED_DIR/green-matrix.md` with the same model, prompts, repository fixtures, and adjudication criteria as the RED/control arm. Add `Skill package SHA` and `Treatment transcript` fields. Do not change a prompt between control and treatment; if a fixture defect requires correction, rerun both arms.
+Create `$REBASE_EVIDENCE_DIR/green-matrix.md` from the RED case identities. Use fresh clones of the same fixture templates and the same prompts, adjudication criteria, bounded command, Portkey provider, default Sol model, and matched Luna model. Add package SHA, raw JSONL transcript, automatic skill event, reference-read events, tool events, exit status, and final refs/OIDs/status/stash/worktree/rebase observations. If a fixture or prompt defect requires correction, rerun both control and treatment arms for Sol and Luna.
 
 The ledger must contain one independently adjudicated section for each exact validation row:
 
@@ -421,7 +450,7 @@ Each row expands every case named by the spec; a row cannot inherit another row'
 
 - [ ] **Step 2: Validate all invocation branches**
 
-Run all ten invocation cases from the spec in isolated harness contexts. Each positive case passes only when the skill activates for the exact requested lifecycle; each negative case passes only when it does not activate. Publication-positive prompts must bind authority and exact destination as part of the start/continue lifecycle, not as a later standalone push.
+Run all ten invocation cases from the spec through the disposable OpenCode harness. Each positive case passes only when raw events show automatic `rebase` skill selection for the exact requested lifecycle; each negative case passes only when no such event occurs. A conditional branch passes only when the raw event stream shows the exact routed path among `references/named-stash.md`, `references/history-shape.md`, `references/conflict-and-ambiguity.md`, `references/active-rebase-recovery.md`, and `references/publication.md`. Publication-positive prompts must bind authority and exact destination as part of the start/continue lifecycle, not as a later standalone push.
 
 Expected: all ten rows record `PASS`; any other status blocks completion.
 
@@ -459,7 +488,9 @@ Run non-leading replay, restoration, and remote-integration conflicts where comp
 
 - [ ] **Step 9: Apply only evidence-supported corrections and rerun the complete matrix**
 
-When a treatment fails, identify the authoritative node/reference, make the smallest prose change that changes the outcome, and rerun its matched control/treatment plus the entire invocation and validation matrix. Do not add a rule for syntactic variation or a no-op. Do not add scripts, persistent state, or evaluation artifacts.
+When a treatment fails, identify the authoritative node/reference and classify the correction before editing. Ordinary wording that preserves the approved invocation contract, router, predicates, terminals, package boundary, reference ownership/load conditions, invariants, and authority semantics may change implementation-local prose. A change to any of those approved semantics stops implementation: update the design spec, obtain user alignment, commit the aligned spec, then restore the exact-source comparison before changing the skill. Make only the smallest evidence-supported correction, rerun its matched Sol/Luna control and treatment arms, then rerun the entire matrix. Do not add a rule for syntactic variation or a no-op. Do not add scripts, persistent state, or evaluation artifacts.
+
+After every correction, rerun Task 2's `diff -u` against the current approved spec. Any nonzero diff blocks completion.
 
 Expected: every row and every named case is `PASS`; zero `UNRUN`, `FAIL`, and `INCONCLUSIVE` entries remain.
 
@@ -473,7 +504,7 @@ git diff --cached --check
 git commit -m "fix(rebase): close behavioral validation gaps"
 ```
 
-If no tracked file changed, do not create an empty commit. In either case, report the matrix path, all commands, status totals, and exact final Git observations; do not claim token or turn savings.
+If user-aligned semantic evidence changed the spec, commit that spec alone before the implementation correction with `docs(rebase): align validated contract`. If no tracked file changed, do not create an empty commit. In every case, report the matrix path, package SHA, all commands, per-model status totals, raw event paths, and exact final Git observations; do not claim token or turn savings.
 
 ---
 
@@ -489,7 +520,9 @@ If no tracked file changed, do not create an empty commit. In either case, repor
 - Review: `scripts/validate_codex_skill_activation.py`
 - Review: `tests/test_validate_codex_skill_activation.py`
 - Review: `tests/fixtures/codex-skill-activation-overrides.json`
-- Review generated activation evidence changed by Task 3
+- Regenerate and review: `tests/fixtures/codex-skill-activation-matrix.jsonl`
+- Regenerate and review: `tests/fixtures/rebase-codex-consumer-evidence.json`
+- Modify conditionally: `harness_compatibility.json`
 
 **Interfaces:**
 - Consumes: all implementation commits and exhaustive GREEN evidence
@@ -505,7 +538,7 @@ Give a second fresh reviewer the spec, repository instructions, commit range, an
 
 - [ ] **Step 3: Resolve findings through evidence, not deference**
 
-For each finding, reproduce the cited problem or compare it directly to the approved design. Apply valid corrections only in the authoritative owner file, rerun the affected RED/GREEN pair, then rerun the complete GREEN matrix. Reject contradictory suggestions with quoted spec evidence in the review report.
+For each finding, reproduce the cited problem or compare it directly to the approved design. Ordinary wording that preserves approved semantics may change only in its authoritative implementation file. A proposed change to the invocation contract, router, predicate, terminal, package boundary, reference ownership/load condition, invariant, or authority semantics stops implementation until the design spec is updated and the user aligns with the change; commit the aligned spec before implementation. After any correction, rerun the affected matched Sol/Luna RED/GREEN arms, the complete GREEN matrix, and Task 2's exact-source comparison. Reject contradictory suggestions with quoted spec evidence in the review report.
 
 - [ ] **Step 4: Re-run all static and package validators**
 
@@ -529,16 +562,17 @@ Expected: render succeeds; router is at most 100 process lines; only the approve
 
 - [ ] **Step 6: Check cross-harness discovery and read-only activation**
 
-First run cross-harness discovery and content checks. Read the current harness measurement files for Claude Code, Codex, OpenCode, Hermes, Kimi, and Cursor; confirm each supported discovery root includes either `.agents/skills` or the retained `.claude/skills` symlink. The Task 3 Codex probe is the required live Codex result. For every other harness binary installed on this host, run a bounded read-only activation from the isolated worktree that explicitly selects `rebase`, asks it to report the router's first terminal and the conditional publication reference, and forbids Git mutation. Record the full command, version, exit status, and response in the disposable GREEN evidence directory.
-
-On the current host, the required additional live commands are Claude Code and OpenCode:
+First run cross-harness discovery and content checks. Read the current harness measurement files for Claude Code, Codex, OpenCode, Hermes, Kimi, and Cursor; confirm each supported discovery root includes either `.agents/skills` or the retained `.claude/skills` symlink. Discover installed harnesses at execution:
 
 ```bash
-uv run --script scripts/run_bounded.py --timeout-seconds 120 -- claude -p 'Read only. Explicitly load the rebase skill from this repository. Report the router first terminal and the skill-relative publication reference; run no Git mutation.'
-uv run --script scripts/run_bounded.py --timeout-seconds 120 -- opencode -p 'Read only. Explicitly load the rebase skill from this repository. Report the router first terminal and the skill-relative publication reference; run no Git mutation.'
+for harness in claude codex opencode hermes kimi cursor-agent; do
+  command -v "$harness" 2>/dev/null || true
+done
 ```
 
-Expected: both exit zero and identify `No change` and `references/publication.md`; Task 3's Codex row is `PASSED`. An absent harness binary is recorded as unavailable rather than claimed as live-tested, but its measured discovery root and static package compatibility must pass.
+For each installed harness, use its measured non-interactive invocation and a 120-second bounded read-only run. Ask this exact graph question: follow the `Start` path where binding succeeds, the ordinary ancestry-only relation is true, and every result/publication destination already matches; report that terminal node label and the literal reference path on the `Publish` → `Yes` node. Run no Git mutation. Record binary path, version, exact command, exit status, raw response, and the validator-computed package SHA under `$REBASE_EVIDENCE_DIR/cross-harness/`.
+
+Expected: every installed harness reports terminal `No change` and path `references/publication.md`; every record names the same package SHA later bound as `$FINAL_PACKAGE_SHA`. An absent harness binary is recorded as unavailable rather than claimed as live-tested; its measured discovery root and static package compatibility must still pass.
 
 Run the static portability guard:
 
@@ -549,7 +583,25 @@ test "$(readlink .claude/skills/rebase)" = '../../.agents/skills/rebase'
 
 Expected: both commands exit zero; shared content contains only ordinary Git/prose actions and skill-relative reference paths.
 
-- [ ] **Step 7: Run the full repository pre-commit suite against the changed files**
+- [ ] **Step 7: Generate activation evidence for the final package SHA**
+
+Run this only after Tasks 4–5 have made every accepted prose correction and both reviewers have approved the resulting content. Compute the canonical package digest with the same function used by the activation validator:
+
+```bash
+FINAL_PACKAGE_SHA="$(uv run python - <<'PY'
+from pathlib import Path
+from scripts.validate_codex_skill_activation import repo_skill_tree_sha256
+print(repo_skill_tree_sha256(Path('.agents/skills/rebase')))
+PY
+)"
+printf '%s\n' "$FINAL_PACKAGE_SHA"
+```
+
+Run the documented real read-only Codex activation probe and its matrix-generation command against the installed repo-scoped skill. Regenerate, never hand-edit, `tests/fixtures/rebase-codex-consumer-evidence.json` and `tests/fixtures/codex-skill-activation-matrix.jsonl`. Require the rebase row to be `PASSED`, resolve installed `SKILL.md` and `references/publication.md`, contain no `rebase_plan.py`, and report both `source_tree_sha256` and `installed_tree_sha256` equal to `$FINAL_PACKAGE_SHA`.
+
+Run `uv run --script scripts/generate_harness_compatibility.py --check`; if objective data changed, regenerate it, rerun `--check`, and stage `harness_compatibility.json`. Any later change beneath `.agents/skills/rebase/` invalidates this step and requires fresh subagent reviews, the complete GREEN matrix, and regeneration against the new package SHA.
+
+- [ ] **Step 8: Run the full repository pre-commit suite against the changed files**
 
 Read `docs/linting-and-type-checking.md`, then run `prek` on the exact changed-file list from the merge base rather than unrelated repository files:
 
@@ -559,17 +611,24 @@ git diff --name-only --diff-filter=ACMR "$(git merge-base HEAD origin/main)" -z 
 
 Expected: every applicable hook passes. Fix underlying failures and rerun; never use `--no-verify`.
 
-- [ ] **Step 8: Commit valid review corrections separately**
+- [ ] **Step 9: Commit valid review corrections and final evidence separately**
 
 If review produced tracked changes, stage only corrected files and commit:
 
 ```bash
 git add .agents/skills/rebase scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json tests/fixtures/codex-skill-activation-matrix.jsonl tests/fixtures/rebase-codex-consumer-evidence.json
+git diff --quiet -- harness_compatibility.json || git add harness_compatibility.json
 git diff --cached --check
 git commit -m "fix(rebase): address independent review"
 ```
 
-Expected: hooks pass. If review found no valid issue, do not create an empty commit. End the Task 5 reviewers and report their explicit completion status.
+Expected: hooks pass and generated evidence binds the committed final package SHA. If review changed no implementation, commit only regenerated evidence whose content changed; do not create an empty commit. End the Task 5 reviewers and report their explicit completion status.
+
+- [ ] **Step 10: Review the exact final HEAD without further writes**
+
+After all Task 5 commits, bind `FINAL_REVIEW_HEAD="$(git rev-parse HEAD)"`. Dispatch fresh Standards and Spec reviewers against that exact commit, the approved spec, complete GREEN matrix, and generated activation evidence. Each reviewer records the commit SHA and package SHA and must explicitly pass. A finding returns to Step 3; after correction, repeat the matrix, evidence generation, commit, and both final reviews. No later skill or evidence change may inherit an earlier review.
+
+Expected: both required subagent reviews explicitly pass the same `FINAL_REVIEW_HEAD` and its package/evidence SHA without changing files.
 
 ---
 
@@ -582,7 +641,7 @@ Expected: hooks pass. If review found no valid issue, do not create an empty com
 
 **Interfaces:**
 - Consumes: reviewed commits, passing exhaustive matrix, and final validation output
-- Produces: one pushed branch, one ready-for-review PR, and addressed reviewer feedback with revalidated corrections
+- Produces: one pushed branch, one squash-merged PR, addressed reviewer feedback, and verified target-branch terminal state
 
 - [ ] **Step 1: Verify the branch is clean and commits are file-scoped**
 
@@ -594,7 +653,7 @@ git log --oneline --decorate "$(git merge-base HEAD origin/main)"..HEAD
 git diff --check "$(git merge-base HEAD origin/main)"..HEAD
 ```
 
-Expected: clean worktree, only the implementation/test/review commits from this plan, and no whitespace errors.
+Expected: clean worktree and no whitespace errors. The range may contain the already-approved design and implementation-plan commits plus the implementation/test/review commits; it must contain no unrelated work. Do not rewrite or squash local branch history to remove approved design/plan commits.
 
 - [ ] **Step 2: Push all completed commits in one batch**
 
@@ -622,4 +681,42 @@ When review arrives, use the receiving-review summary to identify only unresolve
 
 Apply valid systemic corrections in their authoritative file, rerun the affected matched behavioral case, the complete GREEN matrix, package validators, Mermaid render, focused activation tests, and changed-file hooks. Commit with a file-scoped Conventional Commit and push normally. Reply with evidence; explain technically unsupported requests without making performative edits.
 
-Expected: no unresolved actionable review comments or questions remain; all required checks pass; PR remains mergeable and ready for review. Do not merge or force-push without separate explicit authority.
+Any accepted skill-package correction loops back through Task 5's independent subagent reviews and final-package activation-evidence generation before the next push. An accepted semantic-contract correction also requires the spec update and user alignment gate. Continue the background watch until unresolved actionable comments and questions are zero.
+
+Expected: no unresolved actionable review comments or questions remain; all required checks pass; PR remains mergeable and ready for review. Force-push still requires separate explicit authority.
+
+- [ ] **Step 7: Bind the reviewed head and recheck authorized merge gates**
+
+The user has already authorized squash-merge after required subagent reviews and checks pass. Immediately before merging, fetch the remote and bind the exact reviewed PR head:
+
+```bash
+PR_NUMBER="$(gh pr view --json number --jq .number)"
+REVIEWED_HEAD="$(gh pr view "$PR_NUMBER" --json headRefOid --jq .headRefOid)"
+git fetch origin
+test "$(git rev-parse HEAD)" = "$REVIEWED_HEAD"
+test "$(git rev-parse "origin/$(git branch --show-current)")" = "$REVIEWED_HEAD"
+test "$(gh pr view "$PR_NUMBER" --json isDraft --jq .isDraft)" = false
+test "$(gh pr view "$PR_NUMBER" --json mergeable --jq .mergeable)" = MERGEABLE
+gh pr checks "$PR_NUMBER" --required
+```
+
+Re-run the review summary after the fetch. Merge authority is usable only when required checks are successful, required subagent reviews explicitly pass the same `$REVIEWED_HEAD`, unresolved actionable feedback is zero, the PR is non-draft and mergeable, and Task 5 evidence hashes equal that head's package SHA. Any head movement stops the merge and repeats review/validation against the new SHA.
+
+- [ ] **Step 8: Squash-merge and verify terminal PR/base state**
+
+Merge only the bound reviewed head:
+
+```bash
+gh pr merge "$PR_NUMBER" --squash --match-head-commit "$REVIEWED_HEAD"
+git fetch origin main
+gh pr view "$PR_NUMBER" --json state,mergedAt,mergeCommit,baseRefName,headRefOid
+MERGE_COMMIT="$(gh pr view "$PR_NUMBER" --json mergeCommit --jq .mergeCommit.oid)"
+test "$(gh pr view "$PR_NUMBER" --json state --jq .state)" = MERGED
+test "$(gh pr view "$PR_NUMBER" --json baseRefName --jq .baseRefName)" = main
+test "$(gh pr view "$PR_NUMBER" --json mergedAt --jq '.mergedAt != null')" = true
+test -n "$MERGE_COMMIT"
+git merge-base --is-ancestor "$MERGE_COMMIT" origin/main
+BASE_OID="$(git rev-parse origin/main)"
+```
+
+Expected: merge command exits zero, PR state is `MERGED`, `mergedAt` and squash `mergeCommit.oid` are non-null, base is `main`, recorded `headRefOid` equals `$REVIEWED_HEAD`, and the squash commit is reachable from fetched `origin/main`. Report the PR URL, reviewed head, squash commit, and terminal base OID. Do not force-push.
