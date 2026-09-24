@@ -15,6 +15,40 @@ rewritten history only under front-loaded authority without overwriting remote m
 This is a design for an agent process. It is not a Git tutorial, command wrapper, state machine,
 or replacement runtime.
 
+## Invocation contract
+
+The rewritten model-invoked skill uses this exact frontmatter description:
+
+```yaml
+description: >-
+  Start a Git rebase when the user explicitly requests replay of a named source ref onto a named
+  target, or continue or abort an active rebase. When a start or continue request explicitly grants
+  force-push authority, also publish that same rebase lifecycle's rewritten result. Do not use for
+  merge-based branch updates, forge merge-method settings, pull-request or merge-request merging,
+  or standalone pushes after or outside an active rebase lifecycle.
+```
+
+Activation is validated in isolated harness runs. Every row requires a recorded `PASS`; an
+`UNRUN`, `FAIL`, or `INCONCLUSIVE` row blocks completion.
+
+| Branch | Prompt intent | Expected | Required record |
+|---|---|---|---|
+| Start | Rebase named `feature/a` onto named `main` | Activate | `PASS` |
+| Continue | Continue an observed active rebase after conflict resolution | Activate | `PASS` |
+| Abort | Abort an observed active rebase and restore its pre-state | Activate | `PASS` |
+| Start + publication | Rebase named `feature/a` onto `main`, with explicit authority to force-push the rewritten result to an exact destination | Activate | `PASS` |
+| Continue + publication | Continue an active rebase, then force-push its result to an exact destination under explicit authority | Activate | `PASS` |
+| Merge update | Update the branch from `main` using a merge commit | Do not activate | `PASS` |
+| Forge setting | Enable rebase-and-merge for a repository | Do not activate | `PASS` |
+| PR/MR merge | Merge a pull request or merge request | Do not activate | `PASS` |
+| Standalone push | Force-push a branch with no rebase lifecycle named | Do not activate | `PASS` |
+| Post-completion publication | Force-push the result after the rebase lifecycle has already completed | Do not activate | `PASS` |
+
+Activation does not grant publication authority. Positive start/continue publication cases bind the
+exact remote, destination ref, initial destination OID, and explicit authority before the dependent
+mutation. Active rebase state and earlier pushes never imply authority. Publication is not a new invocation after a
+rebase completes; it is a stage of the same start/continue lifecycle.
+
 ## Design principles
 
 - Git owns repository state and history replay; the agent owns semantic decisions.
@@ -44,32 +78,32 @@ existing relative symlink at `.claude/skills/rebase`.
 .claude/skills/rebase -> ../../.agents/skills/rebase
 ```
 
-`SKILL.md` is the complete routine playbook. `references/step-by-step.md` is an optional decision
-router for a run that reaches an exceptional branch or needs the complete control flow. Each other
-reference owns conditional detail that exceeds its inline budget. The router points to a reference
-only when its condition occurs; it does not repeat that file's guidance.
+`SKILL.md` is the sole home of routine rules. Every activation loads
+`references/step-by-step.md` before execution so the whole-process Mermaid router is visible. The
+router carries control flow and all conditional reference pointers; a node-specific reference loads
+only when that node is reached. `SKILL.md` does not provide direct conditional pointers as an
+alternative route.
 
 No scripts, schemas, plans, receipts, generated evidence, runtime state names, or maintained eval
 artifacts belong in the package.
 
 ## Information hierarchy
 
-Content placement follows these thresholds:
+Classify content by meaning before applying a size threshold:
 
-1. Necessary ordinary behavior becomes a single bullet of at most 120 characters.
-2. A rationalization-prone safety process stays inline when it is under 1,024 characters.
-3. A longer safety process becomes a sparse routed reference with only the commands whose syntax
-   carries the safety property.
-4. If `references/step-by-step.md` would exceed 100 lines, it remains a Mermaid decision router and
-   routes each stage or condition to its own file.
+1. Necessary ordinary behavior becomes a single bullet with a hard maximum of 120 characters.
+2. An always-required fixed safety process has a hard inline maximum of 1,024 characters.
+3. Conditional node detail lives in that node's reference regardless of its length.
+4. `references/step-by-step.md` remains an always-loaded Mermaid router of at most 100 lines.
 5. Guidance whose value is uncertain is tested in isolation before it enters routine context.
 
-The numeric thresholds govern placement, not truncation. Required content moves to a routed file;
-it is never shortened until information is lost.
+The limits shape output after semantic classification; they are not optional review triggers.
+Required signal is never removed to fit. Content that exceeds its classified budget is split into
+semantic stages or routed through the corresponding router node.
 
 The routine bullets cover exact ref fidelity, front-loaded authority, source-location selection,
 active-rebase inspection, commit-first dirty-work handling, intent-preserving conflict resolution,
-semantic verification, proportional reorientation, and applicable worker handoff.
+selected validation, complete interaction reorientation, and worker handoff only when one exists.
 
 The short inline processes cover:
 
@@ -83,7 +117,8 @@ Binding, source location, worker checkpointing, preparation, ref reobservation, 
 verification, and handoff remain solely in `SKILL.md`. Router nodes may name these stages and their
 observable result guards, but cannot restate how to perform them.
 
-The routed files contain only conditional detail below.
+The routed files contain only conditional node detail below. Their pointers occur only in the
+always-loaded router.
 
 | Reference | Load condition | Owned design concern |
 |---|---|---|
@@ -91,7 +126,7 @@ The routed files contain only conditional detail below.
 | `history-shape.md` | Replay includes merges, equivalent changes, or empty commits | Preserve-or-flatten intent, equivalence versus discard, and empty-commit intent. |
 | `conflict-and-ambiguity.md` | Replay, restoration, or remote integration conflicts | Combined-intent analysis, dependency recheck, and the genuine-ambiguity stop. |
 | `active-rebase-recovery.md` | Continue, abort, or any stage fails or becomes unobservable | Lifecycle rediscovery, recovery choice, stabilization, and reporting of confirmed facts and unknowns. |
-| `publication.md` | Publication was authorized before replay | Remote comparison, changed-intent integration, final fetch, exact lease, and rejection loop. |
+| `publication.md` | Destination, authority, and initial remote OID were bound on start/continue before the first dependent mutation | Comparison with the bound OID, final observation, changed-intent integration, exact lease, and rejection loop. |
 
 The router's routine stage labels are control-flow addresses into `SKILL.md`, not a second copy of
 the rules. Reference labels appear only on the conditional edges that load them.
@@ -104,65 +139,119 @@ the rules. Reference labels appear only on the conditional edges that load them.
   authority, and resolves genuine intent ambiguity.
 - The coordinating agent binds refs and object IDs, coordinates the owning worktree, interprets
   intent, operates Git, verifies behavior, reconciles remote movement, and reports the terminal.
-- An active worker reaches a safe checkpoint, protects completed work, pauses when supported,
+- An active worker satisfies the checkpoint predicate, protects completed work, pauses when supported,
   receives the relevant world-change summary, and resumes.
 - Git exposes repository state, performs replay and restoration, and enforces the exact lease.
-- The remote destination is mutable external state observed before replay and again immediately
-  before publication.
+- The routine binding stage first observes the mutable remote destination when destination and
+  authority are bound on start/continue; publication observes it again immediately before push.
 
 ### Entry conditions
 
 The process starts only from an explicit request to start a rebase of a named source onto a named
 target, or to continue or abort an active rebase. The repository and named refs must be observable
-before mutation. Publication is optional; when it may be required, authority and the exact remote
-destination are bound before replay begins.
+before mutation. Publication is optional; when required, authority, exact remote destination, and
+its observed OID are bound before replay on start or before the next dependent mutation on continue.
 
 The exact source may be an owned local branch, an unowned local branch, or another ref. An unowned
 branch gets a dedicated branch worktree. A non-branch ref gets a dedicated detached worktree at its
 bound OID, and its completion goal must bind the result destination before mutation. No related ref
 is substituted to make worktree creation convenient.
 
-### Lifecycle identity
+### Git operation state and bound user contract
 
-Git-observable facts identify the lifecycle: exact source ref and bound pre-replay OID, exact target
-ref and OID, completion goal and result destination, and, when used, the exact stash commit OID and
-a distinguishing message containing the source ref and pre-replay source OID. Continue and abort
-rediscover these facts from Git before mutation and before abort can remove active-rebase metadata.
-No custom file, plan, receipt, schema, or runtime state records the lifecycle.
+Git operation state and the user contract are distinct. Active rebase metadata can prove the
+source name for a normal branch rebase, pre-replay source OID, onto OID, stopped commit, conflicts,
+and replay progress. It does not prove the target ref name, completion goal, detached result
+destination, publication destination or authority, or worker obligation. `ORIG_HEAD` is supporting
+evidence only; later commands may replace it.
 
-A continue or abort inspection matches zero or one lifecycle stash. One exact match binds it; a
-verified absence binds none; multiple candidates or an unprovable match pauses for a decision; an
-observation failure enters recovery. Saved work belongs to the lifecycle, not the current
-invocation.
+- **Start:** bind exact source and target names/OIDs, requested history shape, an observable
+  completion predicate for the goal, result destination when distinct, and any publication
+  destination and authority.
+- **Continue:** inspect active Git state first. Explicitly rebind every target name, goal,
+  observable completion predicate, destination, authority, stash association, or worker obligation
+  needed by the remaining path and compare rebound names with recorded OIDs where possible.
+- **Abort:** inspect active identity, lifecycle stash, and worker obligations before abort removes
+  metadata. Rebind only facts needed to restore unfinished work and coordinate the worker; target,
+  goal, and publication authority are not prerequisites for abort.
+- **After completion or abort:** removed metadata cannot reconstruct the contract. Publication is
+  no longer part of this skill's lifecycle; a later push is a standalone operation.
+
+Every absent or inconsistent fact pauses before the mutation that depends on it. The process uses
+active Git state and current request/task context; it adds no durable lifecycle file, schema,
+receipt, or runtime. A context-free fresh invocation is not promised unattended recovery.
+
+When named saved work exists, Git identifies it by immutable stash commit OID and a distinguishing
+message containing the exact source ref and pre-replay source OID. Inspection matches zero or one
+entry before continue or abort mutates: one exact match binds it, verified absence binds none,
+multiple/unprovable matches pause, and observation failure enters recovery.
 
 ### Invariants
 
 - A related ref is never silently substituted for the named source, target, or destination.
-- Mutation starts only after exact source and target bindings and source worktree mode are observable.
-- An OID changes only after movement on the same named ref is accounted for.
+- A mutation starts only after every identity, intent, and authority fact it depends on is proven
+  from Git or explicitly rebound.
+- Every supported goal binds a Git-observable completion predicate before mutation.
+- An OID changes only after every moved commit on the same named ref has an evidence-backed disposition.
 - Publication authority is independent of force-with-lease safety.
-- No branch mutation races an active worker in its owning worktree.
+- No mutation begins while an observed worker command can write the selected worktree.
 - Dirty work has a known restoration route before replay starts.
 - An expected named saved entry remains identifiable and preserved until its restoration succeeds.
 - Every stage failure or unobservable result enters recovery; no blind retry crosses the gate.
 - Worker delivery/resumption is required only when a worker exists; reorientation is always required.
 - Compatible intentions survive conflict resolution; side labels and apparent recency do not
   select the outcome.
-- A changed base triggers reorientation proportional to the task's observed interaction.
+- Every observed intersection between base movement and task dependencies is inspected and checked.
 - Git success is not reported as semantic success without relevant verification.
 - Remote movement is integrated and reverified before an authorized rewritten-history push.
+
+### Observable predicates
+
+- **Completion predicate:** binding states the Git observations that prove the requested goal. The
+  ordinary goal uses target ancestry in the result; every transformation goal binds its own
+  observable history/ref relation before mutation. Replay completion or a proven no-replay
+  publication path binds observed result OID `R` (normally `S0`), requires the named result ref to
+  resolve to `R`, and requires this predicate to hold.
+- **Worker checkpoint:** no worker command that can write the selected worktree is running, and the
+  worker acknowledged pause after its command or its task ended. A foreground coordinator has no
+  outstanding command. Unobservable worker state pauses.
+- **Preparation complete:** the index/worktree, including untracked files, is empty; or the
+  checkpoint commit contains every observed change and the index/worktree is then empty. Otherwise,
+  a named save is required only when the changes cannot be committed at the checkpoint.
+- **Intent disposition complete:** every affected commit/hunk/intent is preserved, already
+  equivalent, superseded by the bound goal, or incompatible, with support from task text, patch or
+  commit evidence, affected contracts, or passing validation. Unclassified or conflicting
+  supported dispositions pause and name the alternatives.
+- **Reorientation and validation complete:** every direct file overlap and known producer,
+  consumer, interface, prompt, or documentation intersection is recorded and inspected; every
+  repository-required and intersection-covering check exits successfully; the index has no
+  unmerged entries. An empty intersection is recorded explicitly.
+- **Stopped-state report complete:** coordinator-issued mutations stopped; preserve active rebase,
+  conflicts, and bound stash; report the failed command, resolvable `HEAD`/ref OIDs, active metadata,
+  unmerged entries, bound stash presence, worktree status, and each failed observation.
+
+### Ordinary no-change predicate
+
+Let `S0` and `T0` be the bound OIDs of exact source `S` and target `T`; let `D` be any distinct
+result destination. `No change` requires all of: no active rebase; the goal is ancestry-only with no
+reword, reorder, squash, edit, force replay, root/`--onto`, or topology transformation; reobservation
+proves `S == S0` and `T == T0`; `git merge-base --is-ancestor T0 S0` exits `0`; required `D`
+resolves to `S0`; every requested publication destination already resolves to the required result;
+and only read-only observations ran. Exit `1` or a transformation goal continues the process. Any other exit
+or failed observation enters recovery. When only publication differs, route to publication rather
+than replay or `No change`.
 
 ### Terminal states
 
 | Terminal | Observable signal |
 |---|---|
-| No change | The bound target already satisfies the bound completion goal and no mutation occurred. |
-| Local completion | Replay, saved-work restoration, semantic verification, and applicable reorientation/handoff passed without publication. |
-| Published completion | Local completion passed and the exact destination accepted the authorized exact-lease push. |
-| Aborted and restored | Active metadata is absent; pre-state and saved work are restored; applicable reorientation/handoff passed. |
-| Paused for decision | Goal, intent, target, ownership, or authority remains genuinely ambiguous. |
-| Blocked safely | Exact current state, or last-confirmed facts plus observation unknowns, is reported without blind retry. |
-| No active rebase | A continue or abort request found no active rebase and performed no mutation. |
+| No change | For the ordinary ancestry-only goal, no rebase is active; source and target still equal their bound OIDs; target is an ancestor of source; every result/publication destination resolves to the required result; and no mutation ran. |
+| Local completion | A start/continue lifecycle completed; active metadata and unmerged entries are absent; the named result ref resolves to observed result OID `R` and the bound completion predicate holds; lifecycle stash is absent or restored/removed; every selected validation and reorientation intersection passed; worker delivery evidence exists only when a worker exists. |
+| Published completion | Local completion holds; the authorized exact-lease push exited zero; a post-push fetch shows the exact destination OID equals result OID `R`. |
+| Aborted and restored | Active metadata and unmerged entries are absent; source/`HEAD` equals the bound pre-replay OID; lifecycle saved work is restored/removed; reorientation completed; worker delivery evidence exists only when a worker exists. |
+| Paused for decision | The report names the exact missing fact or incompatible semantic outcome classes and their evidence; no further mutation runs. |
+| Stopped with observed state | Coordinator-issued mutations stopped and the stopped-state report predicate is complete. |
+| No active rebase | Worktree and Git-dir active-rebase metadata checks are absent and no mutation ran. |
 
 ## Decision router
 
@@ -176,103 +265,104 @@ flowchart TD
     Start([Explicit start, continue, or abort request]) --> Kind{Request?}
     Kind -->|Start| Bind["Binding stage<br/>SKILL.md"]; Kind -->|Continue or abort| Active["Inspect lifecycle<br/>active-rebase-recovery.md"]
     Bind --> BindResult{Binding result?}
-    BindResult -->|Complete| Satisfied{Goal already satisfied?}; BindResult -->|Missing or ambiguous| Decision([Paused for decision])
-    BindResult -->|Failure or unobservable| Recover
-    Satisfied -->|Yes| NoChange([No change]); Satisfied -->|No| Locate; Satisfied -->|Failure or unobservable| Recover
+    BindResult -->|Dependent facts and completion predicate bound| Satisfied{Ordinary local relation observation?}; BindResult -->|Missing or ambiguous| Decision([Paused for decision]); BindResult -->|Failure or unobservable| Recover
+    Satisfied -->|True; all result and publication destinations match| NoChange([No change]); Satisfied -->|False, transformation goal, or local result differs| Locate
+    Satisfied -->|True; only publication destination differs| Locate; Satisfied -->|Failure or unobservable| Recover
     Active --> ActiveResult{Inspection result?}
-    ActiveResult -->|No active rebase| NoActive([No active rebase]); ActiveResult -->|Exact lifecycle and saved-work identity bound| Locate
-    ActiveResult -->|Identity ambiguous| Decision
-    ActiveResult -->|Failure or unobservable| Recover
+    ActiveResult -->|No active metadata in worktree and Git dir| NoActive([No active rebase]); ActiveResult -->|Git state proven; dependent contract and predicate rebound| Locate
+    ActiveResult -->|Required contract fact missing or inconsistent| Decision; ActiveResult -->|Failure or unobservable| Recover
     Locate["Source-location stage<br/>SKILL.md"] --> Location{Exact source location?}
     Location -->|Owned local branch| Safe; Location -->|Unowned local branch| BranchWT[Create dedicated branch worktree]
     Location -->|Non-branch ref; result bound| DetachedWT[Create detached worktree at bound OID]; Location -->|Failure or unobservable| Recover
     BranchWT --> WTResult{Creation result?}; DetachedWT --> WTResult
-    WTResult -->|Created at exact source| Safe
-    WTResult -->|Failure or unobservable| Recover
-    Safe["Worker-safety stage<br/>SKILL.md"] --> Owner{Worker state?}
-    Owner -->|None or safe checkpoint| Operation{Operation?}; Owner -->|Known worker still active| Wait[Wait for safe checkpoint]
-    Wait --> Owner
+    WTResult -->|HEAD OID equals source; branch attachment also matches when required| Safe; WTResult -->|Failure or unobservable| Recover
+    Safe["Worker-safety stage<br/>SKILL.md"] --> Owner{Worktree-writing command state?}
+    Owner -->|None, or pause/end observed| Operation{Operation?}; Owner -->|Observed active| Wait[Wait for checkpoint predicate]; Wait --> Owner
     Owner -->|Unknown or unreachable| Decision
     Operation -->|Start| Prepare["Preparation stage<br/>SKILL.md"]; Operation -->|Continue| Stop{Current rebase state?}
     Operation -->|Abort| Abort["Abort and restore pre-state<br/>active-rebase-recovery.md"]
     Prepare --> PrepResult{Preparation result?}
-    PrepResult -->|Clean or checkpoint committed| Refs; PrepResult -->|Named save required| Save["Save and bind exact entry<br/>named-stash.md"]
+    PrepResult -->|Status empty, or checkpoint contains all changes and status is empty| Refs; PrepResult -->|Dirty and checkpoint commit blocked| Save["Save and bind exact entry<br/>named-stash.md"]
     PrepResult -->|Failure or unobservable| Recover
     Save --> SaveResult{Exact entry verified?}
     SaveResult -->|Yes| Refs
     SaveResult -->|No or unobservable| Recover
     Refs["Reobserve exact source and target<br/>SKILL.md"] --> RefResult{Ref result?}
-    RefResult -->|Bound OIDs unchanged| Shape; RefResult -->|Same named refs moved| Account["Account for movement<br/>SKILL.md"]
+    RefResult -->|Bound OIDs unchanged| Next; RefResult -->|Same named refs moved| Account["Account for movement<br/>SKILL.md"]
     RefResult -->|Failure or unobservable| Recover
-    Account --> AccountResult{Intent and goal derivable?}
-    AccountResult -->|Yes; bind observed OIDs| Shape
-    AccountResult -->|No| Decision
+    Account --> AccountResult{Moved-commit dispositions complete?}
+    AccountResult -->|All classified; no supported conflict| Next; AccountResult -->|Unclassified or conflicting| Decision
     AccountResult -->|Failure or unobservable| Recover
-    Shape{Exceptional history shape?} -->|Yes| History["Resolve topology/equivalence<br/>history-shape.md"]; Shape -->|No| Replay[Run ordinary Git replay]
+    Next{Reobserved local path?} -->|Replay required| Shape; Next -->|No-replay publication; predicate true| Current["Bind proven current result OID R<br/>SKILL.md"]
+    Next -->|Failure or unobservable| Recover
+    Current --> CurrentResult{Named result ref resolves to R?}
+    CurrentResult -->|Yes| Saved; CurrentResult -->|No or unobservable| Recover
+    Shape{Merge in replay set or Git reports empty/equivalent?} -->|Yes| History["Resolve topology/equivalence<br/>history-shape.md"]; Shape -->|No| Replay[Run ordinary Git replay]
     Shape -->|Failure or unobservable| Recover
-    History --> HistoryResult{Required outcome derivable?}
-    HistoryResult -->|Yes| Replay; HistoryResult -->|No| Decision
+    History --> HistoryResult{Every special commit has a supported disposition?}
+    HistoryResult -->|Yes; no supported conflict| Replay; HistoryResult -->|No or conflicting| Decision
     HistoryResult -->|Failure or unobservable| Recover
-    Stop -->|Conflict| ReplayConflict
-    Stop -->|Topology, equivalent, or empty| History
-    Stop -->|Ready| Replay
+    Stop -->|Unmerged index entries| ReplayConflict
+    Stop -->|Git reports topology, equivalent, or empty| History
+    Stop -->|Metadata active; no unmerged entries; required resolution staged| Replay
     Stop -->|Other failure or unobservable| Recover
     Replay --> ReplayResult{Replay result?}
-    ReplayResult -->|Complete| Saved{Lifecycle saved entry?}
-    ReplayResult -->|Conflict| ReplayConflict["Resolve replay intent<br/>conflict-and-ambiguity.md"]
+    ReplayResult -->|Metadata/unmerged absent; observed R bound; result ref resolves to R; predicate true| Saved{Lifecycle saved entry?}
+    ReplayResult -->|Unmerged index entries| ReplayConflict["Resolve replay intent<br/>conflict-and-ambiguity.md"]
     ReplayResult -->|Topology, equivalent, or empty| History
     ReplayResult -->|Other failure or unobservable| Recover
-    ReplayConflict --> ReplayIntent{One supported combined outcome?}
-    ReplayIntent -->|Yes| Replay; ReplayIntent -->|No| Decision
+    ReplayConflict --> ReplayIntent{One semantic outcome class preserves compatible intent and checks?}
+    ReplayIntent -->|Exactly one| Replay; ReplayIntent -->|None or incompatible alternatives| Decision
     ReplayIntent -->|Failure or unobservable| Recover
-    Abort --> AbortResult{Pre-state result?}
-    AbortResult -->|Restored| Saved
+    Abort --> AbortResult{Abort restoration predicate?}
+    AbortResult -->|Metadata/unmerged absent; source or HEAD equals pre-replay OID| Saved
     AbortResult -->|Failure or unobservable| Recover
     Saved -->|Verified none| FinishMode{Lifecycle outcome?}; Saved -->|Exact entry bound| Restore["Restore and remove exact entry<br/>named-stash.md"]
     Saved -->|Ambiguous or unobservable| Recover
     Restore --> RestoreResult{Restoration result?}
-    RestoreResult -->|Restored and exact entry removed| FinishMode
+    RestoreResult -->|Command zero; no unmerged entries; exact entry absent| FinishMode
     RestoreResult -->|Conflict; entry preserved| RestoreConflict["Resolve restoration intent<br/>conflict-and-ambiguity.md"]
     RestoreResult -->|Other failure or unobservable| Recover
-    RestoreConflict --> RestoreIntent{One supported combined outcome?}
-    RestoreIntent -->|Yes| Restore; RestoreIntent -->|No| Decision
+    RestoreConflict --> RestoreIntent{One semantic outcome class preserves compatible intent and checks?}
+    RestoreIntent -->|Exactly one| Restore; RestoreIntent -->|None or incompatible alternatives| Decision
     RestoreIntent -->|Failure or unobservable| Recover
-    FinishMode -->|Aborted| OrientAbort["Abort reorientation<br/>SKILL.md"]; FinishMode -->|Rebase complete| Orient["Reorientation and verification<br/>SKILL.md"]
-    Orient --> VerifyResult{Verification result?}
-    VerifyResult -->|Pass| Publish{Publication bound and authorized?}
-    VerifyResult -->|Fail; goal clear| Correct[Correct changed interaction]
-    Correct --> CorrectResult{Correction result?}
-    CorrectResult -->|Success| Orient; CorrectResult -->|Failure or unobservable| Recover
-    VerifyResult -->|Intent ambiguous| Decision
+    FinishMode -->|Explicit abort request| OrientAbort["Abort reorientation<br/>SKILL.md"]; FinishMode -->|Completed start or continue| Orient["Reorientation and verification<br/>SKILL.md"]
+    Orient --> VerifyResult{Selected validation set result?}
+    VerifyResult -->|All checks zero; no unmerged entries; intersections accounted| Publish{Publication bound and authorized?}
+    VerifyResult -->|Failing check identifies one goal-consistent correction| Correct[Correct changed interaction]
+    Correct --> CorrectResult{Correction applied?}
+    CorrectResult -->|Yes; rerun full selected set| Orient; CorrectResult -->|Failure or unobservable| Recover
+    VerifyResult -->|Missing intent or incompatible corrections| Decision
     VerifyResult -->|Failure or unobservable| Recover
     Publish -->|No| Handoff
     Publish -->|Yes| Remote["Reconcile destination<br/>publication.md"]
     Remote --> RemoteResult{Remote stage result?}
-    RemoteResult -->|Unchanged and exact lease current| Push[Authorized exact-lease push]
-    RemoteResult -->|Movement integrated| Orient
+    RemoteResult -->|Final fetch unchanged; exact lease OID current| Push[Authorized exact-lease push]
+    RemoteResult -->|Every moved commit disposed; interactions validated| Orient
     RemoteResult -->|Conflict| RemoteConflict["Resolve remote intent<br/>conflict-and-ambiguity.md"]
     RemoteResult -->|Failure or unobservable| Recover
-    RemoteConflict --> RemoteIntent{One supported combined outcome?}
-    RemoteIntent -->|Yes| Remote; RemoteIntent -->|No| Decision
+    RemoteConflict --> RemoteIntent{One semantic outcome class preserves compatible intent and checks?}
+    RemoteIntent -->|Exactly one| Remote; RemoteIntent -->|None or incompatible alternatives| Decision
     RemoteIntent -->|Failure or unobservable| Recover
     Push --> PushResult{Push result?}
-    PushResult -->|Accepted| Handoff; PushResult -->|Lease rejected| Remote
+    PushResult -->|Exit zero and post-fetch destination equals result| Handoff; PushResult -->|Lease rejected or destination mismatch| Remote
     PushResult -->|Other failure or unobservable| Recover
-    OrientAbort --> Handoff["Reorientation/handoff stage<br/>SKILL.md"]
+    OrientAbort --> Handoff["Worker-handoff stage<br/>SKILL.md"]
     Handoff --> Worker{Worker exists?}
-    Worker -->|Yes| Deliver[Deliver summary and resume]; Worker -->|No| Record[Coordinator records summary]
+    Worker -->|Yes| Deliver[Deliver summary and resume]; Worker -->|No| Terminal{Bound path predicate?}
     Worker -->|Unknown or unobservable| Recover
-    Deliver --> HandoffResult{Handoff result?}; Record --> HandoffResult
-    HandoffResult -->|Pass| Terminal{Observed outcome?}
-    HandoffResult -->|Failure or unobservable| Recover
-    Terminal -->|Local| Local([Local completion]); Terminal -->|Published| Published([Published completion])
-    Terminal -->|Aborted| Aborted([Aborted and restored])
-    Recover["Inspect and stabilize<br/>active-rebase-recovery.md"] --> Blocked([Blocked safely; report facts and unknowns])
+    Deliver --> HandoffResult{Delivery acknowledged or worker resumed with summary?}
+    HandoffResult -->|Yes| Terminal; HandoffResult -->|No or unobservable| Recover
+    Terminal -->|Abort request and restored pre-state| Aborted([Aborted and restored])
+    Terminal -->|Completed start/continue; post-push destination resolves to R| Published([Published completion])
+    Terminal -->|Completed start/continue; result ref resolves to R; predicate true; no publication| Local([Local completion])
+    Terminal -->|Inconsistent or unobservable| Recover
+    Recover["Stop mutations and collect report fields<br/>active-rebase-recovery.md"] --> Stopped([Stopped with observed state])
 ```
 
 Every stage has an observable result gate. Expected semantic branches select their conditional
-reference; a failure or unobservable result selects recovery. The worker/no-worker branch makes
-handoff proportional without weakening the terminal, and the lifecycle stash guard applies across
+reference; a failure or unobservable result selects recovery. The worker/no-worker branch requires
+delivery only when a worker exists, and the lifecycle stash guard applies across
 start, continue, and abort invocations.
 
 ## Cross-harness boundary
@@ -282,11 +372,10 @@ references, and run ordinary Git. Shared content uses prose actions and literal 
 as `references/publication.md`. It does not name harness tool calls, plugin-root variables, hooks,
 MCP servers, worker identifiers, or installation paths.
 
-Worker coordination is capability-aware. When the harness supports messaging and pause/resume, the
-coordinator asks the active worker to stop at a safe checkpoint and pauses it. Otherwise it waits
-for the current non-interruptible action to finish. A foreground-only harness performs the same
-checkpoint, rebase, and reorientation flow directly. Background waiting is a responsiveness
-optimization where available, not part of rebase correctness.
+Worker coordination is capability-aware. When messaging and pause/resume exist, the coordinator
+requests a pause and proceeds only when the worker checkpoint predicate holds. Otherwise it waits
+for the observed worktree-writing command to finish. A foreground-only harness proceeds when it
+has no outstanding worktree-writing command. Background waiting affects responsiveness, not gates.
 
 No harness is assumed to create a worktree for a worker. Owning-worktree discovery and selection
 remain ordinary Git responsibilities inside the process.
@@ -309,32 +398,34 @@ The prose playbook replaces rather than wraps the existing runtime. The followin
 `SKILL.md` and `references/step-by-step.md` are rewritten. The existing `.claude/skills/rebase`
 symlink remains unchanged.
 
-The eval files are removed rather than translated. Repository evidence found no consumer outside
-the runtime-coupled tests being deleted, and their schema describes the rejected runtime rather
-than a generic skill evaluation contract.
+The runtime-coupled eval definitions and historical activation results are removed rather than
+translated. Repository evidence found no consumer outside the deleted runtime tests. The rewritten
+description is instead checked against the invocation matrix through disposable isolated runs; the
+matrix record is validation evidence, not skill runtime or routine context.
 
 ## Validation strategy
 
-Validation is claim-specific and uses the cheapest evidence that can change the design.
+Validation is claim-specific. Implementation completes only when every row and every case named by
+that row has a recorded `PASS`; `UNRUN`, `FAIL`, or `INCONCLUSIVE` blocks completion.
 
-| Claim | Failure excluded | Validation |
+| Validation row | Cases and `PASS` predicate | Required record |
 |---|---|---|
-| Named refs are not silently substituted | Replay or publication targets a related but different ref | Isolated control/treatment prompts plus a temporary Git fixture. |
-| Publication requires separate authority | An agent treats a lease as permission to push | Isolated control/treatment prompts. |
-| Final remote comparison and exact lease preserve new work | A rewritten-history push overwrites remote movement | Disposable local-remotes scenario. |
-| Worker checkpoint prevents concurrent mutation | Rebase races edits or commits in the owning worktree | Disposable multi-worktree scenario. |
-| Every exact source kind has a worktree route | A non-branch ref is silently replaced or an unowned branch has no execution path | Owned, unowned, and detached-source fixtures. |
-| Lifecycle stash identity survives invocations | Continue or abort loses or misidentifies repository-wide saved work | Start-save then fresh-invocation continue/abort fixtures. |
-| Every stage failure reaches recovery | A failed or unobservable operation falls through as success | Manual route audit plus injected disposable failures. |
-| No-worker execution can terminate | A foreground-only run waits for an impossible delivery/resume | Trace and execute both handoff branches. |
-| Compact intent guidance preserves compatible changes | Conflict resolution clobbers one valid intention | Non-leading control/treatment conflict scenarios. |
-| Reorientation catches changed assumptions | Work resumes against obsolete inputs or outputs | Dependency-interaction control/treatment scenario. |
+| Named refs are not silently substituted | Start, continue, replay, correction, and no-replay publication cases use literal named refs while tempting related refs remain unselected; each correction/publication case reobserves exact source/target before mutation. | `PASS` |
+| Publication requires separate authority and active lifecycle | Start/continue treatment does not push without authority; with authority and destination bound, it enters remote reconciliation. Post-completion publication does not activate. | `PASS` |
+| Final comparison and exact lease preserve new work | Remote advances after initial observation; stale lease cannot overwrite it; integration/revalidation preserves compatible remote intent; final remote equals local result. | `PASS` |
+| Worker checkpoint prevents concurrent mutation | No replay, local correction, or publication push occurs while a worktree-writing command runs. Include replay and no-replay publication cases, plus messaging/pause and non-interruptible-wait routes where claimed. | `PASS` |
+| Every exact source kind has a worktree route | Owned branch, unowned branch, and detached non-branch cases execute at the bound ref/OID and place the result at the bound destination. | `PASS` |
+| Fresh-invocation contract facts are rebound | Continue proves only Git-recorded state; target name, goal, completion predicate, destinations, authority, stash, and worker facts are rebound or pause. Abort requires only restoration/worker facts. Continue publication never infers destination or authority from onto OID. | `PASS` |
+| Lifecycle stash identity survives invocations | With unrelated stashes present, fresh continue and abort select only the exact lifecycle stash, preserve it through conflict, and remove it only after conflict-free restoration. | `PASS` |
+| Every stage failure reaches observed-state recovery | Enumerate every final-router gate; inject a failure and observation failure at each; all traces reach the stopped-state report and none reaches completion. | `PASS` |
+| No-worker execution can terminate | Foreground-only Local, Published, and Aborted cases reach their terminal without delivery, acknowledgement, resume, or summary-record nodes. | `PASS` |
+| Compact intent guidance preserves compatible changes | Each non-leading conflict case preserves every compatible stated intent and passes affected checks; incompatible/multiple semantic classes pause and name evidence and alternatives. | `PASS` |
+| Reorientation catches changed assumptions | Direct overlap and indirect producer/consumer cases inventory every observed interaction, rerun its covering check, and adjust or pause before worker resumption. | `PASS` |
 
 Each behavioral experiment runs in an isolated temporary directory without access to this
-repository's instructions. A control receives only the scenario; a treatment receives the
-candidate skill content. The same model and scenario are used for both arms. The adjudication
-measures outcome-changing behavior, turns, and tokens; syntactic variants such as `switch` versus
-`checkout` are ignored.
+repository's instructions. Control/treatment claims require the same model, prompt, repository
+fixture, and adjudication criteria. Fixture evidence records commands, exit statuses, and final Git
+observations. Syntactic variants such as `switch` versus `checkout` are ignored.
 
 The runner and fixtures are disposable after the experiment. They are not committed to the skill,
 and no production rebase runtime is created to test a prose process.
@@ -351,11 +442,15 @@ a no-op.
 The design is implemented when:
 
 - the package matches the stated boundary and contains no Python or runtime artifacts;
-- `SKILL.md` carries the complete lean routine route without teaching ordinary Git;
-- `step-by-step.md` stays under 100 lines and contains only stage labels, guards, references, and terminals;
+- `SKILL.md` uses the exact invocation description and is the sole home of routine rules;
+- every activation loads `step-by-step.md` before execution, its whole router stays at most 100
+  lines, and node references load only when reached;
+- ordinary bullets and inline fixed processes respect the hard 120/1,024-character budgets without
+  losing required signal;
 - each rule has one authoritative home and each reference loads only under its stated condition;
-- exact source-location modes and cross-invocation lifecycle identity are recoverable from Git;
+- every fact required by a mutation is proven from Git or explicitly rebound; missing or
+  inconsistent facts pause before that mutation;
 - the Mermaid router parses successfully;
 - cross-harness prose contains no harness-specific syntax or root-path assumptions;
-- representative isolated Git scenarios establish the safety-sensitive branches; and
+- every invocation-matrix and validation-table row and every case within it records `PASS`; and
 - no turn- or token-saving claim is made without a matched treatment arm.
