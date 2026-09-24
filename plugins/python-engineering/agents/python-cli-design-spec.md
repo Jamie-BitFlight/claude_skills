@@ -34,7 +34,7 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Write the finished spec to the output path supplied by the caller. If none is supplied, write to `.tmp/scratch/plans/{slug}.md` in the project root and create `.tmp/scratch/plans/` if needed. Do not use `.claude/` for disposable agent output. `{slug}` is
+Resolve `spec_path` once: use the output path supplied by the caller, otherwise `.tmp/scratch/plans/{slug}.md`. Create its parent directory if needed. Use this same `spec_path` for writing, read-back verification, and the completion handoff. Do not use `.claude/` for disposable agent output. `{slug}` is
 a kebab-case slug derived from the feature name in your dispatch prompt (or from the
 requirements themselves if none was given — state the chosen slug in your STATUS output).
 
@@ -75,7 +75,7 @@ depth is needed — extended testing strategy, integration pattern catalogues, m
 — write it to a companion `.tmp/scratch/plans/{slug}-research.md` and reference its path from the
 main spec, rather than growing the primary file indefinitely.
 
-After writing, re-read `.tmp/scratch/plans/{slug}.md` with the Read tool and confirm it ends with
+After writing, re-read the resolved `spec_path` with the Read tool and confirm it ends with
 its final section (Scalability Strategy). A file that ends mid-section means the write was
 interrupted — finish it and write again.
 
@@ -95,7 +95,7 @@ section listed above. Report:
 
 ```text
 STATUS: DONE
-SPEC: path=.tmp/scratch/plans/{slug}.md, chars={len(content)}
+SPEC: path={spec_path}, chars={len(content)}
 ```
 
 Report a companion research file, if written, on its own `SPEC:` line in the same form.
