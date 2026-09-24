@@ -330,10 +330,12 @@ class TestGitCommonRootResourceCleanup:
 
         # Act
         dh_paths._git_common_root(repo_path)
+        close_spy.call_args_list.append(mocker.call(object()))
 
-        # Assert -- working_dir survives close(), so it reliably identifies
-        # which Repo instance a given close() call targeted.
-        calls_for_this_repo = [call for call in close_spy.call_args_list if call.args[0].working_dir == str(repo_path)]
+        # Assert -- class-level spies can observe unrelated, partially shaped receivers.
+        calls_for_this_repo = [
+            call for call in close_spy.call_args_list if getattr(call.args[0], "working_dir", None) == str(repo_path)
+        ]
         assert len(calls_for_this_repo) >= 1
 
 
