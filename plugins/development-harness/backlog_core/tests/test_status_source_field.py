@@ -76,7 +76,7 @@ class _GitHubLikeBackend:
     """
 
     supports_batch_status_fetch = True
-    supports_github_extras = True
+    supports_github_extras = False
 
     def __init__(self, items: list[BacklogItem]) -> None:
         self._items = items

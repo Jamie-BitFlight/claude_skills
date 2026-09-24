@@ -71,6 +71,7 @@ from .models import (
     ItemNotFoundError,
     MilestoneInfo,
     Output,
+    ProviderSnapshot,
     PullRequestRef,
     ReconcileRequest,
     ReconcileScope,
@@ -90,9 +91,7 @@ from .models import (
 from .parsing import (
     SectionSpan,
     extract_leading_code_list_items,
-    find_item,
     items_needing_issues,
-    items_with_issues,
     normalize_issue_title,
     parse_issue_selector,
     parse_sam_task_metadata,
@@ -107,6 +106,7 @@ from .section_registry import SectionKey, resolve_section_name
 from .status_registry import STATUS_LABEL_PREFIX, StatusLabel
 from .sync_state import RETRYABLE_TRANSIENT_EXCEPTIONS, get_sync_state
 from .timestamps import now_iso
+from .work_item_decisions import CommandWorkItems, WorkItemDecisionContext
 
 _SAM_SUCCESSFUL_STATUSES: frozenset[str] = SAM_CORE_SUCCESSFUL_STATUSES | {"closed", "done"}
 _SAM_PLAN_PAGE_SIZE: Final = 100
@@ -146,6 +146,22 @@ class _SamTaskLookupResult(TypedDict):
 
 def _work_item(reference: str) -> BacklogItem:
     return get_config().backend.get_work_item(reference)
+
+
+def _decision_context(
+    *, repo: str = "", allow_cached: bool = False, output: Output | None = None
+) -> WorkItemDecisionContext:
+    """Create the single live work-item decision context for one command.
+
+    Returns:
+        A context bound to the configured backend and fallback policy.
+    """
+    return WorkItemDecisionContext(get_config().backend, repo=repo, allow_cached=allow_cached, output=output)
+
+
+def _pending_decision_items(context: WorkItemDecisionContext) -> list[BacklogItem]:
+    """Return the context's memoized pending intent for safety checks."""
+    return context._pending()
 
 
 def get_github(repo: str = "", timeout: int = 15) -> Repository:
@@ -837,7 +853,9 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
     return True
 
 
-def _update_item_description(item: BacklogItem, description: str, output: Output | None = None) -> bool:
+def _update_item_description(
+    item: BacklogItem, description: str, output: Output | None = None, *, snapshot: ProviderSnapshot | None = None
+) -> bool:
     """Update the backend-owned item description and reconcile immediately.
 
     Mirrors grooming's and striking's immediate-reconcile behavior. Without
@@ -865,7 +883,7 @@ def _update_item_description(item: BacklogItem, description: str, output: Output
         return False
     update_item_metadata(reference, {"description": description}, output=out)
     item.description = description
-    _reconcile_item(item, out)
+    _reconcile_item(item, out, snapshot=snapshot)
     return True
 
 
@@ -1165,6 +1183,7 @@ def _write_groomed_to_item(
     reason: str | None = None,
     added_date: str = "0000-00-00",
     append: bool = False,
+    base_item: BacklogItem | None = None,
 ) -> None:
     """Write groomed content into a backend-owned work item.
 
@@ -1186,8 +1205,9 @@ def _write_groomed_to_item(
         added_date: ISO date used as the entry id when migrating legacy text.
         append: When ``True``, always append a new entry rather than updating
             by id.
+        base_item: Already selected pending/provider content to mutate.
     """
-    item = _work_item(reference)
+    item = base_item.model_copy(deep=True) if base_item is not None else _work_item(reference)
     today_str = today()
     item.metadata.groomed = today_str
 
@@ -1228,6 +1248,7 @@ def _write_groomed_to_reference(
     reason: str | None = None,
     added_date: str = "0000-00-00",
     append: bool = False,
+    base_item: BacklogItem | None = None,
 ) -> None:
     """Merge groomed content into a backend-owned work item.
 
@@ -1245,6 +1266,7 @@ def _write_groomed_to_reference(
         added_date: ISO date for legacy entry migration.
         append: When ``True``, always append a new entry rather than updating
             by id.
+        base_item: Already selected pending/provider content to mutate.
     """
     _write_groomed_to_item(
         reference,
@@ -1256,6 +1278,7 @@ def _write_groomed_to_reference(
         reason=reason,
         added_date=added_date,
         append=append,
+        base_item=base_item,
     )
 
 
@@ -1281,7 +1304,7 @@ def _check_ac_overlap(item: BacklogItem, output: Output) -> None:
         output.warn(_AC_OVERLAP_MSG)
 
 
-def _reconcile_item(item: BacklogItem, output: Output) -> None:
+def _reconcile_item(item: BacklogItem, output: Output, *, snapshot: ProviderSnapshot | None = None) -> None:
     """Trigger an immediate targeted reconcile for one item's queued mutation.
 
     Shared by the write paths that must not leave their mutation sitting in
@@ -1303,6 +1326,7 @@ def _reconcile_item(item: BacklogItem, output: Output) -> None:
             persisted by the caller before this call.
         output: Output aggregator that receives a reconciled/queued/
             unsupported status message.
+        snapshot: Compatible live decision snapshot, when one was obtained.
 
     Raises:
         CacheStateCorruptError: When the local cache state file is corrupted
@@ -1315,8 +1339,12 @@ def _reconcile_item(item: BacklogItem, output: Output) -> None:
     if not isinstance(backend, SyncProvider):
         output.info("Active backend does not support reconciliation.")
         return
+    if snapshot is None and getattr(backend, "supports_github_extras", False):
+        output.info(f"Queued {item.issue} for provider reconciliation.")
+        return
     try:
-        result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue])
+        result = backend.reconcile(request, snapshot=snapshot) if snapshot is not None else backend.reconcile(request)
     except CacheStateCorruptError:
         # A corrupted local cache state file needs operator attention — never
         # degrade it to a routine "queued" message alongside the two cases below.
@@ -1346,6 +1374,7 @@ def _handle_update_groomed(
     replace_section: bool = False,
     reason: str | None = None,
     append: bool = False,
+    snapshot: ProviderSnapshot | None = None,
 ) -> None:
     """Handle groomed content through the configured backend and its sync capability."""
     out = output or Output()
@@ -1370,13 +1399,19 @@ def _handle_update_groomed(
         reason=reason,
         added_date=added_date,
         append=append,
+        base_item=item,
     )
     out.info(f"Updated {item.reference} with groomed content")
-    _reconcile_item(item, out)
+    _reconcile_item(item, out, snapshot=snapshot)
 
 
 def _handle_batch_groomed(
-    item: BacklogItem, sections: dict[str, str], repo: str, output: Output | None = None
+    item: BacklogItem,
+    sections: dict[str, str],
+    repo: str,
+    output: Output | None = None,
+    *,
+    snapshot: ProviderSnapshot | None = None,
 ) -> list[str]:
     """Write multiple groomed sections, then reconcile the linked item once.
 
@@ -1385,6 +1420,7 @@ def _handle_batch_groomed(
         sections: Mapping of section name to raw content (entry-block wrapping applied automatically).
         repo: GitHub repo slug (e.g. "owner/repo").
         output: Optional Output aggregator.
+        snapshot: Compatible live decision snapshot, when one was obtained.
 
     Returns:
         List of section names that were written locally.
@@ -1404,7 +1440,7 @@ def _handle_batch_groomed(
     # when a YAML write targets a .md filepath and a subsequent backend read on
     # that same path incorrectly re-parses it as Markdown, losing prior sections.
     written: list[str] = []
-    batch_item = _work_item(item.reference)
+    batch_item = item.model_copy(deep=True)
     today_str = today()
     batch_item.metadata.groomed = today_str
     for section_name, content in sections.items():
@@ -1431,7 +1467,7 @@ def _handle_batch_groomed(
     if SectionKey.ACCEPTANCE_CRITERIA.value in written:
         _check_ac_overlap(item, out)
 
-    _reconcile_item(batch_item, out)
+    _reconcile_item(batch_item, out, snapshot=snapshot)
 
     return written
 
@@ -1524,7 +1560,7 @@ def _validate_add_item_type(type_: str) -> None:
 _DUPLICATE_TERMINAL_STATUSES: frozenset[str] = frozenset({"done", "resolved", "closed", "completed"})
 
 
-def _duplicate_candidates() -> list[dict[str, str | bool]]:
+def _duplicate_candidates(context: WorkItemDecisionContext) -> list[dict[str, str | bool]]:
     """Build duplicate-check candidates, excluding skipped and terminal-status items.
 
     ``_build_list_entry(item, {})`` falls back to an empty ``status`` string for
@@ -1539,16 +1575,13 @@ def _duplicate_candidates() -> list[dict[str, str | bool]]:
     Returns:
         List entry dicts for every non-skipped, non-terminal-status item.
     """
-    items = [
-        it
-        for it in get_config().backend.list_work_items()
-        if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES
-    ]
+    items = context.all().provider_items + _pending_decision_items(context)
+    items = [it for it in items if not it.skip and it.status.casefold() not in _DUPLICATE_TERMINAL_STATUSES]
     return [_build_list_entry(it, {}) for it in items]
 
 
 def _classify_duplicate_check(
-    title: str, description: str, repo: str, out: Output
+    context: WorkItemDecisionContext, title: str, description: str, out: Output
 ) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
     """Classify whether title/description content matches an existing backlog item.
 
@@ -1565,43 +1598,31 @@ def _classify_duplicate_check(
     returns ``NO_DUPLICATE``, not a downgrade.
 
     Args:
+        context: Command-scoped live provider observation.
         title: Title of the new item.
         description: Description of the new item.
-        repo: Repository slug used for the optional refresh.
         out: Output collector for a COULD_NOT_VERIFY warning.
 
     Returns:
         Tuple of (status, matches). *matches* is non-empty only when status is
         ``DUPLICATE_FOUND``.
     """
-    backend = get_config().backend
-    matches = find_content_duplicates(title, description, _duplicate_candidates())
-    if matches:
-        return DuplicateCheckStatus.DUPLICATE_FOUND, matches
-    if not isinstance(backend, SyncProvider):
-        return DuplicateCheckStatus.NO_DUPLICATE, []
-    try:
-        refresh = refresh_local_cache_from_github(repo=repo, output=out, full_refresh=False)
-    except (GithubException, BacklogError, *RETRYABLE_TRANSIENT_EXCEPTIONS) as e:
-        out.warn(f"  WARNING: Could not verify duplicate status: {e}")
-        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
-    if refresh.get("failures"):
-        out.warn(f"  WARNING: Could not verify duplicate status: {refresh['failures']} item(s) failed to reconcile")
-        return DuplicateCheckStatus.COULD_NOT_VERIFY, []
-    matches = find_content_duplicates(title, description, _duplicate_candidates())
+    matches = find_content_duplicates(title, description, _duplicate_candidates(context))
     if matches:
         return DuplicateCheckStatus.DUPLICATE_FOUND, matches
     return DuplicateCheckStatus.NO_DUPLICATE, []
 
 
-def _check_for_duplicates(title: str, description: str, force: bool, repo: str, out: Output) -> None:
+def _check_for_duplicates(
+    context: WorkItemDecisionContext, title: str, description: str, force: bool, out: Output
+) -> None:
     """Raise DuplicateItemError if a content duplicate is found and force is False.
 
     Args:
+        context: Command-scoped live provider observation.
         title: Title of the new item.
         description: Description of the new item.
         force: When True, skip the check entirely.
-        repo: Repository slug used for the optional refresh.
         out: Output collector for a COULD_NOT_VERIFY warning.
 
     Raises:
@@ -1609,7 +1630,7 @@ def _check_for_duplicates(title: str, description: str, force: bool, repo: str, 
     """
     if force:
         return
-    status, matches = _classify_duplicate_check(title, description, repo, out)
+    status, matches = _classify_duplicate_check(context, title, description, out)
     match status:
         case DuplicateCheckStatus.DUPLICATE_FOUND:
             raise DuplicateItemError(matches)
@@ -1617,10 +1638,10 @@ def _check_for_duplicates(title: str, description: str, force: bool, repo: str, 
             return
 
 
-def _resolve_reference(priority: str, slug: str) -> str:
+def _resolve_reference(context: WorkItemDecisionContext, priority: str, slug: str) -> str:
     base = f"{priority.lower()}-{slug}"
     reference = base
-    existing_references = {item.reference for item in get_config().backend.list_work_items()}
+    existing_references = {item.reference for item in context.all().provider_items + _pending_decision_items(context)}
     idx = 0
     while reference in existing_references:
         idx += 1
@@ -1737,6 +1758,7 @@ def add_item(
     force: bool = False,
     repo: str = "",
     output: Output | None = None,
+    allow_cached: bool = False,
 ) -> dict[str, str | int | bool | list[str]]:
     """Add an item through the configured backend and optionally create its native issue.
 
@@ -1785,8 +1807,9 @@ def add_item(
     _validate_add_item_type(type_)
 
     out = output or Output()
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
 
-    _check_for_duplicates(title, description, force, repo, out)
+    _check_for_duplicates(context, title, description, force, out)
 
     today_str = today()
     slug = title_to_slug(title)
@@ -1805,7 +1828,7 @@ def add_item(
         suggested_location=suggested_location,
     )
     issue_ref = _try_create_backend_issue_ref(item_data, repo, out)
-    item_reference = issue_ref or _resolve_reference(priority, slug)
+    item_reference = issue_ref or _resolve_reference(context, priority, slug)
 
     # Build and persist the backend-owned work item. Reuse item_data.title, not the
     # raw title argument: gh_client.create_issue_for_item mutates item_data.title in
@@ -1898,11 +1921,7 @@ def refresh_local_cache_from_github(
         out.info("Active backend does not support reconciliation.")
         return {"refreshed": 0, "reconciled": 0, "pending_mutations": 0, "rejected_mutations": 0, **out.to_dict()}
     scope = ReconcileScope.INITIAL if full_refresh else ReconcileScope.INCREMENTAL
-    references = (
-        []
-        if label and scope in {ReconcileScope.INITIAL, ReconcileScope.INCREMENTAL}
-        else [item.metadata.issue for item in items_with_issues(get_config().backend.list_work_items())]
-    )
+    references: list[str] = []
     result = backend.reconcile(
         ReconcileRequest(scope=scope, label=label or "", references=references, apply_local_patches=apply_local_patches)
     )
@@ -2386,6 +2405,62 @@ def _listing_provenance(backend: object) -> tuple[bool, bool, bool, bool]:
     return from_cache, has_pending_writes, low_confidence, confirmed_complete
 
 
+def _read_list_decision(
+    *, backend: object, refresh: bool, allow_cached: bool, label: str | None, repo: str, output: Output
+) -> CommandWorkItems:
+    """Read one command snapshot and optionally reconcile it in foreground.
+
+    Returns:
+        The command-scoped provider observation.
+    """
+    read = _decision_context(repo=repo, allow_cached=allow_cached, output=output).all()
+    if refresh and isinstance(backend, SyncProvider):
+        request = ReconcileRequest(scope=ReconcileScope.INCREMENTAL, label=label or "", apply_local_patches=True)
+        result = (
+            backend.reconcile(request, snapshot=read.provider_snapshot)
+            if read.provider_snapshot is not None
+            else backend.reconcile(request)
+        )
+        summary = (
+            f"Reconciled {result.fetched_items} provider item(s): {result.local_updates} local updates, "
+            f"{result.provider_patches} patches, {result.no_ops} no-ops, {result.conflicts} conflicts, "
+            f"{result.failures} failures, {result.pending_mutations} pending mutation(s), "
+            f"{result.rejected_mutations} rejected mutation(s)."
+        )
+        if result.conflicts or result.failures or result.pending_mutations or result.rejected_mutations:
+            output.warn(summary)
+        else:
+            output.info(summary)
+    return read
+
+
+def _list_status_resolution(
+    read: CommandWorkItems,
+    backend: object,
+    open_items: list[BacklogItem],
+    repo: str,
+    status: str | None,
+    output: Output,
+) -> _ListStatusMapResolution:
+    """Resolve status facts from the same provider observation as the rows.
+
+    Returns:
+        Status facts and provenance for list filtering/rendering.
+    """
+    if read.provider_snapshot is not None:
+        return _ListStatusMapResolution(
+            status_map=read.status_map,
+            unavailable=False,
+            skipped_for_credentials=False,
+            has_numeric_issue_reference=any(parse_issue_number(item.issue) is not None for item in open_items),
+        )
+    if read.from_cache and getattr(backend, "supports_github_extras", False):
+        return _ListStatusMapResolution(
+            status_map={}, unavailable=False, skipped_for_credentials=False, has_numeric_issue_reference=False
+        )
+    return _resolve_list_status_map(open_items, repo, status, output)
+
+
 def list_items(
     refresh: bool = False,
     allow_cached: bool = False,
@@ -2450,58 +2525,13 @@ def list_items(
     """
     out = output or Output()
     backend = get_config().backend
-    if refresh:
-        # A warm checkpoint whose most recent snapshot load flagged unreadable
-        # or vanished files (SnapshotCompletenessProvider.has_skipped_snapshots,
-        # backlog #3546 Codex finding 2) cannot be repaired by the default
-        # incremental refresh below: GitHub only returns items that changed
-        # since the checkpoint's watermark, so an item that is locally broken
-        # but unchanged upstream is never refetched, and the low-confidence
-        # signal never clears. has_skipped_snapshots() only reflects a load
-        # that already happened on this backend instance (see its docstring),
-        # so list_work_items() is called once here to read the current
-        # on-disk state honestly before deciding refresh scope -- narrowly
-        # for this branch, not for every refresh=True call, so the common
-        # case (no skip signal) keeps its existing incremental behavior.
-        full_refresh = False
-        if isinstance(backend, SnapshotCompletenessProvider):
-            backend.list_work_items()
-            full_refresh = backend.has_skipped_snapshots()
-        refresh_local_cache_from_github(repo, label, output=out, full_refresh=full_refresh)
-    elif (
-        isinstance(backend, SyncProvider)
-        and isinstance(backend, SnapshotCheckpointProvider)
-        and not backend.has_synced_snapshot()
-    ):
-        # A never-synced cache is shaped exactly like an empty backlog and,
-        # per A1, the checkpoint is now an honest "never" (A-critique.md
-        # Sec 5, ALT-5: "list_items already takes refresh: bool ... Make a
-        # never-synced cache trigger that path once, rather than returning
-        # an annotated zero"). Read through once for a caller that has not
-        # asked for a refresh, instead of only describing the ambiguity
-        # below. This fires whenever the checkpoint is genuinely
-        # uninitialized -- never on a warm cache, since
-        # has_synced_snapshot() then reports True -- and a successful
-        # refresh durably advances the checkpoint, so it cannot recur for
-        # this cache once it has synced. It is not the same cost as probing
-        # on every list regardless of cache state (rejected in
-        # A-critique.md Sec 6.2): a healthy repeat call never re-fetches.
-        # A failed attempt (no token, offline, still refused) is reduced to
-        # a warning here -- an implicit read-through a caller did not ask for
-        # must never turn an unaware listing into a hard error -- but the
-        # low-confidence gate below still withholds the cached listing unless
-        # the caller explicitly passes allow_cached=True. The existing "cache
-        # holds no items" warning also fires since the checkpoint remains None. The
-        # checkpoint staying None also means a *later* list_items() call
-        # against a cache that never manages to sync tries again -- one
-        # attempt per call, never a retry loop within one -- which the
-        # critique frames as complementary, not a defect: "we tried and
-        # could not" is a sharper answer than "we never tried".
-        read_through_cold_cache(repo, out)
-    items = get_config().backend.list_work_items()
-
-    from_cache, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
-    if not items and isinstance(get_config().backend, SyncProvider) and not confirmed_complete:
+    read = _read_list_decision(
+        backend=backend, refresh=refresh, allow_cached=allow_cached, label=label, repo=repo, output=out
+    )
+    _, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
+    from_cache = read.from_cache
+    low_confidence = low_confidence and from_cache
+    if not read.provider_items and isinstance(get_config().backend, SyncProvider) and not confirmed_complete:
         # A provider-backed cache holding nothing reads exactly like an empty
         # backlog. They are different answers and only one is worth acting on,
         # so name the ambiguity rather than reporting a bare count of 0. Gated on
@@ -2545,7 +2575,9 @@ def list_items(
     # always exclude skip=True items regardless of include_closed. The
     # _filter_closed_items call below then decides whether terminal-status items
     # are included based on include_closed.
-    open_items = [it for it in items if not it.skip and it.section]
+    open_items = [it for it in read.provider_items if not it.skip and it.section]
+    if label:
+        open_items = [it for it in open_items if label in it.metadata.labels]
     open_items = _filter_closed_items(open_items, include_closed)
     # Skip the batch fetch for backends that do not support it (e.g. beads,
     # Linear).  Those backends raise NotImplementedError from
@@ -2563,7 +2595,7 @@ def list_items(
     # empty map.  _item_derived_status falls back to item.status when the map is
     # empty, but _build_list_entry does NOT: for numeric-issue items it falls
     # back to "" instead (see _duplicate_candidates, which filters around this).
-    status_resolution = _resolve_list_status_map(open_items, repo, status, out)
+    status_resolution = _list_status_resolution(read, backend, open_items, repo, status, out)
     # Provenance of the status data just resolved above (#3546, B5/B6): "live"
     # when the batch fetch was attempted and succeeded, "cache" when the
     # backend does not need one -- either structurally (its own status field is
@@ -2614,7 +2646,9 @@ def list_items(
 # ---------------------------------------------------------------------------
 
 
-def link_followup(selector: str, followup_to: str, output: Output | None = None) -> dict[str, str | bool | list[str]]:
+def link_followup(
+    selector: str, followup_to: str, output: Output | None = None, *, repo: str = "", allow_cached: bool = False
+) -> dict[str, str | bool | list[str]]:
     """Link a backlog item to its originating plan or task via ``followup_to``.
 
     Records the logical ID of the origin (e.g. ``"P1"``, ``"P1/T3"``) on the
@@ -2627,6 +2661,8 @@ def link_followup(selector: str, followup_to: str, output: Output | None = None)
             ``P{N}`` / ``P{N}/T{N}`` address form (or a slug).  Empty string
             clears the link.
         output: Optional :class:`Output` collector.
+        repo: Provider repository used for live selection.
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         Dict with ``title``, ``followup_to``, and output messages/warnings.
@@ -2635,7 +2671,11 @@ def link_followup(selector: str, followup_to: str, output: Output | None = None)
         ItemNotFoundError: When *selector* does not match any backlog item.
     """
     out = output or Output()
-    item = find_item(get_config().backend.list_work_items(), selector)
+    item = (
+        _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+        .select(selector, purpose="mutation")
+        .mutation_base
+    )
     if not item:
         raise ItemNotFoundError(selector)
     reference = item.reference
@@ -2647,7 +2687,9 @@ def link_followup(selector: str, followup_to: str, output: Output | None = None)
     return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
 
 
-def list_followups(followup_to: str, output: Output | None = None) -> dict[str, int | list[dict[str, str]] | list[str]]:
+def list_followups(
+    followup_to: str, output: Output | None = None, *, repo: str = "", allow_cached: bool = False
+) -> dict[str, int | list[dict[str, str]] | list[str]]:
     """List backlog items linked as follow-ups to the given origin.
 
     Scans all local backlog items and returns those whose
@@ -2657,13 +2699,15 @@ def list_followups(followup_to: str, output: Output | None = None) -> dict[str, 
         followup_to: Logical ID of the originating plan or task
             (e.g. ``"P1"``, ``"P1/T3"``).
         output: Optional :class:`Output` collector.
+        repo: Provider repository used for the live listing.
+        allow_cached: Permit warned cached listing after a live failure.
 
     Returns:
         Dict with ``items`` (list of dicts with ``title``, ``section``,
         ``issue``, ``followup_to``), ``count``, and output messages.
     """
     out = output or Output()
-    items = get_config().backend.list_work_items()
+    items = _decision_context(repo=repo, allow_cached=allow_cached, output=out).all().provider_items
     matches = [it for it in items if not it.skip and it.metadata.followup_to == followup_to]
     result_items = [
         {"title": it.title, "section": it.section, "issue": it.issue, "followup_to": it.metadata.followup_to}
@@ -3683,6 +3727,53 @@ def _view_enrichment_unavailable_reason(enrichment: ViewEnrichmentResult) -> str
     return enrichment.unavailable_reason
 
 
+def _resolve_view_source(
+    selector: str, repo: str, refresh: bool, allow_cached: bool, output: Output
+) -> tuple[BacklogItem | None, ViewItemResult, StatusSource, list[str]]:
+    """Resolve one view from its command-scoped provider observation.
+
+    Returns:
+        Selected item, initial result, status provenance, and unavailable capabilities.
+    """
+    backend = get_config().backend
+    decision = _decision_context(repo=repo, allow_cached=allow_cached, output=output).select(selector, purpose="read")
+    item = decision.provider
+    result = view_result_from_local_item(item) if item else ViewItemResult()
+    if getattr(backend, "supports_github_extras", False):
+        if item is None:
+            raise ItemNotFoundError(selector)
+        result.groomed = item.metadata.groomed
+        return item, result, "live" if decision.provider_snapshot is not None else "cache", []
+
+    issue_num = parse_issue_selector(selector)
+    enrichment = ViewEnrichmentResult(enriched=False, attempted=False)
+    if item:
+        if issue_num or refresh:
+            enrichment = _attempt_view_enrichment(
+                result, _live_lookup_id(item, issue_num, selector), repo, cached_fallback=True
+            )
+            if not enrichment.enriched and enrichment.unavailable_reason:
+                reason = _view_enrichment_unavailable_reason(enrichment)
+                output.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
+        result.groomed = item.metadata.groomed
+    elif issue_num or backend.issue_id_type == "string":
+        enrichment = _attempt_view_enrichment(
+            result, _live_lookup_id(item, issue_num, selector), repo, cached_fallback=False
+        )
+        if not enrichment.enriched:
+            if enrichment.unavailable_reason:
+                raise BackendUnavailableError(enrichment.unavailable_reason)
+            raise ItemNotFoundError(selector)
+    else:
+        raise ItemNotFoundError(selector)
+
+    if enrichment.enriched:
+        return item, result, "live", []
+    if enrichment.unavailable_reason:
+        return item, result, "unavailable", ["live_enrichment"]
+    return item, result, "cache", []
+
+
 def view_item(
     selector: str,
     repo: str = "",
@@ -3694,6 +3785,7 @@ def view_item(
     include_content: bool = True,
     section: str | None = None,
     refresh: bool = False,
+    allow_cached: bool = False,
 ) -> ViewItemResult:
     """View a backlog item or GitHub issue by URL, #N, bare number, or title.
 
@@ -3734,6 +3826,7 @@ def view_item(
             A numeric/#N/URL match, or a selector with no local match, is always
             live-checked regardless of this flag — the only case this flag gates
             is a cached title-substring selector.
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         ViewItemResult with item/issue details. When ``include_content=True``,
@@ -3747,49 +3840,9 @@ def view_item(
     # an omitted filter (full content), not a no-match. strip() preserves real
     # values like "0". (PR #2496 Codex finding.)
     section = (section or "").strip() or None
-    item = find_item(get_config().backend.list_work_items(), selector)
-    issue_num = parse_issue_selector(selector)
-
-    result: ViewItemResult = view_result_from_local_item(item) if item else ViewItemResult()
-
-    enrichment = ViewEnrichmentResult(enriched=False, attempted=False)
-    if item:
-        if issue_num or refresh:
-            live_id = _live_lookup_id(item, issue_num, selector)
-            enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=True)
-            if not enrichment.enriched and enrichment.unavailable_reason:
-                reason = _view_enrichment_unavailable_reason(enrichment)
-                out.warnings.append(f"{reason} — sections_index reflects provider-backed record, may be stale")
-        # Restore groomed date from local item — the enrichment path has no
-        # access to backend-owned metadata, so preserve the date string.
-        result.groomed = item.metadata.groomed
-    elif issue_num or get_config().backend.issue_id_type == "string":
-        live_id = _live_lookup_id(item, issue_num, selector)
-        # No cached record, so the live read is the only answer available. A
-        # BackendUnavailableError propagates deliberately: "the backend refused
-        # the query" is not "the item does not exist", and reporting the second
-        # for the first sends a reader looking for an item that is really there.
-        enrichment = _attempt_view_enrichment(result, live_id, repo, cached_fallback=False)
-        if not enrichment.enriched:
-            if enrichment.unavailable_reason:
-                raise BackendUnavailableError(enrichment.unavailable_reason)
-            raise ItemNotFoundError(selector)
-    else:
-        raise ItemNotFoundError(selector)
-
-    # Provenance of this item's data (#3546, B5/B6): "live" when enrichment
-    # actually enriched this call; "unavailable" when the provider names an
-    # inability to answer; "cache" when no live check was needed or a completed
-    # check confirmed absence and left the cached fallback unchanged. The
-    # provider outcome separately records whether an outbound request was attempted.
-    status_source: StatusSource
-    if enrichment.enriched:
-        status_source = "live"
-    elif enrichment.unavailable_reason:
-        status_source = "unavailable"
-    else:
-        status_source = "cache"
-    unavailable_capabilities: list[str] = ["live_enrichment"] if status_source == "unavailable" else []
+    item, result, status_source, unavailable_capabilities = _resolve_view_source(
+        selector, repo, refresh, allow_cached, out
+    )
 
     # MCP clients send numeric show values as strings; convert before forwarding.
     parsed_show: str | int | None = show
@@ -3939,12 +3992,13 @@ def sync_items(
     out = output or Output()
     backend = get_config().backend
     if isinstance(backend, SyncProvider):
-        create_result = sync_create_missing_issues(get_config().backend.list_work_items(), repo, dry_run, output=out)
-        linked_items = items_with_issues(get_config().backend.list_work_items())
-        references = list(dict.fromkeys(item.issue for item in linked_items))
-        result = backend.reconcile(
-            ReconcileRequest(scope=ReconcileScope.LINKED, references=references, dry_run=dry_run)
+        pending_items = (
+            require_github_extras(backend, "pending_work_items").pending_work_items()
+            if getattr(backend, "supports_github_extras", False)
+            else backend.list_work_items()
         )
+        create_result = sync_create_missing_issues(pending_items, repo, dry_run, output=out)
+        result = backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, dry_run=dry_run))
         out.info(
             f"Reconciled linked items: {result.fetched_pages} pages, {result.fetched_items} items, "
             f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
@@ -3975,6 +4029,7 @@ def close_item(
     force: bool = False,
     repo: str = "",
     output: Output | None = None,
+    allow_cached: bool = False,
 ) -> dict[str, str | bool | list[str]]:
     """Dismiss an item without completion. Requires a categorized reason.
 
@@ -3989,15 +4044,12 @@ def close_item(
     if reason not in VALID_CLOSE_REASONS:
         msg = f"Invalid close reason: {reason!r}. Valid reasons: {', '.join(VALID_CLOSE_REASONS)}"
         raise ValidationError(msg)
-    items = get_config().backend.list_work_items()
-    item = find_item(items, selector)
-    if not item:
-        _pull_if_issue_selector(selector, repo, output=out)
-        items = get_config().backend.list_work_items()
-        item = find_item(items, selector)
+    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="mutation")
+    item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
-    issue_ref = item.issue
+    provider_item = target.provider
+    issue_ref = provider_item.issue if provider_item is not None else item.issue
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
         open_prs = _search_open_prs(issue_num_val, repo) if issue_num_val is not None else []
@@ -4020,7 +4072,7 @@ def close_item(
         msg = "Item has no backend reference"
         # Nothing about the item changes by calling again; only attaching a reference helps.
         raise BacklogError(msg, retryable=False)
-    already_closed = item.status.lower() in {"closed", "done"}
+    already_closed = (provider_item or item).status.lower() in {"closed", "done"}
     if already_closed:
         out.info("Item already closed.")
         return {"title": item.title, "already_closed": True, **out.to_dict()}
@@ -4039,8 +4091,10 @@ def close_item(
     )
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
-    if issue_ref:
+    if issue_ref and target.provider_snapshot is not None:
         close_github_issue(issue_ref, reason, reference=reference, comment=comment, repo=repo, output=out)
+    elif issue_ref:
+        out.info(f"Queued {issue_ref} for provider reconciliation.")
     if cleanup and issue_ref:
         out.info("Cleanup is managed by the configured backend.")
 
@@ -4064,6 +4118,7 @@ def resolve_item(
     force: bool = False,
     repo: str = "",
     output: Output | None = None,
+    allow_cached: bool = False,
 ) -> dict[str, str | bool | list[str]]:
     """Mark item DONE (completed) and close GitHub issue with evidence trail.
 
@@ -4078,15 +4133,12 @@ def resolve_item(
     if not summary.strip():
         msg = "summary is required (what was done)"
         raise ValidationError(msg)
-    items = get_config().backend.list_work_items()
-    item = find_item(items, selector)
-    if not item:
-        _pull_if_issue_selector(selector, repo, output=out)
-        items = get_config().backend.list_work_items()
-        item = find_item(items, selector)
+    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="mutation")
+    item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
-    issue_ref = item.issue
+    provider_item = target.provider
+    issue_ref = provider_item.issue if provider_item is not None else item.issue
     if issue_ref and not force:
         issue_num_val = parse_issue_number(issue_ref)
         open_prs = _search_open_prs(issue_num_val, repo) if issue_num_val is not None else []
@@ -4109,7 +4161,7 @@ def resolve_item(
         msg = "Item has no backend reference"
         # Nothing about the item changes by calling again; only attaching a reference helps.
         raise BacklogError(msg, retryable=False)
-    already_done = item.status.lower() in {"done", "resolved", "completed"}
+    already_done = (provider_item or item).status.lower() in {"done", "resolved", "completed"}
     if already_done:
         out.info("Item already resolved.")
         return {"title": item.title, "already_resolved": True, **out.to_dict()}
@@ -4120,7 +4172,7 @@ def resolve_item(
     update_item_metadata(reference, {"metadata": metadata}, output=out)
 
     out.info(f'Backlog item "{item.title}" resolved.')
-    if issue_ref:
+    if issue_ref and target.provider_snapshot is not None:
         resolve_github_issue(
             issue_ref,
             summary=summary,
@@ -4131,6 +4183,8 @@ def resolve_item(
             repo=repo,
             output=out,
         )
+    elif issue_ref:
+        out.info(f"Queued {issue_ref} for provider reconciliation.")
     if cleanup and issue_ref:
         out.info("Cleanup is managed by the configured backend.")
 
@@ -4286,6 +4340,7 @@ def _apply_groomed_update(
     reason: str | None,
     append: bool,
     sections: dict[str, str] | None,
+    snapshot: ProviderSnapshot | None = None,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Apply groomed content update (batch or single-section) and return result dict.
 
@@ -4305,6 +4360,7 @@ def _apply_groomed_update(
         reason: Reason string for entry-block operations.
         append: When True and section is set, append content.
         sections: Batch mapping of section name to raw content.
+        snapshot: Compatible live decision snapshot for reconciliation reuse.
 
     Returns:
         Completed result dict with groomed_updated and optional sections_written.
@@ -4321,7 +4377,7 @@ def _apply_groomed_update(
 
     if sections is not None:
         if sections:
-            written = _handle_batch_groomed(item, sections, repo, output=output)
+            written = _handle_batch_groomed(item, sections, repo, output=output, snapshot=snapshot)
             return {**result, "sections_written": written, "groomed_updated": True, **output.to_dict()}
         return {**result, "sections_written": [], "groomed_updated": False, **output.to_dict()}
 
@@ -4339,6 +4395,7 @@ def _apply_groomed_update(
         replace_section=replace_section,
         reason=reason,
         append=append,
+        snapshot=snapshot,
     )
     return {**result, "groomed_updated": True, **output.to_dict()}
 
@@ -4363,6 +4420,8 @@ def update_item(
     verified: bool = False,
     append: bool = False,
     sections: dict[str, str] | None = None,
+    allow_cached: bool = False,
+    _context: WorkItemDecisionContext | None = None,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Update item: add Plan, set status:in-progress, apply verified label, or write groomed content.
 
@@ -4387,18 +4446,16 @@ def update_item(
         sections: Mapping of section name to raw content for batch writes.
             Mutually exclusive with groomed_file, groomed_content, section/content.
             An empty dict is a no-op (returns success with sections_written=[]).
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         Dict with update results. When sections is provided, includes
         ``sections_written: list[str]`` and ``groomed_updated: bool``.
     """
     out = output or Output()
-    items = get_config().backend.list_work_items()
-    item = find_item(items, selector)
-    if not item:
-        _pull_if_issue_selector(selector, repo, output=out)
-        items = get_config().backend.list_work_items()
-        item = find_item(items, selector)
+    context = _context or _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="mutation")
+    item = target.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
 
@@ -4409,7 +4466,7 @@ def update_item(
         result["renamed_to"] = title
 
     if description is not None:
-        _update_item_description(item, description, output=out)
+        _update_item_description(item, description, output=out, snapshot=target.provider_snapshot)
         result["description_updated"] = True
 
     has_groomed = groomed or groomed_file or groomed_content or (section and content) or (sections is not None)
@@ -4428,6 +4485,7 @@ def update_item(
             reason=reason,
             append=append,
             sections=sections,
+            snapshot=target.provider_snapshot,
         )
 
     if plan:
@@ -4467,6 +4525,7 @@ def groom_item(
     append: bool = False,
     sections: dict[str, str] | None = None,
     mark_groomed: bool = False,
+    allow_cached: bool = False,
 ) -> dict[str, str | int | bool | list[str] | dict[str, str | int | bool]]:
     """Write groomed content through the configured backend. Delegates to update_item.
 
@@ -4488,16 +4547,18 @@ def groom_item(
             written: set local frontmatter status to 'groomed', remove
             status:needs-grooming label (idempotent), and add status:groomed label
             (created if absent). Default False preserves existing behavior.
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         Dict with groom results.
     """
     out = output or Output()
     has_input = groomed_file or groomed_content or (section and content) or sections is not None
-    items = get_config().backend.list_work_items()
-    item = find_item(items, selector)
-    if not item:
-        _pull_if_issue_selector(selector, repo, output=out)
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    target = context.select(selector, purpose="mutation")
+    item = target.mutation_base
+    if item is None:
+        raise ItemNotFoundError(selector)
     if has_input:
         result = update_item(
             selector=selector,
@@ -4515,14 +4576,15 @@ def groom_item(
             reason=reason,
             append=append,
             sections=sections,
+            allow_cached=allow_cached,
+            _context=context,
         )
     else:
         # No content to write — skip update_item to avoid stdin read in _resolve_groomed_content.
         # Proceed directly to mark_groomed handling below.
         result = {}
     if mark_groomed and "error" not in result:
-        fresh_items = get_config().backend.list_work_items()
-        fresh_item = find_item(fresh_items, selector)
+        fresh_item = item
         if not fresh_item:
             out.warn(f"  mark_groomed requested but item '{selector}' not found after re-parse — status not advanced")
             result["mark_groomed_skipped"] = True
@@ -4546,8 +4608,36 @@ def groom_item(
 # ---------------------------------------------------------------------------
 
 
+def _reconcile_strike(item: BacklogItem, snapshot: ProviderSnapshot | None, output: Output) -> None:
+    """Reconcile one queued strike against its command observation."""
+    if not item.issue:
+        return
+    backend = get_config().backend
+    if not isinstance(backend, SyncProvider):
+        output.info("  Active backend does not support reconciliation.")
+        return
+    if snapshot is None:
+        output.info(f"  Queued {item.issue} for provider reconciliation.")
+        return
+    try:
+        backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]), snapshot=snapshot)
+    except CacheStateCorruptError:
+        raise
+    except BacklogError:
+        output.info(f"  Queued {item.issue} for provider reconciliation.")
+    else:
+        output.info(f"  Reconciled strike for {item.issue}")
+
+
 def strike_entry(
-    selector: str, entry_id: str, reason: str, section: str | None = None, output: Output | None = None
+    selector: str,
+    entry_id: str,
+    reason: str,
+    section: str | None = None,
+    output: Output | None = None,
+    *,
+    repo: str = "",
+    allow_cached: bool = False,
 ) -> dict[str, str | int | bool | list[str]]:
     """Strike (retract) an entry block within a backlog item.
 
@@ -4561,6 +4651,8 @@ def strike_entry(
         reason: Human-readable reason for striking.
         section: Optional section name to scope the search.
         output: Optional Output collector.
+        repo: Provider repository used for live selection.
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         Dict with strike results.
@@ -4573,8 +4665,10 @@ def strike_entry(
             section holding two entries with the same stored id).
     """
     out = output or Output()
-    items = get_config().backend.list_work_items()
-    item = find_item(items, selector)
+    target_decision = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(
+        selector, purpose="mutation"
+    )
+    item = target_decision.mutation_base
     if not item:
         raise ItemNotFoundError(selector)
     # Unreachable — see BacklogItem class docstring (models.py).
@@ -4604,24 +4698,7 @@ def strike_entry(
     backend = get_config().backend
     backend.put_work_item(item)
     out.info(f"Struck entry {entry_id} in {item.reference}")
-    if item.issue:
-        if isinstance(backend, SyncProvider):
-            try:
-                backend.reconcile(ReconcileRequest(scope=ReconcileScope.TARGETED, references=[item.issue]))
-            except CacheStateCorruptError:
-                # A corrupted local cache state file needs operator attention — never
-                # degrade it to a routine "queued" message alongside the case below.
-                raise
-            except BacklogError:
-                # Mirrors _reconcile_item: BackendUnavailableError and a bare
-                # BacklogError (e.g. a transient GraphQL failure) both mean this
-                # attempt didn't reconcile, not that the strike itself failed — the
-                # strike is already saved via put_work_item() above.
-                out.info(f"  Queued {item.issue} for provider reconciliation.")
-            else:
-                out.info(f"  Reconciled strike for {item.issue}")
-        else:
-            out.info("  Active backend does not support reconciliation.")
+    _reconcile_strike(item, target_decision.provider_snapshot, out)
 
     return {"title": item.title, "entry_id": entry_id, "struck": True, **out.to_dict()}
 
@@ -4631,20 +4708,29 @@ def strike_entry(
 # ---------------------------------------------------------------------------
 
 
-def normalize_items(dry_run: bool = False, output: Output | None = None) -> dict[str, int | bool | list[str]]:
+def normalize_items(
+    dry_run: bool = False, output: Output | None = None, *, repo: str = "", allow_cached: bool = False
+) -> dict[str, int | bool | list[str]]:
     """Normalize all work items through the configured backend.
 
     Returns:
         Dict with count of normalized items.
     """
     out = output or Output()
-    items = get_config().backend.list_work_items()
+    context = _decision_context(repo=repo, allow_cached=allow_cached, output=out)
+    read = context.all()
+    by_reference = {item.reference: item for item in read.provider_items}
+    by_reference.update({item.reference: item for item in _pending_decision_items(context)})
+    items = list(by_reference.values())
     if not items:
         out.info("No backlog items found")
         return {"normalized": 0, **out.to_dict()}
     if not dry_run:
         for item in items:
             get_config().backend.put_work_item(item)
+        backend = get_config().backend
+        if isinstance(backend, SyncProvider) and read.provider_snapshot is not None:
+            backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL), snapshot=read.provider_snapshot)
     updated = len(items)
     out.info(f"Normalized {updated} item(s)" + (" [dry-run]" if dry_run else ""))
     return {"normalized": updated, "dry_run": dry_run, **out.to_dict()}
@@ -4700,8 +4786,14 @@ def pull_single_issue(
         out.info("Active backend does not support reconciliation.")
         return {"file_path": None, **out.to_dict()}
     reference = f"#{issue_num}"
-    reconciliation = backend.reconcile(
-        ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff_mode)
+    context = _decision_context(output=out)
+    decision = context.select(reference, purpose="read")
+    request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff_mode)
+    snapshot = decision.provider_snapshot
+    if snapshot is None and getattr(backend, "supports_github_extras", False):
+        snapshot = context.snapshot_for(request)
+    reconciliation = (
+        backend.reconcile(request, snapshot=snapshot) if snapshot is not None else backend.reconcile(request)
     )
     result: dict[str, str | list[str] | None] = {"file_path": reconciliation.file_paths.get(reference), **out.to_dict()}
     if diff_mode:
@@ -4735,30 +4827,28 @@ def pull_by_selector(
         BacklogError: If matched item has no linked remote reference.
     """
     out = output or Output()
+    context = _decision_context(repo=repo, output=out)
+    decision = context.select(selector, purpose="read")
+    item = decision.provider
     issue_num_str = parse_issue_selector(selector)
+    if item is None and issue_num_str is None:
+        raise ItemNotFoundError(selector)
+    if item is not None:
+        issue_num_str = parse_issue_selector(item.issue)
     if not issue_num_str:
-        # Title substring: find item in provider-backed record then pull by its issue number
-        items = get_config().backend.list_work_items()
-        item = find_item(items, selector)
         if item is None:
             raise ItemNotFoundError(selector)
-
-        issue_ref = item.issue
-        if not issue_ref:
-            msg = f"Item '{item.title}' has no linked remote reference. Use backlog_pull() for bulk pull."
-            raise BacklogError(msg)
-
-        issue_num_str = parse_issue_selector(issue_ref)
-        if not issue_num_str:
-            msg = f"Could not parse issue number from '{issue_ref}'"
-            raise BacklogError(msg)
+        msg = f"Item '{item.title}' has no linked remote reference. Use backlog_pull() for bulk pull."
+        raise BacklogError(msg)
 
     reference = f"#{int(issue_num_str)}"
     backend = get_config().backend
     if isinstance(backend, SyncProvider):
-        result = backend.reconcile(
-            ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff)
-        )
+        request = ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], include_diff=diff)
+        snapshot = decision.provider_snapshot
+        if snapshot is None and getattr(backend, "supports_github_extras", False):
+            snapshot = context.snapshot_for(request)
+        result = backend.reconcile(request, snapshot=snapshot) if snapshot is not None else backend.reconcile(request)
         out.info(
             f"Reconciled targeted item: {result.fetched_pages} pages, {result.fetched_items} items, "
             f"{result.local_updates} local updates, {result.provider_patches} patches, {result.no_ops} no-ops, "
@@ -4786,7 +4876,12 @@ def pull_items(
         Dict with count of pulled items.
     """
     out = output or Output()
-    items = get_config().backend.list_work_items()
+    backend = get_config().backend
+    items = (
+        require_github_extras(backend, "pending_work_items").pending_work_items()
+        if getattr(backend, "supports_github_extras", False)
+        else backend.list_work_items()
+    )
 
     # Auto-migration: create missing GitHub Issues for P0/P1 items
     if any(it.section in {"P0", "P1"} and not it.skip and not it.issue for it in items):
@@ -4796,7 +4891,11 @@ def pull_items(
         )
         sync_create_missing_issues(items, repo, dry_run, output=out)
         # Re-parse after migration to pick up updated issue numbers
-        items = get_config().backend.list_work_items()
+        items = (
+            require_github_extras(backend, "pending_work_items").pending_work_items()
+            if getattr(backend, "supports_github_extras", False)
+            else backend.list_work_items()
+        )
 
     candidates = [it for it in items if it.issue and not it.skip]
 
@@ -4804,7 +4903,6 @@ def pull_items(
         out.info("No items with GitHub issue numbers found.")
         return {"pulled": 0, **out.to_dict()}
 
-    backend = get_config().backend
     if isinstance(backend, SyncProvider):
         result = backend.reconcile(
             ReconcileRequest(
@@ -4929,7 +5027,11 @@ def create_sam_task(
 
 
 def get_sam_tasks(
-    parent_issue_number: int | str, refresh_cache: bool = True, repo: str = "", output: Output | None = None
+    parent_issue_number: int | str,
+    refresh_cache: bool = True,
+    repo: str = "",
+    output: Output | None = None,
+    allow_cached: bool = False,
 ) -> _SamTaskLookupResult:
     """Return SAM tasks from plans owned by a backend work item.
 
@@ -4938,6 +5040,7 @@ def get_sam_tasks(
         refresh_cache: Retained for caller compatibility; providers own refresh policy.
         repo: Retained for caller compatibility; the configured backend owns location.
         output: Optional Output collector.
+        allow_cached: Permit warned cached selection after a live failure.
 
     Returns:
         SAM task rows plus explicit provider availability and freshness metadata.
@@ -4961,9 +5064,12 @@ def get_sam_tasks(
 
     parent = str(parent_issue_number)
     owner_references = {parent, f"#{parent}"} if isinstance(parent_issue_number, int) else {parent}
-    for item in backend.list_work_items():
-        if parent in {item.reference.lstrip("#"), item.issue.lstrip("#")}:
-            owner_references.update(reference for reference in (item.reference, item.issue) if reference)
+    selector = f"#{parent}" if isinstance(parent_issue_number, int) else parent
+    target = _decision_context(repo=repo, allow_cached=allow_cached, output=out).select(selector, purpose="read")
+    if target.provider is not None:
+        owner_references.update(
+            reference for reference in (target.provider.reference, target.provider.issue) if reference
+        )
 
     records = {}
     try:
