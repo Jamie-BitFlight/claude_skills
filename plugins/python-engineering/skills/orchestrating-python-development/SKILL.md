@@ -48,7 +48,7 @@ Before the Implement step, check whether the deployment environment is restricte
 
 When the task involves human-facing presentation or interaction, step 1.5 invokes `python-engineering:designing-ui-for-cli` to produce a user-confirmed shape brief before tests are written. Agent-only JSON stdout is an automation contract, not a UI surface, and bypasses this gate. Mixed-audience commands take this gate for their explicit human presentation mode. The brief inputs the architecture's command tree and outputs surface design (colour strategy, status vocabulary, output hierarchy) that the architect references during step 3. This gate is interactive with the user — run it before any automated execution phase, since the shape-brief AskUserQuestion cannot block automated execution once one starts.
 
-The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief.
+The adversarial design step reads the actual codebase, not the architecture spec, and challenges the approach against real code. It identifies gotchas, alternative approaches, and which specialist skills apply. Pass the architecture file path and affected module paths — the agent reads further from there. It produces a behavioral validation plan (Phases 1–3) that the architect receives alongside the implementation brief. Every material verification step states its expected observable result before execution; actual results are compared against that expectation. A mismatch reopens the implementation or plan rather than being patched blindly.
 
 ```mermaid
 flowchart TD
@@ -399,9 +399,9 @@ Analyzes imports, corrects shebang, adds/removes PEP 723 metadata, sets execute 
 
 **For critical code** (payments, auth, security):
 
-- Coverage: >95%
-- Mutation testing: `uv run mutmut run`
-- Security scan: `uv run bandit -r packages/`
+- Exercise security-sensitive contracts, boundaries, and failure modes directly
+- Use mutation testing when it materially strengthens confidence in critical logic
+- Run the repository's configured security checks; add a scanner only when the project or task requires one
 
 **CI Compatibility**: After local checks pass, verify CI requirements are met by checking CI config files for additional validators.
 
