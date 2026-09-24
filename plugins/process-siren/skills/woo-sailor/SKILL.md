@@ -1,13 +1,13 @@
 ---
 name: woo-sailor
-description: Optimize processes in a file or directory by converting prose/bullet workflows to Mermaid diagrams — delegates to the process-siren:process-siren agent. Use when given a single SKILL.md, agent file, CLAUDE.md, or rules file to convert, or a directory containing any of those. Supports --dry-run or --report for read-only planning mode.
-argument-hint: <file-or-directory> [--dry-run|--report]
+description: Analyze, improve, or represent processes across a file or directory by delegating to process-siren. Uses the same semantic model and validation loop as single-process work; Mermaid is produced when it is the useful concise representation.
+argument-hint: <file-or-directory> [--analyze|--improve|--represent] [--dry-run|--report]
 user-invocable: true
 context: fork
 agent: process-siren:process-siren
 ---
 
-You are about to optimize a set of files.
+You are about to process a set of files. Select --analyze, --improve, or --represent; default to --improve. --dry-run and --report imply read-only ANALYZE behavior.
 
 <path>$0</path>
 <options>$1</options>
@@ -41,3 +41,8 @@ flowchart TD
     QBlockedDir -->|"No"| Done(["All eligible files processed"])
     RelayDir --> Done
 ```
+
+
+## Cross-file synthesis
+
+For directory mode, synthesize relevant ProcessModels across boundaries before finalizing changes. Detect caller/callee contradictions, conflicting invariants or assumptions, and ownership/recovery gaps. Revalidate claims affected by cross-file changes. Successful per-file analysis does not establish that the composed system is coherent.
