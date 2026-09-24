@@ -632,8 +632,16 @@ def validate_file(file_path: Path) -> ValidationResult:
     # Get expected shebang
     expected_shebang = get_expected_shebang(rule_number)
 
-    # Check if current matches expected
+    # Check the shebang and the runtime dependency contract. Rule 3 requires
+    # PEP 723 metadata declaring every detected external import; a correct
+    # shebang alone is not sufficient.
     is_correct = current_shebang == expected_shebang
+    missing_pep723_dependencies: set[str] = set()
+    if rule_number == RULE_UV_SCRIPT:
+        has_pep723, _declared = extract_pep723_dependencies(content)
+        normalized_external = {normalize_import_to_package(name) for name in external_imports}
+        missing_pep723_dependencies = normalized_external - pep723_deps
+        is_correct = is_correct and has_pep723 and not missing_pep723_dependencies
 
     # Gather errors
     errors: list[str] = []
@@ -644,6 +652,12 @@ def validate_file(file_path: Path) -> ValidationResult:
         if rule_number == RULE_UV_SCRIPT and UV_SHEBANG_PATTERN.match(current_shebang):
             diag = diagnose_uv_shebang(current_shebang)
             errors.extend(diag)
+
+    if rule_number == RULE_UV_SCRIPT and missing_pep723_dependencies:
+        errors.append(
+            "PEP 723 metadata does not establish dependencies for: "
+            + ", ".join(sorted(missing_pep723_dependencies))
+        )
 
     # Check execute bit alignment with rule
     if rule_number in EXECUTABLE_RULES and not is_exec:
@@ -731,6 +745,12 @@ def auto_fix_file(file_path: Path, result: ValidationResult) -> bool:
         lines = content.split("\n")
         needs_shebang = result.applicable_rule in EXECUTABLE_RULES
         needs_execute_bit = result.applicable_rule in EXECUTABLE_RULES
+        if result.applicable_rule == RULE_UV_SCRIPT and not result.pep723_dependencies:
+            console.print(
+                "[red]ERROR: Cannot auto-fix Rule 3 without established PEP 723 dependency metadata; "
+                "declare the script dependencies explicitly.[/red]"
+            )
+            return False
 
         if lines and lines[0].startswith("#!"):
             lines = lines[1:]
