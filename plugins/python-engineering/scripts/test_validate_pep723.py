@@ -200,3 +200,20 @@ def test_auto_fix_preserves_existing_pep723_metadata(distribution: Path) -> None
     assert 'requires-python = ">=3.12"' in after
     assert '"httpx==0.28.1; python_version >= \'3.12\'"' in after
     assert "# retain_this = true" in after
+
+
+def test_rule3_without_dependency_metadata_is_not_repaired_as_success(distribution: Path) -> None:
+    """A UV shebang cannot make an undeclared external dependency valid."""
+    script = distribution / "scripts" / "missing_metadata.py"
+    script.parent.mkdir(parents=True)
+    script.write_text("#!/usr/bin/env python3\nimport httpx\n", encoding="utf-8")
+    script.chmod(0o755)
+
+    result = validate_file(script)
+    assert result.applicable_rule == RULE_UV_SCRIPT
+    assert result.is_correct is False
+    before = script.read_text(encoding="utf-8")
+
+    assert auto_fix_file(script, result) is False
+    assert script.read_text(encoding="utf-8") == before
+    assert validate_file(script).is_correct is False
