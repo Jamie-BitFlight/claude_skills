@@ -65,9 +65,14 @@ class WorkItemDecisionContext:
         if self._bulk is not None:
             return self._bulk
         if not self._is_github:
-            self._bulk = CommandWorkItems(provider_items=self.backend.list_work_items())
+            self._bulk = CommandWorkItems(
+                provider_items=self.backend.list_work_items(),
+                from_cache=bool(getattr(self.backend, "supports_cached_listing", False)),
+            )
             return self._bulk
-        request = ReconcileRequest(scope=ReconcileScope.INCREMENTAL, since="", apply_local_patches=False)
+        request = ReconcileRequest(
+            scope=ReconcileScope.INCREMENTAL, repo=self.repo, since="", apply_local_patches=False
+        )
         try:
             snapshot = self._github.fetch_snapshot(request)
         except BacklogError as exc:
@@ -136,7 +141,7 @@ class WorkItemDecisionContext:
         missing = [reference for reference in references if reference not in self._targeted]
         if missing:
             snapshot = self._github.fetch_snapshot(
-                request.model_copy(update={"references": missing, "apply_local_patches": False})
+                request.model_copy(update={"repo": self.repo, "references": missing, "apply_local_patches": False})
             )
             for reference in missing:
                 self._targeted[reference] = self._slice_snapshot(snapshot, [reference])
@@ -155,7 +160,9 @@ class WorkItemDecisionContext:
     def _targeted_snapshot(self, reference: str) -> ProviderSnapshot:
         if reference not in self._targeted:
             snapshot = self._github.fetch_snapshot(
-                ReconcileRequest(scope=ReconcileScope.TARGETED, references=[reference], apply_local_patches=False)
+                ReconcileRequest(
+                    scope=ReconcileScope.TARGETED, repo=self.repo, references=[reference], apply_local_patches=False
+                )
             )
             self._targeted[reference] = self._slice_snapshot(snapshot, [reference])
         return self._targeted[reference]

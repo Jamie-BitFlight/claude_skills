@@ -154,7 +154,7 @@ class _GitHubWorkItemSync:
             Provider snapshot whose pagination remains private to this adapter.
         """
         sync_started_at = datetime.now(UTC).isoformat()
-        repo = self._issues.get_github()
+        repo = self._issues.get_github(request.repo)
         owner, repo_name = repo.full_name.split("/", 1)
         labels = [request.label] if request.label else None
         match request.scope:

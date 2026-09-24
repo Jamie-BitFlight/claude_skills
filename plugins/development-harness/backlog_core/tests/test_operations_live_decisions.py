@@ -62,6 +62,7 @@ class _LiveBackend(InMemoryBackend):
         self.reconciliations: list[tuple[ReconcileRequest, ProviderSnapshot | None]] = []
         self.writes: list[BacklogItem] = []
         self.cached_list_calls = 0
+        self.cached_get_calls = 0
         self.live_error: BackendUnavailableError | None = None
 
     def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
@@ -96,6 +97,13 @@ class _LiveBackend(InMemoryBackend):
     def list_work_items(self) -> list[BacklogItem]:
         self.cached_list_calls += 1
         return [item.model_copy(deep=True) for item in self.cached_items]
+
+    def get_work_item(self, reference: str) -> BacklogItem:
+        self.cached_get_calls += 1
+        for item in self.cached_items:
+            if reference in {item.reference, item.issue}:
+                return item.model_copy(deep=True)
+        raise KeyError(reference)
 
     def put_work_item(self, item: BacklogItem) -> None:
         self.writes.append(item.model_copy(deep=True))
@@ -215,3 +223,61 @@ def test_live_failure_reads_cache_only_for_explicit_warned_fallback(mocker: Mock
     assert first["title"] == "cached title"
     assert backend.cached_list_calls == 1
     assert output.warnings == ["Live provider read failed; using cached work items: offline"]
+
+
+@pytest.mark.parametrize("cached_title", [None, "stale title"])
+@pytest.mark.parametrize("route", ["link", "close", "resolve", "title", "description", "plan", "mark-groomed"])
+def test_metadata_mutations_persist_selected_live_base_without_cache_reload(
+    mocker: MockerFixture, route: str, cached_title: str | None
+) -> None:
+    live = BacklogItem(title="live title", description="live description", issue="#7", priority="P1")
+    cached = (
+        BacklogItem(title=cached_title, description="stale description", issue="#7", priority="P1")
+        if cached_title
+        else None
+    )
+    backend = _LiveBackend([live], cached_items=[cached] if cached is not None else [])
+    _configure(mocker, backend)
+    mocker.patch.object(operations, "try_get_github", return_value=None)
+    mocker.patch.object(operations, "close_github_issue")
+    mocker.patch.object(operations, "resolve_github_issue")
+    mocker.patch.object(operations, "apply_status_groomed")
+
+    if route == "link":
+        operations.link_followup("#7", "P1/T1")
+    elif route == "close":
+        operations.close_item("#7", "wontfix", force=True)
+    elif route == "resolve":
+        operations.resolve_item("#7", "completed", force=True)
+    elif route == "title":
+        operations.update_item("#7", title="new title")
+    elif route == "description":
+        operations.update_item("#7", description="new description")
+    elif route == "plan":
+        operations.update_item("#7", plan="P7")
+    else:
+        operations.groom_item("#7", mark_groomed=True)
+
+    assert backend.cached_get_calls == 0
+    assert backend.writes
+    assert backend.writes[0].description != "stale description"
+
+
+def test_command_snapshot_uses_supplied_repository(mocker: MockerFixture) -> None:
+    backend = _LiveBackend([BacklogItem(title="live title", issue="#7", priority="P1")])
+    _configure(mocker, backend)
+
+    operations.view_item("#7", repo="supplied/repository")
+
+    assert backend.snapshot_requests[0].repo == "supplied/repository"
+
+
+def test_live_empty_list_has_no_cache_ambiguity_warning(mocker: MockerFixture) -> None:
+    backend = _LiveBackend([])
+    _configure(mocker, backend)
+
+    result = operations.list_items()
+
+    assert result["items"] == []
+    assert result["from_cache"] is False
+    assert result["warnings"] == []
