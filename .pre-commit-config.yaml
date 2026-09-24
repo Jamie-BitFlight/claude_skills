@@ -168,9 +168,8 @@ repos:
         entry: uv run -q --no-sync plugins/plugin-creator/scripts/check_agent_auto_discovery.py
         language: system
         stages: [pre-commit]
-        pass_filenames: true
-        files: ^plugins/.*/\.claude-plugin/plugin\.json$
-        always_run: false
+        pass_filenames: false
+        always_run: true
 
       - id: check-harness-compatibility-inputs
         name: Check harness compatibility inputs

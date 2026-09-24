@@ -344,7 +344,7 @@ Skills and subagents work together in two directions:
 
 | Approach                     | System prompt                             | Task                        | Also loads                   |
 | ---------------------------- | ----------------------------------------- | --------------------------- | ---------------------------- |
-| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | CLAUDE.md                    |
+| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | Agent startup context; Explore/Plan skip `CLAUDE.md` |
 | Subagent with `skills` field | Subagent's markdown body                  | Claude's delegation message | Preloaded skills + CLAUDE.md |
 
 With `context: fork`, you write the task in your skill and pick an agent type to execute it. For the inverse (defining a custom subagent that uses skills as reference material), see the Sub-Agents documentation.
