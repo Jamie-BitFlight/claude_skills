@@ -217,3 +217,42 @@ def test_rule3_without_dependency_metadata_is_not_repaired_as_success(distributi
     assert auto_fix_file(script, result) is False
     assert script.read_text(encoding="utf-8") == before
     assert validate_file(script).is_correct is False
+
+
+@pytest.mark.parametrize(
+    "requirement",
+    [
+        '"httpx[http2]>=0.27"',
+        "'httpx>=0.27'",
+        '"httpx~=0.28"',
+    ],
+)
+def test_rule3_accepts_valid_pep723_requirement_forms(distribution: Path, requirement: str) -> None:
+    script = distribution / "scripts" / "requirements.py"
+    script.parent.mkdir(parents=True)
+    script.write_text(
+        UV_SHEBANG
+        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = ["
+        + requirement
+        + "]\n# ///\nimport httpx\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    assert validate_file(script).is_correct is True
+
+
+def test_rule3_ignores_sibling_local_module(distribution: Path) -> None:
+    scripts = distribution / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "local_helper.py").write_text("def run() -> None:\n    pass\n", encoding="utf-8")
+    script = scripts / "tool.py"
+    script.write_text(
+        UV_SHEBANG
+        + "\n# /// script\n# requires-python = \">=3.11\"\n# dependencies = [\"httpx>=0.27\"]\n# ///\n"
+        + "import httpx\nfrom local_helper import run\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    result = validate_file(script)
+    assert result.is_correct is True
+    assert "local_helper" not in result.external_imports
