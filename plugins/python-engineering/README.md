@@ -12,7 +12,7 @@ Without this plugin, Claude applies generic Python patterns and makes ad-hoc dec
 
 - Every Python task automatically applies Python 3.11+ standards
 - Tasks are routed to specialist skills (CLI, web, data, TDD, typing) based on what you are building
-- Code quality gates run via `ruff`, `ty`, and `pytest` with strict typing enforced
+- Code quality gates run via `ruff`, `ty`, and `pytest`, while `python-quality-audit` can fan out deeper smell, modernization, ecosystem, and maintenance analysis
 - Multi-step features get a structured task file via `create-feature-task`
   (`.claude/tasks/{feature-name}.md`) capturing phases, acceptance criteria, and context
 
@@ -34,13 +34,14 @@ workflow.
 | Command | Use When |
 |---|---|
 | `/python-engineering:orchestrate` | Any Python task — primary entrypoint |
-| `/python-engineering:review` | Code review |
+| `/python-engineering:python-quality-audit PR|diff|staged|unstaged|path` | Broad read-only Python quality and modernization audit; primary entryway for StinkySnake + SnakePolish + ecosystem research |
+| `/python-engineering:review` | Bounded conventional code review against task requirements and standards |
 | `/python-engineering:lint` | Deterministic quality checks |
 | `/python-engineering:cleanup` | Structured cleanup and modernization |
 | `/python-engineering:debug` | Structured debugging |
 | `/python-engineering:python3-tdd` | Start a feature test-first |
-| `/python-engineering:stinkysnake path/to/file.py` | Nine-phase quality improvement on a file |
-| `/python-engineering:snakepolish` | Polish code after stinkysnake analysis |
+| `/python-engineering:stinkysnake path/to/file.py` | Read-only smell hunter; normally invoked as an audit lane |
+| `/python-engineering:snakepolish path/to/file.py` | Read-only forward-looking Python modernization assessor; normally invoked as an audit lane |
 | `/python-engineering:modernpython` | Apply Python 3.11+ modernization patterns |
 | `/python-engineering:python3-add-feature` | Guided feature addition workflow |
 | `/python-engineering:comprehensive-test-review tests/` | Audit test suite quality |
@@ -80,14 +81,31 @@ These skills are not invoked directly — `python3-core` and `orchestrate` load 
 | `test-failure-mindset` | Root-cause approach to test failures |
 | `designing-ui-for-cli` | CLI UX design, 7-stage workflow; integrates impeccable design rigour |
 
-### Backward-Compat Skills
+### Quality Audit Architecture
+
+`python-quality-audit` is the public entryway for broad assessment. It accepts a PR, git diff, staged/unstaged work, file, or directory and fans out independent evidence gathering before synthesis:
+
+```text
+python-quality-audit
+  ├─ stinkysnake       smell / standards / maintenance-debt discovery
+  ├─ snakepolish       Python/stdlib/ecosystem modernization assessment
+  ├─ ecosystem lane    maintained-library substitution research
+  ├─ project lane      practices from substantial current Python projects
+  └─ removal lane      dead code/process/compatibility and deletion opportunities
+       ↓
+  evidence-backed, deduplicated, actionable report
+```
+
+StinkySnake and SnakePolish remain directly invokable for a single lens, but neither edits code. The audit distinguishes observed/derived/external evidence from hypotheses and requires a verification path before calling material changes actionable.
+
+### Retained Utility Skills
 
 | Skill | Status |
 |---|---|
-| `modernpython` | Kept — reference for PEP-by-PEP modernization |
-| `shebangpython` | Kept — shebang and PEP 723 validation |
-| `stinkysnake` | Kept — progressive quality improvement |
-| `snakepolish` | Kept — implementation phase for stinkysnake |
+| `modernpython` | Reference for PEP-by-PEP modernization |
+| `shebangpython` | Shebang and PEP 723 validation |
+| `stinkysnake` | Focused read-only smell hunter |
+| `snakepolish` | Focused read-only modernization assessor |
 
 ### Agents
 
@@ -96,7 +114,7 @@ These skills are not invoked directly — `python3-core` and `orchestrate` load 
 | `python-cli-architect` | Implements Python CLI features and fixes — primary implementation agent |
 | `python-pytest-architect` | Writes pytest test suites |
 | `python-cli-design-spec` | Designs CLI architecture and produces architecture specifications |
-| `code-reviewer` | Reviews Python code for quality, types, security, performance |
+| `code-reviewer` | Bounded post-implementation review; broad quality/modernization review routes through `python-quality-audit` |
 | `adversarial-solution-design` | Stress-tests design decisions before committing |
 | `semantic-code-search` | Searches codebase by identifier, import shape, type signature and code pattern |
 
@@ -109,12 +127,12 @@ These skills are not invoked directly — `python3-core` and `orchestrate` load 
 | Linter | `ruff` |
 | Quality gates | `prek` — unified pre-commit hook runner |
 | Type checker | `ty` (Astral) — not mypy |
-| Test runner | `pytest` with `pytest-mock` and Hypothesis |
+| Test runner | `pytest`; prefer pytest-mock and Hypothesis when their seams/properties strengthen the tests |
 | Build backend | Hatchling |
 | File size limit | 500 LOC — architect and reviewer agents enforce this per file |
-| `Any` usage | Forbidden in internal code |
-| Type annotations | Required on all functions and class attributes |
-| Coverage target | 80% minimum for production code |
+| `Any` usage | Keep out of the typed core; localize justified dynamic-boundary exceptions by file |
+| Type annotations | Strong typing by default; follow coherent project conventions and truthful boundary types |
+| Coverage | Behavior/risk driven; respect a project's configured gate rather than inventing a percentage |
 | Design | SOLID as active guidance; code smells as signals to investigate |
 
 ## Typing Policy
@@ -144,7 +162,10 @@ The plugin auto-detects the strongest valid typing strategy from Python version 
 # Start any Python task — this is the entry point
 /python-engineering:orchestrate "Add a CLI command that processes CSV files"
 
-# Quality improvement on existing code
+# Broad quality/modernization audit of existing code
+/python-engineering:python-quality-audit src/myapp/
+
+# Single-lens smell hunt
 /python-engineering:stinkysnake src/myapp/processor.py
 
 # Test-first feature
