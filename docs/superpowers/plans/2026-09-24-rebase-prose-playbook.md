@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the rebase Python workflow engine with a forge-neutral, observable prose playbook that uses Git as its runtime and loads edge-case detail only when its Mermaid router reaches that condition.
+**Goal:** Replace the rebase Python workflow engine with a forge-neutral, observable prose playbook that uses Git as its runtime and tells the agent to read edge-case detail only when its Mermaid router reaches that condition.
 
 **Architecture:** `.agents/skills/rebase/SKILL.md` is the single always-loaded control plane: required Agent Skills frontmatter, one local `**Keywords**:` search line, then an authoritative Mermaid router of at most 100 process lines. Five one-level references own destructive or semantic edge cases; the runtime, schemas, receipts, eval JSON, historical walkthrough, and custom state disappear, while the existing Claude Code symlink continues to expose the canonical package. Disposable isolated behavioral experiments validate activation and safety outcomes without becoming a maintained evaluator or production runtime.
 
@@ -19,7 +19,7 @@
 - The Mermaid control plane is at most 100 process lines; discovery metadata is outside that budget.
 - A necessary ordinary note in a conditional reference is one bullet of at most 120 characters.
 - A fixed safety process in a conditional reference is at most 1,024 characters.
-- Conditional references are direct, one level deep, and load only from the router node that needs them.
+- Conditional references are direct Markdown links, one level deep, and are read only from the reached router node.
 - The package contains no scripts, Python, schemas, plans, receipts, generated evidence, runtime state names, maintained eval artifacts, or custom persistent lifecycle state.
 - Exact commands appear only where their syntax enforces a safety property.
 - Every mutation depends only on facts proven from Git or explicitly rebound from the current request/task context.
@@ -254,7 +254,7 @@ Distinguish Git-observable operation state from user contract. On continue, rebi
 
 - [ ] **Step 7: Create `publication.md` with the authorized exact-lease sequence**
 
-Limit this reference to the path where start/continue already bound explicit authority, exact remote, destination ref, and initial destination OID before dependent mutation. Require final fetch/comparison with the bound OID, disposition and integration of every moved remote commit, reorientation/revalidation, another final observation, and an exact lease tied to the observed destination OID. A lease rejection or destination mismatch loops through reconciliation; authority is never inferred from lease syntax or prior pushes. Include the sparse exact `--force-with-lease=<ref>:<oid>` form because its syntax enforces the safety property.
+Limit this reference to the path where start/continue already bound explicit authority, exact remote, destination ref, and initial destination OID before dependent mutation. Require final fetch/comparison with the bound OID, disposition and integration of every moved remote commit, reorientation/revalidation, another final observation, and an exact lease tied to the observed destination OID. A lease rejection or destination mismatch stops external mutation; one more reconciliation/push attempt requires a new explicit decision and authority. Authority is never inferred from lease syntax or prior pushes. Include the sparse exact `--force-with-lease=<ref>:<oid>` form because its syntax enforces the safety property.
 
 - [ ] **Step 8: Verify replacement content before deleting old content**
 
@@ -309,10 +309,11 @@ Expected: renderer exits zero and produces a non-empty SVG. Delete neither produ
 Read `.pre-commit-config.yaml` to confirm the current allowed scope, then stage only `.agents/skills/rebase/` and commit with the matching Conventional Commit scope:
 
 ```bash
-git add -A .agents/skills/rebase
+git add -u -- .agents/skills/rebase
+git add -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/references/named-stash.md .agents/skills/rebase/references/history-shape.md .agents/skills/rebase/references/conflict-and-ambiguity.md .agents/skills/rebase/references/active-rebase-recovery.md .agents/skills/rebase/references/publication.md
 git diff --cached --check
 git diff --cached --stat
-git commit -m "refactor(rebase): replace runtime with prose playbook"
+git commit -m "refactor(rebase): replace runtime with prose playbook" -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/evals .agents/skills/rebase/scripts .agents/skills/rebase/references
 ```
 
 Expected: hooks pass and the commit contains only the rebase package replacement. End the Task 2 subagent after reporting the commit SHA and exact validation output.
@@ -408,10 +409,9 @@ Expected: `harness_compatibility.json is current`. If the check fails because ob
 Stage only the validator, its focused test, and override. Stage generated compatibility data only when Step 7 changed it:
 
 ```bash
-git add scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json
-git diff --quiet -- harness_compatibility.json || git add harness_compatibility.json
+git add -- scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json harness_compatibility.json
 git diff --cached --check
-git commit -m "test(rebase): validate script-free activation"
+git commit -m "test(rebase): validate script-free activation" -- scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json harness_compatibility.json
 ```
 
 Expected: hooks and focused tests pass; the commit contains no skill implementation change and no secrets. End the Task 3 subagent with the commit SHA and exact test output.
@@ -513,9 +513,9 @@ unapproved non-passing result remains.
 If tracked files changed:
 
 ```bash
-git add .agents/skills/rebase/SKILL.md .agents/skills/rebase/references
+git add -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/references/named-stash.md .agents/skills/rebase/references/history-shape.md .agents/skills/rebase/references/conflict-and-ambiguity.md .agents/skills/rebase/references/active-rebase-recovery.md .agents/skills/rebase/references/publication.md
 git diff --cached --check
-git commit -m "fix(rebase): close behavioral validation gaps"
+git commit -m "fix(rebase): close behavioral validation gaps" -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/references/named-stash.md .agents/skills/rebase/references/history-shape.md .agents/skills/rebase/references/conflict-and-ambiguity.md .agents/skills/rebase/references/active-rebase-recovery.md .agents/skills/rebase/references/publication.md
 ```
 
 If user-aligned semantic evidence changed the spec, commit that spec alone before the implementation correction with `docs(rebase): align validated contract`. If no tracked file changed, do not create an empty commit. In every case, report the matrix path, package SHA, all commands, per-model status totals, raw event paths, and exact final Git observations; do not claim token or turn savings.
@@ -621,8 +621,9 @@ hand-edit, `tests/fixtures/rebase-codex-consumer-evidence.json` and
 `tests/fixtures/codex-skill-activation-matrix.jsonl`. Require the rebase row to be `PASSED`, resolve
 installed `SKILL.md` and `references/publication.md`, contain no `rebase_plan.py`, and report both
 `source_tree_sha256` and `installed_tree_sha256` equal to `$FINAL_PACKAGE_SHA`. When the budget is
-closed, preserve the stale evidence, report its bound SHA and schema truthfully, and do not claim it
-validates the final package.
+closed, keep the new task text as a `MAPPED` future probe, clear its unobserved current evidence,
+preserve the historical evidence file under its actual SHA/schema, and do not claim it validates the
+final package.
 
 Run `uv run --script scripts/generate_harness_compatibility.py --check`; if objective data changed, regenerate it, rerun `--check`, and stage `harness_compatibility.json`. Any later change beneath `.agents/skills/rebase/` invalidates this step and requires fresh subagent reviews, a refreshed GREEN ledger, and final-SHA evidence only when the approved budget permits it.
 
@@ -641,10 +642,9 @@ Expected: every applicable hook passes. Fix underlying failures and rerun; never
 If review produced tracked changes, stage only corrected files and commit:
 
 ```bash
-git add .agents/skills/rebase scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json tests/fixtures/codex-skill-activation-matrix.jsonl tests/fixtures/rebase-codex-consumer-evidence.json
-git diff --quiet -- harness_compatibility.json || git add harness_compatibility.json
+git add -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/references/named-stash.md .agents/skills/rebase/references/history-shape.md .agents/skills/rebase/references/conflict-and-ambiguity.md .agents/skills/rebase/references/active-rebase-recovery.md .agents/skills/rebase/references/publication.md scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json tests/fixtures/codex-skill-activation-matrix.jsonl tests/fixtures/rebase-codex-consumer-evidence.json harness_compatibility.json
 git diff --cached --check
-git commit -m "fix(rebase): address independent review"
+git commit -m "fix(rebase): address independent review" -- .agents/skills/rebase/SKILL.md .agents/skills/rebase/references/named-stash.md .agents/skills/rebase/references/history-shape.md .agents/skills/rebase/references/conflict-and-ambiguity.md .agents/skills/rebase/references/active-rebase-recovery.md .agents/skills/rebase/references/publication.md scripts/validate_codex_skill_activation.py tests/test_validate_codex_skill_activation.py tests/fixtures/codex-skill-activation-overrides.json tests/fixtures/codex-skill-activation-matrix.jsonl tests/fixtures/rebase-codex-consumer-evidence.json harness_compatibility.json
 ```
 
 Expected: hooks pass. Generated evidence, when permitted, binds the committed final package SHA;
