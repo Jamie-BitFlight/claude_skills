@@ -14,7 +14,7 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 
 ### Agents (bundled in this plugin)
 
-- **python-cli-architect** — Build modern CLI applications with Typer and Rich (DEFAULT for all Python code)
+- **python-cli-architect** — Default implementation agent. Applies repository architecture first; for new CLIs offers the plugin's preferred Typer architecture, with Rich for human-facing output and compact JSON for agent-facing tools.
 - **python-engineering:python3-stdlib-only** — Create stdlib-only portable scripts (LAST RESORT for confirmed restricted environments only)
 - **python-pytest-architect** — Design comprehensive test suites
 - **code-reviewer** — Review Python code for quality and standards
@@ -200,21 +200,19 @@ flowchart TD
 
 **Use when**:
 
-- **DEFAULT choice for all Python scripts and CLI tools**
-- Building command-line applications with rich user interaction
-- Need progress bars, tables, colored output
-- User-facing CLI tools and automation scripts
-- Any script where UX matters (formatted output, progress feedback)
-- PEP 723 + uv available (internet access present)
+- Default implementation agent for Python work routed by this plugin
+- Building or modifying scripts and CLI applications
+- Human-facing CLI work where Typer/Rich is the preferred new-work default
+- Agent-facing/plugin CLI work where compact JSON is the preferred output contract
+- Existing projects whose established framework/architecture should be preserved
 
 **Characteristics**:
 
-- Uses Typer for CLI framework
-- Uses Rich for terminal output
-- Focuses on UX and polish
-- PEP 723 makes dependencies transparent (single file)
-- Better UX than stdlib alternatives
-- Works anywhere with Python 3.11+ and internet access
+- Offers Typer first for new CLI frameworks when dependencies are acceptable
+- Offers Rich first for human-facing terminal presentation; never for agent-only output
+- Uses compact Pydantic JSON contracts for agent-facing tools when Pydantic is justified/available
+- Preserves coherent project frameworks, architecture, Python floor, and dependency policy
+- PEP 723 + uv is the preferred standalone-script dependency path when appropriate
 
 **Complexity Advantage** (IMPORTANT):
 
@@ -223,7 +221,7 @@ flowchart TD
 - Better UX — professional output with minimal effort
 - Just as portable — PEP 723 + uv makes single-file scripts with dependencies work seamlessly
 
-**This agent is EASIER to use than stdlib-only approaches. Choose this as the default unless portability restrictions exist.**
+Choose this implementation agent by default; its preferred libraries are defaults to offer first, not reasons to replace coherent project choices.
 
 **Rich Width Handling**: For Rich Panel/Table width issues in CI/non-TTY environments, load `Skill(skill="python-engineering:typer-and-rich")` for complete solutions including the `get_rendered_width()` helper pattern.
 
@@ -331,9 +329,9 @@ If answers indicate restrictions: python-engineering:python3-stdlib-only
 **Characteristics**:
 
 - Modern pytest patterns
-- pytest-mock exclusively (never unittest.mock)
-- AAA pattern (Arrange-Act-Assert)
-- Coverage and mutation testing
+- pytest-mock offered first when mocking is appropriate, while preserving coherent existing seams
+- Clear Arrange/Act/Assert structure where useful
+- Behavioral coverage, property testing, and mutation testing when they strengthen evidence
 
 **Example tasks**:
 
