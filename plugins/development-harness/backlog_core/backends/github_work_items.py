@@ -444,15 +444,17 @@ class _GitHubWorkItemSync:
 class _GitHubReconciliation:
     """Drive the reconciliation cycle between the private cache and the provider."""
 
-    def __init__(self, cache: FileCache, provider: _ReconcileProvider) -> None:
+    def __init__(self, cache: FileCache, provider: _ReconcileProvider, *, default_repo: str = "") -> None:
         """Bind the provider-private cache to the snapshot and patch seam.
 
         Args:
             cache: Provider-private durable cache.
             provider: Snapshot and patch operations, resolved at call time.
+            default_repo: Repository assigned to writes and legacy unscoped intent.
         """
         self._cache = cache
         self._provider = provider
+        self._default_repo = default_repo
         # Populated by load_records() (and therefore list_work_items()) on every
         # call from the WorkItemSnapshotBatch.skipped list -- read back by
         # has_skipped_snapshots() with no extra I/O, rather than re-scanning the
@@ -538,9 +540,13 @@ class _GitHubReconciliation:
         """
         return bool(self._cache._pending_work_item_mutations())
 
-    def pending_work_items(self) -> list[BacklogItem]:
+    def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return copied queued work-item intent without cached provider rows."""
-        return [mutation.item.model_copy(deep=True) for mutation in self._cache._pending_work_item_mutations()]
+        selected_repo = repo or self._default_repo
+        return [
+            mutation.item.model_copy(deep=True)
+            for mutation in self._cache._pending_work_item_mutations(selected_repo, default_repo=self._default_repo)
+        ]
 
     def get_work_item(self, reference: str) -> BacklogItem:
         """Get a cached work item by stable reference.
@@ -556,7 +562,7 @@ class _GitHubReconciliation:
                 return record.item
         raise KeyError(reference)
 
-    def put_work_item(self, item: BacklogItem) -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
         """Persist a work-item intent for provider reconciliation.
 
         ``item.reference`` is guaranteed non-empty by
@@ -565,8 +571,12 @@ class _GitHubReconciliation:
         derivation is needed here. A copy is queued (rather than ``item``
         itself) so a caller mutating its own ``item`` after this call cannot
         retroactively alter the queued mutation.
+
+        Empty ``repo`` selects the backend's configured repository. Repository
+        identity is persisted with the mutation so equal issue references in
+        different repositories remain independent.
         """
-        self._cache._queue_work_item(item.reference, item.model_copy())
+        self._cache._queue_work_item(item.reference, item.model_copy(), repo or self._default_repo)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
@@ -581,7 +591,9 @@ class _GitHubReconciliation:
             observed = {item.reference for item in snapshot.items}
             if missing := set(effective_request.references) - observed:
                 raise ValueError(f"Supplied snapshot is missing requested references: {sorted(missing)}")
-        pending_work_items = self._cache._pending_work_item_mutations()
+        pending_work_items = self._cache._pending_work_item_mutations(
+            effective_request.repo or self._default_repo, default_repo=self._default_repo
+        )
         plan = reconcile_backlog(self.load_records(pending_work_items), snapshot, effective_request)
         cache_results: list[ActionResult] = []
         for action in (entry for entry in plan.cache_actions if entry.phase == "before_provider"):

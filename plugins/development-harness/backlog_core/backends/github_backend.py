@@ -153,7 +153,7 @@ class GitHubBackend:
         )
         self._content_cache = _GitHubContentCache(self._cache, self)
         self._work_items = _GitHubWorkItemSync(self, lambda: self._contents)
-        self._reconciliation = _GitHubReconciliation(self._cache, self)
+        self._reconciliation = _GitHubReconciliation(self._cache, self, default_repo=repo)
 
     # ------------------------------------------------------------------
     # Repository access
@@ -245,9 +245,9 @@ class GitHubBackend:
         """
         return self._reconciliation.has_pending_writes()
 
-    def put_work_item(self, item: BacklogItem) -> None:
+    def put_work_item(self, item: BacklogItem, repo: str = "") -> None:
         """Persist a work-item intent for provider reconciliation."""
-        self._reconciliation.put_work_item(item)
+        self._reconciliation.put_work_item(item, repo)
 
     def reconcile(self, request: ReconcileRequest, *, snapshot: ProviderSnapshot | None = None) -> ReconcileResult:
         """Reconcile provider state through the pure engine and private cache.
@@ -277,9 +277,7 @@ class GitHubBackend:
 
     def pending_work_items(self, repo: str = "") -> list[BacklogItem]:
         """Return configured-repository intent only when that repository is selected."""
-        if repo and repo != self._repo:
-            return []
-        return self._reconciliation.pending_work_items()
+        return self._reconciliation.pending_work_items(repo)
 
     def _apply_patches(self, patches: list[ProviderPatch], repo: str = "") -> list[PatchResult]:
         """Apply optimistic GitHub body patches and return one outcome per patch.

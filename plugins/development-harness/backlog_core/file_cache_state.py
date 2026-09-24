@@ -151,6 +151,7 @@ class _PendingWorkItemMutation(BaseModel):
     idempotency_key: str
     key: str
     item: BacklogItem
+    repo: str = ""
 
 
 class _RejectedMutation(BaseModel):
@@ -181,6 +182,7 @@ class _RejectedWorkItemMutation(BaseModel):
     key: str
     item: BacklogItem
     reason: str
+    repo: str = ""
 
 
 class _CorruptQueueEntry(BaseModel):
@@ -239,7 +241,7 @@ def _content_mutation_key(write: ContentWrite) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _work_item_mutation_key(key: str, item: BacklogItem) -> str:
+def _work_item_mutation_key(key: str, item: BacklogItem, repo: str = "") -> str:
     """Reproducible idempotency key for a queued work-item mutation.
 
     Shared by :meth:`FileCache._queue_work_item` (derivation) and
@@ -249,7 +251,8 @@ def _work_item_mutation_key(key: str, item: BacklogItem) -> str:
         The hex-encoded sha256 digest of the key and the item's canonical JSON.
     """
     payload = json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(f"{key}:{payload}".encode()).hexdigest()
+    identity = f"{repo}:{key}" if repo else key
+    return hashlib.sha256(f"{identity}:{payload}".encode()).hexdigest()
 
 
 class _CacheStateStore:
@@ -566,28 +569,29 @@ class _CacheStateStore:
     def _merge_pending_work_items_by_key(
         current: list[_PendingWorkItemMutation], legacy: list[_PendingWorkItemMutation]
     ) -> tuple[list[_PendingWorkItemMutation], list[_RejectedWorkItemMutation]]:
-        """Union two pending-work-item queues, keeping at most one entry per ``key``.
+        """Union queues, keeping at most one entry per repository and work-item key.
 
         Returns:
             The merged queue, and a dead-lettered _RejectedWorkItemMutation
-            for each legacy entry superseded by a same-key entry current
-            already has -- see :meth:`_merge_pending_by_reference` for why
-            idempotency_key alone isn't enough here.
+            for each legacy entry superseded by a same-repository, same-key
+            entry current already has -- see :meth:`_merge_pending_by_reference`
+            for why idempotency_key alone isn't enough here.
         """
         existing_keys = {entry.idempotency_key for entry in current}
-        existing_work_keys = {entry.key for entry in current}
+        existing_work_keys = {(entry.repo, entry.key) for entry in current}
         survivors = list(current)
         superseded: list[_RejectedWorkItemMutation] = []
         for entry in legacy:
             if entry.idempotency_key in existing_keys:
                 continue
-            if entry.key in existing_work_keys:
+            if (entry.repo, entry.key) in existing_work_keys:
                 superseded.append(
                     _RejectedWorkItemMutation(
                         idempotency_key=entry.idempotency_key,
                         key=entry.key,
                         item=entry.item,
                         reason="superseded by cache.json's entry for the same key during legacy-file merge",
+                        repo=entry.repo,
                     )
                 )
                 continue
@@ -883,7 +887,7 @@ class _CacheStateStore:
         pending_work_items: list[_PendingWorkItemMutation] = []
         rejected_work_items = list(state.rejected_work_items)
         for wi_entry in state.pending_work_items:
-            expected = _work_item_mutation_key(wi_entry.key, wi_entry.item)
+            expected = _work_item_mutation_key(wi_entry.key, wi_entry.item, wi_entry.repo)
             if _CacheStateStore._key_is_consistent(path, "pending_work_items", wi_entry.idempotency_key, expected):
                 pending_work_items.append(wi_entry)
             else:
@@ -893,6 +897,7 @@ class _CacheStateStore:
                         key=wi_entry.key,
                         item=wi_entry.item,
                         reason="idempotency_key does not match its content",
+                        repo=wi_entry.repo,
                     )
                 )
         if (

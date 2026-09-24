@@ -29,7 +29,7 @@ from backlog_core.models import (
     ReconcileResult,
     ReconcileScope,
 )
-from backlog_core.reconciliation import ReconcilePlan, synchronized_fingerprint
+from backlog_core.reconciliation import LogicalCacheRecord, ReconcilePlan, synchronized_fingerprint
 from sam_schema.core.plan_id_index import PlanIndexEntry
 
 
@@ -732,6 +732,116 @@ def test_github_work_item_intent_replays_once_after_reconnect(tmp_path: Path) ->
     assert result.provider_patches == 1
     assert FileCache(tmp_path)._pending_work_item_mutations() == []
     assert backend._apply_patches.call_count == 1
+
+
+def test_pending_work_item_queue_keeps_same_reference_per_repository(tmp_path: Path) -> None:
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(repo="default/repository", cache=cache)
+    default_item = BacklogItem(title="Default issue", description="default pending", issue="#1")
+    supplied_item = BacklogItem(title="Supplied issue", description="supplied pending", issue="#1")
+
+    backend.put_work_item(default_item)
+    backend.put_work_item(supplied_item, repo="supplied/repository")
+
+    assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
+        ("default/repository", "default pending"),
+        ("supplied/repository", "supplied pending"),
+    ]
+
+
+def test_reconcile_applies_and_acknowledges_only_selected_repository_pending_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = FileCache(tmp_path)
+    backend = GitHubBackend(repo="default/repository", cache=cache)
+    default_item = BacklogItem(title="Issue 1", description="default pending", issue="#1")
+    supplied_item = BacklogItem(title="Issue 1", description="supplied pending", issue="#1")
+    backend.put_work_item(default_item)
+    backend.put_work_item(supplied_item, repo="supplied/repository")
+    snapshot = ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id="node-1",
+                reference="#1",
+                title="Issue 1",
+                body="provider body",
+                state="OPEN",
+                labels=[],
+                revision="rev-1",
+            )
+        ],
+        sync_started_at="2026-09-24T00:00:00Z",
+    )
+    backend.fetch_snapshot = MagicMock(return_value=snapshot)
+    backend._apply_patches = MagicMock(
+        return_value=[PatchResult(provider_id="node-1", reference="#1", status="applied", revision="rev-2")]
+    )
+
+    def selected_repository_plan(
+        records: Sequence[LogicalCacheRecord], provider_snapshot: ProviderSnapshot, request: ReconcileRequest
+    ) -> ReconcilePlan:
+        assert [record.item.description for record in records] == ["supplied pending"]
+        return ReconcilePlan(
+            provider_patches=[
+                ProviderPatch(provider_id="node-1", reference="#1", expected_revision="rev-1", body="patched")
+            ],
+            result=ReconcileResult(fetched_items=len(provider_snapshot.items)),
+            snapshot_checkpoint=provider_snapshot.sync_started_at,
+        )
+
+    monkeypatch.setattr(github_work_items, "reconcile_backlog", selected_repository_plan)
+
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo="supplied/repository"))
+
+    assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
+        ("default/repository", "default pending")
+    ]
+    backend._apply_patches.assert_called_once()
+    assert backend._apply_patches.call_args.args[1] == "supplied/repository"
+
+
+def test_legacy_unscoped_pending_item_belongs_to_configured_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = FileCache(tmp_path)
+    legacy_item = BacklogItem(title="Issue 1", description="legacy pending", issue="#1")
+    cache._queue_work_item("#1", legacy_item)
+    raw_state = json.loads((tmp_path / "cache.json").read_text(encoding="utf-8"))
+    raw_state["pending_work_items"][0].pop("repo", None)
+    (tmp_path / "cache.json").write_text(json.dumps(raw_state), encoding="utf-8")
+    backend = GitHubBackend(repo="default/repository", cache=FileCache(tmp_path))
+    snapshot = ProviderSnapshot(
+        items=[
+            ProviderItem(
+                provider_id="node-1",
+                reference="#1",
+                title="Issue 1",
+                body="provider body",
+                state="OPEN",
+                labels=[],
+                revision="rev-1",
+            )
+        ],
+        sync_started_at="2026-09-24T00:00:00Z",
+    )
+    backend.fetch_snapshot = MagicMock(return_value=snapshot)
+
+    def supplied_repository_plan(
+        records: Sequence[LogicalCacheRecord], provider_snapshot: ProviderSnapshot, request: ReconcileRequest
+    ) -> ReconcilePlan:
+        assert list(records) == []
+        return ReconcilePlan(
+            result=ReconcileResult(fetched_items=len(provider_snapshot.items)),
+            snapshot_checkpoint=provider_snapshot.sync_started_at,
+        )
+
+    monkeypatch.setattr(github_work_items, "reconcile_backlog", supplied_repository_plan)
+
+    backend.reconcile(ReconcileRequest(scope=ReconcileScope.INCREMENTAL, repo="supplied/repository"))
+
+    assert [item.description for item in backend.pending_work_items("default/repository")] == ["legacy pending"]
+    assert backend.pending_work_items("supplied/repository") == []
+    assert len(cache._pending_work_item_mutations()) == 1
 
 
 def test_reconcile_does_not_acknowledge_pending_mutation_when_unlink_snapshot_save_fails(tmp_path: Path) -> None:

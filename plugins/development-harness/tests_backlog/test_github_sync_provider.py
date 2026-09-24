@@ -221,7 +221,7 @@ def test_reconcile_fetches_and_applies_patches_to_supplied_repository(tmp_path: 
     pending_item = provider_item.model_copy(deep=True)
     pending_item.metadata.sync_fingerprint = synchronized_fingerprint(provider_item)
     pending_item.description = "pending body"
-    backend.put_work_item(pending_item)
+    backend.put_work_item(pending_item, repo="supplied/repository")
     issue = _issue(1)
     issue["body"] = backend.render_issue_body(provider_item)
     backend.get_github = MagicMock(return_value=repository)

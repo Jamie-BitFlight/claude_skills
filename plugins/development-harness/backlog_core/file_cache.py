@@ -290,14 +290,21 @@ class FileCache:
 
         self._state.transaction(reject)
 
-    def _queue_work_item(self, key: str, item: BacklogItem) -> _PendingWorkItemMutation:
-        mutation = _PendingWorkItemMutation(idempotency_key=_work_item_mutation_key(key, item), key=key, item=item)
+    def _queue_work_item(self, key: str, item: BacklogItem, repo: str = "") -> _PendingWorkItemMutation:
+        """Queue the newest work-item intent for one repository-local key.
+
+        Returns:
+            The durable mutation that replaced any prior matching intent.
+        """
+        mutation = _PendingWorkItemMutation(
+            idempotency_key=_work_item_mutation_key(key, item, repo), key=key, item=item, repo=repo
+        )
         return self._state.transaction(
             lambda state: (
                 state.model_copy(
                     update={
                         "pending_work_items": [
-                            *(entry for entry in state.pending_work_items if entry.key != key),
+                            *(entry for entry in state.pending_work_items if (entry.repo, entry.key) != (repo, key)),
                             mutation,
                         ]
                     }
@@ -306,8 +313,14 @@ class FileCache:
             )
         )
 
-    def _pending_work_item_mutations(self) -> list[_PendingWorkItemMutation]:
-        return list(self._load_state().pending_work_items)
+    def _pending_work_item_mutations(
+        self, repo: str | None = None, *, default_repo: str = ""
+    ) -> list[_PendingWorkItemMutation]:
+        """Return all intent, or intent belonging to the selected repository."""
+        pending = list(self._load_state().pending_work_items)
+        if repo is None:
+            return pending
+        return [entry for entry in pending if (entry.repo or default_repo) == repo]
 
     def _rejected_work_item_mutations(self) -> list[_RejectedWorkItemMutation]:
         """Return work-item mutations dead-lettered for a key/content mismatch.
