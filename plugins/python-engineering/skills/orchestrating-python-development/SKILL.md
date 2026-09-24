@@ -32,7 +32,7 @@ Comprehensive guide for orchestrating Python development tasks using specialized
 **Context to include in the prompt** means: file paths, outcomes, and user requirements only. Do not pass file contents, summaries, or pre-gathered data — agents discover and read files themselves.
 
 Design/Architecture steps dispatch `python-cli-design-spec`, which writes its spec to
-`.claude/specs/{slug}.md` — no backlog item_id needed.
+`.tmp/scratch/plans/{slug}.md` — no backlog item_id needed.
 
 ## Core Workflow Patterns
 
@@ -50,7 +50,7 @@ The adversarial design step reads the actual codebase, not the architecture spec
 
 ```mermaid
 flowchart TD
-    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .claude/specs/{slug}.md (interfaces, layout, CLI command tree)"]
+    S1["1. Design<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: user requirements, any existing codebase paths<br>Output: .tmp/scratch/plans/{slug}.md (interfaces, layout, CLI command tree)"]
     S2["2. Write Tests<br>subagent_type=python-engineering:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
@@ -75,7 +75,7 @@ User: "Build a CLI tool to process CSV files with progress bars"
 
 1. Task is Design with subagent_type="python-engineering:python-cli-design-spec"
    Context to include in the prompt: Design architecture for CSV processing CLI with progress tracking
-   Output: .claude/specs/{slug}.md — read directly via the Read tool
+   Output: .tmp/scratch/plans/{slug}.md — read directly via the Read tool
 
 2. Task is Write Tests with subagent_type="python-engineering:python-pytest-architect"
    Context to include in the prompt: Path to architecture design file from step 1
@@ -104,7 +104,7 @@ Before delegating Requirements Gathering, read `git log --oneline -10` and pass 
 ```mermaid
 flowchart TD
     S1["1. Requirements Gathering<br>subagent_type=spec-analyst<br>Context: codebase path, user request verbatim<br>Output: requirements doc with acceptance criteria"]
-    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .claude/specs/{slug}.md, showing integration points"]
+    S2["2. Architecture<br>subagent_type=python-engineering:python-cli-design-spec<br>Context: requirements doc path, existing codebase path<br>Output: .tmp/scratch/plans/{slug}.md, showing integration points"]
     S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: architecture spec path, relevant existing file paths<br>Output: new feature implementation in packages/, broken into an ordered internal task list before writing code"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
@@ -134,9 +134,9 @@ flowchart TD
     S1["1. Self-Review<br>Run: /python-engineering:modernpython on changed files<br>Check: no legacy typing imports (typing.List, typing.Dict, Optional)<br>Check: modern union syntax (X | Y not Union[X, Y])"]
     S2{"2. Scripts present?<br>Criterion: any .py file has shebang (#!/) line"}
     S2a["Run: /python-engineering:shebangpython on each script<br>Pass criteria: PEP 723 compliance verified, shebang corrected if needed"]
-    S3["3. Agent Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, PR description or task description<br>Output: review findings with file:line references, severity labels (critical/major/minor)"]
-    S4{"4. Issues found with severity critical or major?"}
-    S4a["Fix Issues<br>Implementation fixes: python-engineering:python-cli-architect<br>Test fixes: python-engineering:python-pytest-architect<br>Context: review findings doc path, file paths to fix"]
+    S3["3. Agent Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, PR description or task description<br>Output: review findings with file:line references, severity labels (HIGH/MEDIUM/LOW)"]
+    S4{"4. Issues found with severity HIGH or MEDIUM?"}
+    S4a["Fix Issues<br>Implementation fixes: python-engineering:python-cli-architect<br>Test fixes: python-engineering:python-pytest-architect<br>Context: reviewer STATUS FINDINGS, file paths to fix"]
     S5["5. Re-validate<br>Run: Activate holistic-linting skill<br>Run: uv run pytest<br>Pass criteria: all review issues addressed, tests green, linting clean"]
     S1 --> S2
     S2 -->|"Yes — scripts present"| S2a
@@ -144,7 +144,7 @@ flowchart TD
     S2a -->|"PEP 723 compliance verified"| S3
     S3 -->|"Output: review findings with severity labels"| S4
     S4 -->|"Yes — fix required"| S4a
-    S4 -->|"No critical/major issues"| S5
+    S4 -->|"No HIGH/MEDIUM issues"| S5
     S4a -->|"Output: corrections applied"| S5
 ```
 
@@ -152,7 +152,7 @@ flowchart TD
 
 **When to use**: Improving code structure without changing behavior
 
-Decision criterion for "Tests exist?": run `uv run pytest --co -q` — if output lists test items and exit code is 0, tests exist. If exit code is non-zero or output is empty, tests are missing.
+Decision criterion for "Tests exist and pass?": first run `uv run pytest --co -q` to establish that tests are collected, then run `uv run pytest` to establish the passing baseline. Collection alone never proves tests pass.
 
 ```mermaid
 flowchart TD
