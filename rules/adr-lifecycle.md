@@ -1,22 +1,27 @@
-# Architecture documentation, and where ADRs sit
+# Architecture desired state, and where ADRs sit
 
 Two different artifacts, and conflating them is what makes a deliberation binding.
 
-**`ARCHITECTURE.md` states what is true now.** It is the formalized design of the system it
-describes, or the entry point routing to the subsystem architecture document that lives with that
-subsystem's code. It is rewritten in place as the design changes, it lives nearest the code it
-describes — the touched module's own subtree before anything higher — and it is what documentation,
-skills, agents, code and tests reference.
+**`ARCHITECTURE.md` defines the desired system state.** It is the authoritative design contract,
+including behavior not yet implemented, or the entry point routing to the subsystem architecture
+document that lives with that subsystem's code. It is rewritten in place as the desired design
+changes, lives nearest the code it describes — the touched module's own subtree before anything
+higher — and is what documentation, skills, agents, code, audits, and tests reference.
 
 **An ADR records a deliberation**: the context, the options, why one was taken and what was
 rejected. It is planning material. Many repositories never commit one at all.
+
+**A backlog record owns an observed implementation gap** between current behavior and the desired
+architecture. Audits and tests may compare implementation with architecture and report or enforce
+conformance. Neither a gap nor a conformance result weakens the desired-state contract.
 
 ## Nothing links to an ADR
 
 A link makes the ADR load-bearing, and the repository owner must be able to dismiss an ADR that
 turns out not to reflect the goal or the intent without the repository being stuck with it. The
 citation is precisely what removes that right. Where an ADR's substance is needed, write the
-substance into `ARCHITECTURE.md`; where its rationale is worth keeping, write that there too.
+selected desired state and its constraints into `ARCHITECTURE.md`; keep the selection rationale in
+the ADR. The architecture must remain complete when the ADR is absent.
 
 An ADR need not live in the repository at all. A decision record belongs equally in an issue
 tracker or a project board, where an agent reading the code may have no access to it. So a citation
