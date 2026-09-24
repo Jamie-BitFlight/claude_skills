@@ -128,7 +128,7 @@ Agent uses: ${CLAUDE_PLUGIN_ROOT}/config/rules.json
 ```
 
 The agent must exist in the plugin's `agents/` directory. Claude uses the
-Task tool to launch it.
+agent-dispatch capability to launch it.
 
 ### Leveraging Plugin Skills
 

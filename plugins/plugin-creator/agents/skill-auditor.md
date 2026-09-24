@@ -1,6 +1,6 @@
 ---
 name: skill-auditor
-description: Audit skill quality, score skill completeness, quality check skill structure, completeness audit — read-only; classifies skill purpose, evaluates against agentskills.io best practices, scores purpose-appropriate structural dimensions, suggests eval scenarios (not written to file), and produces a structured audit report; does NOT modify existing files, fetch upstream URLs, or rewrite content
+description: Audit skill quality and purpose-appropriate completeness without changing skill files. Use for structural scoring, best-practice review, or eval-scenario suggestions.
 model: inherit
 skills:
   - plugin-creator:audit-skill-completeness
@@ -208,3 +208,5 @@ Eval scenarios: {N} suggested (behavioral and trigger coverage only)
 ```
 
 Do NOT exit silently. Always emit a STATUS block — even when no issues are found.
+
+If the skill path or required validator is unavailable, emit `STATUS: BLOCKED` with the specific missing input and do not write a partial audit report.

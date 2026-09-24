@@ -72,10 +72,10 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 | Field           | Required | Constraints                                                      |
 | --------------- | -------- | ---------------------------------------------------------------- |
-| `name`          | Yes      | Max 64 chars. Lowercase letters, numbers, hyphens only. No leading/trailing/consecutive hyphens. Must match directory name. |
-| `description`   | Yes      | Max 1024 chars. Non-empty. Describes what + when to use.         |
+| `name`          | Yes      | Max 64 chars after NFKC normalization. Lowercase Unicode alphanumeric characters and hyphens only. No leading/trailing/consecutive hyphens. Must match the NFKC-normalized directory name. |
+| `description`   | Yes      | MUST be non-empty and at most 1024 chars. SHOULD describe what + when to use. |
 | `license`       | No       | License name or reference to bundled file.                       |
-| `compatibility` | No       | Max 500 chars. Environment requirements.                         |
+| `compatibility` | No       | If provided, MUST be non-empty and at most 500 chars. Environment requirements. |
 | `metadata`      | No       | Arbitrary string key-value mapping.                              |
 | `allowed-tools` | No       | Space-delimited pre-approved tools. Experimental.                |
 
@@ -85,11 +85,12 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 The required `name` field:
 
-- Must be 1-64 characters
-- May only contain unicode lowercase alphanumeric characters and hyphens (`a-z`, `0-9`, `-`)
+- NFKC-normalize before applying every rule below
+- Must be 1-64 characters after normalization
+- May only contain lowercase Unicode alphanumeric characters and hyphens; reject a name if lowercasing changes it
 - Must not start or end with `-`
 - Must not contain consecutive hyphens (`--`)
-- Must match the parent directory name
+- Must match the NFKC-normalized parent directory name
 
 **Valid:**
 
@@ -109,6 +110,13 @@ name: pdf--processing   # consecutive hyphens not allowed
 name: pdf-              # cannot end with hyphen
 ```
 
+**Source note:** Agent Skills prose is ambiguous about portable character scope. The official
+[`skills-ref` validator](https://github.com/agentskills/agentskills/blob/main/skills-ref/src/skills_ref/validator.py)
+NFKC-normalizes names and accepts Unicode alphanumeric characters; its
+[`test_validator.py`](https://github.com/agentskills/agentskills/blob/main/skills-ref/tests/test_validator.py)
+accepts Chinese and lowercase Russian names plus canonically equivalent normalized forms. This
+reference follows that executable behavior (accessed 2026-09-24).
+
 ---
 
 ### Description Field
@@ -118,7 +126,7 @@ The required `description` field:
 - Must be 1-1024 characters
 - Should describe both what the skill does and when to use it
 - Should include specific keywords that help agents identify relevant tasks
-- Write in **third person** (not "I can help" or "You can use this")
+- Prefer imperative `Use this skill when...` phrasing; the specification recommends what/when and useful keywords but does not require grammatical person
 
 **Good:**
 
@@ -132,7 +140,9 @@ description: Extracts text and tables from PDF files, fills PDF forms, and merge
 description: Helps with PDFs.
 ```
 
-**Naming convention recommendation:** Use gerund form (`processing-pdfs`, `analyzing-spreadsheets`) or noun phrases (`pdf-processing`, `spreadsheet-analysis`). Prefer descriptive names over vague ones (`helper`, `utils`, `tools`).
+**Authoring advice:** Prefer descriptive names such as `pdf-processing` over vague names (`helper`, `utils`, `tools`). The specification does not require gerund naming.
+
+SOURCE: <https://agentskills.io/specification.md> and <https://agentskills.io/skill-creation/optimizing-descriptions.md> (accessed 2026-09-24)
 
 ---
 
@@ -191,6 +201,7 @@ The optional `allowed-tools` field:
 
 - A space-delimited list of tools that are pre-approved to run
 - Experimental — support varies between agent implementations
+- `skills-ref` currently passes this value through without type-checking or delimiter validation; enforce the specification's format independently
 
 ```yaml
 allowed-tools: Bash(git:*) Bash(jq:*) Read

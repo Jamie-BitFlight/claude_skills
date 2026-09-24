@@ -13,8 +13,8 @@ Examples:
 from __future__ import annotations
 
 import logging
-import re
 import sys
+import unicodedata
 from io import TextIOWrapper
 from pathlib import Path
 
@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_SKILL_NAME_LENGTH = 40
+MAX_SKILL_NAME_LENGTH = 64
 REQUIRED_ARGC = 4  # script name + skill-name + --path + path
 
 SKILL_TEMPLATE = """---
@@ -224,16 +224,18 @@ def validate_skill_name(skill_name: str) -> tuple[bool, str | None]:
     Returns:
         Tuple of (is_valid, error_message)
     """
+    skill_name = unicodedata.normalize("NFKC", skill_name.strip())
     if not skill_name:
         return False, "Skill name cannot be empty"
 
     if len(skill_name) > MAX_SKILL_NAME_LENGTH:
         return (False, f"Skill name too long ({len(skill_name)} chars, max {MAX_SKILL_NAME_LENGTH})")
-
-    # Pattern: lowercase letters, digits, hyphens; cannot start/end with hyphen
-    pattern = r"^[a-z0-9]+(-[a-z0-9]+)*$"
-    if not re.match(pattern, skill_name):
-        return (False, "Skill name must be lowercase hyphen-case (e.g., 'my-skill-name')")
+    if skill_name != skill_name.lower():
+        return False, "Skill name must be lowercase"
+    if skill_name.startswith("-") or skill_name.endswith("-") or "--" in skill_name:
+        return False, "Skill name cannot start/end with a hyphen or contain consecutive hyphens"
+    if not all(character.isalnum() or character == "-" for character in skill_name):
+        return False, "Skill name must contain only Unicode alphanumeric characters and hyphens"
 
     return True, None
 
@@ -273,6 +275,8 @@ def init_skill(skill_name: str, path: str) -> Path | None:
     Returns:
         Path to created skill directory, or None if error
     """
+    skill_name = unicodedata.normalize("NFKC", skill_name.strip())
+
     # Determine skill directory path
     skill_dir = Path(path).resolve() / skill_name
 
@@ -338,9 +342,9 @@ def main() -> None:
     if len(sys.argv) < REQUIRED_ARGC or sys.argv[2] != "--path":
         print("Usage: init_skill.py <skill-name> --path <path>")
         print("\nSkill name requirements:")
-        print("  - Hyphen-case identifier (e.g., 'data-analyzer')")
-        print("  - Lowercase letters, digits, and hyphens only")
-        print("  - Max 40 characters")
+        print("  - Hyphen-separated identifier (e.g., 'data-analyzer')")
+        print("  - Lowercase Unicode alphanumeric characters and hyphens only")
+        print("  - Max 64 characters")
         print("  - Must match directory name exactly")
         print("\nExamples:")
         print("  init_skill.py my-new-skill --path skills/public")

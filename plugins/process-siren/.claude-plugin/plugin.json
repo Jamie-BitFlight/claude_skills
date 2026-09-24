@@ -1,6 +1,6 @@
 {
   "name": "process-siren",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Analyzes, improves, validates, and concisely represents processes and systems using a canonical semantic model and claim-level validation.",
   "author": {
     "name": "Jamie Nelson",

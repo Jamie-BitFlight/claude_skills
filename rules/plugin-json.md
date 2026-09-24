@@ -8,7 +8,9 @@
 
 - All paths must start with `./`
 - See `plugin-development.md`'s "plugin.json Auto-Discovery Rules" section — declaring `agents` overrides auto-discovery entirely. Omit the key to use auto-discovery for all agents in `agents/`.
-- `agents` field must be an array of individual file paths — `["./agents/file.md"]` — not a directory string `"./agents/"`
+- `agents` accepts one file path as a string or multiple file paths as an array. Declaring the field
+  replaces the default `agents/` scan; omit it to keep default discovery, or include every
+  default-path agent that must remain visible.
 - Plugins cannot reference files outside their directory (`../shared-utils` fails after installation)
 
 ## Validate After Editing
@@ -22,6 +24,6 @@ claude plugin validate {plugin-directory}
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `agents: Invalid input` | Used `"./agents/"` instead of array | Change to `["./agents/file.md"]` |
+| `agents: Invalid input` | Used a directory instead of agent file path(s) | Use `"./agents/file.md"` or `["./agents/file.md"]` |
 | `name: Required` | Missing name field | Add `"name": "plugin-name"` |
 | Invalid JSON syntax | Malformed JSON | Validate with `python3 -m json.tool plugin.json` |

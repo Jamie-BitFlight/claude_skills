@@ -5,7 +5,7 @@ argument-hint: <plugin-path>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 # Audit Agent Lifecycle
@@ -51,11 +51,11 @@ Scan plugin structure to identify:
 - All agent files in `agents/` directory
 - Agent frontmatter configuration (tools, skills, model, disallowedTools, permissionMode)
 - Skill references in agent prompts (Skill(), /skill-name patterns)
-- Agent delegation patterns (Agent(subagent_type=), @agent-name references)
+- Portable agent delegation names and explicit agent mentions
 - Tool usage keywords in prompt body
 
 Build dependency graph:
-- Agent → Agent (delegation via Agent())
+- Agent → Agent (delegation by portable agent name)
 - Agent → Skill (loading via Skill() or skills field)
 - Agent → Tool (usage via tool keywords in prompt)
 
@@ -76,14 +76,14 @@ Execute 8 semantic audits across 3 depth tiers. See `references/agent-lifecycle-
 
 ### Step 3: Capability Drift Check
 
-Activate with `Skill(skill: "plugin-creator:agent-capability-analyzer")`.
+Activate `/plugin-creator:agent-capability-analyzer`.
 
 This phase compares each agent's static frontmatter `description` against its self-reported capabilities to detect description drift. Misrouted agents and stale descriptions are audit findings.
 
 **Single-agent audit** (one agent being audited):
 
 1. Read `$CLAUDE_PLUGIN_ROOT/resources/describe-your-capabilities.template.md`
-2. Spawn one Task with `subagent_type="<agent-id>"`, using the template as the prompt (replace `AGENT_ID_HERE`)
+2. Dispatch `<agent-id>` with the template as its prompt after replacing `AGENT_ID_HERE`.
 3. If the agent lacks Bash access, it returns capabilities as text — write it directly:
 
 ```bash
@@ -107,8 +107,8 @@ node $CLAUDE_PLUGIN_ROOT/scripts/populate-agent-descriptions.mjs
 ```
 
 2. Read `$CLAUDE_PLUGIN_ROOT/resources/describe-your-capabilities.template.md`
-3. Spawn all agents simultaneously via Agent tool. Agents with Bash access write their own result to the DB. Collect text responses from agents without Bash access and write them via the update script.
-4. After all Tasks complete, export the dataset:
+3. Dispatch all agents simultaneously. Agents with Bash access write their own result to the DB. Collect text responses from agents without Bash access and write them via the update script.
+4. After all agents complete, export the dataset:
 
 ```bash
 node $CLAUDE_PLUGIN_ROOT/scripts/update-agent-map.mjs dump --file .plugin-creator/audits/agent-map.json
@@ -152,7 +152,7 @@ Use `ALIGNED` when all three lists are empty or contain only minor phrasing diff
 Agents with `SIGNIFICANT_DRIFT` or `SCOPE_VIOLATION` verdicts MUST be flagged as audit findings in the report. Pass these agents to `subagent-refactorer` for remediation:
 
 ```text
-Task is fixing description drift with subagent_type="plugin-creator:subagent-refactorer"
+Dispatch `plugin-creator:subagent-refactorer` to fix description drift.
 Context to include in the prompt: agents/<agent-name>.md (agent file), gap analysis report section for this agent
 Output: revised agent file at agents/<agent-name>.md with corrected frontmatter description and rationale for each change
 ```
@@ -185,8 +185,7 @@ Write audit artifacts to `.plugin-creator/audits/`:
 **Tier 3: Specialist Delegation** (for specific issue types)
 - Tool access ambiguity → delegate to agent that reads Claude Code tool inheritance docs
 - Cross-agent contract mismatch → delegate to agent that evaluates input/output compatibility
-- Prompt quality issues → delegate to `@plugin-creator:subagent-refactorer` for optimization
-  (Agent tool: `subagent_type="plugin-creator:subagent-refactorer"`)
+- Prompt quality issues → dispatch `plugin-creator:subagent-refactorer` for optimization
 
 ### 1. Capability vs Configuration Alignment
 
@@ -213,7 +212,7 @@ For each skill reference in agent prompts:
 
 ### 3. Inter-Agent Contract Alignment
 
-When agents delegate to other agents via Agent():
+When agents delegate to other agents:
 - Does the delegating agent's prompt describe inputs matching what the target agent expects?
 - Does the delegating agent expect outputs in a format the target agent produces?
 - Are there assumptions about shared state (files, directories, environment variables) not explicitly communicated?
@@ -255,7 +254,7 @@ For each action the agent prompt describes:
 
 Identify agents that:
 - Are registered in plugin.json but never referenced by any skill, command, or other agent
-- Are referenced in skill documentation but not in any executable context (Skill(), Agent(), @agent)
+- Are referenced in documentation but never activated as `/plugin:skill` or dispatched as `plugin:agent`
 - Have descriptions with trigger phrases that no workflow ever activates
 
 **Output:** List of potentially dead agents with evidence (no inbound references found).

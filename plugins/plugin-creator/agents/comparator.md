@@ -1,6 +1,6 @@
 ---
 name: comparator
-description: Blind A/B comparison of two skill outputs without knowing which version produced them. Use when comparing skill iterations.
+description: Compare two skill outputs blind and select the stronger result. Use for skill-iteration A/B evaluation.
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
 ---
 
@@ -208,3 +208,7 @@ If no expectations were provided, omit the `expectation_results` field entirely.
 - **Be objective**: Don't favor outputs based on style preferences; focus on correctness and completeness.
 - **Explain your reasoning**: The reasoning field should make it clear why you chose the winner.
 - **Handle edge cases**: If both outputs fail, pick the one that fails less badly. If both are excellent, pick the one that's marginally better.
+
+## Terminal Output
+
+After writing `comparison.json`, return `STATUS: DONE`, its path, and the winner. If no material difference exists, report `winner: TIE` and `Findings: None`. Return `STATUS: BLOCKED` with the missing output or eval prompt when comparison cannot proceed.

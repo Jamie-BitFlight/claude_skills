@@ -2,7 +2,7 @@
 name: agent-capability-analyzer
 description: Runs the description-drift experiment — spawns all Claude Code agents simultaneously to collect self-reported capabilities, then compares them against static frontmatter descriptions to reveal how reliable orchestrator routing based on descriptions actually is. Use when measuring description drift across the agent fleet, re-running the capability collection experiment, analyzing a specific agent's self-reported capabilities, or auditing whether frontmatter descriptions accurately reflect agent behavior.
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 # Agent Capability Analyzer
@@ -27,7 +27,7 @@ flowchart TD
 
     Single --> S1[Read ./resources/describe-your-capabilities.template.md]
     S1 --> S2["Append to prompt:<br>'Return only the tagged content.<br>Do not run any commands.'"]
-    S2 --> S3["Spawn one Task with subagent_type='agent-id'<br>Template prompt — AGENT_ID_HERE substituted"]
+    S2 --> S3["Dispatch agent-id<br>Template prompt — AGENT_ID_HERE substituted"]
     S3 --> S4[Orchestrator receives XML-tagged text directly]
     S4 --> S5{agent-map.json exists?}
     S5 -->|Yes| S6["Read .plugin-creator/audits/agent-map.json<br>Extract description field for this agent"]
@@ -103,7 +103,7 @@ node $CLAUDE_PLUGIN_ROOT/scripts/update-agent-map.mjs dump --file .plugin-creato
 When you only want to check one agent:
 
 1. Read `$CLAUDE_PLUGIN_ROOT/resources/describe-your-capabilities.template.md`
-2. Spawn one Task with `subagent_type="<agent-id>"`, using the template as the prompt (replace `AGENT_ID_HERE`)
+2. Dispatch `<agent-id>` with the template as the prompt after replacing `AGENT_ID_HERE`.
 3. The agent writes its own result to the DB
 4. Dump and inspect:
 

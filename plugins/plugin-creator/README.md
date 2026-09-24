@@ -10,13 +10,13 @@ Complete toolkit for creating, refactoring, validating, and auditing Claude Code
 
 Building a Claude Code plugin involves a lot of moving parts: `plugin.json` schema rules, skill frontmatter constraints, agent configuration requirements, hook event wiring, and validation tooling. Without guidance, common mistakes include:
 
-- Frontmatter that silently fails YAML parsing (multiline descriptions, unquoted colons, array fields that must be comma-separated strings)
+- Frontmatter that silently fails YAML parsing or uses a field form unsupported by its destination
 - Skills that grow too large and get truncated from Claude's context budget
 - Agents with weak description triggers that cause misrouting
 - Hooks connected to the wrong events or written in the wrong language
-- `plugin.json` component arrays that override auto-discovery and silently hide agents or skills
+- `plugin.json` agent or command arrays that override auto-discovery and silently hide components
 
-This plugin gives Claude a complete reference for all of those systems plus agentic workflows to handle creation, validation, and refactoring.
+This plugin gives Claude scoped references for those systems plus workflows for creation, validation, and refactoring.
 
 ## Quick Start: From Zero to First Working Skill in 5 Minutes
 
@@ -75,7 +75,7 @@ After invoking, Claude will ask about the skill's purpose and guide through the 
 
 #### `/agent-creator`
 
-Creates Claude Code agent files from requirements. Handles discovery of existing agents, template selection, frontmatter generation, scope determination, and `plugin.json` updates.
+Creates Claude Code agent files from requirements. Handles discovery of existing agents, template selection, frontmatter generation, and scope determination. Default-path plugin agents use auto-discovery; an existing explicit manifest allowlist is preserved and extended.
 
 ```text
 /agent-creator
@@ -105,7 +105,7 @@ Runs the `skilllint` validator on a skill, agent, or plugin directory. Reports t
 
 #### `/write-frontmatter-description`
 
-Writes or tightens the frontmatter `description` field for skills and agents. Treats the description as a context pointer: it names what the skill does and lists the distinct branches that should trigger it, one trigger per branch. Covers third-person phrasing, single-line YAML, and the model-invoked versus user-invoked choice that decides whether the description is written for the agent or for a human.
+Writes or tightens the frontmatter `description` field for skills and agents. Treats the description as a context pointer and uses imperative `Use this skill when...` guidance for portable Agent Skills; any third-person preference is repository house style.
 
 #### `/audit-agent-lifecycle`
 
@@ -261,7 +261,7 @@ These load automatically when Claude needs them, or you can invoke them directly
 | `/hooks-core-reference` | Claude Code hook system fundamentals — all events, matchers, environment variables, execution behavior, debugging |
 | `/hooks-io-api` | Hook JSON input/output API — what data hooks receive via stdin, what JSON they return to control Claude Code behavior |
 | `/hooks-patterns` | Hook recipes and working examples in Python and Node.js |
-| `/agentskills` | Agent Skills Open Standard (agentskills.io) — portable skill format for Claude Code, Cursor, Gemini CLI, and 20+ other agents |
+| `/agentskills` | Agent Skills portable format; links to the live client showcase instead of freezing a client count |
 | `/prompt-optimization` | Principles for optimizing CLAUDE.md files and skills for Claude Code |
 | `/command-development` | Legacy `.claude/commands/` format — frontmatter fields, argument syntax, bash execution, AskUserQuestion patterns, workflow locking |
 | `/mcp-integration` | MCP server configuration within plugins — stdio/SSE/HTTP/WebSocket types, authentication, tool naming, lifecycle, security |
@@ -274,12 +274,13 @@ With this plugin installed, Claude will:
 
 - Recognize when you describe a plugin, skill, agent, or hook and activate the appropriate creation workflow automatically
 - Validate frontmatter before writing it, catching YAML syntax errors, forbidden multiline indicators, and incorrect field types
-- Use the correct tool format for agent and skill `tools` fields (comma-separated strings, not arrays)
+- Use destination-appropriate tool forms: Claude Code accepts documented strings and YAML lists; portable `allowed-tools` is a non-empty string of space-separated tool tokens
 - Write hook scripts in the language that matches the project runtime (Node.js by default; Python when `pyproject.toml` is present); for Node.js always use `.mjs` or `.cjs` — never plain `.js` (see [hooks-nodejs-extension.md](./skills/hooks-guide/references/hooks-nodejs-extension.md))
 - Apply the `${CLAUDE_PLUGIN_ROOT}` environment variable in hook paths rather than hardcoding absolute paths
 - Check skill complexity with token-based thresholds and recommend `references/` extraction or splitting before a skill exceeds Claude's context budget
 - Route refactoring task types to the correct specialist: `SKILL_SPLIT` tasks to `/refactor-skill`, `AGENT_OPTIMIZE` tasks to the `subagent-refactorer` agent, `DOC_IMPROVE` tasks to the `ai-doc-optimizer` agent
-- Require `name:` in all skill and agent frontmatter per the agentskills.io specification
+- Require `name:` in portable skill packages per the Agent Skills specification and in agent
+  frontmatter per the [Claude Code subagent documentation](https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields)
 
 ### Automatic Behaviors
 
@@ -346,7 +347,7 @@ uvx skilllint@latest check ./plugins/my-plugin
 uvx skilllint@latest check --fix ./plugins/my-plugin
 ```
 
-Auto-fix handles: YAML arrays converted to comma-separated strings, multiline descriptions collapsed to single lines, and unquoted colons in description values.
+Auto-fix preserves valid Claude Code YAML lists and handles malformed descriptions without normalizing valid lists to CSV.
 
 ### Refactor an oversized skill
 
@@ -374,25 +375,40 @@ Claude will assess whether the skill needs splitting (multiple independent domai
 - No forbidden multiline indicators (`>-`, `|-`)
 - Required fields present (`name` and `description` for agents; `name` for plugin skills)
 - Field types match schema (string, bool, object)
-- `tools` and `skills` fields are comma-separated strings, not arrays
+- Validate tool fields against the selected runtime or portable package boundary
 - Token-based skill complexity (SK006: warning threshold, SK007: must split)
 - Internal markdown link validity
 
 ### What `claude plugin validate` checks
 
-- `plugin.json` exists in `.claude-plugin/`
-- JSON syntax is valid
-- Required field `name` is present and kebab-case
-- All paths start with `./`
-- `agents` field is an array of individual file paths, not a directory string
+The command validates plugin, project, and user roots plus named skill, agent, and command
+directories. `.claude-plugin/plugin.json` is optional when a plugin uses default component
+locations. Claude Code v2.1.233 and later can validate a component directory without a manifest.
+Plugin-root validation parses default directories and skips symlinks with warnings;
+manifest-declared component paths receive existence-only checks, so their files are not read. A
+plugin-root `SKILL.md` requires a separate validation run against the containing `skills` directory.
+Internal markdown links remain the local checker's responsibility.
+
+- When `.claude-plugin/plugin.json` exists, its JSON syntax is valid
+- When a manifest exists, required field `name` is present and kebab-case
+- Manifest component paths start with `./`
+- `agents` accepts one agent file path as a string or multiple file paths as an array; declaring it replaces the default `agents/` scan
 - Referenced files exist
+
+SOURCE: <https://code.claude.com/docs/en/plugin-marketplaces#validate-a-plugin-or-a-directory-without-a-manifest> (accessed 2026-09-24)
+
+### Marketplace archive boundaries
+
+Archive sources require HTTPS, reject HTTP/loopback/link-local/cloud-metadata hosts, cap archives at 256 MiB, require `.claude-plugin/` at archive root or one top-level folder, and optionally verify `sha256`. Relative marketplace sources stay below the marketplace root, use forward slashes, and cannot contain `../`.
+
+SOURCE: <https://code.claude.com/docs/en/plugin-marketplaces> (accessed 2026-09-24)
 
 ### Common errors and fixes
 
 | Error | Cause | Fix |
 |---|---|---|
 | Skill not appearing as slash command | Missing `name:` field | `skilllint --fix` adds it from directory name |
-| `agents: Invalid input` | Used directory string instead of array | Change `"agents": "./agents/"` to `["./agents/file.md"]` |
+| Agents disappear after a custom path is added | `agents` replaces the default scan | Include every retained default-path agent plus custom paths, or remove `agents` to use default discovery |
 | Description shows as `>-` | YAML multiline indicator | `skilllint --fix` collapses to single line |
 | Hook not firing | Script not executable | `chmod +x scripts/my-hook.mjs` (or `.cjs`/`.py`) |
 | Path errors after install | Used `../` traversal | Use `${CLAUDE_PLUGIN_ROOT}`, or the `/plugin-creator:shared-content-references` skill for prose shared across skills (not symlinks — they degrade on Windows checkouts) |
@@ -413,7 +429,7 @@ These agents run internally to implement the skills above. They are not invoked 
 | `ai-doc-optimizer` | Content optimization and frontmatter description writing for prompts, SKILL.md, and CLAUDE.md files |
 | `plugin-assessor` | Analyzes plugins for structure, frontmatter compliance, orphaned files, and cross-reference validity |
 | `hook-creator` | Generates hook scripts (Node.js `.mjs`/`.cjs` by default, Python or other language when matching project runtime), wires `hooks.json` |
-| `agent-creator` | Creates agent files from requirements with template selection and plugin.json updates |
+| `agent-creator` | Creates agent files from requirements with template selection and scope-aware manifest handling |
 | `grader` | Grades skill eval runs for the evaluation and optimization workflow |
 | `comparator` | Blind A/B comparison of skill variants for the evaluation workflow |
 | `analyzer` | Analyzes graded eval results and produces improvement recommendations |
@@ -440,9 +456,8 @@ Routing summary:
 | Script | Purpose | Usage |
 |---|---|---|
 | `create_plugin.py` | Interactive plugin scaffolding | `./plugins/plugin-creator/scripts/create_plugin.py create` |
-| `fix_tool_formats.py` | Fix invalid tool field formats across the codebase | `./plugins/plugin-creator/scripts/fix_tool_formats.py` |
 | `normalize_frontmatter.py` | Strip unnecessary YAML quotes from all frontmatter | `./plugins/plugin-creator/scripts/normalize_frontmatter.py` |
-| `check_agent_auto_discovery.py` | Detect `plugin.json` arrays that silently mask auto-discovered components | `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py` |
+| `check_agent_auto_discovery.py` | Detect `plugin.json` agent or command arrays that silently mask auto-discovered components | `./plugins/plugin-creator/scripts/check_agent_auto_discovery.py` |
 | `validate-task-file.sh` | Validate refactoring task file format | `./plugins/plugin-creator/scripts/validate-task-file.sh <path>` |
 
 Plugin and marketplace manifest versions are managed by [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action.

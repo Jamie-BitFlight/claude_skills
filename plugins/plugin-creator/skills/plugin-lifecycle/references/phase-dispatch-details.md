@@ -10,7 +10,7 @@ For artifact templates referenced from these outputs, see `./artifact-templates.
 
 ## Phase 0.6 — Mission Statement Draft
 
-1. Task is mission statement drafting with `Skill(skill="plugin-creator:mission-statement")`
+1. Activate `/plugin-creator:mission-statement` for mission statement drafting.
    - Context to include in the prompt: plugin concept from `<plugin_target/>`, path to `discuss-CONTEXT.md`
    - Output: `{plugin-path}/mission.json` with `status: "draft"` — a GitHub backlog interview task is created automatically by the skill
 
@@ -20,7 +20,7 @@ The mission statement is never a blocker. Research and all subsequent phases pro
 
 ## Phase 1 — Assess (existing plugin only)
 
-1. Task is plugin assessment with `Skill(skill="plugin-creator:assessor")`
+1. Activate `/plugin-creator:assessor` for plugin assessment.
    - Context to include in the prompt: plugin directory path from `<plugin_target/>`
    - Output: `.plugin-creator/plans/{plugin-name}/assessment-REPORT.md` — assessment report with design map and task file
 
@@ -28,15 +28,15 @@ The mission statement is never a blocker. Research and all subsequent phases pro
 
 ## Phase 3 — Design
 
-1. Task is prerequisite check with `Skill(skill="dh:rt-ica")`
+1. Activate `/dh:rt-ica` for the prerequisite check.
    - Context to include in the prompt: `research-FINDINGS.md`, plugin concept, user requirements from `discuss-CONTEXT.md`
    - Output: APPROVED or BLOCKED verdict — if BLOCKED, resolve blockers before proceeding
 
-2. Task is design plan creation with `subagent_type="general-purpose"`
+2. Dispatch the harness-native `general-purpose` agent for design plan creation.
    - Context to include in the prompt: `research-FINDINGS.md`, rt-ica output, `discuss-CONTEXT.md`
    - Output: `.plugin-creator/plans/{plugin-name}/design-PLAN.md` — design plan with XML task specs defining every skill, agent, and hook to create. Each task must have: single responsibility, testable `<verify>` command, clear `<done>` criteria.
 
-3. Task is plan verification with `subagent_type="general-purpose"`
+3. Dispatch a separate harness-native `general-purpose` agent for plan verification.
    - Context to include in the prompt: `design-PLAN.md`, `discuss-CONTEXT.md`, `research-FINDINGS.md` key sections
    - Prompt: Verify this plan achieves the plugin goals. Check: (1) do tasks cover all required components? (2) are tasks truly atomic? (3) are `<verify>` commands testable? (4) are there gaps between tasks? (5) does sequence respect dependencies? Return PASS or FAIL with specific issues.
    - Output: PASS verdict (proceed) or FAIL with feedback (return to step 2)
@@ -49,19 +49,20 @@ The Design phase iteration limit is 3 plan-checker FAIL verdicts — track count
 
 For each component defined in `design-PLAN.md`, invoke the appropriate creator skill:
 
-1. Task is skill creation with `Skill(skill="plugin-creator:skill-creator")`
+1. Activate `/plugin-creator:skill-creator` for skill creation.
    - Context to include in the prompt: `design-PLAN.md` task spec for this skill, plugin path
    - Output: `{plugin-path}/skills/{skill-name}/SKILL.md` and any bundled resources
 
-2. Task is agent creation with `Skill(skill="plugin-creator:agent-creator")`
+2. Activate `/plugin-creator:agent-creator` for agent creation.
    - Context to include in the prompt: `design-PLAN.md` task spec for this agent, plugin path
    - Output: `{plugin-path}/agents/{agent-name}.md`
 
-3. Task is hook creation with `Skill(skill="plugin-creator:hook-creator")`
+3. Activate `/plugin-creator:hook-creator` for hook creation.
    - Context to include in the prompt: `design-PLAN.md` task spec for this hook, plugin path
    - Output: hook scripts and `hooks.json` configuration
 
-Repeat for each planned component. Create `plugin.json` via `uv run plugins/plugin-creator/scripts/create_plugin.py` if it does not exist.
+Repeat for each planned component. Keep a manifestless plugin when default component paths are
+sufficient; create `plugin.json` only when stable metadata or custom component paths are required.
 
 For agent-frontmatter decisions during agent creation, also load `/plugin-creator:claude-subagent-reference`.
 
@@ -74,8 +75,8 @@ Routing by concern (use when editing files in `plugins/`, `.claude/`, `AGENTS.md
 - Establish what a skill exists to achieve, before judging any of its content → activate `plugin-creator:skill-goal-extractor`
 - Remove content that serves no goal (decides whether text exists) → activate `plugin-creator:evaluate-and-tighten-skills`
 - Optimize existing content (decides how surviving text reads — clarity, structure, Anthropic prompt engineering principles) → activate `plugin-creator:optimize-claude-md`, which measures, delegates to `ai-doc-optimizer`, verifies, and reports
-- Audit quality (read-only, no writes, score against completeness categories) → `subagent_type="plugin-creator:skill-auditor"`
-- Sync content against upstream docs (add NEW/fix STALE from live sources) → `subagent_type="plugin-creator:skill-content-updater"`
+- Audit quality (read-only, no writes, score against completeness categories) → dispatch `plugin-creator:skill-auditor`
+- Sync content against upstream docs (add NEW/fix STALE from live sources) → dispatch `plugin-creator:skill-content-updater`
 - Write/rewrite description field only → `/plugin-creator:write-frontmatter-description` skill directly
 - Resolve prose duplicated across 2+ skills or agent files (shared reference material, not one skill's own bloat) → activate `plugin-creator:shared-content-references`
 
@@ -112,7 +113,7 @@ optimization from polishing prose that should have been deleted.
    before/after report. A direct agent dispatch skips all of it and produces an unverified,
    unmeasured rewrite.
 
-5. Task is agent prompt optimization with `subagent_type="plugin-creator:subagent-refactorer"`
+5. Dispatch `plugin-creator:subagent-refactorer` for agent prompt optimization.
    - Activate `plugin-creator:subagent-refactoring-methodology` first — that skill carries the analysis criteria, transformation patterns, output format, and validation checklist this agent is written to apply, and its own description requires loading it before the agent runs. It is reference knowledge, not an orchestrator, so the agent is still dispatched directly here.
    - Context to include in the prompt: agent .md files needing improvement
    - Output: optimized agent prompts using Anthropic best practices
@@ -121,7 +122,7 @@ optimization from polishing prose that should have been deleted.
 
 ## Phase 6.5 — Documentation
 
-1. Task is plugin documentation generation with `subagent_type="plugin-creator:plugin-assessor"`
+1. Dispatch `plugin-creator:plugin-assessor` for plugin documentation generation.
    - Context to include in the prompt: plugin path, all SKILL.md files, agent files, plugin.json, `assess-REPORT.md` or `design-PLAN.md` (whichever is available)
    - Prompt: Generate comprehensive documentation. Create: README.md with installation, usage, and examples; `docs/skills.md` if multiple skills exist; configuration guide if hooks or MCP servers are included. Ensure all features are documented, installation instructions are accurate, and examples are runnable.
    - Output: `{plugin-path}/README.md` and any additional documentation files
@@ -130,7 +131,7 @@ optimization from polishing prose that should have been deleted.
 
 ## Phase 7 — Verify
 
-1. Task is recursive validation with `Skill(skill="plugin-creator:ensure-complete")`
+1. Activate `/plugin-creator:ensure-complete` for recursive validation.
    - Context to include in the prompt: plugin path, task file (if applicable)
    - Output: `.plugin-creator/plans/{plugin-name}/validation-REPORT.md`
 

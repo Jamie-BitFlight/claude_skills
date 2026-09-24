@@ -89,7 +89,7 @@ Use when you have 20+ commands with multi-level categorization.
 
 ## Agent Organization
 
-Agents live in `agents/` by default. Every `.md` file in the plugin's `agents/` directory is auto-discovered by Claude Code — **do not** add an `agents` array to `plugin.json` for agents in this default location. Writing the `agents` key (even to add one entry) OVERRIDES auto-discovery: the declared list becomes the complete set and every unlisted agent becomes invisible. The `agents` array exists ONLY for agents stored in non-default paths — and when used, every agent file (default-path and non-default-path) must be listed explicitly.
+Agents live in `agents/` by default and need no manifest registration there. Use the `agents` key for non-default file paths; it accepts one path as a string or multiple paths as an array and replaces the default scan, so include each default-path agent that must remain available.
 
 ### Role-Based
 
@@ -135,7 +135,7 @@ Use when agents serve sequential workflow stages with stage-specific expertise.
 
 ## Skill Organization
 
-Skills live in `skills/` by default. Each skill occupies its own subdirectory containing at minimum a `SKILL.md` file. Skills are auto-discovered — do not add a `skills` key to `plugin.json` unless you need to override auto-discovery with explicit paths.
+Skills live in `skills/` by default. Each skill occupies its own subdirectory containing at minimum a `SKILL.md` file. Use the `skills` key in `plugin.json` only to add custom skill directories alongside the default `skills/` scan.
 
 Important constraint: skills do NOT support subdirectory namespacing. All skill directories must sit directly under `skills/` — one level deep only. Nested skill directories silently fail to register.
 
@@ -227,7 +227,7 @@ Resource usage:
 - `SKILL.md` — overview and when to use each resource (loaded when skill triggers)
 - `references/` — detailed guides loaded on demand by Claude
 - `scripts/` — executable automation, can run without loading into context
-- `assets/` — templates and configurations used in output, not loaded into context
+- `assets/` — output resources that are not eagerly loaded but remain readable on demand
 
 ## Hook Organization
 

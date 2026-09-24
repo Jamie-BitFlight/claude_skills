@@ -75,13 +75,13 @@ flowchart TD
 flowchart TD
     Start(["Preferences captured from Phase 0.5"]) --> Spawn["Spawn all 4 researchers<br>in a single message — they run concurrently"]
 
-    Spawn --> R1["Researcher 1 — subagent_type='plugin-creator:plugin-assessor'<br>Task: search plugins/ and ~/.claude/skills/ for similar functionality;<br>identify gaps and patterns to follow or avoid;<br>write to .plugin-creator/plans/{plugin-name}/research-1-existing.md"]
+    Spawn --> R1["Researcher 1 — dispatch plugin-creator:plugin-assessor<br>Task: search plugins/ and ~/.claude/skills/ for similar functionality;<br>identify gaps and patterns to follow or avoid;<br>write to .plugin-creator/plans/{plugin-name}/research-1-existing.md"]
 
-    Spawn --> R2["Researcher 2 — subagent_type='plugin-creator:plugin-assessor'<br>Task: identify which Claude Code features the plugin should use<br>(dynamic context, hooks, MCP/LSP, subagent execution);<br>write to .plugin-creator/plans/{plugin-name}/research-2-features.md"]
+    Spawn --> R2["Researcher 2 — dispatch plugin-creator:plugin-assessor<br>Task: identify which Claude Code features the plugin should use<br>(dynamic context, hooks, MCP/LSP, subagent execution);<br>write to .plugin-creator/plans/{plugin-name}/research-2-features.md"]
 
-    Spawn --> R3["Researcher 3 — subagent_type='plugin-creator:plugin-assessor'<br>Task: analyze architecture patterns from well-structured plugins<br>(skill directories, reference files, agent definitions, hook configs);<br>write to .plugin-creator/plans/{plugin-name}/research-3-architecture.md"]
+    Spawn --> R3["Researcher 3 — dispatch plugin-creator:plugin-assessor<br>Task: analyze architecture patterns from well-structured plugins<br>(skill directories, reference files, agent definitions, hook configs);<br>write to .plugin-creator/plans/{plugin-name}/research-3-architecture.md"]
 
-    Spawn --> R4["Researcher 4 — subagent_type='general-purpose'<br>Task: fetch https://code.claude.com/docs/en/plugins-reference.md<br>and https://code.claude.com/docs/en/skills.md;<br>identify schema requirements, common mistakes, deprecations;<br>write to .plugin-creator/plans/{plugin-name}/research-4-pitfalls.md"]
+    Spawn --> R4["Researcher 4 — dispatch harness-native general-purpose agent<br>Task: fetch https://code.claude.com/docs/en/plugins-reference.md<br>and https://code.claude.com/docs/en/skills.md;<br>identify schema requirements, common mistakes, deprecations;<br>write to .plugin-creator/plans/{plugin-name}/research-4-pitfalls.md"]
 
     R1 --> Merge
     R2 --> Merge
@@ -98,9 +98,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start(["research-FINDINGS.md written"]) --> Plan["2a — Delegate to Plan agent:<br>subagent_type='Plan'<br>Inputs: discuss-CONTEXT.md + research-FINDINGS.md<br>Output: XML task specs — each task has id, name, files,<br>action, verify command, and done criteria"]
+    Start(["research-FINDINGS.md written"]) --> Plan["2a — Dispatch harness-native Plan agent<br>Inputs: discuss-CONTEXT.md + research-FINDINGS.md<br>Output: XML task specs — each task has id, name, files,<br>action, verify command, and done criteria"]
 
-    Plan --> Check["2b — Delegate to plan checker:<br>subagent_type='general-purpose'<br>Verify: tasks cover all required components,<br>tasks are atomic, verify commands are runnable,<br>no gaps between tasks, sequence respects dependencies"]
+    Plan --> Check["2b — Dispatch general-purpose plan checker<br>Verify: tasks cover all required components,<br>tasks are atomic, verify commands are runnable,<br>no gaps between tasks, sequence respects dependencies"]
 
     Check --> Q{"Plan checker output<br>contains PASS or FAIL?"}
 
@@ -132,14 +132,14 @@ flowchart TD
 
     DepQ -->|"No — no pending dependency"| ParallelQ{"Are there other tasks with<br>no pending dependencies?"}
     ParallelQ -->|"Yes — spawn concurrently"| SpawnMulti["Spawn multiple executor agents<br>in a single message —<br>one per ready task"]
-    ParallelQ -->|"No — only this task is ready"| SpawnOne["Spawn one executor agent:<br>subagent_type='general-purpose'<br>Pass task XML with action, verify command,<br>done criteria, and context from discuss-CONTEXT.md"]
+    ParallelQ -->|"No — only this task is ready"| SpawnOne["Dispatch one general-purpose executor<br>Pass task XML with action, verify command,<br>done criteria, and context from discuss-CONTEXT.md"]
 
     SpawnMulti --> ExecResult
     SpawnOne --> ExecResult
 
     ExecResult{"Executor agent output:<br>Verification result PASS or FAIL?"}
     ExecResult -->|"PASS — done criteria met"| Commit["Atomic git commit —<br>stage only the files listed in the task's files element;<br>commit message: 'task-{N}: {task name}'"]
-    ExecResult -->|"FAIL — verification failed<br>or error in implementation"| Debug["Delegate to debugger agent:<br>subagent_type='general-purpose'<br>Pass failure details + plugin path;<br>receive fix plan as XML;<br>re-execute the task with the fix applied"]
+    ExecResult -->|"FAIL — verification failed<br>or error in implementation"| Debug["Dispatch general-purpose debugger<br>Pass failure details + plugin path;<br>receive fix plan as XML;<br>re-execute the task with the fix applied"]
     Debug --> ExecResult
 
     Commit --> MoreQ{"More tasks remaining<br>in design-PLAN.md?"}
@@ -157,7 +157,7 @@ flowchart TD
 
     L1L2 --> L1["Layer 1 — Script validation (parallel):<br>uv run scripts/create_plugin.py validate ./plugins/{plugin-name}<br>uvx skilllint@latest check ./plugins/{plugin-name}"]
 
-    L1L2 --> L2["Layer 2 — Official docs verification:<br>subagent_type='general-purpose'<br>Fetch plugins-reference.md and skills.md;<br>compare plugin against schema requirements;<br>output PASS with all compliant, or FAIL with file:line violations"]
+    L1L2 --> L2["Layer 2 — Official docs verification:<br>dispatch general-purpose verifier<br>Fetch plugins-reference.md and skills.md;<br>compare plugin against schema requirements;<br>output PASS with all compliant, or FAIL with file:line violations"]
 
     L1 --> L1Q{"Layer 1 exit code = 0?"}
     L2 --> L2Q{"Layer 2 output contains PASS?"}
@@ -172,7 +172,7 @@ flowchart TD
     L3Wait -->|"No — waiting for the other"| L3Wait
     L3Wait -->|"Yes — both passed"| L3
 
-    L3["Layer 3 — Quality assessment:<br>subagent_type='plugin-creator:plugin-assessor'<br>Check structural correctness, frontmatter optimization,<br>documentation completeness, cross-reference integrity;<br>output score 1-10 with specific issues listed"]
+    L3["Layer 3 — Quality assessment:<br>dispatch plugin-creator:plugin-assessor<br>Check structural correctness, frontmatter optimization,<br>documentation completeness, cross-reference integrity;<br>output score 1-10 with specific issues listed"]
 
     L3 --> L3Q{"Layer 3 score >= 7<br>AND no critical issues listed?"}
     L3Q -->|"No — score < 7 or critical issues present"| Debug
@@ -180,7 +180,7 @@ flowchart TD
     L3Q -->|"Yes — quality threshold met"| SaveReport["Save validation-REPORT.md —<br>Layer 1 status + script output,<br>Layer 2 status + compliance details,<br>Layer 3 score + issue list,<br>debug iteration count and fixes applied,<br>Final Status: PASS"]
     SaveReport --> Done(["validation-REPORT.md written —<br>proceed to Phase 5 Documentation"])
 
-    Debug["Layer 4 — Debug cycle:<br>subagent_type='general-purpose'<br>Read failing file(s); identify root cause;<br>generate fix plan as XML with file, issue, action;<br>execute fix; re-run the failing layer"]
+    Debug["Layer 4 — Debug cycle:<br>dispatch general-purpose debugger<br>Read failing file(s); identify root cause;<br>generate fix plan as XML with file, issue, action;<br>execute fix; re-run the failing layer"]
     Debug --> L1L2
 ```
 
@@ -190,7 +190,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start(["validation-REPORT.md written"]) --> Delegate["Delegate to plugin-docs-writer agent:<br>subagent_type='plugin-creator:plugin-docs-writer'<br>Context: ./plugins/{plugin-name} — all validated source files<br>Derive all content from source files only —<br>do not invent diagrams or examples"]
+    Start(["validation-REPORT.md written"]) --> Delegate["Dispatch plugin-creator:plugin-docs-writer<br>Context: ./plugins/{plugin-name} — all validated source files<br>Derive all content from source files only —<br>do not invent diagrams or examples"]
 
     Delegate --> Creates["Agent creates:<br>README.md (installation, usage, examples)<br>docs/skills.md if plugin has multiple skills<br>Configuration guide if hooks or MCP servers are present"]
 
@@ -220,7 +220,7 @@ flowchart TD
 
     Check3 -->|"Yes — README present and complete"| Check4{"Check 4 — Honesty Check:<br>Does each factual claim in SKILL.md files<br>have a cited source (URL or reference path)<br>with an access date?"}
 
-    Check4 -->|"No — uncited claims found"| Fix4["Delegate to ai-doc-optimizer:<br>subagent_type='plugin-creator:ai-doc-optimizer'<br>Add citations to all uncited factual claims"]
+    Check4 -->|"No — uncited claims found"| Fix4["Dispatch plugin-creator:ai-doc-optimizer<br>Add citations to all uncited factual claims"]
     Fix4 --> Check4
 ```
 
@@ -247,15 +247,15 @@ flowchart TD
 
     Q1 -->|"No"| Q2{"Task type?"}
 
-    Q2 -->|"Domain research, code pattern discovery,<br>architecture analysis, quality assessment"| Assessor["subagent_type='plugin-creator:plugin-assessor'"]
+    Q2 -->|"Domain research, code pattern discovery,<br>architecture analysis, quality assessment"| Assessor["dispatch plugin-creator:plugin-assessor"]
 
-    Q2 -->|"Verbatim file retrieval — exact contents,<br>directory listings, keyword search<br>with NO interpretation required"| Explore["Explore agent (Haiku-based) —<br>retrieval ONLY;<br>never reasoning tasks"]
+    Q2 -->|"Read-only codebase discovery"| Explore["Explore agent — inherited model<br>read-only tools"]
 
-    Q2 -->|"Fetch and analyze official documentation<br>from external URLs"| GP["subagent_type='general-purpose'"]
+    Q2 -->|"Fetch and analyze official documentation<br>from external URLs"| GP["dispatch general-purpose agent"]
 
     Q2 -->|"Schema and structure validation"| Scripts["Run validation scripts directly:<br>skilllint or create_plugin.py validate"]
 
-    Q2 -->|"Documentation writing (README, guides)"| Docs["subagent_type='plugin-creator:plugin-docs-writer'"]
+    Q2 -->|"Documentation writing (README, guides)"| Docs["dispatch plugin-creator:plugin-docs-writer"]
 
     Override --> Delegate(["Delegate with context —<br>name inputs, output file path, and expected format"])
     Assessor --> Delegate
@@ -318,10 +318,10 @@ Routing by concern:
 | Agent name | Model | Use for |
 |---|---|---|
 | `general-purpose` | inherits | Reasoning, analysis, implementation, debugging |
-| `Explore` | haiku | Verbatim retrieval only — no reasoning tasks |
+| `Explore` | inherits | Read-only codebase discovery |
 | `Plan` | inherits | Architecture planning, content structure decisions |
 
-SOURCE: CLAUDE.md global instructions (accessed 2026-01-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents> (accessed 2026-09-24)
 
 ### Plugin-Specific Agents
 

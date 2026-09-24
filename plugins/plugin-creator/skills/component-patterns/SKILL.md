@@ -91,13 +91,13 @@ Agents shipped inside a plugin have a restricted security profile compared to ag
 
 - `hooks` declared in frontmatter: silently ignored at runtime
 - `mcpServers` declared in frontmatter: not supported
-- `permissionMode` declared in frontmatter: not supported; agent will not start correctly
+- `permissionMode` declared in frontmatter: ignored for plugin agents
 
 Directly-installed agents (`.claude/agents/` or `~/.claude/agents/`) support all frontmatter fields.
 
 **Decision rule**: If an agent requires hooks for lifecycle automation, MCP server declarations, or custom permission modes — it must be directly installed, not shipped inside a plugin.
 
-SOURCE: [Claude Code Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) line 182 (accessed 2026-04-23)
+SOURCE: [Claude Code Plugins Reference — Agents](https://code.claude.com/docs/en/plugins-reference#agents) (accessed 2026-09-24)
 
 ## Organization Patterns by Component Type
 
@@ -194,7 +194,7 @@ plugin/
         └── agents/
 ```
 
-Register extension paths in `plugin.json` under `commands` and `agents` arrays. Note that listing paths explicitly overrides auto-discovery — all paths must be listed or unlisted components become invisible.
+Register extension paths in `plugin.json` under `commands` and `agents`. Each field accepts a string or array and replaces its default scan, so every retained default-path component must be included.
 
 SOURCE: Cross-component patterns adapted from `../claude-plugins-official/plugins/plugin-dev/skills/plugin-structure/references/component-patterns.md` lines 448-535
 

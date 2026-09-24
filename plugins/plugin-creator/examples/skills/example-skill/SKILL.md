@@ -1,6 +1,6 @@
 ---
 name: example-skill
-description: Demonstrates all available skill frontmatter fields. Use when you need a reference for skill configuration, when learning about skill capabilities, or when creating new skills from scratch.
+description: Illustrative Claude Code skill configuration. Use when learning the basic SKILL.md shape; follow the canonical runtime reference for the current field inventory.
 argument-hint: '[topic]'
 allowed-tools: Read, Grep, Glob, WebFetch
 model: sonnet
@@ -17,26 +17,26 @@ hooks:
 
 # Example Skill
 
-This skill demonstrates all available frontmatter fields for Claude Code skills.
+This skill illustrates a subset of Claude Code runtime frontmatter.
 
 ## Purpose
 
-Use this as a reference when creating new skills. All fields shown above are valid skill frontmatter options.
+See [the canonical Claude Code inventory](../../../skills/claude-skills-overview-2026/resources/claude-code-skills-official.md#frontmatter-reference) for all current fields.
 
 ## Field Descriptions
 
 | Field                      | Type    | Purpose                          | Constraints                     | Default         |
 | -------------------------- | ------- | -------------------------------- | ------------------------------- | --------------- |
-| `name`                     | string  | Display name                     | kebab-case, lowercase           | directory name  |
-| `description`              | string  | When to load this skill          | Must include trigger keywords   | first paragraph |
+| `name`                     | string  | Display name                     | Runtime-defined string          | directory name  |
+| `description`              | string  | When to load this skill          | Clear routing guidance          | first non-empty markdown line |
 | `argument-hint`            | string  | Autocomplete hint for `/` menu   | Brief hint text                 | none            |
-| `allowed-tools`            | string  | Tools without permission prompts | Comma-separated tool names      | none            |
+| `allowed-tools`            | string/list | Tools without permission prompts | Space/CSV string or YAML list | none |
 | `model`                    | string  | Model when skill is active       | sonnet, opus, haiku, or inherit | inherit         |
 | `user-invocable`           | boolean | Show in `/` menu                 | true or false                   | true            |
 | `disable-model-invocation` | boolean | Prevent Claude auto-loading      | true or false                   | false           |
 | `hooks`                    | object  | Scoped hooks for skill lifecycle | Valid hook configuration object | none            |
 
-**Note:** The fields `context` and `agent` are deprecated and not documented in the official Skills reference as of January 2026.
+`context` and `agent` are current Claude Code runtime fields.
 
 ## Validation
 
@@ -54,9 +54,7 @@ claude plugin validate ./path/to/plugin/
 
 | Error                                  | Cause                         | Fix                              |
 | -------------------------------------- | ----------------------------- | -------------------------------- |
-| `allowed-tools must be string`         | Used YAML array format        | Change to comma-separated string |
 | `model must be sonnet/opus/haiku`      | Invalid model name            | Use valid model identifier       |
-| `YAML array detected`                  | Used `- Tool1` format         | Change to `Tool1, Tool2` format  |
 | `Skill body exceeds 500 lines`         | Skill is too large            | Split into multiple skills       |
 | `Internal link points to missing file` | Referenced file doesn't exist | Create file or fix path          |
 | `Description too short`                | Less than 20 characters       | Add trigger keywords and context |
@@ -76,5 +74,6 @@ Skills can be located in:
 ## Sources
 
 - [Skills Reference](https://code.claude.com/docs/en/skills.md) (accessed 2026-01-28)
-- [Skills Overview](../../../skills/claude-skills-overview-2026/SKILL.md) - Complete reference
+- [Skills Overview](../../../skills/claude-skills-overview-2026/SKILL.md) - Claude Code runtime reference
 - [Plugin Creator Validation Scripts](../../../scripts/README.md)
+- SOURCE: <https://code.claude.com/docs/en/skills#frontmatter-reference> (accessed 2026-09-24)

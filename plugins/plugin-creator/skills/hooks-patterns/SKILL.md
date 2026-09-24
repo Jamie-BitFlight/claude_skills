@@ -6,13 +6,13 @@ user-invocable: true
 
 # Claude Code Hooks — Patterns & Examples (May 2026)
 
-Working examples and recipes for building hooks. For hook system fundamentals, activate `Skill(skill: "plugin-creator:hooks-core-reference")`. For JSON I/O schemas, activate `Skill(skill: "plugin-creator:hooks-io-api")`.
+Working examples and recipes for building hooks. For hook system fundamentals, activate `/plugin-creator:hooks-core-reference`. For JSON I/O schemas, activate `/plugin-creator:hooks-io-api`.
 
 ---
 
 ## Plugin Hooks
 
-Plugins can provide hooks that integrate with user and project hooks. For complete plugin documentation including plugin.json schema, directory structure, and component integration, see `Skill(skill: "plugin-creator:claude-plugins-reference-2026")`.
+Plugins can provide hooks that integrate with user and project hooks. For complete plugin documentation including plugin.json schema, directory structure, and component integration, activate `/plugin-creator:claude-plugins-reference-2026`.
 
 ### How Plugin Hooks Work
 
@@ -85,7 +85,7 @@ Or define inline:
 
 ## Hooks in Skills, Agents, and Slash Commands
 
-Hooks can be defined in frontmatter. These are scoped to the component's lifecycle. For complete skill documentation, see `Skill(skill: "plugin-creator:claude-skills-overview-2026")`.
+Hooks can be defined in frontmatter. These are scoped to the component's lifecycle. For complete skill documentation, activate `/plugin-creator:claude-skills-overview-2026`.
 
 **Supported events**: All hook events are supported in skill and agent frontmatter. The most common for subagents are `PreToolUse`, `PostToolUse`, and `Stop` (which is automatically converted to `SubagentStop` in agent context).
 
@@ -390,7 +390,7 @@ evaluation_context = (
     f"Evaluate the following prompt for clarity and specificity.\n"
     f"...\n"
     f"PROCEED IMMEDIATELY if the prompt is clear and specific.\n"
-    f"If vague: use Skill(skill='your-plugin:your-skill') to clarify before proceeding.\n"
+    "If vague: activate /your-plugin:your-skill to clarify before proceeding.\n"
     f"\nUser prompt: {original_prompt}"
 )
 
@@ -418,7 +418,7 @@ Hook configuration (`hooks.json`):
 }
 ```
 
-**Skill contract:** The skill invoked via `Skill(skill='your-plugin:your-skill')` must assume
+**Skill contract:** The skill activated as `/your-plugin:your-skill` must assume
 the hook has already evaluated the prompt for clarity. The skill must not re-evaluate whether
 the prompt is vague — that decision has already been made by the hook. The skill should
 proceed directly to its task (research, clarifying questions, enrichment, or any other

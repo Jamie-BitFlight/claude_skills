@@ -7,8 +7,9 @@ Update `Last verified` when re-running fetch-and-transform-hooks-docs.sh.
 
 | Platform | Hook concept | Doc URL | Reference file | Last verified |
 |----------|-------------|---------|----------------|---------------|
-| Claude Code | Yes — hooks.json + settings.json | <https://code.claude.com/docs/en/hooks.md> | claude-code.md | 2026-02-27 |
-| Claude Code (inline agent) | Yes — agent frontmatter | <https://code.claude.com/docs/en/sub-agents.md> | inline-agent-hooks.md | 2026-02-27 |
+| Claude Code | Yes — hooks.json + settings.json | <https://code.claude.com/docs/en/hooks.md> | claude-code.md | 2026-09-24 |
+| Claude Code (inline agent) | Yes — agent frontmatter | <https://code.claude.com/docs/en/sub-agents.md> | inline-agent-hooks.md | 2026-09-24 |
+| OpenAI Codex plugins | Yes — hooks.json + plugin extension/overlay | <https://learn.chatgpt.com/docs/hooks> | openai-codex.md | 2026-09-24 |
 | GitHub Copilot | Yes — .github/hooks/ | <https://docs.github.com/en/copilot/how-tos/use-copilot-agents/coding-agent/use-hooks.md> | github-copilot.md | 2026-02-27 |
 
 ## Fetch-attempted platforms (no hooks doc found at time of last run)

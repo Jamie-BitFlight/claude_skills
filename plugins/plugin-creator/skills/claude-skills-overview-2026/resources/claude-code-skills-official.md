@@ -4,7 +4,7 @@ Authoritative specification for how Claude Code discovers, loads, configures, an
 
 **Why read this**: This skill teaches you the skills system. This reference is the primary source from which that teaching derives. When the skill's content and the official docs disagree, the official docs win. Read this to verify claims, check for new features, and understand edge cases not covered in the skill body.
 
-SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills.md) (accessed 2026-03-01)
+SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills#frontmatter-reference) (accessed 2026-09-24)
 
 ---
 
@@ -46,16 +46,26 @@ All fields are optional. Only `description` is recommended.
 
 | Field                      | Required    | Description |
 |:---------------------------|:------------|:------------|
-| `name`                     | No          | Display name. If omitted, uses directory name. Lowercase letters, numbers, hyphens only (max 64 chars). |
-| `description`              | Recommended | What the skill does and when to use it. If omitted, uses first paragraph of markdown content. |
+| `name`                     | No          | Display name. If omitted, uses directory name. |
+| `description`              | Recommended | What the skill does and when to use it. If omitted, uses the first non-empty markdown line. |
+| `when_to_use`              | No          | Additional activation guidance. |
 | `argument-hint`            | No          | Hint shown during autocomplete. Example: `[issue-number]` or `[filename] [format]`. |
+| `arguments`                | No          | Argument definition used by the skill. |
 | `disable-model-invocation` | No          | `true` prevents Claude from automatically loading this skill. Default: `false`. |
 | `user-invocable`           | No          | `false` hides from `/` menu. Default: `true`. |
-| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active. |
+| `allowed-tools`            | No          | Space- or comma-separated string, or YAML list, of tools pre-approved while active. |
+| `disallowed-tools`         | No          | Tools unavailable while the skill is active. |
 | `model`                    | No          | Model to use when this skill is active. |
-| `context`                  | No          | `fork` runs in a forked subagent context. |
+| `effort`                   | No          | Effort override while the skill is active. |
+| `context`                  | No          | `fork` runs in a fresh skill subagent, not a conversation fork. |
 | `agent`                    | No          | Subagent type when `context: fork`. Options: `Explore`, `Plan`, `general-purpose`, or custom. Default: `general-purpose`. |
-| `hooks`                    | No          | Hooks scoped to this skill's lifecycle. Events: `PreToolUse`, `PostToolUse`, `Stop`. |
+| `background`               | No          | Forks default to background; `false` waits in the foreground. |
+| `hooks`                    | No          | Hooks scoped to this skill's lifecycle. All hook events are supported; use the hooks reference for event-specific matchers and configuration. |
+| `paths`                    | No          | Path patterns associated with the skill. |
+| `shell`                    | No          | Shell configuration for skill commands. |
+| `metadata`                 | No          | String-keyed metadata. |
+| `license`                  | No          | License name or bundled license reference. |
+| `compatibility`            | No          | Environment requirements. |
 
 ---
 
@@ -86,6 +96,17 @@ All fields are optional. Only `description` is recommended.
 | `$ARGUMENTS[N]`        | Specific argument by 0-based index. |
 | `$N`                   | Shorthand for `$ARGUMENTS[N]`. |
 | `${CLAUDE_SESSION_ID}` | Current session ID. |
+| `${CLAUDE_SKILL_DIR}`  | Absolute path to the directory containing the active `SKILL.md`; substituted in skill content and `allowed-tools`. |
+
+SOURCE: [Available string substitutions](https://code.claude.com/docs/en/skills#available-string-substitutions) (accessed 2026-09-24)
+
+### Tool Pre-Approval
+
+`allowed-tools` pre-approves matching tools for the turn in which the skill is invoked. It does not
+restrict tool availability: unlisted tools remain callable under the user's normal permission
+settings. Use `disallowed-tools` when a skill must make tools unavailable.
+
+SOURCE: [Pre-approve tools for a skill](https://code.claude.com/docs/en/skills#pre-approve-tools-for-a-skill) (accessed 2026-09-24)
 
 ---
 
@@ -146,13 +167,13 @@ Three methods:
 
 ## Run Skills in a Subagent
 
-`context: fork` runs the skill in isolation. The skill content becomes the subagent's prompt — it won't have access to conversation history.
+`context: fork` runs the skill in a fresh subagent. The skill content becomes the prompt and the subagent does not receive conversation history. This is distinct from a conversation fork, which inherits history and cannot fork again.
 
 **Warning**: `context: fork` only makes sense for skills with explicit instructions and a clear task. Guidelines without a task produce no meaningful output.
 
 | Approach                     | System prompt                             | Task                        | Also loads       |
 |:-----------------------------|:------------------------------------------|:----------------------------|:-----------------|
-| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | CLAUDE.md        |
+| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | CLAUDE.md except Explore and Plan |
 | Subagent with `skills` field | Subagent's markdown body                  | Claude's delegation message | Preloaded skills + CLAUDE.md |
 
 ---
@@ -206,16 +227,18 @@ SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents.md)
 
 When Claude invokes a subagent, the model is resolved in this priority order (highest to lowest):
 
-1. `CLAUDE_CODE_SUBAGENT_MODEL` environment variable, if set
-2. The per-invocation `model` parameter passed at invocation time
-3. The subagent definition's `model` frontmatter field
+1. The per-invocation `model` parameter passed at invocation time
+2. The subagent definition's `model` frontmatter field
+3. `CLAUDE_CODE_SUBAGENT_MODEL` environment variable, if set
 4. The main conversation's model (the default — equivalent to `inherit`)
+
+Set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` to force the environment-configured default over higher-precedence selections.
 
 The `model` field in frontmatter accepts: `sonnet`, `opus`, `haiku`, a full model ID (e.g., `claude-opus-4-7`), or `inherit`. Omitting `model` defaults to `inherit`.
 
 The model override from a skill's `model` field applies for the rest of the current turn only and is not saved to settings; the session model resumes on the next prompt.
 
-SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents.md) section "Choose a model" (accessed 2026-04-23)
+SOURCE: [Create custom subagents](https://code.claude.com/docs/en/sub-agents#choose-a-model) (accessed 2026-09-24)
 
 ---
 

@@ -1,10 +1,10 @@
 ---
 name: claude-subagent-reference
-description: Reference spec and schema for Claude Code subagents — covers built-in agents (Explore, Plan, general-purpose), all frontmatter fields (name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color, initialPrompt), scope and file locations, invocation patterns (@-mention, --agent, --agents CLI), tool restrictions, and example subagent definitions. Use when creating, configuring, or debugging a subagent definition file, looking up a frontmatter field, choosing between subagents and agent teams, or understanding what loads at subagent startup.
+description: Claude Code subagent runtime and plugin-agent reference. Use when creating, configuring, or debugging subagent definitions, nested spawning, startup context, model precedence, or plugin field restrictions.
 user-invocable: true
 ---
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents> (accessed 2026-09-24)
 
 # Claude Code Subagents — Reference
 
@@ -16,7 +16,9 @@ Subagents help you:
 - **Reuse configurations** across projects with user-level subagents
 - **Control costs** by routing tasks to faster, cheaper models like Haiku
 
-Subagents cannot spawn other subagents. For coordinated parallel work with inter-agent messaging, see [./references/agent-teams.md](./references/agent-teams.md).
+Subagents can spawn nested subagents up to three layers below the main conversation by default. Set `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`; `1` disables nesting. At the limit Claude Code withholds `Agent`, except forks retain it and receive an error. Interactive launchers wait for background children; non-interactive launchers report late child results to the main conversation. A fork cannot spawn another fork.
+
+SOURCE: <https://code.claude.com/docs/en/sub-agents#let-subagents-spawn-their-own-subagents> (accessed 2026-09-24)
 
 ---
 
@@ -28,13 +30,13 @@ Claude Code includes built-in subagents. **Explore and Plan skip CLAUDE.md files
 
 | Agent | Model | Tools | Purpose |
 |:------|:------|:------|:--------|
-| **Explore** | Haiku (fast) | Read-only | File discovery, code search, codebase exploration. Thoroughness: `quick` / `medium` / `very thorough` |
+| **Explore** | Inherits | Read-only | File discovery, code search, codebase exploration. Thoroughness: `quick` / `medium` / `very thorough` |
 | **Plan** | Inherits | Read-only | Codebase research during [plan mode](https://code.claude.com/docs/en/permission-modes.md#analyze-before-you-edit-with-plan-mode) |
 | **general-purpose** | Inherits | All | Complex multi-step tasks requiring both exploration and modification |
 | **statusline-setup** | Sonnet | — | Invoked automatically for `/statusline` |
 | **claude-code-guide** | Haiku | — | Invoked automatically for Claude Code questions |
 
-> **Explore limitation**: Haiku-based, read-only retrieval only. Do not delegate reasoning or analysis to Explore — validated ~50% accuracy on ambiguous queries. Use `general-purpose` for any task requiring interpretation.
+Explore inherits the main conversation model as of v2.1.198. On the Anthropic API the inherited model is capped at Opus; on other providers it inherits directly. A user or project agent named `Explore` overrides the built-in and uses its own `model` field.
 
 ---
 
@@ -66,26 +68,35 @@ Subagent files are Markdown files with YAML frontmatter. When multiple subagents
 
 SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Supported frontmatter fields (accessed 2026-05-28)
 
-Only `name` and `description` are required. All other fields are optional.
+Project, user, and managed agents require `name` and `description`; all other fields are optional.
+Plugin agents still load without valid `name` frontmatter by using the file path. If their
+frontmatter does not parse, they use a generic plugin description and ignore its fields. Supply
+both fields for stable identity and accurate routing even though plugin loading has fallbacks.
 
 | Field | Required | Description |
 |:------|:---------|:------------|
-| `name` | **Yes** | Unique identifier: lowercase letters and hyphens, max 64 chars. Hooks receive this as `agent_type`. Filename need not match |
-| `description` | **Yes** | When Claude should delegate to this subagent. Write clearly — Claude uses this for routing. Include "use proactively" to encourage automatic delegation |
-| `tools` | No | Allowlist of tools the subagent can use. Inherits all tools when omitted. Accepts exact tool names and MCP server-level patterns (`mcp__<server>` or `mcp__<server>__*`). Use `Agent(worker, researcher)` syntax to restrict which subagent types can be spawned. A subagent whose entries all resolve to nothing refuses to launch. See [./references/tool-and-permission-control.md](./references/tool-and-permission-control.md) |
-| `disallowedTools` | No | Denylist — removed from inherited or specified list. Accepts the same MCP server-level patterns as `tools`. When both fields set, `disallowedTools` applied first |
-| `model` | No | Model to use: `sonnet`, `opus`, `haiku`, a full model ID (e.g., `claude-opus-4-7`), or `inherit`. Defaults to `inherit`. See [./references/model-and-effort.md](./references/model-and-effort.md) |
-| `permissionMode` | No | Permission mode: `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, or `plan`. **Silently ignored for plugin subagents.** See [./references/tool-and-permission-control.md](./references/tool-and-permission-control.md) |
+| `name` | Scope-dependent | Required outside plugins. Plugin agents fall back to their file path. Must not start with `-` or contain `:`. Hooks receive this as `agent_type`; filename need not match |
+| `description` | Scope-dependent | Required outside plugins. Write clearly for plugin routing even though invalid plugin frontmatter gets a generic fallback. Include "use proactively" to encourage automatic delegation |
+| `tools` | No | CSV string or YAML list allowlist. Bare `Agent` enables depth-limited nested spawning in a subagent definition; parenthesized type lists apply only to `claude --agent`. |
+| `disallowedTools` | No | CSV string or YAML list denylist. |
+| `model` | No | `sonnet`, `opus`, `haiku`, `fable`, full model ID, or `inherit`. |
+| `permissionMode` | No | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, or `manual`. Ignored for plugin agents. |
 | `maxTurns` | No | Maximum agentic turns before the subagent stops |
 | `skills` | No | Skills to preload into the subagent's context at startup. Full skill content is injected (not just the description). Cannot preload skills with `disable-model-invocation: true`. See `/claude-skills-overview-2026` for skill authoring |
 | `mcpServers` | No | MCP servers available to this subagent. Each entry: a server name string (reuses parent connection) or an inline definition. **Silently ignored for plugin subagents.** Inline servers connect when the subagent starts and disconnect when it finishes |
 | `hooks` | No | Lifecycle hooks scoped to this subagent. **Silently ignored for plugin subagents.** `Stop` hooks are auto-converted to `SubagentStop` at runtime. See [./references/hooks-for-subagents.md](./references/hooks-for-subagents.md) |
 | `memory` | No | Persistent memory scope: `user`, `project`, or `local`. Enables cross-session learning. See [./references/memory-and-context.md](./references/memory-and-context.md) |
-| `background` | No | Set `true` to always run this subagent as a background task. Default: `false` |
+| `background` | No | Set `true` to force background execution. Otherwise Claude Code chooses foreground or background from session and fork-mode rules |
+| `omitClaudeMd` | No | Omit user, project, and local `CLAUDE.md` files at startup |
 | `effort` | No | Effort level override when this subagent is active: `low`, `medium`, `high`, `xhigh`, `max`. Overrides session level but not `CLAUDE_CODE_EFFORT_LEVEL` env var. See [./references/model-and-effort.md](./references/model-and-effort.md) |
 | `isolation` | No | Set `worktree` to run the subagent in a temporary git worktree (isolated repo copy). Auto-cleaned up if no changes made. Supported in plugin subagents. See [./references/memory-and-context.md](./references/memory-and-context.md) |
 | `color` | No | Display color in task list: `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, or `cyan` |
 | `initialPrompt` | No | Auto-submitted as the first user turn when this agent runs as the main session via `--agent` or the `agent` setting. Commands and skills are processed. Prepended to any user-provided prompt |
+| `experimental` | No | Experimental subagent options |
+
+Plugin agents support the documented plugin subset, including `omitClaudeMd`, `effort`, and `experimental`. They ignore `hooks`, `mcpServers`, and `permissionMode` for security and do not support `initialPrompt`.
+
+SOURCE: <https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields> and <https://code.claude.com/docs/en/plugins-reference#agents> (accessed 2026-09-24)
 
 ---
 
@@ -95,7 +106,6 @@ SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Available tools (acce
 
 These tools are unavailable to subagents even when listed in the `tools` field (they depend on the main conversation's UI or session state):
 
-- `Agent`
 - `AskUserQuestion`
 - `EnterPlanMode`
 - `ExitPlanMode` (unless `permissionMode: plan`)
@@ -188,8 +198,9 @@ SOURCE: <https://code.claude.com/docs/en/env-vars.md> (accessed 2026-05-28)
 
 | Variable | Purpose |
 |:---------|:--------|
-| `CLAUDE_CODE_SUBAGENT_MODEL` | Override model for ALL subagents. Overrides per-invocation parameter and frontmatter `model`. Set to `inherit` to use normal resolution |
-| `CLAUDE_CODE_FORK_SUBAGENT=1` | Enable fork mode (v2.1.117+). See [./references/fork-mode.md](./references/fork-mode.md) |
+| `CLAUDE_CODE_SUBAGENT_MODEL` | Default after per-invocation and frontmatter selections; before parent inheritance |
+| `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` | Force the configured subagent-model default |
+| `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` | Set nested subagent depth; `1` disables nesting |
 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Enable agent teams (v2.1.32+). See [./references/agent-teams.md](./references/agent-teams.md) |
 | `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` | Disable all background task functionality |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | % of context capacity at which auto-compaction triggers (default ~95%) |
@@ -206,6 +217,6 @@ SOURCE: <https://code.claude.com/docs/en/env-vars.md> (accessed 2026-05-28)
 | Model aliases, CLAUDE_CODE_SUBAGENT_MODEL, effort levels | [./references/model-and-effort.md](./references/model-and-effort.md) |
 | Hooks in frontmatter vs settings.json, SubagentStart/Stop schemas | [./references/hooks-for-subagents.md](./references/hooks-for-subagents.md) |
 | Memory scopes, what loads at startup, worktrees, compaction, resume | [./references/memory-and-context.md](./references/memory-and-context.md) |
-| Fork mode (experimental, v2.1.117+) | [./references/fork-mode.md](./references/fork-mode.md) |
+| Fork mode and `/subtask` | [./references/fork-mode.md](./references/fork-mode.md) |
 | Agent teams vs subagents, enabling, best practices | [./references/agent-teams.md](./references/agent-teams.md) |
 | Full example subagent definitions with hook scripts | [./references/example-subagents.md](./references/example-subagents.md) |

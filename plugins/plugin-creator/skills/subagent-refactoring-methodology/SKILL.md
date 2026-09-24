@@ -102,7 +102,7 @@ File reading/analysis:      Read, Grep, Glob
 File creation:              Write, Edit
 Research/documentation:     WebSearch, WebFetch, MCP Ref tools
 Code operations:            Read, Write, Edit, Bash
-Orchestration:              Task, TodoWrite
+Orchestration:              current task tracking or plain STATUS updates
 ```
 
 Prefer specific tools over generic (Grep over Bash for search).

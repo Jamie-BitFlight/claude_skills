@@ -13,16 +13,30 @@ from __future__ import annotations
 
 import re
 import zipfile
-from typing import TYPE_CHECKING
+from pathlib import Path
 
+import pytest
 from ruamel.yaml import YAML
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    import pytest
-
 _yaml = YAML(typ="safe")
+
+
+@pytest.mark.parametrize(
+    ("source", "target"),
+    [
+        ("CLAUDE.md", "../../rules/frontmatter-requirements.md"),
+        ("CLAUDE.md", "../../rules/plugin-json.md"),
+        ("examples/agents/example-agent.md", "../../skills/claude-subagent-reference/SKILL.md"),
+        ("examples/agents/example-agent.md", "../../skills/agent-creator/SKILL.md"),
+        ("examples/agents/example-agent.md", "../../scripts/README.md"),
+        ("examples/skills/example-skill/SKILL.md", "../../../skills/claude-skills-overview-2026/SKILL.md"),
+        ("examples/skills/example-skill/SKILL.md", "../../../scripts/README.md"),
+        ("references/USAGE.md", "./ARCHITECTURE.md"),
+    ],
+)
+def test_repaired_plugin_documentation_link_exists(source: str, target: str) -> None:
+    plugin_root = Path(__file__).parents[1]
+    assert (plugin_root / source).parent.joinpath(target).resolve().exists()
 
 
 # ---------------------------------------------------------------------------
@@ -133,18 +147,43 @@ class TestInitSkillScaffolder:
         assert not is_valid
         assert err is not None
 
-    def test_invalid_name_leading_hyphen_is_rejected(self) -> None:
-        """validate_skill_name rejects names that start with a hyphen.
+    @pytest.mark.parametrize("name", ["-bad-start", "bad-end-", "bad--middle"])
+    def test_invalid_name_hyphen_placement_is_rejected(self, name: str) -> None:
+        """validate_skill_name rejects leading, trailing, or consecutive hyphens.
 
         Tests: Edge-case in the regex guard.
-        How: Call validate_skill_name with a leading-hyphen name.
+        How: Call validate_skill_name with malformed hyphen placement.
         Why: Allows the test to catch regressions to the regex pattern.
         """
         from init_skill import validate_skill_name
 
-        is_valid, err = validate_skill_name("-bad-start")
+        is_valid, err = validate_skill_name(name)
         assert not is_valid
         assert err is not None
+
+    def test_lowercase_unicode_name_is_accepted(self) -> None:
+        from init_skill import validate_skill_name
+
+        is_valid, err = validate_skill_name("données-分析")
+
+        assert is_valid
+        assert err is None
+
+    def test_name_length_is_checked_after_nfkc_normalization(self) -> None:
+        from init_skill import validate_skill_name
+
+        is_valid, err = validate_skill_name("ﬀ" * 33)
+
+        assert not is_valid
+        assert err is not None
+
+    def test_init_skill_writes_nfkc_normalized_name(self, tmp_path: Path) -> None:
+        from init_skill import init_skill
+
+        result = init_skill("cafe\u0301", str(tmp_path))
+
+        assert result == tmp_path / "café"
+        assert _parse_frontmatter(result / "SKILL.md")["name"] == "café"
 
     def test_duplicate_directory_returns_none(self, tmp_path: Path) -> None:
         """init_skill returns None when the target directory already exists.
@@ -270,6 +309,17 @@ class TestPackageSkillPackager:
 
         result = package_skill(skill_dir)
         assert result is None
+
+    def test_invalid_allowed_tools_blocks_packaging(self, tmp_path: Path) -> None:
+        from package_skill import package_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "bad-tools-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: Read,Grep\ndescription:"), encoding="utf-8"
+        )
+
+        assert package_skill(skill_dir) is None
 
     def test_nonexistent_path_returns_none(self, tmp_path: Path) -> None:
         """package_skill returns None for a path that does not exist.
@@ -400,6 +450,62 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "rogue-key" in message
 
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("argument-hint", "'[topic]'"),
+            ("arguments", "topic"),
+            ("disable-model-invocation", "true"),
+            ("user-invocable", "true"),
+            ("disallowed-tools", "Write"),
+            ("model", "sonnet"),
+            ("effort", "high"),
+            ("context", "fork"),
+            ("agent", "Explore"),
+            ("background", "false"),
+            ("hooks", "{}"),
+            ("paths", "[]"),
+            ("shell", "bash"),
+            ("when_to_use", "tests"),
+        ],
+    )
+    def test_claude_only_key_fails_portable_validation(self, tmp_path: Path, key: str, value: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "portable-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"{key}: {value}\ndescription:"), encoding="utf-8"
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert key in message
+
+    @pytest.mark.parametrize("missing", ["name", "description"])
+    def test_required_portable_field_fails(self, tmp_path: Path, missing: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "required-fields")
+        skill_md = skill_dir / "SKILL.md"
+        lines = [line for line in skill_md.read_text().splitlines() if not line.startswith(f"{missing}:")]
+        skill_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert missing in message.lower()
+
+    def test_name_must_match_parent_directory(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "directory-name")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("name: directory-name", "name: other-name"))
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "must match parent directory" in message
+
     def test_uppercase_name_fails(self, tmp_path: Path) -> None:
         """Name containing uppercase letters is rejected.
 
@@ -417,11 +523,157 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert any(kw in message for kw in ("hyphen-case", "MyUpperCaseSkill"))
 
-    def test_description_with_angle_brackets_fails(self, tmp_path: Path) -> None:
-        """Description containing angle brackets is rejected.
+    def test_lowercase_unicode_name_passes(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
 
-        Tests: Angle-bracket guard (blocks HTML-like Claude Code incompatible tokens).
-        """
+        skill_dir = _make_minimal_valid_skill(tmp_path, "données-分析")
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_unicode_uppercase_name_fails(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "НАВЫК")
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "lowercase" in message
+
+    def test_non_alphanumeric_unicode_name_fails(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "技能_分析")
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "Unicode alphanumeric characters and hyphens" in message
+
+    def test_nfkc_normalized_name_matches_directory(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "café")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("name: café", "name: cafe\u0301"), encoding="utf-8")
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_name_length_is_checked_after_nfkc_normalization(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        expanded_name = "ﬀ" * 33
+        skill_dir = _make_minimal_valid_skill(tmp_path, expanded_name)
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "66 characters" in message
+
+    @pytest.mark.parametrize("compatibility", ["", "   "])
+    def test_empty_compatibility_fails(self, tmp_path: Path, compatibility: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "compatibility-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"compatibility: '{compatibility}'\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "compatibility" in message.lower()
+
+    @pytest.mark.parametrize("key", ["license", "compatibility", "metadata", "allowed-tools"])
+    def test_explicit_null_optional_field_fails(self, tmp_path: Path, key: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "null-field-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("description:", f"{key}: null\ndescription:"))
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert key in message
+
+    @pytest.mark.parametrize("description", ["", "   "])
+    def test_whitespace_only_description_fails(self, tmp_path: Path, description: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "empty-description-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace(
+                "description: A test skill for smoke testing", f"description: '{description}'"
+            ),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "description is required" in message.lower()
+
+    def test_description_length_is_checked_before_trimming(self, tmp_path: Path) -> None:
+        from quick_validate import MAX_DESCRIPTION_LENGTH, validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "long-description-skill")
+        skill_md = skill_dir / "SKILL.md"
+        description = f" {'a' * MAX_DESCRIPTION_LENGTH} "
+        skill_md.write_text(
+            skill_md.read_text().replace(
+                "description: A test skill for smoke testing", f"description: '{description}'"
+            ),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert f"{len(description)} characters" in message
+
+    def test_space_delimited_allowed_tools_passes(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: Bash(git:*) Read\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_yaml_list_allowed_tools_fails_portable_validation(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-list-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: [Read, Grep]\ndescription:"), encoding="utf-8"
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "allowed-tools must be a string" in message
+
+    @pytest.mark.parametrize(
+        "allowed_tools", ["", "Read,Grep", "Read, Grep", "Read\tGrep", "Read  Grep", " Read Grep", "Read Grep "]
+    )
+    def test_non_space_delimited_allowed_tools_fails(self, tmp_path: Path, allowed_tools: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-format-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"allowed-tools: '{allowed_tools}'\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "space-separated tool tokens" in message
+
+    def test_description_with_angle_brackets_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = tmp_path / "angle-bracket-skill"
@@ -431,32 +683,20 @@ class TestQuickValidateBrokenFixtures:
         )
 
         valid, message = validate_skill(skill_dir)
-        assert not valid
-        assert any(kw in message.lower() for kw in ("angle bracket", "<", ">"))
+        assert valid, message
 
-    def test_yaml_multiline_indicator_description_fails(self, tmp_path: Path) -> None:
-        """Description written as a bare YAML block-scalar indicator is rejected.
-
-        Tests: Raw-text guard for bare >- / |- indicators on the description line.
-        How: Write SKILL.md with ``description: >-`` (no quotes — the real developer
-             mistake). YAML parses this as an empty string, but the raw-text check in
-             quick_validate must detect the bare indicator and reject the skill.
-        Why: The parsed-value check (``description in {">-", ...}``) cannot catch the
-             bare form because YAML gives empty string, not the literal ">-" string.
-             A regex over the raw SKILL.md text is the only reliable detection method.
-        """
+    def test_yaml_block_scalar_description_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = tmp_path / "multiline-indicator"
         skill_dir.mkdir()
-        # Write the ACTUAL developer mistake: bare block-scalar indicator, no quotes.
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: multiline-indicator\ndescription: >-\n---\n\n# Skill\n", encoding="utf-8"
+            "---\nname: multiline-indicator\ndescription: >-\n  A portable multiline description\n---\n\n# Skill\n",
+            encoding="utf-8",
         )
 
         valid, message = validate_skill(skill_dir)
-        assert not valid
-        assert any(kw in message.lower() for kw in ("block scalar", ">-", "broken", "indicator"))
+        assert valid, message
 
     def test_name_too_long_fails(self, tmp_path: Path) -> None:
         """Name exceeding the maximum length is rejected.
@@ -476,19 +716,74 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "long" in message.lower() or str(MAX_NAME_LENGTH) in message or "maximum" in message.lower()
 
-    def test_name_with_consecutive_hyphens_fails(self, tmp_path: Path) -> None:
-        """Name with consecutive hyphens is rejected.
+    @pytest.mark.parametrize("name", ["-bad-start", "bad-end-", "bad--middle"])
+    def test_name_with_invalid_hyphen_placement_fails(self, tmp_path: Path, name: str) -> None:
+        """Names with leading, trailing, or consecutive hyphens are rejected.
 
-        Tests: Consecutive-hyphen guard in _validate_name().
+        Tests: Hyphen-placement guards in _validate_name().
         """
         from quick_validate import validate_skill
 
-        skill_dir = tmp_path / "bad--hyphens"
-        skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: bad--hyphens\ndescription: fine\n---\n\n# Skill\n", encoding="utf-8"
-        )
+        skill_dir = _make_minimal_valid_skill(tmp_path, name)
 
         valid, message = validate_skill(skill_dir)
         assert not valid
-        assert any(kw in message.lower() for kw in ("consecutive", "hyphen", "bad--hyphens"))
+        assert "hyphen" in message.lower()
+
+
+def test_custom_skill_paths_do_not_mask_default_skills(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    (plugin_dir / "skills" / "default-skill").mkdir(parents=True)
+    (plugin_dir / "skills" / "default-skill" / "SKILL.md").write_text("# Default\n")
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"skills": ["./custom-skills"]}\n')
+
+    assert _check_one_plugin(plugin_json) == []
+
+
+def test_single_agent_path_string_is_accepted(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"agents": "./custom/reviewer.md"}\n')
+
+    assert _check_one_plugin(plugin_json) == []
+
+
+def test_explicit_agent_paths_cannot_mask_nested_default_agents(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    (plugin_dir / "agents" / "review").mkdir(parents=True)
+    (plugin_dir / "agents" / "reviewer.md").write_text("# Reviewer\n")
+    (plugin_dir / "agents" / "review" / "security.md").write_text("# Security\n")
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"agents": ["./agents/reviewer.md"]}\n')
+
+    violations = _check_one_plugin(plugin_json)
+
+    assert len(violations) == 1
+    assert "./agents/review/security.md" in violations[0]
+
+
+@pytest.mark.parametrize("entry", [1, None, {"path": "./agents/reviewer.md"}])
+def test_agent_path_array_rejects_non_string_entries(tmp_path: Path, entry: object) -> None:
+    import json
+
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text(json.dumps({"agents": ["./agents/reviewer.md", entry]}))
+
+    violations = _check_one_plugin(plugin_json)
+
+    assert len(violations) == 1
+    assert "entries must be strings" in violations[0]

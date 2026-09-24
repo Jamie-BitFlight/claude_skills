@@ -1,14 +1,14 @@
 # Memory, Context, and Isolation
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Enable persistent memory (accessed 2026-05-28)
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Manage subagent context (accessed 2026-05-28)
-SOURCE: <https://code.claude.com/docs/en/worktrees.md> § Isolate subagents with worktrees (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#enable-persistent-memory> (accessed 2026-09-24)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#what-loads-at-startup> (accessed 2026-09-24)
+SOURCE: <https://code.claude.com/docs/en/worktrees#isolate-subagents-with-worktrees> (accessed 2026-09-24)
 
 ---
 
 ## What loads at subagent startup
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § What loads at startup (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#what-loads-at-startup> (accessed 2026-09-24)
 
 Each subagent starts with a fresh, isolated context window — no conversation history, no previously invoked skills, no previously read files. Claude composes a delegation message that summarizes the task, and the subagent works from there.
 
@@ -21,7 +21,7 @@ Each subagent starts with a fresh, isolated context window — no conversation h
 | Preloaded skills | Only if listed in `skills` field | Full content injected. Built-in agents don't preload skills |
 | Main conversation history | No | Subagents start fresh. Exception: forks inherit full history — see [./fork-mode.md](./fork-mode.md) |
 
-**Explore and Plan are the only built-in subagents that omit CLAUDE.md and git status.** No frontmatter field changes this behavior for custom subagents.
+Explore and Plan omit `CLAUDE.md` and git status. Custom subagents can set `omitClaudeMd: true` to omit user, project, and local `CLAUDE.md` files.
 
 If a rule must reach a subagent (e.g., "ignore the `vendor/` directory"), restate it in the delegation prompt — the main conversation reads Explore and Plan results with full CLAUDE.md context, so most rules don't need to reach the subagent itself.
 
@@ -29,7 +29,7 @@ If a rule must reach a subagent (e.g., "ignore the `vendor/` directory"), restat
 
 ## Persistent memory
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Enable persistent memory (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#enable-persistent-memory> (accessed 2026-09-24)
 
 The `memory` field gives the subagent a persistent directory that survives across conversations, letting it accumulate knowledge over time (codebase patterns, debugging insights, architectural decisions).
 
@@ -63,8 +63,8 @@ When `memory` is set:
 
 ## Worktree isolation
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Supported frontmatter fields — isolation (accessed 2026-05-28)
-SOURCE: <https://code.claude.com/docs/en/worktrees.md> § Isolate subagents with worktrees (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields> (accessed 2026-09-24)
+SOURCE: <https://code.claude.com/docs/en/worktrees#isolate-subagents-with-worktrees> (accessed 2026-09-24)
 
 ```yaml
 isolation: worktree
@@ -102,7 +102,7 @@ config/secrets.json
 
 ## Resume subagents
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Resume subagents (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#resume-subagents> (accessed 2026-09-24)
 
 Resumed subagents retain their full conversation history. Ask Claude to continue previous work:
 
@@ -114,18 +114,20 @@ Continue that code review and now analyze the authorization logic
 [Claude resumes the subagent with full context from previous conversation]
 ```
 
-Claude uses the `SendMessage` tool with the agent's ID to resume. `SendMessage` is only available when agent teams are enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+Claude Code can resume or follow up with a subagent through the Agent workflow. `SendMessage` is also documented for follow-up and does not require agent teams.
 
 Subagent transcripts are stored at:
 `~/.claude/projects/{project}/{sessionId}/subagents/agent-{agentId}.jsonl`
 
 If a stopped subagent receives a `SendMessage`, it auto-resumes in the background without requiring a new `Agent` invocation.
 
+SOURCE: <https://code.claude.com/docs/en/sub-agents#resume-subagents> (accessed 2026-09-24)
+
 ---
 
 ## Auto-compaction
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Auto-compaction (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#auto-compaction> (accessed 2026-09-24)
 
 Subagents support auto-compaction using the same logic as the main conversation. Default trigger: approximately 95% context capacity.
 

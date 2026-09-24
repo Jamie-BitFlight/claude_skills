@@ -4,9 +4,8 @@
 
 Does not resolve at runtime once a plugin is installed.
 
-SOURCE: `plugins/plugin-creator/agents/ai-doc-optimizer.md:175` ("Never reference files inside
-another skill's directory... won't resolve at runtime"); `plugins/plugin-creator/CLAUDE.md`
-§Plugin Caching ("Plugins CANNOT reference files outside their directory").
+SOURCE: [Plugin caching and runtime paths](../../claude-plugins-reference-2026/references/caching-and-runtime.md)
+and the runtime-escape audit owned by `/plugin-creator:lint`.
 
 ## Symlinks
 
@@ -19,6 +18,5 @@ SOURCE: `AGENTS.md` §Gotchas item 3. Symlinks also carry their own validator er
 
 ## Copy-paste
 
-Creates the exact drift the `refactor-validator` agent's `No duplicate content across skills`
-checklist item exists to catch — two copies that silently diverge the next time either one is
-edited.
+Creates two copies that can silently diverge the next time either one is edited. Store the prose
+once and point each consumer to it.
