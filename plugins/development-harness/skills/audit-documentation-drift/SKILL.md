@@ -1,6 +1,6 @@
 ---
 name: audit-documentation-drift
-description: Audit documentation claims against implementation and authoritative repository evidence, including DH artifact registration when dispatched with a backlog item. Use when checking whether README, architecture, configuration, API, usage, or feature documentation is stale, incomplete, contradicted by code, missing implemented behavior, or when a DH workflow requires a documentation-drift audit.
+description: Audit documentation claims against implementation and authoritative repository evidence. Use when checking whether README, architecture, configuration, API, usage, or feature documentation is stale, incomplete, contradicted by code, missing implemented behavior, or inconsistent with a normative contract.
 ---
 
 # Audit Documentation Drift
@@ -9,13 +9,7 @@ Determine whether documentation still describes the system it governs. Treat dri
 
 ## Inputs and operating mode
 
-Resolve:
-
-- audited project/component and documentation surface;
-- revision/branch and material environment variants;
-- optional DH `item_id` when the caller requires artifact registration.
-
-When dispatched by `dh:doc-drift-auditor`, `item_id` and `project_root` are required and the final report MUST be registered as a DH `audit-report` artifact. In ordinary direct skill use, do not require an item ID; return the report or use the repository's point-in-time report convention.
+Resolve the audited project/component, documentation surface, revision/branch, and material environment variants from the request. Ask only for missing scope that could change the audit result.
 
 Audit read-only. Do not repair documentation or implementation unless a separate instruction explicitly requests repair after the audit.
 
@@ -29,7 +23,6 @@ Audit read-only. Do not repair documentation or implementation unless a separate
    - **generated/derived documentation** — inherits from a source/generator contract;
    - **implementation/tests/configuration** — observed behavior evidence, not automatically intent.
 3. Record unresolved authority instead of assuming code always wins. An unambiguous normative requirement contradicted by implementation is implementation nonconformance, not documentation drift.
-4. For DH repositories, respect logical backend/artifact boundaries; do not infer private storage paths from artifact identifiers.
 
 ## Extract testable claims
 
@@ -126,38 +119,6 @@ Produce:
 
 Counts may summarize demonstrated findings but are not a quality score.
 
-## DH artifact handoff
-
-When `item_id` is supplied by a DH dispatch, assemble the report in memory and register it through the configured DH artifact interface:
-
-```text
-artifact_register(
-  item_id={item_id},
-  artifact_type="audit-report",
-  artifact_id="doc-drift-audit-{slug}",
-  content={report_markdown},
-  status="current",
-  agent="doc-drift-auditor"
-)
-```
-
-Do not write the DH report to a private backend path or tracked repository file.
-
-If `item_id` is required by the dispatch but absent, or artifact registration fails, stop and return `STATUS: BLOCKED` with the missing input or exact registration error. Do not silently fall back to filesystem storage.
-
-On success return the DH subagent contract shape:
-
-```text
-STATUS: DONE
-SUMMARY: {one-paragraph summary}
-ARTIFACTS:
-  - type=audit-report, item={item_id}, artifact_id=doc-drift-audit-{slug}
-RISKS:
-  - {material risks}
-NOTES:
-  - {coverage/evidence limitations}
-```
-
 ## Boundaries
 
 - Do not assume project structure, documentation scope, or authority without evidence.
@@ -167,3 +128,4 @@ NOTES:
 - Do not manufacture undocumented-feature findings from private implementation details.
 - Do not run broad git archaeology when current-state comparison resolves the question.
 - Do not make a correction recommendation without identifying which authoritative surface is wrong or unresolved.
+- Leave persistence, artifact registration, orchestration status, and caller-specific return envelopes to the caller; they are not part of documentation-drift analysis.
