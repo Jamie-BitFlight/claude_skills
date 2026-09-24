@@ -1,11 +1,7 @@
 The purpose and explicit goals of the skill improve-processes:
 
-1. Establish enough purpose, scope, evidence, constraints, and system context at the current useful resolution to judge a process without requiring unnecessary detail.
-2. Build one explicit semantic ProcessModel that exposes contracts, behavior, ownership, state, boundaries, assumptions, failure modes, uncertainty, and inherited constraints without inventing intent.
-3. Select process altitude and local instruction resolution proportionate to consequence and behavioral uncertainty: compress safe routine behavior, preserve critical contracts and safeguards, and locally expand consequential or variable behavior rather than increasing detail everywhere.
-4. Identify falsifiable correctness claims and select the least-formal sufficient validation for each claim, including executable checks, structural fidelity checks, state-space/model checking, theorem proving, or human/environmental evidence where appropriate.
-5. Improve demonstrated gaps when established intent determines the correction, using predeclared success/protection criteria and before/after evidence for material changes; escalate only decisions that would create or alter goals, policy, or intent.
-6. Use failures, regressions, execution traces, and counterexamples as diagnostic evidence; classify requirement, evidence, judgment, transition, interface, recovery, observability, representation, validation/model, and implementation defects before choosing the next correction, then revalidate only affected claims and interfaces.
-7. Optionally measure baseline agent behavior to determine which instructions are genuinely needed, using neutral representative scenarios, diverse/isolated samples, predeclared contracts, variance analysis, and compression validation without treating model consensus as correctness.
-8. Keep recursive analysis bounded by descending only to materially useful narrower resolution, preserving parent contracts and stopping when additional detail cannot change a correctness decision.
-9. Finish with explicit evidence, assumptions, residual risks, validation boundaries, instruction-resolution decisions, and a stable readiness status.
+1. Make a process or system sufficiently explicit at the resolution needed for agents to execute, review, or reason about it without inventing consequential intent.
+2. Improve process behavior while preserving its required purpose, constraints, contracts, and safe behavior.
+3. Use no more procedural detail than materially improves reliable execution, increasing local resolution where consequence or uncertainty warrants it.
+4. Establish proportionate evidence for important correctness claims and for material improvements, exposing unresolved uncertainty rather than implying confidence that has not been earned.
+5. Produce a coherent, auditable process model whose boundaries, assumptions, risks, and readiness are clear enough for downstream representation, validation, and execution.
