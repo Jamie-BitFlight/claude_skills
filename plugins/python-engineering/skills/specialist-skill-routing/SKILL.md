@@ -209,15 +209,15 @@ This skill behaves differently for orchestrators vs sub-agents. Orchestrators de
 
 ---
 
-## Technical Debt / Modernization
+## Python Quality / Modernization Audit
 
-**Triggers**: eliminating `Any` types across a module, removing legacy typing imports (`Optional[X]`, `Union[X, Y]`, `List[X]`, `Dict[K, V]`), refactoring for Protocol usage, progressive quality improvement across multiple files
+**Triggers**: broad Python quality audit, PR/diff quality assessment, technical-debt discovery, Pythonic modernization, dependency/library substitution, maintenance-burden reduction, obsolete compatibility removal, "what can we delete?", "what should a library do for us?", or comparison with practices in large Python projects.
 
 ```text
-Skill(skill="python-engineering:stinkysnake")
+Skill(skill="python-engineering:python-quality-audit")
 ```
 
-Multi-phase workflow: static analysis → type analysis → modernization planning → plan review → test-driven implementation. Load before planning a refactor, not mid-implementation.
+This is the owning entryway. It fans out independent StinkySnake smell discovery, SnakePolish modernization assessment, ecosystem substitution, large-project practice, and removal/process-debt lanes, then synthesizes one verified/actionable report. Invoke `stinkysnake` or `snakepolish` directly only when the task explicitly requests that single lens.
 
 **Triggers**: applying modern Python 3.11+ patterns, learning about PEPs (585, 604, 695), finding modern alternatives for old code
 
@@ -274,9 +274,9 @@ Skill(skill="python-engineering:snakepolish")
 
 ---
 
-## Code Review & Quality Audits
+## Code Review
 
-**Triggers**: reviewing Python code for quality issues, auditing code before merge, checking pattern compliance, verifying architecture standards
+**Triggers**: bounded conventional review against task acceptance criteria, correctness, security, tests, and established standards. For broad quality/modernization audits, route to `python-quality-audit` above.
 
 ```text
 Skill(skill="python-engineering:review")
