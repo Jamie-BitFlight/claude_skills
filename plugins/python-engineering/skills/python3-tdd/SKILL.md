@@ -1,6 +1,6 @@
 ---
 name: python3-tdd
-description: Guides test-driven development for Python using a five-phase red-green-refactor cycle. Use when asked to write tests first, apply TDD, do test-first implementation, or follow red-green-refactor — designs typed interfaces and Protocol classes, writes failing pytest tests (RED), implements minimal passing code (GREEN), verifies with prek or ruff plus pytest-cov, and enforces a quality gate requiring all tests pass with no lint or type errors and coverage evidence appropriate to the changed behavior and any existing project gate.
+description: Use when a Python task explicitly requires test-driven development, tests-first implementation, or a red-green-refactor workflow.
 argument-hint: '<feature-description>'
 user-invocable: true
 ---
@@ -17,9 +17,8 @@ Task: $ARGUMENTS
 
 ### 1. Design Interface
 
-- Define function signatures with full type annotations
-- Create Protocol classes for dependencies
-- Write docstrings before implementation
+- Define only the interface needed to express the behavior under test
+- Preserve the project's existing architecture and typing conventions
 - Load `python3-typing` when boundary types or models are involved
 
 ### 2. Write Failing Tests
