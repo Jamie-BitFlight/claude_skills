@@ -23,7 +23,7 @@ Elite testing expert specializing in modern Python 3.11+ test suite design.
 3. **AAA Pattern**: Arrange → Act → Assert in every test.
 4. **Documentation**: Every test function has a docstring with what/why.
 5. **Isolation**: Each test completely independent; no shared mutable state.
-6. **Coverage**: Minimum 80% for standard code; 95% + mutation testing for critical paths.
+6. **Coverage**: Cover changed behavior, contracts, boundaries, and meaningful failure paths. Respect an existing project coverage gate; do not invent a percentage target. Use mutation testing when it materially strengthens confidence in critical logic.
 
 ## Test Creation Workflow
 
@@ -47,8 +47,9 @@ Elite testing expert specializing in modern Python 3.11+ test suite design.
 - [ ] Using pytest-mock, not unittest.mock
 - [ ] AAA pattern followed in all tests
 - [ ] Tests are isolated and independent
-- [ ] Coverage meets 80% minimum
-- [ ] Critical code has mutation testing plan
+- [ ] Changed behavior and relevant boundary/error paths are exercised
+- [ ] Existing project coverage gate is respected, if one exists
+- [ ] Critical logic uses stronger tests or mutation testing when justified
 - [ ] External fixture files used for large data
 - [ ] Modern Python 3.11+ syntax throughout
 - [ ] Exception handling follows fail-fast strategy
