@@ -264,7 +264,7 @@ See the library modernization reference table in `type-patterns.md#library-moder
 
 ### Step 3.4: Create Modernization Plan Document
 
-Write to `.claude/plans/stinkysnake-plan.md` (create the directory if it does not exist) using the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #modernization-plan-template-phase-3-output`.
+Write to `.claude/plans/stinkysnake-plan.md` (create the directory if it does not exist) using the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #modernization-plan-template-phase-3-output.
 
 ---
 
@@ -274,11 +274,11 @@ Delegate to a review agent with context fork to critique the plan.
 
 ### Step 4.1: Launch Plan Review Agent
 
-Delegate to `code-reviewer` using the prompt in `agent-prompts.md` in the `python-engineering:python3-testing` skill, section #phase-4-plan-review`.
+Delegate to `code-reviewer` using the prompt in `agent-prompts.md` in the `python-engineering:python3-testing` skill, section #phase-4-plan-review.
 
 ### Step 4.2: Review Report Structure
 
-The reviewer produces a report following the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #plan-review-report-template-phase-4-output`.
+The reviewer produces a report following the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #plan-review-report-template-phase-4-output.
 
 ---
 
@@ -311,7 +311,7 @@ For each suggestion:
 
 ### Step 5.4: Update Plan Document
 
-Update `{plan_dir}/stinkysnake-plan.md` (resolve `plan_dir` as in Step 3.4) using the revised plan format in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #revised-plan-template-phase-5-output`.
+Update `{plan_dir}/stinkysnake-plan.md` (resolve `plan_dir` as in Step 3.4) using the revised plan format in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #revised-plan-template-phase-5-output.
 
 ---
 
@@ -331,7 +331,7 @@ uv run rg "^\s+\"\"\"" $ARGUMENTS
 
 ### Step 6.2: Map Code to Docs
 
-Create documentation update plan using the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #documentation-update-plan-template-phase-6-output`.
+Create documentation update plan using the template in `plan-templates.md` in the `python-engineering:python3-testing` skill, section #documentation-update-plan-template-phase-6-output.
 
 ---
 
@@ -399,7 +399,7 @@ Delegate to python-pytest-architect to write failing tests against the interface
 
 ### Step 8.1: Launch Test Writing Agent
 
-Delegate to `python-pytest-architect` using the prompt in `agent-prompts.md` in the `python-engineering:python3-testing` skill, section #phase-8-test-writing-agent`.
+Delegate to `python-pytest-architect` using the prompt in `agent-prompts.md` in the `python-engineering:python3-testing` skill, section #phase-8-test-writing-agent.
 
 ### Step 8.2: Verify Tests Fail
 

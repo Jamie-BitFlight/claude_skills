@@ -20,14 +20,8 @@ Opinionated Python 3.11+ engineering system. Establishes strong defaults and rou
 
 ### Specialist Skills (auto-loaded by router when relevant)
 
-- `python-engineering:python3-typing` — typed-boundary and validation policy
-- `python-engineering:python3-testing` — TDD, pytest, property-based testing
-- `python-engineering:python3-cli` — CLI and script development (Typer/Rich)
-- `python-engineering:python3-web` — web and API development
-- `python-engineering:python3-data` — data and scientific Python
-- `python-engineering:python3-stdlib-only` — constrained/legacy environments
-- `python-engineering:python3-tools` — uv, Hatchling, ty, pre-commit, packaging
-- `python-engineering:python3-tdd` — TDD workflow entrypoint
+The Domain Routing table in `skills/python3-core/SKILL.md` names every specialist and the task
+that selects it. Read it there; this file does not restate the list.
 
 ### Agents (Python-specific)
 

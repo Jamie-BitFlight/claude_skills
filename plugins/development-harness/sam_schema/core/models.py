@@ -41,7 +41,10 @@ class WireContractModel(BaseModel):
 _BEADS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]*-[A-Za-z0-9.]+$")
 
 # Status normalization map — maps human-readable and emoji variants to canonical values.
-# Sourced from task_format.py:28-45 (plugins/development-harness/skills/implementation-manager/scripts/)
+# This is the canonical map. The deprecated STATUS_MAP in
+# skills/implementation-manager/scripts/task_format.py is a narrower, diverged set — it maps
+# WONT-FIX, WONTFIX and three emoji shortcodes that this map does not, and lacks the keys
+# added here. Do not treat either as a copy of the other.
 STATUS_MAP: dict[str, str] = {
     # Space-separated variants
     "NOT STARTED": "not-started",
