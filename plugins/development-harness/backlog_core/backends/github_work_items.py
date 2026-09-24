@@ -455,6 +455,7 @@ class _GitHubReconciliation:
         self._cache = cache
         self._provider = provider
         self._default_repo = default_repo
+        self._cache._set_default_repo(default_repo)
         # Populated by load_records() (and therefore list_work_items()) on every
         # call from the WorkItemSnapshotBatch.skipped list -- read back by
         # has_skipped_snapshots() with no extra I/O, rather than re-scanning the
@@ -478,7 +479,7 @@ class _GitHubReconciliation:
         Returns:
             Persisted work items.
         """
-        return [record.item for record in self.load_records()]
+        return [record.item for record in self.load_records(repo=self._default_repo)]
 
     def has_synced_snapshot(self) -> bool:
         """Report whether a durable, honest provider snapshot has ever completed.
@@ -557,7 +558,7 @@ class _GitHubReconciliation:
         Raises:
             KeyError: If no cached work item carries the reference.
         """
-        for record in self.load_records():
+        for record in self.load_records(repo=self._default_repo):
             if reference == record.item.reference:
                 return record.item
         raise KeyError(reference)
@@ -594,18 +595,24 @@ class _GitHubReconciliation:
         pending_work_items = self._cache._pending_work_item_mutations(
             effective_request.repo or self._default_repo, default_repo=self._default_repo
         )
-        plan = reconcile_backlog(self.load_records(pending_work_items), snapshot, effective_request)
+        plan = reconcile_backlog(
+            self.load_records(pending_work_items, repo=effective_request.repo or self._default_repo),
+            snapshot,
+            effective_request,
+        )
         cache_results: list[ActionResult] = []
         for action in (entry for entry in plan.cache_actions if entry.phase == "before_provider"):
             try:
-                self._cache._save_work_item_snapshot(action.key, action.record.item)
+                self._cache._save_work_item_snapshot(
+                    action.key, action.record.item, repo=effective_request.repo or self._default_repo
+                )
             except OSError:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
             else:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="applied"))
 
         patch_results = (
-            self._provider._apply_patches(plan.provider_patches, effective_request.repo)
+            self._provider._apply_patches(plan.provider_patches, effective_request.repo or self._default_repo)
             if effective_request.apply_local_patches
             else []
         )
@@ -619,7 +626,9 @@ class _GitHubReconciliation:
             metadata = action.record.item.metadata.model_copy(update={"updated_at": revision})
             item = action.record.item.model_copy(update={"metadata": metadata})
             try:
-                self._cache._save_work_item_snapshot(action.key, item)
+                self._cache._save_work_item_snapshot(
+                    action.key, item, repo=effective_request.repo or self._default_repo
+                )
             except OSError:
                 cache_results.append(ActionResult(key=action.key, phase=action.phase, status="error"))
             else:
@@ -634,7 +643,11 @@ class _GitHubReconciliation:
             ),
         )
         self._advance_snapshot_checkpoint(
-            effective_request.scope, effective_request.label, plan.snapshot_checkpoint, outcome
+            effective_request.scope,
+            effective_request.label,
+            plan.snapshot_checkpoint,
+            outcome,
+            repo=effective_request.repo or self._default_repo,
         )
         if not effective_request.dry_run:
             snapshot_by_reference = {item.reference: item for item in snapshot.items}
@@ -669,7 +682,7 @@ class _GitHubReconciliation:
         )
 
     def load_records(
-        self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None
+        self, pending_work_items: Sequence[_PendingWorkItemMutation] | None = None, *, repo: str = ""
     ) -> list[LogicalCacheRecord]:
         """Merge cached work-item snapshots with queued mutations.
 
@@ -688,9 +701,14 @@ class _GitHubReconciliation:
         Returns:
             One logical cache record per work-item reference.
         """
-        batch = self._cache._work_item_snapshots()
+        selected_repo = repo or self._default_repo
+        batch = self._cache._work_item_snapshots(selected_repo, default_repo=self._default_repo)
         self._last_skipped_snapshots = batch.skipped
-        checkpoint = self._cache._get_snapshot_checkpoint()
+        checkpoint = (
+            self._cache._get_snapshot_checkpoint()
+            if selected_repo == self._default_repo
+            else self._cache._get_snapshot_checkpoint(selected_repo)
+        )
         # A checkpoint's items_observed records the total snapshot file count
         # (readable + unreadable) the durable cache held immediately after the
         # reconcile that advanced it (see _advance_snapshot_checkpoint). A
@@ -750,7 +768,12 @@ class _GitHubReconciliation:
             case ReconcileScope.INCREMENTAL:
                 if request.since:
                     return request
-                checkpoint = self._cache._get_snapshot_checkpoint()
+                selected_repo = request.repo or self._default_repo
+                checkpoint = (
+                    self._cache._get_snapshot_checkpoint()
+                    if selected_repo == self._default_repo
+                    else self._cache._get_snapshot_checkpoint(selected_repo)
+                )
                 if checkpoint is None or not checkpoint.has_scope_metadata:
                     return request.model_copy(update={"scope": ReconcileScope.INITIAL, "checkpoint_recovery": True})
                 return request.model_copy(update={"since": checkpoint.watermark})
@@ -758,7 +781,7 @@ class _GitHubReconciliation:
                 return request
 
     def _advance_snapshot_checkpoint(
-        self, scope: ReconcileScope, label: str, watermark: str, outcome: ReconcileOutcome
+        self, scope: ReconcileScope, label: str, watermark: str, outcome: ReconcileOutcome, *, repo: str = ""
     ) -> None:
         """Advance the durable global snapshot watermark, but only when it is honest.
 
@@ -814,12 +837,14 @@ class _GitHubReconciliation:
             # A label-scoped observation never covers the full unlabeled item
             # set a bare checkpoint is read to mean -- see the docstring above.
             return
-        batch = self._cache._work_item_snapshots()
+        selected_repo = repo or self._default_repo
+        batch = self._cache._work_item_snapshots(selected_repo, default_repo=self._default_repo)
         self._cache._set_snapshot_checkpoint(
             _ProviderSnapshotCheckpoint(
                 watermark=watermark,
                 scope=scope.value,
                 label=label,
                 items_observed=len(batch.snapshots) + len(batch.skipped),
-            )
+            ),
+            repo=selected_repo,
         )

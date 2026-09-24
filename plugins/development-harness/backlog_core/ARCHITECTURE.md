@@ -513,9 +513,14 @@ only runtime component permitted to read or write backlog YAML and cached plan o
 
 - `cache.json` — the durable state above, as JSON (`_CacheStateStore` in `file_cache_state.py`). A
   legacy `cache.yaml` from before this file was renamed is migrated automatically on first write.
+  Provider snapshot checkpoints are keyed by canonical repository. A legacy unscoped checkpoint is
+  read only for the backend's configured/default repository.
 - `cache.lock` — cross-process/cross-version mutual exclusion for the state file; never renamed.
-- `items/**/*.yaml` — per-item provider snapshots, written by `yaml_io.py`. These genuinely are
-  YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's format.
+- `items/repositories/<encoded-owner%2Frepo>/**/*.yaml` — repository-scoped per-item provider
+  snapshots, written by `yaml_io.py`. Legacy unscoped `items/**/*.yaml` snapshots remain readable
+  only for the configured/default repository; new reconciliations require no migration. These
+  genuinely are YAML, unlike `cache.json` — don't confuse the two when reasoning about this cache's
+  format.
 
 **Offline behavior**:
 

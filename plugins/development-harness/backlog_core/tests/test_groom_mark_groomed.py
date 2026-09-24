@@ -19,6 +19,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backlog_core import operations
+from backlog_core.backend_types import BacklogConfig
+from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.models import BacklogItem, Entry, Section, ValidationError
 from backlog_core.operations import _apply_groomed_entries, _resolve_groomed_content, groom_item
 
@@ -135,3 +138,24 @@ def test_groom_item_mark_groomed_reuses_one_selection(mocker: MockerFixture) -> 
     mock_update_metadata.assert_called_once()
     mock_apply.assert_not_called()
     assert mock_list.call_count == 1
+
+
+def test_groom_item_mark_groomed_preserves_content_in_final_storage(mocker: MockerFixture) -> None:
+    """The status write accumulates on the item containing the new section."""
+    backend = InMemoryBackend()
+    original = BacklogItem(title="cumulative groom", reference="cumulative-groom", priority="P1")
+    backend.put_work_item(original)
+    mocker.patch.object(operations, "get_config", return_value=BacklogConfig(backend=backend))
+
+    groom_item(
+        "cumulative groom",
+        section="Acceptance Criteria",
+        content="- [ ] Final item keeps this criterion",
+        mark_groomed=True,
+    )
+
+    stored = backend.get_work_item("cumulative-groom")
+    section = stored.sections["acceptance_criteria"]
+    assert isinstance(section, Section)
+    assert section.entries[-1].content == "- [ ] Final item keeps this criterion"
+    assert stored.status == "groomed"

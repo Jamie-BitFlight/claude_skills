@@ -225,6 +225,7 @@ class _CacheState(BaseModel):
     rejected_work_items: list[_RejectedWorkItemMutation] = Field(default_factory=list)
     corrupt_queue_entries: list[_CorruptQueueEntry] = Field(default_factory=list)
     snapshot_checkpoint: _ProviderSnapshotCheckpoint | None = None
+    snapshot_checkpoints: dict[str, _ProviderSnapshotCheckpoint] = Field(default_factory=dict)
 
 
 def _content_mutation_key(write: ContentWrite) -> str:
@@ -739,6 +740,14 @@ class _CacheStateStore:
         # _verify_queue_keys -- not here, so it also runs on states that took
         # the model_validate_json fast path (see _read).
         checkpoint = self._salvage_checkpoint(raw, path)
+        repository_checkpoints: dict[str, _ProviderSnapshotCheckpoint] = {}
+        raw_repository_checkpoints = raw.get("snapshot_checkpoints", {})
+        if isinstance(raw_repository_checkpoints, dict):
+            for repo, value in raw_repository_checkpoints.items():
+                try:
+                    repository_checkpoints[str(repo)] = _ProviderSnapshotCheckpoint.model_validate(value)
+                except pydantic.ValidationError as exc:
+                    _log.warning("Cache state %s: dropping malformed checkpoint for %s: %s", path, repo, exc)
         return _CacheState(
             records=records,
             checkpoints=checkpoints,
@@ -748,6 +757,7 @@ class _CacheStateStore:
             rejected_work_items=cast("list[_RejectedWorkItemMutation]", survivors["rejected_work_items"]),
             corrupt_queue_entries=corrupt,
             snapshot_checkpoint=checkpoint,
+            snapshot_checkpoints=repository_checkpoints,
         )
 
     @staticmethod

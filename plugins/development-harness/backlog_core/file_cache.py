@@ -10,6 +10,7 @@ import warnings
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
+from urllib.parse import quote
 
 from pydantic import BaseModel, ConfigDict
 from ruamel.yaml import YAML, YAMLError
@@ -391,11 +392,28 @@ class FileCache:
             )
         )
 
-    def _get_snapshot_checkpoint(self) -> _ProviderSnapshotCheckpoint | None:
-        return self._load_state().snapshot_checkpoint
+    def _get_snapshot_checkpoint(
+        self, repo: str | None = None, *, default_repo: str = ""
+    ) -> _ProviderSnapshotCheckpoint | None:
+        state = self._load_state()
+        if repo is None:
+            return state.snapshot_checkpoints.get(self._default_repo) or state.snapshot_checkpoint
+        selected_repo = repo or default_repo or self._default_repo
+        checkpoint = state.snapshot_checkpoints.get(selected_repo)
+        if checkpoint is not None:
+            return checkpoint
+        return state.snapshot_checkpoint if selected_repo == (default_repo or self._default_repo) else None
 
-    def _set_snapshot_checkpoint(self, checkpoint: _ProviderSnapshotCheckpoint) -> None:
-        self._state.transaction(lambda state: (state.model_copy(update={"snapshot_checkpoint": checkpoint}), None))
+    def _set_snapshot_checkpoint(self, checkpoint: _ProviderSnapshotCheckpoint, *, repo: str = "") -> None:
+        if not repo:
+            self._state.transaction(lambda state: (state.model_copy(update={"snapshot_checkpoint": checkpoint}), None))
+            return
+
+        def update(state: _CacheState) -> tuple[_CacheState, None]:
+            checkpoints = {**state.snapshot_checkpoints, repo: checkpoint}
+            return state.model_copy(update={"snapshot_checkpoints": checkpoints}), None
+
+        self._state.transaction(update)
 
     def acknowledge_replay(self, acknowledgements: list[ReplayAcknowledgement]) -> None:
         """Checkpoint only applied mutations while retaining all other queued work."""
@@ -485,11 +503,13 @@ class FileCache:
     def _load_item_snapshot(self, relative_path: Path) -> BacklogItem:
         return load_item(self._snapshot_path(relative_path))
 
-    def _save_work_item_snapshot(self, key: str, item: BacklogItem) -> None:
+    def _save_work_item_snapshot(self, key: str, item: BacklogItem, *, repo: str = "") -> None:
         number = parse_issue_number(key)
         relative_path = Path("issues") / f"{number}.yaml" if number is not None else Path(key)
         if number is None and relative_path.suffix not in {".yaml", ".yml"}:
             relative_path = Path(f"{relative_path}.yaml")
+        if repo:
+            relative_path = Path("repositories") / quote(repo, safe="") / relative_path
         self._save_item_snapshot(item, relative_path)
 
     def _record_unreadable_snapshot_directory(self, item_root: Path, skipped: set[str], exc: OSError) -> None:
@@ -514,7 +534,7 @@ class FileCache:
         _log.warning("Work item snapshot directory %s: skipping unreadable subtree: %s", failed_path, exc)
         skipped.add(relative_directory.as_posix())
 
-    def _work_item_snapshots(self) -> WorkItemSnapshotBatch:
+    def _work_item_snapshots(self, repo: str | None = None, *, default_repo: str = "") -> WorkItemSnapshotBatch:
         """Return every durable work-item snapshot beneath the cache root.
 
         An orphaned :meth:`_save_item_snapshot` temp file never reaches this
@@ -579,7 +599,26 @@ class FileCache:
             except (ValueError, YAMLError, OSError) as exc:
                 _log.warning("Work item snapshot %s: skipping corrupt/unparseable snapshot: %s", path, exc)
                 skipped.add(relative.as_posix())
-        return WorkItemSnapshotBatch(snapshots=snapshots, skipped=sorted(skipped))
+        if repo is None:
+            return WorkItemSnapshotBatch(snapshots=snapshots, skipped=sorted(skipped))
+
+        selected_repo = repo or default_repo or self._default_repo
+        configured_default = default_repo or self._default_repo
+        prefix = f"repositories/{quote(selected_repo, safe='')}/"
+        scoped_snapshots = [
+            (key.removeprefix(prefix), item)
+            for key, item in snapshots
+            if key.startswith(prefix) or (selected_repo == configured_default and not key.startswith("repositories/"))
+        ]
+        scoped_skipped = [
+            path.removeprefix(prefix)
+            for path in skipped
+            if path.startswith(prefix) or (selected_repo == configured_default and not path.startswith("repositories/"))
+        ]
+        # A namespaced record supersedes its legacy unscoped counterpart for
+        # the configured repository without rewriting old state in place.
+        by_key = dict(scoped_snapshots)
+        return WorkItemSnapshotBatch(snapshots=list(by_key.items()), skipped=scoped_skipped)
 
     @staticmethod
     def _serialize_item(item: BacklogItem) -> str:
