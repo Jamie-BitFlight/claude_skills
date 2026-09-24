@@ -87,10 +87,7 @@ def scan_plugin(plugin_dir: Path) -> dict:
             try:
                 mcp_server_count += len(json.loads(p.read_text(encoding="utf-8")).get("mcpServers", {}))
             except (json.JSONDecodeError, OSError) as exc:
-                print(
-                    f"warning: {plugin_dir.name}: cannot parse {p.name} ({exc}); counting 0 MCP servers",
-                    file=sys.stderr,
-                )
+                raise ValueError(f"{plugin_dir.name}: cannot parse {p.name}: {exc}") from exc
     return {
         "manifests": {
             "claude": (plugin_dir / ".claude-plugin" / "plugin.json").exists(),

@@ -172,6 +172,14 @@ repos:
         files: ^plugins/.*/\.claude-plugin/plugin\.json$
         always_run: false
 
+      - id: check-harness-compatibility-inputs
+        name: Check harness compatibility inputs
+        entry: uv run --script scripts/generate_harness_compatibility.py --check
+        language: system
+        stages: [pre-commit]
+        pass_filenames: false
+        files: ^(harness_compatibility_verification\.json|scripts/generate_harness_compatibility\.py|plugins/)
+
       - id: skilllint
         name: Validate and fix plugins, skills, agents, commands
         # Keep the caller's import path from shadowing skilllint's isolated environment.

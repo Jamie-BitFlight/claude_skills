@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "generate_harness_compatibility.py"
+BOUNDED_RUNNER_PATH = ROOT / "scripts" / "run_bounded.py"
 
 
 def create_minimal_repo(tmp_path: Path) -> Path:
@@ -39,7 +41,18 @@ def create_minimal_repo(tmp_path: Path) -> Path:
 def run_generator(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the documented self-contained generator command in the clean fixture."""
     return subprocess.run(
-        ["uv", "run", "--script", "scripts/generate_harness_compatibility.py", *args],
+        [
+            sys.executable,
+            str(BOUNDED_RUNNER_PATH),
+            "--timeout-seconds",
+            "30",
+            "--",
+            "uv",
+            "run",
+            "--script",
+            "scripts/generate_harness_compatibility.py",
+            *args,
+        ],
         cwd=tmp_path,
         check=False,
         capture_output=True,
@@ -103,6 +116,19 @@ def test_invalid_verification_status_is_rejected(tmp_path: Path, status: str) ->
 
     assert result.returncode != 0
     assert "Input should be 'verified'" in result.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("manifest_name", [".mcp.json", "mcp.json"])
+def test_malformed_mcp_manifest_is_rejected(tmp_path: Path, manifest_name: str) -> None:
+    """Malformed tracked MCP manifests must make generation fail."""
+    output = create_minimal_repo(tmp_path)
+    (tmp_path / "plugins" / "example" / manifest_name).write_text("{not json}\n", encoding="utf-8")
+
+    result = run_generator(tmp_path)
+
+    assert result.returncode != 0
+    assert f"cannot parse {manifest_name}" in result.stderr
     assert not output.exists()
 
 
