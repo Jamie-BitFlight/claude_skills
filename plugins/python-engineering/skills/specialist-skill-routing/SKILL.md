@@ -266,11 +266,9 @@ Skill(skill="python-engineering:python3-add-feature")
 
 ## Implementation & Refactoring Loop
 
-**Triggers**: implementing functions following a modernization plan, running tests iteratively until passing, executing the implementation phase of a refactor
+**Triggers**: implementing an approved modernization/refactoring plan, applying accepted quality-audit findings, running the implementation/test loop.
 
-```text
-Skill(skill="python-engineering:snakepolish")
-```
+Route implementation through `python-engineering:orchestrate` (or directly to `python-cli-architect` when already inside an orchestrated implementation phase) and use the appropriate TDD/testing path. `snakepolish` is assessment-only and must not be used as a writer.
 
 ---
 
