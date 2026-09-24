@@ -1,0 +1,41 @@
+{
+  "skill_name": "graph-engineering",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a CSV of customers and their current subscription plan. I only need lookup by customer ID and plan. Should I build a knowledge graph?",
+      "expected_output": "Rejects unnecessary graph complexity and recommends a simpler representation with reasoning tied to query shape.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Design a knowledge graph for incident response that can answer: which deploys preceded incidents, which services were affected, and which engineers contributed to those services. Facts come from Git, PagerDuty, and service ownership files and can disagree over time.",
+      "expected_output": "Uses competency questions to drive a minimal schema; distinguishes canonical identity from assertions/evidence; models temporal/provenance semantics and contradiction handling; defines end-to-end validation.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We extract company acquisitions from news. Explain how you would evaluate whether the graph is ready for production. Do not assume any target precision percentage.",
+      "expected_output": "Separates extraction, identity/fusion, graph/query/retrieval and operational evidence; derives thresholds from consequence and representative data instead of inventing universal numeric gates.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Create a task graph for: inspect three independent services, combine findings into one migration plan, have security review only auth-related changes, then deploy after my approval. One inspection may fail because its environment disappears.",
+      "expected_output": "Models node inputs/outputs, real dependencies, parallel readiness, fan-in, conditional verification, executor-loss/failure policy, merge ownership and a human gate immediately before deployment.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Teach me entity resolution for knowledge graphs. I already understand ontologies and extraction, and I want to use my customer database as the example.",
+      "expected_output": "Teaches the requested slice rather than forcing the full lifecycle; uses the user's domain, a worked example and learner application; explains blocking/matching/merge evidence and false-merge trade-offs.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "My workflow says research A, then research B, then compare them, but B does not use A. Can those first two jobs run together? Show the dependency reasoning.",
+      "expected_output": "Removes incidental ordering, runs A and B concurrently when their actual inputs permit it, and retains the compare join because it consumes both outputs.",
+      "files": []
+    }
+  ]
+}

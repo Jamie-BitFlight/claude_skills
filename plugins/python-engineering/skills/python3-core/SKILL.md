@@ -40,9 +40,10 @@ Load a skill only when the task clearly matches it.
 | uv, Hatchling, ty, pre-commit, TOML editing | `python3-tools` |
 | A documentation site with MkDocs or the Material theme | `mkdocs` |
 | A confirmed restriction blocking dependency installation — airgapped, no uv, no internet | `python3-stdlib-only` |
+| Broad Python quality/modernization audit of a PR, diff, staged/unstaged changes, file, or directory | `python-quality-audit` |
 | Broad task classification is not enough to pick from this table | `specialist-skill-routing` |
 
-Manual entrypoints: `/python-engineering:review` (code review), `/python-engineering:cleanup`
+Manual entrypoints: `/python-engineering:python-quality-audit` (fan-out quality/modernization audit), `/python-engineering:review` (bounded conventional code review), `/python-engineering:cleanup`
 (progressive quality improvement), `/python-engineering:lint` (deterministic checks),
 `/python-engineering:debug` (structured debugging).
 

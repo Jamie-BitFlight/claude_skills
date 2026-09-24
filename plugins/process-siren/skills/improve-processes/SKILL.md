@@ -1,209 +1,91 @@
 ---
 name: improve-processes
-description: Process quality methodology for the process-siren agent — use before or during Mermaid conversion when the source process shows ambiguity, missing decisions, undefined actors, vague conditions, or structural weakness. Provides triage sequence, excellence criteria, and an improvement framework drawn from Lean, Six Sigma, BPR, Design Thinking, Systems Thinking, and Theory of Constraints. Activates when source content is poorly structured enough that converting it as-is would encode wrong behavior for AI readers.
+description: Analyze and improve processes or systems using an explicit semantic model, adaptive instruction resolution, evidence-driven change, and claim-level validation. Use when reviewing process quality, resolving ambiguity or gaps, deciding how much procedural detail is necessary, or validating consequential process behavior.
 ---
 
 # Improve Processes
 
-Process-siren's job is semantic fidelity. Faithful conversion of a flawed process encodes the flaws with false precision. Use this skill when the source process needs improvement before — or alongside — Mermaid conversion.
+## Operating Principle
 
-## When to Apply
+Use this skill whenever a process/system must be analyzed or improved, or when faithful representation would otherwise encode ambiguity as authoritative behavior. Establish purpose at the current useful resolution, model only what evidence supports, investigate resolvable uncertainty, and ask the user only when continuing would create or alter intent or policy.
 
-Apply before converting when the source shows ANY of:
+### Model Quality Checks
 
-- Abstract verbs with no concrete action ("handle", "manage", "ensure")
-- Conditions that cannot be evaluated by an AI agent ("when appropriate", "if needed")
-- Missing entry or exit conditions
-- Undefined actors ("we", "the system", "someone")
-- Steps that do not change state (pure description, no action)
-- No feedback loop or error path
+During MODEL and CHALLENGE, verify the relevant ProcessModel has:
 
-## Frameworks (Reference Only)
+- observable desired outcomes and terminal states;
+- explicit actors/ownership, inputs, outputs, state, transitions, resources, and constraints where applicable;
+- evaluable guards and explicitly permitted behavior, including intentional nondeterminism;
+- failure, retry, recovery, rollback, and feedback behavior where applicable;
+- assumptions and boundaries distinguished from verified facts;
+- enough auditability to reconstruct materially important execution;
+- important correctness claims expressed so they can be falsified or otherwise validated.
 
-These frameworks share one principle — a process must make its permitted behavior explicit, auditable, and actor-owned. Do not confuse explicit behavior with determinism: concurrent or distributed processes may intentionally permit multiple valid next states.
+Do not require irrelevant fields merely to complete a checklist.
 
-**Lean** (Ohno) — eliminate steps that produce no state change; apply 5 Whys to trace ambiguity to its root
+## Canonical Process Model
 
-**Six Sigma** / DMAIC (Smith) — Define outcome, Measure current state, Analyze gap, Improve, Control recurrence
-
-**BPR** (Hammer) — radical question: "If we started from scratch, what would this look like?"
-
-**Design Thinking** (IDEO/Brown) — Empathize with the agent executing the process; design for their decision points
-
-**Systems Thinking** (Senge) — identify feedback loops and side effects before encoding structure
-
-**Theory of Constraints** (Goldratt) — find the bottleneck step; simplify around it before adding branches
-
-**Antifragility** (Taleb) — prefer processes that improve under stress over processes that merely tolerate it
-
-## Excellence Checklist
-
-Before converting, verify the source process satisfies:
-
-- [ ] Clarity — no interpretive gaps; every term has one meaning
-- [ ] Explicit behavior — permitted outcomes and transitions are defined; require determinism only where the process contract requires one outcome
-- [ ] Minimal cognitive load — relies on structure, not memory
-- [ ] Explicit feedback loops — error paths and retry conditions stated
-- [ ] Measurable outcomes — each terminal state has an observable signal
-- [ ] Visible constraints — blockers and preconditions named, not implied
-- [ ] Ownership — every step names the actor
-- [ ] Edge case coverage — at least one failure scenario is handled
-- [ ] Teachable in 5 minutes — a novice can follow it cold
-- [ ] Auditable — execution can be traced and verified after the fact
-
-## Pre-Conversion Completeness Gate
-
-After reading the process-under-review and all linked or referencing files, evaluate this gate before any Mermaid conversion begins.
-
-**Question:** Are all branches, conditions, and terminal states derivable from what has been read — with no unbound unknowns?
-
-```mermaid
-flowchart TD
-    Read["Read process-under-review<br>and all linked/referencing files"] --> Inventory["Inventory all steps, conditions,<br>branches, and terminal states<br>found in the source material"]
-    Inventory --> Gate{"Are all branches, conditions,<br>and terminal states derivable<br>from the source — with no<br>unbound unknowns?"}
-    Gate -->|"Yes — all structure is derivable"| Triage["Proceed to Triage Protocol<br>then Mermaid conversion"]
-    Gate -->|"No — unknowns remain"| Coach["Enter coach-mode<br>Stop conversion entirely"]
-    Coach --> Report["Produce BLOCKED report<br>(see Coach-Mode Report Format below)"]
-    Report --> Done(["Return report to process author<br>Await answers before any conversion"])
-```
-
-### Why This Gate Exists
-
-Converting an incomplete process produces a diagram that looks authoritative but encodes ambiguity as if it were resolved. An AI agent reading that diagram will follow the false structure and behave incorrectly. Coach-mode surfaces the incompleteness instead of hiding it.
-
-### Coach-Mode Report Format
-
-When the gate returns NO, produce this report — do not produce any Mermaid:
+Use one lightweight semantic model as the handoff between understanding, improvement, validation, and representation. Populate only fields relevant at the current resolution.
 
 ```text
-CONVERSION ASSESSMENT
-
-Goal:
-- [One sentence stating what the process is intended to accomplish]
-
-Source material read:
-- [List each file or section examined, with path or reference]
-
-What is known (derivable from source):
-- [Fact 1 — cite the source section]
-- [Fact 2 — cite the source section]
-- ...
-
-What is unknown or unbound:
-- [Missing branch] | Gap: [what is undefined] | Source: [which file/section is silent on this]
-- [Ambiguous condition] | Gap: [what observable fact is missing] | Source: [which file/section]
-- [Undefined terminal state] | Gap: [what success/failure looks like] | Source: [absent from all files]
-- [Step referencing undefined thing] | Gap: [the undefined reference] | Source: [where the reference appears]
-
-Questions the process author must answer before conversion can proceed:
-
-[Category — e.g., Branching Conditions]:
-- [Question 1] (needed because: [why this blocks a specific diagram node or edge])
-- [Question 2] (needed because: ...)
-
-[Category — e.g., Terminal States]:
-- [Question] (needed because: ...)
-
-Decision:
-- BLOCKED
-
-Conversion will proceed once all questions above are answered.
+ProcessModel
+  purpose; scope; resolution; parent_constraints[]
+  actors[]; states[]; actions[]; transitions[]
+    action/node may include { purpose; requires[]; guarantees[]; resolution { altitude; consequence; behavioral_variance; rationale }; expansion_ref?; validation[] }
+  inputs[]; outputs[]; resources[]
+  goals[]; invariants[]; assumptions[]; failure_modes[]
+  claims[] { claim; failure_excluded; resolution; assumptions[]; falsifier; validation_method; status; evidence[] }
+  uncertainties[] { classification; evidence; consequence }
+  boundaries[] { caller_assumptions[]; callee_guarantees[]; state_crossing_boundary[]; partial_failure_behavior; recovery_owner }
+  residual_risks[]
 ```
 
-**Report field rules:**
+Mermaid, tests, TLA+, Lean, and prose consume or project this model; do not build parallel interpretations for each representation.
 
-- "What is known" — list only facts directly readable or unambiguously derivable from the source files; cite the source for each
-- "What is unknown or unbound" — list only genuine gaps; do not list things that are merely implicit if the implication is unambiguous
-- "Questions" — one question per gap; ask only what is missing; do not ask about things already answered in the source
-- "BLOCKED" is the only valid verdict when the gate returns NO; there is no partial conversion
+### Result Contract
 
-## Triage Protocol
+Return one overall status plus per-claim status:
 
-```mermaid
-flowchart TD
-    Start(["Source process received"]) --> O{"Is the intended outcome<br>stated in one measurable sentence?"}
-    O -->|"No"| FixO["Rewrite outcome statement<br>before proceeding"]
-    O -->|"Yes"| A{"Is the actor named<br>for every step?"}
-    FixO --> A
-    A -->|"No — actor undefined"| FixA["Name actor per step;<br>ask user if ambiguous"]
-    A -->|"Yes"| B{"Do all steps change observable state?"}
-    FixA --> B
-    B -->|"No — some steps are pure description"| FixB["Remove or rewrite no-op steps<br>as concrete actions"]
-    B -->|"Yes"| C{"Are all decision conditions<br>evaluable without interpretation?"}
-    FixB --> C
-    C -->|"No — vague conditions remain"| FixC["Replace with observable facts:<br>exit code, file existence, string match"]
-    C -->|"Yes"| D{"Are entry and exit<br>conditions explicit?"}
-    FixC --> D
-    D -->|"No"| FixD["Add entry precondition<br>and exit terminal state"]
-    D -->|"Yes"| Convert(["Process is ready for Mermaid conversion"])
-    FixD --> Convert
-```
+- **READY** — usable at requested resolution; required claims have sufficient evidence.
+- **IMPROVED** — authorized corrections applied; affected claims revalidated sufficiently.
+- **BLOCKED_INTENT** — progress requires a decision that creates/alters intent or policy.
+- **UNVALIDATED** — usable model, but required claims lack necessary tooling/evidence.
+- **INVALID** — evidence shows a required claim fails and no intent-preserving correction has resolved it.
+
+Every result records evidence, assumptions, residual uncertainty, and validation boundaries.
 
 ## Process and System Improvement Loop
 
 Treat process improvement as recursive systems engineering, not diagram cleanup. At each useful resolution: establish purpose, model behavior, extract falsifiable claims, challenge them, improve defects that can be resolved without inventing intent, validate with the least-formal sufficient method, and feed failures back into improvement.
+
+### Recursion Safety
+
+Recursive analysis must descend in **system resolution**, not recursively reinvoke Process Siren on the same unchanged scope. Each descent must name a strictly narrower subsystem, boundary, claim, or unresolved dependency and inherit applicable parent goals/constraints. Track visited analysis targets by `(scope, resolution, claim/boundary)`; do not revisit an unchanged target unless new evidence or a process change invalidated prior results. Stop descending when finer resolution cannot materially change a correctness decision, when required evidence/tooling is unavailable, or when an intent-dependent decision is reached. Validation feedback returns to the nearest affected model level rather than restarting the whole analysis.
 
 ### Five Phases
 
 1. **UNDERSTAND** — establish purpose, scope, evidence, desired outcomes, constraints, and current resolution.
 2. **MODEL** — extract actors, state, actions, inputs, outputs, decisions, resources, assumptions, goals, invariants, failure paths, and terminal states.
 3. **CHALLENGE** — identify ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, missing failure handling, and unverifiable claims. Ask what observation would falsify each important claim.
-4. **IMPROVE** — correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
-5. **VALIDATE** — select the cheapest sufficient validator per claim, gather evidence, and feed counterexamples or failures back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
-
-### Authoritative Loop
-
-```mermaid
-flowchart TD
-    Start(["Process or system received"]) --> Scope["Discover relevant source material, constraints, existing behavior, and surrounding system"]
-    Scope --> Purpose{"Purpose and desired outcomes sufficiently explicit?"}
-    Purpose -->|"No"| PurposeGap["Identify missing purpose, goals, or success criteria"]
-    PurposeGap --> ResolvePurpose{"Can available evidence resolve the gap without inventing intent?"}
-    ResolvePurpose -->|"Yes"| DerivePurpose["Derive candidate purpose and record evidence"]
-    DerivePurpose --> Purpose
-    ResolvePurpose -->|"No"| AskPurpose["Explain gap and ask only questions required to continue"]
-    AskPurpose --> Blocked(["Blocked pending information"])
-    Purpose -->|"Yes"| Model["Build semantic model at current resolution"]
-    Model --> Inventory["Inventory actors, states, actions, inputs, outputs, decisions, resources, constraints, failures, and terminal states"]
-    Inventory --> Claims["Extract goals, invariants, assumptions, guarantees, safety, liveness, and other correctness claims"]
-    Claims --> Gaps["Detect ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, and unverifiable claims"]
-    Gaps --> ResolveGap{"Can gaps be resolved from established intent and evidence?"}
-    ResolveGap -->|"No"| Explain["Report known facts, gaps, consequences, and minimal questions"]
-    Explain --> Blocked
-    ResolveGap -->|"Yes"| Improve["Produce candidate improvement preserving established intent"]
-    Improve --> Reclaims["Re-extract claims from candidate"]
-    Reclaims --> Validate["Select cheapest sufficient validator for each important claim"]
-    Validate --> Kind{"Claim type?"}
-    Kind -->|"Observable execution"| Tests["Examples, executable checks, simulation, or property-based tests"]
-    Kind -->|"Structural or routing"| Mermaid["Mermaid plus semantic-fidelity checks"]
-    Kind -->|"State-space or concurrency"| TLA["TLA+ model plus TLC when tooling is available"]
-    Kind -->|"Universal proposition"| LeanProof["Lean specification plus proof when tooling is available"]
-    Kind -->|"Human or environmental"| Evidence["Inspection, measurement, experiment, or explicit user acceptance"]
-    Tests --> Result
-    Mermaid --> Result
-    TLA --> Result
-    LeanProof --> Result
-    Evidence --> Result
-    Result{"Claim supported at required confidence?"}
-    Result -->|"No"| Diagnose["Turn failure or counterexample into diagnostic evidence"]
-    Diagnose --> Root["Identify violated assumption, missing behavior, bad requirement, model defect, or implementation defect"]
-    Root --> Intent{"Would correction create or change established intent?"}
-    Intent -->|"No"| Improve
-    Intent -->|"Yes or uncertain"| Explain
-    Result -->|"Yes"| More{"Important unvalidated claims remain?"}
-    More -->|"Yes"| Validate
-    More -->|"No"| Resolution{"Would finer resolution materially expose new failure modes?"}
-    Resolution -->|"Yes"| Decompose["Decompose relevant subsystem; inherit parent goals, constraints, and invariants"]
-    Decompose --> Model
-    Resolution -->|"No"| Final["Record validated model, evidence, assumptions, residual risks, and validation boundaries"]
-    Final --> Done(["Ready for use"])
-```
+4. **IMPROVE** — before material change, declare the change contract and preserve the smallest useful baseline; then correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
+5. **VALIDATE** — test the candidate against the predeclared contract, compare relevant before/after evidence, select the cheapest sufficient validator per claim, and feed counterexamples or regressions back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
 
 ### Purpose at Any Resolution
 
 Every process or subsystem must have enough purpose to judge improvement. Do not require a fully formal goal hierarchy before useful work begins. Establish the smallest defensible purpose at the current resolution, then refine only where additional resolution can change a correctness decision.
 
 Child processes inherit applicable parent goals, constraints, and invariants. They may strengthen them but must not silently contradict them.
+
+### Evidence Provenance and Authority
+
+Keep requirement authority separate from interpretation. Label material process claims when authority matters:
+
+- **OBSERVED** — directly supported by the source process, authoritative dependency, runtime/repository evidence, or explicit user evidence;
+- **DERIVED** — reasoned from named observations; retain the basis;
+- **ASSUMED** — necessary interpretation not established by available evidence;
+- **PROPOSED** — candidate purpose, requirement, policy, or correction not yet established as intent.
+
+A derived or proposed statement does not become established intent merely because it makes the process more coherent. Only apply a correction when authoritative evidence determines it; otherwise preserve the uncertainty or request the consequential decision.
 
 ### Uncertainty Classification
 
@@ -216,7 +98,77 @@ Do not treat every unknown as blocking. Classify uncertainty:
 - **ASSUMED** — continuation requires an assumption; state it explicitly and do not present it as verified.
 - **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
-Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement.
+Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement. UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user.
+
+### Evidence-Driven Improvement
+
+Scale improvement evidence with consequence and uncertainty; do not impose a benchmark on trivial, reversible edits.
+
+Before a **material behavior change**, record a small change contract before examining the candidate result:
+
+- targeted claim/property and current failure or evidence;
+- expected improvement;
+- invariants/contracts that must remain true;
+- observable success criterion;
+- unacceptable regressions;
+- smallest useful baseline of current behavior, cost, friction, or counterexample.
+
+Then improve and validate the **delta**, not merely whether the candidate appears reasonable. Reuse comparable scenarios/evidence against before and after states where practical. For substantial redesigns, include representative success, failure, boundary, and some held-out scenarios that did not drive the change.
+
+When subjective judgment remains, independent evaluation is preferred where practical: use a fresh agent/context, and hide old/new identity during comparison when knowing which is the candidate could bias judgment. This is an optional strengthening technique, not a required harness architecture.
+
+If execution traces are available, inspect actual navigation, actions, tool use, backtracking, handoffs, omissions, and recovery — not only final prose. Measure only dimensions relevant to the improvement claim, such as correctness, elapsed work, steps, tool calls, human decisions, resource use, recovery quality, interruptions, or context/instruction load.
+
+Classify a failed or disappointing change before editing again. Useful diagnostic classes include:
+
+- **requirement** — the desired behavior/constraint is wrong, contradictory, or incomplete;
+- **knowledge/evidence** — required facts are unavailable or unsupported;
+- **decision/judgment** — the process leaves a consequential choice under-specified;
+- **process/transition** — sequencing, state transition, guard, or terminal behavior is defective;
+- **interface/contract** — caller/callee assumptions or guarantees conflict;
+- **reliability/recovery** — retries, rollback, partial failure, or recovery are inadequate;
+- **observability** — success, failure, or state cannot be determined reliably;
+- **representation** — the underlying process is sound but its instructions/diagram communicate it incorrectly;
+- **validation/model** — the validator, scenario, assumptions, or formal model do not faithfully test the intended claim.
+
+Use the diagnosis to choose the next correction; do not add generic rules in response to an unidentified failure.
+
+Rigor is proportional:
+
+- routine/reversible change → direct improvement plus proportionate check;
+- material behavior change → predeclared change contract + baseline + before/after comparison;
+- consequential, irreversible, destructive, interruptive, or security-sensitive change → higher local resolution plus appropriate independent/adversarial and claim-level validation where practical.
+
+### Altitude and Resolution Review
+
+Completeness means sufficient detail for the process contract and risk at the current resolution; it does not mean equal detail everywhere. Prefer the lowest resolution that makes each decision safe and unambiguous. Review materially important nodes during CHALLENGE before treating missing detail as a gap.
+
+For each node ask:
+
+1. What contract must it satisfy — purpose, preconditions, guarantees, and relevant invariants?
+2. What altitude/resolution is it currently expressed at?
+3. What is the consequence of incorrect inference or execution?
+4. How variable is the behavior a competent agent is likely to infer without more instruction?
+5. Should the node be compressed, retained, or locally expanded and validated?
+
+Use consequence and behavioral variance independently:
+
+- **Low consequence + low variance** — compress aggressively; a short confirmation of the common path may be enough.
+- **Low consequence + high variance** — state the preferred behavior where variance matters.
+- **High consequence + low variance** — state the contract, critical safeguards, and verification even when the procedure is familiar.
+- **High consequence + high variance** — locally expand into a precise child procedure and validate it.
+
+Treat destructive, irreversible, interruptive, security/trust-boundary, externally visible, difficult-to-recover, concurrent/resource-sensitive, credential/money-sensitive, or partial-failure-prone actions as signals that higher local resolution may be required.
+
+Expansion is local. Do not raise the resolution of surrounding routine nodes merely because one node needs detail. Parent nodes state contracts; child expansions state the higher-resolution procedure. A child inherits applicable parent goals, constraints, invariants, preconditions, and guarantees and must not silently weaken them.
+
+High risk does not mean "write more." It means choose the required resolution, make the critical behavior explicit, and validate it at that resolution. Conversely, trim detail that consumes attention without changing safe execution.
+
+#### Optional Baseline Agent Behavior Sampling
+
+When instruction-heavy or complex processes may restate behavior capable agents already infer reliably, optionally measure that baseline before retaining the instruction load. Use neutral representative scenarios and isolated responses across supported models/harnesses; consensus measures likely inference, never correctness. Compress only behavior compatible with required invariants whose inference-failure consequence is acceptable, then validate material compression against the fuller instructions using comparable and held-out scenarios. Keep the method environment-independent; adapt it to available agent, shell, SDK, or API capabilities.
+
+Load [baseline-agent-behavior-eval.md](./references/baseline-agent-behavior-eval.md) when this optional refinement is selected. It defines neutral scenario design, sampling/normalization, bias checks, repeated/cross-model variance interpretation, blind comparison, trace inspection, and compression validation.
 
 ### Claims Are the Unit of Validation
 
@@ -249,18 +201,38 @@ When TLA+ applies, extract state variables, initial conditions, actions/transiti
 
 If formal tooling is unavailable, produce a validation handoff containing those artifacts and mark the claim UNVALIDATED. Never imply that recommending TLA+ or Lean constitutes verification.
 
-### Counterexamples Drive Improvement
+Sources for these capability distinctions: TLA+ is a formal specification language for modeling concurrent/distributed system behaviors and TLC explores reachable states for invariant/temporal-property violations [1]. Lean is an interactive theorem prover/programming language whose kernel checks proof terms [2].
 
-Treat validation failures as first-class evidence. Translate a failing execution, model-checker trace, test failure, or proof failure back into process vocabulary:
+### Counterexamples and Failed Validation
 
-1. state the violated claim;
-2. show the smallest relevant execution or counterexample;
-3. identify the violated assumption or missing/incorrect behavior;
-4. distinguish process defect, requirement defect, model defect, validator mismatch, and implementation defect;
-5. propose a correction only when established intent determines it;
-6. re-enter IMPROVE, re-extract claims, and rerun affected validation.
+Treat failures as evidence. State the violated claim and smallest relevant counterexample, diagnose it using the Evidence-Driven Improvement categories, correct only when established intent determines the change, then rerun affected validation. Do not modify a process merely to satisfy a bad model or validator.
 
-Do not modify a process merely to satisfy a bad model. Diagnose the source of the mismatch first.
+### System Boundary Pass
+
+For every material boundary inspect who calls it, what it calls, state crossing the boundary, caller assumptions, callee guarantees, partial-failure behavior, and recovery ownership. Cross-boundary contradictions are gaps even when each local process is internally coherent.
+
+### Semantic Conservation for Material Rewrites
+
+Goal attainment does not prove that every valuable original behavior survived. Before a material rewrite, inventory independently meaningful original actions/orderings, decision rules, constraints, reasoning principles, routing behavior, validation/completion conditions, and domain or maintenance invariants that could be affected.
+
+After the candidate exists, account for each changed or removed meaning as:
+
+- **PRESERVED** — equivalent behavior remains;
+- **RELOCATED** — equivalent behavior remains at another reachable appropriate location;
+- **AUTOMATED** — deterministic machinery now carries it;
+- **PROVEN-REDUNDANT** — evidence shows removal does not change required execution/maintenance;
+- **UNCERTAIN** — equivalence or safe removal lacks evidence;
+- **LOST** — no valid carrier or redundancy evidence remains.
+
+Reject a material improvement with a required `LOST` meaning. A behavior-affecting `UNCERTAIN` removal remains unresolved rather than being justified by high-level goal alignment.
+
+### Evidence Trade-offs
+
+Keep hard correctness/contract evidence, qualitative judgments, and efficiency telemetry separate. Do not average unlike evidence into one quality score. Lower cost, fewer instructions, or better readability cannot compensate for violation of a required invariant; report mixed trade-offs directly.
+
+### Change-Impact Validation
+
+After improvement, map changed actors, states, actions, transitions, resources, assumptions, and contracts to dependent claims. Revalidate affected claims/interfaces. Do not rerun unrelated validation without reason or assume prior evidence applies to a changed dependency.
 
 ### Authority Boundary
 
@@ -268,33 +240,10 @@ Improve directly only when the correction follows from established purpose, goal
 
 ### Completion Record
 
-An improved process/system is ready only when its required claims have sufficient evidence or unresolved uncertainty is explicitly surfaced. Record:
+Finish only when required claims have sufficient evidence or remaining uncertainty is explicit. Return the Result Contract status plus purpose/scope, material ProcessModel elements, claim → validator → evidence mapping, addressed counterexamples, assumptions, residual risks, validation boundaries, and any useful representations. Mermaid is a projection of the model, not the model itself.
 
-- purpose and scope at the validated resolution;
-- semantic model: actors, states, actions, decisions, resources, constraints, and failure paths;
-- correctness model: claims, invariants, safety/liveness properties, and assumptions;
-- claim → validator → evidence mapping;
-- counterexamples addressed;
-- residual uncertainty and unvalidated claims;
-- environmental dependencies and validation boundaries;
-- useful representations such as Mermaid, tests, TLA+, Lean, or explanatory documentation.
+## References
 
-Mermaid is one projection of this semantic model, not the semantic model itself.
+[1] [TLA+ Documentation](https://lamport.azurewebsites.net/tla/tla.html) (accessed 2026-09-24)
 
-## Practical Improvement Framework
-
-Apply in sequence when rebuilding a weak process:
-
-```mermaid
-flowchart TD
-    S1["1. Rewrite outcome as one measurable sentence"] --> S2
-    S2["2. Replace abstract verbs with concrete actions"] --> S3
-    S3["3. Add decision gates — If X, then Y"] --> S4
-    S4["4. Define inputs and outputs for each step"] --> S5
-    S5["5. Remove steps that do not change state"] --> S6
-    S6["6. Add at least one correct execution example"] --> S7
-    S7["7. Add at least one failure example"] --> S8
-    S8["8. Stress-test: what happens at each edge case?"] --> S9
-    S9["9. Time the walkthrough — can a novice follow in 5 minutes?"] --> S10
-    S10["10. Confirm auditable — can execution be traced after the fact?"] --> Done(["Improved process ready"])
-```
+[2] [Lean Documentation](https://lean-lang.org/documentation/) (accessed 2026-09-24)

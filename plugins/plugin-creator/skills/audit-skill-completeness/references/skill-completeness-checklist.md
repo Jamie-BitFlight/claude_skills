@@ -261,7 +261,7 @@ Not warranted when: the skill produces instructional or behavioral output with n
 ## 8. Assets — Does the skill bundle reusable output resources?
 
 - [ ] Does the skill include templates, fonts, images, or boilerplate that the AI uses in its output?
-- [ ] Are assets files the AI uses (not reads into context)?
+- [ ] Are assets output resources that are not eagerly loaded but remain readable on demand?
 
 **Observed examples from Anthropic skills:**
 
@@ -358,11 +358,11 @@ _This section is populated by team research. Each entry includes the skill where
 
 - **Degrees of freedom as a design parameter**: The skill-creator skill (`SKILL.md` lines 37-46) explicitly teaches the concept of calibrating instruction specificity to task fragility: "High freedom" for text-based instructions when multiple approaches are valid, "Medium freedom" for pseudocode when a preferred pattern exists, "Low freedom" for specific scripts when operations are fragile. This is a meta-pattern about skill design itself — it changes how the AI writes future skills by giving it a framework for deciding how much latitude to leave.
 
-- **Progressive disclosure with explicit loading levels**: The skill-creator skill (`SKILL.md` lines 115-122) defines a three-level loading system: Level 1 is metadata (name + description, ~100 words, always in context), Level 2 is the SKILL.md body (<5k words, loaded when triggered), Level 3 is bundled resources (unlimited, loaded on demand). This architecture directly reduces context window pressure and is a structural design principle that affects every skill's construction.
+- **Progressive disclosure with explicit loading levels**: catalog metadata costs about 50-100 tokens per skill, the activated SKILL.md should stay below 5000 tokens, and supporting scripts/references/assets are read on demand. The portable specification does not require clients to enumerate resources automatically.
 
 - **Scaffolding scripts that enforce structural conventions**: The skill-creator ships `scripts/init_skill.py` which generates a new skill directory with a SKILL.md template containing TODO placeholders, example resource directories, and guidance about structural patterns (workflow-based, task-based, reference/guidelines, capabilities-based). The template itself (lines 18-103 of `init_skill.py`) teaches the AI about skill structure options. This ensures every new skill starts from a consistent, validated baseline rather than being created ad-hoc.
 
-- **Validate-before-package gate**: The skill-creator's `scripts/package_skill.py` calls `validate_skill()` from `quick_validate.py` before creating the .skill archive. If validation fails, packaging is blocked. The validator checks: YAML frontmatter format, required fields (name, description), naming conventions (kebab-case), description constraints (no angle brackets, max 1024 chars), and rejects unexpected frontmatter keys. This is a hard gate that prevents malformed skills from being distributed.
+- **Validate-before-package gate**: The skill-creator's `scripts/package_skill.py` calls `validate_skill()` from `quick_validate.py` before creating a ZIP with the local `.skill` extension convention. The extension is not part of the portable Agent Skills standard. If validation fails, packaging is blocked. The validator checks YAML frontmatter format, required fields (`name`, `description`), portable naming and length constraints, directory-name equality, optional field types, and the portable fields listed in the Agent Skills specification. It enforces `allowed-tools` as a non-empty string of space-separated tool tokens because `skills-ref` does not currently type-check or delimiter-check the field.
 
 - **Reconnaissance-then-action pattern for dynamic environments**: The webapp-testing skill (`SKILL.md` lines 65-81) defines a specific pattern: first navigate and wait for networkidle, then take screenshot or inspect DOM, then identify selectors from rendered state, then execute actions with discovered selectors. This is an explicit directive to observe before acting in environments where the state is not known ahead of time. The decision tree at lines 18-33 further routes the AI based on whether the target is static HTML, a dynamic app with no running server, or a dynamic app with a running server.
 

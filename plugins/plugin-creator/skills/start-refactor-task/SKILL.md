@@ -5,7 +5,7 @@ argument-hint: <task-file-path> [--task <task-id>] [--complete <task-id>]
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 # Start Refactor Task
@@ -205,7 +205,7 @@ Before implementing:
 ```
 # Good: Verify format before writing
 READ ./plugins/example-plugin/skills/example/SKILL.md  # Check actual format
-Skill(skill="plugin-creator:claude-skills-overview-2026")  # Load format reference
+/plugin-creator:claude-skills-overview-2026  # Load format reference
 ```
 
 ### Quality Standards

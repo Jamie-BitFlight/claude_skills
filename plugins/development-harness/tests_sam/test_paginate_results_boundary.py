@@ -1,11 +1,11 @@
-"""Boundary tests for _paginate_results — pagination algorithm pinning.
+"""Boundary tests for paginate_results — pagination algorithm pinning.
 
 Pins the O(N) binary-search pagination against token-straddling data so that
 regressions in the algorithm (off-by-one in bisect direction, dropped
 forced-minimum-of-1 guard, incorrect serialization) are immediately visible.
 
 Context:
-    _paginate_results was refactored from O(N²) re-serialization to O(N)
+    paginate_results was refactored from O(N²) re-serialization to O(N)
     binary search at commit d7175a17.  The existing test suite exercises
     happy-path pagination but does not construct data that straddles the
     token budget.  Any regression in the binary search (e.g. switching
@@ -13,7 +13,7 @@ Context:
     would be invisible without these tests.
 
 Token counting implementation (from server.py):
-    len(_enc.encode(json.dumps(page_items[:k]))) — tiktoken cl100k_base,
+    len(enc.encode(json.dumps(page_items[:k]))) — tiktoken cl100k_base,
     standard json.dumps separators (key insertion order preserved).  Tests
     use the same encoder to compute calibration values so they remain correct
     if the encoder changes; _assert_calibration() enforces this at collection
@@ -32,14 +32,10 @@ import json
 from typing import Any
 
 from hypothesis import given, settings, strategies as st
-from progressive_markdown.list_navigator import (
-    ENCODING as _enc,
-    TOKEN_BUDGET as _TOKEN_BUDGET,
-    paginate_results as _paginate_results,
-)
+from progressive_markdown.list_navigator import ENCODING as enc, TOKEN_BUDGET, paginate_results
 
 # ---------------------------------------------------------------------------
-# Calibrated constants — derived dynamically from _TOKEN_BUDGET
+# Calibrated constants — derived dynamically from TOKEN_BUDGET
 #
 # TOKEN_BUDGET is environment-sensitive (MAX_MCP_OUTPUT_TOKENS env var).
 # Body sizes are computed via binary search so the invariants hold regardless
@@ -54,7 +50,7 @@ def _find_oversized_body(budget: int) -> int:
     while lo < hi:
         mid = (lo + hi) // 2
         item = {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * mid}
-        if len(_enc.encode(json.dumps([item]))) < budget + 1:
+        if len(enc.encode(json.dumps([item]))) < budget + 1:
             lo = mid + 1
         else:
             hi = mid
@@ -73,7 +69,7 @@ def _find_normal_body(budget: int, cut_k: int, oversized: int) -> int:
             {"id": f"T{i:02d}", "title": f"Task {i}", "status": "not-started", "body": "x" * body_chars}
             for i in range(1, k + 1)
         ]
-        return len(_enc.encode(json.dumps(items)))
+        return len(enc.encode(json.dumps(items)))
 
     # Binary search: find largest body_chars where _tc(body_chars, cut_k) <= budget
     lo, hi = 1, oversized - 1
@@ -95,7 +91,7 @@ def _find_item2_exact_body(budget: int, body_item1: int) -> int:
             {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * body_item1},
             {"id": "T02", "title": "Task 2", "status": "not-started", "body": "x" * body2},
         ]
-        return len(_enc.encode(json.dumps(items)))
+        return len(enc.encode(json.dumps(items)))
 
     while lo < hi:
         mid = (lo + hi) // 2
@@ -108,10 +104,10 @@ def _find_item2_exact_body(budget: int, body_item1: int) -> int:
 
 # Compute all calibration constants once at module load.
 _CUT_POINT_K: int = 15
-_BODY_OVERSIZED: int = _find_oversized_body(_TOKEN_BUDGET)
-_BODY_NORMAL: int = _find_normal_body(_TOKEN_BUDGET, _CUT_POINT_K, _BODY_OVERSIZED)
+_BODY_OVERSIZED: int = _find_oversized_body(TOKEN_BUDGET)
+_BODY_NORMAL: int = _find_normal_body(TOKEN_BUDGET, _CUT_POINT_K, _BODY_OVERSIZED)
 _BODY_ITEM1_EXACT: int = max(1, _BODY_OVERSIZED // 40)
-_BODY_ITEM2_EXACT: int = _find_item2_exact_body(_TOKEN_BUDGET, _BODY_ITEM1_EXACT)
+_BODY_ITEM2_EXACT: int = _find_item2_exact_body(TOKEN_BUDGET, _BODY_ITEM1_EXACT)
 _BODY_ITEM3_EXTRA: int = 100
 
 # Token count constants — derived from the body sizes above.
@@ -119,13 +115,13 @@ _items_for_cut = [
     {"id": f"T{i:02d}", "title": f"Task {i}", "status": "not-started", "body": "x" * _BODY_NORMAL}
     for i in range(1, _CUT_POINT_K + 2)
 ]
-_T_AT_CUT: int = len(_enc.encode(json.dumps(_items_for_cut[:_CUT_POINT_K])))
-_T_PAST_CUT: int = len(_enc.encode(json.dumps(_items_for_cut[: _CUT_POINT_K + 1])))
+_T_AT_CUT: int = len(enc.encode(json.dumps(_items_for_cut[:_CUT_POINT_K])))
+_T_PAST_CUT: int = len(enc.encode(json.dumps(_items_for_cut[: _CUT_POINT_K + 1])))
 _exact_items_for_cal = [
     {"id": "T01", "title": "Task 1", "status": "not-started", "body": "x" * _BODY_ITEM1_EXACT},
     {"id": "T02", "title": "Task 2", "status": "not-started", "body": "x" * _BODY_ITEM2_EXACT},
 ]
-_T_PREFIX2_EXACT: int = len(_enc.encode(json.dumps(_exact_items_for_cal)))
+_T_PREFIX2_EXACT: int = len(enc.encode(json.dumps(_exact_items_for_cal)))
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +145,7 @@ def _make_item(n: int, body_chars: int) -> dict[str, Any]:
 def _token_count_prefix(items: list[dict[str, Any]], k: int) -> int:
     """Return the token count of json.dumps(items[:k]) under cl100k_base.
 
-    This mirrors the exact expression used by _paginate_results so that
+    This mirrors the exact expression used by paginate_results so that
     calibration values in this module are computed by the same function,
     not by a separate approximation.
 
@@ -160,7 +156,7 @@ def _token_count_prefix(items: list[dict[str, Any]], k: int) -> int:
     Returns:
         Token count as an integer.
     """
-    return len(_enc.encode(json.dumps(items[:k])))
+    return len(enc.encode(json.dumps(items[:k])))
 
 
 # ---------------------------------------------------------------------------
@@ -180,17 +176,17 @@ def _assert_calibration() -> None:
     """
     items_normal = [_make_item(i, _BODY_NORMAL) for i in range(1, 21)]
     # Cut-point invariant: CUT_POINT_K items fit, CUT_POINT_K+1 do not.
-    assert _token_count_prefix(items_normal, _CUT_POINT_K) <= _TOKEN_BUDGET, (
-        f"Calibration failure: {_CUT_POINT_K} x body={_BODY_NORMAL} → {_T_AT_CUT} tokens, expected ≤ {_TOKEN_BUDGET}"
+    assert _token_count_prefix(items_normal, _CUT_POINT_K) <= TOKEN_BUDGET, (
+        f"Calibration failure: {_CUT_POINT_K} x body={_BODY_NORMAL} → {_T_AT_CUT} tokens, expected ≤ {TOKEN_BUDGET}"
     )
-    assert _token_count_prefix(items_normal, _CUT_POINT_K + 1) > _TOKEN_BUDGET, (
+    assert _token_count_prefix(items_normal, _CUT_POINT_K + 1) > TOKEN_BUDGET, (
         f"Calibration failure: {_CUT_POINT_K + 1} x body={_BODY_NORMAL} → {_T_PAST_CUT} tokens, "
-        f"expected > {_TOKEN_BUDGET}"
+        f"expected > {TOKEN_BUDGET}"
     )
     # Oversized invariant: single item exceeds budget by exactly 1 token.
     actual_oversized = _token_count_prefix([_make_item(1, _BODY_OVERSIZED)], 1)
-    assert actual_oversized == _TOKEN_BUDGET + 1, (
-        f"Calibration failure: body={_BODY_OVERSIZED} produces {actual_oversized} tokens, expected {_TOKEN_BUDGET + 1}"
+    assert actual_oversized == TOKEN_BUDGET + 1, (
+        f"Calibration failure: body={_BODY_OVERSIZED} produces {actual_oversized} tokens, expected {TOKEN_BUDGET + 1}"
     )
     # 2-item discriminating dataset: 2-item prefix at budget, 3-item prefix exceeds it.
     exact_items = [_make_item(1, _BODY_ITEM1_EXACT), _make_item(2, _BODY_ITEM2_EXACT), _make_item(3, _BODY_ITEM3_EXTRA)]
@@ -198,7 +194,7 @@ def _assert_calibration() -> None:
         f"Calibration failure: 2-item prefix → {_token_count_prefix(exact_items, 2)} tokens, "
         f"expected {_T_PREFIX2_EXACT}"
     )
-    assert _token_count_prefix(exact_items, 3) > _TOKEN_BUDGET, (
+    assert _token_count_prefix(exact_items, 3) > TOKEN_BUDGET, (
         "Calibration failure: 3-item prefix should exceed budget (item 3 excluded)"
     )
 
@@ -207,14 +203,14 @@ _assert_calibration()
 
 
 # ---------------------------------------------------------------------------
-# Helper — call _paginate_results with test defaults
+# Helper — call paginate_results with test defaults
 # ---------------------------------------------------------------------------
 
 
 def _paginate(
     all_items: list[dict[str, Any]], *, offset: int = 0, limit: int | None = None, tool_name: str = "test_tool"
 ) -> dict[str, Any]:
-    """Thin wrapper around _paginate_results with empty message lists.
+    """Thin wrapper around paginate_results with empty message lists.
 
     Args:
         all_items: Full list of items to paginate.
@@ -223,9 +219,9 @@ def _paginate(
         tool_name: Name used in ``next_call`` template string.
 
     Returns:
-        Full response dict from _paginate_results.
+        Full response dict from paginate_results.
     """
-    return _paginate_results(
+    return paginate_results(
         all_items, offset=offset, limit=limit, messages=[], warnings=[], errors=[], tool_name=tool_name
     )
 
@@ -242,8 +238,8 @@ class TestTokenStraddlingCutPoint:
         """Return exactly _CUT_POINT_K items when 20 items straddle the token budget.
 
         Calibration:
-            body=_BODY_NORMAL → token_count([:_CUT_POINT_K])     = _T_AT_CUT  ≤ _TOKEN_BUDGET (fits)
-                                  token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > _TOKEN_BUDGET (excluded)
+            body=_BODY_NORMAL → token_count([:_CUT_POINT_K])     = _T_AT_CUT  ≤ TOKEN_BUDGET (fits)
+                                  token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > TOKEN_BUDGET (excluded)
         The binary search must converge to effective_limit = _CUT_POINT_K, not
         _CUT_POINT_K - 1 or _CUT_POINT_K + 1.
         A bisect_left / bisect_right inversion would produce the wrong value.
@@ -259,7 +255,7 @@ class TestTokenStraddlingCutPoint:
         assert pagination["limit"] == _CUT_POINT_K, (
             f"Expected effective_limit={_CUT_POINT_K} but got {pagination['limit']}; "
             f"token_count([:{_CUT_POINT_K}])={_T_AT_CUT}, "
-            f"token_count([:{_CUT_POINT_K + 1}])={_T_PAST_CUT}, budget={_TOKEN_BUDGET}"
+            f"token_count([:{_CUT_POINT_K + 1}])={_T_PAST_CUT}, budget={TOKEN_BUDGET}"
         )
         assert result["count"] == _CUT_POINT_K
         assert pagination["has_more"] is True
@@ -315,14 +311,14 @@ class TestForcedMinimumOfOne:
         """A single item exceeding the token budget returns effective_limit=1.
 
         Calibration:
-            body=_BODY_OVERSIZED → token_count([:1]) = _TOKEN_BUDGET + 1 (exceeds)
+            body=_BODY_OVERSIZED → token_count([:1]) = TOKEN_BUDGET + 1 (exceeds)
         The function must still return 1 item — the budget cannot reduce the
         page below the minimum of 1.  The lo=1 floor in the binary search
         invariant ensures this.
         """
         # Arrange
         oversized = [_make_item(1, _BODY_OVERSIZED)]
-        assert _token_count_prefix(oversized, 1) > _TOKEN_BUDGET, "Precondition: item must exceed budget"
+        assert _token_count_prefix(oversized, 1) > TOKEN_BUDGET, "Precondition: item must exceed budget"
 
         # Act
         result = _paginate(oversized)
@@ -363,7 +359,7 @@ class TestExactBudgetBoundary:
 
     This class uses a 2-item dataset so the binary search comparison body actually
     executes (lo=1 < hi=2 is True).  A single-item dataset is dominated by the
-    lo=1 floor and never evaluates the ``<= _TOKEN_BUDGET`` expression, making it
+    lo=1 floor and never evaluates the ``<= TOKEN_BUDGET`` expression, making it
     indistinguishable from the forced-minimum-of-1 guard.
     """
 
@@ -372,29 +368,29 @@ class TestExactBudgetBoundary:
 
         Calibration:
             item1 body=_BODY_ITEM1_EXACT, item2 body=_BODY_ITEM2_EXACT:
-            token_count([:2]) = _TOKEN_BUDGET (inclusive boundary, fits by ≤)
-            token_count([:3]) > _TOKEN_BUDGET (item 3 excluded)
+            token_count([:2]) = TOKEN_BUDGET (inclusive boundary, fits by ≤)
+            token_count([:3]) > TOKEN_BUDGET (item 3 excluded)
 
-        The binary search evaluates ``len(_enc.encode(json.dumps(page_items[:mid]))) <=
-        _TOKEN_BUDGET`` with mid=2, so this test discriminates ``<=`` from ``<``.
+        The binary search evaluates ``len(enc.encode(json.dumps(page_items[:mid]))) <=
+        TOKEN_BUDGET`` with mid=2, so this test discriminates ``<=`` from ``<``.
         Under a strict ``<`` operator:
-            _TOKEN_BUDGET < _TOKEN_BUDGET → False → hi = mid - 1 = 1 → effective_limit = 1 (wrong)
+            TOKEN_BUDGET < TOKEN_BUDGET → False → hi = mid - 1 = 1 → effective_limit = 1 (wrong)
         Under the correct ``<=`` operator:
-            _TOKEN_BUDGET <= _TOKEN_BUDGET → True → lo = mid = 2 → effective_limit = 2 (correct)
+            TOKEN_BUDGET <= TOKEN_BUDGET → True → lo = mid = 2 → effective_limit = 2 (correct)
         """
         # Arrange
         items = [_make_item(1, _BODY_ITEM1_EXACT), _make_item(2, _BODY_ITEM2_EXACT), _make_item(3, _BODY_ITEM3_EXTRA)]
-        assert _token_count_prefix(items, 2) == _TOKEN_BUDGET, (
+        assert _token_count_prefix(items, 2) == TOKEN_BUDGET, (
             "Precondition: 2-item prefix must equal the token budget exactly"
         )
-        assert _token_count_prefix(items, 3) > _TOKEN_BUDGET, "Precondition: 3-item prefix must exceed the budget"
+        assert _token_count_prefix(items, 3) > TOKEN_BUDGET, "Precondition: 3-item prefix must exceed the budget"
 
         # Act
         result = _paginate(items)
 
         # Assert
         assert result["pagination"]["limit"] == 2, (
-            f"Inclusive boundary failed: 2-item prefix at exactly {_TOKEN_BUDGET} tokens "
+            f"Inclusive boundary failed: 2-item prefix at exactly {TOKEN_BUDGET} tokens "
             f"should produce effective_limit=2, but got {result['pagination']['limit']}. "
             f"A strict '<' operator would produce effective_limit=1."
         )
@@ -419,7 +415,7 @@ class TestOffByOneRegression:
         """The last item that fits within the token budget is present in the result.
 
         With 20 items of body=_BODY_NORMAL, item _CUT_POINT_K is the last that fits:
-            token_count([:_CUT_POINT_K]) = _T_AT_CUT ≤ _TOKEN_BUDGET
+            token_count([:_CUT_POINT_K]) = _T_AT_CUT ≤ TOKEN_BUDGET
         It must appear in result['items'].
         """
         # Arrange
@@ -441,7 +437,7 @@ class TestOffByOneRegression:
 
         With 20 items of body=_BODY_NORMAL, item _CUT_POINT_K + 1 is the first that
         exceeds the budget:
-            token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > _TOKEN_BUDGET
+            token_count([:_CUT_POINT_K + 1]) = _T_PAST_CUT > TOKEN_BUDGET
         It must NOT appear in result['items'].
         """
         # Arrange
@@ -513,7 +509,7 @@ class TestOffsetBehavior:
     def test_explicit_limit_bypasses_token_budget(self) -> None:
         """An explicit limit parameter bypasses the token budget binary search.
 
-        When limit is provided, _paginate_results uses it directly without
+        When limit is provided, paginate_results uses it directly without
         consulting the token budget.  This test confirms the bypass path
         is not affected by the binary search refactor.
         """
@@ -591,7 +587,7 @@ class TestResponseStructureInvariants:
     def test_messages_warnings_errors_propagated(self) -> None:
         """Messages, warnings, and errors from the caller are echoed verbatim.
 
-        _paginate_results does not modify the lists — it injects them as-is.
+        paginate_results does not modify the lists — it injects them as-is.
         """
         # Arrange
         items = [_make_item(i, 10) for i in range(1, 4)]
@@ -600,7 +596,7 @@ class TestResponseStructureInvariants:
         errs = ["error: task missing"]
 
         # Act
-        result = _paginate_results(
+        result = paginate_results(
             items, offset=0, limit=None, messages=msgs, warnings=warns, errors=errs, tool_name="test_tool"
         )
 
@@ -651,15 +647,15 @@ def test_hypothesis_budget_invariant(item_sizes: list[int]) -> None:
     if effective_limit > 1:
         returned_slice = result["items"]
         token_count = _token_count_prefix(returned_slice, len(returned_slice))
-        assert token_count <= _TOKEN_BUDGET, (
-            f"Budget exceeded: token_count={token_count} > budget={_TOKEN_BUDGET} for effective_limit={effective_limit}"
+        assert token_count <= TOKEN_BUDGET, (
+            f"Budget exceeded: token_count={token_count} > budget={TOKEN_BUDGET} for effective_limit={effective_limit}"
         )
 
     # Maximality guard: if there are more items, the next item must have pushed over budget
     if effective_limit < len(items):
         next_count = _token_count_prefix(items, effective_limit + 1)
-        assert next_count > _TOKEN_BUDGET, (
+        assert next_count > TOKEN_BUDGET, (
             f"Cut-point is not maximal: adding item {effective_limit + 1} produces "
-            f"{next_count} tokens which is still within budget={_TOKEN_BUDGET}. "
+            f"{next_count} tokens which is still within budget={TOKEN_BUDGET}. "
             f"The binary search converged too early at effective_limit={effective_limit}."
         )

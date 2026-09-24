@@ -10,7 +10,7 @@ Enforces three contracts across every backend registered in
 3. All concrete backends expose ``supports_batch_status_fetch: bool`` and
    ``issue_id_type: Literal["integer", "string"]`` with the correct types.
 
-Parametrization is driven by ``_bp._VALID_BACKENDS`` — the factory's own
+Parametrization is driven by ``bp._VALID_BACKENDS`` — the factory's own
 source of truth — so any backend added to that tuple is automatically
 enrolled in these contracts without any change to this file.
 
@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import backlog_core.backend_protocol as _bp
+import backlog_core.backend_protocol as bp
 import pytest
 from backlog_core.backend_protocol import create_backend, require_branch_support, require_github_extras
 from backlog_core.backends.sqlite_backend import SQLiteBackend
@@ -68,7 +68,7 @@ def _patch_gh_client_batch_fetch(mocker: MockerFixture) -> None:
 class TestBacklogBackendCapabilityContract:
     """Parametrized contract suite for BacklogBackend capability properties.
 
-    Every backend in ``_bp._VALID_BACKENDS`` is constructed via
+    Every backend in ``bp._VALID_BACKENDS`` is constructed via
     ``create_backend(name)`` and exercised against three contracts.
     Future backends added to that tuple are enrolled automatically.
     """
@@ -77,7 +77,7 @@ class TestBacklogBackendCapabilityContract:
     # Contract 3 — property types
     # ------------------------------------------------------------------
 
-    @pytest.mark.parametrize("name", _bp._VALID_BACKENDS)
+    @pytest.mark.parametrize("name", bp._VALID_BACKENDS)
     def test_supports_batch_status_fetch_is_bool(self, name: str) -> None:
         """``supports_batch_status_fetch`` must be a ``bool`` on every backend.
 
@@ -93,7 +93,7 @@ class TestBacklogBackendCapabilityContract:
             f"{type(backend.supports_batch_status_fetch).__name__!r}, expected bool"
         )
 
-    @pytest.mark.parametrize("name", _bp._VALID_BACKENDS)
+    @pytest.mark.parametrize("name", bp._VALID_BACKENDS)
     def test_issue_id_type_is_valid_literal(self, name: str) -> None:
         """``issue_id_type`` must be exactly ``"integer"`` or ``"string"`` on every backend.
 
@@ -113,7 +113,7 @@ class TestBacklogBackendCapabilityContract:
     # Contract 1 — False flag MUST raise NotImplementedError
     # ------------------------------------------------------------------
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_false_flag_raises_not_implemented(self, name: str) -> None:
         """Backends declaring ``supports_batch_status_fetch == False`` MUST raise.
 
@@ -137,7 +137,7 @@ class TestBacklogBackendCapabilityContract:
     # Contract 2 — True flag MUST NOT raise NotImplementedError
     # ------------------------------------------------------------------
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_true_flag_does_not_raise_not_implemented(self, name: str) -> None:
         """Backends declaring ``supports_batch_status_fetch == True`` MUST NOT raise NotImplementedError.
 
@@ -175,7 +175,7 @@ class TestBacklogBackendCapabilityContract:
     # Contract cohesion — flag and behaviour must agree
     # ------------------------------------------------------------------
 
-    @pytest.mark.parametrize("name", _bp._VALID_BACKENDS)
+    @pytest.mark.parametrize("name", bp._VALID_BACKENDS)
     def test_flag_and_behaviour_are_consistent(self, name: str) -> None:
         """The declared flag and actual ``batch_fetch_statuses`` behaviour must agree.
 
@@ -236,7 +236,7 @@ class TestGitHubExtrasCapabilityContract:
     pair above, for the ``GitHubExtras`` capability gate
     (``require_github_extras``, re-exported from ``backend_protocol.py``)
     instead of ``supports_batch_status_fetch``. Every backend in
-    ``_bp._VALID_BACKENDS`` is enrolled automatically.
+    ``bp._VALID_BACKENDS`` is enrolled automatically.
 
     Unlike ``supports_batch_status_fetch``, the ``GitHubExtras`` gate is not
     self-checked inside the backend's own ``get_github()`` — it is enforced by
@@ -247,7 +247,7 @@ class TestGitHubExtrasCapabilityContract:
     than the backend method directly.
     """
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_false_flag_raises_unsupported_capability(self, name: str) -> None:
         """Backends declaring ``supports_github_extras == False`` MUST raise.
 
@@ -268,7 +268,7 @@ class TestGitHubExtrasCapabilityContract:
         finally:
             _close_if_sqlite(backend)
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
         """Backends declaring ``supports_github_extras == True`` MUST NOT raise it.
 
@@ -297,7 +297,7 @@ class TestGitHubExtrasCapabilityContract:
     def test_protocol_mismatch_flag_distinguishes_backend_bug_from_unsupported(self) -> None:
         """A True flag paired with a non-conforming backend raises protocol_mismatch=True.
 
-        Contract: no backend in ``_bp._VALID_BACKENDS`` currently exhibits this
+        Contract: no backend in ``bp._VALID_BACKENDS`` currently exhibits this
         inconsistency (each one's flag matches its actual method set), so this
         test builds a minimal stub that lies about its own capability —
         ``supports_github_extras = True`` but none of the ``GitHubExtras``
@@ -341,7 +341,7 @@ class TestBranchSupportCapabilityContract:
     ``RuntimeError``/``TypeError`` (backlog #2287, slice 1).
     """
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_false_flag_raises_unsupported_capability(self, name: str) -> None:
         """Backends declaring ``supports_branches == False`` MUST raise.
 
@@ -362,7 +362,7 @@ class TestBranchSupportCapabilityContract:
         finally:
             _close_if_sqlite(backend)
 
-    @pytest.mark.parametrize("name", list(_bp._VALID_BACKENDS))
+    @pytest.mark.parametrize("name", list(bp._VALID_BACKENDS))
     def test_true_flag_does_not_raise_unsupported_capability(self, name: str) -> None:
         """Backends declaring ``supports_branches == True`` MUST NOT raise it.
 
@@ -389,7 +389,7 @@ class TestBranchSupportCapabilityContract:
     def test_protocol_mismatch_flag_distinguishes_backend_bug_from_unsupported(self) -> None:
         """A True flag paired with a non-conforming backend raises protocol_mismatch=True.
 
-        Contract: no backend in ``_bp._VALID_BACKENDS`` currently exhibits this
+        Contract: no backend in ``bp._VALID_BACKENDS`` currently exhibits this
         inconsistency, so this test builds a minimal stub that lies about its
         own capability — ``supports_branches = True`` but none of the
         ``BranchBackend`` methods implemented — to exercise the ``isinstance``

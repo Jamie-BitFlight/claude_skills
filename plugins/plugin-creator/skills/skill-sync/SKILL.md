@@ -87,7 +87,7 @@ If output is not empty: STOP. List the uncommitted files. Report to the user. Do
 
 **Stage 4.5 — Source Validation Agent**
 
-Dispatch `Agent(subagent_type="plugin-creator:skill-sync-source-validator")`. Pass the change plan path.
+Dispatch `plugin-creator:skill-sync-source-validator`. Pass the change plan path.
 
 The agent validates and pre-fetches all source content before the write agent runs, keeping URL fetching out of the write agent's context and providing a structured fallback chain when primary fetch methods fail. It handles:
 - Validating all NEW URLs against the docs index (`llms.txt` / sitemap) — downgrades fabricated URLs to UNVERIFIABLE directly in the change plan file
@@ -97,7 +97,7 @@ The agent validates and pre-fetches all source content before the write agent ru
 
 **Stage 5 — Schema-Aware Write Agent**
 
-Dispatch one `Agent(subagent_type="plugin-creator:skill-content-updater")` in write role. Pass the change plan path. The change plan header now contains the source-material file path — the write agent reads from that file and does not need to fetch any URLs.
+Dispatch one `plugin-creator:skill-content-updater` in write role. Pass the change plan path. The change plan header now contains the source-material file path — the write agent reads from that file and does not need to fetch any URLs.
 
 After the agent returns, run `uvx skilllint@latest check <modified-skill-path>/SKILL.md`. If non-zero: extract the over-budget sections to `references/`, update the change plan with the extraction directive, and re-dispatch the write agent.
 

@@ -18,16 +18,16 @@ Scope: $ARGUMENTS
 2. Run deterministic checks that already exist in the project
 3. Run plugin policy checks when appropriate
 4. Report failures grouped by category
-5. Fix only when the user asked for fixing; otherwise review and explain
+5. Fix only when the user asked for fixing; check-only mode MUST NOT run hooks or commands that can rewrite files
 
 ## Commands to Run
 
 ```bash
-# Linting, formatting, and type checking
-uv run prek run --files $ARGUMENTS
-# Fallback when no .pre-commit-config.yaml:
-# uv run ruff format --check $ARGUMENTS
-# uv run ruff check $ARGUMENTS
+# Check-only path: never invoke mutating hooks.
+uv run ruff format --check $ARGUMENTS
+uv run ruff check --no-fix $ARGUMENTS
+# Run the type checker selected by hooks/CI (ty shown as the default).
+uv run ty check $ARGUMENTS
 
 # Tests (if scope includes test files)
 uv run pytest $ARGUMENTS -v --tb=short
@@ -37,7 +37,7 @@ uv run pytest $ARGUMENTS -v --tb=short
 
 ```bash
 # Typing boundary policy (Any outside boundary modules)
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/check-typing-boundaries.sh $ARGUMENTS
+uv run --script ${CLAUDE_PLUGIN_ROOT}/scripts/check-typing-boundaries.py $ARGUMENTS
 ```
 
 ## Output

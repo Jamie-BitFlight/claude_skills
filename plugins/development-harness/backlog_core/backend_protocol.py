@@ -54,9 +54,9 @@ from .models import (
 if TYPE_CHECKING:
     import types
 
-_dh_paths: types.ModuleType | None = None
+dh_paths: types.ModuleType | None = None
 with contextlib.suppress(ImportError):
-    import dh_paths as _dh_paths  # optional — only present inside the plugin
+    import dh_paths  # optional — only present inside the plugin
 
 __all__ = [
     "BEADS_DIR",
@@ -175,10 +175,10 @@ def _auto_detect_beads() -> str | None:
     Returns:
         ``"beads"`` when the opt-in marker file is present, otherwise ``None``.
     """
-    if _dh_paths is None:
+    if dh_paths is None:
         return None
     try:
-        project_root = _dh_paths.git_project_root()
+        project_root = dh_paths.git_project_root()
     except (FileNotFoundError, RuntimeError):
         return None
     return "beads" if (project_root / BEADS_DIR / BEADS_OPT_IN_MARKER).is_file() else None
@@ -217,9 +217,9 @@ def create_backend(name: str | None = None) -> WorkItemBackend:
         return InMemoryBackend()
 
     if resolved == "sqlite":
-        if _dh_paths is None:
+        if dh_paths is None:
             return SQLiteBackend()
-        db_path = _dh_paths.state_root() / "backlog.sqlite3"
+        db_path = dh_paths.state_root() / "backlog.sqlite3"
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return SQLiteBackend(str(db_path))
 

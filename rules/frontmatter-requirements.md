@@ -2,26 +2,33 @@
 
 ## Skills
 
-- `name`: Required — lowercase, hyphens, must match directory name, satisfies `^[a-z][a-z0-9-]*$`
-- `description`: Optional (uses first paragraph if omitted)
-- `allowed-tools`: comma-separated for Claude Code — `Read, Grep, Glob`; space-delimited when the
-  skill targets multiple platforms. Never a YAML array; that form conforms to neither delimiter
-  convention. Grants permission for the listed tools while the skill is active; it does not
-  restrict which tools are callable (see the `plugin-creator:claude-skills-overview-2026` skill for
-  the full schema).
+- Claude Code runtime: every field is optional. An omitted `name` uses the directory name; an
+  omitted `description` uses the first non-empty markdown line.
+- Portable Agent Skills: `name` and `description` are required. NFKC-normalize `name` first, then
+  require 1-64 lowercase Unicode alphanumeric characters or hyphens, with no leading, trailing, or
+  consecutive hyphen. Reject names changed by lowercasing. Compare the normalized name with the
+  NFKC-normalized directory name. `description` must be non-empty and at most 1024 characters;
+  describing both what the skill does and when to use it is a SHOULD, not a MUST.
+- `allowed-tools`: Claude Code accepts a space- or comma-separated string or YAML list. Portable
+  Agent Skills accepts a space-separated string only and marks the field experimental. In Claude
+  Code it pre-approves listed tools rather than restricting all other tools.
 
 ## Agents
 
-- `name`: Required — lowercase, hyphens, max 64 chars
-- `description`: Required — include trigger keywords, max 1024 chars
-- `model`: Must be `sonnet`, `opus`, `haiku`, or `inherit` if specified
-- `tools`: Must be comma-separated string (not YAML array)
-- No YAML multiline indicators (`>-`, `|-`, `>`, `|`) in any field
+- Project, user, and managed agents require `name` and `description` to load. `name` must not start
+  with `-` or contain `:`.
+- Plugin agents fall back to the file path for the name when `name` is absent. If frontmatter does
+  not parse, they also use a generic plugin description and ignore the invalid fields.
+- Provide both `name` and `description` for reliable routing even where plugin loading can fall back.
+- `model`: Accepts `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or a full model ID
+- `tools` and `disallowedTools`: Accept a comma-separated string or YAML list
+- `hooks`, `mcpServers`, and `permissionMode` are valid for project/user agents but ignored for
+  plugin-shipped agents
 
 ## Commands
 
 - `description`: Required
-- `allowed-tools`: Must be comma-separated string (not YAML array)
+- `allowed-tools`: Accepts a documented string or YAML list
 
 ## Validator Auto-Fix
 
@@ -31,7 +38,8 @@ Run after writing or editing any frontmatter file:
 uvx skilllint@latest check --fix {path}
 ```
 
-The validator auto-adds `name:` derived from the directory name when absent.
+The validator may add `name:` under this repository's portable-profile checks; Claude Code itself
+does not require the field.
 
 ## `skills:` — Never List an Externally-Sourced Plugin's Skill
 

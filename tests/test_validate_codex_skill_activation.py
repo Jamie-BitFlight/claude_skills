@@ -350,44 +350,25 @@ def test_run_app_server_isolates_and_tree_terminates_the_process(
 
 def test_repo_skill_workspace_copies_the_complete_skill_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The consumer receives a contained repo-scoped copy with matching provenance."""
-    source_dir = tmp_path / "source" / ".agents" / "skills" / "rebase"
-    (source_dir / "scripts").mkdir(parents=True)
-    (source_dir / "SKILL.md").write_text("---\nname: rebase\n---\n", encoding="utf-8")
-    (source_dir / "scripts" / "rebase_plan.py").write_text("print('plan')\n", encoding="utf-8")
-    (source_dir / "scripts" / "__pycache__").mkdir()
-    (source_dir / "scripts" / "__pycache__" / "rebase_plan.cpython-313.pyc").write_bytes(b"local bytecode")
+    source_dir = tmp_path / "source" / ".agents" / "skills" / "sample-skill"
+    (source_dir / "references").mkdir(parents=True)
+    (source_dir / "SKILL.md").write_text("---\nname: sample-skill\n---\n", encoding="utf-8")
+    (source_dir / "references" / "guide.md").write_text("guide\n", encoding="utf-8")
+    (source_dir / "references" / "__pycache__").mkdir()
+    (source_dir / "references" / "__pycache__" / "generated.pyc").write_bytes(b"local bytecode")
     monkeypatch.setattr(activation, "REPO_ROOT", tmp_path / "source")
 
-    workspace = activation.create_repo_skill_workspace({"source_path": ".agents/skills/rebase/SKILL.md"}, "rebase")
+    workspace = activation.create_repo_skill_workspace(
+        {"source_path": ".agents/skills/sample-skill/SKILL.md"}, "sample-skill"
+    )
     try:
-        installed_dir = workspace.project_dir / ".agents" / "skills" / "rebase"
+        installed_dir = workspace.project_dir / ".agents" / "skills" / "sample-skill"
         assert installed_dir.is_relative_to(workspace.project_dir)
-        assert (installed_dir / "scripts" / "rebase_plan.py").read_text(encoding="utf-8") == "print('plan')\n"
-        assert not (installed_dir / "scripts" / "__pycache__").exists()
+        assert (installed_dir / "references" / "guide.md").read_text(encoding="utf-8") == "guide\n"
+        assert not (installed_dir / "references" / "__pycache__").exists()
         assert activation.tree_sha256(installed_dir) == activation.repo_skill_tree_sha256(source_dir)
     finally:
         activation.isolated.cleanup_workspace(workspace)
-
-
-def test_repo_skill_resolution_requires_the_installed_root_and_command(tmp_path: Path) -> None:
-    """A response passes only when both installed paths came through the real turn."""
-    skill_file = tmp_path / ".agents" / "skills" / "rebase" / "SKILL.md"
-    skill_file.parent.mkdir(parents=True)
-    skill_file.write_text("skill\n", encoding="utf-8")
-    installed = activation.InstalledSkill(skill_file, Path(".agents/skills/rebase/SKILL.md"), "a", "b")
-    root = str(skill_file.parent)
-
-    assert activation.require_repo_skill_resolution(
-        f"SKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
-    ) == (True, True)
-    with pytest.raises(activation.HarnessError, match="did not resolve"):
-        activation.require_repo_skill_resolution(f"SKILL_ROOT={root}", installed)
-    with pytest.raises(activation.HarnessError, match="did not resolve"):
-        activation.require_repo_skill_resolution(f"COMMAND={root}/scripts/rebase_plan.py", installed)
-    with pytest.raises(activation.HarnessError, match="did not resolve"):
-        activation.require_repo_skill_resolution(
-            f"Paths:\nSKILL_ROOT={root}\nCOMMAND={root}/scripts/rebase_plan.py", installed
-        )
 
 
 def test_proxy_provenance_records_configuration_names_without_values() -> None:
@@ -455,7 +436,7 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
     """The repo target is activated by app-server and leaves no private path or secret in evidence."""
     workspace_root = tmp_path / "consumer"
     project_dir = workspace_root / "project"
-    skill_file = project_dir / ".agents" / "skills" / "rebase" / "SKILL.md"
+    skill_file = project_dir / ".agents" / "skills" / "sample-skill" / "SKILL.md"
     skill_file.parent.mkdir(parents=True)
     skill_file.write_text("skill\n", encoding="utf-8")
     workspace = activation.isolated.ValidationWorkspace(
@@ -471,7 +452,7 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
     )
     installed = activation.InstalledSkill(
         path=skill_file,
-        relative_path=Path(".agents/skills/rebase/SKILL.md"),
+        relative_path=Path(".agents/skills/sample-skill/SKILL.md"),
         sha256="skill-digest",
         tree_sha256="tree-digest",
     )
@@ -487,12 +468,16 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
         },
         installation_kind="repo-scoped-skill-copy",
     )
-    response = f"SKILL_ROOT={skill_file.parent}\nCOMMAND={skill_file.parent}/scripts/rebase_plan.py"
+    response = "Generic activation response"
     captured: dict[str, object] = {}
     monkeypatch.setattr(
         activation,
         "load_matrix_target",
-        lambda _target: {"target": "repo-skills:rebase", "plugin_id": "repo-skills", "task_text": "report paths"},
+        lambda _target: {
+            "target": "repo-skills:sample-skill",
+            "plugin_id": "repo-skills",
+            "task_text": "report activation",
+        },
     )
     monkeypatch.setattr(activation, "prepare_repo_skill_context", lambda *_args: context)
     monkeypatch.setattr(
@@ -511,20 +496,20 @@ def test_main_uses_repo_skill_consumer_and_writes_sanitized_evidence(
         [
             "validate_codex_skill_activation.py",
             "--target",
-            "repo-skills:rebase",
+            "repo-skills:sample-skill",
             "--evidence-file",
             str(tmp_path / "evidence.json"),
             "--expect-contains",
-            "skill_root",
+            "activation response",
         ],
     )
 
     assert activation.main() == 0
     assert captured["status"] == "PASSED"
     assert captured["installation_kind"] == "repo-scoped-skill-copy"
-    assert captured["installed_skill"] == ".agents/skills/rebase/SKILL.md"
-    assert captured["skill_root_matched"] is True
-    assert captured["instructed_command_path_matched"] is True
+    assert captured["installed_skill"] == ".agents/skills/sample-skill/SKILL.md"
+    assert captured["expected_tokens_requested"] == 1
+    assert captured["expected_tokens_matched"] == 1
     assert captured["proxy"] == {
         "transport": "portkey",
         "configuration_names": ["OPENAI_API_BASE", "PORTKEY_API_BASE", "PORTKEY_API_KEY", "PORTKEY_MODEL"],

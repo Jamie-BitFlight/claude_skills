@@ -13,10 +13,8 @@ user-invocable: true
 
 > When editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` for content optimization, route to the owning skill where one exists, and to a subagent only when no skill owns that process. Full routing-by-concern table in `references/phase-dispatch-details.md` → "Phase 6 — Optimize".
 
-> [!IMPORTANT]
-> When provided a process map or Mermaid diagram, treat it as the authoritative procedure. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-> A Mermaid process diagram is an executable instruction set. Follow it exactly as written: respect sequence, conditions, loops, parallel paths, and terminal states. Do not improvise, reorder, or skip steps. If any node is ambiguous or missing required detail, pause and ask a clarifying question before continuing.
-> When interacting with a user, report before acting the interpreted path you will follow from the diagram, then execute.
+Treat each Mermaid process map as executable: follow its branches and stop conditions in order, and
+ask about an ambiguous node before continuing.
 
 # Plugin Lifecycle Orchestration
 
@@ -29,27 +27,14 @@ Arguments: `<invocation_args/>`
 
 ## Domain Knowledge Prerequisites
 
-Load these skills at session start before executing any phase. Full skill descriptions and what each provides: `references/domain-knowledge-prerequisites.md`.
+Load the branch-specific prerequisites from `references/domain-knowledge-prerequisites.md` before
+executing a phase.
 
 Before any phase writes a path, command, fact, or cross-plugin reference into runtime text, confirm it is present in every environment, bundled and reached by a relative path inside the plugin, or inlined; otherwise inline, bundle, guard, or delete it. A harness variable counts only where that harness substitutes it.
 
-Required — load at session start:
-
-1. `Skill(skill="plugin-creator:claude-plugins-reference-2026")` — plugin.json schema, component types, environment variables, installation scopes, path rules
-2. `Skill(skill="plugin-creator:claude-skills-overview-2026")` — SKILL.md format, all 14 frontmatter fields, YAML multiline bug, allowed-tools string format, context fork behavior
-
-Required for phases involving hooks (Phase 4: Create, Phase 5: Debug):
-
-3. `Skill(skill="plugin-creator:hooks-guide")` — 13 hook event types, exit codes, tool denial mechanisms, agent frontmatter fields
-
-Required for phases involving agents (Phase 4: Create):
-
-4. `Skill(skill="plugin-creator:claude-subagent-reference")` — all agent frontmatter fields with descriptions, built-in agents, scope and file locations, tool restrictions, permission modes, hooks and memory configuration, fork mode, agent teams
-
-Recommended for component selection and plugin configuration decisions:
-
-5. `Skill(skill="plugin-creator:component-patterns")` — component lifecycle, discovery and activation phases, decision framework for choosing commands vs skills vs agents vs hooks vs MCP servers
-6. `Skill(skill="plugin-creator:plugin-settings")` — .local.md per-project configuration pattern, YAML frontmatter parsing from hooks, configuration-driven behavior
+Always activate `/plugin-creator:claude-plugins-reference-2026` and
+`/plugin-creator:claude-skills-overview-2026`. The reference file names the hook, agent, component,
+and settings branches that require additional skills.
 
 ## Workflow Overview
 
@@ -219,7 +204,12 @@ flowchart TD
 
 Entry condition: Design gate passed (new plugin path) OR user selected a create intent on the existing plugin path (no design plan required — use the user's stated component description directly).
 
-For each component defined in `design-PLAN.md`, invoke the appropriate creator skill (skill-creator, agent-creator, or hook-creator). Full task specs in `references/phase-dispatch-details.md` → "Phase 4 — Create". For agent-frontmatter decisions during agent creation, also load `/plugin-creator:claude-subagent-reference`. Create `plugin.json` via `uv run plugins/plugin-creator/scripts/create_plugin.py` if it does not exist.
+For each component defined in `design-PLAN.md`, activate the appropriate creator skill
+(`/plugin-creator:skill-creator`, `/plugin-creator:agent-creator`, or
+`/plugin-creator:hook-creator`). Full task specs are in
+`references/phase-dispatch-details.md` under "Phase 4 — Create". For agent-frontmatter decisions,
+also activate `/plugin-creator:claude-subagent-reference`. Keep the plugin manifestless when
+default component paths suffice; create `plugin.json` only for metadata or custom component paths.
 
 The following diagram is the authoritative procedure for Phase 4 Create decision gate. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
 
@@ -307,11 +297,11 @@ Run multi-layer validation. Full task spec in `references/phase-dispatch-details
 Full lookup table with exact invocation syntax for all phase-skill pairings: `references/phase-skill-mapping.md`.
 
 Key invocations:
-- Phase 1: `Skill(skill="plugin-creator:assessor")`
-- Phase 2: `Skill(skill="plugin-creator:feature-discovery")` + 4-way parallel researchers via subagent_type
+- Phase 1: `/plugin-creator:assessor`
+- Phase 2: `/plugin-creator:feature-discovery` plus parallel researchers
 - Phase 4: skill-creator, agent-creator, hook-creator (one Skill call per component type)
 - Phase 5: lint, refactor-skill (one Skill call per error type)
-- Phase 7: `Skill(skill="plugin-creator:ensure-complete")`
+- Phase 7: `/plugin-creator:ensure-complete`
 
 ---
 

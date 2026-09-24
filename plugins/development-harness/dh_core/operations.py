@@ -35,10 +35,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-import dispatch_schema as _ds
+import dispatch_schema
 from backlog_core.artifact_manifest_store import (
     artifact_content_reference,
-    load_manifest as _load_manifest_record,
+    load_manifest as load_manifest_record,
     publish_artifact,
 )
 from backlog_core.artifact_registry import ArtifactRegistry
@@ -1416,9 +1416,9 @@ def _dispatch_reference(milestone_number: int) -> ContentRef:
     return ContentRef(kind=ContentKind.DISPATCH_PLAN, name=f"dispatch-milestone-{milestone_number}")
 
 
-def _read_dispatch_plan(milestone_number: int) -> _ds.DispatchPlan:
+def _read_dispatch_plan(milestone_number: int) -> dispatch_schema.DispatchPlan:
     record = _get_content_provider().get_content(_dispatch_reference(milestone_number))
-    return _ds.DispatchPlan.model_validate_json(record.content)
+    return dispatch_schema.DispatchPlan.model_validate_json(record.content)
 
 
 def dispatch_read_plan(milestone_number: int) -> dict[str, Any]:
@@ -1446,7 +1446,7 @@ def dispatch_validate_plan(milestone_number: int) -> dict[str, Any]:
         plan = _read_dispatch_plan(milestone_number)
     except (ContentUnavailableError, ValueError) as exc:
         return {"error": str(exc), "milestone_number": milestone_number}
-    result = _ds.validate_plan_integrity(plan)
+    result = dispatch_schema.validate_plan_integrity(plan)
     return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
 
 
@@ -1481,7 +1481,7 @@ def dispatch_stale_check(milestone_number: int, repo: str = "") -> dict[str, Any
     except (BacklogError, GithubException) as exc:
         return {"error": f"GitHub API error: {exc}", "milestone_number": milestone_number}
 
-    result = _ds.detect_stale_plan(plan, current_numbers)
+    result = dispatch_schema.detect_stale_plan(plan, current_numbers)
     return {"milestone_number": milestone_number, **dataclasses.asdict(result)}
 
 
@@ -1498,7 +1498,7 @@ def dispatch_create_plan(
         Dict with ``wave_count``, ``item_count``, ``is_valid``, ``errors``,
         ``warnings``, or ``error`` on failure.
     """
-    plan_model = _ds.DispatchPlan.model_validate(plan)
+    plan_model = dispatch_schema.DispatchPlan.model_validate(plan)
 
     if plan_model.milestone.number != milestone_number:
         return {
@@ -1534,7 +1534,7 @@ def dispatch_create_plan(
     val_errors: list[str] = []
     val_warnings: list[str] = []
     if validate:
-        val_result = _ds.validate_plan_integrity(plan_model)
+        val_result = dispatch_schema.validate_plan_integrity(plan_model)
         is_valid = val_result.is_valid
         val_errors = list(val_result.errors)
         val_warnings = list(val_result.warnings)
@@ -2132,7 +2132,7 @@ def _manifest_reference(item_id: int | str) -> ContentRef:
 
 
 def _load_manifest(provider: ContentProvider, item_id: int | str) -> ArtifactManifest:
-    return _load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
+    return load_manifest_record(provider, _manifest_reference(item_id), item_id)[0]
 
 
 def artifact_register(

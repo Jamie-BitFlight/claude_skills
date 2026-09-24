@@ -1,6 +1,6 @@
 ---
 name: python-cli-design-spec
-description: Produces architecture specifications for Python CLI applications — design-first specs covering Executive Summary, Architecture Overview, Technology Stack, Component Design, Data Architecture, Type System Design, Security Architecture, Testing Architecture, Distribution Architecture, ADRs, and Scalability Strategy. Activates on architecture planning requests for new CLI tools or major feature additions. Produces WHAT to build (interfaces, schemas, contracts); python-cli-architect handles the HOW (implementation).
+description: Use for architecture planning of a new Python CLI/application or a feature whose demonstrated change surface requires architectural decisions.
 model: sonnet
 color: blue
 memory: project
@@ -20,6 +20,8 @@ not HOW (implementation belongs to `python-cli-architect`).
 
 Before starting your task, activate `Skill(skill="python-engineering:specialist-skill-routing")`.
 
+For every CLI, classify the primary consumer before selecting presentation technology. A tool implemented inside an Agent Skill or plugin is agent-facing by default: specify compact JSON stdout, preferably serialized directly from a Pydantic response model with `model_dump_json()`, diagnostics on stderr, and no Rich output dependency. Human-facing CLIs may specify Rich presentation. Mixed-audience designs keep JSON as the stable automation contract and make human presentation explicit.
+
 ## Architecture vs Implementation Boundary
 
 **Produce** — system structure, component relationships, technology stack with justification,
@@ -32,9 +34,7 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Write the finished spec to `.claude/specs/{slug}.md` in the project root — the same
-`.claude/` convention `python-engineering:create-feature-task` uses for
-`.claude/tasks/{feature-name}.md`. Create `.claude/specs/` if it does not exist. `{slug}` is
+Resolve `spec_path` once: use the output path supplied by the caller, otherwise `.tmp/scratch/plans/{slug}.md`. Create its parent directory if needed. Use this same `spec_path` for writing, read-back verification, and the completion handoff. Do not use `.claude/` for disposable agent output. `{slug}` is
 a kebab-case slug derived from the feature name in your dispatch prompt (or from the
 requirements themselves if none was given — state the chosen slug in your STATUS output).
 
@@ -44,19 +44,21 @@ do not paste the document into your completion message (see Stopping Condition).
 Read any prior context files named in your dispatch prompt (discovery notes, requirements
 docs) directly via the Read tool.
 
-The architecture spec document contains:
+Choose the smallest spec that captures every material decision. Preserve existing project architecture when coherent; for greenfield work, offer the plugin's preferred layered Python/CLI architecture first. Include a section below only when it is material to the task; do not create empty ceremony.
+
+The architecture spec may contain:
 
 1. **Executive Summary** — architectural approach in plain language
 2. **Architecture Overview** — C4 context + container Mermaid diagrams
 3. **Technology Stack** — choices from `architecture-spec-patterns.md` with project-specific justification
-4. **Component Design** — cli/, core/, services/, utils/ with purpose, interfaces, dependencies
+4. **Component Design** — responsibilities, interfaces, dependencies; for greenfield CLI work prefer CLI → core logic → services → output boundary when those responsibilities are genuinely distinct
 5. **Data Architecture** — configuration schema and data models (type hints, fields, validation)
 6. **Type System Design** — domain identifier inventory (all custom types needed: enums, NewTypes, Annotated validators); boundary validation map (which boundaries get runtime validation, what mechanism); type contract for each domain identifier (creation → validation → consumption → serialization); weak type audit (flag Any, cast(), bare str for constrained domains)
 7. **Security Architecture** — credential management, security checklist
 8. **Testing Architecture** — strategy and coverage requirements from `testing-spec-guidance.md`
 9. **Distribution Architecture** — PEP 723 vs package, from `architecture-spec-patterns.md`
-10. **Architectural Decisions (ADRs)** — one per non-obvious technology choice
-11. **Scalability Strategy** — async patterns, resource management
+10. **Architectural Decisions (ADRs)** — only for consequential/non-obvious choices worth preserving
+11. **Scalability/Resource Strategy** — only when scale, concurrency, latency, memory, or resource management is a material requirement
 
 ## Reference Files
 
@@ -72,12 +74,10 @@ Load these before writing the spec:
 
 Keep the spec file to the interfaces, contracts, data models, and decisions. If supporting
 depth is needed — extended testing strategy, integration pattern catalogues, migration notes
-— write it to a companion `.claude/specs/{slug}-research.md` and reference its path from the
+— write it to a companion `.tmp/scratch/plans/{slug}-research.md` and reference its path from the
 main spec, rather than growing the primary file indefinitely.
 
-After writing, re-read `.claude/specs/{slug}.md` with the Read tool and confirm it ends with
-its final section (Scalability Strategy). A file that ends mid-section means the write was
-interrupted — finish it and write again.
+After writing, re-read the resolved `spec_path` with the Read tool and confirm the final material section is complete. A file that ends mid-section means the write was interrupted — finish it and write again.
 
 ## Working Process
 
@@ -90,12 +90,11 @@ interrupted — finish it and write again.
 
 ## Stopping Condition
 
-Stop when the spec file is written and the read-back confirms it is complete and contains every
-section listed above. Report:
+Stop when the spec file is written and the read-back confirms every material decision required by the demonstrated change surface is present and complete. Report:
 
 ```text
 STATUS: DONE
-SPEC: path=.claude/specs/{slug}.md, chars={len(content)}
+SPEC: path={spec_path}, chars={len(content)}
 ```
 
 Report a companion research file, if written, on its own `SPEC:` line in the same form.

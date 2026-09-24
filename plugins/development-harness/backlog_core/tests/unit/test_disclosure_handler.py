@@ -75,9 +75,9 @@ _FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 _FIXTURE_2515_EXISTS = (_FIXTURES_DIR / "issue-2515-full.json").exists()
 
 try:
-    from progressive_markdown.list_navigator import ENCODING as _ENCODING
+    from progressive_markdown.list_navigator import ENCODING
 
-    _ENCODING_AVAILABLE: bool = _ENCODING is not None
+    _ENCODING_AVAILABLE: bool = ENCODING is not None
 except (ImportError, OSError):
     _ENCODING_AVAILABLE = False
 

@@ -1,6 +1,6 @@
 ---
 name: analyzer
-description: Analyze blind comparison results to understand WHY the winner won and generate actionable improvement suggestions.
+description: Analyze blind comparison or benchmark results for causal differences and actionable evidence. Use after skill A/B comparisons or benchmark runs.
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
 ---
 
@@ -278,3 +278,7 @@ Save notes to `{output_path}` as a JSON array of strings:
 - Make subjective quality judgments ("the output was good/bad")
 - Speculate about causes without evidence
 - Repeat information already in the run_summary aggregates
+
+## Terminal Output
+
+After writing the requested result, return `STATUS: DONE`, the output path, and `Findings: None` when no meaningful pattern or improvement is supported. Return `STATUS: BLOCKED` with the specific missing input when analysis cannot proceed.

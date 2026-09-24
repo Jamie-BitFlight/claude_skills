@@ -1,6 +1,6 @@
 ---
 name: skill-content-updater
-description: Update skill content, sync skill upstream drift, fetch SOURCE URLs and classify drift as NEW/STALE/VERIFIED/UNVERIFIABLE. Use when syncing skill content against live documentation, checking upstream drift, or executing a change plan from /skill-sync Stage 5. Does NOT do content optimization or rewriting — use ai-doc-optimizer for that.
+description: Check skill SOURCE citations for upstream drift or execute an approved skill-sync change plan. Use during skill-sync drift and write stages.
 model: inherit
 skills:
   - plugin-creator:audit-skill-completeness

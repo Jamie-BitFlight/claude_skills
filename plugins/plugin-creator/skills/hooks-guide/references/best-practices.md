@@ -553,21 +553,13 @@ Child process stderr on `stdio: 'inherit'` passes through to the hook's stderr. 
 
 ---
 
-### Deleting the hooks configuration file when unused
+### Keeping an empty hooks configuration file
 
-**Wrong — hooks configuration file removed:**
+Omit `hooks/hooks.json` when the plugin has no hooks. Hook components are optional in Claude Code
+and OpenAI plugins; an empty file adds no behavior and is not required for plugin validation.
 
-```text
-(no hooks/hooks.json present in plugin directory)
-```
-
-**Correct — empty configuration file retained:**
-
-```json
-{ "hooks": {} }
-```
-
-Plugin structure expects `hooks/hooks.json` to be present. Removing it breaks plugin validation and leaves the plugin structure incomplete. Keep an empty configuration file when no hooks are needed.
+SOURCE: <https://code.claude.com/docs/en/plugins.md> and
+<https://developers.openai.com/plugins/build/plugins.md> (accessed 2026-09-24)
 
 ---
 

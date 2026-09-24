@@ -16,11 +16,11 @@ flowchart TD
     Q1 -->|"Write a CLI client that<br>talks to an MCP server"| ClientCLI["Use /fastmcp-client-cli"]
     Q1 -->|"Run, inspect, or debug<br>an MCP server from terminal"| MCPCLI["Use /mcp-cli"]
     Q1 -->|"Write pytest tests for<br>FastMCP server tools"| Tests["Use /fastmcp-python-tests"]
-    Q1 -->|"General Python development<br>for MCP server code"| PyDev["Use /python-engineering:python3-core"]
+    Q1 -->|"General Python development<br>for MCP server code"| PyDev["Use /python-engineering:orchestrate"]
     Q1 -->|"Configure an MCP server<br>inside a Claude Code plugin"| ThisSkill["Continue with this skill"]
 ```
 
-For building FastMCP servers from scratch, use `/fastmcp-creator`. For writing CLI clients that communicate with MCP servers, use `/fastmcp-client-cli`. For terminal-based MCP server inspection and debugging, use `/mcp-cli`. For writing pytest test suites for FastMCP tools, use `/fastmcp-python-tests`. For general Python development of MCP server code, use `/python-engineering:python3-core`.
+For building FastMCP servers from scratch, use `/fastmcp-creator`. For writing CLI clients that communicate with MCP servers, use `/fastmcp-client-cli`. For terminal-based MCP server inspection and debugging, use `/mcp-cli`. For writing pytest test suites for FastMCP tools, use `/fastmcp-python-tests`. For general Python development of MCP server code, use `/python-engineering:orchestrate`.
 
 ## Configuration Methods
 

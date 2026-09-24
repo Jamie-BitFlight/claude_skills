@@ -10,5 +10,5 @@ Skill directories nested under `skills/` silently fail to register — Claude Co
 All skill directories must sit directly under `skills/` — one level deep only. Do not create
 grouping subdirectories to organize related skills.
 
-SOURCE: `.claude/rules/markdown-file-references.md`, section "Subdirectory Namespaces — Skills Do
-NOT Support This" (repo-internal convention; added via commit `ea33cf2e`, 2026-03-22).
+SOURCE: <https://agent-plugins.org/specification.md#71-skills> and
+<https://code.claude.com/docs/en/plugins-reference.md#skills> (accessed 2026-09-24).

@@ -335,7 +335,6 @@ function buildAgentList() {
     { key: 'plugin-docs-writer', file: 'plugin-docs-writer.md' },
     { key: 'process-siren', file: 'process-siren.md' },
     { key: 'research-curator', file: 'research-curator.md' },
-    { key: 'topic-specialist', file: 'topic-specialist.md' },
     { key: 'typescript-pro', file: 'typescript-pro.md' },
   ];
 

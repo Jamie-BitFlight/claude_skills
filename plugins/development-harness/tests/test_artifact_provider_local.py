@@ -72,10 +72,10 @@ class TestInit:
 
     def test_default_manifest_dir_uses_dh_state_root(self, root_worktree: Path) -> None:
         """Without manifest_dir, defaults to dh_paths.state_root() / 'artifacts'."""
-        import dh_paths as _dh_paths  # available after the module-level import in the provider
+        import dh_paths  # available after the module-level import in the provider
 
         p = LocalFilesystemArtifactProvider(root_worktree=root_worktree)
-        assert p._manifest_dir == _dh_paths.state_root() / "artifacts"
+        assert p._manifest_dir == dh_paths.state_root() / "artifacts"
 
 
 # ---------------------------------------------------------------------------

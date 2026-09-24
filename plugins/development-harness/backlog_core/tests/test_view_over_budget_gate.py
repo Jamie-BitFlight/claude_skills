@@ -17,6 +17,7 @@ Test naming: every test contains ``over_budget`` or ``numeric_section`` so
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -525,8 +526,8 @@ class TestUnboundedOverBudgetStillReturnsDirectory:
         # Guard the premise: >16000 chars (old heuristic would gate) but the WHOLE serialised
         # response is under the token budget — measured exactly as the gate measures it.
         assert len(compressible_body) > 16000, "premise: the body must exceed the old 16000-char heuristic threshold."
-        full_response = server._models.ViewItemResult(number=2495, title="Issue 2495", body=compressible_body)
-        premise_tokens = server._token_count(server._json.dumps(full_response.model_dump()))
+        full_response = ViewItemResult(number=2495, title="Issue 2495", body=compressible_body)
+        premise_tokens = server._token_count(json.dumps(full_response.model_dump()))
         assert premise_tokens <= server._VIEW_TOKEN_BUDGET, (
             f"premise: the serialised header-free compressible response must be <= _VIEW_TOKEN_BUDGET "
             f"tokens; got {premise_tokens}.  If this fails the test no longer exercises the "
@@ -581,7 +582,7 @@ class TestOverBudgetMeasurementCountsClearedBodySoleContent:
             "premise: the structured-key drift path must clear the body (finding #5) so the "
             f"section content is the sole delivered copy; got body of {len(str(filtered.get('body')))} chars."
         )
-        verbatim_tokens = server._token_count(server._json.dumps(filtered))
+        verbatim_tokens = server._token_count(json.dumps(filtered))
         assert verbatim_tokens > server._VIEW_TOKEN_BUDGET, (
             "premise: the serialised drift payload (section content the sole copy) must EXCEED the "
             f"budget; got {verbatim_tokens} tokens.  If not, the test no longer exercises the under-count."

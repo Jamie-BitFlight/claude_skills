@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+<title id="title">Claude Skills — engineering workflows for coding agents</title>
+<desc id="desc">A restrained editorial overview of Claude Skills. The top explains the repository principles and composition model. Four cards introduce Python Engineering, Development Harness, Plugin Creator, and Process Siren.</desc>
+<defs>
+<style>
+.s{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.ink{fill:#17201c}.muted{fill:#68736e}.faint{fill:#89938e}.card{fill:#fcfdfa;stroke:#d9dfdb;stroke-width:1.2}
+.panel{fill:#f1f5f1}.line{stroke:#d9dfdb;stroke-width:1.2}.green{fill:#397d61}.greenLine{stroke:#397d61;stroke-width:2;fill:none}
+.blue{fill:#467ba8}.purple{fill:#725ca4}.ochre{fill:#b96e38}
+</style>
+<marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#397d61"/></marker>
+</defs>
+<rect width="1200" height="600" rx="18" fill="#f7f8f5"/>
+
+<!-- Header -->
+<text x="56" y="66" class="s ink" font-size="34" font-weight="700">Claude Skills</text>
+<text x="56" y="98" class="s muted" font-size="17">Engineering workflows for coding agents</text>
+<line x1="56" y1="120" x2="98" y2="120" class="greenLine"/>
+
+<!-- Principle row -->
+<rect x="56" y="151" width="326" height="128" rx="12" class="card"/>
+<text x="78" y="180" class="s faint" font-size="11" letter-spacing="1.6">HOW IT WORKS</text>
+<text x="78" y="211" class="s ink" font-size="14" font-weight="600">Repository-aware defaults</text>
+<text x="78" y="235" class="s ink" font-size="14" font-weight="600">Evidence before action</text>
+<text x="78" y="259" class="s ink" font-size="14" font-weight="600">Specialists for consequential work</text>
+
+<!-- Composition row -->
+<text x="430" y="163" class="s faint" font-size="11" letter-spacing="1.5">COMPOSE</text>
+<rect x="430" y="181" width="134" height="74" rx="10" class="panel"/>
+<text x="497" y="211" text-anchor="middle" class="s ink" font-size="14" font-weight="650">Your intent</text>
+<text x="497" y="234" text-anchor="middle" class="s muted" font-size="12">task + repository</text>
+
+<path d="M564 218H604" class="greenLine" marker-end="url(#a)"/>
+
+<rect x="614" y="172" width="238" height="92" rx="10" class="card"/>
+<rect x="628" y="186" width="98" height="27" rx="6" fill="#e7f0eb"/><text x="677" y="204" text-anchor="middle" class="s ink" font-size="11">Skills</text>
+<rect x="740" y="186" width="98" height="27" rx="6" fill="#edf2f6"/><text x="789" y="204" text-anchor="middle" class="s ink" font-size="11">Agents</text>
+<rect x="628" y="222" width="98" height="27" rx="6" fill="#f5eee8"/><text x="677" y="240" text-anchor="middle" class="s ink" font-size="11">Hooks</text>
+<rect x="740" y="222" width="98" height="27" rx="6" fill="#f0edf5"/><text x="789" y="240" text-anchor="middle" class="s ink" font-size="11">MCP tools</text>
+
+<path d="M852 218H892" class="greenLine" marker-end="url(#a)"/>
+
+<rect x="902" y="181" width="242" height="74" rx="10" class="panel"/>
+<text x="1023" y="211" text-anchor="middle" class="s ink" font-size="14" font-weight="650">Verified execution</text>
+<text x="1023" y="234" text-anchor="middle" class="s muted" font-size="12">trace → act → check → improve</text>
+
+<!-- Section -->
+<text x="56" y="328" class="s faint" font-size="11" letter-spacing="1.7">START WITH THESE</text>
+
+<!-- Cards -->
+<rect x="56" y="348" width="258" height="184" rx="12" class="card"/>
+<circle cx="82" cy="380" r="10" class="blue"/>
+<text x="104" y="386" class="s ink" font-size="16" font-weight="700">Python Engineering</text>
+<text x="76" y="420" class="s muted" font-size="12.5">Opinionated Python defaults with</text>
+<text x="76" y="439" class="s muted" font-size="12.5">independent design challenge,</text>
+<text x="76" y="458" class="s muted" font-size="12.5">testing, review and modernization.</text>
+<line x1="76" y1="480" x2="294" y2="480" class="line"/>
+<text x="76" y="505" class="s ink" font-size="11.5">orchestrate → implement → verify</text>
+<text x="76" y="523" class="s green" font-size="11.5">audit → modernize / delete</text>
+
+<rect x="332" y="348" width="258" height="184" rx="12" class="card"/>
+<circle cx="358" cy="380" r="10" class="green"/>
+<text x="380" y="386" class="s ink" font-size="16" font-weight="700">Development Harness</text>
+<text x="352" y="420" class="s muted" font-size="12.5">A language-independent lifecycle</text>
+<text x="352" y="439" class="s muted" font-size="12.5">from discovery through verified</text>
+<text x="352" y="458" class="s muted" font-size="12.5">delivery with explicit artifacts.</text>
+<line x1="352" y1="480" x2="570" y2="480" class="line"/>
+<text x="352" y="505" class="s ink" font-size="11.5">discover → plan → execute</text>
+<text x="352" y="523" class="s green" font-size="11.5">review → verify</text>
+
+<rect x="608" y="348" width="258" height="184" rx="12" class="card"/>
+<circle cx="634" cy="380" r="10" class="purple"/>
+<text x="656" y="386" class="s ink" font-size="16" font-weight="700">Plugin Creator</text>
+<text x="628" y="420" class="s muted" font-size="12.5">Create and improve Agent Skills,</text>
+<text x="628" y="439" class="s muted" font-size="12.5">agents, hooks and plugins with</text>
+<text x="628" y="458" class="s muted" font-size="12.5">evaluation and validation built in.</text>
+<line x1="628" y1="480" x2="846" y2="480" class="line"/>
+<text x="628" y="505" class="s ink" font-size="11.5">research → design → build</text>
+<text x="628" y="523" class="s green" font-size="11.5">evaluate → tighten → validate</text>
+
+<rect x="884" y="348" width="260" height="184" rx="12" class="card"/>
+<circle cx="910" cy="380" r="10" class="ochre"/>
+<text x="932" y="386" class="s ink" font-size="16" font-weight="700">Process Siren</text>
+<text x="904" y="420" class="s muted" font-size="12.5">Understand and improve processes</text>
+<text x="904" y="439" class="s muted" font-size="12.5">before representing them as concise</text>
+<text x="904" y="458" class="s muted" font-size="12.5">technical models or diagrams.</text>
+<line x1="904" y1="480" x2="1124" y2="480" class="line"/>
+<text x="904" y="505" class="s ink" font-size="11.5">model → challenge → validate</text>
+<text x="904" y="523" class="s green" font-size="11.5">represent only when useful</text>
+
+<text x="600" y="572" text-anchor="middle" class="s faint" font-size="12">Explore → specialize → verify → improve</text>
+</svg>

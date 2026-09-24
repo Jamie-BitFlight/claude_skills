@@ -1,6 +1,6 @@
 ---
 name: refactor-planner
-description: Analyze plugin structure and create comprehensive executable refactoring plans with prioritized tasks and parallelization strategy. Use when planning plugin refactoring, breaking down large refactoring efforts into executable tasks, splitting oversized skills that exceed validator token thresholds (SK006/SK007), or assessing plugin quality before systematic improvements. Identifies refactoring opportunities, maps dependencies, and generates task files for execution.
+description: Create dependency-aware plugin-refactoring plans from validated findings. Use before systematic plugin improvements or SK006/SK007 remediation.
 model: opus
 color: cyan
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
@@ -160,3 +160,5 @@ You are an expert plugin refactoring architect specializing in analyzing Claude 
 - Highly interconnected skills: Recommend careful phased approach
 - No clear domain boundaries: Suggest by use case or complexity level
 - External dependencies: Note and exclude from refactoring scope
+
+**Terminal status:** Return `STATUS: DONE` with the plan path and `Findings: None` when no refactoring work is warranted. Return `STATUS: BLOCKED` with the missing plugin path or assessment evidence when planning cannot proceed.

@@ -5,7 +5,7 @@ title: "Improvement Proposals: The Delegation"
 ## Improvement 1: Plan-level workflow phase field in SAM data model
 
 **Source pattern**: "The explicit phase transitions (idle -> briefing -> working -> awaiting_approval -> done) provide a clear, finite-state model for project lifecycle management. Claude Code's SAM workflow could benefit from similar explicit phase state." (Relevance to Claude Code Development > Patterns Worth Adopting > Agency State Machine)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md, packages/sam_schema/
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md, packages/sam_schema/
 **Confidence**: High
 **Impact**: Medium
 **Backlog**: #779 created
@@ -14,7 +14,7 @@ title: "Improvement Proposals: The Delegation"
 
 The SAM workflow has three implicit phases (planning via `/add-new-feature`, execution via `/implement-feature`, quality gates via `/complete-implementation`) but no explicit plan-level phase field in the data model. Running `uv run sam status P{N}` returns task counts (`total_tasks`, `by_status`, `ready_tasks`, `blocked_tasks`, `completion_pct`) but does not report which workflow phase the plan is in. The orchestrator infers phase from task status counts (e.g., "all tasks COMPLETE" means ready for quality gates), but this inference is implicit and undocumented.
 
-File: `plugins/python3-development/skills/implement-feature/SKILL.md` — the Progress Loop section queries `sam status` and `sam ready` but has no mechanism to read or write a plan-level phase. File: `packages/sam_schema/` — Grep for `phase` returns only code comments about addressing resolution phases, not a workflow phase field.
+The Progress Loop section of the `implement-feature` skill queries `sam status` and `sam ready` but has no mechanism to read or write a plan-level phase. File: `packages/sam_schema/` — Grep for `phase` returns only code comments about addressing resolution phases, not a workflow phase field.
 
 ### Target state
 
@@ -29,7 +29,7 @@ Run `uv run sam status P{N}` on any active plan — output JSON contains a `phas
 ## Improvement 2: Centralized agent action log per plan
 
 **Source pattern**: "Every agent action is logged with timestamp, agent index, task ID, and action description. This transparency is invaluable for debugging multi-agent workflows and understanding causality." (Relevance to Claude Code Development > Patterns Worth Adopting > Transparent Action Logging)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred — confidence low: the research entry itself acknowledges "Claude Code's task_status_hook.py and task file update patterns follow this principle." The local system has per-task timestamps (Started, Completed, LastActivity) but no centralized action log. However, the hook fires on every tool call and adding a log write there could introduce performance concerns. The gap is real but the feasibility of the specific mechanism (centralized log file written by hooks) has not been validated.
@@ -51,14 +51,14 @@ After running `/implement-feature` on a plan with 3+ tasks, `plan/action-log-{sl
 ## Improvement 3: Reusable mid-task human approval checkpoint skill
 
 **Source pattern**: "Generalize The Delegation's request_client_approval -> user-input -> agent-resume pattern into a reusable skill for any Claude Code workflow that requires human checkpoints." (Relevance to Claude Code Development > Integration Opportunities > Client Approval Workflow Automation)
-**Local system**: plugins/python3-development/skills/start-task/SKILL.md, plugins/python3-development/skills/complete-implementation/SKILL.md
+**Local system**: plugins/development-harness/skills/start-task/SKILL.md, plugins/development-harness/skills/complete-implementation/SKILL.md
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred — confidence medium: The local system has approval gates only at `/complete-implementation` phase boundaries (after all tasks complete). There is no mechanism for a sub-agent executing a task to pause mid-execution and request human approval before continuing. However, the feasibility of implementing this within Claude Code's hook-based architecture needs investigation — Claude Code sub-agents run to completion and do not natively support "pause and resume." The Delegation runs in a browser with persistent state, which makes mid-execution pauses natural. The architectural gap between the two systems means the specific mechanism cannot be directly transplanted without design work.
 
 ### Current state
 
-The `/start-task` skill (file: `plugins/python3-development/skills/start-task/SKILL.md`) has no mechanism for a sub-agent to halt execution and request human input mid-task. The `/complete-implementation` skill provides human review checkpoints but only after all tasks are complete. If a sub-agent encounters an ambiguity during task execution, it must either make a decision autonomously or fail the task — there is no "request approval and wait" pattern.
+The `/start-task` skill has no mechanism for a sub-agent to halt execution and request human input mid-task. The `/complete-implementation` skill provides human review checkpoints but only after all tasks are complete. If a sub-agent encounters an ambiguity during task execution, it must either make a decision autonomously or fail the task — there is no "request approval and wait" pattern.
 
 ### Target state
 

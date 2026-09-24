@@ -13,9 +13,9 @@
 
 (Lecture 8.) Every extraction pass produces duplicates: "SEU", "Southeast University",
 "东南大学" are one university; "Bob Smith (doc 3)" and "Robert Smith (doc 41)" may or may not
-be one person. An unfused graph answers multi-hop queries wrongly *with confidence* — paths
-break at duplicate boundaries. This is the #1 reason real-world KG projects produce something
-useless.
+be one person. An unfused graph can answer multi-hop queries incorrectly because paths break at duplicate
+identity boundaries. Treat fusion quality as an end-to-end concern and measure its effect on the
+competency questions rather than assuming one universal dominant failure mode.
 
 ## The fusion pipeline
 
@@ -36,9 +36,10 @@ Three steps, from the course's large-scale entity-matching material:
    aliases and edges, keep per-source attribute values with provenance when they conflict
    (do NOT silently overwrite — conflicting values are signal), record `merged_from` for undo.
 
-Thresholds: auto-merge only above high confidence; auto-reject below low; queue the middle for
-LLM adjudication or human review. An erroneous merge is far more damaging than a missed one —
-it silently fuses two entities' entire edge sets.
+Use separate auto-merge, auto-reject, and review/adjudication regions when automated identity
+resolution is appropriate. Derive thresholds from labeled examples and the relative cost of false
+merges versus missed merges; do not copy a universal confidence cutoff. Preserve merge evidence and
+make consequential merges reversible where practical.
 
 ## Ontology matching
 
@@ -52,9 +53,10 @@ source B's edges through the mapping before instance fusion.
 
 (Lecture 9, direction 1.) Making the graph reduce hallucination and extend context:
 
-- **GraphRAG retrieval:** entity-link the query → expand k hops (k=1-2; beyond 2 is noise
-  without re-ranking) → serialize the subgraph as compact triples/paths with provenance →
-  that is the LLM's context. Answers cite graph facts, not vibes.
+- **GraphRAG retrieval:** entity-link the query → retrieve candidate paths/subgraphs → rank/prune
+  against the query → serialize compact evidence-bearing facts/paths with provenance. Treat hop
+  depth as a retrieval parameter: tune it against competency questions and graph density rather
+  than assuming a fixed depth.
 - **Serialization that works:** `(head)-[REL {time, source}]->(tail)` lines, grouped by head
   entity, deduplicated. Tables of triples beat prose summaries — the LLM can quote exact facts.
 - **Multi-hop questions:** retrieve *paths* between the query's entities, not neighborhoods
@@ -79,8 +81,24 @@ For agents that accumulate knowledge across sessions:
    incremental.
 3. At session start or on demand, retrieve via GraphRAG (above) instead of dumping the whole
    graph into context.
-4. **Contradiction handling:** when a new fact conflicts with a stored one, keep both with
-   time + provenance and prefer the newer at retrieval time — facts change ("works at X"
-   becomes stale); the graph should record the change, not fight it.
+4. **Contradiction handling:** when assertions conflict, retain the competing assertions with
+   provenance and temporal semantics. Resolve at retrieval using the domain's authority, valid-time,
+   observation-time, and confidence rules; recency alone is not a universal truth criterion.
 5. Periodic hygiene pass: re-run fusion over the full graph and re-score stale confidences.
    Unmaintained memory graphs rot the same way unfused extractions do.
+
+
+## End-to-end evaluation
+
+Evaluate serving against the competency questions established during modeling. Keep these dimensions
+separate so a strong result in one cannot hide a failure in another:
+
+- identity/entity-linking correctness;
+- path/subgraph retrieval relevance and evidence coverage;
+- query/answer correctness;
+- provenance traceability;
+- temporal/contradiction handling where applicable;
+- latency, context size, and cost telemetry.
+
+Use failure cases to decide whether the correction belongs in schema, extraction, fusion, storage/query,
+retrieval, or answer generation rather than patching the final prose response.

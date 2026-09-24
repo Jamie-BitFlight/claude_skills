@@ -10,7 +10,7 @@ _PLUGIN_ROOT = Path(__file__).parent.parent
 if str(_PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(_PLUGIN_ROOT))
 
-from backlog_core import rendering as _rendering
+from backlog_core import rendering
 from backlog_core.github_sync import merge_item, parse_issue_body, render_issue_body
 from backlog_core.models import BacklogItem, Entry, GroomedData, Section
 from backlog_core.operations import _normalize_section_key
@@ -975,7 +975,7 @@ class TestSectionKeyRoundTripRegression:
         """
         heading = "Root Cause Investigation Notes"
         key = _normalize_section_key(heading)
-        assert key not in _rendering.SECTION_HEADING, f"{heading!r} must stay unregistered for this test to be valid"
+        assert key not in rendering.SECTION_HEADING, f"{heading!r} must stay unregistered for this test to be valid"
 
         content = "The root cause was traced to a stale cache entry."
         item = _make_item(sections={key: Section(entries=[Entry(id="2026-01-01T00:00:00Z", content=content)])})

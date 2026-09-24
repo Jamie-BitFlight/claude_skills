@@ -568,7 +568,7 @@ SOURCE: [`core/src/tasks-service.ts` lines 17–27](https://github.com/langmarta
 
 ## Subagent File Location
 
-Subagent (Task tool spawned) sessions follow a naming convention separate from main sessions:
+Subagent sessions follow a naming convention separate from main sessions:
 
 ```text
 # Top-level subagent (no parent session context):

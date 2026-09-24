@@ -4,7 +4,7 @@ description: Use when checking skill quality, validating frontmatter before comm
 argument-hint: <path-to-skill-or-plugin>
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 <provided_path>
 $ARGUMENTS

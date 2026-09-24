@@ -4,9 +4,9 @@ not Claude Code, and (b) Claude Code does not already supply it itself (availabl
 listings, tool descriptions, hook execution). Everything else — every project fact, behaviour,
 rule, and index, even when the mechanism it names happens to be Claude-Code-shaped — belongs in
 AGENTS.md, which this file imports below. This repo's plugins ship harness manifests beside
-`.claude-plugin/` (per-plugin coverage varies — see `harness_compatibility.json` and AGENTS.md's
-Repository Overview), so "which skill to use when" is a project workflow rule, not a Claude-Code
-one, even where a given plugin's non-Claude manifest doesn't exist yet.
+`.claude-plugin/` (per-plugin coverage varies — follow AGENTS.md's Repository Overview to generate
+and inspect the compatibility view), so "which skill to use when" is a project workflow rule, not a
+Claude-Code one, even where a given plugin's non-Claude manifest doesn't exist yet.
 -->
 
 @../AGENTS.md

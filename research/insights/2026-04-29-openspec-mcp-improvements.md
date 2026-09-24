@@ -135,7 +135,7 @@ After fix: Tool returns:
 ```
 plugin-creator:docs/architecture.md
 development-harness:docs/sdlc-layers/layer-0/context-fit-complexity.md
-python3-development:docs/architecture.md
+python-engineering:docs/architecture.md
 ```
 
 ---

@@ -52,7 +52,7 @@ For each skill reference in an agent prompt:
 
 ### 3. Inter-Agent Contract Alignment
 
-When agents delegate to other agents (via `Agent(subagent_type=)`):
+When agents delegate to other agents:
 
 - Does the delegating agent's prompt describe inputs that match what the target agent expects?
 - Does the delegating agent expect outputs in a format the target agent produces?
@@ -95,7 +95,7 @@ For each action the agent prompt describes:
 Identify agents that:
 
 - Are registered in `plugin.json` but never referenced by any skill, command, or other agent
-- Are referenced in skill documentation but not in any executable context (`Skill()`, `Agent()`, `@agent`)
+- Are referenced in documentation but never activated as `/plugin:skill` or dispatched as `plugin:agent`
 - Have descriptions with trigger phrases that no workflow ever activates
 
 **Output**: List of potentially dead agents with evidence (no inbound references found).
@@ -146,9 +146,9 @@ Same approach as skill-lifecycle-audit dimension 7:
 ```mermaid
 flowchart TD
     Q{Issue type?}
-    Q -->|Tool access ambiguity| Docs["Task is Claude Code tool inheritance research<br>with subagent_type='context-gathering'<br>Context: agent file path, specific ambiguous tool reference<br>Output: .planning/audit/tool-access-finding.md —<br>confirmed behavior with documentation citations"]
-    Q -->|Cross-agent contract mismatch| Contract["Task is input/output contract evaluation<br>with subagent_type='context-gathering'<br>Context: delegating agent path, target agent path,<br>specific contract claim in prompt<br>Output: .planning/audit/contract-mismatch.md —<br>compatibility verdict with file:line evidence"]
-    Q -->|Prompt quality issues| Prompt["Task is agent prompt optimization<br>with subagent_type='plugin-creator:subagent-refactorer'<br>Context: agent file path, finding description,<br>audit dimension that detected the issue<br>Output: .planning/audit/improvements/{agent-name}-patch.md —<br>revised prompt with rationale"]
+    Q -->|Tool access ambiguity| Docs["Dispatch context-gathering agent for Claude Code tool inheritance research<br>Context: agent file path, specific ambiguous tool reference<br>Output: .planning/audit/tool-access-finding.md —<br>confirmed behavior with documentation citations"]
+    Q -->|Cross-agent contract mismatch| Contract["Dispatch context-gathering agent for input/output contract evaluation<br>Context: delegating agent path, target agent path,<br>specific contract claim in prompt<br>Output: .planning/audit/contract-mismatch.md —<br>compatibility verdict with file:line evidence"]
+    Q -->|Prompt quality issues| Prompt["Dispatch plugin-creator:subagent-refactorer for prompt optimization<br>Context: agent file path, finding description,<br>audit dimension that detected the issue<br>Output: .planning/audit/improvements/{agent-name}-patch.md —<br>revised prompt with rationale"]
 ```
 
 ---

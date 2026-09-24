@@ -4,16 +4,26 @@ description: Use when building CLI applications with Typer and Rich — creating
 user-invocable: false
 ---
 
-# CLI Development (Typer + Rich)
+# CLI Development
 
 Consult `python3-core` for standing defaults. Load `python3-testing` for test patterns.
+
+## Audience First
+
+Before choosing presentation libraries, identify the primary consumer.
+
+- A CLI implemented inside an Agent Skill or plugin is agent-facing by default. Do not use Rich for its command output. Emit compact JSON on stdout, preferably from a Pydantic response model with `model_dump_json()`; do not indent it. Send diagnostics to stderr and keep the JSON schema stable.
+- Human-facing CLIs may use Typer + Rich for terminal presentation.
+- For mixed audiences, compact JSON is the automation contract; human formatting is an explicit presentation mode.
+
+Agents must not need to parse tables, colours, progress bars, panels, or explanatory prose to consume a tool result.
 
 ## Standards
 
 - `Annotated[Type, typer.Option(...)]` syntax for all CLI params
 - `rich_help_panel` to group options
-- Rich emoji tokens (`:white_check_mark:`) not Unicode literals
-- Architecture: CLI (Typer) → Business Logic → Services → Display (Rich)
+- Rich emoji tokens (`:white_check_mark:`) not Unicode literals for human-facing output
+- Architecture: CLI → Business Logic → Services → Output boundary (compact JSON for agents; Rich display for humans)
 - `uv run <script>` over `python3 <script>`
 - Factory pattern for dependency injection
 
@@ -94,7 +104,7 @@ async def _fetch_all(urls: list[str], limit: int) -> list[str]:
 #!/usr/bin/env -S uv run --quiet --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["typer>=0.21", "rich>=13.0"]
+# dependencies = ["typer>=0.21", "rich>=13.0"]  # human-facing example only
 # ///
 ```
 

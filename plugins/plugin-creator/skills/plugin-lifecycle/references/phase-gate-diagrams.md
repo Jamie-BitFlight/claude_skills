@@ -18,11 +18,11 @@ flowchart TD
     HasErrors -->|"No — errors remain"| Q{"Error type in validator output?"}
 
     %% Route each error type to its fix, then loop back to re-validate
-    Q -->|"SK007 — skill exceeds token limit (hard error)"| Split["Invoke: Skill(skill='plugin-creator:refactor-skill')<br>Context = oversized SKILL.md path<br>Output = split skill files at same plugin path"]
+    Q -->|"SK007 — skill exceeds token limit (hard error)"| Split["Activate /plugin-creator:refactor-skill<br>Context = oversized SKILL.md path<br>Output = split skill files at same plugin path"]
     Q -->|"SK006 — skill approaching token limit (warning)"| Extract["Extract content to references/ directory<br>Update SKILL.md to reference extracted files<br>Output = reduced SKILL.md + new references/ file"]
     Q -->|"Broken link error (LINK01 or similar)"| Links["Read the file containing the broken link<br>Verify the target path exists on disk<br>Fix with Edit tool — update or remove the broken reference"]
-    Q -->|"Frontmatter issues (FM-series errors)"| Lint["Invoke: Skill(skill='plugin-creator:lint', args='--fix PATH')<br>Context = file path + validator output<br>Output = corrected frontmatter in the file"]
-    Q -->|"Tool format issues (array instead of string)"| Tools["Invoke: Skill(skill='plugin-creator:lint', args='--fix PATH')<br>Output = fixed comma-separated string in frontmatter"]
+    Q -->|"Frontmatter issues (FM-series errors)"| Lint["Activate /plugin-creator:lint --fix PATH<br>Context = file path + validator output<br>Output = corrected frontmatter in the file"]
+    Q -->|"Tool format issues (array instead of string)"| Tools["Activate /plugin-creator:lint --fix PATH<br>Output = corrected tool field"]
     Q -->|"Other structural errors"| Manual["Read the validator error message<br>Identify the file and line referenced<br>Apply Edit fix directly to that file<br>Verify fix is consistent with plugin schema"]
 
     %% All fix paths loop back to re-validate
@@ -49,7 +49,7 @@ flowchart TD
 
     %% Layer 2: runtime validator
     VL2 -->|"Yes — runtime validation passes"| VL3{"Layer 3 — Does skilllint output<br>contain SK006 or SK007 for any skill?"}
-    VL2 -->|"No — runtime validation fails"| Fail2["Capture Layer 2 error details<br>Check .claude-plugin/plugin.json exists<br>Check all paths start with ./<br>Proceed to Phase 5 — Debug with these errors"]
+    VL2 -->|"No — runtime validation fails"| Fail2["Capture Layer 2 error details<br>If a manifest exists, check custom paths start with ./<br>If manifestless, validate the default component directory<br>Proceed to Phase 5 — Debug with these errors"]
 
     %% Layer 3: token complexity
     VL3 -->|"No SK006/SK007 — all skills within token limits"| VL4{"Layer 4 — For every internal link in all SKILL.md and agent files:<br>does the target file exist on disk?<br>For every skill in plugin.json: does the SKILL.md exist?<br>For every agent reference in skills: does the agent .md exist?"}

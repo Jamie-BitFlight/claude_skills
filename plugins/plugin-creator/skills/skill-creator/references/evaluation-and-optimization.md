@@ -141,10 +141,10 @@ Record execution time and token usage for each run. Save to the eval directory a
 
 ### Step 8d: Grade, aggregate, and launch the viewer
 
-1. For each completed eval config, spawn one **grader agent** per config (`with_skill` and `without_skill`) with subagent_type="plugin-creator:grader":
+1. For each completed eval config, dispatch one `plugin-creator:grader` per config (`with_skill` and `without_skill`):
 
    ```text
-   Task is grading eval results with subagent_type="plugin-creator:grader"
+   Dispatch `plugin-creator:grader` to grade eval results.
    Context to include in the prompt: evals/evals.json (assertions),
      transcript_path: iteration-N/eval-M/with_skill/run-1/transcript.json,
      outputs_dir: iteration-N/eval-M/with_skill/run-1/outputs/
@@ -154,7 +154,7 @@ Record execution time and token usage for each run. Save to the eval directory a
    Spawn a second grader for the baseline:
 
    ```text
-   Task is grading eval results with subagent_type="plugin-creator:grader"
+   Dispatch `plugin-creator:grader` to grade eval results.
    Context to include in the prompt: evals/evals.json (assertions),
      transcript_path: iteration-N/eval-M/without_skill/run-1/transcript.json,
      outputs_dir: iteration-N/eval-M/without_skill/run-1/outputs/
@@ -356,7 +356,7 @@ These plugin agents are available for the eval workflow:
 The `references/` directory has additional documentation:
 
 - `schemas.md` — JSON structures for evals.json, grading.json, etc.
-- `claude-code-skills-official.md` — Official Claude Code skills specification
+- `../../claude-skills-overview-2026/resources/claude-code-skills-official.md` — Canonical Claude Code skills specification
 - `workflows.md` — Workflow design patterns for multi-step skills
 
 The `eval-viewer/` directory contains the interactive eval review viewer:

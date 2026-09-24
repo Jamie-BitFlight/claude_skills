@@ -1,10 +1,8 @@
-# Fork Mode (Experimental)
+# Fork Mode
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> § Fork the current conversation (accessed 2026-05-28)
-SOURCE: <https://code.claude.com/docs/en/env-vars.md> — `CLAUDE_CODE_FORK_SUBAGENT` entry (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents#fork-the-current-conversation> (accessed 2026-09-24)
 
-**Status**: Experimental. Requires Claude Code v2.1.117 or later.
-**Enable**: `CLAUDE_CODE_FORK_SUBAGENT=1`
+Fork mode is enabled by default in interactive Claude Code.
 
 ---
 
@@ -20,20 +18,10 @@ Use a fork when a named subagent would need too much background context to be us
 
 ---
 
-## Enabling fork mode
+## Starting a fork
 
 ```bash
-export CLAUDE_CODE_FORK_SUBAGENT=1
-```
-
-Or in `settings.json`:
-
-```json
-{
-  "env": {
-    "CLAUDE_CODE_FORK_SUBAGENT": "1"
-  }
-}
+/subtask draft unit tests for the parser changes so far
 ```
 
 Works in interactive mode, non-interactive mode (`-p`), and the Agent SDK.
@@ -44,16 +32,16 @@ Works in interactive mode, non-interactive mode (`-p`), and the Agent SDK.
 
 Three behaviors change:
 
-1. **general-purpose becomes a fork**: Claude spawns a fork whenever it would otherwise use the `general-purpose` built-in subagent. Named subagents (Explore, Plan, custom agents) spawn as before.
-2. **All subagent spawns run in the background**: Both forks and named subagents run in the background regardless of the `background` frontmatter field. Forks still surface permission prompts in your terminal; named subagents auto-deny anything that would prompt.
-3. **`/fork` command spawns a fork**: Instead of acting as an alias for `/branch`, `/fork` spawns a fork with the directive you provide.
+1. **Fork is a distinct requested type**: Claude may request the `fork` subagent type. When Claude requests no type, it gets `general-purpose`; subagents spawned from named definitions such as Explore, Plan, and custom agents work as usual.
+2. **Claude-spawned subagents run in the background**: Forks and non-fork subagents run in the background apart from documented foreground exceptions. Every background subagent surfaces permission prompts in the main session, naming the subagent that is asking.
+3. **`/subtask` starts a fork**. `/fork` applied only in versions v2.1.161-v2.1.211.
 
 ---
 
-## /fork command
+## /subtask command
 
 ```text
-/fork draft unit tests for the parser changes so far
+/subtask draft unit tests for the parser changes so far
 ```
 
 Claude Code names the fork from the first words of the directive. The fork appears in a panel below your prompt and runs in the background while you continue working. When it finishes, its result arrives as a message in your main conversation.
@@ -80,7 +68,7 @@ Running forks appear in a panel below the prompt input, with one row for the mai
 | Context | Full conversation history inherited | Fresh context with the delegation prompt |
 | System prompt and tools | Same as main session | From the subagent's definition file |
 | Model | Same as main session | From the subagent's `model` field |
-| Permissions | Prompts surface in your terminal | Auto-denied when running in background |
+| Permissions | Prompts surface in your main session | Prompts surface in your main session when running in background |
 | Prompt cache | **Shared with main session** (cheaper) | Separate cache |
 
 Because a fork's system prompt and tool definitions are identical to the parent, its first request reuses the parent's prompt cache — making forking cheaper than spawning a fresh subagent for tasks needing the same context.
@@ -93,3 +81,5 @@ When Claude spawns a fork through the Agent tool, it can pass `isolation: "workt
 
 - A fork cannot spawn further forks
 - To keep spawns synchronous, set `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` alongside fork mode
+
+SOURCE: <https://code.claude.com/docs/en/sub-agents#fork-the-current-conversation> (accessed 2026-09-24)

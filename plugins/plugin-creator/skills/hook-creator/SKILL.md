@@ -2,16 +2,16 @@
 name: hook-creator
 description: Guide for creating Claude Code plugin hooks — language selection heuristic (Node.js default, match project runtime when obvious), hooks.json configuration, event selection, prompt-based vs command hooks, ${CLAUDE_PLUGIN_ROOT} paths, stdio suppression, timeout sizing, and testing. Use when adding hooks to a plugin, creating PreToolUse/PostToolUse/Stop/SubagentStop/SessionStart/UserPromptSubmit hooks, or wiring hook scripts to hooks.json.
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 # Hook Creator for Claude Code Plugins
 
 Create hooks that integrate with the Claude Code event system. Hooks automate validation, enforcement, and context injection across the session lifecycle.
 
-For the complete hooks I/O API and JSON schemas, load: `Skill(skill: "plugin-creator:hooks-io-api")`
-For working code examples and plugin hook configuration patterns, load: `Skill(skill: "plugin-creator:hooks-patterns")`
-For all hook events, matchers, and environment variables, load: `Skill(skill: "plugin-creator:hooks-core-reference")`
+For the complete hooks I/O API and JSON schemas, activate `/plugin-creator:hooks-io-api`.
+For working code examples and plugin hook configuration patterns, activate `/plugin-creator:hooks-patterns`.
+For all hook events, matchers, and environment variables, activate `/plugin-creator:hooks-core-reference`.
 
 ---
 
@@ -56,7 +56,7 @@ flowchart TD
 
 **For Node.js scripts specifically**: use `.mjs` (ESM, preferred) or `.cjs` (CommonJS). Never use plain `.js`. See [hooks-nodejs-extension.md](../hooks-guide/references/hooks-nodejs-extension.md) for the full rule and rationale.
 
-**For Python hooks**: see `Skill(skill: "plugin-creator:hooks-guide")` → `references/hooks-python.md`.
+**For Python hooks**: activate `/plugin-creator:hooks-guide`, then read `references/hooks-python.md`.
 
 New Node.js hooks written from scratch: default to `.mjs`. Existing hooks that already use `require()`: keep `.cjs`.
 
@@ -491,9 +491,10 @@ Common issues:
 ## Sources
 
 - `plugins/orchestrator-discipline/hooks.json` — verified plugin hooks.json format (lines 1-25, 2026-02-19)
-- `.claude/hooks/session-start-backlog.cjs` — verified Node.js hook pattern (lines 1-69, 2026-02-19)
+- Executable hook files under the current project's `.claude/hooks/` — inspect the whole selected
+  file because filenames and line ranges change.
 - `plugins/orchestrator-discipline/hooks/pre-tool-orchestrator-read-warning.cjs` — verified stdin handling pattern (lines 28-85, 2026-02-19)
-- `Skill(skill: "plugin-creator:hooks-core-reference")` — event reference, matchers, environment variables (accessed 2026-01-28)
-- `Skill(skill: "plugin-creator:hooks-io-api")` — JSON input/output schemas (accessed 2026-01-28)
-- `Skill(skill: "plugin-creator:hooks-patterns")` — prompt-based hooks, code examples (accessed 2026-01-28)
+- `/plugin-creator:hooks-core-reference` — event reference, matchers, environment variables
+- `/plugin-creator:hooks-io-api` — JSON input/output schemas
+- `/plugin-creator:hooks-patterns` — prompt-based hooks, code examples
 - Official hooks docs: <https://code.claude.com/docs/en/hooks.md> (accessed 2026-01-28)

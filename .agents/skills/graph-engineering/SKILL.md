@@ -1,123 +1,68 @@
 ---
 name: graph-engineering
-description: Teaches an agent graph engineering — both halves. Knowledge graphs (ontology design, entity/relation/event extraction, fusion, GraphRAG/memory serving; distilled and translated from Southeast University's graduate Knowledge Graph course, npubird/KnowledgeGraphCourse, 4.4K stars) and task graphs (agent orchestration — parallel fan-out, verifier separation, the stop rule, human gates). Use when asked to build a knowledge graph, extract entities/relations from text, design an ontology, dedupe/merge entities, add graph memory or GraphRAG to an agent, orchestrate multi-agent workflows as a graph, or LEARN graph engineering — in teaching mode the agent explains each stage with worked examples and generates visual diagram artifacts.
+description: Design, build, evaluate, or teach graph-based systems. Use for knowledge graphs, ontology/schema design, entity/relation/event extraction, entity resolution and fusion, GraphRAG or graph memory, and agent/task dependency graphs with concurrency, joins, failure handling, verification, or human gates.
 ---
 
 # Graph Engineering
 
-Graph engineering is the discipline of designing the structures agents work through — not the
-prompts. It has two halves:
+Use graph structure only when relationships, paths, recurring identity, or execution dependencies are central to the problem. Prefer a simpler table, document index, vector search, or serial workflow when it satisfies the required questions or execution contract.
 
-1. **Knowledge graphs** — what agents remember. Nodes are entities and facts, edges are
-   relationships with time and provenance. This file's 9-stage pipeline covers it, distilled
-   from Southeast University's graduate KG course
-   (<https://github.com/npubird/KnowledgeGraphCourse>, Prof. Peng Wang), translated to English
-   and adapted for LLM-era agents.
-2. **Task graphs** — how agents work. Nodes are jobs, edges are execution dependencies:
-   parallel fan-out, separate verifier contexts, the stop rule, the human gate.
-   Read [references/task-graphs.md](./references/task-graphs.md) when the request is about
-   orchestrating agents rather than building memory. The task graph decides the execution
-   shape once; use teammode only for a ready parallel component whose members must coordinate.
-   Keep serial chains with one agent and perfectly isolated parallel nodes as plain subagents.
+## Route the request
 
-Core mental model: a knowledge graph is a **product with a schema**, not a pile of triples.
-Quality comes from the pipeline order — model the domain BEFORE extracting, fuse BEFORE storing,
-evaluate at every stage.
+Choose the branch that matches the user's outcome:
 
-## Teaching Mode
+- **Knowledge graph** — model and serve durable knowledge. Follow the knowledge-graph lifecycle below and load only the reference for the current stage.
+- **Task graph** — model work, dependencies, data flow, readiness, failure, verification, and approval. Read [references/task-graphs.md](./references/task-graphs.md).
+- **Learning** — teach only the relevant branch. Establish the learner's goal and current understanding, use their domain when available, and alternate concept → worked example → learner application → feedback. Visualize topology when it materially improves understanding; do not force the entire lifecycle when the user asks about one part.
 
-When the user wants to LEARN graph engineering (rather than build something), teach it — do
-not just execute. Rules:
+## Knowledge-graph lifecycle
 
-1. Anchor every stage in the user's own domain: ask for one real project or dataset, then use
-   it as the running example through all stages.
-2. **Generate visual artifacts as you teach.** Concepts in this discipline are shapes; show
-   them. For each major concept, produce a small diagram the user can keep — mermaid diagrams
-   (flowchart for the pipeline and task graphs, `graph LR` for example ontologies and
-   subgraphs) or a single self-contained HTML page when interactivity helps. At minimum:
-   the 9-stage pipeline, a 3-type ontology drawn from the user's domain, one extracted
-   subgraph (5-10 nodes) from a real sample, and the diamond pattern with the user's own jobs
-   as nodes.
-3. Teach in the pipeline's order, one stage per exchange, each ending with a small exercise
-   ("write 3 competency questions for your project") before moving on.
-4. Close by assembling what was built during the lesson into a starter `ontology.yaml` and a
-   drawn task graph for the user's first real build.
+Treat competency questions as the graph's specification and end-to-end acceptance tests.
 
-## The 9-Stage Pipeline
+1. **Define value and competency questions.** Write representative questions the system must answer. Stop if a simpler representation answers them adequately.
+2. **Choose representation and fact semantics.** Select property graph, RDF/OWL, or a simpler typed-edge representation. Define identity, temporal semantics, and how assertions retain evidence/provenance. Read [references/modeling.md](./references/modeling.md).
+3. **Model the minimal ontology.** Define only the entity, relation, event, and constraint vocabulary required by the competency questions. Validate that each question has a plausible path through the schema.
+4. **Map or extract source data.** Prefer deterministic mappings for structured data; use constrained extraction for open text. Separate entity, relation, and event extraction when doing so improves validation. Read [references/extraction.md](./references/extraction.md).
+5. **Evaluate extraction.** Sample representative sources and measure the error dimensions that matter to the application. Set acceptance thresholds from consequence, source variability, and downstream cost rather than a universal fixed percentage.
+6. **Resolve identity and fuse assertions.** Block candidate matches, compare identity evidence, preserve conflicting assertions and their provenance, and make merges reversible where practical. Read [references/fusion-and-llm.md](./references/fusion-and-llm.md).
+7. **Store, query, and operate.** Choose storage and indexes from expected graph size, query shapes, update rate, consistency needs, access boundaries, and operational constraints. Define incremental ingestion, retraction/deletion, schema evolution, and integrity checks when the system persists beyond a prototype.
+8. **Serve the graph.** For GraphRAG or memory, retrieve the smallest evidence-bearing subgraph or paths that answer the query. Keep retrieval strategy configurable and evaluate it against the competency questions rather than assuming a fixed hop count. Read [references/fusion-and-llm.md](./references/fusion-and-llm.md).
+9. **Run end-to-end evaluation.** Execute the competency questions against the resulting system. Separate extraction quality, identity/fusion quality, retrieval/query quality, answer correctness, and operational telemetry so one metric cannot hide another's failure.
 
-Run stages in order. For small projects stages 4-6 collapse into one extraction pass, but never
-skip stages 3 (ontology) or 8 (fusion) — they are where real-world graphs fail.
+For academic background or the translated source-course map, read [references/curriculum.md](./references/curriculum.md).
 
-1. **Scope & value test** — Confirm a graph beats a simpler structure. A graph pays off when
-   queries are multi-hop ("who worked with X on projects using Y"), when entities recur across
-   documents, or when relationships ARE the data. If lookups are single-hop, use a table and stop.
+## Knowledge-graph invariants
 
-2. **Knowledge representation choice** — Pick how facts are encoded: property graph
-   (Neo4j-style, pragmatic default), RDF triples (interop/standards), or plain typed edges in
-   JSON/SQLite (small scale). Decide now how time and provenance attach to every fact.
+- Preserve evidence for assertions strongly enough to trace an answer or merge decision back to its source.
+- Keep canonical entity identity separate from individual observations/assertions when multiple sources, changing facts, or contradictions matter.
+- Validate relation/event types against the ontology where the ontology defines those constraints.
+- Do not silently overwrite conflicting source claims during fusion.
+- Treat LLMs as fallible components inside extraction, schema induction, adjudication, retrieval, or reasoning; validate their outputs at the boundary where an error becomes consequential.
+- Pilot the complete path on representative data before scaling when scaling would make correction materially more expensive.
 
-3. **Ontology modeling** — Define entity types, relation types (with domain/range), and
-   attributes BEFORE extraction. Start minimal: 5-15 entity types, 10-30 relation types.
-   Two rules from the course: every relation gets a precise verb name (`ACQUIRED`, not
-   `RELATED_TO`), and if two types are always queried together, merge them.
-   Details and worked examples: [references/modeling.md](./references/modeling.md)
+## Choosing instruction strength
 
-4. **Entity extraction (NER)** — Extract typed entities from sources. Method ladder: exact
-   rules/dictionaries for closed vocabularies → LLM extraction with the ontology in the prompt
-   for open text. Always extract with span + source pointer for provenance.
+Do not turn useful defaults into universal laws.
 
-5. **Relation extraction** — Extract typed edges between recognized entities. Constrain the
-   LLM to the ontology's relation list with domain/range checks; reject edges whose endpoints
-   have incompatible types. This one validation step removes most hallucinated structure.
+- **Invariant** — required to preserve the user's contract or prevent a consequential failure.
+- **Default** — preferred when evidence and context do not indicate otherwise.
+- **Heuristic** — a starting point to tune or evaluate.
+- **Example parameter** — illustrative only; do not promote it to an acceptance threshold without evidence.
 
-6. **Event extraction** — For dynamic domains (news, logs, transactions), extract events as
-   first-class nodes (trigger + typed arguments + time), not just static edges.
-   Extraction methods, prompt patterns, and failure modes for stages 4-6:
-   [references/extraction.md](./references/extraction.md)
+When a numeric threshold, hop count, sample size, agent cap, or retry limit matters, derive or validate it against the current system's consequence and evidence.
 
-7. **Quality gate** — Before fusion, sample and score: entity precision (are extracted
-   entities real and correctly typed?), relation precision (does the source sentence actually
-   assert the edge?). Fix the prompt/rules, not the output, then re-run. Target ≥90% precision
-   on a 50-item sample before proceeding — recall improves with more passes; bad precision
-   poisons the graph permanently.
+## Teaching artifacts
 
-8. **Knowledge fusion** — Merge duplicates within and across sources: same real-world entity,
-   different surface forms ("SEU" = "Southeast University" = "东南大学"). Blocking + matching +
-   merge policy. Skipping this is the #1 cause of useless graphs.
-   Matching strategies: [references/fusion-and-llm.md](./references/fusion-and-llm.md)
+Generate diagrams or starter artifacts only when they advance the learner's stated goal. Useful outputs include an ontology, competency-question set, example subgraph, task DAG, or evaluation plan. Keep Mermaid as a compact representation of a semantic model, not proof that the model is correct.
 
-9. **Serve to LLMs (KG × LLM)** — Make the graph useful to agents: GraphRAG retrieval
-   (subgraph → context), graph-as-memory (agent writes facts back through stages 4-8), and
-   LLM-as-reasoner over paths. Patterns and pitfalls:
-   [references/fusion-and-llm.md](./references/fusion-and-llm.md)
+## Reference map
 
-## Working Rules
-
-- **Schema first, always.** Extraction without an ontology produces a "graph" that is really a
-  word cloud with arrows. If the user resists schema design, build the minimal 5-type ontology
-  from 3 sample documents and show it for approval.
-- **Provenance on every fact.** Each node/edge stores `source`, `extracted_at`, and confidence.
-  Non-negotiable — fusion (stage 8) and trust both depend on it.
-- **Incremental over big-bang.** Process a 10-document pilot through all 9 stages before
-  scaling. The pilot exposes ontology gaps at 1% of the cost.
-- **LLM extraction is stage machinery, not the pipeline.** The LLM slots into stages 4-6;
-  the surrounding schema, validation, and fusion are what make the output a knowledge graph.
-
-## Reference Files
-
-- [references/curriculum.md](./references/curriculum.md) — Full translated curriculum of the
-  source course with per-lecture summaries and links to the original Chinese slide decks.
-  Read when the user wants theory depth, the academic grounding, or the original materials.
-- [references/modeling.md](./references/modeling.md) — Knowledge representation & ontology
-  engineering (course lectures 2-3). Read during stages 2-3.
-- [references/extraction.md](./references/extraction.md) — Entity, relation, and event
-  extraction from rules to LLM prompting (lectures 4-7). Read during stages 4-7.
-- [references/fusion-and-llm.md](./references/fusion-and-llm.md) — Knowledge fusion and
-  KG × LLM integration (lectures 8-9). Read during stages 8-9.
+- [references/modeling.md](./references/modeling.md) — representation, competency questions, ontology and assertion/provenance modeling.
+- [references/extraction.md](./references/extraction.md) — structured mapping plus entity, relation, and event extraction.
+- [references/fusion-and-llm.md](./references/fusion-and-llm.md) — identity resolution, fusion, GraphRAG, graph memory, and serving/evaluation.
+- [references/task-graphs.md](./references/task-graphs.md) — task-node/edge contracts, readiness, concurrency, joins, failure/recovery, verification, human gates, and runtime projection.
+- [references/curriculum.md](./references/curriculum.md) — translated academic source map; load for theory depth or provenance.
 
 ## Credits
 
-Distilled and translated from 东南大学《知识图谱》研究生课程 (Southeast University graduate
-course on Knowledge Graphs), Prof. Peng Wang — <https://github.com/npubird/KnowledgeGraphCourse>.
-All original lecture PDFs are in Chinese; this skill is an independent English distillation
-adapted for AI-agent workflows.
+Knowledge-graph material is distilled and adapted from Southeast University’s graduate Knowledge Graph course by Prof. Peng Wang: https://github.com/npubird/KnowledgeGraphCourse.

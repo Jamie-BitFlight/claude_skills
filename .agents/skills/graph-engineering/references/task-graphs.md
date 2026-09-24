@@ -1,117 +1,102 @@
-# Task Graphs: Orchestrating Agents
-*(The execution half of graph engineering — how agents work, as opposed to what they remember)*
+# Task Graph Engineering
 
-## Contents
-- [What a task graph is](#what-a-task-graph-is)
-- [Fake edges](#fake-edges)
-- [The diamond pattern](#the-diamond-pattern)
-- [The stop rule](#the-stop-rule)
-- [Execution handoff](#execution-handoff)
-- [The human gate](#the-human-gate)
-- [Guardrails](#guardrails)
+Use a task graph to model work whose dependencies, concurrency, joins, failure behavior, or approval boundaries matter. The graph is a semantic execution contract; a diagram or runtime-specific scheduler is only a projection of it.
 
-## What a task graph is
+## Node contract
 
-Nodes are jobs — each one something you would hand to a single assistant (research one
-competitor, write one draft, check one claim). Draw an arrow only when a job needs another
-job's *result* before it can start. The drawing is the plan; agents flow through it.
-A small state object (what was found, what was decided, what remains) travels with the work.
+For each independently executable node, resolve only the fields that affect execution:
 
-This is a DAG — the pattern that has run data infrastructure for decades (Airflow, Prefect,
-Temporal) now applied to agents (LangGraph, CrewAI, AutoGen). The age of the pattern is a
-feature: trust your business to machinery with decades of production history.
+- **purpose** — observable outcome the node owns;
+- **requires** — input artifacts, facts, state, or capabilities needed before start;
+- **produces** — output artifacts, facts, state changes, or decisions downstream nodes consume;
+- **dependencies/readiness** — which predecessor outputs must exist before start;
+- **owner/capability** — executor requirements when assignment affects correctness;
+- **resources/side effects** — exclusive files, environments, credentials, devices, or irreversible actions;
+- **success condition** — evidence that makes the node complete;
+- **failure policy** — retry, skip, compensate, escalate, or stop where failure behavior matters.
 
-## Fake edges
+Do not invent fields that cannot change execution.
 
-The first optimization costs nothing: for every "and then" in an existing pipeline, ask
-whether the next job actually reads the previous job's output. "Summarize this file and then
-check my calendar" — the calendar step never uses the summary; the edge is fake. Delete fake
-edges and those jobs run in parallel. Most hand-built pipelines contain two or three.
+## Edge contract
 
-## The diamond pattern
+Draw an edge only when the consumer requires something produced or established by the predecessor. Record the payload or state dependency when it matters; an edge is not merely "happens after."
 
-The shape serious systems converge to:
+Before keeping an edge, ask:
 
-```
-        ┌─ worker 1 ─┐
-plan ───┼─ worker 2 ─┼─→ verify ─→ merge ─→ result
-        └─ worker 3 ─┘
-```
+1. What does the downstream node consume from upstream?
+2. Would starting downstream before upstream completes violate a requirement?
+3. Is the dependency data flow, shared mutable state/resource ownership, approval, or merely historical ordering?
 
-Split the task into independent angles, run workers in parallel, **verify in a separate
-context**, merge survivors. The verification node is non-negotiable: a model grading its own
-work in its own context misses most of its own mistakes. Give each verifier a different
-question (is it correct? is it current? is the source real?) — diverse skeptics catch what
-identical ones cannot.
+Delete incidental ordering. Keep resource conflicts explicit even when no data flows between the nodes.
 
-## The stop rule
+## Recover the graph
 
-From the Google DeepMind × MIT study "Towards a Science of Scaling Agent Systems"
-(180 controlled configurations): coordinated teams beat a single agent by ~80% on work that
-splits into independent pieces — and **every** multi-agent configuration lost on sequential
-work where each step needs the full picture (degrading 39-70%). Uncoordinated agents
-amplified each other's errors 17.2×; a single coordinator owning the merge cut it to 4.4×.
+1. Identify observable terminal outcomes and externally imposed constraints.
+2. Decompose only until each node has one resolvable responsibility and completion condition.
+3. Record node inputs/outputs and derive edges from real consumption or resource constraints.
+4. Find ready nodes: all required predecessors satisfied and required resources available.
+5. Identify joins explicitly: a join waits only for the predecessors whose outputs it consumes.
+6. Add failure/recovery and human approval edges where their absence could make execution unsafe or ambiguous.
+7. Validate the graph against representative success, failure, and interruption scenarios before projecting it into a runtime.
 
-The decision procedure:
-1. Ask: *where does my work split into pieces that never read each other's results?*
-2. Split only that. Everything sequential stays with one agent.
-3. Never let findings merge without one owner of the merge.
+## Concurrency and the diamond
 
-More agents is not a strategy. The shape of the work decides.
+Independent ready nodes may run concurrently. A common pattern is fan-out → verification/join → merge, but use it only when the work actually decomposes that way.
 
-## Execution handoff
+A verifier should be independent of the producer when producer self-review has an unacceptable blind spot. The verification depth should scale with consequence, uncertainty, and error detectability; do not require a separate verifier for every trivial node.
 
-Design the topology once, then hand each ready component to the smallest runtime that fits it.
-Graph engineering owns the nodes, real dependencies, verification joins, and human gates.
-The runtime MUST consume that graph without adding dependencies or redesigning the split.
+One actor owns each merge decision. If workers mutate shared artifacts, model ownership or serialization explicitly rather than assuming parallel writes will reconcile.
 
-| Ready component | Runtime |
-|---|---|
-| Serial chain | Keep it with the leader or one worker |
-| Parallel nodes that never exchange results | Use plain subagents |
-| Independent parallel nodes that need non-blocking coordination at a shared boundary | Use teammode |
-| Fan-in verification | Start a fresh verifier only after every incoming node finishes |
-| Irreversible action | Stop at the human gate |
+## Readiness, barriers, and waves
 
-If one node needs another node's finding, draw an edge and start the consumer in a later wave.
+Prefer readiness based on each node's actual dependencies. Retain a barrier only when a downstream node genuinely consumes the complete set of prior outputs or an external contract requires synchronized progression.
 
-Initialize teammode only when the first coordination-connected parallel component becomes ready.
-For the installed Codex `omo:teammode` v4.19.4 controller, map graph facts into its supported
-`add-member` inputs:
+Waves are a useful runtime projection of a DAG, not necessarily the semantic model. Do not add dependencies merely to make a wave schedule convenient.
 
-- node scope and file ownership become `--focus`;
-- node acceptance criteria and QA become `--deliverable`;
-- graph dependencies determine which members may start in the current wave;
-- overlapping file ownership means the nodes cannot share a wave: repartition ownership or
-  serialize them;
-- the merge owner remains the leader, never another implicit member.
+## Failure and recovery
 
-With another runtime, put the same scope and acceptance criteria in its supported task description
-or spawn prompt instead of inventing `focus` or `deliverable` state fields.
+Model failure behavior where recovery cannot safely be improvised.
 
-Disband the team when that component and its verification join finish. Do not keep team state for
-serial work, isolated subagents, later human gates, or hypothetical future waves. When teammode is
-unavailable, preserve the topology and use the available serial or plain-subagent runtime instead.
-This boundary avoids a second planner, a graph-to-team compiler, and duplicate orchestration state.
+For consequential nodes, decide:
 
-Runtime basis: OpenAI, [Subagents](https://developers.openai.com/codex/subagents), and LazyCodex's
-version-pinned [`teammode` wave mapping](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/SKILL.md#L248-L261)
-and [`team.mjs` member inputs](https://github.com/code-yeongyu/lazycodex/blob/10f95587d3aeacf208cc1fee88a91315962d31e8/plugins/omo/components/teammode/skills/teammode/scripts/team.mjs#L7-L14)
-(all accessed 2026-08-13). This repository's one-writer rule intentionally tightens the upstream
-worktree guidance for overlapping files.
+- what constitutes failure or lost execution state;
+- whether retry is safe and what state must be reset;
+- whether downstream work becomes invalid or merely blocked;
+- whether compensation/rollback exists;
+- when escalation or human input is required.
 
-## The human gate
+Use bounded retries only when a bound is justified by cost, safety, or convergence evidence. An executor that loses its environment should not silently redesign the topology; report the failure to the graph owner unless the contract explicitly authorizes recovery.
 
-The human is a node. Route every irreversible edge — send, publish, refund, delete, deploy —
-through explicit approval. Placement rule: **put the gate where a mistake is expensive to
-undo, not on every step.** A gate on everything makes the human the bottleneck; a gate on
-nothing means nobody is watching. Judge the system on numbers that cannot argue back (tests
-that ran, money that landed), never on its own self-reports.
+## Human gates
 
-## Guardrails
+Model a human decision where authority or consequence requires it: irreversible publication/deployment/deletion, material spend, policy approval, or unresolved intent. Place the gate immediately before the consequential transition rather than serializing unrelated preparation behind approval.
 
-Four caps that keep a graph from becoming an expensive accident:
-1. Every loop gets a maximum number of rounds.
-2. One writer per file — no two jobs mutate the same artifact.
-3. The routing lives in written steps; the model fills the jobs, not the plan.
-4. A hard cap on how many agents can spawn.
+A gate must state what evidence the human receives and what decision unlocks which edge.
+
+## Runtime projection
+
+Choose the execution mechanism after the semantic graph is valid.
+
+- Keep a serial chain with one executor when context continuity dominates.
+- Use independent subagents for parallel nodes that do not need shared coordination.
+- Use a coordinating team/runtime only when ready parallel nodes need shared non-blocking coordination.
+- Start a join/verifier only after its required incoming outputs exist.
+- Preserve human gates and failure policies regardless of runtime.
+
+The runtime consumes the graph; it does not silently redesign dependencies, ownership, or acceptance criteria. Runtime-specific fields belong in the projection layer, not in the graph's universal semantic model.
+
+## Validation
+
+Test the graph as a process model, not merely as a rendered diagram.
+
+Check at least the scenarios whose failure would matter:
+
+- happy-path reachability to each terminal outcome;
+- no node starts without required inputs;
+- concurrent nodes do not violate shared-resource ownership;
+- joins wait for exactly their required predecessors;
+- failed/skipped nodes propagate according to policy;
+- retries cannot create unbounded execution where that matters;
+- irreversible transitions remain behind required authority gates.
+
+Use ordinary scenario traces for routine DAGs. Consider state-space/formal analysis only when concurrency, retries, resource ownership, or failure interleavings create consequential claims that examples cannot cover confidently.

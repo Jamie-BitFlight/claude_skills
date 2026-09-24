@@ -28,7 +28,15 @@ Before modifying any plugin file (`plugin.json`, agents, skills, hooks), load th
 
 ## plugin.json Auto-Discovery Rules
 
-Claude Code auto-discovers components from default locations within a plugin directory. The `agents`, `skills`, and `commands` keys in `plugin.json` exist ONLY for declaring components in non-default locations.
+Claude Code auto-discovers components from default locations within a plugin directory. Custom
+component paths behave differently by field:
+
+- `agents` and `commands` replace their default scans. Omit the field to use only the default
+  directory; when declaring custom paths, include every default-path component that must remain
+  visible.
+- `skills` adds directories alongside the default `skills/` scan. Declaring custom skill paths does
+  not hide default-path skills. Marketplace entries whose source is the marketplace root have a
+  documented exception: specific skill subdirectories become the complete set for that entry.
 
 **Default auto-discovered locations:**
 
@@ -39,12 +47,14 @@ Claude Code auto-discovers components from default locations within a plugin dir
 
 ```mermaid
 flowchart TD
-    Q{Are ALL components in default locations?}
-    Q -->|Yes — agents/ skills/ commands/ hooks/hooks.json| Omit["Omit agents/skills/commands keys from plugin.json<br>Auto-discovery registers everything"]
-    Q -->|No — some components are in non-default paths| Declare["Declare ONLY the non-default paths<br>⚠️ Declaring a subset overrides auto-discovery<br>Unlisted components become invisible"]
-    Omit --> Done([All components visible])
-    Declare --> Warn["List EVERY component in that key<br>not just the non-default ones"]
-    Warn --> Done
+    Q{Which custom component path?}
+    Q -->|agents or commands| Replace["Declared paths replace the default scan"]
+    Replace --> Keep["List every default-path component<br>that must remain visible"]
+    Q -->|skills| Add["Declared paths add to the default skills/ scan"]
+    Q -->|none| Omit["Omit path fields<br>Use default discovery"]
+    Keep --> Done([Components visible])
+    Add --> Done
+    Omit --> Done
 ```
 
 **Incident record (2026-03-17):** `python3-development` plugin had:

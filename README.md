@@ -1,329 +1,173 @@
 <p align="center">
-  <a href="#available-plugins"><img src="https://img.shields.io/badge/Claude_Code-Plugin_Marketplace-6B4FBB?style=for-the-badge&amp;logo=anthropic&amp;logoColor=white" alt="Claude Code Plugin Marketplace"></a>
-  <a href="#available-plugins"><img src="https://img.shields.io/badge/Plugins-30-blue?style=for-the-badge" alt="30 Plugins"></a>
-  <a href="#available-plugins"><img src="https://img.shields.io/badge/Agents-78-orange?style=for-the-badge" alt="78 Agents"></a>
-  <a href="#available-plugins"><img src="https://img.shields.io/badge/Skills-238-green?style=for-the-badge" alt="238 Skills"></a>
+  <img src="./assets/claude-skills-overview.svg" alt="Diagram showing engineering workflows routed through Claude Skills to skills, specialist agents, hooks, and MCP tools." width="100%" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/stargazers"><img src="https://img.shields.io/github/stars/Jamie-BitFlight/claude_skills.svg?style=flat-square&amp;logo=github" alt="GitHub stars"></a>
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/commits/main"><img src="https://img.shields.io/github/last-commit/Jamie-BitFlight/claude_skills.svg?style=flat-square" alt="GitHub last commit"></a>
-  <a href="https://github.com/Jamie-BitFlight/claude_skills/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"></a>
-  <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.11+"></a>
-  <a href="https://docs.astral.sh/uv/"><img src="https://img.shields.io/badge/uv-package_manager-DE5FE9?style=flat-square&amp;logo=uv&amp;logoColor=white" alt="uv"></a>
-  <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-enabled-6B4FBB?style=flat-square" alt="MCP enabled"></a>
-  <a href="https://www.conventionalcommits.org/"><img src="https://img.shields.io/badge/Conventional_Commits-1.0.0-FE5196?style=flat-square&amp;logo=conventionalcommits&amp;logoColor=white" alt="Conventional Commits"></a>
+  <a href="#quick-start"><strong>Get started</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="#start-with-these"><strong>Explore workflows</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="#plugin-catalogue"><strong>Browse plugins</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="./CONTRIBUTING.md"><strong>Contribute</strong></a>
 </p>
 
-<p align="center">
-  <a href="https://github.com/bitflight-devops/skilllint"><img src="https://img.shields.io/badge/Plugins_validated_with-skilllint-22C55E?style=for-the-badge&amp;logo=python&amp;logoColor=white" alt="Plugins validated with skilllint"></a>
-  <a href="https://pypi.org/project/skilllint/"><img src="https://img.shields.io/pypi/v/skilllint.svg?style=for-the-badge&amp;label=skilllint&amp;color=3775A9&amp;logo=pypi&amp;logoColor=white" alt="skilllint on PyPI"></a>
-</p>
 
-# Claude Skills Collection
+# Claude Skills
 
-Professional workflow plugins for Claude Code — make Claude apply your project's actual linting rules, commit conventions, and testing standards, not generic defaults. Covers Python, shell, Perl, CI/CD, AI tooling, and agent orchestration.
+A marketplace of opinionated Agent Skills, specialist agents, hooks, and engineering workflows for Claude Code.
 
-## What Problem Does This Solve?
+The collection is built around a simple idea: **agents should follow the engineering process of the repository they are working in, gather evidence before acting, and use specialists when the problem deserves them.**
 
-| Without plugins | With plugins |
-| --- | --- |
-| Claude gives generic Python advice | Claude applies Python 3.11+, Typer, Rich, httpx conventions specific to your stack |
-| Claude says "done" before linters pass | holistic-linting enforces root-cause fixes before any task completes |
-| Claude speculates and hallucinates | hallucination-detector blocks completion on ungrounded claims |
-| Claude jumps to solutions without investigating | verification-gate forces evidence gathering before action |
-| Session transcripts disappear with no learning | agentskill-kaizen mines transcripts for anti-patterns and generates skill patches |
-| Commit messages are inconsistent | conventional-commits enforces feat/fix/chore format for semantic versioning |
-| Claude reads source files when it should delegate | orchestrator-discipline hooks block investigation escalation at the tool level |
-
-## Quick Start
+## Quick start
 
 ```bash
-# Add the marketplace (one-time setup, ~10 seconds, no restart required)
 /plugin marketplace add Jamie-BitFlight/claude_skills
 
-# Install a plugin (use the install name from the tables below)
-/plugin install dh@jamie-bitflight-skills
+# Python engineering
 /plugin install python-engineering@jamie-bitflight-skills
+
+# Language-agnostic development workflow
+/plugin install dh@jamie-bitflight-skills
 ```
 
-### Verify Installation
+Browse the [marketplace manifest](./.claude-plugin/marketplace.json) or install one of the systems below.
 
-Start a new session and ask Claude to perform a task the plugin handles (for example, build a CLI with Typer after installing `python-engineering`). Claude will apply the plugin's conventions rather than generic defaults.
+## Start with these
 
-## Available Plugins
+### Python Engineering
 
-### Full-Featured Development Systems
+[python-engineering](./plugins/python-engineering) is an opinionated Python engineering system for coding agents.
 
-Comprehensive frameworks with multiple skills, commands, and specialized agents.
-
-| Plugin | Install name | What It Does |
-| --- | --- | --- |
-| [development-harness](./plugins/development-harness) | `dh` | Language-agnostic SAM 7-stage pipeline (Discovery → Planning → Context → Decomposition → Execution → Review → Verification) with backlog management, milestone dispatch, and kage-bunshin parallel sessions. See the plugin's `skills/` and `agents/` directories for the full roster, plus an MCP backlog server. |
-| [python-engineering](./plugins/python-engineering) | `python-engineering` | Opinionated Python 3.11+ engineering system. Establishes strong defaults (SOLID, typing policy, testing standards, code smell detection) and routes to specialist skills for TDD, CLI (Typer/Rich), web, data/science, and constrained environments. |
-| [bash-development](./plugins/bash-development) | `bash-development` | Write robust Bash 5.1+ scripts with modern patterns, error handling, POSIX portability, and specialized agents for development and auditing. |
-| [perl-development](./plugins/perl-development) | `perl-development` | Build production-quality Perl 5.30+ scripts with modern practices, CPAN ecosystem integration, comprehensive testing, and CLI architecture. |
-| [plugin-creator](./plugins/plugin-creator) | `plugin-creator` | Complete toolkit for creating, refactoring, validating, and auditing Claude Code plugins, skills, agents, and hooks. Automated version bumping via pre-commit, and `skilllint` integration. |
-| astral (upstream) | `astral` | Astral's official `uv`, `ruff`, and `ty` skills plus the `ty` language server, sourced directly from [astral-sh/claude-code-plugins](https://github.com/astral-sh/claude-code-plugins) and pinned to a reviewed commit. Repo-specific policy that overrides this upstream guidance lives in `python-engineering`. |
-| [clang-format](./plugins/clang-format) | `clang-format-configuration` | Stop clang-format from reformatting your existing C/C++ style — analyzes your code's patterns first and shows the impact before applying any changes. |
-| [holistic-linting](./plugins/holistic-linting) | `holistic-linting` | Automatic code quality enforcement — Claude won't say "done" until code passes all configured linters with root-cause fixing. Covers ruff, mypy, and bandit. |
-| [summarizer](./plugins/summarizer) | `summarizer` | Faithful information summarization with anti-hallucination methodology, structured output templates, and autonomous agents for file, URL, and image summarization. |
-| [agentskill-kaizen](./plugins/agentskill-kaizen) | `agentskill-kaizen` | Analyze Claude Code session transcripts to find inefficiencies, anti-patterns, and repeated mistakes with DuckDB process-mining. Two MCP servers included. |
-| [dasel](./plugins/dasel) | `dasel` | Query, transform, and convert structured data files (JSON, YAML, TOML, XML, CSV, HCL, INI) using dasel v3 with exploration agents. |
-| [the-rewrite-room](./plugins/the-rewrite-room) | `rwr` | Portable documentation workflows for audit/sync/freshness, user-facing authoring and summaries, citation-driven writing, docs-to-skill conversion, and AI-instruction optimization. |
-| [process-siren](./plugins/process-siren) | `process-siren` | Converts bullet steps, ASCII art, markdown tables, and prose workflows into precise Mermaid diagrams for AI-facing documents, with process quality methodology for improving ambiguous or incomplete processes before conversion. |
-| [fastmcp-creator](./plugins/fastmcp-creator) | `fastmcp-creator` | Build production-ready MCP servers with FastMCP 3.x — covers provider/transform architecture, authorization, session state, async patterns, STDIO/HTTP transports, and deployment. Includes a live FastMCP reference MCP server. |
-| [dot-dash](./plugins/dot-dash) | `dot-dash` | Real-time browser dashboard for monitoring every active Claude Code session — live transcript streaming, prompt injection, and session termination from a single React UI. Node.js/Hono backend with WebSocket updates and token-based authentication. |
-
-### Lightweight Knowledge Clip-Ins
-
-Focused plugins that teach Claude specific conventions or tools without heavy workflows.
-
-#### Python and Package Management
-
-| Plugin | Install name | What It Does |
-| --- | --- | --- |
-| [litellm](./plugins/litellm) | `litellm` | Call any LLM API (OpenAI/Anthropic/local) from Python with unified interface and retry logic. |
-| [llamafile](./plugins/llamafile) | `llamafile` | Run local GGUF models with OpenAI-compatible API for offline/air-gapped inference. |
-| [xdg-base-directory](./plugins/xdg-base-directory) | `xdg-base-directory` | Store config and data files in XDG-compliant directories using platformdirs — so your tool works on Linux, macOS, and Windows without hardcoded paths. |
-
-#### Git and CI/CD
-
-| Plugin | Install name | What It Does |
-| --- | --- | --- |
-| [conventional-commits](./plugins/conventional-commits) | `conventional-commits` | Write consistent commit messages (feat/fix/chore) for semantic versioning and changelog generation. |
-| [commitlint](./plugins/commitlint) | `commitlint` | Configure and validate commit messages against commitlint rules — CI rejects non-conforming commits before they merge. |
-| [gitlab-skill](./plugins/gitlab-skill) | `gitlab-skill` | Apply documented GitLab CI/CD semantics, components, inputs, experimental Functions, GLFM syntax, and verified gitlab-ci-local behavior. |
-
-#### Better Claude Behavior
-
-| Plugin | Install name | What It Does |
-| --- | --- | --- |
-| [agent-orchestration](./plugins/agent-orchestration) | `agent-orchestration` | Orchestrate sub-agents across harnesses: decompose work into phases, dispatch each with a specialist or generic prompt, adjudicate STATUS reports, and run fan-out, maker/checker, tournament, and loop-until-stop shapes with explicit caps (`delegate`, `parallel-work`). |
-| [verification-gate](./plugins/verification-gate) | `verification-gate` | Forces Claude to verify its hypothesis matches its target before executing writes or edits — blocks correct diagnoses from producing wrong implementations. |
-| [hallucination-detector](https://github.com/bitflight-devops/hallucination-detector) | `hallucination-detector` | Blocks task completion when Claude speculates or makes ungrounded claims, forcing evidence-first rewrites. Separate GitHub repo. |
-| [scientific-method](./plugins/scientific-method) | `scientific-method` | Structures hypothesis-driven debugging and investigation with experiment protocols and evidence-first methodology. |
-| [brainstorming-skill](./plugins/brainstorming-skill) | `brainstorming-skill` | Significantly improves brainstorming with research-validated prompt patterns organized by category. |
-| [frustration-analyzer](./plugins/frustration-analyzer) | `frustration-analyzer` | Finds the single strongest user reaction to an AI instruction-following failure in a session, reconstructs the assistant output that triggered it, and renders the exchange as a terminal-style PNG ready for social media. Includes an MCP server. |
-| [rtfp](./plugins/rtfp) | `rtfp` | Scans Claude Code session transcripts to find the strongest user reactions to instruction-following failures and helps identify what went wrong. |
-| [orchestrator-discipline](./plugins/orchestrator-discipline) | `orchestrator-discipline` | Enforces context window discipline via PreToolUse hooks — blocks source-file reads without edits and blocks diagnostic commands that should be delegated to agents. |
-
-#### Architecture
-
-| Plugin | Install name | What It Does |
-| --- | --- | --- |
-| [twelve-factor-app](./plugins/twelve-factor-app) | `twelve-factor-app` | Apply twelve-factor app methodology (15 principles including 3 modern extensions) to your projects for portable, scalable, cloud-native architecture. |
-
-## Plugin Details
-
-### development-harness
-
-The SAM (Stateless Agent Methodology) pipeline in a single plugin. Every feature request moves through seven stages that each produce a file artifact: Discovery, Planning (with RT-ICA information completeness analysis), Context Integration, Task Decomposition, Execution, Forensic Review, and Final Verification.
-
-Language plugins like `python-engineering` plug into the harness by telling it which specialist agents to use for each task. The harness dispatches `dh:task-worker` either way — it loads the specialist profile the task names, and without a language plugin no profile is named and it executes with the skills the task carries.
-
-Install name: `dh`
-
-**Skills include:** `/dh:add-new-feature`, `/dh:implement-feature`, `/dh:complete-implementation`, `/dh:groom-milestone`, `/dh:work-milestone`, `/dh:dispatch`, `/dh:work-backlog-item`, and more.
-
-**Agents include:** `@dh:swarm-task-planner`, `@dh:feature-researcher`, `@dh:codebase-analyzer`, `@dh:feature-verifier`, `@dh:doc-drift-auditor`, and more.
-
-**MCP servers:** Backlog and SAM servers for selected structured workflow operations, artifact management, and dispatch orchestration; sequential-thinking server. Provider-native operations remain on the configured backend (for example, `bd` in a Beads workspace).
-
-### python-engineering
-
-Opinionated Python 3.11+ engineering system that establishes strong defaults and routes to specialist skills. Composes with `development-harness` for the full pipeline, or works standalone.
-
-**Skills include:** One automatic router (`python3-core`) plus specialist skills for CLI (`python3-cli`), testing (`python3-testing`, `python3-tdd`), typing (`python3-typing`), web (`python3-web`), data (`python3-data`), tooling (`python3-tools`), and constrained environments (`python3-stdlib-only`). Manual entrypoints: `/python-engineering:orchestrate`, `/python-engineering:review`, `/python-engineering:lint`, `/python-engineering:cleanup`, `/python-engineering:debug`.
-
-**Agents include:**
-
-- `@python-engineering:python-cli-architect` — implements Python CLI features end-to-end
-- `@python-engineering:python-cli-design-spec` — produces architecture specs for CLIs
-- `@python-engineering:python-pytest-architect` — writes pytest test suites
-- `@python-engineering:code-reviewer` — code review with Python idiom awareness
-- `@python-engineering:semantic-code-search` — pattern and structure search over Python codebases
-
-### plugin-creator
-
-Toolkit for building, refactoring, and validating plugins. Claude won't drift from current schema when creating agents or skills — the plugin loads the authoritative reference documentation automatically.
-
-**Skills include:** `/plugin-creator:skill-creator`, `/plugin-creator:agent-creator`, `/plugin-creator:plugin-lifecycle`, `/plugin-creator:refactor-plugin`, `/plugin-creator:refactor-skill`, `/plugin-creator:claude-skills-overview-2026`, `/plugin-creator:claude-plugins-reference-2026`, `/plugin-creator:hooks-guide`, and more.
-
-**Agents include:** `refactor-planner`, `refactor-executor`, `refactor-validator`, `subagent-refactorer` (applies Anthropic prompt engineering best practices), `skill-auditor`, `skill-content-updater`, `ai-doc-optimizer`, `plugin-assessor`.
-
-**Scripts include:** `create_plugin.py` (interactive scaffolding). The shared [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner) pre-commit hook synchronizes manifests and bumps plugin versions.
-
-**Validation:** Integrates with `skilllint` (`uvx skilllint@latest check <path>`) for frontmatter validation, skill complexity checking, and auto-fix of common errors.
-
-### orchestrator-discipline
-
-Installs three PreToolUse hooks that run before every Read, Grep, and Bash call:
-
-- **Read/Grep hook** — warns when Claude reads a source file it is not about to edit, prompting delegation instead
-- **Diagnostic command gate** — blocks linter/type-checker/test commands from running directly in the orchestrator context window
-- **Bash misuse prevention** — catches other patterns where the orchestrator should delegate rather than act
-
-These hooks structurally prevent the investigation escalation anti-pattern: the progressive cycle of reading files that justifies reading more files until Claude implements the task itself instead of delegating.
-
-### agentskill-kaizen
-
-Two MCP servers surface transcript analysis directly in your session:
-
-- **kaizen-duckdb** — DuckDB read-only access to the session transcript database for SQL-based process mining
-- **kaizen-analysis** — analysis server for anti-pattern detection and improvement recommendations
-
-Run after sessions to identify what went wrong, what tooling Claude was missing, and where repeated mistakes occurred.
-
-### fastmcp-creator
-
-Covers the full FastMCP 3.x development surface: provider/transform architecture (CodeMode, Tool Search, server-level transforms), component versioning, session state, MultiAuth authorization, PropelAuth integration, Pydantic validation, async patterns, STDIO/HTTP transports, nginx reverse proxy deployment, background tasks, Prefab Apps UI, security patterns, client SDK usage, testing, and migration from FastMCP v2.
-
-Includes a live FastMCP reference MCP server that provides `search_docs`, `scaffold_server`, `validate_server`, and `version_check` tools.
-
-### dot-dash
-
-A browser-based control panel for Claude Code. When you are running multiple sessions simultaneously — across projects, worktrees, or machines — dot-dash gives you a single place to watch what each session is doing and to interact with it.
-
-**What it does:**
-
-- **Live transcript view** — streams JSONL transcript events from each session to the browser in real time via WebSocket, so you can read Claude's reasoning and tool calls as they happen
-- **Session list** — shows all active and recently stopped sessions with project name, working directory, PID, and last-event timestamp
-- **Prompt injection** — lets you queue a message in the browser that will be prepended to the next prompt the user submits in a specific session, without interrupting the current turn
-- **Session termination** — send a stop signal to any session from the dashboard
-
-**How it works:**
-
-Three hooks wire each Claude Code session into the server automatically:
-
-- `SessionStart` — registers the session (ID, CWD, PID) with the local server
-- `SessionEnd` — marks the session stopped and cleans up
-- `UserPromptSubmit` — checks the injection queue before every prompt; if a message is queued, prepends it transparently
-
-The server runs locally at `http://127.0.0.1:7765` by default. A React/TypeScript frontend (built with Vite) is served from the same process. Authentication uses a token stored at `~/.claude/dot-dash/token` (generated on first run, file-permissions 600).
-
-**Starting the server:**
-
-```bash
-cd plugins/dot-dash/server
-npm install
-npm run build
-node dist/main.js
-```
-
-Or use the bundled script:
-
-```bash
-bash plugins/dot-dash/scripts/start-server.sh
-```
-
-Then open `http://127.0.0.1:7765` in a browser. The server must be running before Claude Code sessions start for those sessions to appear in the dashboard.
-
-**Configuration:**
-
-Set `DOT_DASH_PORT` in your environment to use a port other than `7765`:
-
-```bash
-DOT_DASH_PORT=8080 node dist/main.js
-```
-
-## How Plugins Work
-
-Plugins contain:
-
-- **Skills** — Knowledge and workflows that guide Claude's behavior
-- **Commands** — Slash commands you can invoke directly (like `/dh:add-new-feature`)
-- **Agents** — Specialized sub-agents for complex tasks (like code review or architecture design)
-- **Hooks** — Automation that runs at specific lifecycle events
-- **MCP Servers** — Additional tools Claude can call (backlog management, code search, file reading, etc.)
-
-Once installed, plugins work automatically. Claude knows when to apply them based on your project context.
-
-## Plugin Structure
+It provides strong defaults for typing, testing, CLI design, architecture, linting and packaging while preserving coherent existing project conventions. Its implementation workflow independently challenges shallow plans before code is written.
 
 ```text
-plugins/plugin-name/
-├── .claude-plugin/
-│   └── plugin.json       # Plugin manifest
-├── skills/               # What Claude learns
-├── commands/             # Slash commands you can use
-├── agents/               # Specialized sub-agents
-├── hooks/                # hooks.json and hook scripts
-├── scripts/              # Python scripts (optional)
-└── README.md             # Documentation
+/python-engineering:orchestrate "Add a CLI command that processes CSV files"
 ```
 
-Full field-level structure (required vs. optional, frontmatter schemas): see `AGENTS.md`'s Plugin Structure section.
+It also includes a read-only quality/modernization audit that fans out independent investigators:
 
-## Local Development
+```text
+/python-engineering:python-quality-audit PR
+/python-engineering:python-quality-audit staged
+/python-engineering:python-quality-audit src/
+```
+
+The audit asks what smells, what can be deleted, what modern Python can simplify, what maintained libraries can replace local machinery, and how substantial Python projects solve the same demonstrated problems.
+
+[Read the Python Engineering guide →](./plugins/python-engineering/README.md)
+
+### Development Harness
+
+[development-harness](./plugins/development-harness) provides the language-independent development lifecycle: discovery, planning, decomposition, execution, review and verification. Language plugins such as Python Engineering supply the specialist implementation rules.
+
+Install name: `dh`.
+
+### Plugin Creator
+
+[plugin-creator](./plugins/plugin-creator) contains the repository's tooling and methodology for creating, evaluating, tightening and validating Agent Skills, agents and plugins.
+
+### Process Siren
+
+[process-siren](./plugins/process-siren) improves processes before representing them. It includes evidence-driven process improvement, adaptive resolution and Mermaid process modelling.
+
+## Plugin catalogue
+
+### Engineering systems
+
+| Plugin | Install name | Purpose |
+| --- | --- | --- |
+| [Python Engineering](./plugins/python-engineering) | `python-engineering` | Opinionated Python implementation, testing, review, modernization and quality audit |
+| [Development Harness](./plugins/development-harness) | `dh` | Language-independent feature/development lifecycle and orchestration |
+| [Bash Development](./plugins/bash-development) | `bash-development` | Robust Bash development and auditing |
+| [Perl Development](./plugins/perl-development) | `perl-development` | Modern Perl development, testing and CPAN integration |
+| [Plugin Creator](./plugins/plugin-creator) | `plugin-creator` | Create, evaluate, refactor and validate Agent Skills/plugins |
+| [FastMCP Creator](./plugins/fastmcp-creator) | `fastmcp-creator` | Build and test FastMCP servers |
+| [Holistic Linting](./plugins/holistic-linting) | `holistic-linting` | Resolve lint/type failures at their root cause |
+| [Process Siren](./plugins/process-siren) | `process-siren` | Process improvement and precise process modelling |
+| [The Rewrite Room](./plugins/the-rewrite-room) | `rwr` | Documentation audit, synchronization and authoring |
+| [GitLab](./plugins/gitlab-skill) | `gitlab-skill` | GitLab CI/CD semantics and workflows |
+
+### Agent reliability and orchestration
+
+| Plugin | Install name | Purpose |
+| --- | --- | --- |
+| [Agent Orchestration](./plugins/agent-orchestration) | `agent-orchestration` | Fan-out, maker/checker, delegation and parallel-work patterns |
+| [Verification Gate](./plugins/verification-gate) | `verification-gate` | Verify hypotheses against targets before writes |
+| [Scientific Method](./plugins/scientific-method) | `scientific-method` | Hypothesis-driven investigation and debugging |
+| [Orchestrator Discipline](./plugins/orchestrator-discipline) | `orchestrator-discipline` | Keep orchestration contexts from turning into implementation contexts |
+| [AgentSkill Kaizen](./plugins/agentskill-kaizen) | `agentskill-kaizen` | Mine session transcripts for repeated agent/process failures |
+| [Summarizer](./plugins/summarizer) | `summarizer` | Evidence-conscious summarization workflows |
+
+### Focused tools and knowledge
+
+| Plugin | Install name | Purpose |
+| --- | --- | --- |
+| [Conventional Commits](./plugins/conventional-commits) | `conventional-commits` | Consistent semantic commit messages |
+| [Commitlint](./plugins/commitlint) | `commitlint` | Commit-message validation |
+| [clang-format](./plugins/clang-format) | `clang-format-configuration` | Infer and preserve an existing C/C++ formatting style |
+| [dasel](./plugins/dasel) | `dasel` | Structured-data query/transformation workflows |
+| [xdg-base-directory](./plugins/xdg-base-directory) | `xdg-base-directory` | Cross-platform application config/data locations |
+| [LiteLLM](./plugins/litellm) | `litellm` | LiteLLM integration guidance |
+| [llamafile](./plugins/llamafile) | `llamafile` | Local model/llamafile workflows |
+| [Twelve-Factor App](./plugins/twelve-factor-app) | `twelve-factor-app` | Twelve-factor architecture guidance |
+| [Brainstorming](./plugins/brainstorming-skill) | `brainstorming-skill` | Structured brainstorming techniques |
+
+### Session tooling and external/upstream plugins
+
+| Plugin | Install name | Purpose |
+| --- | --- | --- |
+| [dot-dash](./plugins/dot-dash) | `dot-dash` | Browser dashboard for live Claude Code sessions, transcript streaming and prompt injection |
+| [Frustration Analyzer](./plugins/frustration-analyzer) | `frustration-analyzer` | Find instruction-following failures across Claude/Codex sessions and render a shareable receipt |
+| [RTFP](./plugins/rtfp) | `rtfp` | Find and render the strongest instruction-following failure from a Claude Code session |
+| [Hallucination Detector](https://github.com/bitflight-devops/hallucination-detector) | `hallucination-detector` | External plugin for evidence-first handling of ungrounded claims |
+| Astral upstream | `astral` | Pinned upstream Astral Claude Code plugin bundle from `astral-sh/claude-code-plugins` |
+
+The [marketplace manifest](./.claude-plugin/marketplace.json) is the authoritative inventory, including externally sourced plugins. Individual plugin READMEs are the authoritative usage guides.
+
+## How the collection works
+
+A plugin can contain:
+
+- **skills** — reusable knowledge, policies and workflows;
+- **agents** — isolated specialists for bounded responsibilities;
+- **hooks** — lifecycle enforcement;
+- **MCP servers** — structured tools and external capabilities;
+- **scripts/references/assets** — deterministic helpers and progressively disclosed detail.
+
+Skills are designed to route rather than preload everything. Shared policy lives at the appropriate authority and specialists add domain-specific behavior.
+
+## Local development
+
+Load plugins directly from a checkout:
 
 ```bash
-# Option 1: Load specific plugins for this session
-claude --plugin-dir ./plugins/python-engineering --plugin-dir ./plugins/holistic-linting
+claude \
+  --plugin-dir ./plugins/python-engineering \
+  --plugin-dir ./plugins/holistic-linting
+```
 
-# Option 2: Add local marketplace for persistent enable/disable
+Or use the local marketplace:
+
+```bash
 /plugin marketplace add ./.claude-plugin/marketplace.json
-
-# Install plugins you need (--scope local keeps it gitignored)
 /plugin install python-engineering@jamie-bitflight-skills --scope local
-
-# Disable when not needed
-/plugin disable python-engineering@jamie-bitflight-skills
-
-# Re-enable when needed
-/plugin enable python-engineering@jamie-bitflight-skills
 ```
 
-## Troubleshooting
-
-**Plugin commands not found after install?**
-
-Restart Claude Code to reload commands. Verify the plugin installed:
-
-```bash
-/plugin list
-```
-
-**Plugin not influencing Claude's behavior?**
-
-Check that the plugin is enabled and not scoped to a different project:
-
-```bash
-/plugin list --all
-```
-
-**Want to test a plugin before committing to it?**
-
-Use `--scope local` when installing. This keeps the plugin active only in your current project and gitignored.
-
-**Something broken after an update?**
-
-Reinstall the specific plugin (use the install name from the tables above):
-
-```bash
-/plugin install <install-name>@jamie-bitflight-skills
-```
-
-Every plugin works immediately after install — no restart, no configuration. See [Quick Start](#quick-start) above to begin.
+Validate repository changes using the checks defined by the repository itself. Plugin and skill work uses [skilllint](https://github.com/bitflight-devops/skilllint) as part of that validation.
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed guidelines on adding, removing, or updating plugins.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) and [AGENTS.md](./AGENTS.md) before changing plugins.
 
-Quick overview:
+The short version:
 
-1. Fork the repository
-2. Create your plugin using `/plugin-creator` or manually
-3. Update `.claude-plugin/marketplace.json`
-4. Validate with `uvx skilllint@latest check`
-5. Test locally before submitting PR
-6. Submit pull request with description
-
-## Requirements
-
-- Claude Code v2.0 or later
-- Individual plugins may have additional requirements (see plugin READMEs)
+1. preserve the repository's existing contracts and governance;
+2. make the smallest coherent change;
+3. validate the behavior you changed;
+4. update affected documentation and generated artifacts;
+5. submit a focused pull request.
 
 ## License
 
-MIT License — see individual plugins for specifics.
+MIT. See [LICENSE](./LICENSE).

@@ -2,23 +2,28 @@
 
 Destination affects which frontmatter fields work and what runtime capabilities are available. Choose destination before writing frontmatter.
 
-| Destination | `hooks` in frontmatter | `permissionMode` | `context: fork` Agent tool | `/skill-name` in `-p` mode |
-|---|---|---|---|---|
-| Plugin (`plugins/*/skills/`) | Executed at plugin trust level | FORBIDDEN — silently ignored | NOT available | NOT available |
-| Plugin (`plugins/*/agents/`) | FORBIDDEN — prevents startup | FORBIDDEN — silently ignored | N/A | NOT available |
-| Project (`.claude/skills/`) | Executed at project trust level | Supported | NOT available | NOT available |
-| User (`~/.claude/skills/`) | Executed at user trust level | Supported | NOT available | NOT available |
+| Skill destination | `hooks` in frontmatter | `context: fork` subagent | Direct `/<skill-name>` in `-p` / Agent SDK |
+|---|---|---|---|
+| Plugin (`plugins/*/skills/`) | Executed at plugin trust level | Fresh context; ordinary depth-limited nesting | Supported when discovered and user-invocable |
+| Project (`.claude/skills/`) | Executed at project trust level | Fresh context; ordinary depth-limited nesting | Supported when discovered and user-invocable |
+| User (`~/.claude/skills/`) | Executed at user trust level | Fresh context; ordinary depth-limited nesting | Supported when discovered and user-invocable |
+| Portable upload/API package | Not portable | Not portable | N/A |
 
-For plugin agent security restrictions (forbidden frontmatter fields), see the [Plugin Agent Security Restrictions](../claude-plugins-reference-2026/SKILL.md) section in `claude-plugins-reference-2026` — that is the canonical source.
+Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`; these fields do not block startup.
+See [Plugin Manifest and Components](../../claude-plugins-reference-2026/references/manifest-and-components.md#component-distinctions).
 
 **Headless / `-p` mode (any destination):**
 
-ALL `/skill-name` invocations are unavailable when Claude Code runs in headless mode (`-p` flag or Agent SDK CLI). Skills cannot be called from automation via slash syntax. The full workflow must be embedded directly in the prompt instead.
+Send `/<skill-name>` in the prompt to dispatch a discovered, user-invocable skill directly. This works in `claude -p` and Agent SDK sessions and is independent of the SDK `skills` allowlist.
 
 SOURCE: [headless.md](https://code.claude.com/docs/en/headless.md) (accessed 2026-04-23)
 
-**`context: fork` skills (any destination):**
+**`context: fork` skill subagents (any Claude Code destination):**
 
-The Agent tool is NOT available inside a forked context — the skill cannot delegate to subagents. For hierarchical delegation, the parent must run in main context (no `context: fork`).
+Despite the field name, this is not a conversation fork. The skill content becomes the prompt for a fresh subagent with no conversation history. It follows ordinary depth-limited subagent nesting. A separate conversation fork inherits the full history and cannot spawn another conversation fork.
 
-SOURCE: [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills.md) — "Context Fork Behavior" section (accessed 2026-04-23)
+SOURCE: [Claude Code skills](https://code.claude.com/docs/en/skills#run-skills-in-a-subagent) and [subagents](https://code.claude.com/docs/en/sub-agents#fork-the-current-conversation) (accessed 2026-09-24)
+
+**Portable upload/API package:** only `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools` are accepted. claude.ai uploads, the Skills API, and Anthropic packaging hard-fail unexpected fields.
+
+SOURCE: [Using skill frontmatter outside Claude Code](https://code.claude.com/docs/en/skills#using-skill-frontmatter-outside-claude-code) (accessed 2026-09-24)

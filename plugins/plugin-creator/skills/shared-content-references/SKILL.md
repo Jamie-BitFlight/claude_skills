@@ -98,7 +98,6 @@ reference — canary, `skilllint`, and target-existence checks.
   different problem from N skills sharing content.
 - `/plugin-creator:component-patterns` — §Shared Resources covers shared executable code
   (`lib/` at the plugin root), the code counterpart to this skill's shared prose.
-- The `refactor-validator` agent's `No duplicate content across skills` checklist item routes
-  here for the remedy.
+- The `plugin-assessor` agent's cross-component duplicate-content check routes here for the remedy.
 - The `start-refactor-task` skill's `CREATE shared references if specified` step routes here for
   what a shared reference is and how to create one.

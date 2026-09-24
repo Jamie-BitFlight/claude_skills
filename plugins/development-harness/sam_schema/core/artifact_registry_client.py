@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 
-import backlog_core.models as _backlog_models
+import backlog_core.models as backlog_models
 from backlog_core.artifact_provider import ArtifactBackend, create_artifact_provider
 from backlog_core.artifact_registry import ArtifactRegistry
 from backlog_core.models import ArtifactEntry, ArtifactStatus, ArtifactType, BacklogError
@@ -79,13 +79,13 @@ def _get_provider() -> ArtifactBackend:
         ArtifactWriteError: When ``DEFAULT_REPO`` is not set (configuration error).
         BacklogError: On backend initialisation failures.
     """
-    repo = _backlog_models.DEFAULT_REPO
+    repo = backlog_models.DEFAULT_REPO
     if not repo:
         msg = "DEFAULT_REPO not set — cannot initialise artifact provider"
         raise BacklogError(msg)
     return create_artifact_provider(
         repo=repo,
-        root_worktree=_backlog_models._REPO_ROOT,  # ruff: ignore[private-member-access]
+        root_worktree=backlog_models._REPO_ROOT,  # ruff: ignore[private-member-access]
     )
 
 

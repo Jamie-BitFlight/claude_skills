@@ -70,8 +70,9 @@ cross-harness targets, and an index of subsystem architecture documents. Read it
 a change; this file covers how to work in the repository, not how it is built.
 **Plugin availability**: `hallucination-detector` comes from a sibling GitHub repo and is not
 enabled in every install — check `enabledPlugins` in `.claude/settings.json`/`~/.claude/settings.json`
-before relying on its skills. Harness coverage varies per plugin — check that plugin's entry in
-`harness_compatibility.json` (below) before assuming a skill is reachable outside Claude Code.
+before relying on its skills. Harness coverage varies per plugin — first run
+`uv run --script scripts/generate_harness_compatibility.py`, then check that plugin's entry in the
+generated `harness_compatibility.json` view before assuming a skill is reachable outside Claude Code.
 **Languages**: Markdown (skills/commands/agents), Python 3.11+ (scripts; `.python-version` pins 3.13),
 JavaScript/TypeScript (hooks, MCP scripts)
 **Package Manager**: `uv` (Astral) — all Python commands use `uv run` prefix
@@ -89,10 +90,10 @@ for the backend contract, and `plugins/development-harness/AGENTS.md`'s "Backend
 for the Protocol details when extending or modifying `dh`'s backend code.
 
 Plugins are expected to be developed cross-harness compatible (claude-code, codex, hermes, kimi).
-Check `harness_compatibility.json` for each plugin's current manifests, blockers, and verification
-state, and update its `verification` entries after compatibility work — objective fields are
-regenerated with `uv run --script scripts/generate_harness_compatibility.py`, smoke-test procedure
-in `docs/cross-harness-smoke-tests.md`.
+Run `uv run --script scripts/generate_harness_compatibility.py` before checking the generated
+`harness_compatibility.json` view for each plugin's current manifests, blockers, and verification
+state. Record completed smoke-test results in the tracked `harness_compatibility_verification.json`
+source, then regenerate the view; the procedure is in `docs/cross-harness-smoke-tests.md`.
 
 ## Situational Rule Triggers
 
@@ -120,8 +121,7 @@ Before a single `Write` call whose content may exceed 25,000 characters, read
 
 Before assigning a model or effort tier to a dispatched agent, read `rules/model-selection.md`.
 
-Before writing or editing Python, read `rules/python-development.md` for this repo's overrides on
-the Python skills, and load the skills it names.
+Before Python implementation, review, modernization, or debugging, read `rules/python-development.md`; it defines this repository's Python workflow routing and checkout-specific overrides.
 
 Before fixing any problem discovered during a session that the user did not ask about, read
 `rules/proactive-fix-gate.md` for the required gate.
@@ -137,7 +137,10 @@ placement check, and the hard rule against writing agent output under `.claude/`
 uv self update                             # Keep uv itself current (v0.10.0+ required)
 uv sync                                    # Install all dependencies, create .venv/
 uv run prek install -t pre-commit -t commit-msg -t pre-rebase -t post-merge  # Install git hooks
+uv run --script scripts/generate_harness_compatibility.py  # Generate the ignored compatibility view before every task
 ```
+
+The final command is required before every task because its output is an ignored, on-demand view.
 
 Follow `./CONTRIBUTING.md` when adding or modifying a plugin.
 
@@ -151,8 +154,9 @@ installed cache — `fastmcp discover` does not surface plugin-delivered MCP ser
 
 ## Skill, Command, and Agent Usage Policy
 
-In Claude Code, and in any other harness that has a manifest for the named plugin (check
-`harness_compatibility.json` — coverage is currently uneven, see Repository Overview), the harness
+In Claude Code, and in any other harness that has a manifest for the named plugin (first run
+`uv run --script scripts/generate_harness_compatibility.py`, then check the generated
+`harness_compatibility.json` view — coverage is currently uneven, see Repository Overview), the harness
 already knows which skills, commands, and agents exist and what each one does; it supplies that
 listing on its own. What no harness supplies is this repo's policy on *when a given one is
 mandatory*. When the current harness has no manifest for a route below, treat the named policy as

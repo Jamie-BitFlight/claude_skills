@@ -1,13 +1,13 @@
 ---
 name: woo-sailor
-description: Optimize processes in a file or directory by converting prose/bullet workflows to Mermaid diagrams — delegates to the process-siren:process-siren agent. Use when given a single SKILL.md, agent file, CLAUDE.md, or rules file to convert, or a directory containing any of those. Supports --dry-run or --report for read-only planning mode.
-argument-hint: <file-or-directory> [--dry-run|--report]
+description: Analyze, improve, or represent processes across a file or directory by delegating to process-siren. Uses the same semantic model and validation loop as single-process work; Mermaid is produced when it is the useful concise representation.
+argument-hint: <file-or-directory> [--analyze|--improve|--represent] [--dry-run|--report]
 user-invocable: true
 context: fork
 agent: process-siren:process-siren
 ---
 
-You are about to optimize a set of files.
+You are about to process a set of files. Select --analyze, --improve, or --represent; default to --improve. --dry-run and --report imply read-only ANALYZE behavior.
 
 <path>$0</path>
 <options>$1</options>
@@ -15,29 +15,35 @@ You are about to optimize a set of files.
 
 If there is no <path> value, then stop, and say: /woo-sailor <file-or-directory> [--dry-run|--report]
 
-The following diagram is the authoritative procedure for argument handling and execution routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
-Eligible file patterns for directory mode: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`. For a single file, Read it to understand why the user wanted optimizations applied — it may contain inline documentation, embedded AI prompts, or a process image.
+The following diagram is the authoritative routing procedure. Eligible directory files: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENTS.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`.
 
 ```mermaid
 flowchart TD
-    Start(["Path available"]) --> Q1{"Glob pattern '<path>{/*,*}'<br>— any results?"}
-    Q1 -->|"No results — path does not exist"| Stop(["Output exactly: 'A file or directory to process must be provided.'<br>Stop."])
-    Q1 -->|"One result equal to <path> — single file"| Q2File{"Is DRY_RUN true?"}
-    Q1 -->|"Results are children of <path> — directory"| Q2Dir{"Is DRY_RUN true?"}
-    Q2File -->|"Yes"| DryFile["Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Read-only mode. Report every section you would<br>optimize and how. Make NO edits. Target file: <path>')"]
-    Q2File -->|"No"| LiveFile["Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Optimize all processes in this file in-place.<br>Target file: <path>')"]
-    Q2Dir -->|"Yes"| DryFilter["Glob <path> using eligible patterns:<br>SKILL.md, CLAUDE.md, AGENT.md, agents/*.md, rules/*.md"]
-    Q2Dir -->|"No"| LiveFilter["Glob <path> using eligible patterns:<br>SKILL.md, CLAUDE.md, AGENT.md, agents/*.md, rules/*.md"]
-    DryFilter --> DryDir["For each eligible file:<br>Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Read-only mode. Report every section you would<br>optimize and how. Make NO edits. Target file: {file path}')"]
-    LiveFilter --> LiveDir["For each eligible file:<br>Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Optimize all processes in this file in-place.<br>Target file: {file path}')"]
-    DryFile --> QBlockedFile{"Agent returned BLOCKED?"}
-    LiveFile --> QBlockedFile
-    DryDir --> QBlockedDir{"Any agent returned BLOCKED?"}
-    LiveDir --> QBlockedDir
-    QBlockedFile -->|"Yes"| RelayFile["Surface blocking message and file path to user. Stop."]
-    QBlockedFile -->|"No"| Report(["Return report"])
-    QBlockedDir -->|"Yes — per blocked file"| RelayDir["Surface blocking message and file path to user.<br>Skip that file; continue others."]
-    QBlockedDir -->|"No"| Done(["All eligible files processed"])
-    RelayDir --> Done
+    Start(["Path and arguments received"]) --> Exists{"Does path exist?"}
+    Exists -->|"No"| Stop(["Report missing path and stop"])
+    Exists -->|"Yes"| Mode{"Requested mode?"}
+    Mode -->|"--analyze, --dry-run, or --report"| Analyze["Mode = ANALYZE; no mutation"]
+    Mode -->|"--represent"| Represent["Mode = REPRESENT; preserve semantics"]
+    Mode -->|"--improve or no mode"| Improve["Mode = IMPROVE"]
+    Analyze --> Scope{"Single file or directory?"}
+    Represent --> Scope
+    Improve --> Scope
+    Scope -->|"Single file"| One["Run process-siren with selected mode"]
+    Scope -->|"Directory"| Discover["Discover eligible files"]
+    Discover --> Models["Run read-only ANALYZE for each file; collect ProcessModels and statuses"]
+    Models --> Synthesize["Synthesize cross-file contracts, invariants, assumptions, ownership, and recovery"]
+    Synthesize --> Route{"Selected mode?"}
+    Route -->|"ANALYZE"| Aggregate["Return aggregate findings; preserve per-file statuses"]
+    Route -->|"REPRESENT"| Render["Run faithful REPRESENT for requested targets; INVALID/UNVALIDATED may still be represented with status"]
+    Route -->|"IMPROVE"| Plan["Build one cross-file change set; validate dependencies and affected claims before writes"]
+    Plan --> Safe{"Any dependency or intent blocker prevents coherent apply?"}
+    Safe -->|"Yes"| Block["Do not apply dependent change set; report BLOCKED_INTENT/INVALID/UNVALIDATED evidence as applicable"]
+    Safe -->|"No"| Apply["Apply validated change set, then revalidate affected claims/interfaces"]
+    One --> Result["Return target result with evidence, status, blockers, and changes"]
+    Aggregate --> Result
+    Render --> Result
+    Block --> Result
+    Apply --> Result
 ```
+
+A blocked file does not stop unrelated independent work. `UNVALIDATED` or `INVALID` does not by itself block ANALYZE or faithful REPRESENT. In IMPROVE, block only the dependent mutation set whose required contract, evidence, or intent is unresolved; never write per-file improvements before cross-file synthesis establishes a coherent apply set.

@@ -18,6 +18,7 @@ Test naming: every test contains ``over_budget`` or ``numeric_section`` so
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -122,7 +123,7 @@ class TestOverBudgetMeasurementExcludesDuplicatedContent:
         result = operations.view_item(selector="2495", include_content=True)
         full_response = result.model_dump()
         body_tokens = server._token_count(str(full_response["body"]))
-        verbatim_tokens = server._token_count(server._json.dumps(full_response))
+        verbatim_tokens = server._token_count(json.dumps(full_response))
         assert body_tokens <= server._VIEW_TOKEN_BUDGET, (
             f"premise: the body alone must be UNDER budget; got {body_tokens} tokens."
         )

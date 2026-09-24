@@ -5,7 +5,7 @@ argument-hint: <target-plugin-or-skill-path>
 model: sonnet
 user-invocable: true
 ---
-If the user's intent does not match the purpose of this skill, load `plugin-lifecycle` to route to the right skill and process: `Skill(skill="plugin-creator:plugin-lifecycle")`.
+If the user's intent does not match this skill, route through `/plugin-creator:plugin-lifecycle`.
 
 
 <skill_path>$ARGUMENTS</skill_path>
@@ -107,7 +107,7 @@ Display all collected values in structured format. Ask user to confirm before en
 
 **Activate Python development workflow**
 
-Invoke the `/python-engineering:python3-core` skill to load Python development orchestration standards.
+Invoke `/python-engineering:orchestrate` for Python implementation work; it routes through the shared standards and applicable specialists.
 
 **Prepare substituted template**
 

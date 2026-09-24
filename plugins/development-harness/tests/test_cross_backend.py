@@ -724,9 +724,7 @@ class TestBeadsBackendConformance:
              GitHub-specific methods live on GitHubExtras and are gated
              separately via ``isinstance(backend, GitHubExtras)``.
         """
-        from backlog_core.backend_types import WorkItemBackend as _WorkItemBackend
-
-        assert isinstance(beads_backend, _WorkItemBackend)
+        assert isinstance(beads_backend, WorkItemBackend)
 
     def test_probe_backend_status_reachable(self, beads_backend, bd_runner) -> None:
         """probe_backend_status returns REACHABLE when BdRunner.is_available() is True.

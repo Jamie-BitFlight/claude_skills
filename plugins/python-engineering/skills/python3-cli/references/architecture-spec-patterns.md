@@ -17,13 +17,13 @@ decisions, component templates, and integration patterns that go into `architect
 ### CLI Components
 
 - **Command Parsing**: Typer with `Annotated` syntax
-- **Output Formatting**: Rich (tables, panels, progress bars, syntax highlighting)
+- **Output Formatting**: Rich for human-facing CLI presentation; compact JSON for agent/plugin automation contracts
 - **Input Validation**: Pydantic models with type coercion
 - **Error Handling**: Custom exception hierarchy with Rich-formatted messages
 
 ### Development Tools
 
-- **Testing**: pytest 8+ with coverage, pytest-mock (never `unittest.mock` directly)
+- **Testing**: pytest 8+; prefer pytest-mock for new mocking seams when appropriate, preserve coherent project test conventions
 - **Type Checking**: ty (Astral's type checker, primary); basedpyright/pyright as alternative
 - **Linting/Formatting**: ruff
 - **Pre-commit**: prek or pre-commit (detect from `.git/hooks/pre-commit`)
@@ -226,17 +226,9 @@ Search order: explicit path → `.mytool.toml` → `~/.config/mytool/config.toml
 
 ---
 
-## Architectural Decisions (Default ADRs)
+## Architectural Decisions
 
-Include these ADRs in every architecture spec unless the requirements justify deviation:
-
-| ADR | Decision | Rationale |
-|-----|----------|-----------|
-| ADR-001 | Typer for CLI framework | Type safety, automatic help, Rich included |
-| ADR-002 | PEP 723 for standalone tools | Zero-setup execution, single-file distribution |
-| ADR-003 | ty for type checking | Astral's ty is the primary type checker; catches bugs at development time, fast iteration |
-
-Add project-specific ADRs for non-standard decisions.
+For greenfield work, offer Typer, uv/PEP 723 where appropriate, and ty first. Record an ADR only when a non-obvious/consequential choice is worth preserving; do not create ADRs merely to restate defaults.
 
 ---
 
@@ -245,21 +237,9 @@ Add project-specific ADRs for non-standard decisions.
 Architecture specs MUST prescribe patterns that pass the project's review pipeline on first
 assessment. The review pipeline consists of three stages:
 
-### Stage 1: Code Smell and Modernization Analysis (`stinkysnake` + `modernpython`)
+### Stage 1: Shared Python standards
 
-The spec must prescribe:
-
-- Python 3.11+ builtin generics (`list[str]`, `dict[str, int]`) — never `typing.List`, `typing.Dict`
-- Pipe union syntax (`X | None`) — never `Optional[X]`
-- `StrEnum` for all finite string value sets (status codes, categories, modes)
-- `match-case` for branching on discrete values — never `if/elif` chains on the same variable
-- `Self` type (PEP 673) for fluent builder APIs and method chaining
-- Exception notes (PEP 678) via `e.add_note()` for enriching re-raised exceptions
-- `tomlkit` for TOML read and write (preserves formatting, comments); `tomllib` only for stdlib-only scripts
-- `ruamel.yaml` for YAML (not `pyyaml`)
-- Typer with `Annotated` syntax for all CLI parameters
-- Rich tables with explicit width measurement pattern
-- `pytest-mock` (`MockerFixture`) — never `unittest.mock` directly
+The spec must follow the repository first and the plugin defaults second. For greenfield work, prefer modern builtin typing syntax, Typer for CLI parsing, Rich for human-facing presentation, compact JSON for agent-facing output, and the project's selected formatter/type checker. Use match/case, Protocol, Pydantic, tomlkit, ruamel.yaml, pytest-mock, or other preferred tools only when their problem/contract is present; do not manufacture a use case to satisfy the pattern.
 
 ### Stage 2: Shebang and Distribution Validation (`shebangpython`)
 
@@ -273,12 +253,4 @@ The spec's Distribution Architecture section must prescribe:
 
 ### Stage 3: Code Review (`code-reviewer`)
 
-The spec must prescribe architecture that satisfies:
-
-- Layered architecture: CLI → Core (pure logic, no I/O) → Services (external I/O) → Display
-- Data models in `shared/` using Pydantic v2, dataclasses, or StrEnum
-- Constants and exceptions in `shared/`
-- Protocol classes for dependency injection at service boundaries
-- Fail-fast error handling (catch only with specific recovery action)
-- `from __future__ import annotations` at top of every file
-- 80% minimum test coverage target
+The spec must preserve coherent repository architecture and satisfy shared standards. For new work, offer the preferred layered boundaries when responsibilities are genuinely distinct, strongly typed/validated boundary models, direct construction before dependency-injection abstractions, fail-fast error handling, and behavior/risk-driven testing. Respect an existing project coverage gate; do not invent a percentage target.

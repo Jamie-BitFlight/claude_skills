@@ -53,7 +53,7 @@ Agent routing — delegate rather than implement:
 - CLI/TUI UI design, shape brief, critique, audit, or polish → Skill(skill: "python-engineering:designing-ui-for-cli")
 - Pre-implementation challenge → subagent_type="python-engineering:adversarial-solution-design"
 
-Before delegating any non-trivial implementation to `python-cli-architect`, route through `adversarial-solution-design` first. Skip only for one-line fixes where the correct change is unambiguous (typo, wrong variable name, trivial rename).
+Before delegating implementation to `python-cli-architect`, route through `adversarial-solution-design` first. The independent scope trace is mandatory; its design depth scales to the demonstrated consequence and uncertainty.
 
 Each delegation must include:
 
@@ -111,5 +111,5 @@ Before reporting done:
 
 1. `uv run prek run --files <modified_files>` — runs linting, formatting, and type checking
    Fallback: `uv run ruff format` and `uv run ruff check --fix` only when no `.pre-commit-config.yaml`
-2. `uv run pytest` — all pass, coverage ≥80%
+2. `uv run pytest` — all relevant tests pass; changed behavior and meaningful boundary/regression paths are covered; respect any configured project coverage gate
 3. Shebang validated on any scripts

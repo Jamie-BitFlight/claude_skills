@@ -33,7 +33,7 @@ Status: working draft based on:
 | `author`, `homepage`, `repository`, `license`, `keywords` | same fields | portable | all 3 | preserve when present |
 | plugin `skills` | Codex plugin `skills` | portable | `text-to-cad` Claude already includes `skills`; all Codex manifests include `skills` | set `skills: "./skills/"` when a skills directory exists |
 | plugin `.mcp.json` | Codex plugin `mcpServers` | portable in packaging, runtime-dependent in behavior | official Codex docs | set `mcpServers: "./.mcp.json"` when the plugin root includes `.mcp.json`; `.mcp.json` itself should be a direct server map or wrapped `mcp_servers` object, not a top-level `mcpServers` wrapper — **Superseded 2026-08-19: this row is wrong, see the correction under Pattern 4 below — keep the top-level `mcpServers` wrapper** |
-| inline Claude `mcpServers` object | generated root `.mcp.json` + Codex `mcpServers` path | adapt | local `scientific-method`, `development-harness`, `plugin-creator`, `python3-development` | if the Claude manifest carries MCP server definitions inline and no root `.mcp.json` exists, materialize a root `.mcp.json` in Codex’s documented shape and point the Codex manifest at it |
+| inline Claude `mcpServers` object | generated root `.mcp.json` + Codex `mcpServers` path | adapt | local `scientific-method`, `development-harness`, `plugin-creator` | if the Claude manifest carries MCP server definitions inline and no root `.mcp.json` exists, materialize a root `.mcp.json` in Codex’s documented shape and point the Codex manifest at it |
 | root `hooks.json` | Codex plugin `hooks` | portable | official Codex docs | set `hooks: "./hooks.json"` when hooks live at the plugin root |
 | `hooks/hooks.json` | default Codex hook path | portable | official Codex docs | no explicit manifest field required when hooks live at `./hooks/hooks.json` |
 | Codex display metadata | `interface` block | Codex-only add | all 3 | add `interface` in Codex even when Claude manifest lacks it |
@@ -108,7 +108,7 @@ Practical rule:
   (`f9adf1f8`) established and tested the wrapped shape
   (`tests/test_frustration_analyzer_python_compatibility.py::test_codex_mcp_launcher_...`
   reads `config["mcpServers"]["frustration-analyzer"]`), and every `.mcp.json` shipped in this
-  repo (`process-siren`, `development-harness`, `python3-development`, `plugin-creator`,
+  repo (`process-siren`, `development-harness`, `plugin-creator`,
   `agentskill-kaizen`) now uses the wrapper. `scripts/sync_codex_plugin_manifests.py` was fixed
   to match — it now normalizes `mcp_servers` -> `mcpServers` while preserving the wrapper instead
   of stripping it.

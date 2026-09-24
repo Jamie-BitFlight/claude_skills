@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Quick validation script for skills - minimal version."""
+"""Strict portable Agent Skills package validation."""
 
 from __future__ import annotations
 
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from ruamel.yaml import YAML
@@ -15,31 +16,12 @@ _yaml = YAML(typ="safe")
 # Constants
 MAX_NAME_LENGTH = 64
 
-# Detects a bare YAML block-scalar indicator on the description line, e.g.
-#   description: >-
-#   description: |-
-# These are parsed by YAML as empty string (not ">-") so the string-equality
-# guard in _validate_description() cannot catch them — raw-text check is needed.
-_BARE_BLOCK_SCALAR_RE = re.compile(r"^description:\s*[|>][-+]?\s*$", re.MULTILINE)
 MAX_DESCRIPTION_LENGTH = 1024
 REQUIRED_ARGC = 2  # script name + skill-path
 
-# All properties allowed in SKILL.md frontmatter (March 2026 spec)
-_ALLOWED_PROPERTIES = {
-    "name",
-    "description",
-    "license",
-    "allowed-tools",
-    "metadata",
-    "compatibility",
-    "argument-hint",
-    "model",
-    "context",
-    "agent",
-    "user-invocable",
-    "disable-model-invocation",
-    "hooks",
-}
+# Portable Agent Skills fields accepted by claude.ai uploads, the Skills API,
+# and Anthropic's package format.
+_ALLOWED_PROPERTIES = {"name", "description", "license", "allowed-tools", "metadata", "compatibility"}
 
 
 def _read_frontmatter(skill_path: Path) -> tuple[bool, str | dict]:
@@ -91,6 +73,32 @@ def _validate_allowed_keys(frontmatter: dict) -> str | None:
     return None
 
 
+def _validate_optional_fields(frontmatter: dict) -> str | None:
+    """Validate portable optional field types and limits."""
+    for key in ("license", "compatibility", "allowed-tools"):
+        if key not in frontmatter:
+            continue
+        value = frontmatter[key]
+        if not isinstance(value, str):
+            return f"{key} must be a string, got {type(value).__name__}"
+    compatibility = frontmatter.get("compatibility")
+    if isinstance(compatibility, str):
+        if not compatibility.strip():
+            return "compatibility must be non-empty when provided"
+        if len(compatibility) > 500:
+            return f"Compatibility is too long ({len(compatibility)} characters). Maximum is 500 characters."
+    allowed_tools = frontmatter.get("allowed-tools")
+    if isinstance(allowed_tools, str) and not re.fullmatch(r"[^,\s]+(?: [^,\s]+)*", allowed_tools):
+        return "allowed-tools must be a non-empty string of space-separated tool tokens"
+    metadata = frontmatter.get("metadata")
+    if "metadata" in frontmatter and (
+        not isinstance(metadata, dict)
+        or not all(isinstance(key, str) and isinstance(value, str) for key, value in metadata.items())
+    ):
+        return "metadata must be a mapping of string keys to string values"
+    return None
+
+
 def _validate_name(frontmatter: dict) -> str | None:
     """Validate the name field in frontmatter.
 
@@ -104,16 +112,18 @@ def _validate_name(frontmatter: dict) -> str | None:
     if not isinstance(name, str):
         return f"Name must be a string, got {type(name).__name__}"
 
-    name = name.strip()
+    name = unicodedata.normalize("NFKC", name.strip())
     if not name:
-        return None
+        return "Name is required for a portable skill package"
 
-    if not re.match(r"^[a-z0-9-]+$", name):
-        return f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
-    if name.startswith("-") or name.endswith("-") or "--" in name:
-        return f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
     if len(name) > MAX_NAME_LENGTH:
         return f"Name is too long ({len(name)} characters). Maximum is 64 characters."
+    if name != name.lower():
+        return f"Name '{name}' must be lowercase"
+    if name.startswith("-") or name.endswith("-") or "--" in name:
+        return f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+    if not all(character.isalnum() or character == "-" for character in name):
+        return f"Name '{name}' may contain only Unicode alphanumeric characters and hyphens"
 
     return None
 
@@ -131,44 +141,12 @@ def _validate_description(frontmatter: dict) -> str | None:
     if not isinstance(description, str):
         return f"Description must be a string, got {type(description).__name__}"
 
-    description = description.strip()
-    if description in {">-", "|-", ">", "|"}:
-        return (
-            "Description appears to be a YAML multiline indicator (>-, |-, |) "
-            "which is broken in Claude Code. Use single-line quoted strings instead."
-        )
+    if not description.strip():
+        return "Description is required for a portable skill package"
 
-    if not description:
-        return None
-
-    if "<" in description or ">" in description:
-        return "Description cannot contain angle brackets (< or >)"
     if len(description) > MAX_DESCRIPTION_LENGTH:
         return f"Description is too long ({len(description)} characters). Maximum is 1024 characters."
 
-    return None
-
-
-def _validate_description_raw(skill_path: Path) -> str | None:
-    """Check raw SKILL.md text for a bare block-scalar indicator on the description line.
-
-    YAML parses ``description: >-`` (with no block content) as an empty string,
-    so _validate_description() cannot detect it via the parsed dict. This function
-    reads the raw SKILL.md text and catches the pattern directly.
-
-    Args:
-        skill_path: Path to the skill directory
-
-    Returns:
-        Error message string if a bare block-scalar indicator is found, None otherwise
-    """
-    skill_md = skill_path / "SKILL.md"
-    content = skill_md.read_text(encoding="utf-8")
-    if _BARE_BLOCK_SCALAR_RE.search(content):
-        return (
-            "Description uses a bare YAML block scalar indicator (>-, |-) on its own line — "
-            "this is broken in Claude Code. Use a single-line string value instead."
-        )
     return None
 
 
@@ -191,17 +169,22 @@ def validate_skill(skill_path: str | Path) -> tuple[bool, str]:
     if keys_err:
         return False, keys_err
 
+    optional_err = _validate_optional_fields(result)
+    if optional_err:
+        return False, optional_err
+
     name_err = _validate_name(result)
     if name_err:
         return False, name_err
 
+    name = unicodedata.normalize("NFKC", result["name"].strip())
+    directory_name = unicodedata.normalize("NFKC", skill_path.name)
+    if name != directory_name:
+        return False, f"Name '{result['name'].strip()}' must match parent directory '{skill_path.name}'"
+
     desc_err = _validate_description(result)
     if desc_err:
         return False, desc_err
-
-    desc_raw_err = _validate_description_raw(skill_path)
-    if desc_raw_err:
-        return False, desc_raw_err
 
     return True, "Skill is valid!"
 

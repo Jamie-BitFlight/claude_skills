@@ -14,7 +14,7 @@ So a description earns harder pruning than the body it points at. A word that do
 
 SOURCE: [writing-for-agents](https://github.com/mattpocock/skills/tree/main/skills/productivity/writing-for-agents) (accessed 2026-09-13) — the pointer model, branch counting, and the no-op test. Adapted here to the `description` field specifically.
 
-SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2026-03-23) — third-person phrasing, directive triggers, the description as primary router.
+SOURCE: <https://agentskills.io/skill-creation/optimizing-descriptions.md> (accessed 2026-09-24) — imperative `Use this skill when...` phrasing.
 
 ## The two jobs
 
@@ -40,16 +40,17 @@ Specificity and brevity pull the same way once you count branches: spend the wor
 
 Quoted phrases buy nothing. The agent matches on meaning, not on literal strings, and quotes are what force the whole value into YAML quoting.
 
-## Write in third person
+## Write direct activation guidance
 
-The description is injected into the system prompt as instruction to Claude about when to activate the skill. First and second person put the agent in the wrong point of view and degrade discovery.
+The description is injected into the system prompt as an instruction about activation. State the
+action, then give direct `Use when...` guidance.
 
 ```yaml
-# Third person — the agent reads this as its own instruction
-description: Generate commit messages by analyzing staged git diffs. Use when the user asks for help writing a commit message.
+# Direct activation guidance
+description: Generate commit messages by analyzing staged git diffs. Use when writing a commit message.
 
 # First person — describes a helper the agent is not
-description: I can help you write commit messages by looking at your staged changes.
+description: I can help write commit messages by looking at staged changes.
 
 # Second person — addresses a reader who is not there
 description: You can use this to generate commit messages.
@@ -61,7 +62,7 @@ The invocation choice decides what the description is *for*, so settle it before
 
 | Skill | Frontmatter | The description is | Write it |
 | --- | --- | --- | --- |
-| Model-invoked | omit `disable-model-invocation` | the agent's context pointer, loaded every turn | full branch list, third person |
+| Model-invoked | omit `disable-model-invocation` | the agent's context pointer, loaded every turn | full branch list, imperative `Use this skill when...` guidance |
 | User-invoked | `disable-model-invocation: true` | a human-facing menu line the agent never sees | one line of summary, triggers stripped |
 
 Pick model-invocation when the agent, or another skill, must reach this skill on its own. A skill that only ever fires because a human typed its name pays permanent context load for reach nobody uses — set `disable-model-invocation: true` and pay none.
@@ -86,7 +87,7 @@ description: Generate a changelog from merged pull requests. Use when cutting a 
 
 ```yaml
 # Before — the second sentence is the skill's own summary of itself
-description: Validate and fix YAML frontmatter in SKILL.md and agent files. Use when creating a skill or agent, or when frontmatter fails to parse. Ensures frontmatter is single-line, complete, informative, third-person, and front-loaded with trigger conditions.
+description: Validate and fix YAML frontmatter in SKILL.md and agent files. Use when creating a skill or agent, or when frontmatter fails to parse. Ensures frontmatter is complete, informative, and front-loaded with trigger conditions.
 
 # After
 description: Validate and fix YAML frontmatter in SKILL.md and agent files. Use when creating a skill or agent, or when frontmatter fails to parse.

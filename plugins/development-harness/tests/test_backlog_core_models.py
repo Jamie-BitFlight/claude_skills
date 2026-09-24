@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-import backlog_core.models as _bc_models
+import backlog_core.models as bc_models
 import pytest
 from backlog_core.models import (
     BACKLOG_DIR,
@@ -697,15 +697,15 @@ class TestResolveRepo:
 
     def test_resolve_repo_returns_default_when_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Empty string falls back to the configured default_repo."""
-        existing = _bc_models._config
+        existing = bc_models._config
         monkeypatch.setattr(
-            _bc_models,
+            bc_models,
             "_config",
             BacklogConfig(
-                repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
+                repo_root=existing.repo_root if existing is not None else bc_models._resolve_repo_root(),
                 backlog_dir=existing.backlog_dir
                 if existing is not None
-                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                else bc_models.dh_paths.backlog_dir(bc_models._resolve_repo_root()),
                 default_repo="owner/default",
             ),
         )
@@ -713,15 +713,15 @@ class TestResolveRepo:
 
     def test_resolve_repo_returns_input_when_non_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Non-empty slug is returned unchanged regardless of DEFAULT_REPO."""
-        existing = _bc_models._config
+        existing = bc_models._config
         monkeypatch.setattr(
-            _bc_models,
+            bc_models,
             "_config",
             BacklogConfig(
-                repo_root=existing.repo_root if existing is not None else _bc_models._resolve_repo_root(),
+                repo_root=existing.repo_root if existing is not None else bc_models._resolve_repo_root(),
                 backlog_dir=existing.backlog_dir
                 if existing is not None
-                else _bc_models._dh_paths.backlog_dir(_bc_models._resolve_repo_root()),
+                else bc_models.dh_paths.backlog_dir(bc_models._resolve_repo_root()),
                 default_repo="owner/default",
             ),
         )

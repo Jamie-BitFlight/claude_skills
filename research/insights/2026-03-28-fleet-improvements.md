@@ -7,7 +7,7 @@ title: "Improvement Proposals: Fleet"
 | Pattern | Reason skipped |
 |---|---|
 | Plugin Architecture via Service Overrides | Already covered: the development harness uses Voltron-style composition with language manifests and Protocol-based abstractions for role resolution. See `plugins/development-harness/CLAUDE.md` (Composition Model section) and `plugins/development-harness/docs/backend-providers.md`. |
-| Modular Component Design | Already covered: the repo separates heterogeneous subsystems into independent plugins (python3-development, fastmcp-creator, plugin-creator, development-harness) with auto-discovery. Each plugin owns its agents, skills, and scripts independently. |
+| Modular Component Design | Already covered: the repo separates heterogeneous subsystems into independent plugins (fastmcp-creator, plugin-creator, development-harness) with auto-discovery. Each plugin owns its agents, skills, and scripts independently. |
 | Datastore Abstraction | Already covered and actively being developed: `plugins/development-harness/docs/backend-providers.md` documents Protocol-based abstractions for GitHub (current), Linear, GitLab, and Supabase backends with three-primitive storage model (Work Item, Sub-item, Document). |
 | Configuration Management | Too abstract to be actionable: Fleet's centralized YAML+env-var config manager serves a long-running Go server with database connections, TLS, and object storage. The local system is a CLI plugin ecosystem where configuration is per-plugin `plugin.json` plus `CLAUDE.md` rules. The problem domains are incompatible -- a centralized config manager would not serve the same purpose in a stateless agent tool. |
 
