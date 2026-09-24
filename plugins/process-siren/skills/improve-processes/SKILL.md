@@ -1,11 +1,9 @@
 ---
 name: improve-processes
-description: Process quality methodology for the process-siren agent — use before or during Mermaid conversion when the source process shows ambiguity, missing decisions, undefined actors, vague conditions, or structural weakness. Provides triage sequence, excellence criteria, and an improvement framework drawn from Lean, Six Sigma, BPR, Design Thinking, Systems Thinking, and Theory of Constraints. Activates when source content is poorly structured enough that converting it as-is would encode wrong behavior for AI readers.
+description: Analyze and improve processes or systems using an explicit semantic model, adaptive instruction resolution, evidence-driven change, and claim-level validation. Use when reviewing process quality, resolving ambiguity or gaps, deciding how much procedural detail is necessary, or validating consequential process behavior.
 ---
 
 # Improve Processes
-
-Process-siren's job is semantic fidelity. Faithful conversion of a flawed process encodes the flaws with false precision. Use this skill when the source process needs improvement before — or alongside — Mermaid conversion.
 
 ## Operating Principle
 
@@ -71,54 +69,6 @@ Recursive analysis must descend in **system resolution**, not recursively reinvo
 3. **CHALLENGE** — identify ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, missing failure handling, and unverifiable claims. Ask what observation would falsify each important claim.
 4. **IMPROVE** — before material change, declare the change contract and preserve the smallest useful baseline; then correct gaps derivable from established intent. Escalate only changes that create or alter policy, goals, or other intent.
 5. **VALIDATE** — test the candidate against the predeclared contract, compare relevant before/after evidence, select the cheapest sufficient validator per claim, and feed counterexamples or regressions back into CHALLENGE. Stop when required claims are supported or remaining uncertainty requires an explicit human decision.
-
-### Authoritative Loop
-
-```mermaid
-flowchart TD
-    Start(["Process or system received"]) --> Scope["Discover relevant source material, constraints, existing behavior, and surrounding system"]
-    Scope --> Purpose{"Purpose and desired outcomes sufficiently explicit?"}
-    Purpose -->|"No"| PurposeGap["Identify missing purpose, goals, or success criteria"]
-    PurposeGap --> ResolvePurpose{"Can available evidence resolve the gap without inventing intent?"}
-    ResolvePurpose -->|"Yes"| DerivePurpose["Derive candidate purpose and record evidence"]
-    DerivePurpose --> Purpose
-    ResolvePurpose -->|"No"| AskPurpose["Explain gap and ask only questions required to continue"]
-    AskPurpose --> Blocked(["Blocked pending information"])
-    Purpose -->|"Yes"| Model["Build semantic model at current resolution"]
-    Model --> Inventory["Inventory actors, states, actions, inputs, outputs, decisions, resources, constraints, failures, and terminal states"]
-    Inventory --> Claims["Extract goals, invariants, assumptions, guarantees, safety, liveness, and other correctness claims"]
-    Claims --> Gaps["Detect ambiguity, contradictions, missing transitions, undefined ownership, unreachable states, hidden assumptions, and unverifiable claims"]
-    Gaps --> ResolveGap{"Can gaps be resolved from established intent and evidence?"}
-    ResolveGap -->|"No"| Explain["Report known facts, gaps, consequences, and minimal questions"]
-    Explain --> Blocked
-    ResolveGap -->|"Yes"| Improve["Produce candidate improvement preserving established intent"]
-    Improve --> Reclaims["Re-extract claims from candidate"]
-    Reclaims --> Validate["Select cheapest sufficient validator for each important claim"]
-    Validate --> Kind{"Claim type?"}
-    Kind -->|"Observable execution"| Tests["Examples, executable checks, simulation, or property-based tests"]
-    Kind -->|"Structural or routing"| Mermaid["Mermaid plus semantic-fidelity checks"]
-    Kind -->|"State-space or concurrency"| TLA["TLA+ model plus TLC when tooling is available"]
-    Kind -->|"Universal proposition"| LeanProof["Lean specification plus proof when tooling is available"]
-    Kind -->|"Human or environmental"| Evidence["Inspection, measurement, experiment, or explicit user acceptance"]
-    Tests --> Result
-    Mermaid --> Result
-    TLA --> Result
-    LeanProof --> Result
-    Evidence --> Result
-    Result{"Claim supported at required confidence?"}
-    Result -->|"No"| Diagnose["Turn failure or counterexample into diagnostic evidence"]
-    Diagnose --> Root["Identify violated assumption, missing behavior, bad requirement, model defect, or implementation defect"]
-    Root --> Intent{"Would correction create or change established intent?"}
-    Intent -->|"No"| Improve
-    Intent -->|"Yes or uncertain"| Explain
-    Result -->|"Yes"| More{"Important unvalidated claims remain?"}
-    More -->|"Yes"| Validate
-    More -->|"No"| Resolution{"Would finer resolution materially expose new failure modes?"}
-    Resolution -->|"Yes"| Decompose["Decompose relevant subsystem; inherit parent goals, constraints, and invariants"]
-    Decompose --> Model
-    Resolution -->|"No"| Final["Record validated model, evidence, assumptions, residual risks, and validation boundaries"]
-    Final --> Done(["Ready for use"])
-```
 
 ### Purpose at Any Resolution
 
@@ -310,18 +260,9 @@ When TLA+ applies, extract state variables, initial conditions, actions/transiti
 
 If formal tooling is unavailable, produce a validation handoff containing those artifacts and mark the claim UNVALIDATED. Never imply that recommending TLA+ or Lean constitutes verification.
 
-### Counterexamples Drive Improvement
+### Counterexamples and Failed Validation
 
-Treat validation failures as first-class evidence. Translate a failing execution, model-checker trace, test failure, or proof failure back into process vocabulary:
-
-1. state the violated claim;
-2. show the smallest relevant execution or counterexample;
-3. identify the violated assumption or missing/incorrect behavior;
-4. distinguish process defect, requirement defect, model defect, validator mismatch, and implementation defect;
-5. propose a correction only when established intent determines it;
-6. re-enter IMPROVE, re-extract claims, and rerun affected validation.
-
-Do not modify a process merely to satisfy a bad model. Diagnose the source of the mismatch first.
+Treat failures as evidence. State the violated claim and smallest relevant counterexample, diagnose it using the Evidence-Driven Improvement categories, correct only when established intent determines the change, then rerun affected validation. Do not modify a process merely to satisfy a bad model or validator.
 
 ### System Boundary Pass
 
@@ -337,18 +278,7 @@ Improve directly only when the correction follows from established purpose, goal
 
 ### Completion Record
 
-An improved process/system is ready only when its required claims have sufficient evidence or unresolved uncertainty is explicitly surfaced. Record:
-
-- purpose and scope at the validated resolution;
-- semantic model: actors, states, actions, decisions, resources, constraints, and failure paths;
-- correctness model: claims, invariants, safety/liveness properties, and assumptions;
-- claim → validator → evidence mapping;
-- counterexamples addressed;
-- residual uncertainty and unvalidated claims;
-- environmental dependencies and validation boundaries;
-- useful representations such as Mermaid, tests, TLA+, Lean, or explanatory documentation.
-
-Mermaid is one projection of this semantic model, not the semantic model itself.
+Finish only when required claims have sufficient evidence or remaining uncertainty is explicit. Return the Result Contract status plus purpose/scope, material ProcessModel elements, claim → validator → evidence mapping, addressed counterexamples, assumptions, residual risks, validation boundaries, and any useful representations. Mermaid is a projection of the model, not the model itself.
 
 ## Improvement Techniques
 
