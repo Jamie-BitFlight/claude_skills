@@ -141,6 +141,7 @@ class GitHubBackend:
         """
         self._repo = repo
         self._cache = cache or FileCache(dh_paths.state_root() / "github-cache")
+        self._cache._set_default_repo(repo)
         self._artifact_provider = artifact_provider or GitHubGistArtifactProvider(repo=repo)
         self._plan_persistence = plan_persistence or _GitHubPlanPersistence(self._artifact_provider)
         self._dispatch_persistence = _GitHubDispatchPersistence(self._artifact_provider)
