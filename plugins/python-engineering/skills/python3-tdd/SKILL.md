@@ -1,6 +1,6 @@
 ---
 name: python3-tdd
-description: Guides test-driven development for Python using a five-phase red-green-refactor cycle. Use when asked to write tests first, apply TDD, do test-first implementation, or follow red-green-refactor — designs typed interfaces and Protocol classes, writes failing pytest tests (RED), implements minimal passing code (GREEN), verifies with prek or ruff plus pytest-cov, and enforces a quality gate requiring all tests pass with no lint or type errors and coverage at or above 80 percent.
+description: Guides test-driven development for Python using a five-phase red-green-refactor cycle. Use when asked to write tests first, apply TDD, do test-first implementation, or follow red-green-refactor — designs typed interfaces and Protocol classes, writes failing pytest tests (RED), implements minimal passing code (GREEN), verifies with prek or ruff plus pytest-cov, and enforces a quality gate requiring all tests pass with no lint or type errors and coverage evidence appropriate to the changed behavior and any existing project gate.
 argument-hint: '<feature-description>'
 user-invocable: true
 ---
@@ -53,5 +53,6 @@ uv run pytest --cov=src --cov-report=term-missing
 - [ ] All tests pass
 - [ ] No lint errors
 - [ ] No type errors
-- [ ] Coverage ≥80%
+- [ ] Changed behavior, boundaries, and regressions have appropriate tests
+- [ ] Existing project coverage gate is respected, if configured
 - [ ] Shebang validated on scripts
