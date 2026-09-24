@@ -6,45 +6,9 @@ allowed-tools: Read, Grep, Glob
 
 # Mermaid Diagram Syntax
 
-Complete syntax reference for all Mermaid diagram types. Enables AI agents to construct valid diagrams with correct syntax, structure, and configuration across flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, gantt charts, git graphs, mindmaps, timelines, user journeys, data charts, and advanced diagram types.
-
 ## Scope
 
 Use when constructing, selecting, or debugging Mermaid syntax. Choose the diagram family that best expresses the intended semantics, then load only the relevant reference below. This skill covers Mermaid construction and parser/rendering constraints; it does not define the process/system being represented.
-
-## Quick Reference — Common Patterns
-
-```mermaid
-flowchart TD
-    Start([Start]) --> Decision{Condition?}
-    Decision -->|Yes| Action[Do something]
-    Decision -->|No| Other[Do other thing]
-    Action --> End([End])
-    Other --> End
-```
-
-**Direction codes:** `TD`/`TB` = top-down, `LR` = left-right, `BT` = bottom-up, `RL` = right-left
-
-**Essential node shapes:**
-
-| Shape | Classic Syntax | v11.3.0+ Syntax |
-|-------|---------------|-----------------|
-| Rectangle | `A[text]` | `A@{ shape: rect }` |
-| Rounded | `A(text)` | `A@{ shape: rounded }` |
-| Stadium | `A([text])` | `A@{ shape: stadium }` |
-| Diamond | `A{text}` | `A@{ shape: diamond }` |
-| Circle | `A((text))` | `A@{ shape: circle }` |
-| Database | `A[(text)]` | `A@{ shape: cyl }` |
-
-**Essential edge types:**
-
-| Type | Syntax |
-|------|--------|
-| Arrow | `A --> B` |
-| Arrow + text | `A -->\|text\| B` |
-| Dotted arrow | `A -.-> B` |
-| Thick arrow | `A ==> B` |
-| Open link | `A --- B` |
 
 ## Workflow
 
@@ -77,9 +41,6 @@ flowchart TD
     Debug --> Construct
 ```
 
-For flowchart styling, subgraphs, and interactivity, also load [subgraphs-and-layout.md](./references/subgraphs-and-layout.md) and [styling-and-config.md](./references/styling-and-config.md).
-
-For the full 6-phase flowchart element selection process (direction, shape, edge, label, grouping, styling), see [Flowchart Construction Decision Process](./references/flowchart-construction.md).
 
 ## Reference Files
 
