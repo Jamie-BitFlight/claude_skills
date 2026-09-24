@@ -1353,6 +1353,7 @@ class ReconcileRequest(BaseModel):
     """Typed request for a provider-neutral backlog reconciliation pass."""
 
     scope: ReconcileScope
+    repo: str = ""
     label: str = ""
     references: list[str] = Field(default_factory=list)
     since: str = ""

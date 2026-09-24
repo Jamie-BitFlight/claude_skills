@@ -703,8 +703,14 @@ def _md_reconstruct_body_from_sections(
 # ---------------------------------------------------------------------------
 
 
-def _apply_updates_to_item(reference: str, updates: dict[str, str | dict[str, object]], set_synced: bool) -> None:
-    item = _work_item(reference)
+def _apply_updates_to_item(
+    reference: str,
+    updates: dict[str, str | dict[str, object]],
+    set_synced: bool,
+    *,
+    base_item: BacklogItem | None = None,
+) -> None:
+    item = base_item if base_item is not None else _work_item(reference)
     for key, value in updates.items():
         if key == "metadata" and isinstance(value, dict):
             for meta_key, meta_val in value.items():
@@ -722,7 +728,12 @@ def _apply_updates_to_item(reference: str, updates: dict[str, str | dict[str, ob
 
 
 def update_item_metadata(
-    reference: str, updates: dict[str, str | dict[str, object]], set_synced: bool = False, output: Output | None = None
+    reference: str,
+    updates: dict[str, str | dict[str, object]],
+    set_synced: bool = False,
+    output: Output | None = None,
+    *,
+    base_item: BacklogItem | None = None,
 ) -> dict[str, str | bool | list[str]]:
     """Update a work item through its opaque backend reference.
 
@@ -732,7 +743,7 @@ def update_item_metadata(
         Dict with compatibility filepath and updated flag plus output messages.
     """
     out = output or Output()
-    _apply_updates_to_item(reference, updates, set_synced)
+    _apply_updates_to_item(reference, updates, set_synced, base_item=base_item)
     return {"filepath": reference, "updated": True, **out.to_dict()}
 
 
@@ -801,7 +812,9 @@ def _create_issue_and_update_item(item: BacklogItem, repo: str, output: Output |
             # forever while the live issue carries the prefixed one, and every
             # subsequent reconcile's title-equality acknowledge check fails, so this
             # item's pending mutations never drain (#2963).
-            update_item_metadata(reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out)
+            update_item_metadata(
+                reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out, base_item=item
+            )
         return issue_num
 
 
@@ -824,7 +837,7 @@ def _rename_item_title(item: BacklogItem, title: str, repo: str = "", output: Ou
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"name": title}, output=out)
+    update_item_metadata(reference, {"name": title}, output=out, base_item=item)
 
     issue_ref = item.issue
     if issue_ref:
@@ -867,12 +880,10 @@ def _update_item_description(
     durably records (a GitHub audit-comment, not the issue's raw ``body``
     field).
 
-    ``item`` is also refreshed in place: ``update_item_metadata`` writes
-    through its own freshly-loaded copy of the record, so on a backend that
-    returns a new object per read (the GitHub file cache) the caller's
-    ``item`` would otherwise keep the pre-update description -- and
-    ``update_item`` renders a *newly created* issue's body from that same
-    object when the item had no issue yet, publishing the stale text.
+    ``item`` is updated in place and persisted as the command's selected
+    mutation base. This preserves the live provider fields without reloading
+    a stale or absent cache record, and keeps subsequent updates in the same
+    command cumulative.
 
     Returns:
         True if updated, False if no backend reference on item.
@@ -881,8 +892,7 @@ def _update_item_description(
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"description": description}, output=out)
-    item.description = description
+    update_item_metadata(reference, {"description": description}, output=out, base_item=item)
     _reconcile_item(item, out, snapshot=snapshot)
     return True
 
@@ -909,7 +919,7 @@ def _apply_plan_to_item(item: BacklogItem, plan: str, repo: str = "", output: Ou
     reference = item.reference
     if not reference:
         return False
-    update_item_metadata(reference, {"metadata": {"plan": plan}}, output=out)
+    update_item_metadata(reference, {"metadata": {"plan": plan}}, output=out, base_item=item)
 
     # GH-first: post plan reference as a comment on the linked issue
     issue_ref = item.issue
@@ -1585,17 +1595,10 @@ def _classify_duplicate_check(
 ) -> tuple[DuplicateCheckStatus, list[ContentDuplicateMatch]]:
     """Classify whether title/description content matches an existing backlog item.
 
-    Checks the local cache first. When nothing matches locally and the active
-    backend is a ``SyncProvider``, performs one bounded incremental refresh and
-    re-checks — absence of a local match alone does not prove no duplicate
-    exists for backends fed by an external provider whose local cache can lag
-    the remote. A refresh failure never blocks item creation: it downgrades
-    the result to ``COULD_NOT_VERIFY`` and records a warning on *out*.
-
-    Non-``SyncProvider`` backends (SQLite, Memory, Beads) query their own
-    native storage directly in ``_duplicate_candidates()`` — there is no
-    external cache to lag, so a local miss there is already authoritative and
-    returns ``NO_DUPLICATE``, not a downgrade.
+    Checks the command's live provider observation together with separately
+    queued local intent. A live read failure propagates by default; a context
+    configured with ``allow_cached=True`` may use its warned cache fallback.
+    A successful live observation with no match is authoritative.
 
     Args:
         context: Command-scoped live provider observation.
@@ -2476,25 +2479,20 @@ def list_items(
     filter_by_key: dict[str, str] | None = None,
     search: str | None = None,
 ) -> dict[str, int | bool | str | list[str] | list[dict[str, str | bool]] | None]:
-    """List backlog items. Default reads provider-backed record only. Use refresh=True to refresh first.
+    """List backlog items from one live provider observation when supported.
+
+    Provider-backed commands attempt the live read first and raise when it
+    fails by default. A successful empty live snapshot is an authoritative
+    empty listing; pending local intent remains separate from provider rows.
 
     Args:
-        refresh: Refresh the provider-backed record from the configured backend before
-            listing. Escalates to a full (not incremental) refresh automatically when the
-            backend's most recent snapshot load flagged unreadable or vanished cache
-            files (backlog #3546 Codex finding 2), since an incremental refresh alone
-            cannot repair an item that is locally broken but unchanged upstream.
-        allow_cached: Opt into serving items/count from a provider-private
-            cache even when that cache's state cannot be confirmed complete
-            -- never synced, or a warm checkpoint sitting over a
-            partial/corrupted snapshot set (backlog #3546 task A4). Default
-            ``False`` is fail-safe (critique ALT-2): a low-confidence cache
-            listing returns ``items: None, count: None`` instead of an
-            ambiguous ``items: [], count: 0`` an unaware caller could
-            misread as a confirmed-empty backlog. Has no effect on a backend
-            that does not serve listings from a cache at all
-            (``from_cache`` is always ``False``, e.g. sqlite/memory/beads)
-            or on a listing this backend can already confirm.
+        refresh: Reconcile the command's live snapshot in the foreground when
+            the backend supports reconciliation. Live selection happens
+            regardless of this flag.
+        allow_cached: After a live provider read fails, permit a warned fallback
+            to the provider-private cache. Default ``False`` propagates the live
+            failure. This does not turn an authoritative live-empty result into
+            a cache read.
         label: Filter by GitHub label (applied during refresh).
         section: Filter by priority section — P0, P1, P2, or Ideas (case-insensitive).
         status: Filter by status value e.g. 'needs-grooming', 'status:in-progress'.
@@ -2519,9 +2517,9 @@ def list_items(
     Returns:
         Dict with items list (each item a dict with section, title, issue, plan, type, topic,
         file_path, groomed, status, and milestone fields for items with a GitHub issue),
-        plus ``count``, ``from_cache`` and ``has_pending_writes`` (backlog #3546 task A4).
-        ``items``/``count`` are ``None`` instead of ``[]``/``0`` when a
-        low-confidence cache listing is withheld -- see ``allow_cached`` above.
+        plus ``count``, ``from_cache`` and ``has_pending_writes``. A successful
+        live read returns ``from_cache=False``; warned fallback returns
+        ``from_cache=True``.
     """
     out = output or Output()
     backend = get_config().backend
@@ -2531,7 +2529,12 @@ def list_items(
     _, has_pending_writes, low_confidence, confirmed_complete = _listing_provenance(backend)
     from_cache = read.from_cache
     low_confidence = low_confidence and from_cache
-    if not read.provider_items and isinstance(get_config().backend, SyncProvider) and not confirmed_complete:
+    if (
+        read.from_cache
+        and not read.provider_items
+        and isinstance(get_config().backend, SyncProvider)
+        and not confirmed_complete
+    ):
         # A provider-backed cache holding nothing reads exactly like an empty
         # backlog. They are different answers and only one is worth acting on,
         # so name the ambiguity rather than reporting a bare count of 0. Gated on
@@ -2682,7 +2685,7 @@ def link_followup(
     if not reference:
         msg = f"Item {selector!r} has no file_path — cannot persist followup_to"
         raise BacklogError(msg)
-    update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out)
+    update_item_metadata(reference, {"metadata": {"followup_to": followup_to}}, output=out, base_item=item)
     out.info(f"  Linked follow-up: {item.title} -> {followup_to or '(cleared)'}")
     return {"title": item.title, "followup_to": followup_to, **out.to_dict()}
 
@@ -3790,12 +3793,9 @@ def view_item(
     """View a backlog item or GitHub issue by URL, #N, bare number, or title.
 
     For string-ID backends (e.g. beads), ``selector`` also accepts a bare
-    nanoid (e.g. ``"bd-a3f8"``). ``parse_issue_selector`` only recognizes
-    numeric GitHub-style refs, so a nanoid that is not present in the local
-    cache falls through to a direct ``view_enrich_from_github`` call gated on
-    ``get_config().backend.issue_id_type == "string"`` — this lets
-    :class:`~backlog_core.backends.beads_backend.BeadsBackend` resolve the
-    item via ``bd show <id>`` even when it was never synced locally.
+    nanoid (e.g. ``"bd-a3f8"``). Provider-backed selection attempts a live
+    observation first; ``allow_cached=True`` permits warned cache fallback
+    only after that live read fails.
 
     Args:
         selector: Issue URL, #N, bare number, title substring, or (for
@@ -3972,7 +3972,9 @@ def sync_create_missing_issues(
         # this item's pending mutations never drain on later reconciles (#2963).
         reference = item.reference
         if reference:
-            update_item_metadata(reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out)
+            update_item_metadata(
+                reference, {"name": item.title, "metadata": {"issue": f"#{issue_num}"}}, output=out, base_item=item
+            )
 
     return {"created": created, **out.to_dict()}
 
@@ -4088,6 +4090,7 @@ def close_item(
             }
         },
         output=out,
+        base_item=item,
     )
 
     out.info(f'Backlog item "{item.title}" closed ({reason}).')
@@ -4169,7 +4172,7 @@ def resolve_item(
     metadata: dict[str, object] = {"status": "done", "priority": "completed"}
     if plan:
         metadata["plan"] = plan
-    update_item_metadata(reference, {"metadata": metadata}, output=out)
+    update_item_metadata(reference, {"metadata": metadata}, output=out, base_item=item)
 
     out.info(f'Backlog item "{item.title}" resolved.')
     if issue_ref and target.provider_snapshot is not None:
@@ -4219,7 +4222,7 @@ def _apply_non_in_progress_status(
             # for a genuinely unissued item — reference_is_title_derived() is the
             # correct "no real backend reference yet" check instead of `not item.reference`.
             if not reference_is_title_derived(item):
-                update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output)
+                update_item_metadata(item.reference, {"metadata": {"status": "blocked"}}, output=output, base_item=item)
                 result["status"] = "blocked"
             else:
                 result["error"] = "Cannot set status='blocked': item has no backend reference"
@@ -4292,7 +4295,9 @@ def _apply_issue_status_labels(
             # Local YAML update: list_items skips live batch-status fetch for
             # string-ID backends, so write status locally to keep the view current.
             if item.reference:
-                update_item_metadata(item.reference, {"metadata": {"status": "in-progress"}}, output=output)
+                update_item_metadata(
+                    item.reference, {"metadata": {"status": "in-progress"}}, output=output, base_item=item
+                )
         elif has_integer_issue:
             apply_status_in_progress(item, repo, output=output)
         result["status"] = "in-progress"
@@ -4591,7 +4596,9 @@ def groom_item(
             result["mark_groomed_skip_reason"] = f"Item '{selector}' not found in re-parsed backlog"
         else:
             if fresh_item.reference:
-                update_item_metadata(fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out)
+                update_item_metadata(
+                    fresh_item.reference, {"metadata": {"status": "groomed"}}, output=out, base_item=fresh_item
+                )
                 result["mark_groomed_applied"] = True
                 out.info("  Status: groomed (local)")
             if fresh_item.issue:
@@ -5038,7 +5045,7 @@ def get_sam_tasks(
     Args:
         parent_issue_number: Native parent work-item reference.
         refresh_cache: Retained for caller compatibility; providers own refresh policy.
-        repo: Retained for caller compatibility; the configured backend owns location.
+        repo: Provider repository used for live owner selection.
         output: Optional Output collector.
         allow_cached: Permit warned cached selection after a live failure.
 
