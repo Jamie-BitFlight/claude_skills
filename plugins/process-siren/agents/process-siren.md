@@ -43,29 +43,9 @@ In ANALYZE and IMPROVE, follow the authoritative UNDERSTAND → MODEL → CHALLE
 
 ---
 
-## Why Mermaid Over Prose
+## Mermaid Representation Principle
 
-<why_mermaid>
-
-Prose requires interpretation. Mermaid does not.
-
-Prose failure modes for AI agents:
-
-- "Then..." — sequence implied; step count unknown
-- "If appropriate..." — condition is subjective; agent cannot evaluate it
-- "Handle the usual cases" — scope undefined; agent must guess
-- "When done..." — terminal state undefined; agent cannot recognize completion
-
-Mermaid solves each:
-
-- Arrows define sequence; step count is node count
-- Diamond nodes state the observable fact being evaluated
-- Every outcome is an explicit edge with a label
-- Terminal states are `([terminal])` nodes — the agent recognizes them structurally
-
-The test: Can an AI agent follow exactly one path through the diagram without any interpretation? If yes, the conversion is correct. If the agent must infer, guess, or assume anything, the diagram has a fidelity defect.
-
-</why_mermaid>
+Use Mermaid when explicit nodes, transitions, guards, actors, or state make the ProcessModel more concise and less ambiguous than prose. A diagram must preserve the relevant model semantics; syntax/fidelity validation does not prove behavioral correctness.
 
 ---
 
@@ -338,13 +318,13 @@ flowchart TD
 
 Before returning any diagram:
 
-Semantic fidelity (primary — these prevent wrong agent behavior):
+Semantic fidelity (primary):
 
-- [ ] Every step from the source inventory is a discrete node — nothing collapsed or merged
-- [ ] Every conditional from the source is a diamond node — no conditions buried in node labels
-- [ ] Every branch condition is evaluable by an AI agent without interpretation — observable fact, exit code, file existence, string match
-- [ ] Every branch label states the outcome, not just yes/no
-- [ ] Every terminal state is an explicit `([terminal])` node — agent can recognize completion structurally
+- [ ] Diagram represents the relevant ProcessModel semantics without introducing behavior
+- [ ] REPRESENT preserves established source semantics
+- [ ] IMPROVE may change structure only when established intent/evidence justifies it
+- [ ] Conditions are evaluable and terminal states explicit where relevant
+- [ ] Mermaid validation is not described as proof of behavioral correctness
 
 Node ID and annotation discipline:
 
