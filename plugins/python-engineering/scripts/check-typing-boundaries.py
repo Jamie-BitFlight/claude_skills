@@ -7,7 +7,7 @@ import ast
 import sys
 from pathlib import Path
 
-BOUNDARY_PATTERNS = {"boundary", "adapter", "parser", "validator", "external", "inbound"}
+BOUNDARY_PATTERNS = {"boundary", "boundaries", "adapter", "adapters", "parser", "parsers", "validator", "validators", "external", "inbound", "coerce"}
 
 
 def is_boundary_module(filepath: Path) -> bool:
@@ -20,7 +20,8 @@ def is_boundary_module(filepath: Path) -> bool:
     if parts & BOUNDARY_PATTERNS:
         return True
     stem = filepath.stem
-    return any(stem.endswith(f"_{p}") for p in BOUNDARY_PATTERNS)
+    singular = {"boundary", "adapter", "parser", "validator", "external", "inbound", "coerce"}
+    return any(stem.endswith(f"_{p}") for p in singular)
 
 
 def find_any_usage(filepath: Path) -> list[tuple[int, str]]:
@@ -44,18 +45,32 @@ def find_any_usage(filepath: Path) -> list[tuple[int, str]]:
                 isinstance(node.func, ast.Attribute) and node.func.attr == "cast"
             ):
                 violations.append((node.lineno, "calls cast()"))
-        elif isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "Any":
-            violations.append((node.lineno, "uses Any type"))
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id == "typing" and node.attr == "Any":
+                violations.append((node.lineno, "uses typing.Any"))
 
     return violations
 
 
 def main() -> None:
     """Scan a directory for Any/cast() usage outside boundary modules and report violations."""
-    search_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path()
-    all_violations = []
+    targets = [Path(arg) for arg in sys.argv[1:]] or [Path()]
+    missing = [path for path in targets if not path.exists()]
+    if missing:
+        for path in missing:
+            print(f"ERROR: target does not exist: {path}", file=sys.stderr)
+        sys.exit(2)
 
-    for py_file in search_dir.rglob("*.py"):
+    files: list[Path] = []
+    for target in targets:
+        if target.is_file():
+            if target.suffix == ".py":
+                files.append(target)
+        else:
+            files.extend(target.rglob("*.py"))
+
+    all_violations = []
+    for py_file in files:
         if is_boundary_module(py_file):
             continue
         violations = find_any_usage(py_file)
