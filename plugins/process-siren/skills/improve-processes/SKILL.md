@@ -33,6 +33,7 @@ Use one lightweight semantic model as the handoff between understanding, improve
 ProcessModel
   purpose; scope; resolution; parent_constraints[]
   actors[]; states[]; actions[]; transitions[]
+    action/node may include { purpose; requires[]; guarantees[]; resolution { altitude; consequence; behavioral_variance; rationale }; expansion_ref?; validation[] }
   inputs[]; outputs[]; resources[]
   goals[]; invariants[]; assumptions[]; failure_modes[]
   claims[] { claim; failure_excluded; resolution; assumptions[]; falsifier; validation_method; status; evidence[] }
@@ -137,6 +138,45 @@ Do not treat every unknown as blocking. Classify uncertainty:
 - **OUT OF SCOPE** — deliberately excluded; record the boundary.
 
 Only UNKNOWN + INTENT-DEPENDENT gaps block autonomous improvement. UNKNOWN + RESOLVABLE gaps require investigation first; they are not grounds to stop and ask the user.
+
+### Altitude and Resolution Review
+
+Completeness means sufficient detail for the process contract and risk at the current resolution; it does not mean equal detail everywhere. Prefer the lowest resolution that makes each decision safe and unambiguous. Review materially important nodes during CHALLENGE before treating missing detail as a gap.
+
+For each node ask:
+
+1. What contract must it satisfy — purpose, preconditions, guarantees, and relevant invariants?
+2. What altitude/resolution is it currently expressed at?
+3. What is the consequence of incorrect inference or execution?
+4. How variable is the behavior a competent agent is likely to infer without more instruction?
+5. Should the node be compressed, retained, or locally expanded and validated?
+
+Use consequence and behavioral variance independently:
+
+- **Low consequence + low variance** — compress aggressively; a short confirmation of the common path may be enough.
+- **Low consequence + high variance** — state the preferred behavior where variance matters.
+- **High consequence + low variance** — state the contract, critical safeguards, and verification even when the procedure is familiar.
+- **High consequence + high variance** — locally expand into a precise child procedure and validate it.
+
+Treat destructive, irreversible, interruptive, security/trust-boundary, externally visible, difficult-to-recover, concurrent/resource-sensitive, credential/money-sensitive, or partial-failure-prone actions as signals that higher local resolution may be required.
+
+Expansion is local. Do not raise the resolution of surrounding routine nodes merely because one node needs detail. Parent nodes state contracts; child expansions state the higher-resolution procedure. A child inherits applicable parent goals, constraints, invariants, preconditions, and guarantees and must not silently weaken them.
+
+High risk does not mean "write more." It means choose the required resolution, make the critical behavior explicit, and validate it at that resolution. Conversely, trim detail that consumes attention without changing safe execution.
+
+#### Optional Baseline Agent Behavior Sampling
+
+When a process is large, growing complex, or appears to restate behavior agents may already infer reliably, optionally measure baseline behavior before retaining that instruction load. This is a refinement option, not a mandatory gate.
+
+1. Create multiple representative hypothetical scenarios in which the process/capability would be used.
+2. Run at least 10 isolated, single-response LLM queries across available models or harnesses where practical. Give each only the scenario and desired outcome — do not expose the target process instructions or desired step sequence.
+3. Normalize and compare returned step sequences to identify high-consensus behavior, variable decisions, common omissions, and unsafe variants.
+4. Compare consensus with the ProcessModel's required contracts and invariants. Consensus measures likely inference, not correctness.
+5. Compress high-consensus behavior only when it is compatible with required invariants and the consequence of inference failure is acceptable. Retain a short confirmation when useful for sequence/context.
+6. Specify exact or preferred behavior for high-variance decisions. For consequential high-variance nodes, expand locally and validate the child procedure.
+7. Record the scenarios, model/harness diversity, sample count, observed consensus/variance, and resulting instruction decision as evidence. Do not claim universality from the sample.
+
+Sampling may use isolated subcommands in Claude Code, Codex, another agent harness, or direct LLM API calls through an available SDK. Tool choice is environmental; absence of a convenient harness does not block normal resolution review.
 
 ### Claims Are the Unit of Validation
 
