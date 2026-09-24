@@ -4,196 +4,194 @@
 
 # Python Engineering
 
-Opinionated Python 3.11+ engineering system. Establishes strong defaults and routes tasks to specialist skills for TDD, CLI, web, data/science, and constrained environments.
+Opinionated Python engineering for coding agents: strong defaults, independent design challenge, typed boundaries, evidence-first testing, and deep quality/modernization audits.
 
-## Why Install This?
+Existing coherent projects keep their architecture and tooling. New work gets the plugin's preferred choices first.
 
-Without this plugin, Claude applies generic Python patterns and makes ad-hoc decisions about typing, testing tooling, and project structure. With it:
+## Start here
 
-- Every Python task automatically applies Python 3.11+ standards
-- Tasks are routed to specialist skills (CLI, web, data, TDD, typing) based on what you are building
-- Code quality gates run via `ruff`, `ty`, and `pytest`, while `python-quality-audit` can fan out deeper smell, modernization, ecosystem, and maintenance analysis
-- Multi-step features get a structured task file via `create-feature-task`
-  (`.claude/tasks/{feature-name}.md`) capturing phases, acceptance criteria, and context
-
-## Architecture
-
-### One Automatic Router
-
-`python3-core` loads on every Python task, establishes defaults, and routes to specialists based on the task domain.
-
-`/python-engineering:orchestrate` is the primary user entrypoint. It classifies the task,
-loads the appropriate specialist skills, and delegates through this plugin's own agent
-chain — architect (design) → implement → test → review — sized to the task: a one-line fix
-goes straight to implement → review, while a multi-file feature runs the full chain. This
-command is model-invocable — Claude can route work internally using the orchestrate
-workflow.
-
-### Manual Entrypoints (slash commands)
-
-| Command | Use When |
-|---|---|
-| `/python-engineering:orchestrate` | Any Python task — primary entrypoint |
-| `/python-engineering:python-quality-audit PR|diff|staged|unstaged|path` | Broad read-only Python quality and modernization audit; primary entryway for StinkySnake + SnakePolish + ecosystem research |
-| `/python-engineering:review` | Bounded conventional code review against task requirements and standards |
-| `/python-engineering:lint` | Deterministic quality checks |
-| `/python-engineering:cleanup` | Structured cleanup and modernization |
-| `/python-engineering:debug` | Structured debugging |
-| `/python-engineering:python3-tdd` | Start a feature test-first |
-| `/python-engineering:stinkysnake path/to/file.py` | Read-only smell hunter; normally invoked as an audit lane |
-| `/python-engineering:snakepolish path/to/file.py` | Read-only forward-looking Python modernization assessor; normally invoked as an audit lane |
-| `/python-engineering:modernpython` | Apply Python 3.11+ modernization patterns |
-| `/python-engineering:python3-add-feature` | Guided feature addition workflow |
-| `/python-engineering:comprehensive-test-review tests/` | Audit test suite quality |
-| `/python-engineering:analyze-test-failures` | Diagnose test failures systematically |
-| `/python-engineering:python3-packaging` | Configure `pyproject.toml` and packaging |
-| `/python-engineering:python3-publish-release-pipeline` | Set up PyPI publishing CI/CD |
-| `/python-engineering:hatchling` | Hatchling build backend configuration |
-| `/python-engineering:pre-commit` | Set up `.pre-commit-config.yaml` |
-| `/python-engineering:mkdocs` | MkDocs with Material theme documentation |
-| `/python-engineering:pypi-readme-creator` | Create a README for a PyPI package |
-| `/python-engineering:async-python-patterns` | asyncio, gather, queues, WebSocket patterns |
-| `/python-engineering:shebangpython` | Validate and fix Python shebangs and PEP 723 metadata |
-| `/python-engineering:ty` | ty type checker usage and configuration |
-
-### Specialist Skills (auto-loaded when relevant)
-
-These skills are not invoked directly — `python3-core` and `orchestrate` load them automatically.
-
-| Skill | Domain |
-|---|---|
-| `python3-core` | Python 3.11+ standards, SOLID, code smell detection — activates on any `.py` file |
-| `python3-typing` | Typed-boundary policy, Protocol, TypeIs, native generics |
-| `python3-testing` | pytest, fixtures, parametrize, Hypothesis, coverage targets, property-based testing |
-| `python3-cli` | Typer + Rich, Annotated syntax, CliRunner, PEP 723 scripts |
-| `python3-web` | FastAPI, aiohttp, web and API development |
-| `python3-data` | Data and scientific Python |
-| `python3-stdlib-only` | Constrained/legacy environments (last resort) |
-| `python3-tools` | uv, Hatchling, ty, prek, pre-commit, packaging |
-| `python3-tdd` | Red-green-refactor TDD workflow |
-| `typer` | Typer CLI framework — Annotated syntax, enum restrictions, path types |
-| `typer-and-rich` | Typer + Rich integration, CliRunner snapshot testing, non-TTY output |
-| `textual` | Textual TUI framework |
-| `specialist-skill-routing` | Routes Typer, Rich, Textual, FastMCP, uv, TOML tasks to correct specialist |
-| `orchestrating-python-development` | Agent selection criteria for orchestrators |
-| `standards-for-python-development` | Shared typing, testing, and CLI standards reference |
-| `python3-test-design` | pytest suite architecture and coverage strategy |
-| `test-failure-mindset` | Root-cause approach to test failures |
-| `designing-ui-for-cli` | CLI UX design, 7-stage workflow; integrates impeccable design rigour |
-
-### Quality Audit Architecture
-
-`python-quality-audit` is the public entryway for broad assessment. It accepts a PR, git diff, staged/unstaged work, file, or directory and fans out independent evidence gathering before synthesis:
-
-```text
-python-quality-audit
-  ├─ stinkysnake       smell / standards / maintenance-debt discovery
-  ├─ snakepolish       Python/stdlib/ecosystem modernization assessment
-  ├─ ecosystem lane    maintained-library substitution research
-  ├─ project lane      practices from substantial current Python projects
-  └─ removal lane      dead code/process/compatibility and deletion opportunities
-       ↓
-  evidence-backed, deduplicated, actionable report
-```
-
-StinkySnake and SnakePolish remain directly invokable for a single lens, but neither edits code. The audit distinguishes observed/derived/external evidence from hypotheses and requires a verification path before calling material changes actionable.
-
-### Retained Utility Skills
-
-| Skill | Status |
-|---|---|
-| `modernpython` | Reference for PEP-by-PEP modernization |
-| `shebangpython` | Shebang and PEP 723 validation |
-| `stinkysnake` | Focused read-only smell hunter |
-| `snakepolish` | Focused read-only modernization assessor |
-
-### Agents
-
-| Agent | Role |
-|---|---|
-| `python-cli-architect` | Implements Python CLI features and fixes — primary implementation agent |
-| `python-pytest-architect` | Writes pytest test suites |
-| `python-cli-design-spec` | Designs CLI architecture and produces architecture specifications |
-| `code-reviewer` | Bounded post-implementation review; broad quality/modernization review routes through `python-quality-audit` |
-| `adversarial-solution-design` | Stress-tests design decisions before committing |
-| `semantic-code-search` | Searches codebase by identifier, import shape, type signature and code pattern |
-
-## Standing Defaults (applied on every task)
-
-| Category | Standard |
-|---|---|
-| Python version | 3.11+ — native generics, `match`, `Self`, `StrEnum` |
-| Package manager | `uv` — `uv add`, `uv run`, `uv lock` |
-| Linter | `ruff` |
-| Quality gates | `prek` — unified pre-commit hook runner |
-| Type checker | `ty` (Astral) — not mypy |
-| Test runner | `pytest`; prefer pytest-mock and Hypothesis when their seams/properties strengthen the tests |
-| Build backend | Hatchling |
-| File size limit | 500 LOC — architect and reviewer agents enforce this per file |
-| `Any` usage | Keep out of the typed core; localize justified dynamic-boundary exceptions by file |
-| Type annotations | Strong typing by default; follow coherent project conventions and truthful boundary types |
-| Coverage | Behavior/risk driven; respect a project's configured gate rather than inventing a percentage |
-| Design | SOLID as active guidance; code smells as signals to investigate |
-
-## Typing Policy
-
-- `Any`, broad `object`, and unchecked `cast()` are forbidden in normal internal code
-- Use `TypeVar`, `Protocol`, `TypedDict`, `dataclass`, or Pydantic models instead
-- Boundary inputs (raw API/user data) must be validated and returned as typed internal objects
-- `ty` is the enforcer — inline `# ty: ignore` suppressions are prohibited
-
-The plugin auto-detects the strongest valid typing strategy from Python version and available dependencies:
-
-| Python | Dependencies | Strategy |
-|---|---|---|
-| 3.10 | stdlib only | `TypeAlias`, `Protocol`, `TypeGuard` |
-| 3.11+ | stdlib only | `Self`, `TypedDict` + `NotRequired`, `TypeVar` |
-| 3.11+ | pydantic | Pydantic models at boundaries, `TypeAdapter` |
-| 3.11+ | hypothesis | Property-based tests for validators |
-| 3.12+ | — | `type` statement for aliases |
-| 3.13+ | — | `TypeIs` replaces `TypeGuard` |
-
-## Quick Start
-
-```bash
-# Install the plugin
-/plugin install python-engineering@jamie-bitflight-skills
-
-# Start any Python task — this is the entry point
-/python-engineering:orchestrate "Add a CLI command that processes CSV files"
-
-# Broad quality/modernization audit of existing code
-/python-engineering:python-quality-audit src/myapp/
-
-# Single-lens smell hunt
-/python-engineering:stinkysnake src/myapp/processor.py
-
-# Test-first feature
-/python-engineering:python3-tdd "Add rate limiting to the API client"
-
-# Code review
-/python-engineering:review src/myapp/
-```
-
-## From python3-development
-
-This plugin replaces `python3-development`. If you have the old plugin installed:
-
-```bash
-/plugin uninstall python3-development@jamie-bitflight-skills
-/plugin install python-engineering@jamie-bitflight-skills
-```
-
-## Installation
-
-First, add the marketplace (one-time setup):
+Install from the marketplace:
 
 ```bash
 /plugin marketplace add Jamie-BitFlight/claude_skills
-```
-
-Then install the plugin:
-
-```bash
 /plugin install python-engineering@jamie-bitflight-skills
 ```
+
+Then use one of two primary entry points:
+
+```text
+/python-engineering:orchestrate "Add a CLI command that processes CSV files"
+/python-engineering:python-quality-audit PR
+```
+
+**`orchestrate` builds and changes Python.** It traces the affected system, challenges the plan independently, selects specialists, implements, tests, reviews, and validates.
+
+**`python-quality-audit` investigates existing Python.** It is read-only and asks what is wrong, what can disappear, what modern Python can replace, and what mature ecosystem tooling can take off your maintenance burden.
+
+## What you get
+
+- **Opinionated defaults without forced rewrites.** Repository contracts and coherent existing architecture win; greenfield work starts from the plugin's preferred Python stack and design.
+- **Adversarial design before implementation.** A separate agent traces callers, consumers, tests, docs, configuration, generated artifacts, manifests, and public contracts before accepting a plan as complete.
+- **Agent-aware CLI design.** Tools inside Agent Skills/plugins emit compact JSON on stdout, preferably from Pydantic models; human-facing CLIs prefer Typer + Rich.
+- **Typed boundaries.** Dynamic data is validated at explicit boundaries. Necessary typing/lint exceptions are localized by file rather than scattered through the codebase.
+- **Evidence-first tests.** RED must fail for the expected behavioral reason. Coverage protects behavior and risk rather than chasing an invented percentage.
+- **Pythonic design pressure.** SOLID, small cohesive modules, direct construction before abstraction, and ~500 physical LOC per source file as the default boundary.
+- **Modernization that can delete code.** Audits look for obsolete compatibility layers, hand-built machinery replaceable by modern Python or maintained libraries, redundant process, and practices proven in substantial Python projects.
+
+## Quality audit
+
+This is the broad review entry point:
+
+```text
+/python-engineering:python-quality-audit PR
+/python-engineering:python-quality-audit diff
+/python-engineering:python-quality-audit staged
+/python-engineering:python-quality-audit unstaged
+/python-engineering:python-quality-audit src/
+/python-engineering:python-quality-audit src/ "assess Python 3.15 as the proposed minimum"
+```
+
+It fans out independent investigators so one interpretation does not anchor the others:
+
+```text
+python-quality-audit
+  ├─ StinkySnake       smells, standards drift, maintenance hazards
+  ├─ SnakePolish       modern Python, stdlib and ecosystem opportunities
+  ├─ ecosystem lane    maintained libraries that can replace local machinery
+  ├─ project lane      how substantial Python projects solve the same problems
+  └─ removal lane      dead code, compatibility and process that can disappear
+       ↓
+  evidence-backed synthesis
+       ↓
+  actionable findings + protected behavior + verification plan
+```
+
+Findings distinguish **OBSERVED**, **DERIVED**, **VERIFIED-EXTERNAL**, and **HYPOTHESIS** evidence. A material recommendation is not called actionable until its affected surface and verification path are known.
+
+Use the individual lenses when you only need one:
+
+```text
+/python-engineering:stinkysnake src/myapp/processor.py
+/python-engineering:snakepolish src/myapp/
+```
+
+Both are read-only. StinkySnake hunts smells and root causes; SnakePolish asks how the same behavior could require less code and maintenance.
+
+## Engineering workflow
+
+```text
+orchestrate
+   ↓
+classify task + repository constraints
+   ↓
+architecture/design when material
+   ↓
+independent adversarial scope trace
+   ↓
+tests first when applicable
+   ↓
+implementation
+   ↓
+bounded code review
+   ↓
+repository checks + behavioral verification
+```
+
+The adversarial stage is intentionally difficult to skip. Its **investigation depth is fixed** while its **design ceremony is adaptive**: a two-line change still gets its callers and consequences traced, but it does not need an eleven-section architecture document unless the decisions justify one.
+
+## Defaults
+
+These are first choices for new work, not reasons to churn a coherent project.
+
+| Area | Preferred default |
+|---|---|
+| Runtime | Project floor first; modern supported Python for greenfield work |
+| Dependencies | `uv` |
+| Lint / format | `ruff` |
+| Type checking | `ty` |
+| Tests | `pytest`; pytest-mock/Hypothesis when they strengthen the test |
+| Build backend | Hatchling |
+| Human CLI | Typer + Rich |
+| Agent/plugin CLI | Compact JSON stdout; diagnostics on stderr |
+| Structured boundary data | Pydantic when runtime validation/serialization earns it |
+| TOML mutation | `tomlkit` |
+| Module size | ~500 physical LOC; decompose by cohesive responsibility |
+| Coverage | Changed behavior, boundaries and risk; respect project gates |
+| Design | SOLID as design pressure, not an abstraction quota |
+
+Precedence is explicit requirements/safety → repository contracts and established architecture → ecosystem conventions → plugin defaults.
+
+## Design principles
+
+### Keep the typed core clean
+
+Prefer precise types. External/dynamic data enters through explicit validator/parser/adapter modules and becomes strongly typed immediately. If an integration genuinely requires `Any` or a lint exception, localize that exceptional code in a dedicated file and configure the narrowest file-level exception there.
+
+### Don't cargo-cult privacy
+
+A leading underscore is an architectural claim. Do not create `_helper`, `_client`, or `_thing` merely because implementation details are traditionally made "private." Require an actual API boundary, framework requirement, name-mangling need, or collision.
+
+### Keep modules comprehensible as a whole
+
+~500 physical LOC is the default source-file boundary, including docstrings. Approaching it triggers decomposition analysis. Larger files need evidence that splitting would damage cohesion or create a worse dependency/API boundary.
+
+### Prefer deletion over another abstraction
+
+Before adding a wrapper, factory, protocol, compatibility layer, parser, retry loop, serializer, or automation step, ask whether Python, the existing project, or a mature maintained library already owns the problem.
+
+## Focused commands
+
+| Command | Purpose |
+|---|---|
+| `/python-engineering:orchestrate` | Primary implementation/change workflow |
+| `/python-engineering:python-quality-audit` | Broad read-only quality and modernization audit |
+| `/python-engineering:review` | Bounded conventional code review |
+| `/python-engineering:lint` | Deterministic check-only lint/type checks |
+| `/python-engineering:debug` | Hypothesis-driven debugging |
+| `/python-engineering:python3-tdd` | Explicit red-green-refactor workflow |
+| `/python-engineering:stinkysnake` | Single-lens smell hunt |
+| `/python-engineering:snakepolish` | Single-lens modernization assessment |
+| `/python-engineering:modernpython` | Python-version/PEP modernization reference |
+| `/python-engineering:shebangpython` | Shebang and PEP 723 validation/repair |
+| `/python-engineering:python3-packaging` | Packaging and `pyproject.toml` |
+| `/python-engineering:python3-publish-release-pipeline` | PyPI release automation |
+
+Specialists for web, data/science, async, typing, testing, Typer/Rich, Textual, packaging and constrained stdlib-only environments are routed automatically.
+
+## Agents
+
+| Agent | Responsibility |
+|---|---|
+| `python-cli-architect` | Primary implementation agent; preserves project architecture and applies preferred defaults for new work |
+| `adversarial-solution-design` | Independently traces the real change surface and challenges shallow plans |
+| `python-cli-design-spec` | Architecture/contracts when material decisions require a design artifact |
+| `python-pytest-architect` | Behavioral and property-based test design |
+| `code-reviewer` | Bounded post-implementation review; broad audits route through `python-quality-audit` |
+| `semantic-code-search` | Structural/pattern search across Python codebases |
+
+## Existing projects
+
+The plugin does not treat its preferences as permission for drive-by modernization.
+
+It follows:
+
+1. explicit user requirements and safety/security constraints;
+2. repository Python floor, contracts, architecture, dependencies, CI and local conventions;
+3. framework/library conventions;
+4. plugin defaults.
+
+Modernization becomes a deliberate task or an evidence-backed audit recommendation.
+
+## Development
+
+Load this checkout directly:
+
+```bash
+claude --plugin-dir ./plugins/python-engineering
+```
+
+Repository validation is defined by the repository's hooks and CI. Follow [the repository contribution guide](../../CONTRIBUTING.md) for development and submission requirements.
+
+## License
+
+MIT. See [LICENSE](../../LICENSE).
