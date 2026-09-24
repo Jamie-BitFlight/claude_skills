@@ -6,7 +6,7 @@ disallowedTools: Bash, Write, Edit
 model: sonnet
 permissionMode: default
 skills:
-  - python3-development
+  - python-engineering:python3-core
   - plugin-creator:claude-skills-overview-2026
 hooks:
   PreToolUse:

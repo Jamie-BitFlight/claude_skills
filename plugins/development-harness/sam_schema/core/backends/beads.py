@@ -51,7 +51,7 @@ from backlog_core.backends.beads_models import (
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from sam_schema.core.backends._utils import _now_iso, validate_appended_task
-from sam_schema.core.dependencies import SUCCESSFUL_STATUSES as _SUCCESSFUL_STATUSES
+from sam_schema.core.dependencies import SUCCESSFUL_STATUSES
 from sam_schema.core.exceptions import (
     DocumentNotFoundError,
     PlanExistsError,
@@ -1131,7 +1131,7 @@ class BeadsTaskProvider:
             for task_id, td in task_data_by_id.items():
                 if td["status"] != "not-started":
                     continue
-                if all(status_by_task_id.get(dep_id, "") in _SUCCESSFUL_STATUSES for dep_id in td["dependencies"]):
+                if all(status_by_task_id.get(dep_id, "") in SUCCESSFUL_STATUSES for dep_id in td["dependencies"]):
                     ready_ids.add(task_id)
 
         return [task_data_by_id[tid] for tid in ready_ids if tid in task_data_by_id]
@@ -1164,7 +1164,7 @@ class BeadsTaskProvider:
         for task in tasks:
             if task["status"] != "not-started":
                 continue
-            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in _SUCCESSFUL_STATUSES]
+            unsatisfied = [d for d in task["dependencies"] if status_by_id.get(d, "") not in SUCCESSFUL_STATUSES]
             if unsatisfied:
                 blocked_tasks.append({task["id"]: unsatisfied})
             else:

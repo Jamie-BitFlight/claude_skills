@@ -155,7 +155,7 @@ Agents default to sequential analysis (form hypothesis → test → refine) when
 | Pattern | Reason skipped |
 |---------|---|
 | Skill distribution via npm package manager | mattpocock/skills distributed via `npx skills@latest add mattpocock/skills/tdd`. claude_skills distributed via GitHub + plugin marketplace. Different distribution models appropriate to each repository's scope and audience. No actionable improvement for this repository. |
-| Cross-language skill support (Python, Go, Rust) | mattpocock/skills heavily JavaScript/TypeScript-centric. claude_skills is language-agnostic. No gap identified — repository already supports multi-language skills (python3-development, etc.). |
+| Cross-language skill support (Python, Go, Rust) | mattpocock/skills heavily JavaScript/TypeScript-centric. claude_skills is language-agnostic. No gap identified — repository already supports multi-language skills. |
 
 ---
 

@@ -58,7 +58,7 @@ def get_plugins_root() -> Path:
 
     Returns:
         Absolute :class:`~pathlib.Path` to the directory whose children are the
-        individual plugin directories (e.g. ``python3-development/``,
+        individual plugin directories (e.g. ``python-engineering/``,
         ``plugin-creator/``, ``development-harness/``).
 
     Raises:
@@ -372,8 +372,8 @@ def find_agent(agent_name: str, plugins_root: Path | None = None) -> AgentEntry:
         Splits on the first colon, resolves the plugin directory, and constructs
         the expected path directly without scanning. The remainder after the first
         colon is used as a slash-delimited path relative to ``agents/``.
-        Example: ``python3-development:code-reviewer``
-        → ``plugins/python3-development/agents/code-reviewer.md``
+        Example: ``python-engineering:code-reviewer``
+        → ``plugins/python-engineering/agents/code-reviewer.md``
 
     **Bare name** (no colon):
         Scans all plugins. Exactly one match → returns it. Zero matches →
@@ -389,7 +389,7 @@ def find_agent(agent_name: str, plugins_root: Path | None = None) -> AgentEntry:
 
     Args:
         agent_name: Agent name in bare (``code-reviewer``) or plugin-qualified
-            (``python3-development:code-reviewer``) form. Subdirectory agents
+            (``python-engineering:code-reviewer``) form. Subdirectory agents
             should be plugin-qualified (``dh:analyze-test-failures``)
             to avoid false-positive plugin detection.
         plugins_root: Path to ``plugins/``. When ``None``,

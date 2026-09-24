@@ -21,7 +21,7 @@ Load and follow the standards in `/python-engineering:standards-for-python-devel
 
 1. **Analyze existing project** structure and configuration
 2. **Create or update** pyproject.toml with complete configuration
-3. **Configure tools** (ruff, ty/mypy per `python3-standards.md`, pytest, hatch/setuptools)
+3. **Configure tools** (ruff, ty/mypy per `standards-for-python-development`, pytest, hatch/setuptools)
 4. **Set up dependencies** with proper version constraints
 5. **Verify configuration** by running build
 
@@ -85,7 +85,7 @@ dev = [
     "ruff>=0.9.0",
 ]
 # Type checker: ty is the default for new work. If the project uses mypy, replace ty with
-# mypy>=1.8.0 here. See python3-standards.md for type checker selection guidance.
+# mypy>=1.8.0 here. See standards-for-python-development for type checker selection guidance.
 
 [project.scripts]
 my-cli = "my_package.cli:app"
@@ -308,7 +308,7 @@ dev = [
     "ruff>=0.9.0",
     "ty>=0.0.0a1",
     # Type checker: ty is the default. Replace with mypy>=1.8.0 if the project uses mypy.
-    # See python3-standards.md for type checker selection guidance.
+    # See standards-for-python-development for type checker selection guidance.
 ]
 docs = [
     "mkdocs>=1.5.0",
@@ -370,7 +370,7 @@ repos:
   #     hooks:
   #       - id: mypy
   #         args: [--strict]
-  # See python3-standards.md for type checker selection guidance.
+  # See standards-for-python-development for type checker selection guidance.
   - repo: https://github.com/astral-sh/ty
     rev: 0.0.0-alpha.11
     hooks:
@@ -391,7 +391,7 @@ uv pip install -e ".[dev]"
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 # Type check — ty is default; use uv run mypy src/ if project hooks/CI run mypy
-# Type checker selection: see python3-standards.md
+# Type checker selection: see standards-for-python-development
 uv run ty check src/
 
 # Run tests

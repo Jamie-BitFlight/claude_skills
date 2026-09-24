@@ -27,6 +27,7 @@ _HARNESS_DIR = Path(__file__).resolve().parents[1]
 if str(_HARNESS_DIR) not in sys.path:
     sys.path.insert(0, str(_HARNESS_DIR))
 
+from scripts import verify_migration_fidelity as migration_fidelity
 from scripts.verify_migration_fidelity import CONTENT_LOSS, MATCH, FileResult, VerificationReport, _summary_payload, app
 from typer.testing import CliRunner
 
@@ -53,6 +54,12 @@ metadata:
 
 Some context content that must survive migration.
 """
+
+
+@pytest.fixture(autouse=True)
+def isolated_report_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep each test's generated report inside its pytest temp directory."""
+    monkeypatch.setattr(migration_fidelity, "_REPORT_PATH", tmp_path / "migration-fidelity-verification.md")
 
 
 def _write_matching_pair(backlog_dir: Path, name: str = "item1") -> None:

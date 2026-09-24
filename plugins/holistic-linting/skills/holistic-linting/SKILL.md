@@ -276,5 +276,5 @@ When uncertain whether an issue is blocking: treat it as blocking and fix it.
 
 - [holistic-linting-orchestrator](../holistic-linting-orchestrator/SKILL.md) - Orchestrator delegation workflows for linting tasks
 - [holistic-linting-resolver](../holistic-linting-resolver/SKILL.md) - Linter-specific resolution workflows for sub-agents
-- **python3-development** - Modern Python development patterns and best practices
+- **python-engineering** - Modern Python development patterns and best practices
 - **uv** - Python package and project management with uv

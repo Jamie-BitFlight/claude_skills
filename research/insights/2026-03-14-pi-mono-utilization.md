@@ -31,17 +31,7 @@ Pi-mono documents **three callable surfaces**:
 - **Gap identified**: The agent advises on *how to write TypeScript code correctly*, not on *spawning agent frameworks or integrating external agent runtimes*
 - **Why unsuitable**: Pi-mono is a framework that *other projects* instantiate to build agents. `typescript-pro` helps users understand TypeScript—it does not build agents, CLI tools, or TUI applications itself. Pi-mono would be a library that a *new* TypeScript project might adopt, but typescript-pro does not call libraries to create systems.
 
-### 2. Plugin: `python3-development`
-
-**File**: `./plugins/python3-development/`
-
-**Role**: Primary Python implementation plugin with delegation framework for developers and agents.
-
-**Potential fit**: ❌ No
-- **Scope**: Python-focused (see rules/python-development.md). Routes all Python implementation tasks to specialist agents.
-- **Why unsuitable**: Pi-mono is TypeScript-only. The Python development plugin has no TypeScript agent counterpart in this repository, and adding one is out of scope for utilization assessment.
-
-### 3. Agents: `feature-researcher`, `codebase-analyzer`, `integration-checker`
+### 2. Agents: `feature-researcher`, `codebase-analyzer`, `integration-checker`
 
 **Files**: `./plugins/development-harness/agents/`
 
@@ -51,7 +41,7 @@ Pi-mono documents **three callable surfaces**:
 - **Gap identified**: These agents perform goal-backward discovery and validate implemented features. They do not execute frameworks or integrate external tools as part of their analysis.
 - **Why unsuitable**: Pi-mono is relevant for *architectural pattern research* (the research notes reference it for agent runtime design, tool execution, session management), not for *automated recommendation or invocation*.
 
-### 4. Skills: `external-pattern-integrator`, `swarm-spawning`, `swarm-primitives`
+### 3. Skills: `external-pattern-integrator`, `swarm-spawning`, `swarm-primitives`
 
 **Files**: `./.claude/skills/{external-pattern-integrator,swarm-spawning,swarm-primitives}/`
 
@@ -96,9 +86,8 @@ Concrete mismatch:
 
 **PROPOSALS_WRITTEN**: 0
 
-**SKIPPED**: 4 candidate systems
+**SKIPPED**: 3 candidate systems
 - `typescript-pro`: Advises on TypeScript, does not spawn frameworks or invoke runtimes
-- `python3-development` plugin: Python-focused; no TypeScript agent framework exists to call pi-mono
 - `feature-researcher`, `codebase-analyzer`: Analysis agents; not executors of framework integration
 - `external-pattern-integrator`, `swarm-*` skills: Pattern adoption tools, not service integration tools
 

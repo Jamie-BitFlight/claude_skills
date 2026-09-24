@@ -308,7 +308,7 @@ DESIGN and DOCUMENT these aspects for each refactoring target:
 <file_naming>
 Generate a slug from the plugin name using these rules:
 1. Use the plugin directory name directly (already lowercase with hyphens)
-Example: "python3-development" → "python3-development"
+Example: "python-engineering" → "python-engineering"
 </file_naming>
 
 <output_file_structure>
@@ -828,7 +828,7 @@ Each phase MUST complete before the next begins:
 
 Use the plugin directory name directly (already lowercase with hyphens):
 
-- `python3-development` → `python3-development`
+- `python-engineering` → `python-engineering`
 - `gitlab-skill` → `gitlab-skill`
 
 **Quality Assurance**:

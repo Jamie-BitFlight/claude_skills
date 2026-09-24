@@ -113,12 +113,12 @@ class TestLazyMigration:
         DHConfig), it overrides the default ``"local"`` backend.
 
         Arrange: write .dh/config.yaml with task.backend=memory to tmp_path;
-                 mock dh_config._dh_paths to return tmp_path as project root;
+                 mock dh_config.dh_paths to return tmp_path as project root;
                  clear TASKBACKEND env var.
         Act: call create_task_backend() with no arguments.
         Assert: returned backend is InMemoryTaskProvider.
         """
-        import dh_config as _dh_config_mod
+        import dh_config as dh_config_mod
 
         # Arrange — write YAML config to the mocked project .dh/ dir
         dh_dir = tmp_path / ".dh"
@@ -136,7 +136,7 @@ class TestLazyMigration:
         mock_dh._dh_user_root.return_value = tmp_path / "home" / ".dh"
         mock_dh.project_dh_dir.return_value = dh_dir
         (tmp_path / "home" / ".dh").mkdir(parents=True)
-        monkeypatch.setattr(_dh_config_mod, "_dh_paths", mock_dh)
+        monkeypatch.setattr(dh_config_mod, "dh_paths", mock_dh)
 
         # Act
         backend = create_task_backend()
@@ -153,11 +153,11 @@ class TestLazyMigration:
 
         Arrange: write .dh/config.yaml with task.backend=local to tmp_path;
                  set TASKBACKEND="memory" via monkeypatch;
-                 mock dh_config._dh_paths to return tmp_path.
+                 mock dh_config.dh_paths to return tmp_path.
         Act: call create_task_backend() with no arguments.
         Assert: returned backend is InMemoryTaskProvider (env var wins over config).
         """
-        import dh_config as _dh_config_mod
+        import dh_config as dh_config_mod
 
         # Arrange — config says "local", env var says "memory"
         dh_dir = tmp_path / ".dh"
@@ -175,7 +175,7 @@ class TestLazyMigration:
         mock_dh._dh_user_root.return_value = tmp_path / "home" / ".dh"
         mock_dh.project_dh_dir.return_value = dh_dir
         (tmp_path / "home" / ".dh").mkdir(parents=True)
-        monkeypatch.setattr(_dh_config_mod, "_dh_paths", mock_dh)
+        monkeypatch.setattr(dh_config_mod, "dh_paths", mock_dh)
 
         # Act
         backend = create_task_backend()

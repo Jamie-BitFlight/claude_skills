@@ -15,7 +15,7 @@ Start a comprehensive plugin refactoring workflow for the specified plugin.
 
 ## Arguments
 
-- `<plugin_path/>`: Path to the plugin directory to refactor (e.g., `./plugins/python3-development`)
+- `<plugin_path/>`: Path to the plugin directory to refactor (e.g., `./plugins/python-engineering`)
 
 ## Workflow Overview
 
@@ -36,7 +36,7 @@ If no plugin path provided:
 ```text
 ERROR: No plugin path provided.
 Usage: /plugin-creator:refactor <plugin-path>
-Example: /plugin-creator:refactor ./plugins/python3-development
+Example: /plugin-creator:refactor ./plugins/python-engineering
 ```
 
 ### Step 2: Verify Plugin Exists
@@ -106,7 +106,7 @@ Ask user:
 
 ```bash
 # Start refactoring a plugin
-/plugin-creator:refactor ./plugins/python3-development
+/plugin-creator:refactor ./plugins/python-engineering
 
 # Start refactoring current directory plugin
 /plugin-creator:refactor .

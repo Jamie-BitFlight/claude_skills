@@ -51,7 +51,7 @@ error_console = Console(stderr=True)
 def _get_table_width(table: Table) -> int:
     """Get natural width of table using temporary wide console.
 
-    Source: python3-development skill - tool-library-registry.md
+    Source: python-engineering python3-core skill - tool-library-registry.md
 
     Returns:
         The natural width of the table in characters.
@@ -371,7 +371,7 @@ def display_results(plugin_dir: Path, results: list[ValidationResult]) -> bool:
         if not result.valid:
             all_valid = False
 
-    # Set table width to prevent wrapping (per python3-development guidelines)
+    # Set table width to prevent wrapping (per python-engineering guidelines)
     table.width = _get_table_width(table)
     console.print(table, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True)
     return all_valid

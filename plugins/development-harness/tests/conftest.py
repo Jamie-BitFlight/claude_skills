@@ -36,7 +36,7 @@ _docs_dir = _plugin_dir / "docs"
 if str(_docs_dir) not in sys.path:
     sys.path.insert(0, str(_docs_dir))
 
-import backlog_core.models as _bc_models
+import backlog_core.models as bc_models
 import pytest
 from backlog_core.backend_protocol import reset_config, set_config
 from backlog_core.backend_types import BacklogConfig
@@ -129,11 +129,11 @@ def backlog_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Redirect backlog_dir via _config so get_backlog_dir() returns the temp path.
     # parsing.py and operations.py call _models.get_backlog_dir(); patching _config
     # is the correct interception point after the BacklogConfig refactor.
-    existing = _bc_models._config
+    existing = bc_models._config
     monkeypatch.setattr(
-        _bc_models,
+        bc_models,
         "_config",
-        _bc_models.BacklogConfig(
+        bc_models.BacklogConfig(
             repo_root=existing.repo_root if existing is not None else fake_project_root,
             backlog_dir=bd,
             default_repo=existing.default_repo if existing is not None else "",

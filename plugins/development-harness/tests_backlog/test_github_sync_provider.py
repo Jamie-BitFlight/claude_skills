@@ -10,6 +10,7 @@ import pytest
 from backlog_core.backend_types import AddedCommentNode
 from backlog_core.backends._github_work_item_versions import render_work_item_comment, root_revision, work_item_head_ref
 from backlog_core.backends.github_backend import GitHubBackend, _GitHubDispatchPersistence
+from backlog_core.backends.github_content_stores import _content_revision
 from backlog_core.backends.memory_backend import InMemoryBackend
 from backlog_core.file_cache import FileCache
 from backlog_core.models import (
@@ -748,7 +749,7 @@ def test_github_content_provider_replay_preserves_concurrent_remote_revision(tmp
         reference=reference,
         owner_reference="#1",
         content=remote["content"],
-        revision=GitHubBackend._content_revision(remote["content"]),
+        revision=_content_revision(remote["content"]),
     )
     cache.cache_content(initial)
     backend.try_get_github = MagicMock(return_value=None)

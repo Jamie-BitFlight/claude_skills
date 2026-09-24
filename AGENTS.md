@@ -179,7 +179,7 @@ to Codex/OpenCode; existing `Skill(...)` blocks elsewhere in this repo predate t
 are not bugs to fix on sight).
 
 - Skills: `/plugin-name:skill-name` (e.g. `/plugin-creator:skill-creator`).
-- Sub-agents: `plugin-name:agent-name` (e.g. `python3-development:python-cli-architect`).
+- Sub-agents: `plugin-name:agent-name` (e.g. `python-engineering:python-cli-architect`).
 
 Load `/plugin-creator:skill-creator` before creating a skill, before modifying an existing
 `SKILL.md`/`references/*.md`, or before converting loose documentation into skill format. Before

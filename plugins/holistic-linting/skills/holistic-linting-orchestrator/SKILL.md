@@ -53,7 +53,7 @@ Agent(
 - Records pre-existing issues it finds to the repo's tracking system
 - Researches rule documentation
 - Traces type flows and architectural context
-- Implements elegant fixes following python3-development patterns
+- Implements elegant fixes following python-engineering patterns
 - Verifies resolution by re-running linters
 - Creates resolution artifacts in `.claude/reports/` and `.claude/artifacts/`
 

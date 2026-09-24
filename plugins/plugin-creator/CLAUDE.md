@@ -265,7 +265,7 @@ Routing by concern (DOC_IMPROVE and ORPHAN_RESOLVE):
 
 **Process:**
 1. Phase 0 — Variable Collection: validate target skill path; infer defaults (skill name, cooldown 7 days); collect 6 template variables via AskUserQuestion; confirm before proceeding
-2. Phase 1 — Implementation: load `/python3-development`; substitute template variables; delegate to `@python-cli-architect`; creates `scripts/update-{LOCAL_DOC_DIR}-docs.py`
+2. Phase 1 — Implementation: load `/python-engineering:python3-core`; substitute template variables; delegate to `@python-cli-architect`; creates `scripts/update-{LOCAL_DOC_DIR}-docs.py`
 3. Phase 2 — Code Review: delegate to `@python-code-reviewer`; validate ReDoS-safe regex, atomic operations, link transformation; loop back to Phase 1 on failure
 4. Phase 3 — Quality Gates: sequential `ruff format → ruff check → mypy → pyright → prek`; all must pass; loop back to Phase 1 on failure
 5. Phase 4 — Testing: 7-point checklist (execution, file existence, Hugo shortcode removal, link sampling, SKILL.md integration, cooldown enforcement, force flag); loop back on failure
@@ -497,7 +497,7 @@ LSP servers require separate binary installation — plugins configure the conne
 
 - `prompt-optimization` — now a skill within this plugin; used by `ai-doc-optimizer` and `subagent-refactorer` agents
 - `holistic-linting` — code quality and linting
-- `python3-development` — Python-specific development patterns
+- `python-engineering` — Python-specific development patterns
 
 ---
 

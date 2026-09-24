@@ -72,7 +72,7 @@ class TestCreateTaskBackendConfig:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """.dh/config.yaml with task.backend = 'beads' must route to BeadsTaskProvider."""
-        import dh_config as _dh_config_mod
+        import dh_config as dh_config_mod
 
         dh_dir = tmp_path / ".dh"
         dh_dir.mkdir()
@@ -82,7 +82,7 @@ class TestCreateTaskBackendConfig:
         monkeypatch.delenv("TASKBACKEND", raising=False)
 
         monkeypatch.setattr(
-            _dh_config_mod, "_dh_paths", make_dh_paths_mock(tmp_path / "empty-project", user_dh_root=dh_dir)
+            dh_config_mod, "dh_paths", make_dh_paths_mock(tmp_path / "empty-project", user_dh_root=dh_dir)
         )
 
         backend = create_task_backend()

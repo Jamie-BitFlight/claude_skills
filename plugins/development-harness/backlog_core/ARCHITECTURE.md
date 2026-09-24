@@ -314,11 +314,11 @@ section name (from `backlog_groom`'s `section=`/`sections={}` MCP parameters) th
 `resolve_section_name` before persisting — a resolvable alias or legacy `unknown__` form always
 persists under its resolved canonical key, never under the alias spelling and never under
 `unknown__`. A name that resolves to neither the registry nor the alias map falls back to
-`heading_to_unknown_key` (`rendering.py`) as before, but that fallback now also calls
-`operations._warn_unregistered_section`, which prints a diagnostic to stderr unconditionally (this
-is forensic output per AGENTS.md "CLI and script output — agent-only, never human-facing", not
-primary output) and records the same fact on the caller's `Output.warnings` when one is provided —
-so a new, permanently unregistered name is visible immediately instead of silently accumulating.
+`heading_to_unknown_key` (`rendering.py`) as before. After the backend successfully persists that
+fallback, the owning single- or batch-write path calls `operations._warn_unregistered_section`,
+which prints a diagnostic to stderr and records the same warning on the caller's `Output.warnings`
+when one is provided. The persisted content remains intact, and the warning names the reconstructed
+display spelling that a later section read can retrieve.
 `github_sync._parse_groomed_section` applies the identical `resolve_subsection_name` resolution to
 `### subsection` headings parsed from a GitHub issue body — the write boundary for subsections.
 `github_sync.parse_issue_body`'s top-level `## Section` heading lookup and the public
@@ -607,7 +607,7 @@ dedicated branch in `render_issue_body`/`parse_issue_body`, not the generic `SEC
 **Dependency direction**: `models ← parsing ← entry_blocks ← github_sync` (must remain acyclic;
 do not import from `gh_client.py`, `operations.py`, or `server.py`)
 
-**Imports from other modules**: `from . import rendering as _rendering`,
+**Imports from other modules**: `from . import rendering`,
 `from .entry_blocks import parse_entries`, `from .models import BacklogItem, GroomedData, Section`,
 `from .parsing import extract_sections`
 
@@ -1169,7 +1169,7 @@ All subprocess calls in `_bootstrap_beads()` follow these rules:
 
 ### Project Directory Source
 
-Bootstrap receives the project root from `models.get_repo_root()`, which returns the path set during `_init_models()` at module import time. The sequence is: `sys.argv` → `_parse_args()` → `_init_models(project_dir)` → `models._REPO_ROOT` → `models.get_repo_root()` → `_bootstrap_beads(project_dir)`.
+Bootstrap receives the project root from `models.get_repo_root()`, which returns the path set during `init_models()` at module import time. The sequence is: `sys.argv` → `_parse_args()` → `init_models(project_dir)` → `models._REPO_ROOT` → `models.get_repo_root()` → `_bootstrap_beads(project_dir)`.
 
 ---
 

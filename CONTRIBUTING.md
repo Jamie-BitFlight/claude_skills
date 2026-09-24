@@ -147,7 +147,7 @@ The marketplace description should:
 
 **Bad:**
 
-> "Collection of 26 plugins including python3-development, holistic-linting, plugin-creator..."
+> "Collection of 26 plugins including python-engineering, holistic-linting, plugin-creator..."
 
 ## Pull Request Checklist
 

@@ -18,6 +18,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Final
 
 import pytest
@@ -246,10 +247,12 @@ class TestRelevanceAnchorPaths:
         _write_entry(entry, FABRICATED_ANCHOR, entry_date=EXEMPT_DATE)
         assert len(_issues_for(_run_json(entry), "relevance_anchor_path_missing")) == 1
 
-    def test_outside_a_checkout_reports_unchecked_rather_than_clean(self, tmp_path: Path) -> None:
+    def test_outside_a_checkout_reports_unchecked_rather_than_clean(self) -> None:
         """No checkout root means the paths were not checked -- say so instead of passing silently."""
-        entry = tmp_path / "example.md"
-        _write_entry(entry, FABRICATED_ANCHOR)
-        issues = _issues_for(_run_json(entry), "relevance_anchor_paths_unchecked")
-        assert len(issues) == 1
-        assert _issues_for(_run_json(entry), "relevance_anchor_path_missing") == []
+        with TemporaryDirectory(dir=Path.home()) as directory:
+            entry = Path(directory) / "example.md"
+            assert all(not (parent / ".git").exists() for parent in entry.resolve().parents)
+            _write_entry(entry, FABRICATED_ANCHOR)
+            issues = _issues_for(_run_json(entry), "relevance_anchor_paths_unchecked")
+            assert len(issues) == 1
+            assert _issues_for(_run_json(entry), "relevance_anchor_path_missing") == []

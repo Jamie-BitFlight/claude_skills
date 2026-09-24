@@ -9,8 +9,7 @@ docstring for the full contract this module implements.
 from __future__ import annotations
 
 import json
-from pathlib import Path as _Path
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from merge_layer import (
     ExtractionFragment,
@@ -22,9 +21,6 @@ from merge_layer import (
     write_layer,
 )
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 def _fragment(
     source_file: str,
@@ -34,7 +30,7 @@ def _fragment(
 ) -> ExtractionFragment:
     """Build a minimal, valid ExtractionFragment for tests."""
     return ExtractionFragment(
-        source_file=_Path(source_file),
+        source_file=Path(source_file),
         layer_type="step",
         extracted_at="2026-07-10T00:00:00Z",
         items=tuple(items or []),

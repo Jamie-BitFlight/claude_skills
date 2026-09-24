@@ -1293,13 +1293,13 @@ class TestLifespanReEntryGuard:
 
         mocker.patch("backlog_core.sync_engine._startup_sync_loop", side_effect=_counted_sync)
 
-        import backlog_core.server as _srv
+        import backlog_core.server as srv
         from backlog_core.server import _backlog_lifespan
 
         # Simulate two lifespan entries (FastMCP #1115 scenario).
-        async with _backlog_lifespan(_srv.mcp):
+        async with _backlog_lifespan(srv.mcp):
             await asyncio.sleep(0)
-            async with _backlog_lifespan(_srv.mcp):
+            async with _backlog_lifespan(srv.mcp):
                 await asyncio.sleep(0)
 
         assert launch_count <= 1, (
@@ -1358,7 +1358,7 @@ class TestKillSwitch:
         reset_sync_state()
 
         mocker.patch("backlog_core.server._startup_sync_enabled", return_value=True)
-        mocker.patch("backlog_core.server._get_config", return_value=BackendConfig(backend=backend))
+        mocker.patch("backlog_core.server.get_config", return_value=BackendConfig(backend=backend))
         mocker.patch("backlog_core.server._active_startup_sync_task", None)
         create_task = mocker.patch("backlog_core.server.asyncio.create_task")
 

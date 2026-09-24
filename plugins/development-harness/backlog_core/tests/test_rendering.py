@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from backlog_core import rendering as _rendering
+from backlog_core import rendering
 from backlog_core.backends.beads_backend import BeadsBackend
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -83,7 +83,7 @@ class TestRenderGroomedSectionConsistency:
                 "unknown__custom_section": "Extra section content for unknown-key path",
             },
         )
-        expected = _rendering.render_groomed_section(groomed)
+        expected = rendering.render_groomed_section(groomed)
 
         # Act
         result = backend_instance.render_groomed_section(groomed)
@@ -207,7 +207,7 @@ class TestUnknownKeyToHeading:
         ``unknown__`` prefixing applied during section storage, producing a
         human-readable heading for display.
         """
-        result = _rendering.unknown_key_to_heading(key)
+        result = rendering.unknown_key_to_heading(key)
         assert result == expected, f"unknown_key_to_heading({key!r}) returned {result!r}, expected {expected!r}"
 
 
@@ -242,10 +242,10 @@ class TestSectionDisplayTitleConsistency:
         """Each backend's section_display_title matches the canonical rendering module output.
 
         Asserts that ``backend.section_display_title(key, groomed_date)`` equals
-        ``_rendering.section_display_title(key, groomed_date)`` for every backend
+        ``rendering.section_display_title(key, groomed_date)`` for every backend
         and every representative input combination.
         """
-        expected = _rendering.section_display_title(key, groomed_date)
+        expected = rendering.section_display_title(key, groomed_date)
         result = backend_instance.section_display_title(key, groomed_date)
         assert result == expected, (
             f"{type(backend_instance).__name__}.section_display_title({key!r}, {groomed_date!r}) "

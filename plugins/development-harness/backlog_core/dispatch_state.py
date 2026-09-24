@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from backlog_core.backends.bd_runner import BdRunner
 from backlog_core.backends.beads_models import parse_issue
 from backlog_core.models import DispatchItemRecord, DispatchWaveRecord
-from backlog_core.timestamps import now_iso as _now_iso
+from backlog_core.timestamps import now_iso
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -257,7 +257,7 @@ class DispatchStateManager:
                 started_at = COALESCE(started_at, ?)
             WHERE milestone = ? AND wave_num = ? AND issue = ?
             """,
-            (pid, _now_iso(), milestone, wave_num, issue),
+            (pid, now_iso(), milestone, wave_num, issue),
         )
         # Also update wave status to in-progress when first item starts.
         cursor.execute(
@@ -267,7 +267,7 @@ class DispatchStateManager:
                 started_at = COALESCE(started_at, ?)
             WHERE milestone = ? AND wave_num = ?
             """,
-            (_now_iso(), milestone, wave_num),
+            (now_iso(), milestone, wave_num),
         )
         self._conn.commit()
 
@@ -303,7 +303,7 @@ class DispatchStateManager:
             result: Result summary or JSON string from the result file.
             cost: USD cost if available from the claude session output.
         """
-        now = _now_iso()
+        now = now_iso()
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -328,7 +328,7 @@ class DispatchStateManager:
             issue: GitHub issue number of the item.
             error: Human-readable error details.
         """
-        now = _now_iso()
+        now = now_iso()
         cursor = self._conn.cursor()
         cursor.execute(
             """
@@ -491,7 +491,7 @@ class DispatchStateManager:
                 WHERE milestone = ? AND wave_num = ?
                   AND status != 'complete'
                 """,
-                (_now_iso(), milestone, wave_num),
+                (now_iso(), milestone, wave_num),
             )
             self._conn.commit()
 

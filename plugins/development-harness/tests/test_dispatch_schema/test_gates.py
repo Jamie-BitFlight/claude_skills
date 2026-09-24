@@ -16,7 +16,7 @@ from __future__ import annotations
 import subprocess
 from typing import TYPE_CHECKING
 
-import dispatch_schema.gates as _gates_module
+import dispatch_schema.gates as gates_module
 import pytest
 from dispatch_schema.core.models import GateResult, GateRunMode
 from dispatch_schema.gates import run_quality_gates
@@ -39,7 +39,7 @@ def _clear_resolve_executable_cache() -> None:
     bypassing a mocker.patch("dispatch_schema.gates.shutil.which", ...) mock
     installed by the current test.
     """
-    _gates_module._resolve_executable.cache_clear()
+    gates_module._resolve_executable.cache_clear()
 
 
 # ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ if str(_plugin_root) not in sys.path:
 
 import contextlib
 
-import dh_paths as _dh_paths
+import dh_paths
 
 if TYPE_CHECKING:
     # Imported for type annotations only.  At runtime this module may be loaded
@@ -84,7 +84,7 @@ class LocalFilesystemArtifactProvider:
                 ``None``, defaults to ``dh_paths.state_root() / "artifacts"``.
         """
         self._root_worktree = root_worktree
-        self._manifest_dir: Path = manifest_dir if manifest_dir is not None else _dh_paths.state_root() / "artifacts"
+        self._manifest_dir: Path = manifest_dir if manifest_dir is not None else dh_paths.state_root() / "artifacts"
 
     # ------------------------------------------------------------------
     # ArtifactBackend protocol implementation

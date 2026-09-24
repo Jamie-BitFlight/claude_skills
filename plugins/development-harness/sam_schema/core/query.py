@@ -365,13 +365,9 @@ def update_status(plan_path: Path, task_id: str, new_status: TaskStatus, timesta
     kwargs = current.model_dump(by_alias=False)
     kwargs["status"] = new_status
     if timestamp_field == "started":
-        from datetime import datetime as _dt  # ruff: ignore[import-outside-top-level]
-
-        kwargs["started"] = _dt.fromisoformat(ts)
+        kwargs["started"] = datetime.fromisoformat(ts)
     elif timestamp_field == "completed":
-        from datetime import datetime as _dt  # ruff: ignore[import-outside-top-level]
-
-        kwargs["completed"] = _dt.fromisoformat(ts)
+        kwargs["completed"] = datetime.fromisoformat(ts)
     return Task.model_validate(kwargs)
 
 

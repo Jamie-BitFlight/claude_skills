@@ -77,7 +77,7 @@ Status: complete. Results are consolidated in `2026-06-13-codex-plugin-inventory
 | Avicenna | Inventory batch A | `agentskill-kaizen`, `gitlab-skill`, `bash-development`, `holistic-linting`, `commitlint`. |
 | Kepler | Inventory batch B | `scientific-method`, `clang-format`, `rtfp`, `dot-dash`, `brainstorming-skill`. |
 | Lagrange | Inventory batch C | `process-siren`, `perl-development`, `development-harness`, `xdg-base-directory`, `llamafile`. |
-| Leibniz | Inventory batch D | `uv`, `agent-orchestration`, `the-rewrite-room`, `python3-development`, `plugin-creator`. |
+| Leibniz | Inventory batch D | `uv`, `agent-orchestration`, `the-rewrite-room`, `plugin-creator`. |
 
 ## Queued Subagents
 
@@ -125,7 +125,6 @@ Validation notes:
 
 - `xdg-base-directory`: install and smoke response passed from copied/zipped temp plugin, but this remains weaker than explicit named-skill activation because the answer could come from general knowledge.
 - `verification-gate`: install passed; Codex selected `verification-gate:verification-gate`, loaded the installed plugin skill from the temp plugin cache, and produced the expected PEP 723 dependency-system alignment analysis.
-- `uv`: repo-marketplace validation passed in an otherwise empty temp `CODEX_HOME`; the current `plugins/uv/skills/uv -> ../../python3-development/skills/uv` symlink caused no observed Codex install/runtime failure, so it should not be rewritten absent a Codex-specific break.
 - `python-engineering:orchestrate`: explicit activation succeeded and the exact skill was available in-session, but its mandatory Step 1 follow-on skill load did not complete in Codex. That is a chained-instruction failure, not a full pass.
 
 ## Local Integration Rules

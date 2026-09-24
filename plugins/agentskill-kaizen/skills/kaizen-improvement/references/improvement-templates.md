@@ -162,7 +162,7 @@ Output: Proposal for new script or skill.
 ```mermaid
 flowchart TD
     Q{What is being automated?}
-    Q -->|Repeatable CLI workflow| Script["Task is script automation<br>with subagent_type='python3-development:python-cli-architect'<br>Context: workflow description with evidence,<br>input/output spec, desired single-step replacement<br>Output: scripts/{name}.py — executable CLI script"]
+    Q -->|Repeatable CLI workflow| Script["Task is script automation<br>with subagent_type='python-engineering:python-cli-architect'<br>Context: workflow description with evidence,<br>input/output spec, desired single-step replacement<br>Output: scripts/{name}.py — executable CLI script"]
     Q -->|Reusable AI workflow guidance| Skill["Activate /plugin-creator:skill-creator<br>(skill invocation, not Task subagent)<br>Context: workflow description, source material<br>Output: new skill directory with SKILL.md"]
 ```
 

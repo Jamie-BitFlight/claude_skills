@@ -5,7 +5,7 @@ title: "Improvement Proposals: Stakpak Agent"
 ## Improvement 1: Stall detection using LastActivity field in SAM task execution
 
 **Source pattern**: "Secret Substitution / Real-Time Progress Streaming" -- Stakpak streams progress updates for long-running operations instead of blocking on completion (Section: Key Features, item 4 and 8)
-**Local system**: plugins/python3-development/skills/implementation-manager/scripts/task_status_hook.py
+**Local system**: plugins/development-harness/skills/implementation-manager/scripts/task_status_hook.py
 **Confidence**: Medium
 **Impact**: High
 **Backlog**: Deferred -- confidence medium: already tracked as #87 (SAM: Timeout/Stall Detection) and #448 (Stall detection for subagent tasks)
@@ -27,7 +27,7 @@ Run: `uv run implementation_manager.py status . {slug}` -- output includes `stal
 ## Improvement 2: Reversible file operations with automatic backup
 
 **Source pattern**: "All file modifications are automatically backed up, enabling rollback recovery if changes prove problematic." (Section: Key Features, item 7 -- Reversible File Operations)
-**Local system**: plugins/python3-development/skills/start-task/SKILL.md
+**Local system**: plugins/development-harness/skills/start-task/SKILL.md
 **Confidence**: Low
 **Impact**: Medium
 **Backlog**: Deferred -- confidence low: the local system relies on git for file recovery; implementing file-level backups outside git would require determining whether the gap is real or whether git already provides equivalent coverage via `git stash` and `git diff`
@@ -71,7 +71,7 @@ The fastmcp-creator SKILL.md or a reference file contains a "Security Patterns" 
 ## Improvement 4: Preflight validation for SAM task execution environment
 
 **Source pattern**: "Preflight Checks: `stakpak autopilot doctor` validates system readiness before startup." (Section: Key Features, item 2 -- Autopilot)
-**Local system**: plugins/python3-development/skills/implement-feature/SKILL.md
+**Local system**: plugins/development-harness/skills/implement-feature/SKILL.md
 **Confidence**: Medium
 **Impact**: Medium
 **Backlog**: Deferred -- confidence medium: the implement-feature skill assumes the environment is ready (plan directory exists, implementation_manager.py is runnable, hooks are installed). Failures surface only after task dispatch begins. However, the `validate` command in implementation_manager.py partially covers this for task file validation -- the gap is specifically about runtime environment readiness (hooks installed, MCP servers available, agents resolvable).

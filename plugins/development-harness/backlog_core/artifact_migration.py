@@ -10,7 +10,7 @@ import dh_paths
 from github import GithubException
 from ruamel.yaml import YAML, YAMLError
 
-from . import models as _models
+from . import models
 from .artifact_provider import ArtifactBackend, ItemId, create_artifact_provider
 from .artifact_provider_local import LocalFilesystemArtifactProvider
 from .artifact_registry import ArtifactRegistry
@@ -26,11 +26,11 @@ def _get_migrate_artifact_provider() -> ArtifactBackend:
     Returns:
         An artifact provider, falling back to local storage when remote setup is unavailable.
     """
-    repo = _models.get_default_repo()
+    repo = models.get_default_repo()
     if not repo:
         return LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
     try:
-        return create_artifact_provider(repo=repo, root_worktree=_models.get_repo_root())
+        return create_artifact_provider(repo=repo, root_worktree=models.get_repo_root())
     except (GitHubUnavailableError, BacklogError):
         return LocalFilesystemArtifactProvider(root_worktree=dh_paths.git_project_root())
 
@@ -411,7 +411,7 @@ def migrate_dry_run(issue_number: ItemId | None) -> dict:
         issue number — filtered entries are counted in ``would_skip`` but not
         included individually.
     """
-    repo_root = _models.get_repo_root()
+    repo_root = models.get_repo_root()
     candidates, filtered_count = _migrate_discover_candidates(repo_root, issue_number, [])
 
     details: list[dict] = []
@@ -493,7 +493,7 @@ def migrate_live_run(issue_number: ItemId | None, out: Output) -> dict:
         skipped entries are counted in ``skipped`` but not listed individually
         to keep the response compact.
     """
-    repo_root = _models.get_repo_root()
+    repo_root = models.get_repo_root()
     provider = _get_migrate_artifact_provider()
 
     try:
