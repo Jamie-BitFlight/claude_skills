@@ -47,17 +47,11 @@ error handling, security, naming, CLI output, and testing.
 3. Test quality and debugging ergonomics
 4. Type health and escape hatches
 5. Operational clarity
-6. Module size — flag any file exceeding 500 LOC as HIGH severity
+6. Cohesion and comprehensibility — investigate large files/functions and report only demonstrated responsibility or traceability problems
 
-## File Size Policy
+## Cohesion Review
 
-Flag any Python source file exceeding 500 lines, counted with `wc -l`, as a HIGH severity finding. Docstrings count: the boundary is the size an agent reads whole, and prose fills a context window like code does. A file over it indicates multiple responsibilities that should be split into focused modules.
-
-When flagging:
-- Report the current LOC count
-- Identify the distinct responsibilities in the file
-- Suggest a decomposition into named modules with estimated LOC each
-- Note which functions are the top candidates to extract first
+Large files, long functions, and deep nesting trigger inspection, not an automatic finding. Report a size/cohesion issue only when evidence shows multiple responsibilities, poor locality, difficult dependency tracing, or an established project limit is violated. When reporting it, identify the concrete responsibilities/boundaries that justify decomposition.
 
 ## Operating Rules
 
@@ -82,31 +76,19 @@ Read the task file to understand:
 
 ### Step 2: Review Architecture Compliance
 
-Check that implementation follows project patterns:
+Check that implementation follows the repository's architecture first. For new architecture, offer the plugin defaults from shared standards before inventing alternatives:
 
-- Is new code in the correct module?
-- Does it follow the layered architecture?
-- Are data models defined in `shared/`?
+- Is new code owned by the correct responsibility/module?
+- Are boundaries explicit where components change independently?
+- Are shared models placed where their consumers can depend on them without creating cycles?
 
 ### Step 3: Check for Reinvented Wheels
 
-Search for patterns that should use existing utilities:
-
-- Service operations → should use `services/` modules
-- Display output → should use `ui/` or `output/` modules
-- Input parsing → should use existing parsing utilities
-- Models → should use or extend `shared/models.py`
+Search for existing utilities and abstractions before accepting new ones. Prefer reuse when the existing contract fits; do not force code into `services/`, `ui/`, or `shared/` directories that the project does not use.
 
 ### Step 4: Verify Dependency Utilization
 
-Check that installed dependencies are used appropriately:
-
-- Service-specific SDKs for external integrations (not raw HTTP)
-- `tomlkit` for TOML config parsing (preserves formatting), `ruamel.yaml` for YAML config parsing
-- `pydantic` for validation (not manual checks)
-- `rich` for display (not raw print)
-- `typer` or `click` for CLI
-- `tenacity` for retries (not manual loops)
+Check dependency choices against the repository and shared defaults. Prefer an already-adopted suitable library over reinventing it, but require the dependency to earn its maintenance cost. For new work, offer the plugin's preferred libraries first where applicable (for example tomlkit for formatting-preserving TOML, Pydantic at runtime-validation/serialization boundaries, Typer/Rich for human-facing CLI UX). Agent-facing CLI output remains compact JSON and must not be pushed through Rich.
 
 ### Step 5: Identify Gaps
 
@@ -119,13 +101,7 @@ Look for:
 - Missing type hints
 - Identifier naming violations: acronym-named public functions or methods (`gcd`, `lcm`,
   `bfs`, `dfs`) that should be expanded (see `standards-for-python-development` §1.5)
-- Missing Hypothesis property-based tests: scan for functions that are strong candidates:
-  - Parsers, serializers, and codecs (round-trip: `encode → decode == identity`)
-  - Validators and boundary parsers (`validate_*(x)` should hold for all valid domain inputs)
-  - Mathematical/algorithmic functions (sorting, searching, arithmetic properties)
-  - String transformation functions (normalization, escaping, formatting)
-  - CLI argument parsing paths (any CLI input → typed value conversion)
-  Flag as MEDIUM if a tested function matches one of these patterns but has only example-based tests and no `@given`-decorated test.
+- Missing property-based evidence when a meaningful invariant, broad input space, and material defect risk make generated cases stronger than examples. Do not report absence of Hypothesis merely from the function category.
 
 ### Step 6: Execute Automated Analysis
 
