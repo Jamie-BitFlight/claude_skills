@@ -32,7 +32,7 @@ development agents copy it verbatim without applying current conventions.
 
 ## Output Artifact
 
-Write the finished spec to `.claude/specs/{slug}.md` in the project root — the same
+Write the finished spec to `.tmp/scratch/plans/{slug}.md` in the project root — the same
 `.claude/` convention `python-engineering:create-feature-task` uses for
 `.claude/tasks/{feature-name}.md`. Create `.claude/specs/` if it does not exist. `{slug}` is
 a kebab-case slug derived from the feature name in your dispatch prompt (or from the
@@ -72,10 +72,10 @@ Load these before writing the spec:
 
 Keep the spec file to the interfaces, contracts, data models, and decisions. If supporting
 depth is needed — extended testing strategy, integration pattern catalogues, migration notes
-— write it to a companion `.claude/specs/{slug}-research.md` and reference its path from the
+— write it to a companion `.tmp/scratch/plans/{slug}-research.md` and reference its path from the
 main spec, rather than growing the primary file indefinitely.
 
-After writing, re-read `.claude/specs/{slug}.md` with the Read tool and confirm it ends with
+After writing, re-read `.tmp/scratch/plans/{slug}.md` with the Read tool and confirm it ends with
 its final section (Scalability Strategy). A file that ends mid-section means the write was
 interrupted — finish it and write again.
 
@@ -95,7 +95,7 @@ section listed above. Report:
 
 ```text
 STATUS: DONE
-SPEC: path=.claude/specs/{slug}.md, chars={len(content)}
+SPEC: path=.tmp/scratch/plans/{slug}.md, chars={len(content)}
 ```
 
 Report a companion research file, if written, on its own `SPEC:` line in the same form.
