@@ -26,7 +26,7 @@ Determine the CLI's primary consumer before choosing its output layer.
 
 This audience decision outranks the Rich-specific defaults below.
 
-You follow the princials of SOLID when designing, writing, refactoring, changing, editing, all code. If the improvement to a SOLID design seems out of scope, finish your task and provide a <concerns></concerns> block at the end of your final response that points out the issues you found during your task that were not scoped for you to address. This is always helpful.
+Use SOLID as design pressure, not a demand for abstractions. Preserve coherent project architecture and prefer the simplest design with cohesive responsibilities, explicit dependencies, substitutable contracts where needed, and small interfaces. Do not introduce factories, protocols, layers, or dependency injection unless the change surface demonstrates a responsibility or variation that benefits from them. Report material out-of-scope design concerns without opportunistically refactoring them.
 
 ## Testing Behaviour
 
@@ -66,22 +66,16 @@ completion on it.
 
 - `Annotated` syntax for all CLI params; `rich_help_panel` to group options
 - Architecture: CLI → Business Logic → Service Layer → Output boundary; compact JSON for agent tools, Rich presentation only for human-facing CLIs
-- Factory pattern for dependency injection
+- Direct construction by default; factories/protocol-based injection when construction policy or interchangeable dependencies justify them
 - Google-style docstrings (Args/Returns/Raises)
 - Human-facing Rich output uses emoji name tokens, not Unicode literals; agent-facing output is JSON
 
-## File Size Policy
+## Comprehension and Cohesion
 
-Keep every Python source file under ~500 lines. Count what is in the file: docstrings count, because an agent reading the file scrolls past them like anything else. The boundary is the size an agent will swallow whole — past it, it heads, tails or greps, and stops seeing how the functions chain and what depends on what. Measure with `wc -l`, not with a counter that discounts prose.
+Keep source files and functions small enough that their behavior, dependencies, and invariants can be understood together. Large files, long functions, and deep nesting are signals to inspect cohesion, not automatic failures.
 
-When a file approaches or exceeds ~500 lines:
-- Split into focused modules by responsibility before adding more code
-- Extract related functions into a new module with a clear name
-- Use a facade module (re-exports) if callers need a single import point
+Split when responsibilities change independently, callers benefit from a stable boundary, or an agent/human can no longer trace the relevant behavior reliably in one unit. Do not split cohesive code merely to satisfy a line count. For PEP 723 scripts, only the executable entry script carries the shebang and inline dependency block; extracted local modules remain ordinary modules.
 
-Do not create a file that will exceed it. When the task needs more code than fits in one module, decompose as part of the implementation rather than afterwards.
-
-This applies to PEP 723 scripts: a script may import its own modules, so the inline block's scope is its PyPI dependencies, not its file count. Split one the same way; only the entry script keeps the shebang and the `# /// script` block. See "Splitting a Script Across Files" in `PEP723.md` in the `python-engineering:python3-core` skill for how the imports resolve.
 
 ## Quality Gate (MANDATORY before reporting done)
 
