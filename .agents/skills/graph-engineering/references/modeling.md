@@ -20,24 +20,31 @@ plus one pragmatic shortcut:
 | **RDF/OWL triples** | Interop with existing ontologies, standards compliance, need for description-logic reasoning (subsumption, consistency checking). | Verbose; reification needed for edge properties; steeper tooling. |
 | **Typed edges in JSON/SQLite** | <50K nodes, single application, agent-local memory. | Query power capped; migrate when multi-hop queries get slow or frequent. |
 
-Decide at this stage (not later) how every fact carries:
-- **Time** — validity interval or event timestamp (`since`, `until`).
-- **Provenance** — source document/URL + extraction timestamp + confidence.
+Decide at this stage how assertions carry identity, time, and evidence when those dimensions matter:
 
-In property graphs these are edge properties; in RDF use reification or RDF-star; in JSON just
-add the fields. Retrofitting provenance after fusion is effectively impossible.
+- **Canonical identity** — the entity or event the assertion is about.
+- **Valid time** — when the asserted state is true, distinct from when it was observed.
+- **Observation/extraction time** — when the source was seen or processed.
+- **Provenance** — source pointer plus extraction/observation method and confidence where useful.
+
+Do not assume provenance belongs only on a canonical node or edge. When multiple sources can support,
+contradict, or supersede the same fact, model the assertion/observation as the provenance-bearing unit
+(or use an equivalent edge-assertion representation). Preserve enough evidence to explain a merge,
+retraction, temporal change, or answer.
 
 ## Ontology engineering method
 
 Condensed from the course's ontology-engineering process:
 
-1. **Competency questions.** Write the 10-20 questions the graph must answer
-   ("Which suppliers does product X depend on transitively?"). These are the ontology's spec
-   AND its test suite.
-2. **Enumerate core entity types** from the competency questions. Start with 5-15. Each type
-   needs a one-line definition and 2-3 real examples.
+1. **Competency questions.** Write representative questions the graph must answer
+   ("Which suppliers does product X depend on transitively?"). These are the graph's specification
+   and end-to-end acceptance cases. Choose enough to cover materially different query shapes; do not
+   impose a fixed count when a smaller or larger set better represents the system.
+2. **Enumerate core entity types** from the competency questions. Start with the smallest set that
+   answers them. Give each type a concise definition and representative examples where examples reduce ambiguity.
 3. **Enumerate relation types** with **domain and range** (e.g. `EMPLOYED_BY: Person → Org`).
-   Start with 10-30. Add cardinality notes where they matter (a Person has one birthplace).
+   Add only relations required by the competency questions and cardinality/constraint rules where
+   violating them would change correctness.
 4. **Attributes vs entities.** If it has its own relationships, it's an entity ("City" — has
    country, population). If it's a value you filter on, it's an attribute ("founding year").
 5. **Type hierarchy only when queries need it.** `Company ⊂ Organization` is worth having if
