@@ -986,6 +986,11 @@ The provider either honors it or creates its canonical reference with a warning.
 detection and create-only failure live at this shared operation/provider boundary, so callers do
 not recreate the rule.
 
+Explicit-reference creation uses an atomic provider-boundary insert-if-absent operation. A
+frontend existence check followed by an ordinary write is outside the contract because another
+creator can win between those operations. An existing reference returns the create-only collision
+error and remains unchanged.
+
 The same restriction applies to `reconciliation.py`: reconciliation classifies snapshots and asks
 the provider to persist outcomes; it does not own filesystem storage.
 
