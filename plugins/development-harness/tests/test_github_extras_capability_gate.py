@@ -3,9 +3,8 @@
 Before this fix, ``operations.py`` gated every ``GitHubExtras``-only operation with
 a bare ``isinstance(backend, GitHubExtras)`` check. ``GitHubExtras`` is a
 ``runtime_checkable`` Protocol, so that ``isinstance`` check verifies attribute
-*names* only. ``SQLiteBackend`` and ``InMemoryBackend`` implement every
-``GitHubExtras`` method as a local simulation, so both satisfied the check and
-reached ``SQLiteBackend.get_github()``'s bare ``RuntimeError`` stub instead of a
+*names* only. Local backends once implemented every method as simulations, so
+both satisfied the check and reached a bare ``RuntimeError`` stub instead of a
 caller-recognisable error.
 
 This test proves the fix: ``require_github_extras()`` gates on the
@@ -20,8 +19,7 @@ from collections.abc import Iterator
 import pytest
 from backlog_core import operations
 from backlog_core.backend_protocol import reset_config, set_config
-from backlog_core.backend_types import BacklogConfig, GitHubExtras
-from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.backend_types import BacklogConfig
 from backlog_core.backends.sqlite_backend import SQLiteBackend
 from backlog_core.models import UnsupportedBackendCapabilityError
 
@@ -64,16 +62,6 @@ def test_list_milestones_under_sqlite_backend_no_longer_requires_github_extras(s
     # Assert
     assert result["milestones"] == []
     assert result["count"] == 0
-
-
-def test_local_github_simulators_remain_structurally_complete() -> None:
-    memory_backend = InMemoryBackend()
-    sqlite_backend = SQLiteBackend(":memory:")
-    try:
-        assert isinstance(memory_backend, GitHubExtras)
-        assert isinstance(sqlite_backend, GitHubExtras)
-    finally:
-        sqlite_backend._conn.close()
 
 
 def test_list_milestones_under_beads_backend_raises_typed_milestones_capability_error() -> None:

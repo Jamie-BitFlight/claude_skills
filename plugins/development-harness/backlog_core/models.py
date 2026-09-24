@@ -1309,6 +1309,7 @@ class ProviderItem(BaseModel):
     state: str
     labels: list[str]
     revision: str
+    milestone: str = ""
     exists: bool = True
 
 

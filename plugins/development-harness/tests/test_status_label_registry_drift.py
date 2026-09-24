@@ -3,7 +3,7 @@
 ``backlog_core/gh_client.py`` previously defined an under-used ``DH_LABELS`` dict plus
 ~19 raw ``"status:X"`` string literals scattered through label-management functions
 (``apply_status_in_progress``, ``apply_status_verified``, ``apply_status_groomed``,
-``apply_status_blocked``, ``_pick_primary_status_label``, ...), with no canonical
+``apply_status_blocked``, primary-status selection, ...), with no canonical
 source of truth. A second, independent copy of one of those labels
 (``VERIFIED_LABEL = 'status:verified'``) is hardcoded in
 ``.github/workflows/quality-gate-audit.yml``'s inline JS. ``backlog_core/server.py``

@@ -1,0 +1,239 @@
+"""Command-scoped live work-item decision tests."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pytest
+
+from backlog_core.backends.memory_backend import InMemoryBackend
+from backlog_core.gh_client import _fetch_issues_graphql
+from backlog_core.models import (
+    BackendUnavailableError,
+    BacklogError,
+    BacklogItem,
+    Output,
+    ProviderItem,
+    ProviderSnapshot,
+    ReconcileRequest,
+    ReconcileScope,
+)
+from backlog_core.work_item_decisions import WorkItemDecisionContext
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
+
+def provider_item(reference: str, title: str, *, status: str = "status:groomed") -> ProviderItem:
+    """Build one live provider item."""
+    return ProviderItem(
+        provider_id=f"node-{reference}",
+        reference=reference,
+        title=title,
+        body="",
+        state="OPEN",
+        labels=[status],
+        revision=f"revision-{reference}",
+        milestone="M1",
+    )
+
+
+class DecisionBackend(InMemoryBackend):
+    """In-memory backend with an observable GitHub live-read seam."""
+
+    supports_github_extras = True
+
+    def __init__(
+        self,
+        *,
+        live_items: list[ProviderItem],
+        cached_items: list[BacklogItem] | None = None,
+        pending_items: list[BacklogItem] | None = None,
+    ) -> None:
+        super().__init__()
+        self.live_items = live_items
+        self.cached_items = cached_items or []
+        self.pending_items = pending_items or []
+        self.snapshot_requests: list[ReconcileRequest] = []
+        self.cached_list_calls = 0
+        self.live_error: Exception | None = None
+
+    def fetch_snapshot(self, request: ReconcileRequest) -> ProviderSnapshot:
+        """Return the requested live observation and record its scope."""
+        self.snapshot_requests.append(request)
+        if self.live_error is not None:
+            raise self.live_error
+        if request.scope in {ReconcileScope.TARGETED, ReconcileScope.LINKED}:
+            by_reference = {item.reference: item for item in self.live_items}
+            items = [
+                by_reference.get(
+                    reference,
+                    ProviderItem(
+                        provider_id="",
+                        reference=reference,
+                        title="",
+                        body="",
+                        state="",
+                        labels=[],
+                        revision="",
+                        exists=False,
+                    ),
+                )
+                for reference in request.references
+            ]
+        else:
+            items = self.live_items
+        return ProviderSnapshot(items=items, sync_started_at="2026-09-24T00:00:00+00:00")
+
+    def pending_work_items(self) -> list[BacklogItem]:
+        """Return queued local intent independently from provider observations."""
+        return [item.model_copy(deep=True) for item in self.pending_items]
+
+    def list_work_items(self) -> list[BacklogItem]:
+        """Expose whether a live decision accidentally read the durable cache."""
+        self.cached_list_calls += 1
+        return [item.model_copy(deep=True) for item in self.cached_items]
+
+
+def test_all_memoizes_one_bulk_snapshot_and_never_uses_cached_provider_rows() -> None:
+    backend = DecisionBackend(
+        live_items=[provider_item("#7", "live title")], cached_items=[BacklogItem(title="stale title", issue="#7")]
+    )
+    context = WorkItemDecisionContext(backend)
+
+    first = context.all()
+    second = context.all()
+
+    assert [item.title for item in first.provider_items] == ["live title"]
+    assert first.status_map[7].status == "status:groomed"
+    assert first.status_map[7].milestone == "M1"
+    assert second is first
+    assert [request.scope for request in backend.snapshot_requests] == [ReconcileScope.INCREMENTAL]
+    assert backend.cached_list_calls == 0
+
+
+def test_explicit_cached_fallback_attempts_live_first_and_reads_cache_once() -> None:
+    backend = DecisionBackend(live_items=[], cached_items=[BacklogItem(title="cached title", issue="#7")])
+    backend.live_error = BackendUnavailableError("offline")
+    output = Output()
+    context = WorkItemDecisionContext(backend, allow_cached=True, output=output)
+
+    first = context.all()
+    second = context.all()
+    target = context.select("#7", purpose="read")
+
+    assert [item.title for item in first.provider_items] == ["cached title"]
+    assert first.from_cache is True
+    assert second is first
+    assert len(backend.snapshot_requests) == 1
+    assert backend.cached_list_calls == 1
+    assert target.provider is not None
+    assert target.provider.title == "cached title"
+    assert target.provider_snapshot is None
+    assert output.warnings == ["Live provider read failed; using cached work items: offline"]
+
+
+def test_select_memoizes_one_targeted_snapshot_for_equivalent_exact_references() -> None:
+    backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
+    context = WorkItemDecisionContext(backend)
+
+    first = context.select("#7", purpose="read")
+    second = context.select("7", purpose="read")
+
+    assert first.provider is not None
+    assert first.provider.title == "live title"
+    assert second.provider == first.provider
+    assert [(request.scope, request.references) for request in backend.snapshot_requests] == [
+        (ReconcileScope.TARGETED, ["#7"])
+    ]
+
+
+def test_targeted_then_global_reads_each_live_scope_once() -> None:
+    backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
+    context = WorkItemDecisionContext(backend)
+
+    context.select("#7", purpose="read")
+    context.all()
+    context.all()
+
+    assert [request.scope for request in backend.snapshot_requests] == [
+        ReconcileScope.TARGETED,
+        ReconcileScope.INCREMENTAL,
+    ]
+
+
+def test_journal_entries_remain_separate_from_live_reads_and_supply_mutation_content() -> None:
+    pending = BacklogItem(title="pending title", description="queued edit", issue="#7")
+    pending_only = BacklogItem(title="pending only", issue="#8")
+    backend = DecisionBackend(
+        live_items=[provider_item("#7", "live title", status="status:blocked")], pending_items=[pending, pending_only]
+    )
+    context = WorkItemDecisionContext(backend)
+
+    read = context.all()
+    target = context.select("#7", purpose="mutation")
+
+    assert [item.issue for item in read.provider_items] == ["#7"]
+    assert target.provider is not None
+    assert target.provider.title == "live title"
+    assert target.provider.metadata.labels == ["status:blocked"]
+    assert target.pending is not None
+    assert target.pending.description == "queued edit"
+    assert target.mutation_base == target.pending
+    assert all(item.issue != "#8" for item in read.provider_items)
+
+
+def test_live_read_failure_returns_no_partial_or_cached_result() -> None:
+    backend = DecisionBackend(
+        live_items=[provider_item("#7", "partial live row")], cached_items=[BacklogItem(title="cached row", issue="#9")]
+    )
+    backend.live_error = RuntimeError("second provider page failed")
+    context = WorkItemDecisionContext(backend)
+
+    with pytest.raises(RuntimeError, match="second provider page failed"):
+        context.all()
+
+    assert backend.cached_list_calls == 0
+
+
+def test_snapshot_for_slices_memoized_bulk_snapshot_and_adds_absent_tombstones() -> None:
+    backend = DecisionBackend(live_items=[provider_item("#7", "live title")])
+    context = WorkItemDecisionContext(backend)
+    context.all()
+
+    snapshot = context.snapshot_for(ReconcileRequest(scope=ReconcileScope.TARGETED, references=["#7", "#8"]))
+
+    assert [(item.reference, item.exists) for item in snapshot.items] == [("#7", True), ("#8", False)]
+    assert len(backend.snapshot_requests) == 1
+
+
+def test_provider_pagination_failure_returns_no_partial_page(mocker: MockerFixture) -> None:
+    page_one = {
+        "repository": {
+            "issues": {
+                "nodes": [
+                    {
+                        "id": "node-7",
+                        "number": 7,
+                        "title": "first page",
+                        "state": "OPEN",
+                        "body": "",
+                        "createdAt": "2026-09-24T00:00:00Z",
+                        "updatedAt": "2026-09-24T00:00:00Z",
+                        "labels": {"nodes": []},
+                        "milestone": None,
+                        "assignees": {"nodes": []},
+                    }
+                ],
+                "pageInfo": {"hasNextPage": True, "endCursor": "page-2"},
+            }
+        }
+    }
+    graphql = mocker.patch(
+        "backlog_core.gh_client._graphql_request", side_effect=[page_one, BacklogError("second provider page failed")]
+    )
+
+    with pytest.raises(BacklogError, match="second provider page failed"):
+        _fetch_issues_graphql(mocker.Mock(), "owner", "repo")
+
+    assert graphql.call_count == 2
