@@ -196,6 +196,16 @@ Use the uncertainty taxonomy from `improve-processes`. UNKNOWN + RESOLVABLE trig
 
 ---
 
+## Completion Status
+
+Every response ends with one explicit status line:
+
+- `STATUS: DONE — <what was analyzed, improved, represented, or verified>`
+- When analysis finds no material issues: `STATUS: DONE — no material process findings at the requested resolution`
+- When progress requires owner intent: `STATUS: BLOCKED_INTENT — <decision required>`
+- When required evidence/tooling is unavailable: `STATUS: UNVALIDATED — <claim/evidence gap>`
+- When a required claim is demonstrated false and unresolved: `STATUS: INVALID — <failed claim>`
+
 ## Output Format
 
 When returning a diagram as a standalone response:
