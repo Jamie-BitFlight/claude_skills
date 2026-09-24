@@ -26,6 +26,7 @@
 - Shared skill content uses skill-relative paths and contains no harness-specific invocation syntax, root-path assumptions, hooks, MCP servers, or worker identifiers.
 - Every invocation-matrix row, validation-table row, and named case must record `PASS`; `UNRUN`, `FAIL`, and `INCONCLUSIVE` block completion.
 - Behavioral fixtures and runners are disposable, live outside the repository checkout, and receive no maintained tests of their own.
+- The orchestrator passes Task 1's absolute evidence-directory path to Tasks 4 and 5; shell variables do not cross fresh subagents.
 - Make no turn- or token-saving claim without a matched treatment arm.
 - Preserve `.claude/skills/rebase -> ../../.agents/skills/rebase` unchanged.
 - Use file-scoped Conventional Commits with the repository-required scope; never bypass hooks.
