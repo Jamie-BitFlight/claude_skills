@@ -25,7 +25,7 @@ Scope: $ARGUMENTS
 ```bash
 # Check-only path: never invoke mutating hooks.
 uv run ruff format --check $ARGUMENTS
-uv run ruff check $ARGUMENTS
+uv run ruff check --no-fix $ARGUMENTS
 # Run the type checker selected by hooks/CI (ty shown as the default).
 uv run ty check $ARGUMENTS
 
