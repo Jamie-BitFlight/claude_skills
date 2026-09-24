@@ -13,7 +13,9 @@ from threading import Barrier, Thread
 from unittest.mock import MagicMock
 
 import pytest
-from backlog_core import file_cache
+from backlog_core import file_cache, models
+from backlog_core.backend_protocol import create_backend
+from backlog_core.backends import github_backend
 from backlog_core.backends.github_backend import GitHubBackend
 from backlog_core.file_cache import CacheCheckpoint, FileCache, ReplayAcknowledgement, _ProviderSnapshotCheckpoint
 from backlog_core.file_cache_state import (
@@ -142,6 +144,25 @@ def test_configured_repository_write_replaces_legacy_unscoped_intent(tmp_path: P
 
     assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
         ("default/repository", "new pending")
+    ]
+
+
+def test_factory_configured_repository_write_replaces_legacy_unscoped_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configured_repo = "owner/repository"
+    monkeypatch.setattr(models, "_config", None)
+    models.init_paths(project_dir=str(tmp_path), repo=configured_repo)
+    monkeypatch.setattr(github_backend.dh_paths, "state_root", lambda: tmp_path)
+    cache = FileCache(tmp_path / "github-cache")
+    cache._queue_work_item("#1", BacklogItem(title="Issue 1", description="legacy pending"))
+
+    backend = create_backend("github")
+    assert isinstance(backend, GitHubBackend)
+    backend.put_work_item(BacklogItem(title="Issue 1", description="new pending", issue="#1"), repo=configured_repo)
+
+    assert [(entry.repo, entry.item.description) for entry in cache._pending_work_item_mutations()] == [
+        (configured_repo, "new pending")
     ]
 
 
