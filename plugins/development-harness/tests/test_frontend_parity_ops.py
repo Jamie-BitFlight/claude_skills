@@ -28,6 +28,8 @@ _plugin_root = Path(__file__).resolve().parent.parent
 if str(_plugin_root) not in sys.path:
     sys.path.insert(0, str(_plugin_root))
 
+import backlog_core.operations as backlog_operations
+import dh_core.operations as dh_operations
 from backlog_core.backend_protocol import reset_config as reset_bp_config, set_config as set_bp_config
 from backlog_core.backend_types import BacklogConfig as BPBacklogConfig
 from backlog_core.backends.memory_backend import InMemoryBackend
@@ -160,6 +162,42 @@ async def test_backlog_list_parity(dh_env: dict[str, str]) -> None:
     mcp_titles = {item["title"] for item in mcp_list.get("items", [])}
     assert "Parity Item" in cli_titles
     assert "Parity Item" in mcp_titles
+
+
+@pytest.mark.parametrize("allow_cached", [False, True])
+async def test_backlog_list_allow_cached_forwarding_parity(
+    dh_env: dict[str, str], monkeypatch: pytest.MonkeyPatch, allow_cached: bool
+) -> None:
+    """CLI and MCP forward the same default and explicit cache-fallback choice."""
+    del dh_env
+    calls: list[tuple[str, bool]] = []
+
+    def result(transport: str) -> Callable[..., dict[str, object]]:
+        def record(*_args: object, allow_cached: bool = False, **_kwargs: object) -> dict[str, object]:
+            calls.append((transport, allow_cached))
+            return {
+                "items": [],
+                "count": 0,
+                "from_cache": False,
+                "has_pending_writes": False,
+                "status_source": "live",
+                "unavailable_capabilities": [],
+                "filters_evaluated_against_unavailable_data": [],
+                "messages": [],
+                "warnings": [],
+                "errors": [],
+            }
+
+        return record
+
+    monkeypatch.setattr(backlog_operations, "list_items", result("cli"))
+    monkeypatch.setattr(dh_operations, "list_items", result("mcp"))
+
+    cli_args = ["backlog", "list", *(["--allow-cached"] if allow_cached else [])]
+    _invoke_cli(cli_args)
+    await call_mcp_tool(backlog_mcp, "backlog_list", {"allow_cached": allow_cached})
+
+    assert calls == [("cli", allow_cached), ("mcp", allow_cached)]
 
 
 # ---------------------------------------------------------------------------

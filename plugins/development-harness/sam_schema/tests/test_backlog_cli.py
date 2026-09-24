@@ -254,6 +254,27 @@ class TestLiveFirstCliContract:
         assert json.loads(result.stdout)["error"] == "provider unavailable"
         assert "Traceback" not in result.stderr
 
+    @pytest.mark.parametrize(
+        ("args", "operation"),
+        [
+            (["backlog", "pull", "--selector", "#42"], "pull_by_selector"),
+            (["backlog", "pull-all"], "pull_items"),
+            (["backlog", "refresh"], "refresh_local_cache_from_github"),
+            (["backlog", "labels"], "list_labels"),
+            (["backlog", "merged-prs"], "list_merged_prs"),
+        ],
+    )
+    def test_provider_command_backlog_error_is_json_without_traceback(
+        self, mocker: MockerFixture, args: list[str], operation: str
+    ) -> None:
+        mocker.patch(f"sam_schema.backlog.operations.{operation}", side_effect=BacklogError("provider unavailable"))
+
+        result = runner.invoke(app, args, env=_CLI_ENV)
+
+        assert result.exit_code == 1
+        assert json.loads(result.stdout)["error"] == "provider unavailable"
+        assert "Traceback" not in result.stderr
+
 
 class TestBacklogSyncFallback:
     """The ``backlog sync`` fallback invokes a command that actually exists."""

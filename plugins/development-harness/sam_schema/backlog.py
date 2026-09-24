@@ -344,7 +344,10 @@ def pull(
 ) -> None:
     """Pull a single backlog item using the selected backend provider."""
     output = Output()
-    result = operations.pull_by_selector(selector=selector, repo=repo, diff=diff, output=output)
+    try:
+        result = operations.pull_by_selector(selector=selector, repo=repo, diff=diff, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -357,7 +360,10 @@ def pull_all(
 ) -> None:
     """Pull all backlog items using the selected backend provider."""
     output = Output()
-    result = operations.pull_items(repo=repo, dry_run=dry_run, force=force, diff=diff, output=output)
+    try:
+        result = operations.pull_items(repo=repo, dry_run=dry_run, force=force, diff=diff, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -407,9 +413,12 @@ def refresh(
 ) -> None:
     """Refresh the local backlog cache from the selected backend provider."""
     output = Output()
-    result = operations.refresh_local_cache_from_github(
-        repo=repo, label=label, full_refresh=full_refresh, output=output
-    )
+    try:
+        result = operations.refresh_local_cache_from_github(
+            repo=repo, label=label, full_refresh=full_refresh, output=output
+        )
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -420,7 +429,10 @@ def labels(
 ) -> None:
     """List labels for a repository."""
     output = Output()
-    result = operations.list_labels(repo=repo, limit=limit, output=output)
+    try:
+        result = operations.list_labels(repo=repo, limit=limit, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
@@ -432,7 +444,10 @@ def merged_prs(
 ) -> None:
     """List merged pull requests for a repository."""
     output = Output()
-    result = operations.list_merged_prs(repo=repo, search=search, limit=limit, output=output)
+    try:
+        result = operations.list_merged_prs(repo=repo, search=search, limit=limit, output=output)
+    except BacklogError as exc:
+        cli_output.exit_with_json_error({"error": str(exc), **output.to_dict()})
     _emit(result, output)
 
 
