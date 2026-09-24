@@ -260,6 +260,8 @@ When TLA+ applies, extract state variables, initial conditions, actions/transiti
 
 If formal tooling is unavailable, produce a validation handoff containing those artifacts and mark the claim UNVALIDATED. Never imply that recommending TLA+ or Lean constitutes verification.
 
+Sources for these capability distinctions: TLA+ is a formal specification language for modeling concurrent/distributed system behaviors and TLC explores reachable states for invariant/temporal-property violations [1]. Lean is an interactive theorem prover/programming language whose kernel checks proof terms [2].
+
 ### Counterexamples and Failed Validation
 
 Treat failures as evidence. State the violated claim and smallest relevant counterexample, diagnose it using the Evidence-Driven Improvement categories, correct only when established intent determines the change, then rerun affected validation. Do not modify a process merely to satisfy a bad model or validator.
@@ -283,3 +285,10 @@ Finish only when required claims have sufficient evidence or remaining uncertain
 ## Improvement Techniques
 
 Use these inside CHALLENGE/IMPROVE, not as a second workflow: rewrite outcomes measurably; replace abstract verbs with concrete actions; make guards observable; define inputs/outputs; remove or rewrite no-op work; exercise success and failure examples; stress edge cases; minimize cognitive load; ensure execution is auditable. The authoritative workflow remains UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE.
+
+
+## References
+
+[1] [TLA+ Documentation](https://lamport.azurewebsites.net/tla/tla.html) (accessed 2026-09-24)
+
+[2] [Lean Documentation](https://lean-lang.org/documentation/) (accessed 2026-09-24)
