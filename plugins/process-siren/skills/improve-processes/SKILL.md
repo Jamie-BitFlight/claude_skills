@@ -76,6 +76,17 @@ Every process or subsystem must have enough purpose to judge improvement. Do not
 
 Child processes inherit applicable parent goals, constraints, and invariants. They may strengthen them but must not silently contradict them.
 
+### Evidence Provenance and Authority
+
+Keep requirement authority separate from interpretation. Label material process claims when authority matters:
+
+- **OBSERVED** — directly supported by the source process, authoritative dependency, runtime/repository evidence, or explicit user evidence;
+- **DERIVED** — reasoned from named observations; retain the basis;
+- **ASSUMED** — necessary interpretation not established by available evidence;
+- **PROPOSED** — candidate purpose, requirement, policy, or correction not yet established as intent.
+
+A derived or proposed statement does not become established intent merely because it makes the process more coherent. Only apply a correction when authoritative evidence determines it; otherwise preserve the uncertainty or request the consequential decision.
+
 ### Uncertainty Classification
 
 Do not treat every unknown as blocking. Classify uncertainty:
@@ -155,79 +166,9 @@ High risk does not mean "write more." It means choose the required resolution, m
 
 #### Optional Baseline Agent Behavior Sampling
 
-When a process is large, growing complex, or appears to restate behavior agents may already infer reliably, optionally measure baseline behavior before retaining that instruction load. This is a refinement method, not a mandatory gate or prescribed tool. Adapt execution to whatever isolated-agent, shell, harness, SDK, or API capability exists in the environment.
+When instruction-heavy or complex processes may restate behavior capable agents already infer reliably, optionally measure that baseline before retaining the instruction load. Use neutral representative scenarios and isolated responses across supported models/harnesses; consensus measures likely inference, never correctness. Compress only behavior compatible with required invariants whose inference-failure consequence is acceptable, then validate material compression against the fuller instructions using comparable and held-out scenarios. Keep the method environment-independent; adapt it to available agent, shell, SDK, or API capabilities.
 
-The experiment asks **what an otherwise capable agent naturally does**, not whether it can reproduce the process being evaluated. Scenario design therefore matters as much as sample size.
-
-##### Scenario design
-
-Create several realistic situations that exercise the same underlying capability under different incidental details. Each prompt should contain only information the agent would naturally have at that point in real execution:
-
-- state the situation, available evidence/resources, constraints that genuinely exist, and desired outcome;
-- ask what steps/actions the agent would take next;
-- vary names, ordering, surrounding context, and non-essential details so repeated wording does not manufacture consensus;
-- include ordinary cases plus relevant boundary/failure cases when those are part of the capability;
-- keep the desired outcome constant enough that returned approaches remain comparable;
-- make each query independent and single-response where practical so previous samples cannot anchor later ones.
-
-Do **not** expose the target process, its step names, preferred ordering, expected safeguards, implementation-specific vocabulary, or the hypothesis being tested unless that information would genuinely exist in the real scenario. Avoid leading constructions such as "make sure to", "safely", "correctly", "without losing data", "following best practices", named techniques, or questions that enumerate candidate actions. Such wording can cue the behavior whose spontaneous presence is being measured.
-
-Prefer neutral prompts such as:
-
-```text
-You are in <concrete situation>. You have <resources/evidence actually available>.
-Your desired outcome is <observable outcome>.
-What steps would you take?
-```
-
-rather than:
-
-```text
-How would you safely perform <task> while ensuring you verify X, preserve Y,
-and recover if Z fails?
-```
-
-The second prompt has already supplied much of the process and cannot measure whether agents infer those steps independently.
-
-##### Sampling and interpretation
-
-1. Run at least 10 isolated responses across available models/harnesses where practical. Prefer model and harness diversity over repeated samples from one configuration when the question is what agents generally infer.
-2. Preserve raw responses before interpretation. Normalize them into comparable semantic steps without forcing differently expressed actions into the same category.
-3. Identify high-consensus behavior, variable decisions, common omissions, ordering differences, and unsafe variants. Look across scenarios as well as models: behavior that appears only under one wording may be prompt-sensitive rather than common knowledge.
-4. Compare observations with the ProcessModel's required contracts and invariants. Consensus measures likely inference, not correctness or safety.
-5. Treat absence carefully. A step omitted from a concise answer may be implicit rather than behavior the agent would omit during execution. When that distinction materially affects compression, use a scenario that makes the decision observable rather than asking a leading follow-up.
-6. Compress high-consensus behavior only when it satisfies required invariants and the consequence of inference failure is acceptable. A short confirmation may remain useful for sequencing or contract boundaries.
-7. Specify exact/preferred behavior for high-variance decisions. For consequential high-variance nodes, locally expand and validate the child procedure.
-8. Record scenarios, prompt wording, model/harness diversity, sample count, normalization decisions, observed consensus/variance, unsafe variants, and the resulting instruction decision. Do not claim universality from the sample.
-
-##### Compression validation
-
-Baseline sampling discovers candidate prior knowledge; it does not by itself justify deleting instructions. Before examining sample results, record the contract-relevant invariants, unacceptable outcomes, and material decision points that compression must preserve so success criteria cannot drift toward outputs that merely look plausible.
-
-When compression is material, optionally validate the candidate instruction set against the fuller version:
-
-1. Run the same representative scenarios with the full and compressed instructions under comparable tools/environment.
-2. Include held-out scenarios that were not used to decide what to compress; do not tune only to the discovery scenarios.
-3. Repeat selected scenario/model combinations when practical. Separate within-model stochastic variation, consistent cross-model disagreement, and sensitivity to scenario wording — each is a different reason behavior may need explicit instruction.
-4. Where practical, compare outputs or execution traces without telling the evaluator which instruction variant produced them. Judge against the pre-recorded contract rather than preference for brevity or the newer version.
-5. If the harness exposes execution traces, inspect actions, navigation, tool use, omissions, and recovery behavior as well as the final answer. A model mentioning a safeguard is weaker evidence than observing it perform the safeguard when required.
-6. Observe the benefit of compression where available: instruction/context reduction, task success, unsafe or contract-violating behavior, execution time, and unnecessary tool/work expansion. No fixed metric or tooling is required.
-7. Restore or specify behavior when compression causes a contract-relevant regression. Retain compression when behavior remains within the contract across the evidence collected.
-
-Cross-model evidence should reflect the models the process is expected to support. Behavior consistently inferred by stronger models but missed by a supported weaker model is not safely redundant for that deployment context.
-
-##### Bias checks
-
-Before using the sample, ask:
-
-- Would a respondent know the preferred process merely from vocabulary or facts included in the prompt?
-- Does the prompt imply that a particular safeguard, ordering, tool, or failure mode should be considered?
-- Are scenarios diverse enough that consensus is not an artifact of one framing?
-- Did normalization erase meaningful differences between responses?
-- Are we mistaking common model training patterns for requirements of this specific system?
-- Would removing the instruction still be acceptable if a future capable model chose a different but contract-compatible path?
-
-If these checks fail, redesign the scenarios rather than treating the resulting consensus as evidence for compression.
+Load [baseline-agent-behavior-eval.md](./references/baseline-agent-behavior-eval.md) when this optional refinement is selected. It defines neutral scenario design, sampling/normalization, bias checks, repeated/cross-model variance interpretation, blind comparison, trace inspection, and compression validation.
 
 ### Claims Are the Unit of Validation
 
@@ -270,6 +211,25 @@ Treat failures as evidence. State the violated claim and smallest relevant count
 
 For every material boundary inspect who calls it, what it calls, state crossing the boundary, caller assumptions, callee guarantees, partial-failure behavior, and recovery ownership. Cross-boundary contradictions are gaps even when each local process is internally coherent.
 
+### Semantic Conservation for Material Rewrites
+
+Goal attainment does not prove that every valuable original behavior survived. Before a material rewrite, inventory independently meaningful original actions/orderings, decision rules, constraints, reasoning principles, routing behavior, validation/completion conditions, and domain or maintenance invariants that could be affected.
+
+After the candidate exists, account for each changed or removed meaning as:
+
+- **PRESERVED** — equivalent behavior remains;
+- **RELOCATED** — equivalent behavior remains at another reachable appropriate location;
+- **AUTOMATED** — deterministic machinery now carries it;
+- **PROVEN-REDUNDANT** — evidence shows removal does not change required execution/maintenance;
+- **UNCERTAIN** — equivalence or safe removal lacks evidence;
+- **LOST** — no valid carrier or redundancy evidence remains.
+
+Reject a material improvement with a required `LOST` meaning. A behavior-affecting `UNCERTAIN` removal remains unresolved rather than being justified by high-level goal alignment.
+
+### Evidence Trade-offs
+
+Keep hard correctness/contract evidence, qualitative judgments, and efficiency telemetry separate. Do not average unlike evidence into one quality score. Lower cost, fewer instructions, or better readability cannot compensate for violation of a required invariant; report mixed trade-offs directly.
+
 ### Change-Impact Validation
 
 After improvement, map changed actors, states, actions, transitions, resources, assumptions, and contracts to dependent claims. Revalidate affected claims/interfaces. Do not rerun unrelated validation without reason or assume prior evidence applies to a changed dependency.
@@ -281,11 +241,6 @@ Improve directly only when the correction follows from established purpose, goal
 ### Completion Record
 
 Finish only when required claims have sufficient evidence or remaining uncertainty is explicit. Return the Result Contract status plus purpose/scope, material ProcessModel elements, claim → validator → evidence mapping, addressed counterexamples, assumptions, residual risks, validation boundaries, and any useful representations. Mermaid is a projection of the model, not the model itself.
-
-## Improvement Techniques
-
-Use these inside CHALLENGE/IMPROVE, not as a second workflow: rewrite outcomes measurably; replace abstract verbs with concrete actions; make guards observable; define inputs/outputs; remove or rewrite no-op work; exercise success and failure examples; stress edge cases; minimize cognitive load; ensure execution is auditable. The authoritative workflow remains UNDERSTAND → MODEL → CHALLENGE → IMPROVE → VALIDATE.
-
 
 ## References
 
