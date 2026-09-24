@@ -177,7 +177,7 @@ jobs:
 
   # Option 2: Token-based Publishing (Alternative)
   # publish-pypi:
-  #   needs: build
+  #   needs: [build, test]
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Download artifacts
