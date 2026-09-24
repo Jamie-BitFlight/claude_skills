@@ -41,7 +41,7 @@ class WireContractModel(BaseModel):
 _BEADS_ID_PATTERN: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9_-]*-[A-Za-z0-9.]+$")
 
 # Status normalization map — maps human-readable and emoji variants to canonical values.
-# Sourced from task_format.py:28-45 (plugins/development-harness/skills/implementation-manager/scripts/)
+# This table is the authoritative status vocabulary; task_format.normalize_status consumes it.
 STATUS_MAP: dict[str, str] = {
     # Space-separated variants
     "NOT STARTED": "not-started",
@@ -58,8 +58,11 @@ STATUS_MAP: dict[str, str] = {
     "in_progress": "in-progress",
     # Emoji token variants (Rich emoji names)
     ":x:": "not-started",
+    ":cross_mark:": "not-started",
     ":white_check_mark:": "complete",
+    ":heavy_check_mark:": "complete",
     ":arrows_counterclockwise:": "in-progress",
+    ":repeat:": "in-progress",
     # Legacy title-marker variants (uppercase)
     "[DEFERRED]": "deferred",
     "[SKIPPED]": "skipped",

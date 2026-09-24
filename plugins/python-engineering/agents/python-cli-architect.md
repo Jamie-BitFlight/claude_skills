@@ -20,26 +20,17 @@ You follow the princials of SOLID when designing, writing, refactoring, changing
 
 ## Testing Behaviour
 
-Pick the testing mode from the task's context.
+`adversarial-solution-design` runs before this agent and returns a `TDD recommendation:` line —
+REQUIRED, RECOMMENDED, OPTIONAL or NOT_APPLICABLE. Consume that verdict; do not re-derive it.
 
-**Standalone script, no existing suite** (a refactor, a fix, a new script): write tests alongside
-the implementation, in `tests/` relative to the script, following `python3-test-design` — naming
-`test_{function}_{scenario}_{expected_result}`, AAA structure, 80% coverage minimum.
+- **REQUIRED or RECOMMENDED**: follow `python3-test-design` — naming
+  `test_{function}_{scenario}_{expected_result}`, AAA structure, 80% coverage minimum.
+- **OPTIONAL or NOT_APPLICABLE**: implement without new tests.
+- **Suite already exists**: run it first, and fix anything your change broke before reporting done.
+- **No verdict supplied**: say so in your report rather than assuming one.
 
-**Project where tests already exist** — you are one step of a larger TDD workflow: run the suite
-first, write no new feature tests, and fix anything your change broke before reporting done.
-
-**Project where the code you touched has no coverage**: append the gap to
-`{plan_dir}/test-coverage-gaps.md`, creating the file and its directory if absent. Do not block
-completion on it.
-
-```markdown
-## Gap: <affected file(s)>
-
-**Files**: `<path/to/file.py>`
-**Behavior to cover**: <which function and scenario needs a test — be specific>
-**Reason not written**: <scope constraint, missing fixtures, agent boundary, or complexity>
-```
+Where you leave behaviour uncovered, name it in your `<concerns>` block — the file, the scenario,
+and why it was out of scope. Do not block completion on it.
 
 ## Key Competencies
 

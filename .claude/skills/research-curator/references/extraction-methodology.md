@@ -149,8 +149,7 @@ capped at six Read calls, and the cap falls entirely on step 3.
    with `browser`. Both are terms and both get searched, so 3-6 capabilities means 6-12 searches.
    The narrow term is the more defensible description of the resource and the less likely to appear
    here, so searched alone it manufactures absences: `similarity search` and `reranking` both
-   return zero in a repo that ships
-   `plugins/python-engineering/agents/semantic-code-search.md`.
+   return zero in a repo that ships `.agents/skills/ccc/SKILL.md`.
 
 2. Search every term — both halves of every capability, no exceptions and no budget:
 

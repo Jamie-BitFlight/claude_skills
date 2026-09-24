@@ -13,7 +13,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -225,25 +225,75 @@ function resolveLatestVersion(pluginDir) {
  * @param {string} agentFile - Filename of the agent (e.g. `code-architect.md`)
  * @returns {string | null} - Resolved path or null if not found
  */
-function resolvePluginAgentPath(pluginDir, agentFile) {
-  const version = resolveLatestVersion(pluginDir);
-  if (version === null) return null;
+/**
+ * Discover every agent the plugin cache holds, keyed `<pluginName>:<agentName>`.
+ *
+ * The cache lays plugins out as `<marketplace>/<plugin>/<version>/agents/*.md`, and the plugin
+ * directory name is the namespace a plugin-qualified agent reference uses — which is the plugin's
+ * manifest `name`, not its source directory in the repository. Scanning rather than listing keeps
+ * this in step with renames, additions and removals on its own.
+ *
+ * @returns {Array<{ key: string, filePath: string }>}
+ */
+function discoverPluginAgents() {
+  /** @type {Array<{ key: string, filePath: string }>} */
+  const discovered = [];
 
-  const withAgentsSubdir = join(pluginDir, version, 'agents', agentFile);
+  /** @type {import('node:fs').Dirent[]} */
+  let marketplaces;
   try {
-    statSync(withAgentsSubdir);
-    return withAgentsSubdir;
+    marketplaces = readdirSync(PLUGIN_CACHE_DIR, { withFileTypes: true });
   } catch {
-    // Fall through to flat layout
+    process.stderr.write(`WARN: no plugin cache directory at ${PLUGIN_CACHE_DIR}\n`);
+    return discovered;
   }
 
-  const flat = join(pluginDir, version, agentFile);
-  try {
-    statSync(flat);
-    return flat;
-  } catch {
-    return null;
+  for (const marketplace of marketplaces) {
+    // Transient clone directories the installer leaves behind are not marketplaces.
+    if (!marketplace.isDirectory() || marketplace.name.startsWith('temp_')) continue;
+
+    const marketplaceDir = join(PLUGIN_CACHE_DIR, marketplace.name);
+    /** @type {import('node:fs').Dirent[]} */
+    let plugins;
+    try {
+      plugins = readdirSync(marketplaceDir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const plugin of plugins) {
+      if (!plugin.isDirectory()) continue;
+
+      const pluginDir = join(marketplaceDir, plugin.name);
+      const version = resolveLatestVersion(pluginDir);
+      if (version === null) continue;
+
+      const agentsDir = join(pluginDir, version, 'agents');
+      /** @type {import('node:fs').Dirent[]} */
+      let entries;
+      try {
+        entries = readdirSync(agentsDir, { withFileTypes: true });
+      } catch {
+        continue; // Plugin ships no agents.
+      }
+
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+        discovered.push({
+          key: `${plugin.name}:${basename(entry.name, '.md')}`,
+          filePath: join(agentsDir, entry.name),
+        });
+      }
+    }
   }
+
+  if (discovered.length === 0) {
+    process.stderr.write(
+      `WARN: found no plugin agents under ${PLUGIN_CACHE_DIR} — the map will hold only user and project agents\n`,
+    );
+  }
+
+  return discovered;
 }
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
@@ -345,305 +395,8 @@ function buildAgentList() {
   }
 
   // ── Plugin agents ────────────────────────────────────────────────────────────
-  /**
-   * @type {Array<{
-   *   key: string,
-   *   pluginDir: string,
-   *   agentFile: string
-   * }>}
-   */
-  const pluginAgents = [
-    {
-      key: 'episodic-memory:search-conversations',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'superpowers-marketplace/episodic-memory'),
-      agentFile: 'search-conversations.md',
-    },
-    {
-      key: 'feature-dev:code-architect',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'claude-plugins-official/feature-dev'),
-      agentFile: 'code-architect.md',
-    },
-    {
-      key: 'feature-dev:code-explorer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'claude-plugins-official/feature-dev'),
-      agentFile: 'code-explorer.md',
-    },
-    {
-      key: 'feature-dev:code-reviewer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'claude-plugins-official/feature-dev'),
-      agentFile: 'code-reviewer.md',
-    },
-    {
-      key: 'holistic-linting:linting-root-cause-resolver',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/holistic-linting'),
-      agentFile: 'linting-root-cause-resolver.md',
-    },
-    {
-      key: 'holistic-linting:post-linting-architecture-reviewer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/holistic-linting'),
-      agentFile: 'post-linting-architecture-reviewer.md',
-    },
-    {
-      key: 'plugin-creator:agent-creator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'agent-creator.md',
-    },
-    {
-      key: 'plugin-creator:ai-doc-optimizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'ai-doc-optimizer.md',
-    },
-    {
-      key: 'plugin-creator:skill-auditor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'skill-auditor.md',
-    },
-    {
-      key: 'plugin-creator:skill-content-updater',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'skill-content-updater.md',
-    },
-    {
-      key: 'plugin-creator:hook-creator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'hook-creator.md',
-    },
-    {
-      key: 'plugin-creator:plugin-assessor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'plugin-assessor.md',
-    },
-    {
-      key: 'plugin-creator:refactor-executor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'refactor-executor.md',
-    },
-    {
-      key: 'plugin-creator:refactor-planner',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'refactor-planner.md',
-    },
-    {
-      key: 'plugin-creator:refactor-validator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'refactor-validator.md',
-    },
-    {
-      key: 'plugin-creator:subagent-refactorer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/plugin-creator'),
-      agentFile: 'subagent-refactorer.md',
-    },
-    {
-      key: 'process-siren:process-siren',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/process-siren'),
-      agentFile: 'process-siren.md',
-    },
-    {
-      key: 'development-harness:codebase-analyzer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'codebase-analyzer.md',
-    },
-    {
-      key: 'development-harness:dh-context-gathering',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'dh-context-gathering.md',
-    },
-    {
-      key: 'development-harness:context-refinement',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'context-refinement.md',
-    },
-    {
-      key: 'development-harness:doc-drift-auditor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'doc-drift-auditor.md',
-    },
-    {
-      key: 'development-harness:ecosystem-researcher',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'ecosystem-researcher.md',
-    },
-    {
-      key: 'development-harness:feature-researcher',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'feature-researcher.md',
-    },
-    {
-      key: 'development-harness:feature-verifier',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'feature-verifier.md',
-    },
-    {
-      key: 'development-harness:integration-checker',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'integration-checker.md',
-    },
-    {
-      key: 'development-harness:plan-validator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/development-harness'),
-      agentFile: 'plan-validator.md',
-    },
-    {
-      key: 'python-engineering:code-reviewer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/python-engineering'),
-      agentFile: 'code-reviewer.md',
-    },
-    {
-      key: 'python-engineering:python-cli-architect',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/python-engineering'),
-      agentFile: 'python-cli-architect.md',
-    },
-    {
-      key: 'python-engineering:python-cli-design-spec',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/python-engineering'),
-      agentFile: 'python-cli-design-spec.md',
-    },
-    {
-      key: 'python-engineering:python-pytest-architect',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/python-engineering'),
-      agentFile: 'python-pytest-architect.md',
-    },
-    {
-      key: 'summarizer:file-summarizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/summarizer'),
-      agentFile: 'file-summarizer.md',
-    },
-    {
-      key: 'summarizer:image-summarizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/summarizer'),
-      agentFile: 'image-summarizer.md',
-    },
-    {
-      key: 'summarizer:url-summarizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'jamie-bitflight-skills/summarizer'),
-      agentFile: 'url-summarizer.md',
-    },
-    {
-      key: 'superpowers:code-reviewer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'claude-plugins-official/superpowers'),
-      agentFile: 'code-reviewer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:build-engineer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'build-engineer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:cli-developer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'cli-developer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:dependency-manager',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'dependency-manager.md',
-    },
-    {
-      key: 'voltagent-dev-exp:documentation-engineer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'documentation-engineer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:dx-optimizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'dx-optimizer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:git-workflow-manager',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'git-workflow-manager.md',
-    },
-    {
-      key: 'voltagent-dev-exp:legacy-modernizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'legacy-modernizer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:mcp-developer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'mcp-developer.md',
-    },
-    {
-      key: 'voltagent-dev-exp:powershell-module-architect',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'powershell-module-architect.md',
-    },
-    {
-      key: 'voltagent-dev-exp:powershell-ui-architect',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'powershell-ui-architect.md',
-    },
-    {
-      key: 'voltagent-dev-exp:refactoring-specialist',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'refactoring-specialist.md',
-    },
-    {
-      key: 'voltagent-dev-exp:slack-expert',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'slack-expert.md',
-    },
-    {
-      key: 'voltagent-dev-exp:tooling-engineer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-dev-exp'),
-      agentFile: 'tooling-engineer.md',
-    },
-    {
-      key: 'voltagent-meta:agent-organizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'agent-organizer.md',
-    },
-    {
-      key: 'voltagent-meta:context-manager',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'context-manager.md',
-    },
-    {
-      key: 'voltagent-meta:error-coordinator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'error-coordinator.md',
-    },
-    {
-      key: 'voltagent-meta:it-ops-orchestrator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'it-ops-orchestrator.md',
-    },
-    {
-      key: 'voltagent-meta:knowledge-synthesizer',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'knowledge-synthesizer.md',
-    },
-    {
-      key: 'voltagent-meta:multi-agent-coordinator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'multi-agent-coordinator.md',
-    },
-    {
-      key: 'voltagent-meta:performance-monitor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'performance-monitor.md',
-    },
-    {
-      key: 'voltagent-meta:task-distributor',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'task-distributor.md',
-    },
-    {
-      key: 'voltagent-meta:workflow-orchestrator',
-      pluginDir: join(PLUGIN_CACHE_DIR, 'voltagent-subagents/voltagent-meta'),
-      agentFile: 'workflow-orchestrator.md',
-    },
-  ];
-
-  for (const { key, pluginDir, agentFile } of pluginAgents) {
-    const resolved = resolvePluginAgentPath(pluginDir, agentFile);
-    if (resolved !== null) {
-      agents.set(key, resolved);
-    } else {
-      process.stderr.write(
-        `WARN: Could not resolve path for plugin agent "${key}" in ${pluginDir}\n`,
-      );
-    }
+  for (const { key, filePath } of discoverPluginAgents()) {
+    agents.set(key, filePath);
   }
 
   return Array.from(agents.entries()).map(([key, filePath]) => ({ key, filePath }));

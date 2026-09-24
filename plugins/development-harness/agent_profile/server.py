@@ -126,7 +126,7 @@ def _list(
             default=None,
             description=(
                 "When provided, restrict the listing to agents owned by this plugin "
-                "(e.g. 'development-harness', 'python-engineering'). "
+                "(e.g. 'dh', 'python-engineering'). "
                 "When omitted or null, all plugins are included."
             ),
         ),

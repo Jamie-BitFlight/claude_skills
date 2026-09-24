@@ -105,9 +105,8 @@ claim about this repository, and each needs the search that produced it recorded
 The cost of skipping the search is building something that already exists.
 `research/insights/2026-03-10-cocoindex-code-improvements.md` states "No skill in `.claude/skills/`
 or `plugins/` provides semantic code search capability" and targets creating one, while
-`plugins/python-engineering/agents/semantic-code-search.md` and
-`plugins/python-engineering/agents/semantic-code-search.md` both exist. One
-`git grep -il "semantic" -- plugins/` would have prevented it.
+`.agents/skills/ccc/SKILL.md` already wraps a semantic code index. One
+`git grep -il "semantic" -- plugins/ .agents/` would have prevented it.
 
 Use `git grep`, never plain `grep`. `git grep` searches tracked files only; plain `grep` descends
 into gitignored `.claude/worktrees/`, which holds more files than the rest of the repo combined, so
