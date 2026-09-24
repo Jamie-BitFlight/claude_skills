@@ -1,6 +1,6 @@
 ---
 name: agentskills
-description: Agent Skills Open Standard reference (agentskills.io). Use when creating portable skills for Claude Code, Cursor, Gemini CLI, OpenAI Codex, VS Code, Roo Code, and 20+ compatible agents. Covers frontmatter schema, naming rules, directory structure, progressive disclosure, validation, and authoring. Load before creating cross-agent skills.
+description: Agent Skills portable format reference. Use when creating cross-client skills, validating portable frontmatter, packaging for upload/API use, or implementing skill discovery and activation. Covers the specification and links to the live client showcase.
 user-invocable: true
 ---
 
@@ -54,17 +54,17 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 | Field           | Required | Max Length | Constraints                                                      |
 | --------------- | -------- | ---------- | ---------------------------------------------------------------- |
-| `name`          | Yes      | 64 chars   | Lowercase alphanumeric + hyphens. No leading/trailing/consecutive hyphens. Must match directory name. |
-| `description`   | Yes      | 1024 chars | Non-empty. Describe what + when to use. Include trigger keywords. |
+| `name`          | Yes      | 64 chars   | Unicode lowercase alphanumeric + hyphens. No leading/trailing/consecutive hyphens. Must match directory name. |
+| `description`   | Yes      | 1024 chars | MUST be non-empty. SHOULD describe what + when to use and SHOULD include useful keywords. |
 | `license`       | No       | —          | License name or reference to bundled file.                       |
-| `compatibility` | No       | 500 chars  | Environment requirements (products, packages, network).          |
+| `compatibility` | No       | 500 chars  | If provided, MUST be non-empty. Environment requirements (products, packages, network). |
 | `metadata`      | No       | —          | Arbitrary string key-value pairs.                                |
 | `allowed-tools` | No       | —          | Space-delimited pre-approved tools. Experimental.                |
 
 ### Name Validation Rules
 
 - 1-64 characters
-- Unicode lowercase alphanumeric and hyphens only (`a-z`, `0-9`, `-`)
+- Unicode lowercase alphanumeric characters and hyphens only
 - Must not start or end with `-`
 - Must not contain consecutive hyphens (`--`)
 - Must match the parent directory name
@@ -74,7 +74,7 @@ Invalid: `PDF-Processing` (uppercase), `-pdf` (leading hyphen), `pdf--processing
 
 ### Description Guidelines
 
-Write in **third person**. Include both what the skill does and when to use it.
+Prefer imperative phrasing such as `Use this skill when...`. The description should include what the skill does, when to use it, and useful keywords.
 
 ```yaml
 # Good — specific, includes triggers
@@ -84,7 +84,7 @@ description: Extract text and tables from PDF files, fill forms, merge documents
 description: Helps with PDFs.
 ```
 
-**Preferred patterns:** Use gerund form (`processing-pdfs`) or noun phrases (`pdf-processing`). Prefer descriptive names like `pdf-processing` over generic names like `helper` or `utils`.
+Use descriptive names such as `pdf-processing`; grammatical form is authoring advice, not a specification requirement.
 
 ---
 
@@ -94,7 +94,7 @@ Skills use three-level loading to manage context efficiently:
 
 1. **Metadata** (~100 tokens): `name` + `description` loaded at startup for all skills
 2. **Instructions** (<5000 tokens recommended, and ideally under 500 lines): Full SKILL.md body loaded on activation
-3. **Resources** (as needed): Files in `scripts/`, `references/`, `assets/` loaded on demand
+3. **Resources** (as needed): Files in `scripts/`, `references/`, and `assets/` are not eagerly read and load on demand
 
 **Keep SKILL.md body lean.** Move detailed reference material to separate files. Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance on token-based sizing.
 
@@ -153,7 +153,7 @@ Documentation loaded on demand. Keep individual files focused — smaller files 
 
 ### assets/
 
-Static resources used in output (templates, images, data files). Not loaded into context — used by the agent in its output.
+Static resources used in output (templates, images, data files). They are not eagerly loaded, but remain available to read on demand.
 
 ---
 
@@ -236,7 +236,7 @@ The open standard defines a **portable subset**. Claude Code extends it with add
 | `disable-model-invocation` | No          | Yes                   |
 | `hooks`                  | No            | Yes                   |
 
-**For portable skills:** Use only the open standard fields. Other agents will ignore unknown fields, but keeping frontmatter clean improves compatibility.
+**For portable skills and claude.ai/Skills API/package upload:** use only the six fields above. Anthropic upload and package boundaries hard-fail unknown fields; runtime behavior for other clients is implementation-specific.
 
 **Claude Code-specific validation:** Claude Code additionally rejects `name` or `description` values containing XML tags, and rejects `name` values containing the reserved words `anthropic` or `claude` — a stricter check than the open standard's own name/description rules above. This constraint is Claude Code-specific and not part of the agentskills.io specification.
 
@@ -252,7 +252,8 @@ The open standard defines a **portable subset**. Claude Code extends it with add
 
 ## External Links
 
-- Specification: <https://agentskills.io/specification> (accessed 2026-08-24)
+- Specification: <https://agentskills.io/specification> (accessed 2026-09-24)
+- Client showcase: <https://agentskills.io> (accessed 2026-09-24)
 - Best practices: <https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices> (accessed 2026-08-24)
 - Example skills: <https://github.com/anthropics/skills> (accessed 2026-08-24)
 - Reference library: <https://github.com/agentskills/agentskills/tree/main/skills-ref> (accessed 2026-08-24)

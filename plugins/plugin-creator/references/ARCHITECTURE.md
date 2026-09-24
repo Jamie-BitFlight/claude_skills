@@ -100,9 +100,9 @@ class ComplexityValidator:
         body_tokens = len(encoding.encode(body))
 
         # Apply thresholds
-        if body_tokens > TOKEN_ERROR_THRESHOLD:  # 6400
+        if body_tokens > TOKEN_ERROR_THRESHOLD:  # 8800
             # ERROR: Must split
-        elif body_tokens > TOKEN_WARNING_THRESHOLD:  # 4000
+        elif body_tokens > TOKEN_WARNING_THRESHOLD:  # 4400
             # WARNING: Consider splitting
 ```
 
@@ -168,36 +168,16 @@ skill-name/
 **Error codes**: FM001-FM010
 
 **Pydantic models**:
-- `SkillFrontmatter` - Skills (all fields optional)
+- `SkillFrontmatter` - Claude Code runtime skills (runtime fields optional; extension fields preserved)
 - `AgentFrontmatter` - Agents (name, description required)
 - `CommandFrontmatter` - Commands (description required)
 
+Portable package validation is owned by `skills/skill-creator/scripts/quick_validate.py`.
+
 **Auto-fix capabilities**:
 - FM004: Removes multiline indicators (`>-`, `|-`)
-- FM007: Converts tools YAML array → CSV string
-- FM008: Converts skills YAML array → CSV string
+- Valid Claude Code YAML tool lists are preserved
 - FM009: Quotes descriptions with colons — `_fix_unquoted_colons()` skips rewriting lines inside ecosystem-owned top-level frontmatter blocks (e.g., `mcp:` from OpenCode)
-
-**Implementation highlights**:
-
-```python
-def fix(self, path: Path) -> list[str]:
-    """Auto-fix frontmatter issues."""
-
-    fixes = []
-
-    # Fix 1: YAML arrays → CSV strings
-    if "tools:" in content and "- " in content:
-        content = re.sub(r"tools:\s*\n(?:\s*-\s*(\w+)\n)+", lambda m: f"tools: {', '.join(m.groups())}", content)
-        fixes.append("Converted tools YAML array to CSV")
-
-    # Fix 2: Quote descriptions with colons
-    if "description:" in content and ":" in desc_value:
-        content = content.replace(f"description: {desc_value}", f'description: "{desc_value}"')
-        fixes.append("Quoted description with colons")
-
-    return fixes
-```
 
 ### 2. NameFormatValidator (lines 1139-1324)
 
@@ -312,7 +292,9 @@ def _count_files(self, directory: Path) -> int:
 
 ### 7. PluginStructureValidator (lines 1661-1935)
 
-**Purpose**: Validates plugin.json and delegates to Claude CLI
+**Purpose**: Delegates plugin validation to the Claude CLI. The CLI parses direct skill/agent/command paths and default plugin directories, skips symlinks with warnings, and checks manifest-declared component paths for existence without reading their files.
+
+SOURCE: <https://code.claude.com/docs/en/plugins-reference> (accessed 2026-09-24)
 
 **Error codes**: PL001-PL005
 

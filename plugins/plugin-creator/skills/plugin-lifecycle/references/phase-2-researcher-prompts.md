@@ -68,7 +68,7 @@ Context to include in the prompt: plugin concept, feature context from Researche
 
 Prompt:
 
-> Fetch `https://code.claude.com/docs/en/plugins-reference.md` and `https://code.claude.com/docs/en/skills.md`. Identify schema requirements (comma-separated strings NOT arrays), common mistakes, deprecations or new features. Report gotchas to avoid.
+> Fetch `https://code.claude.com/docs/en/plugins-reference.md` and `https://code.claude.com/docs/en/skills.md`. Identify current schema requirements and accepted list forms, common mistakes, deprecations or new features. Report gotchas to avoid.
 
 Output: `.plugin-creator/plans/{plugin-name}/research-4-pitfalls.md`
 

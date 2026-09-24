@@ -8,7 +8,7 @@ Empirical tests of Claude Code skill frontmatter field behavior. Each experiment
 
 **Goal**: Determine whether `allowed-tools` pre-approves listed tools (skips permission prompts) in a restrictive permission mode.
 
-**Context from E1**: Three runs confirmed `allowed-tools: Read` does NOT restrict unlisted tools in either inline or forked contexts. All tools (Read, Grep, Glob, Bash) succeeded regardless of whether they were listed. The restriction claim from official docs was not observed.
+**Context from E1**: Three runs confirmed `allowed-tools: Read` does NOT restrict unlisted tools in either inline execution or a `context: fork` skill subagent. All tools (Read, Grep, Glob, Bash) succeeded regardless of whether they were listed. The restriction claim from official docs was not observed.
 
 **What U3 tests**: The other documented behavior — pre-approval. The official docs say "Tools Claude can use without asking permission when this skill is active." All prior runs used permissive permission settings, so pre-approval could not be distinguished from "already permitted."
 

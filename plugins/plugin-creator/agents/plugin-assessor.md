@@ -41,13 +41,13 @@ Execute in order. Report discovery summary before proceeding to Phase 2.
     - URL reachable with fallback-title context only (no sentence-length claim phrase) => informational (`Drift: Unknown`, no finding/deduction)
     - URL reachable but sentence-length claim phrase absent => RECOMMENDATION (drift suspected)
     - phrase present => no finding
-- If any skill exceeds 4000 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
+- If any skill exceeds 4400 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
 
 **Phase 4 — Commands Analysis**: Validate frontmatter. Check argument documentation and example usage.
 
 **Phase 5 — Agents Analysis**: Validate frontmatter. Check delegation trigger keywords in description. Review tool restrictions.
 - Run citation drift checks for `SOURCE:` references in agent markdown using the same extraction, deduplication, timeout, and severity rules from Phase 3.
-- If any agent body exceeds 4000 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
+- If any agent body exceeds 4400 tokens: load `plugin-creator:optimize` and use it to identify specific reduction and reorganization opportunities. Include these as RECOMMENDATION findings in the report.
 
 **Phase 6 — Hooks Validation**: If `hooks.json` exists or hooks in frontmatter, validate event names, handler fields, exit codes.
 

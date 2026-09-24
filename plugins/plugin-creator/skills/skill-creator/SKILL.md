@@ -108,7 +108,7 @@ Every skill consists of a required SKILL.md file and optional bundled resources:
 skill-name/
 ├── SKILL.md (required)
 │   ├── YAML frontmatter metadata (required)
-│   │   └── name: (recommended — if omitted, uses directory name; required per agentskills.io spec)
+│   │   └── name: (optional in Claude Code; required for portable packages)
 │   │   └── description: (recommended)
 │   └── Markdown instructions (required)
 └── Bundled Resources (optional)
@@ -121,7 +121,7 @@ skill-name/
 
 Every SKILL.md consists of:
 
-- **Frontmatter** (YAML): Metadata fields like `name`, `description`, `argument-hint`, `allowed-tools`, `model`, `context`, `user-invocable`, `disable-model-invocation`, and `hooks`. The `description` field (or first paragraph if omitted) is what Claude reads to determine when the skill gets used, thus it is very important to be clear and comprehensive in describing what the skill is and when it should be used.
+- **Frontmatter** (YAML): Choose either the portable Agent Skills fields or Claude Code runtime extensions for the intended destination. In Claude Code, an omitted `description` uses the first non-empty markdown line.
 - **Body** (Markdown): Instructions and guidance for using the skill. Only loaded AFTER the skill triggers (if at all).
 
 #### Bundled Resources and Content Patterns (optional)
@@ -148,7 +148,7 @@ Documentation and reference material intended to be loaded as needed into contex
 
 ##### Assets (`assets/`)
 
-Files not intended to be loaded into context, but rather used within the output Claude produces.
+Files primarily used in output. They are not eagerly loaded, but the agent can read them on demand.
 
 - **When to include**: When the skill needs files that will be used in the final output
 - **Examples**: `assets/logo.png` for brand assets, `assets/slides.pptx` for PowerPoint templates, `assets/frontend-template/` for HTML/React boilerplate, `assets/font.ttf` for typography
@@ -175,7 +175,7 @@ The skill should only contain the information needed for an AI agent to do the j
 
 #### Context Fork (Isolated Execution)
 
-Add `context: fork` to frontmatter when you want a skill to run in isolation without access to conversation history.
+Add `context: fork` to frontmatter when you want a skill to run in a fresh subagent without access to conversation history. Despite the field name, this is not a conversation fork.
 
 **When to use:**
 
@@ -187,7 +187,7 @@ Add `context: fork` to frontmatter when you want a skill to run in isolation wit
 
 - Skill contains only guidelines (e.g., "use these API conventions") without actionable task
 - Need access to conversation context or previous discussion
-- Need to delegate to other subagents (Agent tool not available in forked contexts)
+- Need the current conversation history; use a conversation fork instead
 
 **Agent types:**
 
@@ -198,15 +198,16 @@ agent: Explore  # or Plan, general-purpose, custom-agent-name
 
 | Agent             | Model    | Tools                      | Use Case                     |
 | ----------------- | -------- | -------------------------- | ---------------------------- |
-| `Explore`         | Haiku    | File/web/MCP (read-only)   | Verbatim retrieval only — never analysis or reasoning (~50% hallucination rate on reasoning tasks) |
+| `Explore`         | Inherits | Read-only                  | File discovery and codebase exploration |
 | `Plan`            | Inherits | File/web/MCP (read-only)   | Research before planning     |
 | `general-purpose` | Inherits | File/web/MCP + Bash/system | Complex operations (default) |
 
 **Tool restrictions:**
 
-- Forked contexts have Read, Write, Edit, Grep, Glob, WebSearch, WebFetch, Bash, MCP tools
-- **Agent tool is NOT available** - cannot delegate to other subagents
-- For hierarchical delegation, parent must run in main context (no `context: fork`)
+- Forks default to background execution; set `background: false` to wait and retain foreground tools
+- Background agents retain MCP tools plus a narrower built-in tool set, and their edits are outside `/rewind`
+- Explore and Plan skip `CLAUDE.md` and git status
+- This skill subagent follows ordinary depth-limited nesting; only conversation forks are unable to spawn another conversation fork
 
 **SOURCE:** `../claude-skills-overview-2026/SKILL.md` section on Context Fork Behavior.
 
@@ -275,9 +276,9 @@ hooks:
 
 Skills use a three-level loading system to manage context efficiently:
 
-1. **Metadata (name + description)** - Always in context (~100 words)
-2. **SKILL.md body** - When skill triggers (<5k words)
-3. **Bundled resources** - As needed by Claude (Unlimited because scripts can be executed without reading into context window)
+1. **Metadata (name + description)** - Cataloged at about 50-100 tokens per skill
+2. **SKILL.md body** - Loaded on activation; keep below 5000 tokens
+3. **Bundled resources** - Read on demand when the skill instructions or task call for them; the portable specification does not require clients to enumerate them automatically
 
 #### Progressive Disclosure Patterns
 
@@ -416,7 +417,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/skill-creator/scripts/init_skill.py my-skill --path
 
 **What the script does:**
 
-- Validates skill name (lowercase, hyphens, max 40 chars)
+- Validates portable skill names (lowercase, hyphens, max 64 chars)
 - Creates skill directory at specified path
 - Generates SKILL.md template with proper frontmatter and TODO placeholders
 - Creates `scripts/`, `references/`, `assets/` directories
@@ -487,23 +488,21 @@ These patterns appear when skill content is drafted from training data or genera
 
 Write the YAML frontmatter. All fields are optional, but `description` is strongly recommended:
 
-- `name`: Optional. The skill name (defaults to directory name if omitted). Lowercase letters, numbers, and hyphens only. Max 64 characters.
-- `description`: Optional but strongly recommended. This is the primary triggering mechanism for your skill, and helps Claude understand when to use the skill. If omitted, uses the first paragraph of markdown content.
+- `name`: Optional in Claude Code. The skill name defaults to the directory name if omitted. Portable packages require it, cap it at 64 characters, apply the portable name grammar, and require directory equality.
+- `description`: Optional but strongly recommended in Claude Code. If omitted, uses the first non-empty markdown line. Portable packages require it and cap it at 1024 characters.
   - Include both what the Skill does and specific triggers/contexts for when to use it.
   - Include all "when to use" information here - Not in the body. The body is only loaded after triggering, so "When to Use This Skill" sections in the body are not helpful to Claude.
-  - Max 1024 characters.
-  - **CRITICAL:** Do NOT use YAML multiline indicators (`>-`, `|-`, `|`) - they are broken and will display as ">-" instead of your text. Use single-line quoted strings instead.
   - Example description for a `docx` skill: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. Use when Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 - `argument-hint`: Optional. Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`.
-- `allowed-tools`: Optional. Lists tools Claude can use without asking permission when this skill is active. When omitted, the skill inherits all tool capabilities from the parent agent. (comma-separated). Example: `Read, Grep, Glob, Bash(npm run:*)`
+- `allowed-tools`: Optional. Claude Code accepts a space- or comma-separated string or YAML list. Portable Agent Skills accepts a string, describes its contents as space-separated, and marks support experimental; preserve valid string whitespace because the reference validator does not canonicalize it.
 - `model`: Optional. Model to use when this skill is active. Options: `claude-opus-4-5-20251101`, `claude-sonnet-4-20250514`, `opus`, `sonnet`, `haiku`
-- `context`: Optional. Set to `fork` to run in a forked subagent context for isolation. See advanced patterns below.
+- `context`: Optional. Set to `fork` to run in a fresh skill subagent for isolation; this is not a conversation fork. See advanced patterns below.
 - `agent`: Optional. Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent name.
 - `user-invocable`: Optional. Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`.
-- `disable-model-invocation`: Optional. Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. **Note:** This field has no effect in `-p` (headless/Agent SDK CLI) mode — ALL skill invocations via `/skill-name` are unavailable in `-p` mode regardless of this setting. Skills used in automation must embed their full workflow in the prompt. See `../claude-skills-overview-2026/resources/headless-agent-sdk.md`.
+- `disable-model-invocation`: Optional. Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. Agent SDK sessions can dispatch a user-invocable skill directly by sending `/<name>` in the prompt; this dispatch is independent of the SDK `skills` allowlist. See `../claude-skills-overview-2026/resources/headless-agent-sdk.md`.
 - `hooks`: Optional. Hooks scoped to this skill's lifecycle. See hooks documentation for configuration format.
 
-**Multi-runtime scaffold** — when a skill targets multiple runtimes, combine portable fields with runtime-specific extensions. Fields not recognized by a runtime are silently ignored:
+**Destination boundaries:** portable uploads, the Skills API, and Anthropic packaging accept only `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools`; unexpected fields hard-fail. Claude Code runtime loading accepts its documented extensions. Preserve other ecosystem-owned fields such as OpenCode `mcp:` only for consumers that document them.
 
 ```yaml
 ---
@@ -516,9 +515,9 @@ mcp:
 ---
 ```
 
-Here `mcp:` is an OpenCode-only extension — Claude Code ignores it. Use this pattern to ship a single SKILL.md that works on both runtimes without branching.
+Here `mcp:` is an OpenCode-only extension. Do not submit this mixed file to a portable upload/API/package boundary.
 
-**Complete field reference:** See `../claude-skills-overview-2026/SKILL.md` for definitive schema documentation, or the `references/claude-code-skills-official.md` for the authoritative source specification.
+**Claude Code runtime field reference:** See `../claude-skills-overview-2026/SKILL.md`. **Portable upload/package schema:** see `../agentskills/SKILL.md`.
 
 ##### Body
 
@@ -553,16 +552,16 @@ The following diagram is the authoritative procedure for skill packaging and plu
 flowchart TD
     Start(["Skill development complete<br>Enter Step 6"]) --> Q{"Distributing via<br>plugin marketplace?"}
     Q -->|"No — skill is in .claude/skills/<br>or ~/.claude/skills/<br>already in final location"| Skip(["Skip Step 6 entirely<br>Proceed to Step 7"])
-    Q -->|"Yes — plugin distribution planned"| Q2{"Prefer standalone .skill file<br>or bundle directly in plugin?"}
+    Q -->|"Yes — plugin distribution planned"| Q2{"Prefer the local .skill ZIP convention<br>or bundle directly in plugin?"}
     Q2 -->|"Bundle directly in plugin<br>(recommended)"| Bundle["Place skill directory under<br>plugin's skills/ directory<br>Claude Code auto-discovers all skills under skills/<br>No plugin.json update needed"]
-    Q2 -->|"Standalone .skill file"| RunPkg["Run: scripts/package_skill.py path/to/skill-folder<br>Optional: scripts/package_skill.py path/to/skill-folder ./dist"]
-    RunPkg --> Validate["Script validates automatically:<br>YAML frontmatter format and fields<br>Skill naming conventions and directory structure<br>Description completeness and quality<br>File organization and resource references"]
+    Q2 -->|"Local standalone .skill ZIP convention"| RunPkg["Run: scripts/package_skill.py path/to/skill-folder<br>Only portable Agent Skills fields are accepted<br>.skill is a local/client convention, not part of the portable standard"]
+    RunPkg --> Validate["Script validates the portable package boundary:<br>required name and description<br>six-field allowlist<br>64/1024 limits<br>name matches parent directory"]
     Validate --> VQ{"Validation<br>exit code?"}
     VQ -->|"0 — validation passed"| Package["Script packages the skill<br>Creates my-skill.skill (zip with .skill extension)<br>Includes all files with proper directory structure"]
     VQ -->|"non-zero — validation failed<br>script reports errors and exits"| Fix["Fix reported validation errors<br>then run packaging command again"]
     Fix --> RunPkg
-    Bundle --> SkillReg["Skills auto-discovered when no<br>skills field present in plugin.json<br>Do NOT add skill entries to plugin.json<br>(adding skills field opts into manual allowlist mode —<br>SK009 fires as INFO reminder)"]
-    Package --> AgentReg["Agents in agents/ are auto-discovered<br>Do NOT add entries to the agents array in plugin.json<br>Writing agents key OVERRIDES auto-discovery<br>⚠️ ALL-OR-NOTHING — if the array exists,<br>every unlisted agent becomes invisible"]
+    Bundle --> SkillReg["Skills under skills/ are auto-discovered<br>Custom skills paths add directories<br>alongside the default skills/ scan"]
+    Package --> AgentReg["Agents in agents/ are auto-discovered<br>Use agents only for non-default file paths<br>It accepts a string or array and replaces default discovery<br>Include every default-path agent that must remain loaded"]
     SkillReg --> Done(["Step 6 complete — proceed to Step 7"])
     AgentReg --> Done
 ```

@@ -13,16 +13,30 @@ from __future__ import annotations
 
 import re
 import zipfile
-from typing import TYPE_CHECKING
+from pathlib import Path
 
+import pytest
 from ruamel.yaml import YAML
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    import pytest
-
 _yaml = YAML(typ="safe")
+
+
+@pytest.mark.parametrize(
+    ("source", "target"),
+    [
+        ("CLAUDE.md", "../../rules/frontmatter-requirements.md"),
+        ("CLAUDE.md", "../../rules/plugin-json.md"),
+        ("examples/agents/example-agent.md", "../../skills/claude-subagent-reference/SKILL.md"),
+        ("examples/agents/example-agent.md", "../../skills/agent-creator/SKILL.md"),
+        ("examples/agents/example-agent.md", "../../scripts/README.md"),
+        ("examples/skills/example-skill/SKILL.md", "../../../skills/claude-skills-overview-2026/SKILL.md"),
+        ("examples/skills/example-skill/SKILL.md", "../../../scripts/README.md"),
+        ("references/USAGE.md", "./ARCHITECTURE.md"),
+    ],
+)
+def test_repaired_plugin_documentation_link_exists(source: str, target: str) -> None:
+    plugin_root = Path(__file__).parents[1]
+    assert (plugin_root / source).parent.joinpath(target).resolve().exists()
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +159,22 @@ class TestInitSkillScaffolder:
         is_valid, err = validate_skill_name("-bad-start")
         assert not is_valid
         assert err is not None
+
+    def test_unicode_lowercase_name_is_accepted(self) -> None:
+        from init_skill import validate_skill_name
+
+        is_valid, err = validate_skill_name("données-分析")
+
+        assert is_valid
+        assert err is None
+
+    def test_name_length_is_checked_after_nfkc_normalization(self) -> None:
+        from init_skill import validate_skill_name
+
+        is_valid, err = validate_skill_name("e\u0301" * 33)
+
+        assert is_valid
+        assert err is None
 
     def test_duplicate_directory_returns_none(self, tmp_path: Path) -> None:
         """init_skill returns None when the target directory already exists.
@@ -400,6 +430,62 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert "rogue-key" in message
 
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("argument-hint", "'[topic]'"),
+            ("arguments", "topic"),
+            ("disable-model-invocation", "true"),
+            ("user-invocable", "true"),
+            ("disallowed-tools", "Write"),
+            ("model", "sonnet"),
+            ("effort", "high"),
+            ("context", "fork"),
+            ("agent", "Explore"),
+            ("background", "false"),
+            ("hooks", "{}"),
+            ("paths", "[]"),
+            ("shell", "bash"),
+            ("when_to_use", "tests"),
+        ],
+    )
+    def test_claude_only_key_fails_portable_validation(self, tmp_path: Path, key: str, value: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "portable-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"{key}: {value}\ndescription:"), encoding="utf-8"
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert key in message
+
+    @pytest.mark.parametrize("missing", ["name", "description"])
+    def test_required_portable_field_fails(self, tmp_path: Path, missing: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "required-fields")
+        skill_md = skill_dir / "SKILL.md"
+        lines = [line for line in skill_md.read_text().splitlines() if not line.startswith(f"{missing}:")]
+        skill_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert missing in message.lower()
+
+    def test_name_must_match_parent_directory(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "directory-name")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(skill_md.read_text().replace("name: directory-name", "name: other-name"))
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "must match parent directory" in message
+
     def test_uppercase_name_fails(self, tmp_path: Path) -> None:
         """Name containing uppercase letters is rejected.
 
@@ -417,11 +503,70 @@ class TestQuickValidateBrokenFixtures:
         assert not valid
         assert any(kw in message for kw in ("hyphen-case", "MyUpperCaseSkill"))
 
-    def test_description_with_angle_brackets_fails(self, tmp_path: Path) -> None:
-        """Description containing angle brackets is rejected.
+    def test_unicode_lowercase_alphanumeric_name_passes(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
 
-        Tests: Angle-bracket guard (blocks HTML-like Claude Code incompatible tokens).
-        """
+        skill_dir = _make_minimal_valid_skill(tmp_path, "données-分析")
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    @pytest.mark.parametrize("compatibility", ["", "   "])
+    def test_empty_compatibility_fails(self, tmp_path: Path, compatibility: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "compatibility-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"compatibility: '{compatibility}'\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "compatibility" in message.lower()
+
+    def test_space_delimited_allowed_tools_passes(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: Bash(git:*) Read\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_yaml_list_allowed_tools_fails_portable_validation(self, tmp_path: Path) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-list-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", "allowed-tools: [Read, Grep]\ndescription:"), encoding="utf-8"
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert not valid
+        assert "allowed-tools must be a string" in message
+
+    @pytest.mark.parametrize("allowed_tools", ["", "Read,Grep", "Read  Grep", "Read\tGrep"])
+    def test_allowed_tools_string_whitespace_is_not_canonicalized(self, tmp_path: Path, allowed_tools: str) -> None:
+        from quick_validate import validate_skill
+
+        skill_dir = _make_minimal_valid_skill(tmp_path, "tool-format-skill")
+        skill_md = skill_dir / "SKILL.md"
+        skill_md.write_text(
+            skill_md.read_text().replace("description:", f"allowed-tools: '{allowed_tools}'\ndescription:"),
+            encoding="utf-8",
+        )
+
+        valid, message = validate_skill(skill_dir)
+        assert valid, message
+
+    def test_description_with_angle_brackets_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = tmp_path / "angle-bracket-skill"
@@ -431,32 +576,20 @@ class TestQuickValidateBrokenFixtures:
         )
 
         valid, message = validate_skill(skill_dir)
-        assert not valid
-        assert any(kw in message.lower() for kw in ("angle bracket", "<", ">"))
+        assert valid, message
 
-    def test_yaml_multiline_indicator_description_fails(self, tmp_path: Path) -> None:
-        """Description written as a bare YAML block-scalar indicator is rejected.
-
-        Tests: Raw-text guard for bare >- / |- indicators on the description line.
-        How: Write SKILL.md with ``description: >-`` (no quotes — the real developer
-             mistake). YAML parses this as an empty string, but the raw-text check in
-             quick_validate must detect the bare indicator and reject the skill.
-        Why: The parsed-value check (``description in {">-", ...}``) cannot catch the
-             bare form because YAML gives empty string, not the literal ">-" string.
-             A regex over the raw SKILL.md text is the only reliable detection method.
-        """
+    def test_yaml_block_scalar_description_passes(self, tmp_path: Path) -> None:
         from quick_validate import validate_skill
 
         skill_dir = tmp_path / "multiline-indicator"
         skill_dir.mkdir()
-        # Write the ACTUAL developer mistake: bare block-scalar indicator, no quotes.
         (skill_dir / "SKILL.md").write_text(
-            "---\nname: multiline-indicator\ndescription: >-\n---\n\n# Skill\n", encoding="utf-8"
+            "---\nname: multiline-indicator\ndescription: >-\n  A portable multiline description\n---\n\n# Skill\n",
+            encoding="utf-8",
         )
 
         valid, message = validate_skill(skill_dir)
-        assert not valid
-        assert any(kw in message.lower() for kw in ("block scalar", ">-", "broken", "indicator"))
+        assert valid, message
 
     def test_name_too_long_fails(self, tmp_path: Path) -> None:
         """Name exceeding the maximum length is rejected.
@@ -492,3 +625,44 @@ class TestQuickValidateBrokenFixtures:
         valid, message = validate_skill(skill_dir)
         assert not valid
         assert any(kw in message.lower() for kw in ("consecutive", "hyphen", "bad--hyphens"))
+
+
+def test_custom_skill_paths_do_not_mask_default_skills(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    (plugin_dir / "skills" / "default-skill").mkdir(parents=True)
+    (plugin_dir / "skills" / "default-skill" / "SKILL.md").write_text("# Default\n")
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"skills": ["./custom-skills"]}\n')
+
+    assert _check_one_plugin(plugin_json) == []
+
+
+def test_single_agent_path_string_is_accepted(tmp_path: Path) -> None:
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text('{"agents": "./custom/reviewer.md"}\n')
+
+    assert _check_one_plugin(plugin_json) == []
+
+
+@pytest.mark.parametrize("entry", [1, None, {"path": "./agents/reviewer.md"}])
+def test_agent_path_array_rejects_non_string_entries(tmp_path: Path, entry: object) -> None:
+    import json
+
+    from check_agent_auto_discovery import _check_one_plugin
+
+    plugin_dir = tmp_path / "plugin"
+    (plugin_dir / ".claude-plugin").mkdir(parents=True)
+    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
+    plugin_json.write_text(json.dumps({"agents": ["./agents/reviewer.md", entry]}))
+
+    violations = _check_one_plugin(plugin_json)
+
+    assert len(violations) == 1
+    assert "entries must be strings" in violations[0]

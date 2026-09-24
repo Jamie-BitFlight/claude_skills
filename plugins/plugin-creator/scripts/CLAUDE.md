@@ -42,10 +42,10 @@ uvx skilllint@latest check --no-color <path>
 
 **Auto-fixes:**
 
-- YAML arrays → comma-separated strings
+- Preserves valid Claude Code YAML lists; portable package validation uses its own schema
 - Multiline descriptions → single-line strings
 - Unquoted colons in descriptions — adds quotes to prevent YAML parsing failures
-- Adds `name:` field to plugin skills when absent (derived from directory name; required per agentskills.io spec)
+- Adds `name:` when applying this repository's portable Agent Skills profile (derived from the directory name)
 
 **Error Codes:** Each finding printed by `skilllint` carries its own code, severity, and suggested fix — read them from the command output.
 
@@ -64,24 +64,6 @@ uv run plugins/plugin-creator/scripts/create_plugin.py
 - `.claude-plugin/` directory with `plugin.json`
 - Optional `skills/`, `agents/`, `commands/` directories
 - Self-validates before completion
-
-### fix_tool_formats.py
-
-Scans codebase for invalid tool format patterns in frontmatter and fixes them.
-
-**Usage:**
-
-```bash
-# Scans ~/.claude and ~/repos recursively
-uv run plugins/plugin-creator/scripts/fix_tool_formats.py
-```
-
-**Fixes:**
-
-- YAML list → comma-separated string
-- JSON array → comma-separated string
-
-**Documentation:** [README.md](./README.md)
 
 ### validate-task-file.sh
 

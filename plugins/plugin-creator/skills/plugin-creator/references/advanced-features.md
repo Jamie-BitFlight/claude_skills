@@ -76,7 +76,7 @@ Research $ARGUMENTS thoroughly:
 
 **Available agent types:**
 
-- `Explore` — Read-only tools, verbatim file retrieval only (Haiku-based, no reasoning tasks)
+- `Explore` — Read-only codebase exploration; inherits the parent model
 - `Plan` — Architecture and planning tasks with reasoning
 - `general-purpose` — Full tool access with reasoning
 

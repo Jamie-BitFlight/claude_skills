@@ -4,7 +4,7 @@ The authoritative specification for skill file format, frontmatter fields, disco
 
 **Why read this**: You're building skills. This reference is the primary source for how Claude Code processes the files you create. Frontmatter field names, loading behavior, budget limits, and discovery rules all come from here. When you need to verify a frontmatter field exists, check how `context: fork` actually works, or understand why a skill isn't triggering — this is where to look.
 
-SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills.md) (accessed 2026-03-01)
+SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills#frontmatter-reference) (accessed 2026-09-24)
 
 ---
 
@@ -61,16 +61,26 @@ All fields are optional. Only `description` is recommended.
 
 | Field                      | Required    | Description |
 |:---------------------------|:------------|:------------|
-| `name`                     | No          | Display name. If omitted, uses directory name. Lowercase letters, numbers, hyphens only (max 64 chars). |
-| `description`              | Recommended | What the skill does and when to use it. Claude uses this to decide when to apply the skill. If omitted, uses first paragraph of markdown content. |
+| `name`                     | No          | Display name. If omitted, uses directory name. |
+| `description`              | Recommended | What the skill does and when to use it. If omitted, uses the first non-empty markdown line. |
+| `when_to_use`              | No          | Additional activation guidance. |
 | `argument-hint`            | No          | Hint shown during autocomplete. Example: `[issue-number]` or `[filename] [format]`. |
+| `arguments`                | No          | Argument definition used by the skill. |
 | `disable-model-invocation` | No          | `true` prevents Claude from automatically loading this skill. For manual-only workflows. Default: `false`. |
 | `user-invocable`           | No          | `false` hides from `/` menu. For background knowledge Claude loads automatically. Default: `true`. |
-| `allowed-tools`            | No          | Tools Claude can use without permission when skill is active. |
+| `allowed-tools`            | No          | Space- or comma-separated string, or YAML list. |
+| `disallowed-tools`         | No          | Tools unavailable while the skill is active. |
 | `model`                    | No          | Model to use when this skill is active. |
-| `context`                  | No          | `fork` runs in a forked subagent context. |
+| `effort`                   | No          | Effort override while active. |
+| `context`                  | No          | `fork` runs in a fresh skill subagent, not a conversation fork. |
 | `agent`                    | No          | Subagent type when `context: fork`. Options: `Explore`, `Plan`, `general-purpose`, or custom agent from `.claude/agents/`. Default: `general-purpose`. |
+| `background`               | No          | Forks default to background; `false` waits in the foreground. |
 | `hooks`                    | No          | Hooks scoped to this skill's lifecycle. See Hooks docs for format. |
+| `paths`                    | No          | Path patterns associated with the skill. |
+| `shell`                    | No          | Shell configuration. |
+| `metadata`                 | No          | String-keyed metadata. |
+| `license`                  | No          | License name or bundled reference. |
+| `compatibility`            | No          | Environment requirements. |
 
 ### allowed-tools Behavior
 
@@ -91,9 +101,9 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 ## Naming Conventions
 
-Use consistent naming patterns to make skills easier to reference and discuss. The `name` field must use lowercase letters, numbers, and hyphens only.
+Use consistent naming patterns to make skills easier to reference and discuss. Portable Agent Skills packages restrict `name` to lowercase letters, numbers, and hyphens; Claude Code runtime skills do not impose that portable grammar.
 
-**Preferred: gerund form** (verb + -ing) — clearly describes the activity the skill provides:
+**Repository house style:** gerund or noun forms can make activity names easy to scan:
 
 - `processing-pdfs`
 - `analyzing-spreadsheets`
@@ -123,7 +133,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 The `description` field is injected into the system prompt and is the **primary trigger mechanism** — Claude uses it to choose the right skill from potentially 100+ available skills.
 
-**Always write in third person.** The description is injected into the system prompt, and inconsistent point-of-view causes discovery problems.
+Prefer imperative phrasing such as `Use this skill when...`. The portable specification says descriptions should cover what the skill does, when to use it, and useful keywords; it does not require grammatical person.
 
 Good:
 
@@ -270,16 +280,16 @@ This is preprocessing, not something Claude executes. Claude only sees the final
 
 ## Context Fork (Subagent Execution)
 
-`context: fork` runs the skill in isolation. The skill content becomes the subagent's prompt — no access to conversation history.
+`context: fork` runs the skill in a fresh subagent. The skill content becomes the prompt and the subagent has no conversation history. This is distinct from a conversation fork, which inherits history and cannot fork again.
 
 **Warning**: Only makes sense for skills with explicit instructions and a clear task. Guidelines without a task produce no meaningful output.
 
 | Approach                     | System prompt                             | Task                        | Also loads       |
 |:-----------------------------|:------------------------------------------|:----------------------------|:-----------------|
-| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | CLAUDE.md        |
+| Skill with `context: fork`   | From agent type (`Explore`, `Plan`, etc.) | SKILL.md content            | CLAUDE.md except Explore and Plan |
 | Subagent with `skills` field | Subagent's markdown body                  | Claude's delegation message | Preloaded skills + CLAUDE.md |
 
-The `agent` field determines the execution environment. Options: `Explore` (Haiku, read-only), `Plan` (inherits model, read-only), `general-purpose` (inherits model, full tools), or any custom subagent from `.claude/agents/`.
+The `agent` field determines the execution environment. Explore now inherits the parent model. Skill subagents default to background execution; set `background: false` to wait in the foreground. Explore and Plan skip `CLAUDE.md` and git status.
 
 ---
 

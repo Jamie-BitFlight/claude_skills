@@ -36,7 +36,7 @@ Before any phase writes a path, command, fact, or cross-plugin reference into ru
 Required — load at session start:
 
 1. `Skill(skill="plugin-creator:claude-plugins-reference-2026")` — plugin.json schema, component types, environment variables, installation scopes, path rules
-2. `Skill(skill="plugin-creator:claude-skills-overview-2026")` — SKILL.md format, all 14 frontmatter fields, YAML multiline bug, allowed-tools string format, context fork behavior
+2. `/plugin-creator:claude-skills-overview-2026` — current Claude Code runtime fields, accepted tool-list forms, and context-fork behavior
 
 Required for phases involving hooks (Phase 4: Create, Phase 5: Debug):
 

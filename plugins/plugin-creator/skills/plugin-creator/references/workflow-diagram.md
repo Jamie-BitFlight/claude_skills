@@ -249,7 +249,7 @@ flowchart TD
 
     Q2 -->|"Domain research, code pattern discovery,<br>architecture analysis, quality assessment"| Assessor["subagent_type='plugin-creator:plugin-assessor'"]
 
-    Q2 -->|"Verbatim file retrieval — exact contents,<br>directory listings, keyword search<br>with NO interpretation required"| Explore["Explore agent (Haiku-based) —<br>retrieval ONLY;<br>never reasoning tasks"]
+    Q2 -->|"Read-only codebase discovery"| Explore["Explore agent — inherited model<br>read-only tools"]
 
     Q2 -->|"Fetch and analyze official documentation<br>from external URLs"| GP["subagent_type='general-purpose'"]
 
@@ -318,10 +318,10 @@ Routing by concern:
 | Agent name | Model | Use for |
 |---|---|---|
 | `general-purpose` | inherits | Reasoning, analysis, implementation, debugging |
-| `Explore` | haiku | Verbatim retrieval only — no reasoning tasks |
+| `Explore` | inherits | Read-only codebase discovery |
 | `Plan` | inherits | Architecture planning, content structure decisions |
 
-SOURCE: CLAUDE.md global instructions (accessed 2026-01-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents> (accessed 2026-09-24)
 
 ### Plugin-Specific Agents
 

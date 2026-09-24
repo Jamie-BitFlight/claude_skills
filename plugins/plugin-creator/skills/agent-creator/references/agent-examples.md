@@ -427,7 +427,7 @@ Paths:
 
 ## Example 9: Formatter Plugin (With Hooks)
 
-**IMPORTANT**: Hooks are NOT configured in agent frontmatter. Hooks are configured at the plugin or project level in `hooks/hooks.json` or `.claude-plugin/plugin.json`.
+Agent frontmatter may define lifecycle hooks for project and user agents. Plugin-shipped agents ignore agent frontmatter hooks, so ship required plugin behavior through plugin hooks instead.
 
 This example shows how a **plugin** (not an agent) can use hooks for automated formatting and validation.
 

@@ -11,9 +11,9 @@ Two production plugin bundle systems exist as of 2026-02-26. They share near-ide
 - Manifest location: `.claude-plugin/plugin.json`
 - Required field: `name` (kebab-case only)
 - Component fields: `skills`, `agents`, `commands`, `hooks`, `mcpServers`, `lspServers`, `outputStyles`
-- `agents` must be an array of individual file paths — not a directory string
+- `agents` accepts one agent file path as a string or multiple file paths as an array; declaring it replaces the default `agents/` scan
 - All paths relative, starting with `./`
-- Official docs: <https://code.claude.com/docs/en/plugins-reference.md>
+- Official docs: <https://code.claude.com/docs/en/plugins-reference#component-path-fields> (accessed 2026-09-24)
 
 ### Cursor (launched 2026-02-17)
 
@@ -29,16 +29,16 @@ Two production plugin bundle systems exist as of 2026-02-26. They share near-ide
 
 The `SKILL.md` format is a cross-vendor open standard. Confirmed adopters as of 2026-02-26: Claude Code, Cursor, VS Code Copilot (v1.109, January 2026), Gemini CLI, OpenAI Codex, LM-Kit.NET.
 
-Portable frontmatter fields (all vendors): `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`
+Portable specification fields: `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools`. Client support is implementation-dependent.
 
-Claude Code-only extensions (other vendors ignore these fields): `argument-hint`, `model`, `context`, `agent`, `user-invocable`, `disable-model-invocation`, `hooks`
+Claude Code runtime extensions include `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `disallowed-tools`, `model`, `effort`, `context`, `agent`, `background`, `hooks`, `paths`, and `shell`. Do not assume another runtime ignores unknown keys; verify its schema.
 
 **Critical portability gap — `allowed-tools` delimiter:**
 
 - agentskills.io spec: space-delimited — `allowed-tools: Read Grep Glob`
 - Claude Code: comma-delimited — `allowed-tools: Read, Grep, Glob`
 
-A skill using space-delimited `allowed-tools` is cross-vendor portable. A skill using comma-delimited is Claude Code-specific. When writing a skill intended for multiple platforms, use the space-delimited form.
+Use space-delimited `allowed-tools` for maximum cross-vendor interoperability. The portable reference validator accepts any string form without canonicalizing whitespace; individual clients decide how to interpret that string.
 
 Spec URL: <https://agentskills.io/specification>
 
@@ -106,7 +106,7 @@ MCP servers declared via either mechanism use idle-timeout pooling:
 
 ### Portability note
 
-The `mcp:` frontmatter key is an OpenCode extension. Claude Code and Cursor do not define this field — they ignore it. AmpCode compatibility with inline `mcp:` frontmatter is unverified. When writing skills targeting multiple platforms, the `mcp:` block is silently inert outside OpenCode.
+The `mcp:` frontmatter key is an OpenCode extension. Preserve it for OpenCode consumers, but exclude it from portable uploads, the Skills API, and Anthropic packages because those boundaries hard-fail unknown fields. Behavior in other runtimes is unverified.
 
 The `skilllint` FM009 guard treats `mcp:` as an ecosystem-owned key and skips rewriting its sub-keys (e.g., `command: npx -y server`) to avoid corrupting OpenCode skill definitions.
 
@@ -143,7 +143,7 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 ```mermaid
 flowchart TD
     Start([Writing a plugin file]) --> Q1{What platform?}
-    Q1 -->|Claude Code only| CC[Use .claude-plugin/plugin.json<br>agents field = array of file paths<br>name required kebab-case<br>comma-delimited allowed-tools]
+    Q1 -->|Claude Code only| CC[Use .claude-plugin/plugin.json<br>agents field = string or array of file paths<br>allowed-tools accepts documented strings or YAML lists]
     Q1 -->|Cursor only| CU[Use .cursor-plugin/plugin.json<br>Same schema as Claude Code<br>Rules use .mdc files]
     Q1 -->|Both or portable| Both[Use agentskills.io portable fields only<br>space-delimited allowed-tools<br>Avoid Claude Code-only frontmatter]
     CC --> Val[Validate: claude plugin validate path]
@@ -154,6 +154,8 @@ flowchart TD
 ## Self-Update Protocol
 
 When making changes that affect ecosystem facts — new vendor adopters, schema changes, new fields, updated spec URLs — update this file and cite the source URL and access date inline.
+
+SOURCE: <https://agentskills.io/specification.md> and <https://code.claude.com/docs/en/skills#using-skill-frontmatter-outside-claude-code> (accessed 2026-09-24)
 
 Reference URLs to monitor for changes:
 

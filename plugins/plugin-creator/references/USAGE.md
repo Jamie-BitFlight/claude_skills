@@ -149,9 +149,7 @@ Validating: plugins/my-plugin/skills/my-skill/SKILL.md
 
 🔧 Auto-fixing issues...
 
-Fixed (4 changes):
-  - FM007: Converted tools YAML array to comma-separated string
-  - FM008: Converted skills YAML array to comma-separated string
+Fixed (2 changes):
   - FM009: Quoted description containing colons
   - FM004: Removed multiline indicator from description
 
@@ -209,8 +207,8 @@ Running validators:
 
   4. ComplexityValidator
      - Measuring token count... ✅ (2847 tokens)
-     - Checking warning threshold... ✅ (<4000)
-     - Checking error threshold... ✅ (<6400)
+     - Checking warning threshold... ✅ (<4400)
+     - Checking error threshold... ✅ (<8800)
 
   5. InternalLinkValidator
      - Extracting markdown links... (3 links found)
@@ -613,7 +611,7 @@ echo "✅ Pre-release validation passed"
 python3 -c "from ruamel.yaml import YAML; y = YAML(typ='safe'); y.load(open('SKILL.md').read().split('---')[1])"
 ```
 
-### Issue: "Token count exceeds 6400" but file looks reasonable
+### Issue: "Token count exceeds 8800" but file looks reasonable
 
 **Symptom**: SK007 error but file doesn't seem oversized
 
@@ -638,7 +636,7 @@ uvx skilllint@latest check \
 **Symptom**: `--fix` modifies content in unintended ways
 
 **Cause**: Auto-fix applies specific transformations:
-- Converts YAML arrays to CSV strings
+- Preserves valid Claude Code YAML lists
 - Quotes descriptions with colons
 - Removes multiline indicators
 
@@ -663,7 +661,7 @@ uvx skilllint@latest check \
 
 **Cause**: Different validation scopes:
 - `skilllint` validates component files
-- `claude plugin validate` validates plugin.json structure
+- `claude plugin validate` parses default plugin component directories and direct component paths; manifest-declared component paths receive existence-only checks
 
 **Fix**:
 1. Run both validators:

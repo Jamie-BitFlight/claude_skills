@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Skill Packager - Creates a distributable .skill file of a skill folder.
+"""Create a ZIP using the local/client .skill extension convention.
+
+The archive contents pass the portable Agent Skills frontmatter boundary, but
+the .skill extension itself is not part of the portable specification.
 
 Usage:
     python utils/package_skill.py <path/to/skill-folder> [output-directory]
@@ -71,8 +74,8 @@ def package_skill(skill_path: str | Path, output_dir: str | Path | None = None) 
         OSError: If file system operations fail during zip creation
 
     Note:
-        Runs quick_validate.validate_skill() before packaging. Package will not be created
-        if validation fails.
+        Runs strict portable Agent Skills validation before packaging. Claude Code runtime
+        extension fields are rejected because upload/API package boundaries hard-fail them.
     """
     skill_path = Path(skill_path).resolve()
 

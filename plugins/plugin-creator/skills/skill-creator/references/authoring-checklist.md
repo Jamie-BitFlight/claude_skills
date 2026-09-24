@@ -25,8 +25,8 @@ SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2
 
 ## Structure
 
-- [ ] Frontmatter `name` field: max 64 characters, lowercase letters/numbers/hyphens only, no XML tags, no reserved words
-- [ ] Frontmatter `description` field: max 1024 characters, non-empty, no XML tags
+- [ ] Portable upload/package frontmatter has a required `name` (max 64 characters; lowercase letters, numbers, and hyphens only) and `description` (non-empty; max 1024 characters)
+- [ ] Claude Code-only frontmatter is checked against the runtime field rules rather than portable package constraints
 - [ ] Frontmatter validated with `uvx skilllint@latest check --fix <file>` — auto-fixes YAML formatting issues
 - [ ] Reference files sit one level deep under `references/` — not in subdirectories
 - [ ] Long reference files (100+ lines) have a Table of Contents at the top

@@ -68,7 +68,7 @@ least one non-MCP tool unless that runtime dependency is intended.
 # Validate single agent file
 uvx skilllint@latest check path/to/agent.md
 
-# Auto-fix common issues (YAML arrays → comma-separated strings, etc.)
+# Validate current CSV or YAML-list tool forms without rewriting valid lists
 uvx skilllint@latest check --fix path/to/agent.md
 
 # Validate full plugin (when agent is inside a plugin)

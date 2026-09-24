@@ -10,7 +10,7 @@ Provides: plugin definition, directory structure, plugin.json schema (all field 
 
 2. `Skill(skill="plugin-creator:claude-skills-overview-2026")`
 
-Provides: SKILL.md format, all 14 frontmatter fields (name, description, allowed-tools, model, context, agent, user-invocable, disable-model-invocation, hooks, argument-hint), YAML multiline bug (do not use `>-` or `|` in descriptions), skill tokenomics and progressive disclosure, string substitutions (`$ARGUMENTS`, `${CLAUDE_SESSION_ID}`), dynamic context injection (`!` backtick syntax), invocation control, tool assignment via allowed-tools (comma-separated string, not array), context fork behavior and tool restrictions.
+Provides: SKILL.md format, the canonical Claude Code runtime field inventory, accepted `allowed-tools` strings and YAML lists, progressive disclosure, substitutions, dynamic context injection, invocation control, and foreground/background fork behavior.
 
 ## Required for Phases Involving Hooks (Phase 4: Create, Phase 5: Debug)
 
@@ -22,9 +22,9 @@ Provides: hook event types (13 events), hook types (command, prompt, agent), hoo
 
 4. `Skill(skill="plugin-creator:claude-subagent-reference")`
 
-Provides: all agent frontmatter fields (name, description, tools, disallowedTools, model, permissionMode, maxTurns, skills, mcpServers, hooks, memory, background, effort, isolation, color, initialPrompt) with full descriptions and examples; built-in agents (Explore, Plan, general-purpose); scope and file locations (project, user, plugin, managed, CLI-defined); tool allowlist/denylist and Agent() spawn restriction syntax; all permission modes and protected paths; hooks in frontmatter vs settings.json; memory scopes and what loads at startup; worktree isolation; fork mode (experimental); agent teams vs subagents comparison.
+Provides: the current subagent fields, including `omitClaudeMd`, `experimental`, `effort`, and `initialPrompt`; plugin-supported versus ignored/unsupported fields; CSV/YAML tool forms; depth-limited nested spawning; startup context; model precedence; worktree isolation; default fork mode and `/subtask`; agent teams comparison.
 
-SOURCE: <https://code.claude.com/docs/en/sub-agents.md> (accessed 2026-05-28)
+SOURCE: <https://code.claude.com/docs/en/sub-agents> and <https://code.claude.com/docs/en/plugins-reference#agents> (accessed 2026-09-24)
 
 ## Why These Matter
 

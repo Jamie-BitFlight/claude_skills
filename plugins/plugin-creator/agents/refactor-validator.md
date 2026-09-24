@@ -59,9 +59,9 @@ You are a refactoring validation specialist responsible for verifying that refac
 ### Skill Quality
 
 - [ ] `skilllint` reports no token threshold violations (`TOKEN_WARNING_THRESHOLD` / `TOKEN_ERROR_THRESHOLD`)
-- [ ] Skill frontmatter: `name` field is PRESENT and matches the directory name (required per agentskills.io spec)
+- [ ] Portable package frontmatter: `name` is present and matches the directory; Claude Code runtime validation is evaluated separately
 - [ ] Skill frontmatter: `description` field is present and contains trigger keywords
-- [ ] Skill frontmatter: tool restrictions use `allowed-tools` field (comma-separated string), NOT `tools`
+- [ ] Skill frontmatter: Claude Code `allowed-tools` uses a space/CSV string or YAML list; portable `allowed-tools` is a string and is not rejected for non-canonical whitespace
 - [ ] No YAML multiline indicators (`>-`, `|-`) in any frontmatter `description` field
 - [ ] Description is single-line string (quoted only if YAML syntax requires — colons, leading special chars, boolean literals); not multiline
 - [ ] Progressive disclosure used for complex skills (references/, examples/, scripts/)
@@ -70,10 +70,10 @@ You are a refactoring validation specialist responsible for verifying that refac
 ### Agent Quality
 
 - [ ] Valid YAML frontmatter
-- [ ] `name` field present (required for agents — lowercase, hyphens, max 64 chars)
-- [ ] `description` field present and contains trigger keywords (max 1024 chars). Validated with `uvx skilllint@latest check --fix <file>`
+- [ ] `name` field present (Claude Code forbids leading `-` and `:`; tighter naming is repository policy)
+- [ ] `description` field present and contains clear routing guidance
 - [ ] `model` specified (sonnet/opus/haiku/inherit)
-- [ ] `tools` field is comma-separated string (not YAML array) if specified
+- [ ] `tools` field is CSV or a YAML list if specified
 - [ ] System prompt is comprehensive
 - [ ] Triggers are clear and specific
 

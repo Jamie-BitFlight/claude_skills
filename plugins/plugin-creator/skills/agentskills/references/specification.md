@@ -72,10 +72,10 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 
 | Field           | Required | Constraints                                                      |
 | --------------- | -------- | ---------------------------------------------------------------- |
-| `name`          | Yes      | Max 64 chars. Lowercase letters, numbers, hyphens only. No leading/trailing/consecutive hyphens. Must match directory name. |
-| `description`   | Yes      | Max 1024 chars. Non-empty. Describes what + when to use.         |
+| `name`          | Yes      | Max 64 chars. Unicode lowercase alphanumeric characters and hyphens only. No leading/trailing/consecutive hyphens. Must match directory name. |
+| `description`   | Yes      | MUST be non-empty and at most 1024 chars. SHOULD describe what + when to use. |
 | `license`       | No       | License name or reference to bundled file.                       |
-| `compatibility` | No       | Max 500 chars. Environment requirements.                         |
+| `compatibility` | No       | If provided, MUST be non-empty and at most 500 chars. Environment requirements. |
 | `metadata`      | No       | Arbitrary string key-value mapping.                              |
 | `allowed-tools` | No       | Space-delimited pre-approved tools. Experimental.                |
 
@@ -86,7 +86,7 @@ allowed-tools: Bash(git:*) Bash(jq:*) Read
 The required `name` field:
 
 - Must be 1-64 characters
-- May only contain unicode lowercase alphanumeric characters and hyphens (`a-z`, `0-9`, `-`)
+- May only contain Unicode lowercase alphanumeric characters and hyphens
 - Must not start or end with `-`
 - Must not contain consecutive hyphens (`--`)
 - Must match the parent directory name
@@ -118,7 +118,7 @@ The required `description` field:
 - Must be 1-1024 characters
 - Should describe both what the skill does and when to use it
 - Should include specific keywords that help agents identify relevant tasks
-- Write in **third person** (not "I can help" or "You can use this")
+- Prefer imperative `Use this skill when...` phrasing; the specification recommends what/when and useful keywords but does not require grammatical person
 
 **Good:**
 
@@ -132,7 +132,9 @@ description: Extracts text and tables from PDF files, fills PDF forms, and merge
 description: Helps with PDFs.
 ```
 
-**Naming convention recommendation:** Use gerund form (`processing-pdfs`, `analyzing-spreadsheets`) or noun phrases (`pdf-processing`, `spreadsheet-analysis`). Prefer descriptive names over vague ones (`helper`, `utils`, `tools`).
+**Authoring advice:** Prefer descriptive names such as `pdf-processing` over vague names (`helper`, `utils`, `tools`). The specification does not require gerund naming.
+
+SOURCE: <https://agentskills.io/specification.md> and <https://agentskills.io/skill-creation/optimizing-descriptions.md> (accessed 2026-09-24)
 
 ---
 
@@ -191,6 +193,7 @@ The optional `allowed-tools` field:
 
 - A space-delimited list of tools that are pre-approved to run
 - Experimental — support varies between agent implementations
+- The reference validator checks that this field is a string and does not impose whitespace canonicalization
 
 ```yaml
 allowed-tools: Bash(git:*) Bash(jq:*) Read

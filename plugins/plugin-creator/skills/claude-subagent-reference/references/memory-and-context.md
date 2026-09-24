@@ -21,7 +21,7 @@ Each subagent starts with a fresh, isolated context window — no conversation h
 | Preloaded skills | Only if listed in `skills` field | Full content injected. Built-in agents don't preload skills |
 | Main conversation history | No | Subagents start fresh. Exception: forks inherit full history — see [./fork-mode.md](./fork-mode.md) |
 
-**Explore and Plan are the only built-in subagents that omit CLAUDE.md and git status.** No frontmatter field changes this behavior for custom subagents.
+Explore and Plan omit `CLAUDE.md` and git status. Custom subagents can set `omitClaudeMd: true` to omit user, project, and local `CLAUDE.md` files.
 
 If a rule must reach a subagent (e.g., "ignore the `vendor/` directory"), restate it in the delegation prompt — the main conversation reads Explore and Plan results with full CLAUDE.md context, so most rules don't need to reach the subagent itself.
 
@@ -114,12 +114,14 @@ Continue that code review and now analyze the authorization logic
 [Claude resumes the subagent with full context from previous conversation]
 ```
 
-Claude uses the `SendMessage` tool with the agent's ID to resume. `SendMessage` is only available when agent teams are enabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+Claude Code can resume or follow up with a subagent through the Agent workflow. `SendMessage` is also documented for follow-up and does not require agent teams.
 
 Subagent transcripts are stored at:
 `~/.claude/projects/{project}/{sessionId}/subagents/agent-{agentId}.jsonl`
 
 If a stopped subagent receives a `SendMessage`, it auto-resumes in the background without requiring a new `Agent` invocation.
+
+SOURCE: <https://code.claude.com/docs/en/sub-agents#choose-a-model> (accessed 2026-09-24)
 
 ---
 

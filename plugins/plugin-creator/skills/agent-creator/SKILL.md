@@ -177,11 +177,12 @@ CREATE the agent file following this structure:
 
 ```markdown
 ---
+name: {agent-name}
 description: '{What it does - action verbs and capabilities}. {When to use it - trigger scenarios, file types, tasks}. {Additional context - specializations, keywords}.'
 model: {sonnet|opus|haiku|inherit}
-tools: {tool-list if restricting; use Agent(type) to restrict subagent spawning}
+tools: {CSV or YAML list if restricting; use bare Agent to enable nested spawning}
 disallowedTools: {denylist if needed}
-permissionMode: {default|acceptEdits|dontAsk|bypassPermissions|plan}
+permissionMode: {default|acceptEdits|auto|dontAsk|bypassPermissions|plan|manual}
 skills: {comma-separated skill names if needed}
 mcpServers:
   {server-name references or inline definitions}
@@ -229,9 +230,9 @@ color: {optional terminal color}
 
 BEFORE saving the agent file, verify:
 
-- [ ] Name is lowercase, hyphens only, max 64 chars
+- [ ] Name does not start with `-` or contain `:`; apply tighter repository naming style only when required locally
 - [ ] Description includes action verbs and trigger keywords
-- [ ] Description is under 1024 chars
+- [ ] Description is concise enough to route the agent accurately; apply a length cap only when required by repository-local policy
 - [ ] Tool restrictions match agent's actual needs
 - [ ] Skills listed actually exist in the project
 - [ ] Model choice matches complexity requirements
@@ -289,16 +290,12 @@ C) **Plugin** - Part of a plugin (saved to plugin directory; auto-discovered fro
 1. ASK: "Which plugin should contain this agent?"
 2. VERIFY plugin exists at specified path
 3. SAVE agent to `{plugin-path}/agents/{agent-name}.md`
-4. **DO NOT TOUCH `plugin.json`.** Claude Code auto-discovers every `.md` file in the plugin's `agents/` directory. Writing the `agents` array — even to add one entry — OVERRIDES auto-discovery: the declared list becomes the *complete* list and every unlisted agent becomes invisible.
+4. INSPECT `plugin.json` before saving the agent. If `agents` is absent, leave it absent: Claude Code auto-discovers every `.md` file in the plugin's `agents/` directory. If `agents` already exists, preserve its explicit allowlist and add the new path, converting a string to an array when needed.
 
-   > **AUTO-DISCOVERY RULE — DO NOT REGISTER**
-   > Agents in the default `agents/` directory are auto-discovered. The `agents` array in `plugin.json` exists ONLY for agents stored in non-default paths. Never introduce the `agents` key for agents in the default location. Declaring the key overrides auto-discovery entirely: the declared list becomes the complete set and every unlisted agent becomes invisible.
-   >
-   > If the plugin already has an `agents` array (Mode B — manual allowlist for non-default paths), READ it first, carry forward every existing entry, and append the new one. Never write a single-entry array.
-5. VALIDATE plugin.json still has no `agents` key (unless the plugin uses non-default paths):
-   ```bash
-   ! grep -q '"agents"' {plugin-path}/.claude-plugin/plugin.json
-   ```
+   > **AUTO-DISCOVERY RULE — DO NOT REGISTER DEFAULT-PATH AGENTS**
+   > A pre-existing `agents` field replaces default discovery. One path may be a string; multiple paths use an array. Preserve every existing entry and include every default-path file that must remain loaded.
+5. RUN the auto-discovery guard to verify an existing explicit allowlist includes every default-path agent:
+   `uv run plugins/plugin-creator/scripts/check_agent_auto_discovery.py {plugin-path}/.claude-plugin/plugin.json`
 6. RUN plugin validation: `claude plugin validate {plugin-path}`
 7. RUN agent frontmatter validation: `uvx skilllint@latest check {plugin-path}/agents/{agent-name}.md`
 
@@ -383,11 +380,13 @@ memory: user
 # Read, Write, Edit auto-enabled for memory management
 ```
 
-### With Subagent Spawn Restrictions (main-thread agents only)
+### With Nested Subagents
 
 ```yaml
-tools: Agent(worker, researcher), Read, Bash
+tools: Agent, Read, Bash
 ```
+
+Bare `Agent` enables depth-limited nesting in a subagent definition. `Agent(worker, researcher)` allowlists types only when this definition runs as the main thread via `claude --agent`; nested type lists are ignored.
 
 </tool_patterns>
 
@@ -811,11 +810,11 @@ After creating an agent, test it before production use.
   - Project: `.claude/agents/{name}.md`
   - User: `~/.claude/agents/{name}.md`
   - Plugin: `{plugin-path}/agents/{name}.md`
-- [ ] If plugin agent: plugin.json updated with agent path
+- [ ] If plugin agent: `plugin.json` stayed unchanged when `agents` was absent, or its existing explicit allowlist was preserved and extended
 - [ ] If plugin agent: `claude plugin validate` passed
 - [ ] YAML frontmatter parses correctly (no syntax errors)
 - [ ] Frontmatter validation passed (via skilllint)
-- [ ] Name follows constraints (lowercase, hyphens, max 64 chars)
+- [ ] Name does not start with `-` or contain `:`; apply tighter repository naming style only when required locally
 - [ ] Description includes trigger keywords
 - [ ] All referenced skills exist
 
@@ -988,7 +987,7 @@ WHEN finished:
 2. VERIFY it passes validation checklist (Phase 6)
 3. ASK user where to save (project/user/plugin) using AskUserQuestion
 4. SAVE to appropriate location based on scope (Phase 7)
-5. CONFIRM plugin.json was NOT modified (default-path agents are auto-discovered; writing the `agents` key would mask every other agent in the plugin)
+5. CONFIRM `plugin.json` stayed unchanged when `agents` was absent; if the field already existed, confirm its explicit allowlist retains every prior entry and includes the new agent
 6. RUN validation on agent file and plugin (if applicable) (Phase 8)
 7. REPORT file location and validation results
 8. REMIND user to test the agent with example prompts

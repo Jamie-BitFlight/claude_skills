@@ -162,7 +162,7 @@ claude plugin validate {plugin-directory}
 
 | Issue                         | Cause                                                | Fix                                                                         |
 | ----------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
-| `agents: Invalid input`       | Used `"./agents/"` directory string instead of array | Change to array of file paths: `["./agents/file1.md", "./agents/file2.md"]` |
+| Default agents disappear     | Declared replacement `agents` paths without default files | Include retained default agent files or remove `agents` |
 | `name: Required`              | Missing required name field                          | Add `"name": "plugin-name"` in kebab-case                                   |
 | Invalid path format           | Absolute paths or missing `./` prefix                | All paths must be relative and start with `./`                              |
 | Referenced file doesn't exist | Path in plugin.json points to moved/deleted file     | Update paths to match new file locations after refactoring                  |

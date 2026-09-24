@@ -12,7 +12,7 @@ Activate when any condition matches:
 - User asks to validate frontmatter, plugin structure, or skill complexity
 - User asks to refactor a plugin or split an oversized skill
 - User asks to check skill size or complexity
-- User needs to fix tool formatting issues in frontmatter
+- User needs to validate tool fields in frontmatter
 - Editing files in `plugins/`, `.claude/`, `AGENTS.md`, or `CLAUDE.md` within this plugin
 
 ---
@@ -27,7 +27,7 @@ flowchart TD
     Q1 -->|Create agent or skill| Q2{What?}
     Q1 -->|Validate| Q3{Scope?}
     Q1 -->|Refactor| Q4{What?}
-    Q1 -->|Fix errors| Fix[Read plugin.json<br>Check common errors table<br>Run fix_tool_formats.py]
+    Q1 -->|Fix errors| Fix[Read plugin.json<br>Check common errors table<br>Run skilllint]
 
     Q2 -->|Agent| CreateAgent["/agent-creator skill"]
     Q2 -->|Skill| CreateSkill["/skill-creator skill"]
@@ -68,11 +68,11 @@ flowchart TD
 | `/agent-creator` | Yes | Create agents from scratch or templates; handles scope (project/user/plugin) |
 | `/skill-creator` | Yes | Create skills from scratch or templates; handles scope and validation |
 | `/skill-goal-extractor` | Yes | Extract a skill's small set of explicit goals by reading it in full — for characterizing a skill's purpose before refactoring or reviewing it |
-| `/write-frontmatter-description` | Yes | Write or tighten a skill or agent `description` — the context pointer that decides whether the component loads; branch counting, third person, single-line YAML, model-invoked vs user-invoked |
+| `/write-frontmatter-description` | Yes | Write or tighten a skill or agent `description` — branch-aware activation guidance and destination-specific constraints |
 | `/skill-sync` | Yes | Sync skill content against upstream documentation — update STALE SOURCE: URLs, add NEW upstream claims, enforce progressive-disclosure structure via /refactor-skill |
 | `/output-style-creator` | Yes | Create, validate, and ship Claude Code output styles — mechanism selection, frontmatter, scope placement, plugin packaging, activation and testing |
-| `/claude-skills-overview-2026` | Yes | Complete reference for Claude Code skills system (January 2026) |
-| `/claude-plugins-reference-2026` | Yes | Complete reference for Claude Code plugins system (January 2026) |
+| `/claude-skills-overview-2026` | Yes | Claude Code runtime skills reference |
+| `/claude-plugins-reference-2026` | Yes | Claude Code plugin and marketplace reference |
 | `/hooks-guide` | Yes | Cross-platform hooks reference — Claude Code, GitHub Copilot, Cursor, Windsurf, Amp |
 | `/add-doc-updater` | Yes | Add doc sync pipeline to skills wrapping external documentation |
 | `/assessor` | Yes | Analyze plugin structure and create refactoring task files |
@@ -102,13 +102,12 @@ flowchart TD
 | `ai-doc-optimizer` | sonnet | (inherits) | Content optimization and frontmatter description writing for prompts, SKILL.md, and CLAUDE.md files |
 | `plugin-assessor` | sonnet | (inherits) | Analyze plugins for structure, frontmatter, and quality |
 
-### Scripts (6)
+### Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `create_plugin.py` | Interactive plugin scaffolding — creates `.claude-plugin/`, `plugin.json` |
 | `plugin_validator.py` | Removed — replaced by `uvx skilllint@latest check` |
-| `fix_tool_formats.py` | Fix invalid tool format patterns in frontmatter across codebase |
 | `validate-task-file.sh` | Validate refactoring task file format |
 
 Manifest sync and plugin version bumps come from [agent-marketplace-versioner](https://github.com/Jamie-BitFlight/agent-marketplace-versioner), a separate pre-commit hook and GitHub Action, not a script in this plugin.
@@ -138,7 +137,7 @@ Interactive scaffolding — prompts for name, description, author; creates `.cla
 2. Requirements gathering — uses AskUserQuestion for: purpose, triggers, tools, model, skills
 3. Template selection — existing project agents, role archetypes, or from scratch
 4. Agent file creation — frontmatter with validated fields, body with workflow
-5. Scope determination (AskUserQuestion): project → `.claude/agents/{name}.md` | user → `~/.claude/agents/{name}.md` | plugin → `{plugin}/agents/{name}.md` + updates plugin.json
+5. Scope determination (AskUserQuestion): project → `.claude/agents/{name}.md` | user → `~/.claude/agents/{name}.md` | plugin → `{plugin}/agents/{name}.md`; leave an absent manifest `agents` field absent, or preserve and extend an existing explicit allowlist
 6. Validation — runs `uvx skilllint@latest check` on agent file; if plugin agent: also runs `claude plugin validate {plugin-path}`
 
 ---
@@ -178,17 +177,17 @@ uvx skilllint@latest check --check {path}
 
 **What it validates:**
 
-- Frontmatter schema — YAML syntax, no forbidden multiline indicators (`>-`, `|-`), required fields, field types, tools/skills as comma-separated strings
+- Frontmatter schema — destination-specific fields and accepted tool-list forms
 - Plugin structure — plugin.json schema compliance, component path references, version consistency
 - Skill complexity — token-based measurement; thresholds defined as `TOKEN_WARNING_THRESHOLD` (SK006) and `TOKEN_ERROR_THRESHOLD` (SK007) in `skilllint` — not as line counts
 - Internal links — markdown link validity, progressive disclosure structure
 
 **What it auto-fixes:**
 
-- YAML arrays → comma-separated strings
+- Preserve valid Claude Code YAML lists; portable package checks use the portable schema
 - Multiline descriptions → single-line strings
 - Unquoted colons in descriptions — adds quotes to prevent YAML parsing failures
-- Missing `name:` fields in plugin skills (skilllint auto-adds name: from directory name; required per agentskills.io spec)
+- Missing `name:` fields when applying this repository's portable Agent Skills profile (skilllint derives the value from the directory name)
 
 **Error Codes:** Each finding printed by `skilllint` carries its own code, severity, and suggested fix — read them from the command output.
 
@@ -200,7 +199,9 @@ uvx skilllint@latest check --check {path}
 claude plugin validate {plugin-directory}
 ```
 
-Validates: plugin.json exists in `.claude-plugin/`; JSON syntax valid; required field `name` present; `name` is kebab-case; all paths start with `./`; `agents` field is array of individual file paths (not directory string); referenced files exist.
+Validates direct skill, agent, and command paths and project/user/plugin roots. For plugin roots it parses default component directories, accepts a root `SKILL.md`, and skips symlinks with warnings. Manifest-declared component paths are checked for existence only; their files are not read. Use the local link checker separately for markdown links.
+
+SOURCE: <https://code.claude.com/docs/en/plugins-reference> (accessed 2026-09-24)
 
 ---
 
@@ -275,30 +276,14 @@ Routing by concern (DOC_IMPROVE and ORPHAN_RESOLVE):
 
 ---
 
-### Fix Tool Formatting Issues
-
-**Script:** `fix_tool_formats.py`
-
-```bash
-uv run plugins/plugin-creator/scripts/fix_tool_formats.py
-```
-
-Scans `~/.claude/agents/**/*.md`, `~/.claude/commands/**/*.md`, `~/.claude/skills/**/SKILL.md`, `~/repos/**/.claude/**` and fixes:
-- YAML list → comma-separated string
-- JSON array → comma-separated string
-
-**Reason:** Invalid formats become "evidence" in future Grep searches, creating a feedback loop where the AI learns incorrect patterns from its own mistakes.
-
----
-
 ## Quality Standards
 
 ### Skill Size Limits
 
 Run `uvx skilllint@latest check <skill-path>` after writing and follow its guidance. Thresholds defined as `TOKEN_WARNING_THRESHOLD` (SK006) and `TOKEN_ERROR_THRESHOLD` (SK007) in `skilllint` — not line counts. SK006 triggers `references/` extraction; SK007 requires skill splitting.
 
-- Frontmatter requirements: [`.claude/rules/frontmatter-requirements.md`](./.claude/rules/frontmatter-requirements.md)
-- Plugin.json requirements: [`.claude/rules/plugin-json.md`](./.claude/rules/plugin-json.md)
+- Frontmatter requirements: [`rules/frontmatter-requirements.md`](../../rules/frontmatter-requirements.md)
+- Plugin.json requirements: [`rules/plugin-json.md`](../../rules/plugin-json.md)
 
 ---
 
@@ -306,7 +291,7 @@ Run `uvx skilllint@latest check <skill-path>` after writing and follow its guida
 
 ### Plugin Caching
 
-Claude Code copies plugins to a cache directory — not used in-place.
+Plugin paths cannot escape the plugin boundary. Marketplace sources are copied to cache unless their source mode loads in place; `--plugin-dir`, command link mode, and local-directory sources load in place, while `--plugin-url` fetches an archive for the session.
 
 - Plugins with `.claude-plugin/plugin.json`: the directory containing `.claude-plugin/` is copied recursively
 - Plugins CANNOT reference files outside their directory (`../shared-utils` will fail after installation)
@@ -315,7 +300,7 @@ Claude Code copies plugins to a cache directory — not used in-place.
 - Sharing instructional prose across this plugin's own skills or agents: activate the `/plugin-creator:shared-content-references` skill — plugin-root `docs/` or an index skill, not a symlink (symlinks degrade to plain files on a Windows checkout; see `AGENTS.md` §Gotchas item 3)
 - Restructure marketplace: set `source` to the parent directory containing all required files
 
-**SOURCE:** Lines 350-398 of claude-plugins-reference-2026/SKILL.md
+**SOURCE:** <https://code.claude.com/docs/en/plugins> and <https://code.claude.com/docs/en/plugin-marketplaces> (accessed 2026-09-24)
 
 ### Installation Scopes
 
@@ -360,7 +345,7 @@ Scripts expect to be run from repository root or use `${CLAUDE_PLUGIN_ROOT}`.
 The shared `agent-marketplace-versioner` pre-commit hook runs automatically on `git commit`:
 
 1. Detects CRUD operations on plugins and components from git staged changes
-2. Updates `plugin.json` component arrays (skills, agents, commands) with `./` paths
+2. Preserves component discovery semantics; default-path agents remain auto-discovered unless an explicit manifest allowlist already exists
 3. Bumps plugin versions — Major: component deleted; Minor: component added; Patch: component modified
 4. Reconciles local `marketplace.json` plugin membership without bumping its version
 5. Stages updated manifest files automatically
@@ -378,9 +363,9 @@ For the current hook, CI, repair delivery, and compatibility-tool boundary, see 
 
 ---
 
-## Skill Name Field (Current Behavior)
+## Portable Skill Name Profile
 
-Plugin skills **must include** the `name:` field in frontmatter. Value must match the directory name and satisfy `^[a-z][a-z0-9-]*$`.
+This repository includes `name:` in plugin skills so they also satisfy the portable Agent Skills package schema. Portable artifacts require the value to match the directory name and satisfy the Agent Skills name grammar. Claude Code runtime loading itself makes `name` optional and defaults it to the directory name.
 
 ```yaml
 ---
@@ -390,7 +375,7 @@ user-invocable: true
 ---
 ```
 
-`skilllint` auto-adds `name:` from the directory name when absent. Per [agentskills.io specification](https://agentskills.io/specification), `name:` is required for portability.
+`skilllint` auto-adds `name:` from the directory name when applying this repository's portability profile.
 
 **Note on commands:** Skills and slash commands are unified — a skill with `user-invocable: true` creates a slash command. No separate command-creator is needed.
 

@@ -1,6 +1,6 @@
 # Integrating Agent Skills into Your Agent
 
-> Source: <https://agentskills.io/integrate-skills.md>
+> SOURCE: <https://agentskills.io/client-implementation/adding-skills-support.md> (accessed 2026-09-24)
 
 **Use this guide when** building or modifying an AI agent or development tool to support the Agent Skills format — discovering skills, loading metadata, injecting into context, and handling script execution safely.
 
@@ -37,11 +37,11 @@ This guide explains how to add skills support to an AI agent or development tool
 
 A skills-compatible agent needs to:
 
-1. **Discover** skills in configured directories
-2. **Load metadata** (name and description) at startup
-3. **Match** user tasks to relevant skills
-4. **Activate** skills by loading full instructions
-5. **Execute** scripts and access resources as needed
+1. **Discover** skills in configured directories, including `.agents/skills/` for interoperability
+2. **Catalog** concise metadata for model discovery
+3. **Activate** a selected skill by loading full instructions
+4. **Load resources** on demand rather than eagerly
+5. **Retain or compact** activated content so it remains effective over time
 
 ---
 
@@ -59,7 +59,7 @@ Filesystem-based discovery assumes the agent has access to the local filesystem.
 - **User-level skills need external provision** — Skills stored at the user level (e.g., `~/.claude/skills/`) are not present in a fresh sandbox. Provision them by cloning a config repository into the sandbox before agent startup, providing skill URLs the agent can fetch, or offering a web UI where users upload skills before starting a session.
 - **Built-in skills as static deployment artifacts** — Skills that the product ships as part of its deployment image are always available in any sandbox. Package commonly needed skills as static assets in the deployment.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 
@@ -120,17 +120,13 @@ When using a dedicated tool (rather than filesystem commands) to activate a skil
 <skill_content name="pdf-processing">
   Skill directory: /path/to/skills/pdf-processing/
   Relative paths in this skill are relative to the skill directory.
-
-  <skill_resources>
-    references/forms.md
-    references/api.md
-    scripts/extract.py
-    assets/template.docx
-  </skill_resources>
 </skill_content>
 ```
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+Do not imply that a client automatically inventories bundled resources. Load a referenced resource
+only when the skill instructions or current task names the path.
+
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 
@@ -151,7 +147,7 @@ Project-level skills (committed to a repository) can come from untrusted sources
 
 **Recommended approach:** Gate project-level skill loading on an explicit trust signal — for example, requiring the user to mark a directory as trusted before its skills are loaded into context. This prevents untrusted repositories from injecting instructions automatically.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 
@@ -161,7 +157,7 @@ When an agent uses a permission system that prompts the user before file reads, 
 
 **Recommended approach:** When a skill is loaded, add its directory to the agent's read-permission allowlist so the model can access bundled resources without interrupting the user for each file. Without allowlisting, every reference file access produces a confirmation prompt that breaks the user experience.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 
@@ -175,7 +171,7 @@ Some agent implementations support running a skill in a separate subagent sessio
 
 This is useful for complex skill workflows that benefit from an isolated context window. Support for subagent delegation is optional and varies between agent implementations.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 

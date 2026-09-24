@@ -26,39 +26,28 @@ claude -p "Find and fix the bug in auth.py" --allowedTools "Read,Edit,Bash"
 
 ---
 
-## CRITICAL CONSTRAINT: Skills Are Unavailable in `-p` Mode
+## Skills in Programmatic Sessions
 
-> User-invoked skills like `/commit` and built-in commands are only available in interactive
-> mode. In `-p` mode, describe the task you want to accomplish instead.
+Without `--bare`, `claude -p` discovers skills from the same configured filesystem sources as an
+interactive session. Python and TypeScript Agent SDK sessions load skills through
+`setting_sources`/`settingSources`; use the SDK `skills` option to control which discovered skills
+Claude may invoke automatically.
 
-SOURCE: <https://code.claude.com/docs/en/headless.md> (exact quote, accessed 2026-03-17)
-
-### What this means for plugin authors
-
-```mermaid
-flowchart TD
-    Q{Skill invocation type} --> A["User-invoked skill<br>e.g. /commit, /deploy, /my-skill"]
-    Q --> B["Model-invocable skill<br>disable-model-invocation: false (default)"]
-    A -->|"Called in -p mode"| Unavail["NOT available — skill cannot be invoked<br>User sees: command not recognized"]
-    B -->|"Called in -p mode"| AlsoUnavail["ALSO not available — the Skill tool<br>itself is absent in -p mode"]
-    A -->|"Called interactively"| Works["Works normally"]
-    B -->|"Called interactively"| Works2["Works normally — Claude auto-invokes<br>when relevant"]
-```
-
-**Design implication:** Skills designed for automation use cases (CI/CD, cron jobs, scripts)
-must embed their full workflow in the `-p` prompt. You cannot rely on `/my-skill` being
-available. Instead, instruct the user to pass the task description as a prompt:
+Dispatch a user-invocable skill directly by sending `/<name>` in the prompt. Direct dispatch does
+not depend on the SDK `skills` allowlist, although `user-invocable: false` removes that command
+surface. Check `system/init.skills` and `system/init.slash_commands` before dispatch when the caller
+must fail fast on missing configuration.
 
 ```bash
-# WRONG — skill invocation does not work in -p mode
 claude -p "/my-deploy-skill production"
-
-# CORRECT — describe the task directly
-claude -p "Deploy to production: run ./scripts/deploy.sh production and verify health check"
 ```
 
-This constraint applies to ALL skills, regardless of `disable-model-invocation` or
-`user-invocable` settings.
+The SDK does not provide an API for registering in-memory skill definitions; skills remain
+filesystem artifacts. `--bare` skips normal skill discovery, except the documented `.claude/skills/`
+handling for directories supplied with `--add-dir`.
+
+SOURCE: <https://code.claude.com/docs/en/headless> and
+<https://code.claude.com/docs/en/agent-sdk/skills> (accessed 2026-09-24)
 
 ---
 
@@ -293,7 +282,7 @@ For session-scoped polling and reminders (interactive use only), see
 
 ---
 
-## Disabling Skills vs Headless Constraints
+## Invocation Controls in Programmatic Sessions
 
 These are two separate and independent mechanisms:
 
@@ -301,10 +290,12 @@ These are two separate and independent mechanisms:
 |-----------|-----------------|
 | `disable-model-invocation: true` | Prevents Claude from auto-loading the skill; user must type `/skill-name` |
 | `user-invocable: false` | Hides skill from `/` menu; Claude still auto-invokes when relevant |
-| `-p` mode | Neither setting matters — ALL skill invocations are unavailable |
+| SDK `skills` option | Controls model invocation; direct `/<name>` dispatch is independent |
+| `--bare` | Skips normal filesystem skill discovery |
 
-A skill with `disable-model-invocation: false` (the default) is no more available in `-p`
-mode than one with `disable-model-invocation: true`. The constraint is the mode itself.
+Direct dispatch still requires a discovered, user-invocable skill. A missing command is handled as
+an ordinary prompt with a note that the command did not run, so inspect `slash_commands` when that
+distinction must be deterministic.
 
 ---
 
@@ -312,7 +303,7 @@ mode than one with `disable-model-invocation: true`. The constraint is the mode 
 
 Before shipping a skill intended for use in automation or CI/CD:
 
-- [ ] The skill's workflow can be fully expressed as a `-p` prompt (no `/skill-name` invocations)
+- [ ] The session loads the intended setting sources, and `system/init` confirms the skill or command before direct dispatch
 - [ ] Any polling behavior uses GitHub Actions or an external cron (not `/loop` or `CronCreate`)
 - [ ] `--allowedTools` is documented for any tools the workflow needs
 - [ ] Multi-turn dependencies use `--continue` or `--resume` with captured session IDs

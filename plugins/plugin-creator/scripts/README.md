@@ -6,11 +6,11 @@ Utility scripts for maintaining Claude Code plugins, skills, agents, and command
 
 ## check_agent_auto_discovery.py
 
-Regression guard that detects `plugin.json` files where explicit component arrays silently mask auto-discovered agents, skills, or commands.
+Regression guard that detects `plugin.json` files where explicit component path fields silently mask auto-discovered agents or commands.
 
 ### Background
 
-Claude Code auto-discovers every `.md` file in a plugin's `agents/`, `commands/`, and `skills/` directories — but only when the corresponding key is **absent** from `plugin.json`. Writing the key with even a single entry overrides auto-discovery: the declared list becomes the complete list and every unlisted file becomes invisible.
+Claude Code auto-discovers every `.md` file in a plugin's `agents/` and `commands/` directories only when the corresponding key is **absent** from `plugin.json`. Writing either key overrides that default directory. Custom `skills` paths are additive to the default `skills/` scan and are not checked by this guard.
 
 Two production incidents hit this trap:
 
@@ -19,7 +19,7 @@ Two production incidents hit this trap:
 
 ### What it checks
 
-Fails when any `plugin.json` under `plugins/` contains an `agents`, `commands`, or `skills` key that is a strict subset of the corresponding files on disk, or when the key is an empty list.
+Fails when any `plugin.json` under `plugins/` contains an `agents` or `commands` string/array that omits corresponding default-path files, or when the field is empty.
 
 ### Usage
 
@@ -58,80 +58,6 @@ Interactive plugin scaffolding tool. Prompts for plugin details and creates a ne
 # Validate an existing plugin
 ./plugins/plugin-creator/scripts/create_plugin.py validate <plugin-path>
 ```
-
----
-
-## fix_tool_formats.py
-
-Scans Claude Code frontmatter files and converts invalid tool field formats to the required comma-separated string format.
-
-### What it fixes
-
-Claude Code requires tool specifications in frontmatter to use comma-separated string format:
-
-```yaml
-tools: Read, Grep, Glob, Bash
-```
-
-The script converts two invalid formats:
-
-**YAML list format:**
-
-```yaml
-# Before (invalid)
-allowed-tools:
-  - Read
-  - Glob
-  - Bash
-
-# After (valid)
-allowed-tools: Read, Glob, Bash
-```
-
-**JSON array format:**
-
-```yaml
-# Before (invalid)
-tools: ["Read", "Grep", "Glob", "Write"]
-
-# After (valid)
-tools: Read, Grep, Glob, Write
-```
-
-### Why this matters
-
-Invalid formats written by Claude in earlier sessions become "evidence" in future searches, creating a feedback loop where the AI learns incorrect patterns from its own prior output.
-
-### Usage
-
-```bash
-# Fix all .claude directories in the home directory
-./plugins/plugin-creator/scripts/fix_tool_formats.py
-
-# Also scan ~/repos/** directories
-./plugins/plugin-creator/scripts/fix_tool_formats.py --scan-repos
-
-# Preview changes without writing
-./plugins/plugin-creator/scripts/fix_tool_formats.py --dry-run
-```
-
-### Arguments
-
-| Flag | Description |
-|---|---|
-| `--scan-repos` | Also scan `~/repos/**` directories (default: off) |
-| `--no-scan-repos` | Scan only `~/.claude/**` (default) |
-| `--dry-run` | Show what would be changed without modifying files |
-
-### Scan locations
-
-By default, scans:
-
-- `~/.claude/agents/**/*.md`
-- `~/.claude/commands/**/*.md`
-- `~/.claude/skills/**/SKILL.md`
-
-With `--scan-repos`, additionally scans all `.claude` directories under `~/repos/`.
 
 ---
 
@@ -200,7 +126,6 @@ These modules are not standalone scripts. They are imported by the scripts above
 
 | Module | Purpose |
 |---|---|
-| `frontmatter_core.py` | Pydantic models and validation logic for SKILL.md, agent, and command frontmatter. Shared by `normalize_frontmatter.py` and the `skilllint` validators. |
 | `frontmatter_utils.py` | Load/dump helpers for YAML frontmatter using `ruamel.yaml` round-trip mode. Preserves formatting and only adds quotes where YAML syntax requires them. |
 
 ---

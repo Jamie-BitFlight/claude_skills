@@ -108,7 +108,7 @@ What works perfectly for Opus might need more detail for Haiku. If your skill wi
 
 Use consistent naming patterns. **Gerund form** (verb + -ing) is the recommended style because it clearly describes the activity the skill provides.
 
-- Good (gerund): `processing-pdfs`, `analyzing-spreadsheets`, `managing-databases`, `testing-code`
+- Descriptive: `pdf-processing`, `spreadsheet-analysis`, `database-management`, `code-testing`
 - Acceptable alternatives: noun phrases (`pdf-processing`) or action-oriented (`process-pdfs`)
 - Avoid: vague names (`helper`, `utils`, `tools`), overly generic names (`documents`, `data`), reserved words (`anthropic-helper`, `claude-tools`)
 
@@ -116,9 +116,9 @@ Consistent naming makes it easier to reference skills in documentation, understa
 
 ### Writing Effective Descriptions
 
-The `description` field enables skill discovery. Include both what the skill does and when to use it.
+The `description` field enables skill discovery. It should include both what the skill does and when to use it.
 
-**Write in third person.** The description is injected into the system prompt.
+Use imperative phrasing: `Use this skill when...`. Treat third-person wording only as repository house style where a repository explicitly requires it.
 
 - Prefer: "Processes Excel files and generates reports"
 - Prefer: "Extract text from PDFs. Use when the user mentions PDFs or document extraction"
@@ -279,7 +279,7 @@ description: >-
 
 Apply this check before sharing or publishing a skill that targets multiple clients.
 
-SOURCE: [agentskills.io integration guide](https://agentskills.io/integrate-skills.md) (accessed 2026-08-24)
+SOURCE: [agentskills.io integration guide](https://agentskills.io/client-implementation/adding-skills-support.md) (accessed 2026-09-24)
 
 ---
 
@@ -491,9 +491,9 @@ Use the BigQuery:bigquery_schema tool to retrieve table schemas.
 
 ### Core Quality
 
-- [ ] Description is specific and includes key terms
-- [ ] Description includes both what the skill does and when to use it
-- [ ] Description written in third person
+- [ ] Description is specific and should include useful key terms
+- [ ] Description should include both what the skill does and when to use it
+- [ ] Description uses clear imperative activation guidance
 - [ ] SKILL.md body passes token-count validation (run `uvx skilllint@latest check <skill-path>` and follow its sizing guidance)
 - [ ] Additional details in separate files (if needed)
 - [ ] Current patterns as default; legacy in clearly labeled section

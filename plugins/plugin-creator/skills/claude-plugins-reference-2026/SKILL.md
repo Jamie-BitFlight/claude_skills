@@ -1,12 +1,12 @@
 ---
 name: claude-plugins-reference-2026
-description: Complete reference for Claude Code plugins system (April 2026). Use when creating plugins, understanding plugin.json schema, marketplace configuration, bundling skills/commands/agents/hooks/MCP/LSP/monitor servers, plugin caching, validation, or distribution. Covers plugin components, directory structure, installation scopes, environment variables, CLI commands, debugging, and enterprise features.
+description: Claude Code plugin and marketplace reference. Use when creating plugins, configuring component paths, validating plugin roots, or distributing local, Git, and archive sources.
 user-invocable: true
 ---
 
-# Claude Code Plugins System - Complete Reference (April 2026)
+# Claude Code Plugins and Marketplaces Reference
 
-Plugins extend Claude Code with skills, agents, hooks, MCP servers, and LSP servers. This reference provides complete technical specifications for creating and distributing plugins.
+Plugins extend Claude Code with skills, agents, hooks, MCP servers, and LSP servers. This reference covers verified plugin and marketplace boundaries.
 
 ---
 
@@ -76,7 +76,7 @@ The `plugin.json` file in `.claude-plugin/` defines your plugin's metadata and c
 | Field          | Type           | Description                                                                    | Example                                |
 | -------------- | -------------- | ------------------------------------------------------------------------------ | -------------------------------------- |
 | `commands`     | string\|array  | Command files/directories — replaces the default `commands/`                   | `"./custom/cmd.md"` or `["./cmd1.md"]` |
-| `agents`       | array          | Agent file paths — replaces the default `agents/`; must be an array of individual files, NOT a directory string | `["./agents/reviewer.md"]`             |
+| `agents`       | string\|array  | Agent file path(s) — replaces the default `agents/` scan | `"./custom/reviewer.md"` or `["./custom/reviewer.md"]` |
 | `skills`       | string\|array  | Additional skill directories — loaded alongside the default `skills/`          | `"./custom/skills/"`                   |
 | `hooks`        | string\|object | Hook config path or inline config                                              | `"./hooks.json"`                       |
 | `mcpServers`   | string\|object | MCP config path or inline config                                               | `"./mcp-config.json"`                  |
@@ -94,19 +94,16 @@ Whether a custom path replaces or extends the plugin's default directory depends
 - **Adds to the default**: `skills`. The default `skills/` directory is always scanned, and directories listed in `skills` load alongside it. Exception: for a marketplace entry whose `source` resolves to the marketplace root, declaring specific subdirectories replaces the default `skills/` scan
 - All paths must be relative to plugin root and start with `./`
 - Multiple paths can be specified as arrays
-- **CRITICAL**: `agents` field must ALWAYS be an array of individual file paths, never a directory string
+- `agents` accepts one path as a string or multiple paths as an array. Declaring it replaces the default `agents/` scan, so include default-path files when retaining them.
 
-SOURCE: [Plugins reference — Path resolution](https://code.claude.com/docs/en/plugins-reference) (accessed 2026-09-13)
+SOURCE: [Plugins reference — Component path fields](https://code.claude.com/docs/en/plugins-reference#component-path-fields) (accessed 2026-09-24)
 
 **Common validation errors**:
 
 ```json
-// CORRECT agents field
+// CORRECT agents fields
+"agents": "./custom/security-reviewer.md"
 "agents": ["./agents/security-reviewer.md", "./agents/code-formatter.md"]
-
-// INCORRECT - will fail validation
-"agents": "./agents/"
-"agents": "./custom/agents/"
 ```
 
 ---
@@ -210,12 +207,12 @@ For security reasons, certain frontmatter fields are silently ignored when prese
 
 | Field | Status in plugin agents |
 | ----- | ----------------------- |
-| `hooks` | Silently ignored |
-| `mcpServers` | Not supported |
-| `permissionMode` | Not supported |
+| `hooks` | Valid agent field; silently ignored for plugin agents |
+| `mcpServers` | Valid agent field; ignored for plugin agents |
+| `permissionMode` | Valid agent field; ignored for plugin agents |
 | `isolation` | Supported — valid value: `"worktree"` (provides isolated worktree environment for agent execution) |
 
-SOURCE: [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) line 182 (accessed 2026-04-23)
+SOURCE: [Plugins Reference — Agents](https://code.claude.com/docs/en/plugins-reference#agents) (accessed 2026-09-24)
 
 **`isolation` field example:**
 
@@ -397,7 +394,7 @@ SOURCE: [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md
 
 ## Plugin Caching and File Resolution
 
-For security and verification purposes, Claude Code copies plugins to a cache directory rather than using them in-place. Understanding this behavior is important when developing plugins that reference external files.
+Plugin-contained paths must remain within the plugin boundary. Marketplace sources are copied to cache unless the source loads in place; `--plugin-dir`, marketplace command link mode, and local-directory sources load in place, while `--plugin-url` fetches an archive for the session.
 
 ### How Plugin Caching Works
 
@@ -408,22 +405,13 @@ When you install a plugin, Claude Code copies the plugin files to a cache direct
 
 ### Path Traversal Limitations
 
-Plugins cannot reference files outside their copied directory structure. Paths that traverse outside the plugin root (such as `../shared-utils`) will not work after installation because those external files are not copied to the cache.
+Plugins cannot use component paths that escape the plugin root, regardless of whether that source is cached or loaded in place.
 
 ### Working with External Dependencies
 
 If your plugin needs to access files outside its directory, you have two options:
 
-**Option 1: Use symlinks**
-
-Create symbolic links to external files within your plugin directory. Symlinks are honored during the copy process:
-
-```bash
-# Inside your plugin directory
-ln -s /path/to/shared-utils ./shared-utils
-```
-
-The symlinked content will be copied into the plugin cache.
+**Repository portability policy:** keep dependencies physically within the plugin boundary rather than relying on symlinks. Claude Code handles symlinks explicitly, but checkout behavior differs across platforms.
 
 **Option 2: Restructure your marketplace**
 
@@ -442,7 +430,7 @@ Set the plugin path to a parent directory that contains all required files, then
 
 This approach copies the entire marketplace root, giving your plugin access to sibling directories.
 
-**Note**: Symlinks that point to locations outside the plugin's logical root are followed during copying. This provides flexibility while maintaining the security benefits of the caching system.
+SOURCE: [Create plugins](https://code.claude.com/docs/en/plugins) and [Plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) (accessed 2026-09-24)
 
 ---
 
@@ -623,6 +611,16 @@ You can pin to a specific branch, tag, or commit:
 | `ref` | string | Optional. Git branch or tag (defaults to repository default branch)   |
 | `sha` | string | Optional. Full 40-character git commit SHA to pin to an exact version |
 
+#### Zip archives
+
+- Archive URLs must use HTTPS. HTTP, loopback, link-local, and cloud-metadata hosts are rejected.
+- Archives larger than 256 MiB are refused.
+- `.claude-plugin/` must be at the archive root or beneath one top-level folder.
+- Optional `sha256` is verified when supplied.
+- Marketplace-relative sources must remain below the marketplace root, use forward slashes, and cannot contain `../`.
+
+SOURCE: [Plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) (accessed 2026-09-24)
+
 ---
 
 ## CLI Commands Reference
@@ -794,7 +792,7 @@ This shows:
 | Issue                               | Cause                                  | Solution                                                                 |
 | ----------------------------------- | -------------------------------------- | ------------------------------------------------------------------------ |
 | Plugin not loading                  | Invalid `plugin.json`                  | Validate JSON syntax with `claude plugin validate` or `/plugin validate` |
-| `agents: Invalid input`             | Used directory string instead of array | Change `"agents": "./agents/"` to `"agents": ["./agents/file.md"]`       |
+| Default agents disappear           | Declared replacement `agents` paths without default files | Include retained default agent files or remove `agents` |
 | Commands not appearing              | Wrong directory structure              | Ensure `commands/` at root, not in `.claude-plugin/`                     |
 | Hooks not firing                    | Script not executable                  | Run `chmod +x script.sh`                                                 |
 | MCP server fails                    | Missing `${CLAUDE_PLUGIN_ROOT}`        | Use variable for all plugin paths                                        |
@@ -980,7 +978,7 @@ Follow semantic versioning for plugin releases:
 
 ## Constraints and Limitations
 
-- Plugins copied to cache, not used in-place
+- Marketplace plugins are cached unless their source mode loads in place; `--plugin-dir` loads directly
 - Cannot reference files outside plugin directory (`../` fails)
 - LSP servers require separate binary installation
 - All paths must be relative, start with `./`
@@ -1004,7 +1002,7 @@ SOURCE: [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md
 
 - [Plugins Reference](https://code.claude.com/docs/en/plugins-reference.md) (accessed 2026-01-28, refreshed 2026-04-23)
 - [Create Plugins](https://code.claude.com/docs/en/plugins.md) (accessed 2026-01-28, refreshed 2026-04-23)
-- [Plugin Marketplaces](https://code.claude.com/docs/en/plugin-marketplaces.md) (accessed 2026-01-28)
+- [Plugin Marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) (accessed 2026-09-24)
 - [Skills Reference](https://code.claude.com/docs/en/skills.md)
 - [Hooks Reference](https://code.claude.com/docs/en/hooks.md)
 - [MCP Reference](https://code.claude.com/docs/en/mcp.md)

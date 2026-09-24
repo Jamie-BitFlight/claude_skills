@@ -1,6 +1,6 @@
 ---
 name: example-agent
-description: Demonstrates all available agent frontmatter fields. Use when you need a reference for agent configuration or when learning about agent capabilities. Handles example tasks, demonstration requests, and tutorial scenarios.
+description: Illustrative Claude Code agent configuration. Use when learning the basic agent file shape; follow the canonical subagent reference for the current field inventory.
 tools: Read, Grep, Glob, WebFetch, WebSearch
 disallowedTools: Bash, Write, Edit
 model: sonnet
@@ -20,27 +20,27 @@ color: cyan
 
 # Example Agent
 
-This agent demonstrates all available frontmatter fields for Claude Code agents.
+This agent illustrates a subset of Claude Code agent frontmatter.
 
 ## Purpose
 
-Use this as a reference when creating new agents. All fields shown above are valid agent frontmatter options.
+Use this as a compact example. See [the canonical subagent reference](../../skills/claude-subagent-reference/SKILL.md) for current fields and plugin restrictions.
 
 ## Field Descriptions
 
 | Field             | Type   | Purpose                                  | Constraints                              | Required |
 | ----------------- | ------ | ---------------------------------------- | ---------------------------------------- | -------- |
-| `name`            | string | Unique identifier                        | kebab-case, lowercase, max 64 characters | Yes      |
-| `description`     | string | When to delegate to this agent           | Trigger keywords, max 1024 characters    | Yes      |
-| `tools`           | string | Allowlist of tools the agent can use     | Comma-separated tool names               | No       |
-| `disallowedTools` | string | Denylist of tools the agent cannot use   | Comma-separated tool names               | No       |
+| `name`            | string | Unique identifier                        | No leading `-`; cannot contain `:`        | Yes      |
+| `description`     | string | When to delegate to this agent           | Clear routing guidance                    | Yes      |
+| `tools`           | string/list | Allowlist of tools the agent can use | CSV string or YAML list                  | No       |
+| `disallowedTools` | string/list | Denylist of tools the agent cannot use | CSV string or YAML list                  | No       |
 | `model`           | string | Which model to use                       | sonnet, opus, haiku, or inherit          | No       |
-| `permissionMode`  | string | Permission behavior for tool usage       | default, relaxed, strict                 | No       |
+| `permissionMode`  | string | Permission behavior for tool usage       | See canonical reference; ignored in plugin agents | No |
 | `skills`          | string | Skills to load when agent is active      | Comma-separated skill names              | No       |
 | `hooks`           | object | Scoped hooks for agent lifecycle         | Valid hook configuration object          | No       |
 | `color`           | string | Terminal output color for agent messages | Valid color name (cyan, green, yellow)   | No       |
 
-**Critical:** `tools`, `disallowedTools`, and `skills` fields MUST be comma-separated strings, NOT YAML arrays.
+`tools` and `disallowedTools` accept CSV strings or YAML lists. Plugin agents ignore `hooks`, `mcpServers`, and `permissionMode`, and do not support `initialPrompt`.
 
 ## Validation
 
@@ -64,11 +64,7 @@ claude plugin validate ./path/to/plugin/
 | ------------------------------- | ------------------------- | --------------------------------------- |
 | `name: Required`                | Missing name field        | Add `name` field to frontmatter         |
 | `description: Required`         | Missing description field | Add `description` with trigger keywords |
-| `tools must be string`          | Used YAML array format    | Change to comma-separated string        |
-| `YAML array detected`           | Used `- Tool1` format     | Change to `Tool1, Tool2` format         |
 | `model must be sonnet/opus/...` | Invalid model name        | Use valid model identifier              |
-| `name exceeds 64 characters`    | Name too long             | Shorten to max 64 characters            |
-| `description exceeds 1024 ...`  | Description too long      | Shorten to max 1024 characters          |
 
 ## Agent Location
 
@@ -82,9 +78,9 @@ When creating an agent in a plugin, drop the `.md` file into the plugin's `agent
 
 **Do not add the `agents` key to `plugin.json` for default-path agents.** Writing the key (even to add a single entry) OVERRIDES auto-discovery: the declared list becomes the complete set and every agent not listed becomes invisible. See `.claude/rules/plugin-development.md` for the 2026-03-17 / 2026-04-12 incident history.
 
-The `agents` key exists ONLY for agents stored in non-default paths (e.g. `custom/agents/my-agent.md`). When used, it must be an array of individual file paths and must list EVERY agent file (default-path and non-default-path) — never a directory string.
+The `agents` key exists for non-default agent paths. It accepts one file path as a string or multiple file paths as an array. Because declaring it replaces the default scan, include every default-path agent that must remain available.
 
-**Skills vs agents registration parity:** Skills, agents, and commands all obey the same auto-discovery semantics. Skills in `skills/`, agents in `agents/`, and commands in `commands/` are auto-discovered without any `plugin.json` entry. Adding the corresponding key opts the plugin into manual allowlist mode and requires every file to be listed explicitly.
+Custom skill directories add to the default `skills/` scan. Custom `agents` and `commands` paths replace their default directories.
 
 ## Creating Agents
 
@@ -110,5 +106,7 @@ This agent is for demonstration purposes only. When creating real agents, includ
 ## Sources
 
 - [Claude Code Documentation](https://code.claude.com/docs/en/sub-agents.md) (accessed 2026-01-28)
-- [Agent Creator Skill](./plugins/plugin-creator/skills/agent-creator/SKILL.md)
-- [Plugin Creator Validation Scripts](./plugins/plugin-creator/scripts/README.md)
+- [Agent Creator Skill](../../skills/agent-creator/SKILL.md)
+- [Plugin Creator Validation Scripts](../../scripts/README.md)
+- SOURCE: <https://code.claude.com/docs/en/sub-agents#supported-frontmatter-fields> (accessed 2026-09-24)
+- SOURCE: <https://code.claude.com/docs/en/plugins-reference#agents> (accessed 2026-09-24)

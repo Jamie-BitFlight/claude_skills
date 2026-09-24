@@ -1,6 +1,6 @@
 ---
 name: agent-creator
-description: Creates Claude Code agent files from requirements — handles discovery, template selection, frontmatter generation, scope determination (project/user/plugin), and plugin.json updates. Use when the user asks to create an agent, generate an agent, add an agent to a plugin, or describes agent functionality they need. Trigger phrases — 'create an agent', 'add an agent', 'build a new agent', 'make me an agent that', 'I need an agent for'. Examples — <example>Context — User wants a code review agent. User says 'Create an agent that reviews code for quality issues'. I will use the agent-creator agent to generate the agent configuration. User requesting new agent creation triggers agent-creator.</example> <example>Context — User wants to add agent to plugin. User says 'Add an agent to my plugin that validates configurations'. I will use the agent-creator agent to generate a configuration validator agent. Plugin development with agent addition triggers agent-creator.</example>
+description: Creates Claude Code agent files from requirements — handles discovery, template selection, frontmatter generation, and project, user, or plugin scope. Use when the user asks to create an agent, generate an agent, add an agent to a plugin, or describes agent functionality they need. Trigger phrases — 'create an agent', 'add an agent', 'build a new agent', 'make me an agent that', 'I need an agent for'. Examples — <example>Context — User wants a code review agent. User says 'Create an agent that reviews code for quality issues'. I will use the agent-creator agent to generate the agent configuration. User requesting new agent creation triggers agent-creator.</example> <example>Context — User wants to add agent to plugin. User says 'Add an agent to my plugin that validates configurations'. I will use the agent-creator agent to generate a configuration validator agent. Plugin development with agent addition triggers agent-creator.</example>
 model: sonnet
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill, SendMessage
 skills:
@@ -22,14 +22,14 @@ For the complete field specification (all fields with descriptions, env vars, an
 
 **Required fields:**
 
-- `name`: lowercase, hyphens only, max 64 chars — REQUIRED in all agent files per agentskills.io spec
-- `description`: single-line string, max 1024 chars, no multiline YAML indicators (`>-`, `|-`). Front-load trigger keywords. Validate with `uvx skilllint@latest check --fix <file>`
+- `name`: required by Claude Code; must not start with `-` or contain `:`. This repository may apply a tighter lowercase-hyphen house style.
+- `description`: required by Claude Code. Front-load trigger keywords and validate with `uvx skilllint@latest check --fix <file>`.
 
 **Creation warnings:**
 
 - MCP tool names: use the exact registered name, case-sensitive (`mcp__Ref__ref_read_url`, never `mcp__ref__...`). Grant a whole server with `mcp__<server>__*` or `mcp__<server>` — both forms grant every tool that server exposes and compose with named tools. A plugin-bundled server registers as `mcp__plugin_<plugin-name>_<server-name>`.
 - MCP-only tool grants: an entry matching no live tool is dropped and the rest of the grant still resolves, but an agent whose every entry resolves to nothing refuses to launch. A server pattern grants nothing while that server is disconnected, so an agent granted only MCP tools cannot be invoked at all until the server returns — give it at least one non-MCP tool unless that runtime dependency is intended.
-- **Auto-discovery**: agents in the default `agents/` directory are registered automatically — never add them to `plugin.json`. Declaring the `agents` key overrides auto-discovery entirely (see Phase 5).
+- **Auto-discovery**: when `plugin.json` has no `agents` field, agents in the default `agents/` directory are registered automatically. A pre-existing `agents` field is an explicit allowlist: preserve every entry and add the new path (see Phase 5).
 - For plugin field restrictions (`permissionMode`, `hooks`, `mcpServers` silently ignored) and `Agent()` spawn syntax, see the preloaded `/plugin-creator:claude-subagent-reference`.
 
 **Color convention for this repository:**
@@ -96,9 +96,9 @@ Write frontmatter + body:
 name: {identifier}
 description: "{trigger phrases and examples}"
 model: {choice}
-tools: {comma-separated if restricting; Agent(type) for subagent restrictions}
+tools: {CSV or YAML list if restricting; bare Agent enables depth-limited nesting}
 disallowedTools: {denylist if needed}
-permissionMode: {default|acceptEdits|dontAsk|bypassPermissions|plan}
+permissionMode: {default|acceptEdits|auto|dontAsk|bypassPermissions|plan|manual}
 skills: {comma-separated if needed}
 mcpServers: {server references or inline definitions}
 memory: {user|project|local if persistent learning needed}
@@ -144,12 +144,11 @@ flowchart TD
     Validate --> Done([Report location and result])
 ```
 
-**Plugin.json update pattern** — agents in the default `agents/` directory are auto-discovered. No plugin.json entry is needed or wanted for them.
+**Plugin.json handling** — agents in the default `agents/` directory are auto-discovered when the manifest has no `agents` field. Leave an absent field absent.
 
-> **AUTO-DISCOVERY — ALL OR NOTHING**
-> Agents in `agents/` are registered automatically. The `agents` key in `plugin.json` exists only for agents stored outside the default `agents/` directory. When `agents` is declared, it **replaces** auto-discovery entirely — every agent not listed becomes invisible. If you must use it, always read the existing array first and carry forward every entry.
+> If `agents` already exists, it accepts a single file path string or an array and replaces the default scan. Preserve every existing path and add the new default-path agent.
 
-Only use the `agents` key when placing agent files outside `agents/`:
+An existing explicit allowlist that includes a non-default path must also include retained default-path agents:
 
 ```json
 {
@@ -161,13 +160,13 @@ Only use the `agents` key when placing agent files outside `agents/`:
 }
 ```
 
-If all agents are in the default `agents/` directory, omit the `agents` key entirely — auto-discovery handles registration. If agents exist in non-default paths, enumerate every agent file explicitly as individual paths in the array — do not use directory strings.
+When `agents` is absent, keep it absent for default-path agents. When it already exists, convert a string to an array as needed and include retained default-path agents.
 
-SOURCE: <https://code.claude.com/docs/en/plugins.md> — "agents/" listed as default auto-discovered location in Plugin structure overview table (accessed 2026-04-07). Declaring the `agents` key replaces auto-discovery entirely: do not declare a partial `agents` key subset — every agent file (default-path and non-default-path) must be listed explicitly, or the key must be omitted.
+SOURCE: <https://code.claude.com/docs/en/plugins-reference#component-path-fields> (accessed 2026-09-24). Declaring `agents` replaces default discovery; the field accepts a string or array of agent file paths.
 
 **Skills vs agents registration distinction:**
 
-- **Agents** in `agents/` are auto-discovered — do NOT add them to `plugin.json`. Only declare the `agents` key for agents in non-default locations, and be aware that doing so overrides auto-discovery entirely.
+- **Agents** in `agents/` are auto-discovered while `agents` is absent. Preserve and extend an existing explicit allowlist because it overrides auto-discovery entirely.
 - **Skills** in `skills/` are auto-discovered — do NOT add skill paths to `plugin.json` for skills under the standard `skills/` directory.
 
 ### Phase 6 — Validation
@@ -193,8 +192,8 @@ flowchart TD
 
 <quality>
 
-- Identifier: lowercase, hyphens, 3-50 chars
-- Description: strong trigger phrases, 2-4 inline `<example>` blocks, under 1024 chars
+- Identifier: no leading `-` and no `:`; repository house style is lowercase hyphens
+- Description: strong trigger phrases and useful examples
 - System prompt: clear role, numbered responsibilities, step-by-step workflow, output format
 - Model: haiku for simple reads, sonnet for most tasks, opus for complex reasoning
 - Tools: least-privilege — only what the agent needs

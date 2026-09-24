@@ -99,7 +99,7 @@ Phase 1: Assess
   Errors found:
     SK007: skills/main-skill/SKILL.md exceeds token limit (8,200 tokens)
     LINK01: skills/main-skill/SKILL.md:45 → references/missing-file.md (file not found)
-    FM003: skills/helper-skill/SKILL.md — allowed-tools uses array format, not comma-separated string
+    FM003: skills/helper-skill/SKILL.md — validate allowed-tools against its destination schema
 
   → Proceeding to Phase 5: Debug
 
@@ -112,9 +112,9 @@ Phase 5: Debug — Iteration 1
     skills/main-skill/SKILL.md:45 references ./references/missing-file.md
     File does not exist — removing stale link ✓
 
-  FM003 (array format):
-    Running fix_tool_formats.py on skills/helper-skill/SKILL.md...
-    Fixed: allowed-tools array → comma-separated string ✓
+  FM003 (destination schema):
+    Running skilllint on skills/helper-skill/SKILL.md...
+    Validated the tool field against its destination schema ✓
 
   Re-validating...
   Exit code: 0 — 0 errors ✓

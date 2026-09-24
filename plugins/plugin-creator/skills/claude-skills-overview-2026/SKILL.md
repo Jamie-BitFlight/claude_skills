@@ -1,10 +1,10 @@
 ---
 name: claude-skills-overview-2026
-description: Reference guide for Claude Code skills system (March 2026). Use when creating, modifying, or understanding skills, SKILL.md format, frontmatter fields, hooks, context fork, or skill best practices.
+description: Claude Code runtime skills reference. Use when creating, modifying, or understanding SKILL.md frontmatter, hooks, context forks, invocation, or skill loading behavior.
 user-invocable: true
 ---
 
-# Claude Code Skills System - Complete Reference (March 2026)
+# Claude Code Skills Runtime Reference
 
 Skills extend what Claude can do. Create a `SKILL.md` file with instructions, and Claude adds it to its toolkit. Claude uses skills when relevant, or you can invoke one directly with `/skill-name`.
 
@@ -12,7 +12,7 @@ Skills extend what Claude can do. Create a `SKILL.md` file with instructions, an
 
 **Skills and slash commands are now unified** - they are the same system. A file at `.claude/commands/review.md` and a skill at `.claude/skills/review/SKILL.md` both create `/review` and work identically. If a skill and a command share the same name, the skill takes precedence. Skills are the recommended approach as they support additional features like supporting files and advanced frontmatter options.
 
-> **Portable skills?** This reference covers **Claude Code-specific** features (hooks, context fork, model selection, invocation control). If you need to create skills that work across Claude Code, Cursor, Gemini CLI, OpenAI Codex, VS Code, and 20+ other agents, see the `../agentskills/SKILL.md` skill instead — it covers the portable subset of the format defined at [agentskills.io](https://agentskills.io).
+> **Portable skills?** This reference covers **Claude Code runtime extensions**. For the portable Agent Skills schema and current client showcase, see `../agentskills/SKILL.md` and <https://agentskills.io>.
 
 ---
 
@@ -74,24 +74,36 @@ Your instructions here...
 
 ---
 
-## All Frontmatter Fields
+## Claude Code Frontmatter Fields
 
 All fields are optional. Only `description` is recommended so Claude knows when to use the skill.
 
-The fields `name`, `description`, `license`, `compatibility`, `metadata`, and `allowed-tools` are part of the `../agentskills/SKILL.md` and are portable across all compatible agents. The remaining fields below are Claude Code extensions.
+The portable Agent Skills specification defines `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools`; support varies by implementation. Claude Code accepts those fields plus the runtime extensions below.
 
 | Field                      | Required    | Type    | Max Length | Description                                                                                                                                           |
 | -------------------------- | ----------- | ------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                     | Recommended | string  | 64 chars   | Display name for the skill. If omitted, uses directory name. Lowercase letters, numbers, hyphens only. Required per agentskills.io spec; optional in Claude Code. |
-| `description`              | Recommended | string  | 1024 chars | What the skill does and when to use it. Claude uses this to decide when to apply the skill. If omitted, uses the first paragraph of markdown content. |
+| `name`                     | No          | string  | —          | Display name for the skill. If omitted, uses directory name. |
+| `description`              | Recommended | string  | — | What the skill does and when to use it. If omitted, uses the first non-empty markdown line. |
+| `when_to_use`              | No          | string  | — | Additional activation guidance. |
 | `argument-hint`            | No          | string  | —          | Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`.                                    |
-| `allowed-tools`            | No          | string  | —          | Tools Claude can use without asking permission when this skill is active (comma-separated). Example: `Read, Grep, Glob, Bash(npm run:*)`              |
+| `arguments`                | No          | string  | —          | Argument definition used by the skill. |
+| `allowed-tools`            | No          | string or list | — | Space- or comma-separated string, or YAML list, of tools pre-approved while active. |
+| `disallowed-tools`         | No          | string or list | — | Tools unavailable while the skill is active. |
 | `model`                    | No          | string  | —          | Model to use when this skill is active. Use aliases `opus`, `sonnet`, `haiku` (preferred) or full model IDs like `claude-opus-4-6`, `claude-sonnet-4-6`. |
-| `context`                  | No          | string  | —          | Set to `fork` to run in a forked subagent context. See [Context Fork Behavior](#context-fork-behavior) for tool restrictions.                         |
+| `effort`                   | No          | string  | —          | Effort override while the skill is active. |
+| `context`                  | No          | string  | —          | Set to `fork` to run in a fresh skill subagent. This is not a conversation fork. See [Context Fork Behavior](#context-fork-behavior).                 |
 | `agent`                    | No          | string  | —          | Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agent. Default: `general-purpose`    |
+| `background`               | No          | boolean | —          | For forked skills, defaults to background; set `false` to wait in the foreground. |
 | `user-invocable`           | No          | boolean | —          | Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`.                              |
 | `disable-model-invocation` | No          | boolean | —          | Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. |
 | `hooks`                    | No          | object  | —          | Hooks scoped to this skill's lifecycle. See [Hooks](/en/hooks) for configuration format. Events: `PreToolUse`, `PostToolUse`, `Stop`                  |
+| `paths`                    | No          | string or list | — | Path patterns associated with the skill. |
+| `shell`                    | No          | string  | —          | Shell configuration for skill commands. |
+| `metadata`                 | No          | object  | —          | String-keyed metadata. |
+| `license`                  | No          | string  | —          | License name or bundled license reference. |
+| `compatibility`            | No          | string  | —          | Environment requirements. |
+
+SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills#frontmatter-reference) (accessed 2026-09-24)
 
 > [!IMPORTANT]
 >
@@ -102,7 +114,7 @@ The fields `name`, `description`, `license`, `compatibility`, `metadata`, and `a
 > SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills.md) section "Pre-approve tools for a skill" (accessed 2026-04-23)
 
 > [!NOTE]
-> **`name:` is required** per the [Agent Skills open standard](https://agentskills.io/specification). A bug in Claude Code v2.1.23 caused plugin skills with `name:` to not appear as slash commands; that bug was resolved 2026-02-20. Include `name:` in all SKILL.md files. The value must match the directory name.
+> Portable Agent Skills packages require `name:` and require it to match the directory name. Claude Code runtime skills do not. Apply the portable rule only when the destination is a portable package or upload boundary.
 
 ---
 
@@ -118,12 +130,12 @@ The context window is a public good shared with everything else Claude needs to 
 
 SOURCE: Anthropic skill-authoring best practices (docs.anthropic.com, accessed 2026-03-23)
 
-### Budget Constraints
+### Portable Package Constraints
 
 | Resource                   | Limit                                      | Notes                               |
 | -------------------------- | ------------------------------------------ | ----------------------------------- |
-| `name` field               | 64 chars                                   | Lowercase, numbers, hyphens only    |
-| `description` field        | 1024 chars                                  | Critical for skill selection        |
+| `name` field               | 64 chars                                   | Agent Skills package limit; Unicode lowercase alphanumeric characters and hyphens only |
+| `description` field        | 1024 chars                                  | Agent Skills package limit          |
 | `<available_skills>` block | 2% of context window (fallback 16,000 chars) | Scales dynamically; separate from global context |
 | Skills before truncation   | ~34-36                                     | Varies by description complexity    |
 
@@ -289,7 +301,7 @@ For complete hook configuration including all events, matchers, JSON output cont
 
 ## Context Fork Behavior
 
-Add `context: fork` to your frontmatter when you want a skill to run in isolation. The skill content becomes the prompt that drives the subagent. It won't have access to your conversation history.
+Add `context: fork` to your frontmatter when you want a skill to run in an isolated subagent. The skill content becomes the prompt and the subagent does not receive conversation history. Despite the field name, this is not a conversation fork; `/subtask` conversation forks inherit the history accumulated so far.
 
 **Use `context: fork` only when the skill includes explicit instructions and a clear task.** If the skill contains guidelines like "use these API conventions" without a task, the subagent receives the guidelines but no actionable prompt and may return without meaningful output.
 
@@ -302,23 +314,25 @@ agent: Explore
 
 | Agent             | Model    | Tools                      | Use Case                     |
 | ----------------- | -------- | -------------------------- | ---------------------------- |
-| `Explore`         | Haiku    | File/web/MCP (read-only)   | Verbatim retrieval only — never analysis or reasoning (~50% hallucination rate on reasoning tasks) |
+| `Explore`         | Inherits | Read-only                  | File discovery and codebase exploration |
 | `Plan`            | Inherits | File/web/MCP (read-only)   | Research before planning     |
 | `general-purpose` | Inherits | File/web/MCP + Bash/system | Complex operations (default) |
 | Custom            | Custom   | Custom                     | Project-specific work        |
 
-### Tool Restrictions in Forked Contexts
+### Tool Restrictions in Skill Subagents
 
 **VERIFIED BEHAVIOR** (experimentally confirmed 2026-01-22):
 
-When `context: fork` is set, the forked subagent has access to:
+When `context: fork` is set, the fresh skill subagent has access to:
 
 - File operations: Read, Write, Edit, Grep, Glob
 - Web operations: WebSearch, WebFetch
 - MCP tools (if configured)
 - Bash and other system tools (depending on agent type)
 
-**The Agent tool is NOT available in forked contexts.** This means forked skills cannot delegate to other subagents. If you need hierarchical delegation (subagent delegates to another subagent), the parent must run in the main context (no `context: fork`), not in a forked context.
+Skills with `context: fork` default to background execution. Set `background: false` to wait and retain foreground tools. Background agents have MCP tools plus a narrower built-in set, and their edits are outside checkpoints and `/rewind`. Explore and Plan skip `CLAUDE.md` and git status. These are ordinary depth-limited subagents; only conversation forks inherit history and cannot spawn another conversation fork.
+
+SOURCE: [Extend Claude with skills](https://code.claude.com/docs/en/skills) and [subagent startup](https://code.claude.com/docs/en/sub-agents#what-loads-at-startup) (accessed 2026-09-24)
 
 **Source**: Experimental verification on 2026-01-22. Official documentation at <https://code.claude.com/docs/en/skills.md> does not explicitly document this restriction.
 
@@ -562,7 +576,7 @@ Only runs when user types `/deploy-production`.
 - **Unified skills and commands** — `.claude/commands/` files now work as skills, skills recommended
 - **Dynamic context injection** - \!\`command\` syntax for preprocessing shell command output
 - **`argument-hint` field** - Show autocomplete hints for expected arguments
-- **Optional name/description** - If omitted, uses directory name and first paragraph
+- **Optional name/description** - If omitted, uses directory name and first non-empty markdown line
 - **`once: true` for hooks** - Run only once per session
 - **`${CLAUDE_SESSION_ID}`** - Session-scoped operations
 - **`context: fork`** with agent selection
@@ -582,18 +596,18 @@ Only runs when user types `/deploy-production`.
 
 ## Related Skills
 
-- **`../agentskills/SKILL.md`** — The portable specification (agentskills.io). Use when creating skills for cross-agent compatibility. Covers the subset of frontmatter fields (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`) recognized by all 25+ compatible agents.
+- **`../agentskills/SKILL.md`** — The portable specification. It defines `name`, `description`, `license`, `compatibility`, `metadata`, and experimental `allowed-tools`; see the linked client showcase for current implementations.
 - **`../claude-plugins-reference-2026/SKILL.md`** — Plugin creation, distribution, and plugin.json schema.
 - **`../hooks-guide/SKILL.md`** — Complete hook events, matchers, and configuration. Cross-platform coverage with Node.js CJS and Python guides.
 - **`resources/claude-code-skills-official.md`** — Authoritative specification from code.claude.com: frontmatter fields, discovery rules, invocation control, budget limits, and bundled skills.
 - **`resources/scheduled-tasks.md`** — CronCreate, CronList, CronDelete, /loop syntax, cron expressions, plugin integration patterns.
-- **`resources/headless-agent-sdk.md`** — Running Claude Code programmatically via `claude -p`. Covers the critical constraint that skills are unavailable in `-p` mode, all CLI flags, output formats (json/stream-json/schema), automation patterns, and design checklist for plugin authors.
+- **`resources/headless-agent-sdk.md`** — Running Claude Code programmatically via `claude -p` or the Agent SDK, including discovered skills, direct `/<name>` dispatch, CLI flags, output formats, and automation patterns.
 - **`resources/output-styles.md`** — Custom output styles, plugin.json outputStyles field, comparison with CLAUDE.md and skills.
 - **`resources/agent-teams.md`** — TeammateIdle/TaskCompleted hooks, team architecture, display modes, lifecycle.
 
 ## Sources
 
-- **Primary**: [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills.md) (accessed 2026-03-01) — full reference at `resources/claude-code-skills-official.md`
+- **Primary**: [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills) (accessed 2026-09-24) — full reference at `resources/claude-code-skills-official.md`
 - **Standards**: [Agent Skills Open Standard](https://agentskills.io) — see also the `../agentskills/SKILL.md` for the full portable specification reference
 - **Examples**: [anthropics/skills](https://github.com/anthropics/skills)
 - **Blog**: [Anthropic Engineering Blog - Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)

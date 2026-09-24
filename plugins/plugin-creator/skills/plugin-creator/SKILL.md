@@ -26,7 +26,7 @@ flowchart TD
     Q1 -->|Yes — explicit instruction| Override["Use exactly the agent named<br>Explicit instruction overrides all routing tables"]
     Q1 -->|No| Q2{Task type?}
     Q2 -->|Domain research or reasoning| CG["plugin-assessor agent<br>subagent_type='plugin-creator:plugin-assessor'"]
-    Q2 -->|Verbatim file/keyword retrieval only| Explore["Explore agent — Haiku-based<br>⚠️ retrieval only, never reasoning"]
+    Q2 -->|Read-only codebase exploration| Explore["Explore agent — inherited model<br>read-only discovery"]
     Q2 -->|Official docs fetch or analysis| GP["general-purpose agent<br>subagent_type='general-purpose'"]
     Q2 -->|Schema validation| Scripts[Validation scripts]
     Q2 -->|Quality review| Assessor["plugin-assessor agent"]
@@ -40,7 +40,7 @@ flowchart TD
     Docs --> Done
 ```
 
-**Explore agent constraint (hard rule from CLAUDE.md):** Explore uses Haiku internally. Validated failure rate ~50% for reasoning tasks (2026-02-02). Use Explore ONLY for verbatim retrieval — exact file contents, directory listings, keyword searches with no interpretation required. Any task requiring analysis, comparison, or judgment goes to plugin-creator:plugin-assessor or general-purpose.
+Explore inherits the main conversation model as of Claude Code v2.1.198 and remains read-only. Use a writing-capable agent when the delegated task must edit files.
 
 **How to dispatch agents:**
 
@@ -319,7 +319,7 @@ RESEARCHER 4: PITFALLS & OFFICIAL DOCS
 Fetch https://code.claude.com/docs/en/plugins-reference.md
 Fetch https://code.claude.com/docs/en/skills.md
 IDENTIFY:
-- Schema requirements (comma-separated strings NOT arrays)
+- Current schema requirements and accepted list forms
 - Common mistakes
 - Deprecations or new features
 REPORT: Gotchas to avoid, schema requirements
@@ -379,7 +379,7 @@ Agent(
   <task id='1' type='auto'>
     <name>Create plugin.json manifest</name>
     <files>.claude-plugin/plugin.json</files>
-    <action>Create manifest with name, version, description. Do NOT add a skills field — skills under ./skills/ are auto-discovered by Claude Code (Mode A). Add a skills field only when explicitly opting into manual allowlist mode (Mode B).</action>
+    <action>Create manifest with name, version, description. Skills under ./skills/ are auto-discovered. Add a skills field only for custom skill directories; those paths load alongside the default skills/ scan.</action>
     <verify>jq '.name' .claude-plugin/plugin.json returns plugin name</verify>
     <done>Valid plugin.json exists with all required fields</done>
   </task>
@@ -599,14 +599,14 @@ my-plugin/
 | `description`  | string         | No       | Max 1024 chars, include trigger keywords |
 | `author`       | object         | No       | `{name, email?, url?}`                   |
 | `keywords`     | array          | No       | Discovery tags (JSON array)              |
-| `agents`       | array          | No       | Array of individual agent file paths (e.g., `["./agents/reviewer.md"]`). Must be an array — a directory string will fail validation. |
+| `agents`       | string\|array  | No       | Agent file path(s). Declaring the field replaces the default `agents/` scan. |
 | `skills`       | string\|array  | No       | Path(s) to skill directories             |
 | `hooks`        | string\|object | No       | Hook config path or inline               |
 | `mcpServers`   | string\|object | No       | MCP config path or inline                |
 | `lspServers`   | string\|object | No       | LSP config path or inline                |
 | `outputStyles` | string\|array  | No       | Path(s) to output style files            |
 
-**Source**: <https://code.claude.com/docs/en/plugins-reference.md#plugin-manifest-schema>
+**Source**: <https://code.claude.com/docs/en/plugins-reference#component-path-fields> (accessed 2026-09-24)
 
 > The `settings` field (inline `{"agent": "agent-name"}`) activates a plugin agent as the main thread, applying its system prompt and tool restrictions as the default behavior. SOURCE: <https://code.claude.com/docs/en/plugins.md> (accessed 2026-03-07)
 
@@ -621,17 +621,17 @@ allowed-tools: Read, Grep, Glob
 
 | Field                      | Type                   | Default         | Purpose                                    |
 | -------------------------- | ---------------------- | --------------- | ------------------------------------------ |
-| `name`                     | string                 | directory name  | Display name (lowercase, hyphens, max 64)  |
-| `description`              | string                 | first paragraph | When to use; for auto-invocation           |
+| `name`                     | string                 | directory name  | Display name                               |
+| `description`              | string                 | first non-empty markdown line | When to use; for auto-invocation |
 | `argument-hint`            | string                 | none            | Autocomplete hint (e.g., `[issue-number]`) |
-| `allowed-tools`            | comma-separated string | none            | Tools without permission prompts           |
+| `allowed-tools`            | string or YAML list    | none            | Tools without permission prompts           |
 | `model`                    | string                 | default         | Model when skill is active                 |
 | `context`                  | string                 | none            | `fork` for isolated subagent               |
 | `agent`                    | string                 | general-purpose | Subagent type when `context: fork`         |
 | `user-invocable`           | boolean                | true            | `false` hides from `/` menu                |
 | `disable-model-invocation` | boolean                | false           | `true` prevents Claude auto-loading        |
 
-**CRITICAL**: YAML frontmatter fields like `allowed-tools` MUST be comma-separated strings, NOT arrays.
+Claude Code accepts `allowed-tools` as a space- or comma-separated string or YAML list. Portable Agent Skills accepts a string and the reference validator does not canonicalize its whitespace.
 
 **Source**: <https://code.claude.com/docs/en/skills.md>
 

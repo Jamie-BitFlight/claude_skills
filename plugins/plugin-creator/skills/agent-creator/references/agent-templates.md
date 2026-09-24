@@ -138,22 +138,22 @@ These templates follow a structured contract pattern with standardized inputs/ou
 
 | Field         | Type   | Required | Description                                    | Example                                   |
 | ------------- | ------ | -------- | ---------------------------------------------- | ----------------------------------------- |
-| `name`        | string | Yes      | Unique identifier (lowercase, hyphens, max 64) | `python-reviewer`                         |
-| `description` | string | Yes      | Trigger keywords + purpose (max 1024 chars)    | `"Review Python code for quality issues"` |
+| `name`        | string | Yes      | Cannot start with `-` or contain `:`; repository style may be tighter | `python-reviewer` |
+| `description` | string | Yes      | Clear delegation trigger and purpose | `"Review Python code for quality issues"` |
 
 ### Optional Fields
 
 | Field             | Type   | Default     | Valid Values                                               | Description                             |
 | ----------------- | ------ | ----------- | ---------------------------------------------------------- | --------------------------------------- |
-| `model`           | string | `inherit`   | `sonnet`, `opus`, `haiku`, `inherit`                       | Claude model to use                     |
+| `model`           | string | `inherit`   | `sonnet`, `opus`, `haiku`, `fable`, `inherit`, or full model ID | Claude model to use                     |
 | `tools`           | string | (all tools) | Comma-separated: `Read, Grep, Glob, Bash, Edit, Write`. MCP tools: exact registered name, case-sensitive; `mcp__<server>__*` or `mcp__<server>` grants that server's whole tool set. An entry matching no live tool is dropped; an agent whose entries all resolve to nothing refuses to launch. | Tools available to agent |
 | `disallowedTools` | string | (none)      | Comma-separated tool names                                 | Tools explicitly forbidden              |
-| `permissionMode`  | string | (inherit)   | `dontAsk`, `plan`, `acceptEdits`, `acceptAll`              | Permission behavior                     |
+| `permissionMode`  | string | (inherit)   | `default`, `acceptEdits`, `auto`, `dontAsk`, `bypassPermissions`, `plan`, `manual` | Permission behavior; ignored for plugin agents |
 | `skills`          | string | (none)      | Comma-separated skill names                                | Skills to load                          |
-| `color`           | string | (none)      | `cyan`, `yellow`, `orange`, `green`, `red`                 | Visual distinction in UI                |
-| `hooks`           | N/A    | N/A         | **NOT VALID IN AGENT FRONTMATTER** (use plugin hooks.json) | Hooks are plugin-level, not agent-level |
+| `color`           | string | (none)      | `red`, `blue`, `green`, `yellow`, `purple`, `orange`, `pink`, `cyan` | Visual distinction in UI |
+| `hooks`           | object | (none)      | Agent lifecycle hook configuration | Valid for project/user agents; ignored for plugin agents |
 
-**CRITICAL**: The `hooks` field is NOT valid in agent frontmatter. Hooks are configured at the plugin or project level in `hooks/hooks.json` or `.claude-plugin/plugin.json`.
+Agent frontmatter may define lifecycle hooks. Plugin-shipped agents ignore this field; use plugin hooks when the behavior must ship in a plugin.
 
 **SOURCE**: Lines 171-184 of [./claude-plugins-reference-2026/SKILL.md](../../claude-plugins-reference-2026/SKILL.md)
 

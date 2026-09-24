@@ -1,7 +1,7 @@
 # E1: allowed-tools Frontmatter Field Behavior
 
 **Date**: 2026-02-14
-**Status**: Partial — inline and forked context tested, pre-approval untested
+**Status**: Partial — inline and `context: fork` skill-subagent execution tested, pre-approval untested
 
 ## Question
 
@@ -130,13 +130,13 @@ Modified `.claude/skills/test-allowed-tools/SKILL.md` to add `context: fork` and
 
 ```yaml
 ---
-description: 'Test skill to verify allowed-tools behavior in forked context. Invoke with /test-allowed-tools to run the test.'
+description: 'Test skill to verify allowed-tools behavior in a context: fork skill subagent. Invoke with /test-allowed-tools to run the test.'
 allowed-tools: Read
 disable-model-invocation: true
 context: fork
 ---
 
-# Test: allowed-tools behavior (forked context)
+# Test: allowed-tools behavior (`context: fork` skill subagent)
 
 This skill has `allowed-tools: Read` and `context: fork` set. Test what happens:
 
@@ -156,13 +156,13 @@ Report which tools succeeded and which were blocked or unavailable. For each too
 1. Write the file above to `.claude/skills/test-allowed-tools/SKILL.md`
 2. Start a Claude Code session in the repo root
 3. Type `/test-allowed-tools .prettierrc` to invoke the skill
-4. The skill runs in a forked subagent context due to `context: fork`
+4. The skill runs in a fresh skill subagent due to `context: fork`
 5. Observe which of the four tool calls (Read, Grep, Glob, Bash) succeed or fail
 6. Record the session's permission mode
 
 ### Execution
 
-Invoked `/test-allowed-tools .prettierrc`. The skill ran in a forked subagent. Four tool calls were issued:
+Invoked `/test-allowed-tools .prettierrc`. The skill ran in a fresh `context: fork` subagent. Four tool calls were issued:
 
 1. `Read` — `.claude/skills/test-allowed-tools/SKILL.md`
 2. `Grep` — pattern `allowed-tools` in `.claude/skills/test-allowed-tools/SKILL.md`
@@ -180,7 +180,7 @@ Invoked `/test-allowed-tools .prettierrc`. The skill ran in a forked subagent. F
 
 ### Observation
 
-All four tools executed without error in a forked subagent context. The `allowed-tools: Read` field did NOT prevent Grep, Glob, or Bash from being used. This matches the inline context results from the previous two experiments.
+All four tools executed without error in the fresh skill subagent. The `allowed-tools: Read` field did NOT prevent Grep, Glob, or Bash from being used. This matches the inline context results from the previous two experiments.
 
 ### Permission Mode
 
@@ -211,7 +211,7 @@ The skill-creator SKILL.md describes `allowed-tools` as:
 
 > "Tools Claude can use without asking permission when this skill is active (comma-separated)."
 
-This description matches documentation claim 1 and 3 but omits claim 2 (restriction). The observed runtime behavior in both inline and forked contexts showed no restriction effect across three test runs.
+This description matches documentation claim 1 and 3 but omits claim 2 (restriction). The observed runtime behavior in both inline and `context: fork` skill-subagent execution showed no restriction effect across three test runs.
 
 The skill-creator guided the creation of `/find-cause` with `allowed-tools: Read, Grep, Glob, Bash, AskUserQuestion` — a field that was applied without understanding its runtime effect. The field was subsequently removed.
 
