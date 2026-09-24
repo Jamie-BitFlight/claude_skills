@@ -28,6 +28,9 @@ description: "Start a Git rebase when the user explicitly requests replay of a n
 **Keywords**: rebase, git rebase, history replay, rebase conflict, continue rebase, abort rebase, git worktree, rewritten history, authorized force-with-lease publication
 ```
 
+Keep the description on one line because Claude Code displays multiline YAML descriptions
+incorrectly in menus and skill catalogues. Multiline descriptions still load and activate.
+
 The required frontmatter and local keyword entry are discovery material outside the Mermaid process-line
 budget. `**Keywords**:` is a local Markdown grep/search convention, not Agent Skills metadata or a
 universal skill requirement; automatic activation still depends on `description`. The body contains
