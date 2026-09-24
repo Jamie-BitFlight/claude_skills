@@ -115,7 +115,10 @@ class WorkItemDecisionContext:
                     ),
                     None,
                 )
-        pending = find_item(self._pending(), f"#{exact}" if exact is not None else selector)
+        pending_selector = (
+            provider.reference if provider is not None else f"#{exact}" if exact is not None else selector
+        )
+        pending = find_item(self._pending(), pending_selector)
         return DecisionTarget(
             provider=provider, pending=pending, mutation_base=pending or provider, provider_snapshot=snapshot
         )
@@ -164,7 +167,15 @@ class WorkItemDecisionContext:
 
     def _cached_items(self) -> CommandWorkItems:
         if self._cached is None:
-            self._cached = CommandWorkItems(provider_items=self.backend.list_work_items(), from_cache=True)
+            pending_identities = {
+                identity for item in self._pending() for identity in (item.reference, item.issue) if identity
+            }
+            provider_items = [
+                item
+                for item in self.backend.list_work_items()
+                if not pending_identities.intersection((item.reference, item.issue))
+            ]
+            self._cached = CommandWorkItems(provider_items=provider_items, from_cache=True)
         return self._cached
 
     def _from_snapshot(self, snapshot: ProviderSnapshot) -> CommandWorkItems:
