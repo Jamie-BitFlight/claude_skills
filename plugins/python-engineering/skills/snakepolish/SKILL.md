@@ -1,226 +1,29 @@
 ---
 name: snakepolish
-description: Executes the implementation phase of the python-engineering stinkysnake modernization workflow. Use when stinkysnake phases 1-8 are complete — modernization plan reviewed, interfaces designed, and failing tests written. Implements functions in dependency order (types, data structures, utilities, core logic, integration, entry points) applying modern Python patterns (Protocol, dataclass, Pydantic, modern type annotations, httpx, orjson). Runs iterative pytest loops until all tests pass, then verifies with static analysis via prek or ruff. Success criteria — all tests pass, no type errors, no lint errors, coverage meets project threshold.
-argument-hint: '[file-paths-or-module]'
-context: fork
-agent: python-cli-architect
+description: Use when independently assessing how bounded Python code could accomplish the same behavior with less maintained code, more Pythonic design, newer language/stdlib capabilities, or well-maintained ecosystem libraries.
+argument-hint: '[file-paths-or-review-scope] [optional target Python floor]'
 user-invocable: true
 ---
 
-<file_paths>$ARGUMENTS</file_paths>
+# SnakePolish — Python Modernization Assessor
 
-# Snake Polish — Implementation Phase
+Read-only specialist. Look forward from current behavior; do not implement changes. Load `python-engineering:python3-core`. Preserve repository contracts and the authoritative Python floor unless the caller explicitly supplies a proposed target floor.
 
-Execute the implementation plan from `/python-engineering:stinkysnake`. Implement functions following the modernization plan, run tests iteratively until all pass.
+For the bounded scope ask:
 
-## Arguments
+- What are we implementing by hand that the modern stdlib or a mature maintained Python library can own?
+- What local code/process would disappear?
+- What compatibility/backport/scaffolding becomes unnecessary at the current or proposed Python floor?
+- What can newer Python language, typing, stdlib, packaging, async/concurrency, or data-model capabilities make smaller or clearer?
+- Which modules/functions/processes can be removed or combined without losing cohesion or contracts?
+- Where is the design un-Pythonic or carrying unnecessary ceremony?
+- Which dependencies are redundant because Python itself now provides the capability?
+- Which mechanisms should remain local because a dependency would cost more than it removes?
 
-<file_paths/>
+For ecosystem substitutions, verify current maintenance, supported Python versions, capability, and migration risk from primary sources. Prefer deletion of maintained code over novelty; do not recommend a dependency merely because one exists.
 
-## Prerequisites
+For a proposed newer Python floor, separate improvements available now, improvements unlocked by the proposed floor, and compatibility/contracts lost by adopting it.
 
-Before invoking this skill, ensure:
+For each candidate return: title, repository/external evidence, current burden, proposed state, deletion/reduction, trade-off, protected behavior, affected surface, verification path, and readiness (ACTIONABLE | EXPERIMENT | HYPOTHESIS).
 
-1. `/python-engineering:stinkysnake` phases 1-8 completed
-2. Modernization plan reviewed and refined
-3. Interfaces designed and documented
-4. Failing tests written by `python-engineering:python-pytest-architect`
-
-## Instructions
-
-### Step 1: Load Context
-
-Read the stinkysnake plan artifacts:
-
-```text
-ARTIFACTS TO LOAD:
-- [ ] Modernization plan (Phase 3 output)
-- [ ] Plan review feedback (Phase 4-5 output)
-- [ ] Interface definitions (Phase 7 output)
-- [ ] Failing test files (Phase 8 output)
-```
-
-### Step 2: Verify Test Baseline
-
-Run tests to confirm failing state:
-
-```bash
-uv run pytest <file_paths/> -v --tb=short 2>&1 | head -100
-```
-
-**Expected**: Tests fail because implementations don't exist yet.
-
-**If tests pass**: Stop. Implementation already complete or tests are not testing the right things.
-
-### Step 3: Implementation Order
-
-Follow this implementation sequence:
-
-```text
-IMPLEMENTATION ORDER:
-1. Type definitions (TypeAlias, TypedDict, Protocol)
-2. Data structures (dataclass, Pydantic models)
-3. Utility functions (pure functions, no side effects)
-4. Core business logic
-5. Integration points (API clients, file I/O)
-6. Entry points (CLI commands, handlers)
-```
-
-### Step 4: Implement Following Plan
-
-For each planned change:
-
-```text
-FOR EACH IMPLEMENTATION ITEM:
-1. Read the interface/protocol definition
-2. Read the failing test(s) for this component
-3. Implement the function/class
-4. Run targeted tests: uv run pytest -k "test_name" -v
-5. If fails: debug and fix
-6. If passes: move to next item
-```
-
-### Step 5: Modern Python Patterns
-
-Apply these patterns during implementation:
-
-#### Type Annotations
-
-```python
-# Use modern union syntax
-def process(data: str | None) -> dict[str, Any]: ...
-
-
-# Use TypeGuard for narrowing
-def is_valid_user(obj: object) -> TypeGuard[User]:
-    return isinstance(obj, dict) and "id" in obj
-```
-
-#### Protocol-Based Design
-
-```python
-from typing import Protocol
-
-
-class Serializable(Protocol):
-    def to_dict(self) -> dict[str, Any]: ...
-
-
-def save(item: Serializable) -> None:
-    data = item.to_dict()
-    ...
-```
-
-#### Dataclass Patterns
-
-```python
-from dataclasses import dataclass, field
-
-
-@dataclass(slots=True, frozen=True)
-class Config:
-    name: str
-    options: list[str] = field(default_factory=list)
-```
-
-#### Pydantic for Validation
-
-```python
-from pydantic import BaseModel, Field
-
-
-class APIResponse(BaseModel):
-    status: int = Field(ge=100, le=599)
-    data: dict[str, Any]
-
-    model_config = {"strict": True}
-```
-
-#### Modern Libraries
-
-```python
-# httpx for async HTTP
-async with httpx.AsyncClient() as client:
-    response = await client.get(url)
-
-# orjson for fast JSON
-data = orjson.loads(response.content)
-output = orjson.dumps(result, option=orjson.OPT_INDENT_2)
-
-# tomlkit for TOML with comments preserved
-doc = tomlkit.parse(content)
-doc["section"]["key"] = value
-```
-
-### Step 6: Iterative Test Loop
-
-After each implementation batch:
-
-```bash
-# Run full test suite
-uv run pytest <file_paths/> -v --tb=short
-
-# If failures remain, focus on failing tests
-uv run pytest <file_paths/> -v --tb=long -x  # Stop on first failure
-```
-
-### Step 7: Static Analysis Verification
-
-Before completion, verify code quality:
-
-```bash
-uv run prek run --files $ARGUMENTS
-# Fallback when no .pre-commit-config.yaml:
-# uv run ruff check $ARGUMENTS
-```
-
-Fix any issues that arise.
-
-### Step 8: Final Test Run
-
-Confirm all tests pass:
-
-```bash
-uv run pytest <file_paths/> -v --cov --cov-report=term-missing
-```
-
-**Success Criteria**:
-
-- All tests pass
-- No type errors
-- No lint errors
-- Coverage meets project threshold (typically 80%+)
-
-## Completion
-
-When all tests pass and static analysis is clean:
-
-1. Report implementation summary
-2. List any deferred items or technical debt
-3. Reference documentation updates needed (from Phase 6)
-
-## Error Handling
-
-### Test Failures That Indicate Test Bugs
-
-If a test failure appears to be a test bug rather than implementation bug:
-
-1. Document the suspected test issue
-2. Check the test against the interface specification
-3. If test is wrong: fix the test, document the fix
-4. If unclear: flag for review, continue with other implementations
-
-### Blocked Implementations
-
-If an implementation is blocked:
-
-1. Document the blocker
-2. Check if it's a dependency ordering issue
-3. If external dependency: note and continue with independent items
-4. If architectural issue: flag for plan revision
-
-## References
-
-- `../stinkysnake/SKILL.md` - Parent workflow
-- `../../agents/python-cli-architect.md` - Implementation agent
-- `../python3-core/SKILL.md` - Modern Python patterns
+Do not edit, stage, commit, or invoke implementation workflows. The caller owns synthesis and action.
