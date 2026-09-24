@@ -15,34 +15,28 @@ You are about to process a set of files. Select --analyze, --improve, or --repre
 
 If there is no <path> value, then stop, and say: /woo-sailor <file-or-directory> [--dry-run|--report]
 
-The following diagram is the authoritative procedure for argument handling and execution routing. Execute steps in the exact order shown, including branches, decision points, and stop conditions.
-
-Eligible file patterns for directory mode: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`. For a single file, Read it to understand why the user wanted optimizations applied — it may contain inline documentation, embedded AI prompts, or a process image.
+The following diagram is the authoritative routing procedure. Eligible directory files: `**/SKILL.md`, `**/CLAUDE.md`, `**/AGENT.md`, `**/agents/*.md`, `**/rules/*.md`.
 
 ```mermaid
 flowchart TD
-    Start(["Path available"]) --> Q1{"Glob pattern '<path>{/*,*}'<br>— any results?"}
-    Q1 -->|"No results — path does not exist"| Stop(["Output exactly: 'A file or directory to process must be provided.'<br>Stop."])
-    Q1 -->|"One result equal to <path> — single file"| Q2File{"Is DRY_RUN true?"}
-    Q1 -->|"Results are children of <path> — directory"| Q2Dir{"Is DRY_RUN true?"}
-    Q2File -->|"Yes"| DryFile["Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Read-only mode. Report every section you would<br>optimize and how. Make NO edits. Target file: <path>')"]
-    Q2File -->|"No"| LiveFile["Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Optimize all processes in this file in-place.<br>Target file: <path>')"]
-    Q2Dir -->|"Yes"| DryFilter["Glob <path> using eligible patterns:<br>SKILL.md, CLAUDE.md, AGENT.md, agents/*.md, rules/*.md"]
-    Q2Dir -->|"No"| LiveFilter["Glob <path> using eligible patterns:<br>SKILL.md, CLAUDE.md, AGENT.md, agents/*.md, rules/*.md"]
-    DryFilter --> DryDir["For each eligible file:<br>Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Read-only mode. Report every section you would<br>optimize and how. Make NO edits. Target file: {file path}')"]
-    LiveFilter --> LiveDir["For each eligible file:<br>Spawn Agent(subagent_type='process-siren:process-siren',<br>prompt='Optimize all processes in this file in-place.<br>Target file: {file path}')"]
-    DryFile --> QBlockedFile{"Agent returned BLOCKED?"}
-    LiveFile --> QBlockedFile
-    DryDir --> QBlockedDir{"Any agent returned BLOCKED?"}
-    LiveDir --> QBlockedDir
-    QBlockedFile -->|"Yes"| RelayFile["Surface blocking message and file path to user. Stop."]
-    QBlockedFile -->|"No"| Report(["Return report"])
-    QBlockedDir -->|"Yes — per blocked file"| RelayDir["Surface blocking message and file path to user.<br>Skip that file; continue others."]
-    QBlockedDir -->|"No"| Done(["All eligible files processed"])
-    RelayDir --> Done
+    Start(["Path and arguments received"]) --> Exists{"Does path exist?"}
+    Exists -->|"No"| Stop(["Report missing path and stop"])
+    Exists -->|"Yes"| Mode{"Requested mode?"}
+    Mode -->|"--analyze, --dry-run, or --report"| Analyze["Mode = ANALYZE; no process mutation"]
+    Mode -->|"--represent"| Represent["Mode = REPRESENT; preserve process semantics"]
+    Mode -->|"--improve or no mode"| Improve["Mode = IMPROVE; apply intent-preserving changes"]
+    Analyze --> Scope{"Single file or directory?"}
+    Represent --> Scope
+    Improve --> Scope
+    Scope -->|"Single file"| One["Run process-siren once with selected mode and target file"]
+    Scope -->|"Directory"| Discover["Discover eligible files"]
+    Discover --> PerFile["Run process-siren for each eligible file with selected mode"]
+    PerFile --> Synthesize["Synthesize ProcessModels across material boundaries"]
+    Synthesize --> Cross["Detect cross-file contract, invariant, assumption, ownership, and recovery gaps"]
+    Cross --> Revalidate["Revalidate claims affected by cross-file findings or changes"]
+    One --> Result["Return target result with evidence, status, blockers, and changes"]
+    Revalidate --> Result
 ```
 
+A blocked file does not stop unrelated files. Preserve its `BLOCKED_INTENT`, `UNVALIDATED`, or `INVALID` status and continue eligible independent work. In IMPROVE mode, do not finalize cross-file changes until synthesis and affected-claim revalidation complete.
 
-## Cross-file synthesis
-
-For directory mode, synthesize relevant ProcessModels across boundaries before finalizing changes. Detect caller/callee contradictions, conflicting invariants or assumptions, and ownership/recovery gaps. Revalidate claims affected by cross-file changes. Successful per-file analysis does not establish that the composed system is coherent.
