@@ -40,6 +40,8 @@ Design/Architecture steps dispatch `python-cli-design-spec`, which writes its sp
 
 **When to use**: Building new features, fixing bugs with test coverage
 
+The adversarial solution-design stage is mandatory before implementation. Its investigation depth is fixed: it independently traces callers, consumers, tests, documentation, configuration, generated artifacts, manifests, and public contracts. Its prescription depth is adaptive: genuinely local changes need little design ceremony; architectural or high-consequence changes require explicit alternatives, invariants/failure modes, and stronger validation.
+
 Prose above the diagram carries detail that would clutter the nodes. Before delegating the Design step, verify whether the user has existing architecture docs — if yes, pass those paths instead of creating new architecture.
 
 Before the Implement step, check whether the deployment environment is restricted (no internet, no uv). If yes, use `python-engineering:python3-stdlib-only` instead of `python-engineering:python-cli-architect`.
@@ -54,7 +56,7 @@ flowchart TD
     S2["2. Write Tests<br>subagent_type=python-engineering:python-pytest-architect<br>Context: architecture design file path<br>Output: tests/ directory with failing test suite"]
     S3{"3. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: tests/ path, load python-engineering:typer-and-rich for python-cli-demo.py<br>Output: implementation that makes all tests pass"}
     S4["4. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: implementation file paths, tests/ path<br>Output: review findings with file:line references, improvement suggestions"]
-    S5["5. Validate<br>Run: /python-engineering:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify >80% coverage)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
+    S5["5. Validate<br>Run: /python-engineering:shebangpython on each script<br>Run: Activate holistic-linting skill<br>Run: uv run pytest (verify changed behavior and configured project coverage gate)<br>Check: CI config for additional validators<br>Pass criteria: all tests green, linting clean, coverage threshold met"]
     S1Q{"Display, output, or<br>interaction code in scope?"}
     S1B["1.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
     S1 -->|"Output: interfaces, layout, CLI command tree"| S1Q
@@ -92,14 +94,14 @@ User: "Build a CLI tool to process CSV files with progress bars"
 5. Validate
    /python-engineering:shebangpython packages/csv_processor.py
    Activate holistic-linting skill on packages/ tests/
-   uv run pytest — verify all pass, coverage >80%
+   uv run pytest — verify all pass, coverage configured project coverage gate
 </example>
 
 ### 2. Feature Addition Workflow
 
 **When to use**: Adding new functionality to existing codebase
 
-Before delegating Requirements Gathering, read `git log --oneline -10` and pass the codebase path to the spec-analyst — do not summarize the codebase yourself.
+Before delegating Requirements Gathering, read `git log --oneline -10`. If an external `spec-analyst` capability is available, pass it the codebase path and user request verbatim. Otherwise gather the same acceptance criteria through this workflow's discovery step; absence of the preferred specialist is not itself a blocker.
 
 ```mermaid
 flowchart TD
@@ -108,7 +110,7 @@ flowchart TD
     S4{"4. Implement<br>Default: python-engineering:python-cli-architect<br>Restricted env only: python-engineering:python3-stdlib-only<br>Context: architecture spec path, relevant existing file paths<br>Output: new feature implementation in packages/, broken into an ordered internal task list before writing code"}
     S5["5. Testing<br>subagent_type=python-engineering:python-pytest-architect<br>Context: new implementation paths, existing test patterns path<br>Output: tests for new feature + integration tests in tests/"]
     S6["6. Review<br>subagent_type=python-engineering:code-reviewer<br>Context: changed file paths, requirements doc path<br>Output: quality assessment against acceptance criteria, improvement list"]
-    S7["7. Validate<br>Run: uv run pytest (verify no regressions, >80% coverage)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
+    S7["7. Validate<br>Run: uv run pytest (verify no regressions, changed behavior and configured project coverage gate)<br>Run: Activate holistic-linting skill<br>Run: /python-engineering:modernpython on changed files<br>Pass criteria: all tests green, no regressions, linting clean"]
     S1 -->|"Output: requirements doc, acceptance criteria"| S2
     S2Q{"Display, output, or<br>interaction code in scope?"}
     S2B["2.5 UI Design<br>Skill: python-engineering:designing-ui-for-cli<br>Context: architecture file path, surfaces in scope<br>Output: shape brief (user-confirmed)"]
@@ -391,7 +393,7 @@ Analyzes imports, corrects shebang, adds/removes PEP 723 metadata, sets execute 
 **Every Python development task must pass**:
 
 1. **Code quality**: Activate holistic-linting skill for linting, formatting, and type checking workflows
-2. **Tests**: `uv run pytest` (>80% coverage)
+2. **Tests**: `uv run pytest` (changed behavior and configured project coverage gate)
 3. **Standards**: `/python-engineering:modernpython` for modern patterns
 4. **Script compliance**: `/python-engineering:shebangpython` for standalone scripts
 
