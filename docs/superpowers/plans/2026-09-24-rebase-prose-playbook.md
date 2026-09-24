@@ -24,11 +24,15 @@
 - Exact commands appear only where their syntax enforces a safety property.
 - Every mutation depends only on facts proven from Git or explicitly rebound from the current request/task context.
 - Shared skill content uses skill-relative paths and contains no harness-specific invocation syntax, root-path assumptions, hooks, MCP servers, or worker identifiers.
-- Every invocation-matrix row, validation-table row, and named case must record `PASS`; `UNRUN`, `FAIL`, and `INCONCLUSIVE` block completion.
+- Target `PASS` for every invocation and validation case. Preserve every other result as observed;
+  completion follows the spec's bounded-evidence gate, so only explicitly accepted limitations and
+  disclosed `UNVALIDATED` claims may remain after every permitted high-value and static check runs.
 - Behavioral runners and evidence are disposable under `.tmp/scratch/`; Git execution fixtures live under `/tmp` and receive no repository instructions.
 - The disposable runner has no maintained tests, package, fixture generator, or production use.
 - The orchestrator passes Task 1's absolute evidence and fixture paths to Tasks 2, 4, and 5; shell variables do not cross fresh subagents.
-- Portkey is the evaluation transport; Sol is the default model and every control/treatment case has a matched Luna arm.
+- Portkey is the evaluation transport and Sol is the default model. Comparative control/treatment
+  cases use matched Luna arms; explicitly selected Sol-only high-value probes are bounded evidence,
+  not comparative claims.
 - A wording correction may remain implementation-local; changing an approved semantic contract requires a spec update and user alignment first.
 - Make no turn- or token-saving claim without a matched treatment arm.
 - Preserve `.claude/skills/rebase -> ../../.agents/skills/rebase` unchanged.
@@ -425,7 +429,8 @@ Expected: hooks and focused tests pass; the commit contains no skill implementat
 
 **Interfaces:**
 - Consumes: Task 1's absolute evidence/fixture paths, disposable runner, matched Sol/Luna controls, and Task 2's prose package
-- Produces: an exhaustive disposable `green-matrix.md` in which every invocation and validation case is `PASS`, plus evidence-backed narrow prose corrections when treatment exposed a defect
+- Produces: a complete disposable `green-matrix.md` that preserves each observed status, plus
+  evidence-backed narrow prose corrections when treatment exposed a defect
 
 - [ ] **Step 1: Copy the RED case identities into a separate GREEN ledger**
 
@@ -448,15 +453,22 @@ The ledger must contain one independently adjudicated section for each exact val
 
 Each row expands every case named by the spec; a row cannot inherit another row's result or pass from representative sampling.
 
+Steps 2–8 define the claim inventory and each claim's `PASS` predicate. Execute the
+process-owner-selected high-value cases within the approved model/token budget; mark every case
+without a valid verdict `UNVALIDATED`. Intrinsic Git-fixture assertions do not validate whether an
+agent follows the prose and must not replace those records.
+
 - [ ] **Step 2: Validate all invocation branches**
 
-Run all ten invocation cases from the spec through the disposable OpenCode harness. Each positive case passes only when raw events show automatic `rebase` skill selection for the exact requested lifecycle; each negative case passes only when no such event occurs. A conditional branch passes only when the raw event stream shows the exact routed path among `references/named-stash.md`, `references/history-shape.md`, `references/conflict-and-ambiguity.md`, `references/active-rebase-recovery.md`, and `references/publication.md`. Publication-positive prompts must bind authority and exact destination as part of the start/continue lifecycle, not as a later standalone push.
+Inventory all ten invocation cases from the spec and run the permitted cases through the disposable OpenCode harness. Each positive case passes only when raw events show automatic `rebase` skill selection for the exact requested lifecycle; each negative case passes only when no such event occurs. A conditional branch passes only when the raw event stream shows the exact routed path among `references/named-stash.md`, `references/history-shape.md`, `references/conflict-and-ambiguity.md`, `references/active-rebase-recovery.md`, and `references/publication.md`. Publication-positive prompts must bind authority and exact destination as part of the start/continue lifecycle, not as a later standalone push.
 
-Expected: all ten rows record `PASS`; any other status blocks completion.
+Expected: each executed row records its observed result. A non-passing row blocks unless the
+spec's bounded-evidence gate records it as an explicitly accepted limitation or `UNVALIDATED`
+claim after the approved evidence budget closes.
 
 - [ ] **Step 3: Validate package discovery and exact-ref behavior**
 
-Run every case in these validation rows:
+Inventory every case in these validation rows and execute the permitted high-value cases:
 
 - skill discovery and package shape;
 - named refs are not silently substituted for start, continue, replay, correction, or no-replay publication; and
@@ -478,21 +490,23 @@ Run replay and no-replay publication while a worktree-writing command is active.
 
 For continue, prove only Git-recorded state and require target name, goal, completion predicate, destinations, authority, stash, and worker facts to be rebound or paused. For abort, require only restoration/stash/worker facts. With unrelated stashes present, pass only when the exact lifecycle entry survives conflict and is removed only after conflict-free restoration.
 
-- [ ] **Step 7: Validate every router gate's recovery edge exhaustively**
+- [ ] **Step 7: Inventory every router gate's recovery edge**
 
-Enumerate every final-router guard that has a `Failure or unobservable`, `Other failure or unobservable`, `No or unobservable`, `Ambiguous or unobservable`, `Inconsistent or unobservable`, or equivalent recovery edge. For each guard, inject one command failure and one observation failure unless one injection proves both outcomes are indistinguishable at that gate. Pass only when every trace stops coordinator mutations, preserves active rebase/conflicts/bound stash, records every stopped-state field, and cannot reach a completion terminal.
+Enumerate every final-router guard that has a `Failure or unobservable`, `Other failure or unobservable`, `No or unobservable`, `Ambiguous or unobservable`, `Inconsistent or unobservable`, or equivalent recovery edge. Within the approved evidence budget, inject one command failure and one observation failure unless one injection proves both outcomes are indistinguishable at that gate. A tested gate passes only when every trace stops coordinator mutations, preserves active rebase/conflicts/bound stash, records every stopped-state field, and cannot reach a completion terminal; every untested gate remains `UNVALIDATED`.
 
 - [ ] **Step 8: Validate conflict intent and proportional reorientation**
 
 Run non-leading replay, restoration, and remote-integration conflicts where compatible intents overlap; also run incompatible/multiple-semantic-class cases. Run both direct file overlap and indirect producer/consumer change. Pass only when compatible intents survive and affected checks pass, while incompatible alternatives pause with evidence before worker resumption.
 
-- [ ] **Step 9: Apply only evidence-supported corrections and rerun the complete matrix**
+- [ ] **Step 9: Apply only evidence-supported corrections and update the complete matrix**
 
-When a treatment fails, identify the authoritative node/reference and classify the correction before editing. Ordinary wording that preserves the approved invocation contract, router, predicates, terminals, package boundary, reference ownership/load conditions, invariants, and authority semantics may change implementation-local prose. A change to any of those approved semantics stops implementation: update the design spec, obtain user alignment, commit the aligned spec, then restore the exact-source comparison before changing the skill. Make only the smallest evidence-supported correction, rerun its matched Sol/Luna control and treatment arms, then rerun the entire matrix. Do not add a rule for syntactic variation or a no-op. Do not add scripts, persistent state, or evaluation artifacts.
+When a treatment fails, identify the authoritative node/reference and classify the correction before editing. Ordinary wording that preserves the approved invocation contract, router, predicates, terminals, package boundary, reference ownership/load conditions, invariants, and authority semantics may change implementation-local prose. A change to any of those approved semantics stops implementation: update the design spec, obtain user alignment, commit the aligned spec, then restore the exact-source comparison before changing the skill. Make only the smallest evidence-supported correction. Rerun matched Sol/Luna arms and the matrix only while the approved evidence budget remains; when the budget closes, preserve affected rows as observed and apply the bounded-evidence gate. Do not add a rule for syntactic variation or a no-op. Do not add scripts, persistent state, or evaluation artifacts.
 
 After every correction, rerun Task 2's `diff -u` against the current approved spec. Any nonzero diff blocks completion.
 
-Expected: every row and every named case is `PASS`; zero `UNRUN`, `FAIL`, and `INCONCLUSIVE` entries remain.
+Expected: every permitted high-value and static check has a truthful record. `PASS` remains the
+target; explicitly accepted limitations and `UNVALIDATED` claims retain those labels and no
+unapproved non-passing result remains.
 
 - [ ] **Step 10: Commit any evidence-backed prose correction as a file-scoped unit**
 
@@ -525,7 +539,8 @@ If user-aligned semantic evidence changed the spec, commit that spec alone befor
 - Modify conditionally: `harness_compatibility.json`
 
 **Interfaces:**
-- Consumes: all implementation commits and exhaustive GREEN evidence
+- Consumes: all implementation commits, the complete GREEN ledger, and explicit bounded-evidence
+  rulings
 - Produces: independent standards/spec findings with file/line evidence; accepted corrections; final static, package, behavioral, Mermaid, and cross-harness verification output
 
 - [ ] **Step 1: Run a writing-for-agents audit with no prior conclusions supplied**
@@ -538,7 +553,7 @@ Give a second fresh reviewer the spec, repository instructions, commit range, an
 
 - [ ] **Step 3: Resolve findings through evidence, not deference**
 
-For each finding, reproduce the cited problem or compare it directly to the approved design. Ordinary wording that preserves approved semantics may change only in its authoritative implementation file. A proposed change to the invocation contract, router, predicate, terminal, package boundary, reference ownership/load condition, invariant, or authority semantics stops implementation until the design spec is updated and the user aligns with the change; commit the aligned spec before implementation. After any correction, rerun the affected matched Sol/Luna RED/GREEN arms, the complete GREEN matrix, and Task 2's exact-source comparison. Reject contradictory suggestions with quoted spec evidence in the review report.
+For each finding, reproduce the cited problem or compare it directly to the approved design. Ordinary wording that preserves approved semantics may change only in its authoritative implementation file. A proposed change to the invocation contract, router, predicate, terminal, package boundary, reference ownership/load condition, invariant, or authority semantics stops implementation until the design spec is updated and the user aligns with the change; commit the aligned spec before implementation. After any correction, rerun affected matched Sol/Luna RED/GREEN arms only while the approved evidence budget remains, update the complete GREEN ledger without relabeling non-passing evidence, and rerun Task 2's exact-source comparison. Reject contradictory suggestions with quoted spec evidence in the review report.
 
 - [ ] **Step 4: Re-run all static and package validators**
 
@@ -570,9 +585,12 @@ for harness in claude codex opencode hermes kimi cursor-agent; do
 done
 ```
 
-For each installed harness, use its measured non-interactive invocation and a 120-second bounded read-only run. Ask this exact graph question: follow the `Start` path where binding succeeds, the ordinary ancestry-only relation is true, and every result/publication destination already matches; report that terminal node label and the literal reference path on the `Publish` → `Yes` node. Run no Git mutation. Record binary path, version, exact command, exit status, raw response, and the validator-computed package SHA under `$REBASE_EVIDENCE_DIR/cross-harness/`.
+While the approved model-call budget remains, use each installed harness's measured non-interactive invocation and a 120-second bounded read-only run. Ask this exact graph question: follow the `Start` path where binding succeeds, the ordinary ancestry-only relation is true, and every result/publication destination already matches; report that terminal node label and the literal reference path on the `Publish` → `Yes` node. Run no Git mutation. Record binary path, version, exact command, exit status, raw response, and the validator-computed package SHA under `$REBASE_EVIDENCE_DIR/cross-harness/`. When the budget is closed, run only discovery and static portability checks and record live consumer behavior as `UNVALIDATED`.
 
-Expected: every installed harness reports terminal `No change` and path `references/publication.md`; every record names the same package SHA later bound as `$FINAL_PACKAGE_SHA`. An absent harness binary is recorded as unavailable rather than claimed as live-tested; its measured discovery root and static package compatibility must still pass.
+Expected: every permitted live run reports terminal `No change` and path
+`references/publication.md`, and names the package SHA later bound as `$FINAL_PACKAGE_SHA`.
+Budget-excluded and absent harnesses are recorded as `UNVALIDATED` or unavailable rather than
+claimed as live-tested; measured discovery roots and static package compatibility must still pass.
 
 Run the static portability guard:
 
@@ -597,9 +615,16 @@ PY
 printf '%s\n' "$FINAL_PACKAGE_SHA"
 ```
 
-Run the documented real read-only Codex activation probe and its matrix-generation command against the installed repo-scoped skill. Regenerate, never hand-edit, `tests/fixtures/rebase-codex-consumer-evidence.json` and `tests/fixtures/codex-skill-activation-matrix.jsonl`. Require the rebase row to be `PASSED`, resolve installed `SKILL.md` and `references/publication.md`, contain no `rebase_plan.py`, and report both `source_tree_sha256` and `installed_tree_sha256` equal to `$FINAL_PACKAGE_SHA`.
+When the approved model-call budget remains, run the documented real read-only Codex activation
+probe and its matrix-generation command against the installed repo-scoped skill. Regenerate, never
+hand-edit, `tests/fixtures/rebase-codex-consumer-evidence.json` and
+`tests/fixtures/codex-skill-activation-matrix.jsonl`. Require the rebase row to be `PASSED`, resolve
+installed `SKILL.md` and `references/publication.md`, contain no `rebase_plan.py`, and report both
+`source_tree_sha256` and `installed_tree_sha256` equal to `$FINAL_PACKAGE_SHA`. When the budget is
+closed, preserve the stale evidence, report its bound SHA and schema truthfully, and do not claim it
+validates the final package.
 
-Run `uv run --script scripts/generate_harness_compatibility.py --check`; if objective data changed, regenerate it, rerun `--check`, and stage `harness_compatibility.json`. Any later change beneath `.agents/skills/rebase/` invalidates this step and requires fresh subagent reviews, the complete GREEN matrix, and regeneration against the new package SHA.
+Run `uv run --script scripts/generate_harness_compatibility.py --check`; if objective data changed, regenerate it, rerun `--check`, and stage `harness_compatibility.json`. Any later change beneath `.agents/skills/rebase/` invalidates this step and requires fresh subagent reviews, a refreshed GREEN ledger, and final-SHA evidence only when the approved budget permits it.
 
 - [ ] **Step 8: Run the full repository pre-commit suite against the changed files**
 
@@ -622,13 +647,18 @@ git diff --cached --check
 git commit -m "fix(rebase): address independent review"
 ```
 
-Expected: hooks pass and generated evidence binds the committed final package SHA. If review changed no implementation, commit only regenerated evidence whose content changed; do not create an empty commit. End the Task 5 reviewers and report their explicit completion status.
+Expected: hooks pass. Generated evidence, when permitted, binds the committed final package SHA;
+otherwise the report names stale hashes and final-package consumer behavior as `UNVALIDATED`. If
+review changed no implementation, commit only regenerated evidence whose content changed; do not
+create an empty commit. End the Task 5 reviewers and report their explicit completion status.
 
 - [ ] **Step 10: Review the exact final HEAD without further writes**
 
-After all Task 5 commits, bind `FINAL_REVIEW_HEAD="$(git rev-parse HEAD)"`. Dispatch fresh Standards and Spec reviewers against that exact commit, the approved spec, complete GREEN matrix, and generated activation evidence. Each reviewer records the commit SHA and package SHA and must explicitly pass. A finding returns to Step 3; after correction, repeat the matrix, evidence generation, commit, and both final reviews. No later skill or evidence change may inherit an earlier review.
+After all Task 5 commits, bind `FINAL_REVIEW_HEAD="$(git rev-parse HEAD)"`. Dispatch fresh Standards and Spec reviewers against that exact commit, the approved spec, complete GREEN ledger, and available activation evidence. Each reviewer records the commit SHA and package SHA and must explicitly pass, using `PASS WITH CONCERNS` when an accepted limitation or `UNVALIDATED` claim remains. A finding returns to Step 3; after correction, update permitted evidence, commit, and repeat both final reviews. No later skill or evidence change may inherit an earlier review.
 
-Expected: both required subagent reviews explicitly pass the same `FINAL_REVIEW_HEAD` and its package/evidence SHA without changing files.
+Expected: both required subagent reviews explicitly record `PASS` or `PASS WITH CONCERNS` for the
+same `FINAL_REVIEW_HEAD` and package SHA without changing files. Concerns name every accepted
+limitation, `UNVALIDATED` claim, and stale evidence SHA.
 
 ---
 
@@ -640,7 +670,7 @@ Expected: both required subagent reviews explicitly pass the same `FINAL_REVIEW_
 - Read: the repository `receiving-pr-reviews` skill and its conditional references
 
 **Interfaces:**
-- Consumes: reviewed commits, passing exhaustive matrix, and final validation output
+- Consumes: reviewed commits, the complete bounded-evidence ledger, and final validation output
 - Produces: one pushed branch, one squash-merged PR, addressed reviewer feedback, and verified target-branch terminal state
 
 - [ ] **Step 1: Verify the branch is clean and commits are file-scoped**
@@ -663,7 +693,7 @@ Expected: push exits zero and the remote branch resolves to local `HEAD`.
 
 - [ ] **Step 3: Create one non-draft PR**
 
-Use `/pr` to write a concise body that explains the runtime removal, always-visible Mermaid router, five conditional references, script-free cross-harness activation probe, and exhaustive behavioral/static validation. Create the PR against `main`, then verify `draft: false`.
+Use `/pr` to write a concise body that explains the runtime removal, always-visible Mermaid router, five conditional references, script-free cross-harness activation probe, complete static validation, bounded behavioral evidence, accepted Sol limitation, and five `UNVALIDATED` scenarios. Create the PR against `main`, then verify `draft: false`.
 
 Expected: PR URL exists, head SHA equals local `HEAD`, and the PR is ready for review.
 
@@ -679,7 +709,7 @@ When review arrives, use the receiving-review summary to identify only unresolve
 
 - [ ] **Step 6: Address valid review findings and revalidate proportionally**
 
-Apply valid systemic corrections in their authoritative file, rerun the affected matched behavioral case, the complete GREEN matrix, package validators, Mermaid render, focused activation tests, and changed-file hooks. Commit with a file-scoped Conventional Commit and push normally. Reply with evidence; explain technically unsupported requests without making performative edits.
+Apply valid systemic corrections in their authoritative file; rerun affected matched behavioral evidence only while the approved budget remains, then update the GREEN ledger without relabeling unknowns. Always rerun package validators, Mermaid render, focused activation tests, and changed-file hooks. Commit with a file-scoped Conventional Commit and push normally. Reply with evidence; explain technically unsupported requests without making performative edits.
 
 Any accepted skill-package correction loops back through Task 5's independent subagent reviews and final-package activation-evidence generation before the next push. An accepted semantic-contract correction also requires the spec update and user alignment gate. Continue the background watch until unresolved actionable comments and questions are zero.
 
@@ -700,7 +730,7 @@ test "$(gh pr view "$PR_NUMBER" --json mergeable --jq .mergeable)" = MERGEABLE
 gh pr checks "$PR_NUMBER" --required
 ```
 
-Re-run the review summary after the fetch. Merge authority is usable only when required checks are successful, required subagent reviews explicitly pass the same `$REVIEWED_HEAD`, unresolved actionable feedback is zero, the PR is non-draft and mergeable, and Task 5 evidence hashes equal that head's package SHA. Any head movement stops the merge and repeats review/validation against the new SHA.
+Re-run the review summary after the fetch. Merge authority is usable only when required checks are successful, required subagent reviews explicitly pass or pass with the bounded concerns against the same `$REVIEWED_HEAD`, unresolved actionable feedback is zero, and the PR is non-draft and mergeable. Task 5 evidence hashes must equal that head's package SHA when regeneration was permitted; otherwise the final reviews must name the stale hashes and final-package behavior as `UNVALIDATED`. Any head movement stops the merge and repeats review/validation against the new SHA.
 
 - [ ] **Step 8: Squash-merge and verify terminal PR/base state**
 
