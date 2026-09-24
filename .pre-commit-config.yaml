@@ -178,6 +178,7 @@ repos:
         language: system
         stages: [pre-commit]
         pass_filenames: false
+        always_run: true
         files: ^(harness_compatibility_verification\.json|scripts/generate_harness_compatibility\.py|plugins/)
 
       - id: skilllint
